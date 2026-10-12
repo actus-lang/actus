@@ -17,6 +17,33 @@ pub(super) fn lower_array_element_compound_assignment(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
+    let base_value = provider.lower_expression(collection, instructions)?;
+    if provider.nominal_type(base_value).is_some_and(|ty| ty.name == "Buffer") {
+        let lowered_index = provider.lower_expression(index, instructions)?;
+        let current = super::buffer::lower_buffer_element_from_base(
+            provider,
+            base_value,
+            index,
+            span,
+            instructions,
+        )?;
+        let value = provider.lower_expression(value, instructions)?;
+        let result = provider.lower_integer_binary(
+            compound_operation(operator),
+            current,
+            value,
+            span,
+            instructions,
+        )?;
+        return super::buffer::lower_buffer_element_store(
+            provider,
+            base_value,
+            lowered_index,
+            result,
+            span,
+            instructions,
+        );
+    }
     let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
         lower_array_element_location(provider, collection, index, span, instructions)?;
     let current = provider.allocate();

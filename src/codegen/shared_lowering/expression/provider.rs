@@ -42,6 +42,10 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn set_binding_value(&mut self, name: &str, value: BackendValueId) {
         state::set_binding_value(self, name, value);
     }
+
+    fn binding_value(&self, name: &str) -> Option<BackendValueId> {
+        self.binding_value(name)
+    }
     fn enter_scope(&mut self, _span: SourceSpan) {
         self.locals.push(BTreeMap::new());
     }
@@ -154,13 +158,15 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             self.locals[scope_index].insert(name.to_owned(), value);
             return Ok(());
         }
-        if self.locals.len() == 1 && self.parameters.contains_key(name) {
+        if self.parameters.contains_key(name) {
             self.parameters.insert(name.to_owned(), value);
             return Ok(());
         }
         Err(unsupported(
             span,
-            "scalar assignment requires a local owner in the current lexical scope",
+            format!(
+                "scalar assignment for `{name}` requires a local owner in the current lexical scope"
+            ),
         ))
     }
 

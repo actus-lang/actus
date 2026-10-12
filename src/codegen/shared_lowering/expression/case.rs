@@ -47,14 +47,7 @@ pub(super) fn bind_enum_variant_payload(
     else {
         return Err(unsupported(span, "enum case payload source type"));
     };
-    let layout = provider
-        .value_types
-        .get(&subject)
-        .and_then(|ty| match ty {
-            BackendValueType::Enum { layout } => Some(*layout),
-            _ => None,
-        })
-        .ok_or_else(|| unsupported(span, "enum case subject is not a neutral enum value"))?;
+    let layout = neutral_enum_layout(provider, subject, span)?;
     let result = provider.allocate();
     provider.remember_value(result, payload_type);
     instructions.push(BackendInstruction::EnumPayloadBinding {
@@ -70,4 +63,26 @@ pub(super) fn bind_enum_variant_payload(
         span,
     });
     provider.bind_owner(binding, result, None, span, instructions)
+}
+
+fn neutral_enum_layout(
+    provider: &SharedExpressionProvider<'_>,
+    subject: BackendValueId,
+    span: SourceSpan,
+) -> Result<super::super::super::BackendEnumLayout, BackendContractError> {
+    provider
+        .value_type(subject)
+        .and_then(|ty| match ty {
+            BackendValueType::Enum { layout } => Some(layout),
+            _ => None,
+        })
+        .ok_or_else(|| {
+            unsupported(
+                span,
+                format!(
+                    "enum case subject is not a neutral enum value (subject type: {:?})",
+                    provider.value_type(subject)
+                ),
+            )
+        })
 }

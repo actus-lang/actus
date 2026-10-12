@@ -76,8 +76,8 @@ fn add_incoming(
     for ((_, phi), argument) in parameters.iter().zip(arguments) {
         let value = values.get(&argument.value).copied().ok_or_else(|| {
             BackendEmitError(format!(
-                "LLVM edge argument value {} is unavailable",
-                argument.value.0
+                "LLVM edge argument value {} for block {} is unavailable",
+                argument.value.0, target.0
             ))
         })?;
         let mut incoming_value = value;

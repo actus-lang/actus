@@ -1,7 +1,7 @@
 // The provider constructor stores all explicit neutral lowering contracts.
 #![allow(clippy::too_many_arguments)]
 
-use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
+use crate::ast::{BinaryOp, CaseMode, Expr, Role, UnaryOp, VariantPayload, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
@@ -30,6 +30,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
     layouts: &'a dyn super::super::BackendLayoutProvider,
     parameters: BTreeMap<String, BackendValueId>,
+    owned_parameters: std::collections::BTreeSet<String>,
     locals: Vec<BTreeMap<String, BackendValueId>>,
     verb_name: String,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
@@ -60,6 +61,12 @@ impl<'a> SharedExpressionProvider<'a> {
             .enumerate()
             .map(|(index, parameter)| (parameter.name.clone(), BackendValueId(index as u32)))
             .collect::<BTreeMap<_, _>>();
+        let owned_parameters = verb
+            .params
+            .iter()
+            .filter(|parameter| parameter.role == Role::Erg)
+            .map(|parameter| parameter.name.clone())
+            .collect();
         let parameter_types = state::parameter_types(verb, layouts);
         let nominal_types = aggregate::parameter_nominal_types(verb, layouts);
         let enum_payload_types = state::enum_payload_types(verb, layouts);
@@ -67,6 +74,7 @@ impl<'a> SharedExpressionProvider<'a> {
             namespace,
             layouts,
             parameters: parameter_bindings,
+            owned_parameters,
             locals: Vec::new(),
             verb_name: verb.name.clone(),
             return_types,
@@ -89,6 +97,9 @@ impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn parameter_value(&self, name: &str) -> Option<BackendValueId> {
         self.parameters.get(name).copied()
     }
+    pub(super) fn parameter_is_owned(&self, name: &str) -> bool {
+        self.owned_parameters.contains(name)
+    }
     pub(super) fn binding_value(&self, name: &str) -> Option<BackendValueId> {
         self.locals
             .iter()
@@ -104,6 +115,26 @@ impl<'a> SharedExpressionProvider<'a> {
     }
     pub(super) fn nominal_type(&self, value: BackendValueId) -> Option<&crate::ast::TypeName> {
         self.nominal_types.get(&value)
+    }
+    pub(super) fn enum_layout(
+        &self,
+        type_name: &crate::ast::TypeName,
+    ) -> Option<super::super::BackendEnumLayout> {
+        self.layouts.enum_layout_for(type_name)
+    }
+    pub(super) fn enum_variant(
+        &self,
+        type_name: &crate::ast::TypeName,
+        variant: &str,
+    ) -> Option<(u32, bool)> {
+        self.layouts.enum_variant(type_name, variant)
+    }
+    pub(super) fn enum_variant_for_layout(
+        &self,
+        layout: super::super::BackendEnumLayout,
+        variant: &str,
+    ) -> Option<(u32, bool)> {
+        self.layouts.enum_variant_for_layout(layout, variant)
     }
     pub(super) fn remember_nominal_type(
         &mut self,
@@ -182,6 +213,8 @@ impl SharedExpressionProvider<'_> {
             BinaryOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
             BinaryOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
             BinaryOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
+            BinaryOp::LogicalAnd => BackendIntegerBinaryOp::LogicalAnd,
+            BinaryOp::LogicalOr => BackendIntegerBinaryOp::LogicalOr,
             BinaryOp::LessThan
             | BinaryOp::LessEquals
             | BinaryOp::GreaterThan
@@ -189,12 +222,6 @@ impl SharedExpressionProvider<'_> {
             | BinaryOp::Equals
             | BinaryOp::NotEquals => {
                 return self.lower_compare(left, right, *operator, *span, instructions);
-            }
-            _ => {
-                return Err(unsupported(
-                    *span,
-                    "binary operator is outside the initial scalar lowering contract",
-                ));
             }
         };
         self.lower_integer_binary(operation, left, right, *span, instructions)

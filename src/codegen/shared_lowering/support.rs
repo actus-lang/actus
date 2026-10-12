@@ -57,6 +57,9 @@ pub(super) fn backend_value_type(
     if matches!(type_name.name.as_str(), "Arena" | "Buffer" | "String") {
         return Some(super::super::BackendValueType::Pointer);
     }
+    if let Some(layout) = layouts.enum_layout_for(type_name) {
+        return Some(super::super::BackendValueType::Enum { layout });
+    }
     Some(super::super::BackendValueType::Aggregate { layout })
 }
 

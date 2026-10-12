@@ -48,6 +48,8 @@ pub(super) fn lower_integer_binary(
         BackendIntegerBinaryOp::BitwiseAnd => builder.ins().band(left, right),
         BackendIntegerBinaryOp::BitwiseOr => builder.ins().bor(left, right),
         BackendIntegerBinaryOp::BitwiseXor => builder.ins().bxor(left, right),
+        BackendIntegerBinaryOp::LogicalAnd => builder.ins().band(left, right),
+        BackendIntegerBinaryOp::LogicalOr => builder.ins().bor(left, right),
     };
     values.insert(*result, value);
     Ok(())

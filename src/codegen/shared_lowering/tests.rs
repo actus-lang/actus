@@ -111,7 +111,7 @@ fn lowers_result_constructor_to_neutral_enum_instruction() {
             BackendInstruction::Constant { .. },
             BackendInstruction::EnumConstruct {
                 discriminant: 0,
-                payload_type: BackendValueType::Integer { signed: true, width: 32 },
+                payload_type: Some(BackendValueType::Integer { signed: true, width: 32 }),
                 ..
             },
             BackendInstruction::Return { value: Some(_), .. }

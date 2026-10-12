@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 
-use llvm_sys::core::{LLVMBuildRet, LLVMBuildRetVoid};
-use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
+use llvm_sys::core::{
+    LLVMBuildMemMove, LLVMBuildRet, LLVMBuildRetVoid, LLVMConstInt, LLVMInt64TypeInContext,
+};
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendFunction, BackendValueId, BackendValueType};
 use super::declarations::FunctionDeclaration;
 
 pub(super) fn emit_return(
+    context: LLVMContextRef,
     builder: LLVMBuilderRef,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
@@ -28,7 +31,25 @@ pub(super) fn emit_return(
             })?;
             if declaration.return_slot {
                 let slot = unsafe { llvm_sys::core::LLVMGetParam(declaration.value, 0) };
-                unsafe { llvm_sys::core::LLVMBuildStore(builder, value, slot) };
+                let size = declaration.runtime_return_size.ok_or_else(|| {
+                    BackendEmitError("LLVM return slot has no known storage size".to_owned())
+                })?;
+                let alignment = declaration.return_alignment.ok_or_else(|| {
+                    BackendEmitError("LLVM return slot has no known alignment".to_owned())
+                })?;
+                let copied = unsafe {
+                    LLVMBuildMemMove(
+                        builder,
+                        slot,
+                        alignment,
+                        value,
+                        alignment,
+                        LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(size), 0),
+                    )
+                };
+                if copied.is_null() {
+                    return Err(BackendEmitError("LLVM failed to copy return slot".to_owned()));
+                }
                 unsafe { LLVMBuildRetVoid(builder) };
             } else {
                 unsafe { LLVMBuildRet(builder, value) };

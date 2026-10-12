@@ -16,6 +16,8 @@ pub enum BackendIntegerBinaryOp {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    LogicalAnd,
+    LogicalOr,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -450,9 +450,9 @@ fn emits_neutral_result_constructor_with_payload() {
                 BackendInstruction::EnumConstruct {
                     result: BackendValueId(1),
                     discriminant: 0,
-                    payload: BackendValueId(0),
+                    payload: Some(BackendValueId(0)),
                     layout: enum_layout,
-                    payload_type: integer,
+                    payload_type: Some(integer),
                     span: actus::lexer::SourceSpan::new(1, 2),
                 },
                 BackendInstruction::Return {
@@ -2577,12 +2577,12 @@ fn compares_llvm_and_cranelift_on_result_return_slot_call_fixture() {
                 BackendInstruction::EnumConstruct {
                     result: BackendValueId(1),
                     discriminant: 0,
-                    payload: BackendValueId(0),
+                    payload: Some(BackendValueId(0)),
                     layout: match result_type {
                         BackendValueType::Enum { layout } => layout,
                         _ => unreachable!(),
                     },
-                    payload_type,
+                    payload_type: Some(payload_type),
                     span: actus::lexer::SourceSpan::new(1, 2),
                 },
                 BackendInstruction::Return {

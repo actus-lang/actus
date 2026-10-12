@@ -177,7 +177,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         }
     }
 
-    fn collect_carried_bindings(
+    pub(super) fn collect_carried_bindings(
         &mut self,
         body: &Block,
         span: SourceSpan,
@@ -231,6 +231,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             binding.span,
             &mut prefix,
         )?;
+        let nested_block_start = self.blocks.len();
         let result = self.lower_block_in_scope(body_id, body, Some(increment_id));
         let mut lowered = match result {
             Ok(block) => block,
@@ -251,7 +252,10 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         self.loop_targets.pop();
         prefix.append(&mut lowered.instructions);
         lowered.instructions = prefix;
-        let mut lowered = replace_jump_arguments(lowered, increment_id, continue_arguments);
+        let mut lowered = replace_jump_arguments(lowered, increment_id, continue_arguments.clone());
+        for block in self.blocks.iter_mut().skip(nested_block_start) {
+            replace_jump_arguments_in_block(block, increment_id, &continue_arguments);
+        }
         lowered.parameters = body_parameters(ids.body, binding, ids, carried, span)?;
         Ok(lowered)
     }
@@ -296,10 +300,10 @@ struct LoopValues {
     exit_carried: Vec<super::super::BackendValueId>,
 }
 
-struct CarriedBinding {
-    name: String,
-    value: super::super::BackendValueId,
-    ty: BackendValueType,
+pub(super) struct CarriedBinding {
+    pub(super) name: String,
+    pub(super) value: super::super::BackendValueId,
+    pub(super) ty: BackendValueType,
 }
 
 fn initial_loop_arguments(
@@ -430,7 +434,7 @@ fn increment_block(
     }
 }
 
-fn replace_jump_arguments(
+pub(super) fn replace_jump_arguments(
     mut block: BackendBlock,
     target: BackendBlockId,
     edge_arguments: Vec<BackendEdgeArgument>,
@@ -443,6 +447,20 @@ fn replace_jump_arguments(
         *current = edge_arguments;
     }
     block
+}
+
+pub(super) fn replace_jump_arguments_in_block(
+    block: &mut BackendBlock,
+    target: BackendBlockId,
+    edge_arguments: &[BackendEdgeArgument],
+) {
+    if let Some(BackendInstruction::Jump { target: actual, arguments, .. }) =
+        block.instructions.last_mut()
+        && *actual == target
+        && arguments.is_empty()
+    {
+        *arguments = edge_arguments.to_vec();
+    }
 }
 
 fn range_binding_type(
@@ -471,7 +489,7 @@ fn index_type_signed(ty: BackendValueType) -> bool {
     matches!(ty, BackendValueType::Integer { signed: true, .. })
 }
 
-fn collect_assignment_names(block: &Block, names: &mut Vec<String>) {
+pub(super) fn collect_assignment_names(block: &Block, names: &mut Vec<String>) {
     for statement in &block.statements {
         collect_statement_assignment_names(statement, names);
     }

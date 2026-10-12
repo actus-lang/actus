@@ -52,35 +52,49 @@ fn lower_construct(
         slot,
         layout.discriminant_offset as i32,
     );
+    lower_construct_payload(module, builder, slot, *layout, payload, payload_type, values)?;
+    Ok(())
+}
+
+fn lower_construct_payload(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    slot: cranelift_codegen::ir::Value,
+    layout: super::super::super::BackendEnumLayout,
+    payload: &Option<BackendValueId>,
+    payload_type: &Option<BackendValueType>,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let (Some(payload), Some(payload_type), Some(payload_layout)) =
+        (payload, payload_type, layout.payload)
+    else {
+        return Ok(());
+    };
     let payload_value = values.get(payload).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift enum payload {} is unavailable", payload.0))
-    })?;
-    let payload_layout = layout.payload.ok_or_else(|| {
-        BackendEmitError("Cranelift enum constructor payload layout is missing".to_owned())
     })?;
     let payload_address = builder.ins().iadd_imm_s(slot, i64::from(layout.payload_offset));
     if is_scalar_payload(*payload_type) {
         builder.ins().store(MemFlagsData::new(), payload_value, slot, layout.payload_offset as i32);
-    } else {
-        if builder.func.dfg.value_type(payload_value) != module.isa().pointer_type() {
-            return Err(BackendEmitError(
-                "Cranelift aggregate enum payload must be a pointer".to_owned(),
-            ));
-        }
-        let alignment = u8::try_from(payload_layout.alignment).map_err(|_| {
-            BackendEmitError("Cranelift enum payload alignment is invalid".to_owned())
-        })?;
-        builder.emit_small_memory_copy(
-            module.isa().frontend_config(),
-            payload_address,
-            payload_value,
-            u64::from(payload_layout.size),
-            alignment,
-            alignment,
-            false,
-            MemFlagsData::new(),
-        );
+        return Ok(());
     }
+    if builder.func.dfg.value_type(payload_value) != module.isa().pointer_type() {
+        return Err(BackendEmitError(
+            "Cranelift aggregate enum payload must be a pointer".to_owned(),
+        ));
+    }
+    let alignment = u8::try_from(payload_layout.alignment)
+        .map_err(|_| BackendEmitError("Cranelift enum payload alignment is invalid".to_owned()))?;
+    builder.emit_small_memory_copy(
+        module.isa().frontend_config(),
+        payload_address,
+        payload_value,
+        u64::from(payload_layout.size),
+        alignment,
+        alignment,
+        false,
+        MemFlagsData::new(),
+    );
     Ok(())
 }
 

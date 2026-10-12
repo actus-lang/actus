@@ -3,7 +3,8 @@ use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendExpressionProvider,
     BackendInstruction, BackendValueId, BodyLowering,
 };
-use crate::ast::{Block, CaseBody, CaseMode, Expr, Pattern, Stmt, VariantPayload};
+use crate::ast::{Block, CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Stmt, VariantPayload};
+use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_case_return(
@@ -11,6 +12,34 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         id: BackendBlockId,
         expression: &Expr,
         span: SourceSpan,
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        self.lower_case_control_flow(id, expression, span, None, instructions)
+    }
+
+    pub(super) fn lower_case_statement(
+        &mut self,
+        id: BackendBlockId,
+        expression: &Expr,
+        span: SourceSpan,
+        continuation_id: BackendBlockId,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        self.lower_case_control_flow(
+            id,
+            expression,
+            span,
+            Some(continuation_id),
+            std::mem::take(instructions),
+        )
+    }
+
+    fn lower_case_control_flow(
+        &mut self,
+        id: BackendBlockId,
+        expression: &Expr,
+        span: SourceSpan,
+        fallthrough: Option<BackendBlockId>,
         mut instructions: Vec<BackendInstruction>,
     ) -> Result<BackendBlock, BackendContractError> {
         let Expr::Case { mode, subject, branches, .. } = expression else {
@@ -35,8 +64,15 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 span: branch.span,
             });
             let branch_block_start = self.blocks.len();
-            let body =
-                lower_case_branch_body(self, matched_id, branch, span, subject_value, *mode)?;
+            let body = lower_case_branch_body(
+                self,
+                matched_id,
+                branch,
+                span,
+                subject_value,
+                *mode,
+                fallthrough,
+            )?;
             self.blocks.insert(branch_block_start, body);
             if let Some(following_id) = following_id {
                 if entry_instructions.is_none() {
@@ -100,6 +136,7 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
     span: SourceSpan,
     subject: BackendValueId,
     mode: CaseMode,
+    fallthrough: Option<BackendBlockId>,
 ) -> Result<BackendBlock, BackendContractError> {
     lowering.provider.enter_scope(branch.span);
     let mut body_prefix = Vec::new();
@@ -116,7 +153,7 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
         Ok(())
     };
     let nested_block_start = lowering.blocks.len();
-    match binding_result.and_then(|_| case_return_block(lowering, id, branch, span)) {
+    match binding_result.and_then(|_| case_return_block(lowering, id, branch, span, fallthrough)) {
         Ok(mut body) => {
             body.instructions.splice(0..0, body_prefix);
             lowering.provider.distribute_scope_cleanup(
@@ -134,7 +171,7 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
         }
     }
 }
-fn lower_case_condition<P: BackendExpressionProvider>(
+pub(super) fn lower_case_condition<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
     subject: &Expr,
     branch: &crate::ast::CaseBranch,
@@ -160,7 +197,60 @@ fn lower_case_condition<P: BackendExpressionProvider>(
             )?;
             Ok((subject_value, condition))
         }
+        Pattern::Literal { value, .. } => {
+            let subject_value = lowering.provider.lower_expression(subject, instructions)?;
+            let expected = literal_case_expression(
+                value,
+                lowering.provider.value_type(subject_value),
+                branch.span,
+            )?;
+            let expected_value = lowering.provider.lower_expression(&expected, instructions)?;
+            let condition = lowering.provider.allocate_value(BackendValueType::Bool);
+            instructions.push(BackendInstruction::IntegerCompare {
+                result: condition,
+                operation: super::super::BackendIntegerCompareOp::Equals,
+                left: subject_value,
+                right: expected_value,
+                signed: true,
+                span: branch.span,
+            });
+            Ok((subject_value, condition))
+        }
         _ => Err(unsupported(branch.span, "enum case payload or pattern")),
+    }
+}
+
+fn literal_case_expression(
+    pattern: &LiteralPattern,
+    subject_type: Option<BackendValueType>,
+    span: SourceSpan,
+) -> Result<Expr, BackendContractError> {
+    match pattern {
+        LiteralPattern::Bool(value) => Ok(Expr::BoolLiteral { value: *value, span }),
+        LiteralPattern::Integer(value) => {
+            let Some(BackendValueType::Integer { signed, width }) = subject_type else {
+                return Err(unsupported(span, "integer case pattern requires an integer subject"));
+            };
+            Ok(Expr::Integer {
+                value: value.clone(),
+                suffix: Some(integer_suffix(signed, width).to_owned()),
+                span,
+            })
+        }
+    }
+}
+
+fn integer_suffix(signed: bool, width: u8) -> &'static str {
+    match (signed, width) {
+        (true, 8) => "i8",
+        (true, 16) => "i16",
+        (true, 32) => "i32",
+        (true, 64) => "i64",
+        (false, 8) => "u8",
+        (false, 16) => "u16",
+        (false, 32) => "u32",
+        (false, 64) => "u64",
+        _ => "i32",
     }
 }
 fn branch_variant(branch: &crate::ast::CaseBranch) -> &str {
@@ -182,15 +272,28 @@ fn case_return_block<P: BackendExpressionProvider>(
     id: BackendBlockId,
     branch: &crate::ast::CaseBranch,
     span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
 ) -> Result<BackendBlock, BackendContractError> {
     match &branch.body {
         CaseBody::Expression(expression) => {
-            let block = Block {
-                statements: vec![Stmt::Return { value: Some(*expression.clone()), span }],
-                span: branch.span,
+            let statement = if fallthrough.is_some() {
+                Stmt::Expression { expression: *expression.clone(), span }
+            } else {
+                Stmt::Return { value: Some(*expression.clone()), span }
             };
-            lowering.lower_block(id, &block, None)
+            let block = Block { statements: vec![statement], span: branch.span };
+            lowering.lower_block(id, &block, fallthrough)
         }
-        CaseBody::Block(block) => lowering.lower_block(id, block, None),
+        CaseBody::Block(block) => {
+            if fallthrough.is_none()
+                && let Some(Stmt::Expression { expression, span }) = block.statements.last()
+            {
+                let mut statements = block.statements[..block.statements.len() - 1].to_vec();
+                statements.push(Stmt::Return { value: Some(expression.clone()), span: *span });
+                let block = Block { statements, span: block.span };
+                return lowering.lower_block(id, &block, fallthrough);
+            }
+            lowering.lower_block(id, block, fallthrough)
+        }
     }
 }

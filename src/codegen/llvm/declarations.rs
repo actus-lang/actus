@@ -21,6 +21,7 @@ pub(super) struct FunctionDeclaration {
     pub(super) return_slot: bool,
     pub(super) runtime_pointer_return: bool,
     pub(super) runtime_return_size: Option<u32>,
+    pub(super) return_alignment: Option<u32>,
     pub(super) returns_void: bool,
 }
 
@@ -68,6 +69,10 @@ pub(super) fn declare_function(
         runtime_pointer_return,
         runtime_return_size: match &return_value.passing {
             BackendReturnMode::ReturnSlot { layout } => Some(layout.size),
+            _ => None,
+        },
+        return_alignment: match &return_value.passing {
+            BackendReturnMode::ReturnSlot { layout } => Some(layout.alignment),
             _ => None,
         },
         returns_void: matches!(return_value.ty, super::super::BackendValueType::Unit)

@@ -108,14 +108,41 @@ pub(super) fn emit_aggregate_field_load(
         BackendEmitError(format!("LLVM aggregate base {} is unavailable", base.0))
     })?;
     let address = field_address(context, builder, base, *offset)?;
-    let value_type = super::values::llvm_type(context, *ty)?;
-    let value = unsafe {
-        LLVMBuildLoad2(builder, value_type, address, c"aggregate.field.load".as_ptr().cast())
-    };
-    if value.is_null() {
-        return Err(BackendEmitError("LLVM failed to load aggregate field".to_owned()));
+    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
+        let value_type = super::values::llvm_type(context, *ty)?;
+        let destination = unsafe {
+            LLVMBuildAlloca(builder, value_type, c"aggregate.field.copy".as_ptr().cast())
+        };
+        if destination.is_null() {
+            return Err(BackendEmitError("LLVM failed to allocate aggregate field".to_owned()));
+        }
+        unsafe { LLVMSetAlignment(destination, layout.alignment) };
+        let size =
+            unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+        let copy = unsafe {
+            LLVMBuildMemMove(
+                builder,
+                destination,
+                layout.alignment,
+                address,
+                layout.alignment,
+                size,
+            )
+        };
+        if copy.is_null() {
+            return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
+        }
+        values.insert(*result, destination);
+    } else {
+        let value_type = super::values::llvm_type(context, *ty)?;
+        let value = unsafe {
+            LLVMBuildLoad2(builder, value_type, address, c"aggregate.field.load".as_ptr().cast())
+        };
+        if value.is_null() {
+            return Err(BackendEmitError("LLVM failed to load aggregate field".to_owned()));
+        }
+        values.insert(*result, value);
     }
-    values.insert(*result, value);
     Ok(false)
 }
 
@@ -136,7 +163,16 @@ pub(super) fn emit_aggregate_field_store(
         BackendEmitError(format!("LLVM aggregate field value {} is unavailable", value.0))
     })?;
     let address = field_address(context, builder, base, *offset)?;
-    if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
+    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
+        let size =
+            unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+        let copy = unsafe {
+            LLVMBuildMemMove(builder, address, layout.alignment, value, layout.alignment, size)
+        };
+        if copy.is_null() {
+            return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
+        }
+    } else if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
         return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
     }
     let _ = ty;

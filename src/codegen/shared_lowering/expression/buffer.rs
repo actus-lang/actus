@@ -67,14 +67,38 @@ pub(super) fn lower_buffer_element_assignment_from_base(
 ) -> Result<(), BackendContractError> {
     let index = provider.lower_expression(index, instructions)?;
     let value = provider.lower_expression(value, instructions)?;
+    lower_buffer_element_store(provider, base, index, value, span, instructions)
+}
+
+pub(super) fn lower_buffer_element_store(
+    provider: &mut SharedExpressionProvider<'_>,
+    base: BackendValueId,
+    index: BackendValueId,
+    value: BackendValueId,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
     let index = checked_i32(provider, index, span, instructions)?;
     let value_type = provider
         .value_type(value)
         .ok_or_else(|| unsupported(span, "Buffer byte value type is unavailable"))?;
     let byte_type = BackendValueType::Integer { signed: false, width: 8 };
-    if value_type != byte_type {
-        return Err(unsupported(span, "Buffer byte assignment requires u8"));
-    }
+    let value = if value_type == byte_type {
+        value
+    } else if matches!(value_type, BackendValueType::Integer { width: 32, .. }) {
+        let converted = provider.allocate();
+        provider.remember_value(converted, byte_type);
+        instructions.push(BackendInstruction::IntegerCast {
+            result: converted,
+            source: value,
+            source_type: value_type,
+            target_type: byte_type,
+            span,
+        });
+        converted
+    } else {
+        return Err(unsupported(span, "Buffer byte assignment requires an 8-bit integer"));
+    };
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Integer { signed: true, width: 32 });
     instructions.push(BackendInstruction::Call {

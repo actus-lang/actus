@@ -70,7 +70,7 @@ pub(super) fn unsupported_name(statement: &Stmt) -> &'static str {
     }
 }
 
-pub(super) fn unsupported(span: SourceSpan, name: &str) -> BackendContractError {
+pub(super) fn unsupported(span: SourceSpan, name: impl Into<String>) -> BackendContractError {
     BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
         "body-lowering",
         span,
@@ -78,6 +78,6 @@ pub(super) fn unsupported(span: SourceSpan, name: &str) -> BackendContractError 
             backend: "neutral-contract".to_owned(),
             target: "semantic-model".to_owned(),
         },
-        format!("{name} has no neutral lowering contract yet"),
+        format!("{} has no neutral lowering contract yet", name.into()),
     ))
 }

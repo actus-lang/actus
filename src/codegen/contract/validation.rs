@@ -245,12 +245,12 @@ fn validate_array_element_store(
 fn validate_enum_construct(
     discriminant: u32,
     layout: super::BackendEnumLayout,
-    payload_type: super::BackendValueType,
+    payload_type: Option<super::BackendValueType>,
 ) -> Result<(), BackendContractError> {
     layout.validate()?;
-    if layout.niche_pointer || layout.payload.is_none() {
+    if layout.niche_pointer || payload_type.is_some() != layout.payload.is_some() {
         return Err(BackendContractError::InvalidEnumLayout(
-            "enum constructor requires an inline payload",
+            "enum constructor payload does not match its layout",
         ));
     }
     if u64::from(discriminant) >= (1u64 << (u32::from(layout.discriminant_size) * 8)) {
@@ -258,7 +258,7 @@ fn validate_enum_construct(
             "enum constructor discriminant does not fit its field",
         ));
     }
-    validate_value_type(payload_type)
+    if let Some(payload_type) = payload_type { validate_value_type(payload_type) } else { Ok(()) }
 }
 
 fn validate_aggregate_construct(
@@ -294,8 +294,6 @@ fn validate_aggregate_field_load(
         ty,
         super::BackendValueType::Unit
             | super::BackendValueType::Float { .. }
-            | super::BackendValueType::Aggregate { .. }
-            | super::BackendValueType::Region { .. }
             | super::BackendValueType::Enum { .. }
     );
     if unsupported_type
@@ -320,8 +318,6 @@ fn validate_aggregate_field_store(
         ty,
         super::BackendValueType::Unit
             | super::BackendValueType::Float { .. }
-            | super::BackendValueType::Aggregate { .. }
-            | super::BackendValueType::Region { .. }
             | super::BackendValueType::Enum { .. }
     );
     if unsupported_type

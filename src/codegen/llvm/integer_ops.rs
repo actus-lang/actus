@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
+use std::ffi::CStr;
 
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
     LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAnd, LLVMBuildICmp, LLVMBuildLShr, LLVMBuildMul,
-    LLVMBuildOr, LLVMBuildSDiv, LLVMBuildSRem, LLVMBuildShl, LLVMBuildSub, LLVMBuildUDiv,
-    LLVMBuildURem, LLVMBuildXor,
+    LLVMBuildOr, LLVMBuildSDiv, LLVMBuildSExt, LLVMBuildSRem, LLVMBuildShl, LLVMBuildSub,
+    LLVMBuildUDiv, LLVMBuildURem, LLVMBuildXor, LLVMBuildZExt, LLVMGetIntTypeWidth, LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -12,7 +13,7 @@ use super::super::{
     BackendEmitError, BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp,
     BackendIntegerUnaryOp, BackendValueId,
 };
-use llvm_sys::core::{LLVMConstAllOnes, LLVMConstNull, LLVMTypeOf};
+use llvm_sys::core::{LLVMConstAllOnes, LLVMConstNull};
 
 pub(super) fn emit_integer_binary(
     builder: LLVMBuilderRef,
@@ -29,6 +30,8 @@ pub(super) fn emit_integer_binary(
     let right = values.get(right).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM binary right operand {} is unavailable", right.0))
     })?;
+    let signed = matches!(ty, super::super::BackendValueType::Integer { signed: true, .. });
+    let (left, right) = normalize_integer_pair(builder, left, right, signed)?;
     let value = build_integer_binary(builder, *operation, *ty, left, right);
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to emit integer binary operation".to_owned()));
@@ -91,6 +94,12 @@ fn build_integer_binary(
             BackendIntegerBinaryOp::BitwiseXor => {
                 LLVMBuildXor(builder, left, right, c"actus.xor".as_ptr())
             }
+            BackendIntegerBinaryOp::LogicalAnd => {
+                LLVMBuildAnd(builder, left, right, c"actus.logical_and".as_ptr())
+            }
+            BackendIntegerBinaryOp::LogicalOr => {
+                LLVMBuildOr(builder, left, right, c"actus.logical_or".as_ptr())
+            }
         }
     }
 }
@@ -111,6 +120,7 @@ pub(super) fn emit_integer_compare(
     let right = values.get(right).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM comparison right operand {} is unavailable", right.0))
     })?;
+    let (left, right) = normalize_integer_pair(builder, left, right, *signed)?;
     let predicate = match (operation, signed) {
         (BackendIntegerCompareOp::LessThan, true) => LLVMIntPredicate::LLVMIntSLT,
         (BackendIntegerCompareOp::LessEquals, true) => LLVMIntPredicate::LLVMIntSLE,
@@ -130,6 +140,37 @@ pub(super) fn emit_integer_compare(
     }
     values.insert(*result, value);
     Ok(false)
+}
+
+fn normalize_integer_pair(
+    builder: LLVMBuilderRef,
+    left: LLVMValueRef,
+    right: LLVMValueRef,
+    signed: bool,
+) -> Result<(LLVMValueRef, LLVMValueRef), BackendEmitError> {
+    let left_width = unsafe { LLVMGetIntTypeWidth(LLVMTypeOf(left)) };
+    let right_width = unsafe { LLVMGetIntTypeWidth(LLVMTypeOf(right)) };
+    if left_width == right_width {
+        return Ok((left, right));
+    }
+    let cast = |value, target, name: &CStr| unsafe {
+        if signed {
+            LLVMBuildSExt(builder, value, target, name.as_ptr())
+        } else {
+            LLVMBuildZExt(builder, value, target, name.as_ptr())
+        }
+    };
+    if left_width < right_width {
+        let value = cast(left, unsafe { LLVMTypeOf(right) }, c"actus.int.sext.left");
+        (!value.is_null())
+            .then_some((value, right))
+            .ok_or_else(|| BackendEmitError("LLVM integer operand extension failed".to_owned()))
+    } else {
+        let value = cast(right, unsafe { LLVMTypeOf(left) }, c"actus.int.sext.right");
+        (!value.is_null())
+            .then_some((left, value))
+            .ok_or_else(|| BackendEmitError("LLVM integer operand extension failed".to_owned()))
+    }
 }
 
 pub(super) fn emit_integer_unary(

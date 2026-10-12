@@ -55,6 +55,10 @@ pub trait BackendExpressionProvider {
 
     fn set_binding_value(&mut self, _name: &str, _value: BackendValueId) {}
 
+    fn binding_value(&self, _name: &str) -> Option<BackendValueId> {
+        None
+    }
+
     fn lower_array_element(
         &mut self,
         _collection: &Expr,

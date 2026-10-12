@@ -153,6 +153,9 @@ fn parameter_cleanup(
             let super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
                 continue;
             };
+            if !provider.parameter_is_owned(name) {
+                continue;
+            }
             let Some(value) = provider.parameter_value(name) else { continue };
             let Some(descriptor) = plan.resolved_bridges.get(index).and_then(|items| items.first())
             else {

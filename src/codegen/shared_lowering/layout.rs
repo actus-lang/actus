@@ -355,6 +355,59 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         self.named_enum_layout(type_name.name.as_str(), &mut Vec::new())
     }
 
+    fn enum_variant(&self, type_name: &TypeName, variant: &str) -> Option<(u32, bool)> {
+        let definition = self.enums.get(type_name.name.as_str())?;
+        let (index, definition) = definition
+            .variants
+            .iter()
+            .enumerate()
+            .find(|(_, candidate)| candidate.name == variant)?;
+        Some((index as u32, matches!(definition.payload, EnumPayload::Unit)))
+    }
+
+    fn enum_variant_for_layout(
+        &self,
+        layout: super::super::abi::BackendEnumLayout,
+        variant: &str,
+    ) -> Option<(u32, bool)> {
+        self.enums.values().find_map(|definition| {
+            let type_name = TypeName {
+                name: definition.name.clone(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span: definition.span,
+            };
+            (self.enum_layout_for(&type_name) == Some(layout))
+                .then(|| self.enum_variant(&type_name, variant))
+                .flatten()
+        })
+    }
+
+    fn type_for_layout(&self, layout: BackendLayout) -> Option<TypeName> {
+        self.packs
+            .values()
+            .find_map(|definition| {
+                let type_name = TypeName {
+                    name: definition.name.clone(),
+                    arguments: Vec::new(),
+                    reference_role: None,
+                    span: definition.span,
+                };
+                (self.layout_for(&type_name) == Some(layout)).then_some(type_name)
+            })
+            .or_else(|| {
+                self.structs.values().find_map(|definition| {
+                    let type_name = TypeName {
+                        name: definition.name.clone(),
+                        arguments: Vec::new(),
+                        reference_role: None,
+                        span: definition.span,
+                    };
+                    (self.layout_for(&type_name) == Some(layout)).then_some(type_name)
+                })
+            })
+    }
+
     fn packed_field_for(
         &self,
         type_name: &TypeName,

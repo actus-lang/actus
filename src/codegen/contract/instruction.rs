@@ -94,9 +94,9 @@ pub enum BackendInstruction {
     EnumConstruct {
         result: super::BackendValueId,
         discriminant: u32,
-        payload: super::BackendValueId,
+        payload: Option<super::BackendValueId>,
         layout: super::BackendEnumLayout,
-        payload_type: BackendValueType,
+        payload_type: Option<BackendValueType>,
         span: SourceSpan,
     },
     IntegerUnary {

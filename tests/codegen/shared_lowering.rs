@@ -35,7 +35,7 @@ fn lowers_result_constructor_with_region_payload_layout() {
         |instruction| matches!(
             instruction,
             BackendInstruction::EnumConstruct {
-                payload_type: actus::codegen::BackendValueType::Region { .. },
+                payload_type: Some(actus::codegen::BackendValueType::Region { .. }),
                 ..
             }
         )

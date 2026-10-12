@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 use std::ffi::CString;
 
-use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildLoad2, LLVMConstInt};
+use llvm_sys::core::{
+    LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildMemMove, LLVMConstInt, LLVMSetAlignment,
+};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendValueId};
@@ -27,7 +29,7 @@ pub(super) fn emit_call(
         .copied()
         .ok_or_else(|| BackendEmitError(format!("LLVM callee `{callee}` is unavailable")))?;
     validate_argument_count(callee, argument_ids, declaration.parameter_count)?;
-    let mut arguments = collect_arguments(argument_ids, values)?;
+    let mut arguments = collect_arguments(callee, argument_ids, values)?;
     let return_slot = prepare_return_slot(builder, declaration, result, &mut arguments)?;
     let call = build_call(builder, declaration, result, &mut arguments)?;
     record_call_result(
@@ -55,15 +57,15 @@ fn validate_argument_count(
 }
 
 fn collect_arguments(
+    callee: &str,
     ids: &[BackendValueId],
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<Vec<LLVMValueRef>, BackendEmitError> {
     ids.iter()
         .map(|id| {
-            values
-                .get(id)
-                .copied()
-                .ok_or_else(|| BackendEmitError(format!("LLVM call value {} is unavailable", id.0)))
+            values.get(id).copied().ok_or_else(|| {
+                BackendEmitError(format!("LLVM call `{callee}` value {} is unavailable", id.0))
+            })
         })
         .collect()
 }
@@ -128,15 +130,7 @@ fn record_call_result(
         return Ok(());
     }
     if let Some(slot) = return_slot {
-        let name = CString::new(format!("result{}", result.0))
-            .map_err(|_| BackendEmitError("LLVM result name contains NUL".to_owned()))?;
-        let value = unsafe {
-            LLVMBuildLoad2(result_context.builder, declaration.return_type, slot, name.as_ptr())
-        };
-        if value.is_null() {
-            return Err(BackendEmitError("LLVM failed to load return slot".to_owned()));
-        }
-        values.insert(result, value);
+        values.insert(result, slot);
     } else if declaration.returns_void {
         return Err(BackendEmitError("LLVM call result cannot be void".to_owned()));
     } else {
@@ -158,15 +152,36 @@ fn record_runtime_pointer_result(
         )?;
     let slot_name = CString::new(format!("runtime.result{}", result.0))
         .map_err(|_| BackendEmitError("LLVM runtime result name contains NUL".to_owned()))?;
-    let value = unsafe {
-        LLVMBuildLoad2(result_context.builder, declaration.return_type, call, slot_name.as_ptr())
-    };
-    if value.is_null() {
-        return Err(BackendEmitError("LLVM failed to load runtime result".to_owned()));
-    }
     let size = declaration.runtime_return_size.ok_or_else(|| {
         BackendEmitError("LLVM runtime result has no known storage size".to_owned())
     })?;
+    let alignment = declaration
+        .return_alignment
+        .ok_or_else(|| BackendEmitError("LLVM runtime result has no known alignment".to_owned()))?;
+    let value = unsafe {
+        LLVMBuildAlloca(result_context.builder, declaration.return_type, slot_name.as_ptr())
+    };
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to allocate runtime result copy".to_owned()));
+    }
+    unsafe { LLVMSetAlignment(value, alignment) };
+    let copied = unsafe {
+        LLVMBuildMemMove(
+            result_context.builder,
+            value,
+            alignment,
+            call,
+            alignment,
+            LLVMConstInt(
+                llvm_sys::core::LLVMInt64TypeInContext(result_context.context),
+                u64::from(size),
+                0,
+            ),
+        )
+    };
+    if copied.is_null() {
+        return Err(BackendEmitError("LLVM failed to copy runtime result".to_owned()));
+    }
     let integer_type = unsafe { llvm_sys::core::LLVMInt64TypeInContext(result_context.context) };
     let mut arguments = [call, unsafe { LLVMConstInt(integer_type, u64::from(size), 0) }];
     let cleanup = unsafe {

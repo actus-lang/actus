@@ -96,12 +96,36 @@ pub(super) fn lower_aggregate_field_load(
     let base = values.get(base).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift aggregate base {} is unavailable", base.0))
     })?;
-    let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
-        BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
-    })?;
     let offset = i32::try_from(*offset)
         .map_err(|_| BackendEmitError("Cranelift aggregate field offset exceeds i32".to_owned()))?;
-    values.insert(*result, builder.ins().load(value_type, MemFlagsData::new(), base, offset));
+    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
+        let alignment = u8::try_from(layout.alignment).map_err(|_| {
+            BackendEmitError("Cranelift aggregate field alignment exceeds u8".to_owned())
+        })?;
+        let slot = builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+            layout.size,
+            alignment.trailing_zeros() as u8,
+        ));
+        let destination = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+        let source = builder.ins().iadd_imm_s(base, i64::from(offset));
+        builder.emit_small_memory_copy(
+            module.isa().frontend_config(),
+            destination,
+            source,
+            u64::from(layout.size),
+            alignment,
+            alignment,
+            false,
+            MemFlagsData::new(),
+        );
+        values.insert(*result, destination);
+    } else {
+        let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
+            BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
+        })?;
+        values.insert(*result, builder.ins().load(value_type, MemFlagsData::new(), base, offset));
+    }
     Ok(())
 }
 
@@ -121,15 +145,34 @@ pub(super) fn lower_aggregate_field_store(
     let value = values.get(value).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift aggregate field value {} is unavailable", value.0))
     })?;
-    let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
-        BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
-    })?;
-    if builder.func.dfg.value_type(value) != value_type {
-        return Err(BackendEmitError("Cranelift aggregate field store type mismatch".to_owned()));
-    }
     let offset = i32::try_from(*offset)
         .map_err(|_| BackendEmitError("Cranelift aggregate field offset exceeds i32".to_owned()))?;
-    builder.ins().store(MemFlagsData::new(), value, base, offset);
+    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
+        let destination = builder.ins().iadd_imm_s(base, i64::from(offset));
+        let alignment = u8::try_from(layout.alignment).map_err(|_| {
+            BackendEmitError("Cranelift aggregate field alignment exceeds u8".to_owned())
+        })?;
+        builder.emit_small_memory_copy(
+            module.isa().frontend_config(),
+            destination,
+            value,
+            u64::from(layout.size),
+            alignment,
+            alignment,
+            false,
+            MemFlagsData::new(),
+        );
+    } else {
+        let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
+            BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
+        })?;
+        if builder.func.dfg.value_type(value) != value_type {
+            return Err(BackendEmitError(
+                "Cranelift aggregate field store type mismatch".to_owned(),
+            ));
+        }
+        builder.ins().store(MemFlagsData::new(), value, base, offset);
+    }
     Ok(())
 }
 

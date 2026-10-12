@@ -39,6 +39,24 @@ pub(super) fn lower_aggregate_expression(
             lower_struct_literal_expression(provider, expression, instructions)
         }
         Expr::FieldAccess { object, field, span } => {
+            if let Expr::Identifier { name, .. } = object.as_ref() {
+                let type_name = TypeName {
+                    name: name.clone(),
+                    arguments: Vec::new(),
+                    reference_role: None,
+                    span: *span,
+                };
+                if provider.enum_variant(&type_name, field).is_some() {
+                    return super::super::constructors::lower_named_unit_enum(
+                        provider,
+                        &type_name,
+                        field,
+                        &[],
+                        *span,
+                        instructions,
+                    );
+                }
+            }
             lower_field_access_expression(provider, object, field, *span, instructions)
         }
         Expr::Index { target, index, span } => {
@@ -201,7 +219,10 @@ fn lower_array_element_location_from_values(
         .cloned()
         .ok_or_else(|| unsupported(span, "array base has no nominal type"))?;
     if type_name.name != "Array" || type_name.arguments.len() != 2 {
-        return Err(unsupported(span, "array element access requires a fixed array"));
+        return Err(unsupported(
+            span,
+            format!("array element access requires a fixed array (found `{}`)", type_name.name),
+        ));
     }
     let element_type_name = type_name.arguments[0].clone();
     let capacity = type_name.arguments[1]
@@ -293,10 +314,24 @@ pub(super) fn lower_field_access_expression(
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
     let base = provider.lower_expression(object, instructions)?;
-    let type_name = provider
-        .nominal_type(base)
-        .cloned()
-        .ok_or_else(|| unsupported(span, "aggregate field access has no nominal type"))?;
+    let type_name = provider.nominal_type(base).cloned().or_else(|| {
+        provider
+            .value_type(base)
+            .and_then(|value_type| match value_type {
+                BackendValueType::Aggregate { layout } => Some(layout),
+                _ => None,
+            })
+            .and_then(|layout| provider.layouts.type_for_layout(layout))
+    });
+    let type_name = type_name.ok_or_else(|| {
+        unsupported(
+            span,
+            format!(
+                "aggregate field access has no nominal type (value type: {:?})",
+                provider.value_type(base)
+            ),
+        )
+    })?;
     let aggregate_layout = provider
         .layouts
         .layout_for(&type_name)

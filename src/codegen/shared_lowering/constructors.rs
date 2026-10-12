@@ -23,7 +23,14 @@ pub(super) fn lower_method_call(
         unsupported(*span, "Result constructor receiver has an invalid type name")
     })?;
     if result_type.name != "Result" || result_type.arguments.len() != 2 {
-        return Err(unsupported(*span, "method call is outside the neutral enum contract"));
+        return lower_named_unit_enum(
+            provider,
+            &result_type,
+            method,
+            arguments,
+            *span,
+            instructions,
+        );
     }
     let discriminant = match method.as_str() {
         "Ok" => 0,
@@ -45,10 +52,43 @@ pub(super) fn lower_method_call(
     instructions.push(BackendInstruction::EnumConstruct {
         result,
         discriminant,
-        payload,
+        payload: Some(payload),
         layout,
-        payload_type,
+        payload_type: Some(payload_type),
         span: *span,
+    });
+    Ok(result)
+}
+
+pub(super) fn lower_named_unit_enum(
+    provider: &mut SharedExpressionProvider<'_>,
+    type_name: &TypeName,
+    variant: &str,
+    arguments: &[crate::ast::Argument],
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    if !arguments.is_empty() {
+        return Err(unsupported(span, "named enum unit variants cannot carry a payload"));
+    }
+    let Some((discriminant, is_unit)) = provider.enum_variant(type_name, variant) else {
+        return Err(unsupported(span, "unknown named enum variant"));
+    };
+    if !is_unit {
+        return Err(unsupported(span, "named enum payload constructors are not lowered"));
+    }
+    let layout = provider
+        .enum_layout(type_name)
+        .ok_or_else(|| unsupported(span, "named enum has no neutral layout"))?;
+    let result = provider.allocate();
+    provider.remember_value(result, BackendValueType::Enum { layout });
+    instructions.push(BackendInstruction::EnumConstruct {
+        result,
+        discriminant,
+        payload: None,
+        layout,
+        payload_type: None,
+        span,
     });
     Ok(result)
 }
@@ -66,7 +106,10 @@ pub(super) fn lower_enum_variant_condition_value(
     let discriminant = match variant {
         "Ok" => 0,
         "Err" => 1,
-        _ => return Err(unsupported(span, "unknown Result case variant")),
+        _ => provider
+            .enum_variant_for_layout(layout, variant)
+            .map(|(id, _)| id)
+            .ok_or_else(|| unsupported(span, "unknown enum case variant"))?,
     };
     let actual = provider.allocate();
     let integer = BackendValueType::Integer { signed: false, width: 32 };
@@ -82,7 +125,7 @@ pub(super) fn lower_enum_variant_condition_value(
     instructions.push(BackendInstruction::Constant {
         result: expected,
         ty: integer,
-        value: discriminant,
+        value: u64::from(discriminant),
         span,
     });
     let condition = provider.allocate();

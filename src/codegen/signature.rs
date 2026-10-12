@@ -25,6 +25,22 @@ pub trait BackendLayoutProvider {
     fn enum_layout_for(&self, _type_name: &TypeName) -> Option<BackendEnumLayout> {
         None
     }
+
+    fn enum_variant(&self, _type_name: &TypeName, _variant: &str) -> Option<(u32, bool)> {
+        None
+    }
+
+    fn enum_variant_for_layout(
+        &self,
+        _layout: BackendEnumLayout,
+        _variant: &str,
+    ) -> Option<(u32, bool)> {
+        None
+    }
+
+    fn type_for_layout(&self, _layout: BackendLayout) -> Option<TypeName> {
+        None
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
