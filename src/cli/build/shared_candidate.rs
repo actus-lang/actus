@@ -4,18 +4,28 @@ use crate::ast::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+#[path = "shared_candidate_arrays.rs"]
+mod shared_candidate_arrays;
+
+use shared_candidate_arrays::{
+    array_bindings, fixed_array_expression, fixed_array_literal_index, fixed_array_type,
+};
+
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     let unit_enums = unit_enums(program);
     let returns_value = returns_value(program);
     program.declarations.iter().all(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => {
+            let array_bindings = array_bindings(verb);
+            let context =
+                CandidateContext { returns_value: &returns_value, array_bindings: &array_bindings };
             verb.generic_parameters.is_empty()
                 && verb.params.iter().all(|parameter| scalar_parameter(parameter, &unit_enums))
                 && verb
                     .return_type
                     .as_ref()
                     .is_none_or(|return_type| scalar_or_result_type(&return_type.ty, &unit_enums))
-                && scalar_block(&verb.body, &returns_value, true, &unit_enums)
+                && scalar_block(&verb.body, &context, true)
         }
         crate::ast::TopLevelDecl::ExternalVerb(verb) => {
             verb.generic_parameters.is_empty()
@@ -36,6 +46,11 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
         crate::ast::TopLevelDecl::Perform(perform) => supported_perform(perform, program),
         _ => false,
     })
+}
+
+struct CandidateContext<'a> {
+    returns_value: &'a BTreeMap<String, bool>,
+    array_bindings: &'a BTreeSet<String>,
 }
 
 fn unit_enums(program: &Program) -> BTreeSet<String> {
@@ -113,80 +128,64 @@ fn scalar_or_result_type(type_name: &crate::ast::TypeName, unit_enums: &BTreeSet
                 || unit_enums.contains(&type_name.arguments[1].name)))
 }
 
-fn scalar_block(
-    block: &Block,
-    returns_value: &BTreeMap<String, bool>,
-    allow_assignment: bool,
-    unit_enums: &BTreeSet<String>,
-) -> bool {
-    block
-        .statements
-        .iter()
-        .all(|statement| scalar_statement(statement, returns_value, allow_assignment, unit_enums))
+fn scalar_block(block: &Block, context: &CandidateContext<'_>, allow_assignment: bool) -> bool {
+    block.statements.iter().all(|statement| scalar_statement(statement, context, allow_assignment))
 }
 
 fn scalar_statement(
     statement: &Stmt,
-    returns_value: &BTreeMap<String, bool>,
+    context: &CandidateContext<'_>,
     allow_assignment: bool,
-    unit_enums: &BTreeSet<String>,
 ) -> bool {
     match statement {
-        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, returns_value),
+        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, context),
         Stmt::Assignment { target, value, .. } if allow_assignment => {
-            scalar_place(target) && scalar_expression(value, returns_value)
+            scalar_place(target) && scalar_expression(value, context)
         }
         Stmt::CompoundAssignment { target, value, .. } if allow_assignment => {
-            scalar_place(target) && scalar_expression(value, returns_value)
+            scalar_place(target) && scalar_expression(value, context)
         }
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
         Stmt::Expression { expression, .. } => {
-            matches!(expression, Expr::Call { .. })
-                && scalar_statement_call(expression, returns_value)
+            matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context)
         }
         Stmt::If { condition, then_branch, else_branch, .. } => {
-            scalar_expression(condition, returns_value)
-                && scalar_return_block(then_branch, returns_value, unit_enums)
+            scalar_expression(condition, context)
+                && scalar_return_block(then_branch, context)
                 && matches!(
                     else_branch,
                     Some(IfBranch::Block(block))
-                        if scalar_return_block(block, returns_value, unit_enums)
+                        if scalar_return_block(block, context)
                 )
         }
         Stmt::Return { value, .. } => value.as_ref().is_none_or(|value| {
-            scalar_expression(value, returns_value)
-                || result_case_expression(value, returns_value, unit_enums)
+            scalar_expression(value, context) || result_case_expression(value, context)
         }),
-        Stmt::Loop(block) => scalar_block(block, returns_value, true, unit_enums),
-        Stmt::Block(block) => scalar_block(block, returns_value, true, unit_enums),
+        Stmt::Loop(block) => scalar_block(block, context, true),
+        Stmt::Block(block) => scalar_block(block, context, true),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::ForRange { binding, start, end, body, .. } => {
             integer_binding(binding)
-                && scalar_expression(start, returns_value)
-                && scalar_expression(end, returns_value)
-                && range_loop_block(body, returns_value, unit_enums)
+                && scalar_expression(start, context)
+                && scalar_expression(end, context)
+                && range_loop_block(body, context)
         }
         Stmt::ForArray { binding, collection, body, .. } => {
             integer_binding(binding)
-                && scalar_expression(collection, returns_value)
-                && array_loop_block(body, returns_value, unit_enums)
+                && scalar_expression(collection, context)
+                && array_loop_block(body, context)
         }
         Stmt::Drop { .. } => true,
     }
 }
 
-fn scalar_return_block(
-    block: &Block,
-    returns_value: &BTreeMap<String, bool>,
-    unit_enums: &BTreeSet<String>,
-) -> bool {
-    scalar_block(block, returns_value, false, unit_enums)
+fn scalar_return_block(block: &Block, context: &CandidateContext<'_>) -> bool {
+    scalar_block(block, context, false)
         && matches!(
             block.statements.last(),
             Some(Stmt::Return { value, .. })
                 if value.as_ref().is_none_or(|value| {
-                    scalar_expression(value, returns_value)
-                    || result_case_expression(value, returns_value, unit_enums)
+                    scalar_expression(value, context) || result_case_expression(value, context)
                 })
         )
 }
@@ -202,36 +201,36 @@ fn scalar_place(place: &Place) -> bool {
     matches!(place, Place::Binding { .. } | Place::Field { .. })
 }
 
-fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
+fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
     match expression {
         Expr::Identifier { .. }
         | Expr::Integer { .. }
         | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. } => true,
         Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-            scalar_expression(expression, returns_value)
+            scalar_expression(expression, context)
         }
         Expr::Cast { expression, target, .. } => {
-            scalar_type(target) && scalar_expression(expression, returns_value)
+            scalar_type(target) && scalar_expression(expression, context)
         }
         Expr::Binary { left, operator, right, .. } => {
-            scalar_binary_expression(left, *operator, right, returns_value)
+            scalar_binary_expression(left, *operator, right, context)
         }
-        Expr::Call { callee, arguments, .. } => {
-            scalar_call_expression(callee, arguments, returns_value)
-        }
+        Expr::Call { callee, arguments, .. } => scalar_call_expression(callee, arguments, context),
         Expr::MethodCall { receiver, method, arguments, .. } => {
             let Expr::Identifier { name, .. } = receiver.as_ref() else { return false };
             name.starts_with("Result[")
                 && matches!(method.as_str(), "Ok" | "Err")
                 && arguments.len() == 1
-                && scalar_expression(&arguments[0].expression, returns_value)
+                && scalar_expression(&arguments[0].expression, context)
         }
         Expr::StructLit { name, fields, .. } => {
-            !name.is_empty()
-                && fields.iter().all(|field| scalar_expression(&field.value, returns_value))
+            !name.is_empty() && fields.iter().all(|field| scalar_expression(&field.value, context))
         }
-        Expr::FieldAccess { object, .. } => scalar_expression(object, returns_value),
+        Expr::FieldAccess { object, .. } => scalar_expression(object, context),
+        Expr::Index { target, index, .. } => {
+            fixed_array_expression(target, context) && fixed_array_literal_index(index)
+        }
         _ => false,
     }
 }
@@ -240,7 +239,7 @@ fn scalar_binary_expression(
     left: &Expr,
     operator: BinaryOp,
     right: &Expr,
-    returns_value: &BTreeMap<String, bool>,
+    context: &CandidateContext<'_>,
 ) -> bool {
     matches!(
         operator,
@@ -260,83 +259,75 @@ fn scalar_binary_expression(
             | BinaryOp::GreaterEquals
             | BinaryOp::Equals
             | BinaryOp::NotEquals
-    ) && scalar_expression(left, returns_value)
-        && scalar_expression(right, returns_value)
+    ) && scalar_expression(left, context)
+        && scalar_expression(right, context)
 }
 
 fn scalar_call_expression(
     callee: &str,
     arguments: &[crate::ast::Argument],
-    returns_value: &BTreeMap<String, bool>,
+    context: &CandidateContext<'_>,
 ) -> bool {
     let array_constructor = arguments.is_empty()
         && callee.starts_with("Array[")
         && crate::semantic::parse_type_name_key(callee, crate::lexer::SourceSpan::new(0, 0))
             .is_some_and(|type_name| fixed_array_type(&type_name));
-    (returns_value.get(callee).copied().unwrap_or(false) || array_constructor)
-        && arguments.iter().all(|argument| scalar_expression(&argument.expression, returns_value))
+    (context.returns_value.get(callee).copied().unwrap_or(false) || array_constructor)
+        && arguments.iter().all(|argument| scalar_expression(&argument.expression, context))
 }
 
-fn array_loop_block(
-    block: &Block,
-    returns_value: &BTreeMap<String, bool>,
-    unit_enums: &BTreeSet<String>,
-) -> bool {
+fn array_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
     block.statements.iter().all(|statement| match statement {
-        Stmt::OwnerDecl { initializer, .. } => array_loop_expression(initializer, returns_value),
+        Stmt::OwnerDecl { initializer, .. } => array_loop_expression(initializer, context),
         Stmt::Assignment { target, value, .. } | Stmt::CompoundAssignment { target, value, .. } => {
-            scalar_place(target) && array_loop_expression(value, returns_value)
+            scalar_place(target) && array_loop_expression(value, context)
         }
         Stmt::Return { value, .. } => {
-            value.as_ref().is_none_or(|value| array_loop_expression(value, returns_value))
+            value.as_ref().is_none_or(|value| array_loop_expression(value, context))
         }
-        Stmt::Expression { expression, .. } => scalar_statement_call(expression, returns_value),
+        Stmt::Expression { expression, .. } => scalar_statement_call(expression, context),
         Stmt::If { .. } | Stmt::Loop(_) | Stmt::Block(_) | Stmt::ForArray { .. } => {
-            scalar_statement(statement, returns_value, true, unit_enums)
+            scalar_statement(statement, context, true)
         }
         Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
         Stmt::ForRange { .. } => false,
     })
 }
 
-fn range_loop_block(
-    block: &Block,
-    returns_value: &BTreeMap<String, bool>,
-    unit_enums: &BTreeSet<String>,
-) -> bool {
+fn range_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
     block.statements.iter().all(|statement| match statement {
-        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, returns_value),
+        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, context),
         Stmt::Assignment { target, value, .. } | Stmt::CompoundAssignment { target, value, .. } => {
-            scalar_place(target) && scalar_expression(value, returns_value)
+            scalar_place(target) && scalar_expression(value, context)
         }
         Stmt::Return { value, .. } => {
-            value.as_ref().is_none_or(|value| scalar_expression(value, returns_value))
+            value.as_ref().is_none_or(|value| scalar_expression(value, context))
         }
-        Stmt::Expression { expression, .. } => scalar_statement_call(expression, returns_value),
+        Stmt::Expression { expression, .. } => scalar_statement_call(expression, context),
         Stmt::If { .. } | Stmt::Loop(_) | Stmt::Block(_) => {
-            scalar_statement(statement, returns_value, true, unit_enums)
+            scalar_statement(statement, context, true)
         }
         Stmt::ForRange { binding, start, end, body, .. } => {
             integer_binding(binding)
-                && scalar_expression(start, returns_value)
-                && scalar_expression(end, returns_value)
-                && range_loop_block(body, returns_value, unit_enums)
+                && scalar_expression(start, context)
+                && scalar_expression(end, context)
+                && range_loop_block(body, context)
         }
         Stmt::ForArray { .. } => false,
         Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
     })
 }
 
-fn array_loop_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
+fn array_loop_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
     match expression {
         Expr::Index { target, index, .. } => {
-            scalar_expression(target, returns_value) && scalar_expression(index, returns_value)
+            fixed_array_expression(target, context) && scalar_expression(index, context)
         }
         Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-            array_loop_expression(expression, returns_value)
+            array_loop_expression(expression, context)
         }
         Expr::Cast { expression, target, .. } => {
-            scalar_type(target) && array_loop_expression(expression, returns_value)
+            scalar_type(target) && array_loop_expression(expression, context)
         }
         Expr::Binary { left, operator, right, .. } => {
             matches!(
@@ -357,20 +348,16 @@ fn array_loop_expression(expression: &Expr, returns_value: &BTreeMap<String, boo
                     | BinaryOp::GreaterEquals
                     | BinaryOp::Equals
                     | BinaryOp::NotEquals
-            ) && array_loop_expression(left, returns_value)
-                && array_loop_expression(right, returns_value)
+            ) && array_loop_expression(left, context)
+                && array_loop_expression(right, context)
         }
-        _ => scalar_expression(expression, returns_value),
+        _ => scalar_expression(expression, context),
     }
 }
 
-fn result_case_expression(
-    expression: &Expr,
-    returns_value: &BTreeMap<String, bool>,
-    unit_enums: &BTreeSet<String>,
-) -> bool {
+fn result_case_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
     let Expr::Case { subject, branches, .. } = expression else { return false };
-    if branches.is_empty() || !scalar_expression(subject, returns_value) {
+    if branches.is_empty() || !scalar_expression(subject, context) {
         return false;
     }
     branches.iter().enumerate().all(|(index, branch)| {
@@ -378,8 +365,8 @@ fn result_case_expression(
             return false;
         }
         match &branch.body {
-            CaseBody::Expression(body) if scalar_expression(body, returns_value) => {}
-            CaseBody::Block(block) if scalar_return_block(block, returns_value, unit_enums) => {}
+            CaseBody::Expression(body) if scalar_expression(body, context) => {}
+            CaseBody::Block(block) if scalar_return_block(block, context) => {}
             _ => return false,
         }
         match &branch.pattern {
@@ -390,19 +377,15 @@ fn result_case_expression(
     })
 }
 
-fn scalar_statement_call(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
+fn scalar_statement_call(expression: &Expr, context: &CandidateContext<'_>) -> bool {
     let Expr::Call { callee, arguments, .. } = expression else {
         return false;
     };
-    returns_value.contains_key(callee)
-        && arguments.iter().all(|argument| scalar_expression(&argument.expression, returns_value))
-}
-
-fn fixed_array_type(type_name: &crate::ast::TypeName) -> bool {
-    type_name.name == "Array"
-        && type_name.arguments.len() == 2
-        && type_name.arguments[1].name.parse::<u32>().is_ok_and(|capacity| capacity > 0)
-        && scalar_type(&type_name.arguments[0])
+    context.returns_value.contains_key(callee)
+        && arguments.iter().all(|argument| {
+            !matches!(argument.expression, Expr::Index { .. })
+                && scalar_expression(&argument.expression, context)
+        })
 }
 
 #[cfg(test)]
@@ -462,6 +445,15 @@ mod tests {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("fixed-array fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn accepts_direct_fixed_array_index_reads_in_the_shared_contract() {
+        let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[2u32] as Int; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("direct array index fixture should parse");
         assert!(supports_scalar_shared_lowering(&program));
     }
 

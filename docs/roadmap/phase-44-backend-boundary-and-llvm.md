@@ -1107,6 +1107,21 @@ green, including the existing array, aggregate, generic, ownership, runtime,
 and freestanding Cranelift fixtures. No Cranelift-specific semantic lowering
 was added to shared modules and no legacy behavior was removed.
 
+Direct fixed-array literal-index reads now use the same guarded shared route.
+The CLI classifier admits an indexed expression only when its base is a
+declared fixed `Array[T, N]` binding or a concrete fixed-array constructor,
+the index is an integer literal, and the expression is a value read rather
+than an indexed loan argument. Neutral `ArrayElementLoad` lowering then
+validates the nominal element type, concrete capacity, recursive layout, and
+integer index before either backend emits code. The classifier regression
+`accepts_direct_fixed_array_index_reads_in_the_shared_contract` and the hosted
+fixtures `cranelift_backend_builds_and_runs_a_shared_fixed_array_index_read`
+and `llvm_backend_builds_and_runs_a_shared_fixed_array_index_read` compile and
+execute the identical source through both selected backends. This evidence
+covers literal-index reads only; array stores, dynamic indexing,
+indexed loan arguments, and the remaining
+semantic-to-backend migration stay outside this slice.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
