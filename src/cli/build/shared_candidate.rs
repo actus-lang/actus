@@ -160,7 +160,12 @@ fn scalar_statement(
         Stmt::Loop(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Block(block) => scalar_block(block, returns_value, true, unit_enums),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
-        Stmt::ForRange { .. } | Stmt::ForArray { .. } => false,
+        Stmt::ForRange { .. } => false,
+        Stmt::ForArray { binding, collection, body, .. } => {
+            integer_binding(binding)
+                && scalar_expression(collection, returns_value)
+                && array_loop_block(body, returns_value, unit_enums)
+        }
         Stmt::Drop { .. } => true,
     }
 }
@@ -181,6 +186,13 @@ fn scalar_return_block(
         )
 }
 
+fn integer_binding(binding: &crate::ast::ForBinding) -> bool {
+    matches!(
+        binding.ty.as_deref(),
+        None | Some("u8") | Some("u16") | Some("u32") | Some("u64") | Some("Int")
+    )
+}
+
 fn scalar_place(place: &Place) -> bool {
     matches!(place, Place::Binding { .. } | Place::Field { .. })
 }
@@ -196,6 +208,102 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
         }
         Expr::Cast { expression, target, .. } => {
             scalar_type(target) && scalar_expression(expression, returns_value)
+        }
+        Expr::Binary { left, operator, right, .. } => {
+            scalar_binary_expression(left, *operator, right, returns_value)
+        }
+        Expr::Call { callee, arguments, .. } => {
+            scalar_call_expression(callee, arguments, returns_value)
+        }
+        Expr::MethodCall { receiver, method, arguments, .. } => {
+            let Expr::Identifier { name, .. } = receiver.as_ref() else { return false };
+            name.starts_with("Result[")
+                && matches!(method.as_str(), "Ok" | "Err")
+                && arguments.len() == 1
+                && scalar_expression(&arguments[0].expression, returns_value)
+        }
+        Expr::StructLit { name, fields, .. } => {
+            !name.is_empty()
+                && fields.iter().all(|field| scalar_expression(&field.value, returns_value))
+        }
+        Expr::FieldAccess { object, .. } => scalar_expression(object, returns_value),
+        _ => false,
+    }
+}
+
+fn scalar_binary_expression(
+    left: &Expr,
+    operator: BinaryOp,
+    right: &Expr,
+    returns_value: &BTreeMap<String, bool>,
+) -> bool {
+    matches!(
+        operator,
+        BinaryOp::Add
+            | BinaryOp::Subtract
+            | BinaryOp::Multiply
+            | BinaryOp::Divide
+            | BinaryOp::Remainder
+            | BinaryOp::ShiftLeft
+            | BinaryOp::ShiftRight
+            | BinaryOp::BitwiseAnd
+            | BinaryOp::BitwiseOr
+            | BinaryOp::BitwiseXor
+            | BinaryOp::LessThan
+            | BinaryOp::LessEquals
+            | BinaryOp::GreaterThan
+            | BinaryOp::GreaterEquals
+            | BinaryOp::Equals
+            | BinaryOp::NotEquals
+    ) && scalar_expression(left, returns_value)
+        && scalar_expression(right, returns_value)
+}
+
+fn scalar_call_expression(
+    callee: &str,
+    arguments: &[crate::ast::Argument],
+    returns_value: &BTreeMap<String, bool>,
+) -> bool {
+    let array_constructor = arguments.is_empty()
+        && callee.starts_with("Array[")
+        && crate::semantic::parse_type_name_key(callee, crate::lexer::SourceSpan::new(0, 0))
+            .is_some_and(|type_name| fixed_array_type(&type_name));
+    (returns_value.get(callee).copied().unwrap_or(false) || array_constructor)
+        && arguments.iter().all(|argument| scalar_expression(&argument.expression, returns_value))
+}
+
+fn array_loop_block(
+    block: &Block,
+    returns_value: &BTreeMap<String, bool>,
+    unit_enums: &BTreeSet<String>,
+) -> bool {
+    block.statements.iter().all(|statement| match statement {
+        Stmt::OwnerDecl { initializer, .. } => array_loop_expression(initializer, returns_value),
+        Stmt::Assignment { target, value, .. } | Stmt::CompoundAssignment { target, value, .. } => {
+            scalar_place(target) && array_loop_expression(value, returns_value)
+        }
+        Stmt::Return { value, .. } => {
+            value.as_ref().is_none_or(|value| array_loop_expression(value, returns_value))
+        }
+        Stmt::Expression { expression, .. } => scalar_statement_call(expression, returns_value),
+        Stmt::If { .. } | Stmt::Loop(_) | Stmt::Block(_) | Stmt::ForArray { .. } => {
+            scalar_statement(statement, returns_value, true, unit_enums)
+        }
+        Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
+        Stmt::ForRange { .. } => false,
+    })
+}
+
+fn array_loop_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) -> bool {
+    match expression {
+        Expr::Index { target, index, .. } => {
+            scalar_expression(target, returns_value) && scalar_expression(index, returns_value)
+        }
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            array_loop_expression(expression, returns_value)
+        }
+        Expr::Cast { expression, target, .. } => {
+            scalar_type(target) && array_loop_expression(expression, returns_value)
         }
         Expr::Binary { left, operator, right, .. } => {
             matches!(
@@ -216,28 +324,10 @@ fn scalar_expression(expression: &Expr, returns_value: &BTreeMap<String, bool>) 
                     | BinaryOp::GreaterEquals
                     | BinaryOp::Equals
                     | BinaryOp::NotEquals
-            ) && scalar_expression(left, returns_value)
-                && scalar_expression(right, returns_value)
+            ) && array_loop_expression(left, returns_value)
+                && array_loop_expression(right, returns_value)
         }
-        Expr::Call { callee, arguments, .. } => {
-            returns_value.get(callee).copied().unwrap_or(false)
-                && arguments
-                    .iter()
-                    .all(|argument| scalar_expression(&argument.expression, returns_value))
-        }
-        Expr::MethodCall { receiver, method, arguments, .. } => {
-            let Expr::Identifier { name, .. } = receiver.as_ref() else { return false };
-            name.starts_with("Result[")
-                && matches!(method.as_str(), "Ok" | "Err")
-                && arguments.len() == 1
-                && scalar_expression(&arguments[0].expression, returns_value)
-        }
-        Expr::StructLit { name, fields, .. } => {
-            !name.is_empty()
-                && fields.iter().all(|field| scalar_expression(&field.value, returns_value))
-        }
-        Expr::FieldAccess { object, .. } => scalar_expression(object, returns_value),
-        _ => false,
+        _ => scalar_expression(expression, returns_value),
     }
 }
 
@@ -273,6 +363,13 @@ fn scalar_statement_call(expression: &Expr, returns_value: &BTreeMap<String, boo
     };
     returns_value.contains_key(callee)
         && arguments.iter().all(|argument| scalar_expression(&argument.expression, returns_value))
+}
+
+fn fixed_array_type(type_name: &crate::ast::TypeName) -> bool {
+    type_name.name == "Array"
+        && type_name.arguments.len() == 2
+        && type_name.arguments[1].name.parse::<u32>().is_ok_and(|capacity| capacity > 0)
+        && scalar_type(&type_name.arguments[0])
 }
 
 #[cfg(test)]
@@ -323,6 +420,15 @@ mod tests {
         let (tokens, errors) = scan(source);
         assert!(errors.is_empty());
         let program = parse(tokens).expect("Buffer and Region fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program));
+    }
+
+    #[test]
+    fn accepts_fixed_array_iteration_in_the_shared_contract() {
+        let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }";
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty());
+        let program = parse(tokens).expect("fixed-array fixture should parse");
         assert!(supports_scalar_shared_lowering(&program));
     }
 

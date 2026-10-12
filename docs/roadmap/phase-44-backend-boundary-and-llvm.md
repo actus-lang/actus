@@ -664,7 +664,7 @@ the same fixture through LLVM and Cranelift object emission.
       arguments, and hosted CLI fixtures for both backends.
 - [x] Route fixed-array iteration through the shared loop contract and add its
       hosted CLI fixtures for both backends.
-- [ ] Preserve the complete current Cranelift lowering behavior while adding
+- [x] Preserve the complete current Cranelift lowering behavior while adding
       the shared path; no backend-specific semantic rewrite or duplicate
       lowering implementation is allowed.
 - [ ] Implement the LLVM CLI emission path for the supported shared contract,
@@ -1076,6 +1076,17 @@ fixed_array_loop -- --test-threads=1`; the neutral and backend suites also
 pass with 44 and 46 tests respectively. The broader backend-pipeline gate
 remains open until its remaining semantic lowering, unsupported-operation,
 configuration, reproducibility, and documentation requirements are complete.
+
+The Cranelift shared-candidate classifier now admits the fixed-array slice only
+when the source has a concrete non-zero `Array[T, N]` constructor, an integer
+array-loop binding, and scalar indexed reads. The positive classifier regression
+`accepts_fixed_array_iteration_in_the_shared_contract` and the hosted
+Cranelift fixture prove that this source reaches the neutral `BackendModule`
+route; unsupported constructs continue through the established legacy
+Cranelift path. The complete all-targets/all-features regression suite remains
+green, including the existing array, aggregate, generic, ownership, runtime,
+and freestanding Cranelift fixtures. No Cranelift-specific semantic lowering
+was added to shared modules and no legacy behavior was removed.
 
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
