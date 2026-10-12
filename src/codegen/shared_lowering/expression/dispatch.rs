@@ -4,6 +4,8 @@ use super::super::super::{
 use super::super::support::{expression_span, parse_integer, unsupported};
 use super::SharedExpressionProvider;
 use crate::ast::Expr;
+use crate::codegen::body::BackendExpressionProvider;
+use crate::lexer::SourceSpan;
 
 pub(super) fn lower_expression(
     provider: &mut SharedExpressionProvider<'_>,
@@ -46,6 +48,9 @@ pub(super) fn lower_expression(
                 provider.lower_runtime_cast(expression, target, *span, instructions)
             }
         }
+        Expr::Try { expression, span } => {
+            lower_same_result_try(provider, expression, *span, instructions)
+        }
         Expr::Unary { .. } => provider.lower_unary(expression, instructions),
         Expr::Binary { .. } => provider.lower_binary(expression, instructions),
         Expr::Call { .. } => super::calls::lower_call(provider, expression, instructions),
@@ -58,4 +63,23 @@ pub(super) fn lower_expression(
             "expression is outside the scalar shared lowering contract",
         )),
     }
+}
+
+fn lower_same_result_try(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let value = provider.lower_expression(expression, instructions)?;
+    let return_type = provider
+        .return_types
+        .get(&provider.verb_name)
+        .copied()
+        .flatten()
+        .ok_or_else(|| unsupported(span, "try propagation requires a Result return type"))?;
+    if provider.value_type(value) != Some(return_type) {
+        return Err(unsupported(span, "try propagation requires the same Result type"));
+    }
+    Ok(value)
 }
