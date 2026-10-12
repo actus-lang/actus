@@ -937,6 +937,15 @@ of the declaration and call symbol; generic compile-time expression lowering,
 aggregate specialization, ownership-bearing generic values, cleanup bridges,
 and cross-backend parity remain open work.
 
+The hosted regression
+`llvm_backend_builds_and_runs_a_const_generic_from_an_imported_module` extends
+that evidence to a generic declaration owned by an imported module. The CLI
+collects the instance from the module implementation unit, specializes the
+module declaration, emits its namespaced specialized symbol, and links the
+root call through the LLVM object set. This covers the imported-module generic
+specialization slice; aggregate specialization, ownership-bearing generic
+values, cleanup bridges, and cross-backend parity remain open work.
+
 The Cranelift CLI now sends the same bounded scalar const-generic slice through
 the shared neutral route after specialization. The regression
 `cranelift_backend_builds_and_runs_a_scalar_const_generic_through_shared_lowering`

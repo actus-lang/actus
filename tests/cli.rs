@@ -245,6 +245,49 @@ fn llvm_backend_builds_and_runs_a_scalar_const_generic() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(all(unix, feature = "llvm", feature = "cranelift"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_const_generic_from_an_imported_module() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-module-generic-{}", std::process::id()));
+    let input = root.join("src/main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(root.join("src/math"))
+        .expect("create LLVM generic module fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-module-generic-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM generic module fixture manifest");
+    fs::write(&input, "import math; verb main() -> u32 { return read_capacity[4](); }\n")
+        .expect("write LLVM generic module root source");
+    fs::write(root.join("src/math/math.act"), "open api;\n")
+        .expect("write LLVM generic module facade");
+    fs::write(
+        root.join("src/math/api.act"),
+        "open verb read_capacity[N: Usize]() -> u32 { return N as u32; }\n",
+    )
+    .expect("write LLVM generic module implementation");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run LLVM generic module fixture");
+    assert_eq!(status.code(), Some(4));
+    let _ = fs::remove_dir_all(root);
+}
+
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
 fn cranelift_backend_builds_and_runs_a_scalar_const_generic_through_shared_lowering() {
