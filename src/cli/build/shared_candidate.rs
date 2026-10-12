@@ -13,6 +13,7 @@ use shared_candidate_arrays::{
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     let unit_enums = unit_enums(program);
+    let unit_structs = unit_structs(program);
     let returns_value = returns_value(program);
     program.declarations.iter().all(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => {
@@ -20,7 +21,10 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
             let context =
                 CandidateContext { returns_value: &returns_value, array_bindings: &array_bindings };
             verb.generic_parameters.is_empty()
-                && verb.params.iter().all(|parameter| scalar_parameter(parameter, &unit_enums))
+                && verb
+                    .params
+                    .iter()
+                    .all(|parameter| scalar_parameter(parameter, &unit_enums, &unit_structs))
                 && verb
                     .return_type
                     .as_ref()
@@ -29,7 +33,10 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
         }
         crate::ast::TopLevelDecl::ExternalVerb(verb) => {
             verb.generic_parameters.is_empty()
-                && verb.params.iter().all(|parameter| scalar_parameter(parameter, &unit_enums))
+                && verb
+                    .params
+                    .iter()
+                    .all(|parameter| scalar_parameter(parameter, &unit_enums, &unit_structs))
                 && verb
                     .return_type
                     .as_ref()
@@ -42,7 +49,9 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
                     .iter()
                     .all(|variant| matches!(variant.payload, EnumPayload::Unit))
         }
-        crate::ast::TopLevelDecl::Struct(definition) => supported_struct(definition),
+        crate::ast::TopLevelDecl::Struct(definition) => {
+            supported_struct(definition) || supported_value_struct(definition)
+        }
         crate::ast::TopLevelDecl::Perform(perform) => supported_perform(perform, program),
         _ => false,
     })
@@ -64,6 +73,21 @@ fn unit_enums(program: &Program) -> BTreeSet<String> {
                         .variants
                         .iter()
                         .all(|variant| matches!(variant.payload, EnumPayload::Unit)) =>
+            {
+                Some(definition.name.clone())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn unit_structs(program: &Program) -> BTreeSet<String> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            crate::ast::TopLevelDecl::Struct(definition)
+                if supported_struct(definition) || supported_value_struct(definition) =>
             {
                 Some(definition.name.clone())
             }
@@ -95,6 +119,13 @@ fn supported_struct(definition: &crate::ast::StructDef) -> bool {
         })
 }
 
+fn supported_value_struct(definition: &crate::ast::StructDef) -> bool {
+    definition.generic_parameters.is_empty()
+        && definition.fields.iter().all(|field| {
+            matches!(field.role, crate::ast::StructFieldRole::Value) && scalar_type(&field.ty)
+        })
+}
+
 fn supported_perform(perform: &crate::ast::PerformDecl, program: &Program) -> bool {
     perform.target.arguments.is_empty()
         && program.declarations.iter().any(|declaration| {
@@ -106,10 +137,16 @@ fn supported_perform(perform: &crate::ast::PerformDecl, program: &Program) -> bo
         })
 }
 
-fn scalar_parameter(parameter: &crate::ast::Param, unit_enums: &BTreeSet<String>) -> bool {
+fn scalar_parameter(
+    parameter: &crate::ast::Param,
+    unit_enums: &BTreeSet<String>,
+    unit_structs: &BTreeSet<String>,
+) -> bool {
     matches!(parameter.role, Role::Erg | Role::Abs | Role::Ins | Role::Dat)
         && parameter.dispatch == DispatchMode::Static
-        && (scalar_or_result_type(&parameter.ty, unit_enums) || fixed_array_type(&parameter.ty))
+        && (scalar_or_result_type(&parameter.ty, unit_enums)
+            || fixed_array_type(&parameter.ty)
+            || unit_structs.contains(&parameter.ty.name))
 }
 
 fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
@@ -389,107 +426,5 @@ fn scalar_statement_call(expression: &Expr, context: &CandidateContext<'_>) -> b
 }
 
 #[cfg(test)]
-mod tests {
-    use super::supports_scalar_shared_lowering;
-    use crate::lexer::scan;
-    use crate::parser::parse;
-
-    #[test]
-    fn accepts_the_supported_scalar_contract_slice() {
-        let source = "verb main() -> Int { return 40 + 2; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("scalar fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_scalar_assignment_in_the_function_scope() {
-        let source = "verb main() -> Int { erg value = 40; value += 2; return value; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("assignment fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_checked_scalar_arithmetic_in_the_shared_contract() {
-        let source = "verb main() -> Int { erg value: u8 = 1u8; erg count: u8 = 8u8; return value << count; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("checked arithmetic fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_scalar_result_construction_and_case_return() {
-        let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => value + 1, Result.Err(_) => 0, }; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("Result fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_bounded_buffer_and_region_signatures() {
-        let source = "verb create() -> Buffer { return Buffer[16]; } verb inspect(abs region: Region[u8]) { return; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("Buffer and Region fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_fixed_array_iteration_in_the_shared_contract() {
-        let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("fixed-array fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_direct_fixed_array_index_reads_in_the_shared_contract() {
-        let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[2u32] as Int; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("direct array index fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_fixed_array_parameter_reads_in_the_shared_contract() {
-        let source = "verb read(abs values: Array[u32, 4]) -> Int { return values[2u32] as Int; } verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return read(values: abs values); }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("fixed-array parameter fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_block_bodied_result_cases_in_the_shared_contract() {
-        let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case dat result { Result.Err(_) => { return 0; }, Result.Ok(value) => { return value + 1; }, }; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("block-bodied Result fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn accepts_bounded_range_iteration_in_the_shared_contract() {
-        let source = "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { total += index; } return total as Int; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("range fixture should parse");
-        assert!(supports_scalar_shared_lowering(&program));
-    }
-
-    #[test]
-    fn rejects_branch_mutation_outside_the_shared_contract_slice() {
-        let source = "verb main() -> Int { erg value: u32 = 0u32; if true { value = 1u32; } return value as Int; }";
-        let (tokens, errors) = scan(source);
-        assert!(errors.is_empty());
-        let program = parse(tokens).expect("branch mutation fixture should parse");
-        assert!(!supports_scalar_shared_lowering(&program));
-    }
-}
+#[path = "shared_candidate_tests.rs"]
+mod tests;

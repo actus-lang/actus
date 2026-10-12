@@ -1132,6 +1132,16 @@ backends. This validates the current nominal aggregate parameter ABI slice;
 array mutation, dynamic indexing, indexed loan arguments, and the remaining
 semantic-to-backend migration stay outside this slice.
 
+Scalar-field-only value structs are now admitted at aggregate call boundaries.
+The classifier regression
+`accepts_scalar_struct_parameter_reads_in_the_shared_contract` and the hosted
+fixtures `cranelift_backend_builds_and_runs_a_shared_scalar_struct_parameter_read`
+and `llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_read` compile
+and execute the same `Counter` parameter/read source through both selected
+backends. The slice covers read-only scalar fields in non-generic value
+structs; ownership-bearing fields, mutable indexed stores, generic structs, and
+the remaining semantic-to-backend migration stay outside this slice.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
