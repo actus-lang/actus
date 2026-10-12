@@ -137,6 +137,17 @@ pub trait BackendExpressionProvider {
         Err(unsupported(span, "aggregate field assignment"))
     }
 
+    fn assign_index(
+        &mut self,
+        _target: &Expr,
+        _index: &Expr,
+        _value: &Expr,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "fixed-array element assignment"))
+    }
+
     fn compound_assign_field(
         &mut self,
         _object: &Expr,

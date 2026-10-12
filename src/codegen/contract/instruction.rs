@@ -177,4 +177,14 @@ pub enum BackendInstruction {
         capacity: u32,
         span: SourceSpan,
     },
+    ArrayElementStore {
+        base: super::BackendValueId,
+        index: super::BackendValueId,
+        aggregate_layout: super::BackendLayout,
+        element_layout: super::BackendLayout,
+        element_type: BackendValueType,
+        value: super::BackendValueId,
+        capacity: u32,
+        span: SourceSpan,
+    },
 }

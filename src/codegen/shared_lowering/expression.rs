@@ -118,11 +118,9 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn supports_range_loops(&self) -> bool {
         true
     }
-
     fn supports_array_loops(&self) -> bool {
         true
     }
-
     fn array_capacity(
         &self,
         value: BackendValueId,
@@ -147,7 +145,6 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn exit_loop(&mut self) {
         self.loop_depth = self.loop_depth.saturating_sub(1);
     }
-
     fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
         self.value_type(value)
     }
@@ -161,7 +158,6 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn set_binding_value(&mut self, name: &str, value: BackendValueId) {
         state::set_binding_value(self, name, value);
     }
-
     fn enter_scope(&mut self, _span: SourceSpan) {
         self.locals.push(BTreeMap::new());
     }
@@ -227,7 +223,6 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     ) -> Result<(), BackendContractError> {
         drop::lower_binding(self, name, span, instructions)
     }
-
     fn bind_owner(
         &mut self,
         name: &str,
@@ -365,6 +360,17 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         aggregate::lower_field_assignment(self, object, field, value, span, instructions)
+    }
+
+    fn assign_index(
+        &mut self,
+        target: &Expr,
+        index: &Expr,
+        value: &Expr,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        aggregate::lower_array_element_assignment(self, target, index, value, span, instructions)
     }
 
     fn compound_assign_field(

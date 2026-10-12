@@ -166,6 +166,18 @@ fn validate_aggregate_instruction(
             *element_type,
             *capacity,
         ),
+        BackendInstruction::ArrayElementStore {
+            aggregate_layout,
+            element_layout,
+            element_type,
+            capacity,
+            ..
+        } => validate_array_element_store(
+            *aggregate_layout,
+            *element_layout,
+            *element_type,
+            *capacity,
+        ),
         _ => Ok(()),
     }
 }
@@ -186,6 +198,15 @@ fn validate_array_element_load(
         ));
     }
     validate_value_type(element_type)
+}
+
+fn validate_array_element_store(
+    aggregate_layout: super::BackendLayout,
+    element_layout: super::BackendLayout,
+    element_type: super::BackendValueType,
+    capacity: u32,
+) -> Result<(), BackendContractError> {
+    validate_array_element_load(aggregate_layout, element_layout, element_type, capacity)
 }
 
 fn validate_enum_construct(

@@ -1154,6 +1154,18 @@ the caller's post-call read; nested ownership fields, indexed stores, generic
 structs, and the remaining semantic-to-backend migration stay outside this
 slice.
 
+Fixed-array literal-index stores now use the shared aggregate contract. The
+classifier regression
+`accepts_fixed_array_element_stores_in_the_shared_contract` and the hosted
+fixtures
+`cranelift_backend_builds_and_runs_a_shared_fixed_array_element_store` and
+`llvm_backend_builds_and_runs_a_shared_fixed_array_element_store` compile and
+execute the same `Array[u32, 4]` store/read source through both selected
+backends. The neutral contract validates element layout, capacity, scalar
+value type, and integer index before emission; dynamic indexing, indexed
+compound assignment, aggregate element stores, and the remaining
+semantic-to-backend migration stay outside this slice.
+
 No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.

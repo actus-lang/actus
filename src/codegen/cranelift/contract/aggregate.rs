@@ -166,6 +166,45 @@ pub(super) fn lower_array_element_load(
     Ok(())
 }
 
+pub(super) fn lower_array_element_store(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::ArrayElementStore {
+        base,
+        index,
+        element_layout,
+        element_type,
+        value,
+        ..
+    } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift array element store expected".to_owned()));
+    };
+    let base = values.get(base).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift array base {} is unavailable", base.0))
+    })?;
+    let index = values.get(index).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift array index {} is unavailable", index.0))
+    })?;
+    let value = values.get(value).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift array value {} is unavailable", value.0))
+    })?;
+    let pointer_type = module.isa().pointer_type();
+    let index = coerce_array_index(builder, index, pointer_type);
+    let offset = builder.ins().imul_imm_u(index, i64::from(element_layout.size));
+    let address = builder.ins().iadd(base, offset);
+    let value_type = super::scalar_type(module, *element_type)?
+        .ok_or_else(|| BackendEmitError("Cranelift array element must be scalar".to_owned()))?;
+    if builder.func.dfg.value_type(value) != value_type {
+        return Err(BackendEmitError("Cranelift array element store type mismatch".to_owned()));
+    }
+    builder.ins().store(MemFlagsData::new(), value, address, 0);
+    Ok(())
+}
+
 fn coerce_array_index(
     builder: &mut FunctionBuilder<'_>,
     index: cranelift_codegen::ir::Value,
@@ -214,6 +253,9 @@ pub(super) fn lower_aggregate_instruction(
         }
         BackendInstruction::ArrayElementLoad { .. } => {
             lower_array_element_load(module, builder, instruction, values)
+        }
+        BackendInstruction::ArrayElementStore { .. } => {
+            lower_array_element_store(module, builder, instruction, values)
         }
         _ => Err(BackendEmitError("Cranelift aggregate instruction expected".to_owned())),
     }

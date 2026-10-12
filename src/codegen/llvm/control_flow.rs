@@ -192,7 +192,8 @@ fn emit_non_control_instruction(
         }
         BackendInstruction::AggregateConstruct { .. }
         | BackendInstruction::AggregateFieldLoad { .. }
-        | BackendInstruction::ArrayElementLoad { .. } => {
+        | BackendInstruction::ArrayElementLoad { .. }
+        | BackendInstruction::ArrayElementStore { .. } => {
             super::aggregates::emit_aggregate_instruction(context, builder, instruction, values)
         }
         BackendInstruction::AggregateFieldStore { .. } => {

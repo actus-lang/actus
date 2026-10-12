@@ -78,6 +78,9 @@ pub(super) fn emit_aggregate_instruction(
         BackendInstruction::ArrayElementLoad { .. } => {
             emit_array_element_load(context, builder, instruction, values)
         }
+        BackendInstruction::ArrayElementStore { .. } => {
+            emit_array_element_store(context, builder, instruction, values)
+        }
         _ => Err(BackendEmitError("LLVM aggregate instruction expected".to_owned())),
     }
 }
@@ -133,6 +136,61 @@ fn emit_array_element_load(
         return Err(BackendEmitError("LLVM failed to load array element".to_owned()));
     }
     values.insert(*result, value);
+    Ok(false)
+}
+
+fn emit_array_element_store(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::ArrayElementStore {
+        base,
+        index,
+        element_layout,
+        element_type,
+        value,
+        ..
+    } = instruction
+    else {
+        return Err(BackendEmitError("LLVM array element store expected".to_owned()));
+    };
+    let base = values
+        .get(base)
+        .copied()
+        .ok_or_else(|| BackendEmitError(format!("LLVM array base {} is unavailable", base.0)))?;
+    let index = values
+        .get(index)
+        .copied()
+        .ok_or_else(|| BackendEmitError(format!("LLVM array index {} is unavailable", index.0)))?;
+    let value = values
+        .get(value)
+        .copied()
+        .ok_or_else(|| BackendEmitError(format!("LLVM array value {} is unavailable", value.0)))?;
+    let index_type = unsafe { LLVMInt64TypeInContext(context) };
+    let index =
+        unsafe { LLVMBuildZExt(builder, index, index_type, c"array.index".as_ptr().cast()) };
+    let scale = unsafe { LLVMConstInt(index_type, u64::from(element_layout.size), 0) };
+    let offset = unsafe { LLVMBuildMul(builder, index, scale, c"array.offset".as_ptr().cast()) };
+    let address = unsafe {
+        LLVMBuildGEP2(
+            builder,
+            LLVMInt8TypeInContext(context),
+            base,
+            &offset as *const _ as *mut _,
+            1,
+            c"array.element".as_ptr().cast(),
+        )
+    };
+    if address.is_null() {
+        return Err(BackendEmitError("LLVM failed to address array element".to_owned()));
+    }
+    let value_type = super::values::llvm_type(context, *element_type)?;
+    if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to store array element".to_owned()));
+    }
+    let _ = (value_type, element_layout);
     Ok(false)
 }
 

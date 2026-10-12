@@ -386,7 +386,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             Place::Field { object, field, .. } => {
                 self.provider.assign_field(&object.to_expr(), field, value, span, instructions)
             }
-            Place::Index { .. } => Err(unsupported(span, "assignment target")),
+            Place::Index { target, index, .. } => {
+                self.provider.assign_index(&target.to_expr(), index, value, span, instructions)
+            }
         }
     }
 

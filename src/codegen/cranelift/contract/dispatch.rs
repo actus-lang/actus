@@ -64,12 +64,12 @@ pub(super) fn lower_instruction(
         BackendInstruction::AggregateConstruct { .. }
         | BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. }
-        | BackendInstruction::ArrayElementLoad { .. } => {
+        | BackendInstruction::ArrayElementLoad { .. }
+        | BackendInstruction::ArrayElementStore { .. } => {
             aggregate::lower_aggregate_instruction(module, builder, instruction, values)
         }
     }
 }
-
 fn lower_scalar(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
