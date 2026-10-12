@@ -707,7 +707,19 @@ branch-merge value contract. The regression coverage is
 parameters use the same value-rebinding model while nested branch mutation
 remains rejected until a merge contract exists. The negative regression
 `rejects_outer_scalar_assignment_without_a_branch_merge_contract` verifies that
-boundary explicitly. The LLVM CLI fixture
+boundary explicitly.
+
+Generic AST specialization is now owned by the backend-neutral
+`src/codegen/generic/` module. Generic verb expansion, type substitution,
+transitive instance discovery, specialized naming, and specialized declaration
+materialization no longer live under the Cranelift implementation directory.
+Both CLI backend paths use the same specialization functions, and LLVM-only
+library compilation no longer requires the Cranelift feature for this stage.
+Machine-dependent generic layout calculation remains backend-owned. This closes
+the generic specialization ownership slice but does not close Gate 44.7.1:
+complete shared semantic lowering, LLVM CLI emission coverage, typed unsupported
+operation diagnostics, and full cross-backend acceptance remain open.
+
 `llvm_backend_builds_and_runs_shared_scalar_control_flow` builds and executes a
 program that declares, reassigns, branches on, and returns a scalar owner.
 The LLVM CLI regression

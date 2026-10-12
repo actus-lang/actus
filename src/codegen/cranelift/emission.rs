@@ -102,7 +102,7 @@ fn prepare_program(
         &local_instances,
     );
     let specialized_program =
-        super::generic::specialize_program(&normalized_program, &generic_instances)?;
+        crate::codegen::specialize_program(&normalized_program, &generic_instances)?;
     for instance in super::generic::collect_concrete_type_instances(&specialized_program) {
         if !generic_instances.iter().any(|known| known.identity() == instance.identity()) {
             generic_instances.push(instance);

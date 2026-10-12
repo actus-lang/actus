@@ -6,6 +6,7 @@ mod constants;
 mod contract;
 #[cfg(feature = "cranelift")]
 pub mod cranelift;
+mod generic;
 mod linker;
 #[cfg(feature = "llvm")]
 pub mod llvm;
@@ -55,11 +56,8 @@ pub(crate) use signature::{lower_parameter, lower_return};
 pub use symbols::{BackendSymbolBindings, SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
 #[cfg(feature = "cranelift")]
-pub(crate) use cranelift::generic::expand_generic_instances;
-#[cfg(feature = "cranelift")]
-pub(crate) use cranelift::generic::specialize_program;
-#[cfg(feature = "cranelift")]
-pub(crate) use cranelift::generic::specialized_generic_name;
-#[cfg(feature = "cranelift")]
 pub(crate) use cranelift::native::reachable_call_names;
+pub(crate) use generic::expand_generic_instances;
+pub(crate) use generic::specialize_program;
+pub(crate) use generic::specialized_generic_name;
 pub(crate) use result_constructors::normalize_program;

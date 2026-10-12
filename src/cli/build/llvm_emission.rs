@@ -51,7 +51,6 @@ pub(super) fn emit_objects_llvm(
     Ok(objects)
 }
 
-#[cfg(feature = "cranelift")]
 fn llvm_generic_inputs(
     plan: &ModuleCompilationPlan,
     configuration: &CompilerConfiguration,
@@ -91,15 +90,6 @@ fn llvm_generic_inputs(
     Ok((generic_types, generic_instances))
 }
 
-#[cfg(not(feature = "cranelift"))]
-fn llvm_generic_inputs(
-    _plan: &ModuleCompilationPlan,
-    _configuration: &CompilerConfiguration,
-) -> Result<(Vec<crate::ast::TypeName>, Vec<crate::semantic::GenericInstance>), BackendEmitError> {
-    Ok((Vec::new(), Vec::new()))
-}
-
-#[cfg(feature = "cranelift")]
 fn specialize_llvm_program(
     program: &crate::ast::Program,
     configuration: &CompilerConfiguration,
@@ -108,16 +98,6 @@ fn specialize_llvm_program(
     let targeted = crate::semantic::filter_program_for_target(program, configuration.target());
     let normalized = crate::codegen::normalize_program(&targeted);
     crate::codegen::specialize_program(&normalized, generic_instances)
-}
-
-#[cfg(not(feature = "cranelift"))]
-fn specialize_llvm_program(
-    program: &crate::ast::Program,
-    configuration: &CompilerConfiguration,
-    _generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<crate::ast::Program, BackendEmitError> {
-    let targeted = crate::semantic::filter_program_for_target(program, configuration.target());
-    Ok(crate::codegen::normalize_program(&targeted))
 }
 
 fn llvm_object(
@@ -146,7 +126,6 @@ fn llvm_module_bindings(
                 name.clone(),
                 symbol.as_str().to_owned(),
             ));
-            #[cfg(feature = "cranelift")]
             for instance in generic_instances.iter().filter(|instance| &instance.name == name) {
                 let specialized = crate::codegen::specialized_generic_name(instance);
                 let symbol = SymbolIdentity::new(

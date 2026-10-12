@@ -6,9 +6,9 @@ use crate::ast::{
 };
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::super::native::BackendEmitError;
+use crate::codegen::BackendEmitError;
 
-pub(in crate::codegen) fn specialized_structs(
+pub(crate) fn specialized_structs(
     program: &Program,
     instances: &[GenericInstance],
 ) -> Result<Vec<StructDef>, BackendEmitError> {
@@ -42,7 +42,7 @@ pub(in crate::codegen) fn specialized_structs(
         .collect()
 }
 
-pub(in crate::codegen) fn specialized_enums(
+pub(crate) fn specialized_enums(
     program: &Program,
     instances: &[GenericInstance],
 ) -> Result<Vec<EnumDef>, BackendEmitError> {
@@ -359,7 +359,7 @@ fn specialize_type(type_name: &TypeName, generic_names: &HashSet<String>) -> Typ
     }
 }
 
-pub(in crate::codegen) fn canonical_type_name(type_name: &TypeName) -> String {
+pub(crate) fn canonical_type_name(type_name: &TypeName) -> String {
     let role = type_name
         .reference_role
         .as_ref()
