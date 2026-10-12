@@ -8,6 +8,7 @@ use super::super::super::{
 use super::super::SharedExpressionProvider;
 use super::super::support::expression_span;
 use super::super::support::unsupported;
+use super::packed;
 
 pub(super) fn parameter_nominal_types(
     verb: &crate::ast::VerbDecl,
@@ -261,11 +262,23 @@ pub(super) fn lower_field_access_expression(
     let base = provider.lower_expression(object, instructions)?;
     let type_name = provider
         .nominal_type(base)
+        .cloned()
         .ok_or_else(|| unsupported(span, "aggregate field access has no nominal type"))?;
     let aggregate_layout = provider
         .layouts
-        .layout_for(type_name)
+        .layout_for(&type_name)
         .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?;
+    if provider.layouts.packed_field_for(&type_name, field).is_some() {
+        return packed::lower_field_access(
+            provider,
+            base,
+            &type_name,
+            field,
+            aggregate_layout,
+            span,
+            instructions,
+        );
+    }
     let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
@@ -298,6 +311,17 @@ pub(super) fn lower_field_assignment(
         .nominal_type(base)
         .cloned()
         .ok_or_else(|| unsupported(span, "aggregate field assignment has no nominal type"))?;
+    if provider.layouts.packed_field_for(&type_name, field).is_some() {
+        return packed::lower_field_assignment(
+            provider,
+            base,
+            &type_name,
+            field,
+            value,
+            span,
+            instructions,
+        );
+    }
     let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
@@ -342,6 +366,43 @@ pub(super) fn lower_field_compound_assignment(
         .layouts
         .layout_for(&type_name)
         .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?;
+    if provider.layouts.packed_field_for(&type_name, field).is_some() {
+        return packed::lower_field_compound_assignment(
+            provider,
+            base,
+            &type_name,
+            field,
+            operator,
+            value,
+            aggregate_layout,
+            span,
+            instructions,
+        );
+    }
+    return lower_plain_field_compound_assignment(
+        provider,
+        base,
+        &type_name,
+        field,
+        operator,
+        value,
+        aggregate_layout,
+        span,
+        instructions,
+    );
+}
+
+fn lower_plain_field_compound_assignment(
+    provider: &mut SharedExpressionProvider<'_>,
+    base: BackendValueId,
+    type_name: &TypeName,
+    field: &str,
+    operator: CompoundAssignmentOp,
+    value: &Expr,
+    aggregate_layout: super::super::super::BackendLayout,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
     let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;

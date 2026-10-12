@@ -166,6 +166,29 @@ fn preserves_nominal_type_for_aggregate_array_element_field_access() {
 }
 
 #[test]
+fn lowers_array_pack_bit_fields_into_neutral_instructions() {
+    let source = "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { erg registers: Array[Register, 2] = Array[Register, 2](); registers[1] = Register { storage: 0, }; registers[1].enabled = 1; return registers[1].enabled; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "pack field fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("pack field fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("pack field access should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::PackedFieldLoad { width: 1, .. }
+    )));
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::PackedFieldStore { width: 1, .. }
+    )));
+}
+
+#[test]
 fn lowers_scalar_aggregate_field_assignment_into_neutral_store() {
     let source = "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value = 42; return counter.value; }";
     let (tokens, errors) = actus::lexer::scan(source);

@@ -801,8 +801,13 @@ The next contract slice now exposes validated packed-field metadata
 (`bit_offset`, `width`, storage layout, and endianness) through the neutral
 layout provider. The regression
 `exposes_pack_bit_field_metadata_to_the_neutral_contract` verifies the metadata
-for a little-endian `u1` field. Backend bit extraction and update instructions
-remain open until both emitters consume this metadata.
+for a little-endian `u1` field. Backend bit extraction and update instructions now consume this metadata
+through the shared `PackedFieldLoad` and `PackedFieldStore` contract. The
+regression `both_backends_consume_shared_array_pack_bit_fields` verifies LLVM
+IR emission and Cranelift object emission for an array-backed little-endian
+`u1` field. A separate hosted fixture also builds and executes the same source
+with LLVM and returns the updated field value. Big-endian packed emission and
+unit-return call lowering remain separate open slices.
 
 The neutral cleanup provider now uses the same program-backed layout source for
 builtin cleanup bridges and nested owned `Buffer` or `Region` field descriptors.

@@ -65,7 +65,19 @@ fn both_backends_consume_shared_fixed_array_iteration() {
     assert!(object.symbols().any(|symbol| symbol.name() == Ok("inspect")));
 }
 
-#[cfg(feature = "cranelift")]
+#[test]
+fn llvm_consumes_shared_array_pack_bit_fields() {
+    let source = "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { erg registers: Array[Register, 2] = Array[Register, 2](); registers[1] = Register { storage: 0, }; registers[1].enabled = 1; return registers[1].enabled; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "packed field fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("packed field fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("packed fields should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume packed field instructions");
+    assert!(llvm_ir.contains("packed.field.load"));
+    assert!(llvm_ir.contains("packed.field.updated"));
+}
+
 #[test]
 fn both_backends_emit_user_defined_drop_performance_calls() {
     let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect() { erg value: Counter = Counter { value: 7, }; return; }";

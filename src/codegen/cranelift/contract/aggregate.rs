@@ -237,6 +237,134 @@ pub(super) fn lower_aggregate_field_instruction(
     }
 }
 
+fn lower_packed_field_load(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::PackedFieldLoad {
+        result,
+        base,
+        storage_layout,
+        bit_offset,
+        width,
+        big_endian,
+        ty,
+        ..
+    } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift packed field load expected".to_owned()));
+    };
+    if *big_endian {
+        return Err(BackendEmitError(
+            "Cranelift neutral packed big-endian fields are not implemented".to_owned(),
+        ));
+    }
+    let base = values.get(base).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift packed field base {} is unavailable", base.0))
+    })?;
+    let storage_type = packed_storage_type(*storage_layout)?;
+    let storage = builder.ins().load(storage_type, MemFlagsData::new(), base, 0);
+    let mask = packed_mask(builder, storage_type, *width)?;
+    let shifted = if *bit_offset == 0 {
+        storage
+    } else {
+        let shift = builder.ins().iconst(storage_type, i64::from(*bit_offset));
+        builder.ins().ushr(storage, shift)
+    };
+    let extracted = builder.ins().band(shifted, mask);
+    let target_type = super::scalar_type(module, *ty)?
+        .ok_or_else(|| BackendEmitError("Cranelift packed field must be scalar".to_owned()))?;
+    values.insert(*result, coerce_integer(builder, extracted, target_type));
+    Ok(())
+}
+
+fn lower_packed_field_store(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::PackedFieldStore {
+        base,
+        storage_layout,
+        bit_offset,
+        width,
+        big_endian,
+        value,
+        ty,
+        ..
+    } = instruction
+    else {
+        return Err(BackendEmitError("Cranelift packed field store expected".to_owned()));
+    };
+    if *big_endian {
+        return Err(BackendEmitError(
+            "Cranelift neutral packed big-endian fields are not implemented".to_owned(),
+        ));
+    }
+    let base = values.get(base).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift packed field base {} is unavailable", base.0))
+    })?;
+    let value = values.get(value).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift packed field value {} is unavailable", value.0))
+    })?;
+    let storage_type = packed_storage_type(*storage_layout)?;
+    let current = builder.ins().load(storage_type, MemFlagsData::new(), base, 0);
+    let mask = packed_mask(builder, storage_type, *width)?;
+    let shift = builder.ins().iconst(storage_type, i64::from(*bit_offset));
+    let shifted_mask = if *bit_offset == 0 { mask } else { builder.ins().ishl(mask, shift) };
+    let inverse = builder.ins().bnot(shifted_mask);
+    let cleared = builder.ins().band(current, inverse);
+    let _ = module;
+    let value = coerce_integer(builder, value, storage_type);
+    let value = builder.ins().band(value, mask);
+    let value = if *bit_offset == 0 { value } else { builder.ins().ishl(value, shift) };
+    let updated = builder.ins().bor(cleared, value);
+    builder.ins().store(MemFlagsData::new(), updated, base, 0);
+    let _ = ty;
+    Ok(())
+}
+
+fn packed_storage_type(
+    layout: crate::codegen::BackendLayout,
+) -> Result<cranelift_codegen::ir::Type, BackendEmitError> {
+    match layout.size {
+        1 => Ok(cranelift_codegen::ir::types::I8),
+        2 => Ok(cranelift_codegen::ir::types::I16),
+        4 => Ok(cranelift_codegen::ir::types::I32),
+        8 => Ok(cranelift_codegen::ir::types::I64),
+        _ => {
+            Err(BackendEmitError("Cranelift packed storage must be 1, 2, 4, or 8 bytes".to_owned()))
+        }
+    }
+}
+
+fn packed_mask(
+    builder: &mut FunctionBuilder<'_>,
+    ty: cranelift_codegen::ir::Type,
+    width: u8,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    let value = if width == 64 { -1 } else { (1i64 << width) - 1 };
+    Ok(builder.ins().iconst(ty, value))
+}
+
+fn coerce_integer(
+    builder: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+    target: cranelift_codegen::ir::Type,
+) -> cranelift_codegen::ir::Value {
+    let source = builder.func.dfg.value_type(value);
+    if source == target {
+        value
+    } else if source.bits() < target.bits() {
+        builder.ins().uextend(target, value)
+    } else {
+        builder.ins().ireduce(target, value)
+    }
+}
+
 pub(super) fn lower_aggregate_instruction(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
@@ -250,6 +378,12 @@ pub(super) fn lower_aggregate_instruction(
         BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. } => {
             lower_aggregate_field_instruction(module, builder, instruction, values)
+        }
+        BackendInstruction::PackedFieldLoad { .. } => {
+            lower_packed_field_load(module, builder, instruction, values)
+        }
+        BackendInstruction::PackedFieldStore { .. } => {
+            lower_packed_field_store(module, builder, instruction, values)
         }
         BackendInstruction::ArrayElementLoad { .. } => {
             lower_array_element_load(module, builder, instruction, values)

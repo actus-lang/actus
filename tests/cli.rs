@@ -38,6 +38,40 @@ fn llvm_backend_builds_and_runs_a_scalar_root_program() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn llvm_backend_builds_and_runs_array_pack_bit_fields() {
+    let root = std::env::temp_dir().join(format!("actus-cli-llvm-pack-{}", std::process::id()));
+    let input = root.join("main.act");
+    let output = root.join("main.bin");
+    fs::create_dir_all(&root).expect("create LLVM pack fixture directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm-pack-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write LLVM pack fixture manifest");
+    fs::write(
+        &input,
+        "pack Register { erg storage: u32; layout little; fields { erg enabled: u1 at 0; abs _reserved: u31 at 1 = 0; } } verb main() -> Int { erg registers: Array[Register, 2] = Array[Register, 2](); registers[1] = Register { storage: 0, }; registers[1].enabled = 1; return registers[1].enabled; }\n",
+    )
+    .expect("write LLVM pack fixture source");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM pack fixture");
+    assert_eq!(status.code(), Some(1));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn llvm_backend_builds_and_runs_a_user_defined_drop_performance() {
     let root = std::env::temp_dir().join(format!("actus-cli-llvm-drop-{}", std::process::id()));
     let input = root.join("main.act");

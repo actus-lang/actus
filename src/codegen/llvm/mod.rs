@@ -1,4 +1,5 @@
 mod aggregates;
+mod arrays;
 mod branches;
 mod calls;
 mod cleanup;
@@ -14,6 +15,7 @@ mod integer_ops;
 mod memory;
 mod module;
 mod object;
+mod packed;
 mod returns;
 mod values;
 mod verification;

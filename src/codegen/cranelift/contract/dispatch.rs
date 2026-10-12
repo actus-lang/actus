@@ -62,14 +62,24 @@ pub(super) fn lower_instruction(
             aggregate_values,
             function,
         ),
-        BackendInstruction::AggregateConstruct { .. }
-        | BackendInstruction::AggregateFieldLoad { .. }
-        | BackendInstruction::AggregateFieldStore { .. }
-        | BackendInstruction::ArrayElementLoad { .. }
-        | BackendInstruction::ArrayElementStore { .. } => {
+        _ if is_aggregate_instruction(instruction) => {
             aggregate::lower_aggregate_instruction(module, builder, instruction, values)
         }
+        _ => unreachable!("Cranelift instruction dispatch is exhaustive"),
     }
+}
+
+fn is_aggregate_instruction(instruction: &BackendInstruction) -> bool {
+    matches!(
+        instruction,
+        BackendInstruction::AggregateConstruct { .. }
+            | BackendInstruction::AggregateFieldLoad { .. }
+            | BackendInstruction::AggregateFieldStore { .. }
+            | BackendInstruction::PackedFieldLoad { .. }
+            | BackendInstruction::PackedFieldStore { .. }
+            | BackendInstruction::ArrayElementLoad { .. }
+            | BackendInstruction::ArrayElementStore { .. }
+    )
 }
 
 fn cf(

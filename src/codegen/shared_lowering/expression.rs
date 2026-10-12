@@ -12,6 +12,7 @@ mod dispatch;
 mod drop;
 mod layout;
 mod literals;
+mod packed;
 mod state;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
