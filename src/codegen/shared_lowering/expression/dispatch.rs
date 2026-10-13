@@ -102,7 +102,12 @@ fn lower_borrow(
     let value = lower_expression(provider, expression, instructions)?;
     if matches!(
         provider.value_type(value),
-        Some(BackendValueType::Pointer | BackendValueType::NichePointerOption { .. })
+        Some(
+            BackendValueType::Bool
+                | BackendValueType::Integer { .. }
+                | BackendValueType::Pointer
+                | BackendValueType::NichePointerOption { .. },
+        )
     ) {
         Ok(value)
     } else {

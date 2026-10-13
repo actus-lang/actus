@@ -118,6 +118,16 @@ fn lowers_pointer_valued_borrow_without_allocating_a_second_value() {
 }
 
 #[test]
+fn lowers_scalar_borrow_without_allocating_a_second_value() {
+    let source = "verb observe(abs value: Int) -> Int { return 0; } verb main() -> Int { erg value = 40; { abs view = ref value; observe(value: view); } return 0; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "scalar borrow fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("scalar borrow fixture should parse");
+    lower_scalar_program("actus_root", &program, None)
+        .expect("scalar borrow should lower through the neutral contract");
+}
+
+#[test]
 fn lowers_pointer_option_constructors_through_the_neutral_contract() {
     let source = "struct Node { value: Int, abs next: Option[abs Node], } verb sum(abs node: Node) -> Int { abs next = ref node.next; return case next { Option.Some(_) => 1, Option.None => 0, }; } verb main() -> Int { erg node = Node { value: 7, next: Option[abs Node].None, }; return sum(node: abs node); }";
     let (tokens, errors) = actus::lexer::scan(source);
