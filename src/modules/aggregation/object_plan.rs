@@ -174,7 +174,41 @@ fn append_generic_type_declaration(
     if let Some(identity) = type_declaration_identity(declaration)
         && declaration_identities.insert(identity)
     {
+        let declaration = declaration.clone();
         declarations.push(declaration.clone());
+        for dependency in declaration_type_dependencies(&declaration) {
+            append_generic_type_declaration(
+                compilation,
+                dependency,
+                declaration_identities,
+                declarations,
+            );
+        }
+    }
+}
+
+fn declaration_type_dependencies(declaration: &TopLevelDecl) -> Vec<&crate::ast::TypeName> {
+    match declaration {
+        TopLevelDecl::Struct(definition) => {
+            definition.fields.iter().map(|field| &field.ty).collect()
+        }
+        TopLevelDecl::Enum(definition) => definition
+            .variants
+            .iter()
+            .flat_map(|variant| match &variant.payload {
+                crate::ast::EnumPayload::Unit => Vec::new(),
+                crate::ast::EnumPayload::Tuple(fields) => fields.iter().collect(),
+                crate::ast::EnumPayload::Struct(fields) => {
+                    fields.iter().map(|field| &field.ty).collect()
+                }
+            })
+            .collect(),
+        TopLevelDecl::Pack(definition) => {
+            let mut dependencies = vec![definition.storage.type_name()];
+            dependencies.extend(definition.fields.iter().map(|field| &field.ty));
+            dependencies
+        }
+        _ => Vec::new(),
     }
 }
 
