@@ -35,6 +35,15 @@ pub(crate) fn retain_reachable_root_functions(
                 }
             }
         }
+        for cleanup in &function.cleanup {
+            for descriptor in cleanup.resolved_bridges.iter().flatten() {
+                let Some(symbol) = descriptor.performance_symbol.as_ref() else { continue };
+                let symbol = symbol.as_str();
+                if functions.contains_key(symbol) {
+                    pending.push_back(symbol.to_owned());
+                }
+            }
+        }
     }
     module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
     module

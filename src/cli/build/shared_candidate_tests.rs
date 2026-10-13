@@ -40,6 +40,15 @@ fn accepts_scalar_result_construction_and_case_return() {
 }
 
 #[test]
+fn accepts_nested_option_case_expression_in_arithmetic() {
+    let source = "struct Node { value: Int, abs next: Option[abs Node], } verb sum(abs node: Node) -> Int { abs next = ref node.next; return node.value + case next { Option.Some(_) => 1, Option.None => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("nested Option case fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_bounded_buffer_and_region_signatures() {
     let source = "verb create() -> Buffer { return Buffer[16]; } verb inspect(abs region: Region[u8]) { return; }";
     let (tokens, errors) = scan(source);

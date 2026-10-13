@@ -498,7 +498,13 @@ expressions are hoisted into synthetic owners, then lowered through the
 existing branch and merge-block path. `examples/arena_tree.act` now builds and
 runs through both LLVM and Cranelift with exit status 60. More complex nested
 cases inside additional expression forms remain a separate follow-up rather
-than being claimed by this slice.
+than being claimed by this slice. The shared CLI candidate now admits the
+corresponding nested `Option` case used as an arithmetic operand, including
+the borrowed recursive field shape required by the fixture. The regression
+`both_native_backends_build_nested_option_case_arithmetic_through_shared_lowering`
+builds and runs the same source through LLVM and Cranelift with exit status 41;
+the classifier and neutral lowering therefore agree at this boundary without
+falling back to a backend-specific implementation.
 The LLVM parameter-value mapper skips the hidden return-slot parameter when
 assigning neutral `BackendValueId`s, so typed-failure payloads cannot alias the
 slot pointer. This is covered by the hosted parity fixture.

@@ -1,6 +1,5 @@
 use crate::ast::{
-    BinaryOp, Block, CaseBody, DispatchMode, EnumPayload, Expr, IfBranch, Pattern, Place, Program,
-    Role, Stmt,
+    BinaryOp, Block, DispatchMode, EnumPayload, Expr, IfBranch, Place, Program, Role, Stmt,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,6 +9,13 @@ mod shared_candidate_arrays;
 use shared_candidate_arrays::{
     aggregate_array_bindings, aggregate_array_expression, array_bindings, fixed_array_expression,
     fixed_array_index_expression, integer_binding, scalar_place, supported_array_type,
+};
+
+#[path = "shared_candidate_cases.rs"]
+mod shared_candidate_cases;
+
+use shared_candidate_cases::{
+    result_case_expression, scalar_case_expression, scalar_statement_call,
 };
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
@@ -123,14 +129,18 @@ fn returns_value(program: &Program) -> BTreeMap<String, bool> {
 fn supported_struct(definition: &crate::ast::StructDef) -> bool {
     definition.generic_parameters.is_empty()
         && definition.fields.iter().all(|field| {
-            matches!(field.role, crate::ast::StructFieldRole::Erg) && scalar_type(&field.ty)
+            (matches!(field.role, crate::ast::StructFieldRole::Erg) && scalar_type(&field.ty))
+                || (matches!(field.role, crate::ast::StructFieldRole::Abs)
+                    && scalar_option_type(&field.ty))
         })
 }
 
 fn supported_value_struct(definition: &crate::ast::StructDef) -> bool {
     definition.generic_parameters.is_empty()
         && definition.fields.iter().all(|field| {
-            matches!(field.role, crate::ast::StructFieldRole::Value) && scalar_type(&field.ty)
+            (matches!(field.role, crate::ast::StructFieldRole::Value) && scalar_type(&field.ty))
+                || (matches!(field.role, crate::ast::StructFieldRole::Abs)
+                    && scalar_option_type(&field.ty))
         })
 }
 
@@ -162,6 +172,13 @@ fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
         type_name.name.as_str(),
         "Bool" | "Int" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
     ) || matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String")
+}
+
+fn scalar_option_type(type_name: &crate::ast::TypeName) -> bool {
+    type_name.name == "Option"
+        && type_name.arguments.len() == 1
+        && type_name.arguments[0].reference_role == Some(Role::Abs)
+        && type_name.arguments[0].arguments.is_empty()
 }
 
 fn scalar_or_result_type(type_name: &crate::ast::TypeName, unit_enums: &BTreeSet<String>) -> bool {
@@ -259,6 +276,7 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         | Expr::Integer { .. }
         | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. } => true,
+        Expr::Borrow { expression, .. } => scalar_expression(expression, context),
         Expr::Grouping { expression, .. } => scalar_nested_expression(expression, context),
         Expr::Unary { expression, .. } => scalar_expression(expression, context),
         Expr::Cast { expression, target, .. } => {
@@ -268,6 +286,7 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
             scalar_binary_expression(left, *operator, right, context)
         }
         Expr::Call { callee, arguments, .. } => scalar_call_expression(callee, arguments, context),
+        Expr::Case { .. } => scalar_case_expression(expression, context),
         Expr::MethodCall { receiver, method, arguments, .. } => {
             let Expr::Identifier { name, .. } = receiver.as_ref() else { return false };
             name.starts_with("Result[")
@@ -311,9 +330,7 @@ fn scalar_nested_expression(expression: &Expr, context: &CandidateContext<'_>) -
 }
 
 fn scalar_return_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
-    scalar_expression(expression, context)
-        || result_case_expression(expression, context)
-        || value_if_expression(expression, context)
+    scalar_expression(expression, context) || value_if_expression(expression, context)
 }
 
 fn value_if_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
@@ -460,39 +477,6 @@ fn array_loop_expression(expression: &Expr, context: &CandidateContext<'_>) -> b
         }
         _ => scalar_expression(expression, context),
     }
-}
-
-fn result_case_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
-    let Expr::Case { subject, branches, .. } = expression else { return false };
-    if branches.is_empty() || !scalar_expression(subject, context) {
-        return false;
-    }
-    branches.iter().enumerate().all(|(index, branch)| {
-        if branch.guard.is_some() {
-            return false;
-        }
-        match &branch.body {
-            CaseBody::Expression(body) if scalar_expression(body, context) => {}
-            CaseBody::Block(block) if scalar_return_block(block, context) => {}
-            _ => return false,
-        }
-        match &branch.pattern {
-            Pattern::Variant { variant, .. } => matches!(variant.as_str(), "Ok" | "Err"),
-            Pattern::Wildcard { .. } => index + 1 == branches.len(),
-            Pattern::Literal { .. } => false,
-        }
-    })
-}
-
-fn scalar_statement_call(expression: &Expr, context: &CandidateContext<'_>) -> bool {
-    let Expr::Call { callee, arguments, .. } = expression else {
-        return false;
-    };
-    context.returns_value.contains_key(callee)
-        && arguments.iter().all(|argument| {
-            !matches!(argument.expression, Expr::Index { .. })
-                && scalar_expression(&argument.expression, context)
-        })
 }
 
 #[cfg(test)]
