@@ -50,9 +50,13 @@ pub(super) fn bind_enum_variant_payload(
         })
         .or_else(|| nominal_payload_type(provider, subject, discriminant))
         .ok_or_else(|| unsupported(span, "enum case payload source type"))?;
+    let payload_nominal_type = nominal_payload_type_name(provider, subject, discriminant);
     let layout = neutral_enum_layout(provider, subject, span)?;
     let result = provider.allocate();
     provider.remember_value(result, payload_type);
+    if let Some(payload_nominal_type) = payload_nominal_type {
+        provider.remember_nominal_type(result, payload_nominal_type);
+    }
     instructions.push(BackendInstruction::EnumPayloadBinding {
         result,
         subject,
@@ -113,6 +117,27 @@ fn nominal_payload_type(
         None
     }?;
     super::super::support::backend_value_type(provider.layouts, payload)
+}
+
+fn nominal_payload_type_name(
+    provider: &SharedExpressionProvider<'_>,
+    subject: BackendValueId,
+    discriminant: u32,
+) -> Option<crate::ast::TypeName> {
+    let type_name = provider.nominal_type(subject)?;
+    let niche_option =
+        matches!(provider.value_type(subject), Some(BackendValueType::NichePointerOption { .. }));
+    let argument = if type_name.name == "Option"
+        && type_name.arguments.len() == 1
+        && ((niche_option && discriminant == 1) || (!niche_option && discriminant == 0))
+    {
+        type_name.arguments.first()
+    } else if type_name.name == "Result" && type_name.arguments.len() == 2 && discriminant < 2 {
+        type_name.arguments.get(discriminant as usize)
+    } else {
+        None
+    }?;
+    Some(argument.clone())
 }
 
 fn neutral_enum_layout(

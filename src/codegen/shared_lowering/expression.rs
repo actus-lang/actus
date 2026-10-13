@@ -34,9 +34,11 @@ pub(super) struct SharedExpressionProvider<'a> {
     locals: Vec<BTreeMap<String, BackendValueId>>,
     verb_name: String,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
+    return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
     return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
     performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
+    performance_return_nominal_types: &'a BTreeMap<(String, String), Option<crate::ast::TypeName>>,
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
     bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
@@ -60,9 +62,14 @@ impl<'a> SharedExpressionProvider<'a> {
         verb: &VerbDecl,
         layouts: &'a impl super::super::BackendLayoutProvider,
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
+        return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
         return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
         performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
         performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
+        performance_return_nominal_types: &'a BTreeMap<
+            (String, String),
+            Option<crate::ast::TypeName>,
+        >,
         external_symbols: &'a BTreeMap<String, SymbolIdentity>,
         bindings: Option<&'a BackendSymbolBindings>,
         cleanup_plans: &'a [super::super::BackendCleanupPlan],
@@ -90,9 +97,11 @@ impl<'a> SharedExpressionProvider<'a> {
             locals: Vec::new(),
             verb_name: verb.name.clone(),
             return_types,
+            return_nominal_types,
             return_payload_types,
             performance_symbols,
             performance_return_types,
+            performance_return_nominal_types,
             external_symbols,
             bindings,
             cleanup_plans,
@@ -201,11 +210,7 @@ impl SharedExpressionProvider<'_> {
             .nominal_type(receiver_value)
             .ok_or_else(|| unsupported(*span, "performance receiver has no nominal type"))?;
         let key = (receiver_type.canonical_key(), method.clone());
-        let callee = self
-            .performance_symbols
-            .get(&key)
-            .cloned()
-            .ok_or_else(|| unsupported(*span, "performance method has no static symbol"))?;
+        let callee = self.method_callee(&key, method, *span)?;
         let mut lowered_arguments = Vec::with_capacity(arguments.len() + 1);
         lowered_arguments.push(receiver_value);
         lowered_arguments.extend(
@@ -216,17 +221,10 @@ impl SharedExpressionProvider<'_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         );
-        let result_type = self.performance_return_types.get(&key).copied().flatten();
+        let result_type = self.method_result_type(&key, method);
         let result = result_type.map(|_| self.allocate());
         if let (Some(result), Some(result_type)) = (result, result_type) {
-            self.remember_value(result, result_type);
-            if let Some(payload_types) = self.return_payload_types.get(method) {
-                for (discriminant, payload_type) in payload_types.iter().enumerate() {
-                    if let Some(payload_type) = payload_type {
-                        self.remember_enum_payload(result, discriminant as u32, *payload_type);
-                    }
-                }
-            }
+            self.remember_call_result(result, result_type, &key, method);
         }
         instructions.push(BackendInstruction::Call {
             callee,
@@ -235,6 +233,57 @@ impl SharedExpressionProvider<'_> {
             span: *span,
         });
         result.ok_or_else(|| unsupported(*span, "unit performance method cannot produce a value"))
+    }
+
+    fn method_callee(
+        &self,
+        key: &(String, String),
+        method: &str,
+        span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError> {
+        self.performance_symbols
+            .get(key)
+            .cloned()
+            .or_else(|| {
+                self.return_types
+                    .contains_key(method)
+                    .then(|| calls::callee_for(self, method, span).ok())
+                    .flatten()
+            })
+            .ok_or_else(|| unsupported(span, "method has no static symbol"))
+    }
+
+    fn method_result_type(&self, key: &(String, String), method: &str) -> Option<BackendValueType> {
+        self.performance_return_types
+            .get(key)
+            .copied()
+            .flatten()
+            .or_else(|| self.return_types.get(method).copied().flatten())
+    }
+
+    fn remember_call_result(
+        &mut self,
+        result: BackendValueId,
+        result_type: BackendValueType,
+        key: &(String, String),
+        method: &str,
+    ) {
+        self.remember_value(result, result_type);
+        let nominal_type = self
+            .performance_return_nominal_types
+            .get(key)
+            .and_then(Option::as_ref)
+            .or_else(|| self.return_nominal_types.get(method).and_then(Option::as_ref));
+        if let Some(nominal_type) = nominal_type {
+            self.remember_nominal_type(result, nominal_type.clone());
+        }
+        if let Some(payload_types) = self.return_payload_types.get(method) {
+            for (discriminant, payload_type) in payload_types.iter().enumerate() {
+                if let Some(payload_type) = payload_type {
+                    self.remember_enum_payload(result, discriminant as u32, *payload_type);
+                }
+            }
+        }
     }
 
     fn lower_unary(

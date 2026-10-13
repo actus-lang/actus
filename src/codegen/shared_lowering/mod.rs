@@ -126,9 +126,11 @@ pub(super) struct SharedDeclarations<'program> {
     performance_signatures: Vec<BackendSignature>,
     external_signatures: Vec<BackendSignature>,
     return_types: BTreeMap<String, Option<BackendValueType>>,
+    return_nominal_types: BTreeMap<String, Option<TypeName>>,
     return_payload_types: BTreeMap<String, [Option<BackendValueType>; 2]>,
     performance_symbols: BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: BTreeMap<(String, String), Option<BackendValueType>>,
+    performance_return_nominal_types: BTreeMap<(String, String), Option<TypeName>>,
 }
 
 impl<'program> SharedDeclarations<'program> {
@@ -163,8 +165,10 @@ impl<'program> SharedDeclarations<'program> {
         );
         let return_payload_types =
             shared_return_payload_types(&verbs, &externals, layouts, &performances);
-        let (performance_symbols, performance_return_types) =
-            performance_dispatch_maps(&performances, &performance_signatures);
+        let return_nominal_types =
+            performance::shared_return_nominal_types(&verbs, &externals, &performances);
+        let (performance_symbols, performance_return_types, performance_return_nominal_types) =
+            performance::performance_dispatch_maps(&performances, &performance_signatures);
         Ok(Self {
             verbs,
             externals,
@@ -172,39 +176,13 @@ impl<'program> SharedDeclarations<'program> {
             performance_signatures,
             external_signatures,
             return_types,
+            return_nominal_types,
             return_payload_types,
             performance_symbols,
             performance_return_types,
+            performance_return_nominal_types,
         })
     }
-}
-
-fn performance_dispatch_maps(
-    performances: &[(&PerformDecl, &VerbDecl)],
-    signatures: &[BackendSignature],
-) -> (
-    BTreeMap<(String, String), SymbolIdentity>,
-    BTreeMap<(String, String), Option<BackendValueType>>,
-) {
-    let symbols = performances
-        .iter()
-        .zip(signatures)
-        .map(|((perform, method), signature)| {
-            ((perform.target.canonical_key(), method.name.clone()), signature.symbol.clone())
-        })
-        .collect();
-    let return_types = performances
-        .iter()
-        .zip(signatures)
-        .map(|((perform, method), signature)| {
-            (
-                (perform.target.canonical_key(), method.name.clone()),
-                (signature.return_value.ty != BackendValueType::Unit)
-                    .then_some(signature.return_value.ty),
-            )
-        })
-        .collect();
-    (symbols, return_types)
 }
 
 fn build_backend_externals(
@@ -444,9 +422,11 @@ pub(super) fn lower_shared_verb(
     layouts: &impl BackendLayoutProvider,
     cleanup_plans: &[super::BackendCleanupPlan],
     return_types: &BTreeMap<String, Option<BackendValueType>>,
+    return_nominal_types: &BTreeMap<String, Option<TypeName>>,
     return_payload_types: &BTreeMap<String, [Option<BackendValueType>; 2]>,
     performance_symbols: &BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
+    performance_return_nominal_types: &BTreeMap<(String, String), Option<TypeName>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<super::BackendFunction, BackendContractError> {
@@ -455,9 +435,11 @@ pub(super) fn lower_shared_verb(
         verb,
         layouts,
         return_types,
+        return_nominal_types,
         return_payload_types,
         performance_symbols,
         performance_return_types,
+        performance_return_nominal_types,
         external_symbols,
         bindings,
         cleanup_plans,

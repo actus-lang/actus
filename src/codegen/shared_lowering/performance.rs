@@ -3,14 +3,80 @@
 
 use std::collections::BTreeMap;
 
+use crate::ast::{ExternalVerbDecl, TypeName};
 use crate::ast::{PerformDecl, VerbDecl};
 
 use super::super::{
     BackendBlockId, BackendCleanupPlan, BackendContractError, BackendFunction, BackendInstruction,
-    BackendLayoutProvider, BackendSymbolBindings, BackendValueType, SymbolIdentity,
+    BackendLayoutProvider, BackendSignature, BackendSymbolBindings, BackendValueType,
+    SymbolIdentity,
 };
 use super::expression::SharedExpressionProvider;
 use super::{SharedDeclarations, lower_shared_verb};
+
+pub(super) fn performance_dispatch_maps(
+    performances: &[(&PerformDecl, &VerbDecl)],
+    signatures: &[BackendSignature],
+) -> (
+    BTreeMap<(String, String), SymbolIdentity>,
+    BTreeMap<(String, String), Option<BackendValueType>>,
+    BTreeMap<(String, String), Option<TypeName>>,
+) {
+    let symbols = performances
+        .iter()
+        .zip(signatures)
+        .map(|((perform, method), signature)| {
+            ((perform.target.canonical_key(), method.name.clone()), signature.symbol.clone())
+        })
+        .collect();
+    let return_types = performances
+        .iter()
+        .zip(signatures)
+        .map(|((perform, method), signature)| {
+            (
+                (perform.target.canonical_key(), method.name.clone()),
+                (signature.return_value.ty != BackendValueType::Unit)
+                    .then_some(signature.return_value.ty),
+            )
+        })
+        .collect();
+    let return_nominal_types = performances
+        .iter()
+        .zip(signatures)
+        .map(|((perform, method), _)| {
+            (
+                (perform.target.canonical_key(), method.name.clone()),
+                method.return_type.as_ref().map(|return_type| return_type.ty.clone()),
+            )
+        })
+        .collect();
+    (symbols, return_types, return_nominal_types)
+}
+
+pub(super) fn shared_return_nominal_types(
+    verbs: &[&VerbDecl],
+    externals: &[&ExternalVerbDecl],
+    performances: &[(&PerformDecl, &VerbDecl)],
+) -> BTreeMap<String, Option<TypeName>> {
+    verbs
+        .iter()
+        .map(|verb| {
+            (verb.name.clone(), verb.return_type.as_ref().map(|return_type| return_type.ty.clone()))
+        })
+        .chain(externals.iter().map(|external| {
+            (
+                external.name.clone(),
+                external.return_type.as_ref().map(|return_type| return_type.ty.clone()),
+            )
+        }))
+        .chain(performances.iter().map(|(_, method)| {
+            (
+                method.name.clone(),
+                method.return_type.as_ref().map(|return_type| return_type.ty.clone()),
+            )
+        }))
+        .collect()
+}
 
 pub(super) fn lower_shared_functions(
     namespace: &str,
@@ -31,9 +97,11 @@ pub(super) fn lower_shared_functions(
             layouts,
             cleanup_plans,
             &declarations.return_types,
+            &declarations.return_nominal_types,
             &declarations.return_payload_types,
             &declarations.performance_symbols,
             &declarations.performance_return_types,
+            &declarations.performance_return_nominal_types,
             external_symbols,
             bindings,
         )?);
@@ -49,9 +117,11 @@ pub(super) fn lower_shared_functions(
             layouts,
             cleanup_plans,
             &declarations.return_types,
+            &declarations.return_nominal_types,
             &declarations.return_payload_types,
             &declarations.performance_symbols,
             &declarations.performance_return_types,
+            &declarations.performance_return_nominal_types,
             external_symbols,
             bindings,
         )?);
@@ -67,9 +137,11 @@ fn lower_shared_performance(
     layouts: &impl BackendLayoutProvider,
     cleanup_plans: &[BackendCleanupPlan],
     return_types: &BTreeMap<String, Option<BackendValueType>>,
+    return_nominal_types: &BTreeMap<String, Option<crate::ast::TypeName>>,
     return_payload_types: &BTreeMap<String, [Option<BackendValueType>; 2]>,
     performance_symbols: &BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
+    performance_return_nominal_types: &BTreeMap<(String, String), Option<crate::ast::TypeName>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendFunction, BackendContractError> {
@@ -78,9 +150,11 @@ fn lower_shared_performance(
         method,
         layouts,
         return_types,
+        return_nominal_types,
         return_payload_types,
         performance_symbols,
         performance_return_types,
+        performance_return_nominal_types,
         external_symbols,
         bindings,
         cleanup_plans,
