@@ -63,6 +63,9 @@ fn llvm_generic_inputs(
         .generic_instances;
     let mut generic_instances = caller_instances;
     for unit in plan.units() {
+        if !contains_generic_declaration(unit.implementation()) {
+            continue;
+        }
         let targeted_implementation =
             crate::codegen::normalize_program(&crate::semantic::filter_program_for_target(
                 unit.implementation(),
@@ -87,6 +90,16 @@ fn llvm_generic_inputs(
     let generic_types =
         generic_instances.iter().flat_map(|instance| instance.arguments.iter().cloned()).collect();
     Ok((generic_types, generic_instances))
+}
+
+fn contains_generic_declaration(program: &crate::ast::Program) -> bool {
+    program.declarations.iter().any(|declaration| match declaration {
+        crate::ast::TopLevelDecl::Verb(verb) => !verb.generic_parameters.is_empty(),
+        crate::ast::TopLevelDecl::ExternalVerb(verb) => !verb.generic_parameters.is_empty(),
+        crate::ast::TopLevelDecl::Struct(definition) => !definition.generic_parameters.is_empty(),
+        crate::ast::TopLevelDecl::Enum(definition) => !definition.generic_parameters.is_empty(),
+        _ => false,
+    })
 }
 
 fn specialize_llvm_program(
