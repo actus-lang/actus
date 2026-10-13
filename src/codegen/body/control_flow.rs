@@ -3,7 +3,16 @@
 use super::case_value::CaseOwnerInput;
 use super::{BackendBlock, BackendBlockId, BackendContractError, BackendInstruction, BodyLowering};
 use crate::ast::{Block, Expr, Stmt};
-use crate::lexer::SourceSpan;
+
+struct CaseExpressionStatementInput<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    expression: &'a Expr,
+    span: crate::lexer::SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    instructions: Vec<BackendInstruction>,
+}
 
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_structured_statement(
@@ -37,16 +46,16 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             Stmt::Return { value: Some(expression @ Expr::If { .. }), span } => {
                 self.lower_if_return(id, expression, *span, instructions).map(Some)
             }
-            Stmt::Expression { expression: Expr::Case { .. }, span } => self
-                .lower_case_expression_statement(
+            Stmt::Expression { expression: expression @ Expr::Case { .. }, span } => self
+                .lower_case_expression_statement(CaseExpressionStatementInput {
                     id,
                     block,
                     index,
-                    statement,
-                    *span,
+                    expression,
+                    span: *span,
                     fallthrough,
                     instructions,
-                )
+                })
                 .map(Some),
             Stmt::OwnerDecl { initializer: Expr::Case { .. }, .. } => self
                 .lower_case_owner_statement(id, block, index, statement, fallthrough, instructions)
@@ -161,16 +170,18 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn lower_case_expression_statement(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        statement: &Stmt,
-        span: SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        mut instructions: Vec<BackendInstruction>,
+        input: CaseExpressionStatementInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let CaseExpressionStatementInput {
+            id,
+            block,
+            index,
+            expression,
+            span,
+            fallthrough,
+            mut instructions,
+        } = input;
         let continuation_id = self.allocate_block();
-        let Stmt::Expression { expression, .. } = statement else { unreachable!() };
         let case_block =
             self.lower_case_statement(id, expression, span, continuation_id, &mut instructions)?;
         let continuation =
