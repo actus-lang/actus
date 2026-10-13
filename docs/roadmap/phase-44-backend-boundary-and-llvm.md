@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned. This phase defines the architecture for multiple native code
+In progress. This phase defines the architecture for multiple native code
 generation backends. It starts from the checkpoint
 `checkpoint/pre-backend-refactor` and must preserve the current Cranelift
 behavior throughout the migration.
@@ -679,13 +679,13 @@ the same fixture through LLVM and Cranelift object emission.
 - [x] Preserve the complete current Cranelift lowering behavior while adding
       the shared path; no backend-specific semantic rewrite or duplicate
       lowering implementation is allowed.
-- [ ] Implement the LLVM CLI emission path for the supported shared contract,
+- [x] Implement the LLVM CLI emission path for the supported shared contract,
       including module units, generic specializations, runtime bridges, entry
       selection, object merging, and linker integration.
 - [ ] Make unsupported operations fail with the typed backend diagnostic that
       names the operation, source span, selected backend, and target; never
       silently fall back to the other backend.
-- [ ] Add configuration tests for default selection, manifest selection,
+- [x] Add configuration tests for default selection, manifest selection,
       feature-disabled selection, target/backend incompatibility, and invalid
       backend names.
 - [ ] Add hosted and freestanding CLI fixtures that build the same source with
@@ -694,7 +694,7 @@ the same fixture through LLVM and Cranelift object emission.
 - [x] Run the standard-library Region and aggregate fixtures through LLVM as
       well as Cranelift, including hosted execution and freestanding object
       acceptance where the target contract permits it.
-- [ ] Verify that the selected backend is included in build metadata, artifact
+- [x] Verify that the selected backend is included in build metadata, artifact
       invalidation, diagnostics, and reproducibility records.
 - [x] Verify architecture boundaries: shared semantic/codegen modules contain
       no Cranelift or LLVM imports, and backend implementations remain inside
@@ -1400,6 +1400,20 @@ passes through LLVM, the existing Cranelift view regression remains green, and
 `examples/view_pipeline.act` builds and runs through both backends with exit
 status `42`. The fix changes cleanup placement at the shared body-lowering
 boundary; it does not alter the Buffer ABI or ownership roles.
+
+The LLVM CLI emission slice is now accepted for the supported shared contract.
+The all-feature CLI and backend suites cover imported module objects, generic
+specialization, hosted runtime bridges, configured entry selection, object
+merging, and executable linking; the examples matrix also passes the LLVM
+`file_utility.act` regression after transitive generic type dependencies were
+preserved. Configuration coverage verifies default and manifest backend
+selection, unavailable-feature handling, target/backend incompatibility, and
+invalid backend names. Build-graph coverage verifies that changing the
+selected backend invalidates generated artifacts and metadata. The acceptance
+environment is Rust `1.98.0`, LLVM `23.1.1`, target
+`x86_64-unknown-linux-gnu`, with `CARGO_BUILD_JOBS=2` and
+`--test-threads=1`; the full all-target run remains blocked by the existing
+source-limit test failures listed in its diagnostic.
 
 ## Out of scope
 
