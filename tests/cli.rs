@@ -1078,6 +1078,70 @@ fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_read() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_a_shared_fixed_array_parameter_compound_store() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-array-param-compound-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb mutate(ins values: Array[u32, 4]) { values[2u32] += 41u32; } verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); mutate(values: ins values); return values[2u32] as Int + 1; }\n",
+    )
+    .expect("write Cranelift fixed-array parameter compound fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run Cranelift fixed-array parameter compound fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_a_shared_dynamic_fixed_array_parameter_store() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-array-param-dynamic-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb mutate(ins values: Array[u32, 4]) { erg index: u32 = 2u32; values[index] = 41u32; } verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); mutate(values: ins values); return values[2u32] as Int + 1; }\n",
+    )
+    .expect("write Cranelift dynamic fixed-array parameter fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run Cranelift dynamic fixed-array parameter fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store() {
@@ -1107,6 +1171,74 @@ fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store() {
     let status = std::process::Command::new(&output)
         .status()
         .expect("run LLVM fixed-array parameter store fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_compound_store() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-llvm-array-param-compound-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb mutate(ins values: Array[u32, 4]) { values[2u32] += 41u32; } verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); mutate(values: ins values); return values[2u32] as Int + 1; }\n",
+    )
+    .expect("write LLVM fixed-array parameter compound fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run LLVM fixed-array parameter compound fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_shared_dynamic_fixed_array_parameter_store() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-llvm-array-param-dynamic-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb mutate(ins values: Array[u32, 4]) { erg index: u32 = 2u32; values[index] = 41u32; } verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); mutate(values: ins values); return values[2u32] as Int + 1; }\n",
+    )
+    .expect("write LLVM dynamic fixed-array parameter fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run LLVM dynamic fixed-array parameter fixture");
     assert_eq!(status.code(), Some(42));
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);

@@ -1358,6 +1358,26 @@ focused shared-candidate tests pass with 16 tests and both backend regressions
 pass with 2 tests; dynamic indexing, indexed compound assignment, and
 aggregate element stores remain outside this slice.
 
+Indexed scalar compound assignment on exclusive fixed-array parameters now
+uses the same shared aggregate contract. The hosted regressions
+`cranelift_backend_builds_and_runs_a_shared_fixed_array_parameter_compound_store`
+and
+`llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_compound_store`
+compile and execute the identical `ins Array[u32, 4]` update with exit status
+`42`; the focused parameter matrix passes all 6 Cranelift/LLVM read, store, and
+compound-store tests. Aggregate element values and compound expressions beyond
+the supported scalar operand slice remain outside this step.
+
+Dynamic integer indexing for exclusive fixed-array parameters now follows the
+local-array dynamic-index contract, including the neutral bounds trap before
+the store. The hosted regressions
+`cranelift_backend_builds_and_runs_a_shared_dynamic_fixed_array_parameter_store`
+and
+`llvm_backend_builds_and_runs_a_shared_dynamic_fixed_array_parameter_store`
+compile and execute the same parameter mutation with exit status `42`; the
+expanded parameter matrix passes all 8 read, literal-store, compound-store,
+and dynamic-store tests across both backends.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.
