@@ -1,7 +1,9 @@
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendValueId, BackendValueType,
 };
-use super::super::support::{expression_span, parse_integer, unsupported};
+use super::super::support::{
+    expression_kind, expression_span, parse_integer, unsupported, unsupported_operation,
+};
 use super::SharedExpressionProvider;
 use crate::ast::Expr;
 use crate::codegen::body::BackendExpressionProvider;
@@ -54,8 +56,9 @@ pub(super) fn lower_expression(
         Expr::StructLit { .. } | Expr::FieldAccess { .. } | Expr::Index { .. } => {
             super::aggregate::lower_aggregate_expression(provider, expression, instructions)
         }
-        _ => Err(unsupported(
+        _ => Err(unsupported_operation(
             expression_span(expression),
+            expression_kind(expression),
             "expression is outside the scalar shared lowering contract",
         )),
     }

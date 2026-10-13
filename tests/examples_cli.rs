@@ -41,23 +41,26 @@ fn sensor_telemetry_example_builds_and_executes() {
 #[test]
 fn sensor_telemetry_example_rejects_llvm_float_lowering_explicitly() {
     let source = format!("{}/examples/sensor_telemetry.act", env!("CARGO_MANIFEST_DIR"));
-    let result = run_with_args(
-        vec![
-            "build".to_owned(),
-            source,
-            "--backend".to_owned(),
-            "llvm".to_owned(),
-            "--emit".to_owned(),
-            "exe".to_owned(),
-            "-o".to_owned(),
-            std::env::temp_dir()
-                .join(format!("actus-sensor-llvm-{}.bin", std::process::id()))
-                .display()
-                .to_string(),
-        ]
-        .into_iter(),
-    );
-    assert_eq!(result, 1);
+    let output_path =
+        std::env::temp_dir().join(format!("actus-sensor-llvm-{}.bin", std::process::id()));
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            &source,
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output_path.to_str().expect("sensor output path should be valid UTF-8"),
+        ])
+        .output()
+        .expect("LLVM sensor build should start");
+    assert_eq!(result.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(stderr.contains("`float-literal`"), "missing operation in diagnostic: {stderr}");
+    assert!(stderr.contains("backend `llvm`"), "missing backend in diagnostic: {stderr}");
+    let _ = fs::remove_file(output_path);
 }
 
 #[cfg(unix)]
