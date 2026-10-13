@@ -2,7 +2,7 @@ use crate::ast::{Block, Expr, Role, Stmt};
 
 use crate::lexer::SourceSpan;
 
-/// Hoist value-producing cases nested inside scalar binary expressions.
+/// Hoist value-producing cases and conditionals nested inside scalar expressions.
 pub(super) fn normalize_block(block: &Block) -> Block {
     let mut statements = Vec::new();
     for statement in &block.statements {
@@ -59,12 +59,11 @@ fn normalize_statement(statement: &Stmt, output: &mut Vec<Stmt>) {
 }
 
 fn extract_nested_cases(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -> Expr {
-    if matches!(expression, Expr::Case { .. }) {
-        if root {
-            return expression.clone();
-        }
+    if !root && matches!(expression, Expr::Case { .. } | Expr::If { .. }) {
         let span = expression_span(expression);
-        let name = format!("__nested_case_{}_{}", span.start, span.end);
+        let prefix =
+            if matches!(expression, Expr::Case { .. }) { "__nested_case" } else { "__nested_if" };
+        let name = format!("{prefix}_{}_{}", span.start, span.end);
         owners.push(Stmt::OwnerDecl {
             role: Role::Erg,
             name: name.clone(),

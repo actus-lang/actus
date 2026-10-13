@@ -268,9 +268,8 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         | Expr::Integer { .. }
         | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. } => true,
-        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
-            scalar_expression(expression, context)
-        }
+        Expr::Grouping { expression, .. } => scalar_nested_expression(expression, context),
+        Expr::Unary { expression, .. } => scalar_expression(expression, context),
         Expr::Cast { expression, target, .. } => {
             scalar_type(target) && scalar_expression(expression, context)
         }
@@ -293,6 +292,17 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
             fixed_array_expression(target, context) && fixed_array_index_expression(index)
         }
         _ => false,
+    }
+}
+
+fn scalar_nested_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+    match expression {
+        Expr::If { .. } => value_if_expression(expression, context),
+        Expr::Grouping { expression, .. } => scalar_nested_expression(expression, context),
+        Expr::Binary { left, operator, right, .. } => {
+            scalar_binary_expression(left, *operator, right, context)
+        }
+        _ => scalar_expression(expression, context),
     }
 }
 
@@ -350,8 +360,8 @@ fn scalar_binary_expression(
             | BinaryOp::GreaterEquals
             | BinaryOp::Equals
             | BinaryOp::NotEquals
-    ) && scalar_expression(left, context)
-        && scalar_expression(right, context)
+    ) && scalar_nested_expression(left, context)
+        && scalar_nested_expression(right, context)
 }
 
 fn scalar_call_expression(

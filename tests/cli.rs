@@ -2268,7 +2268,7 @@ fn unknown_command_help_returns_an_error() {
 }
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
-fn run_shared_value_if_fixture(backend: &str) -> i32 {
+fn run_shared_value_if_fixture(backend: &str, source: &str) -> i32 {
     let root =
         std::env::temp_dir().join(format!("actus-cli-value-if-{backend}-{}", std::process::id()));
     let input = root.join("main.act");
@@ -2281,11 +2281,7 @@ fn run_shared_value_if_fixture(backend: &str) -> i32 {
         ),
     )
     .expect("write value-if fixture manifest");
-    fs::write(
-        &input,
-        "verb main() -> Int { erg selected = if true { 41 } else { 1 }; return selected + 1; }\n",
-    )
-    .expect("write value-if fixture source");
+    fs::write(&input, source).expect("write value-if fixture source");
     let result = run_with_args(
         vec![
             "build".to_owned(),
@@ -2307,11 +2303,47 @@ fn run_shared_value_if_fixture(backend: &str) -> i32 {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn cranelift_backend_builds_and_runs_shared_value_if_expression() {
-    assert_eq!(run_shared_value_if_fixture("cranelift"), 42);
+    assert_eq!(
+        run_shared_value_if_fixture(
+            "cranelift",
+            "verb main() -> Int { erg selected = if true { 41 } else { 1 }; return selected + 1; }\n",
+        ),
+        42
+    );
 }
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_shared_value_if_expression() {
-    assert_eq!(run_shared_value_if_fixture("llvm"), 42);
+    assert_eq!(
+        run_shared_value_if_fixture(
+            "llvm",
+            "verb main() -> Int { erg selected = if true { 41 } else { 1 }; return selected + 1; }\n",
+        ),
+        42
+    );
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn cranelift_backend_builds_and_runs_nested_shared_value_if_expression() {
+    assert_eq!(
+        run_shared_value_if_fixture(
+            "cranelift",
+            "verb main() -> Int { return 1 + (if true { 41 } else { 1 }); }\n",
+        ),
+        42
+    );
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_nested_shared_value_if_expression() {
+    assert_eq!(
+        run_shared_value_if_fixture(
+            "llvm",
+            "verb main() -> Int { return 1 + (if true { 41 } else { 1 }); }\n",
+        ),
+        42
+    );
 }
