@@ -1,8 +1,44 @@
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::Path;
 
-use super::super::{BackendEmitError, BackendModule};
+use super::super::{BackendEmitError, BackendInstruction, BackendModule};
 use super::verification::{print_module, verify_module};
 use crate::target::TargetSpec;
+
+/// Keeps only the functions reachable from a configured root entry.
+///
+/// Root object emission must not expose unrelated verbs. This mirrors the
+/// object reachability contract used by the other native backend while keeping
+/// the policy inside the LLVM backend implementation.
+pub(crate) fn retain_reachable_root_functions(
+    mut module: BackendModule,
+    entry_symbol: &str,
+) -> BackendModule {
+    let functions = module
+        .functions
+        .iter()
+        .map(|function| (function.symbol.as_str().to_owned(), function))
+        .collect::<BTreeMap<_, _>>();
+    let mut reachable = BTreeSet::new();
+    let mut pending = VecDeque::from([entry_symbol.to_owned()]);
+    while let Some(symbol) = pending.pop_front() {
+        if !reachable.insert(symbol.clone()) {
+            continue;
+        }
+        let Some(function) = functions.get(&symbol) else { continue };
+        for block in &function.blocks {
+            for instruction in &block.instructions {
+                let BackendInstruction::Call { callee, .. } = instruction else { continue };
+                let callee = callee.as_str();
+                if functions.contains_key(callee) {
+                    pending.push_back(callee.to_owned());
+                }
+            }
+        }
+    }
+    module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
+    module
+}
 
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.
 ///

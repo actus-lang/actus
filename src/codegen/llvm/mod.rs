@@ -21,4 +21,5 @@ mod returns;
 mod values;
 mod verification;
 
+pub(crate) use emission::retain_reachable_root_functions;
 pub use emission::{emit_module, emit_object, emit_object_bytes};

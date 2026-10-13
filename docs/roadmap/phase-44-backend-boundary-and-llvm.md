@@ -721,6 +721,13 @@ remains rejected until a merge contract exists. The negative regression
 `rejects_outer_scalar_assignment_without_a_branch_merge_contract` verifies that
 boundary explicitly.
 
+`tests/backend_parity.rs` contains the intended CLI parity matrix. Hosted exit
+status, freestanding entry export, zero-float evidence, and the shared
+large-aggregate failure class pass for both backends. The gate remains open
+because the freestanding fixture still exposes additional Cranelift cleanup
+bridge imports (`buffer_drop` and `enum_drop`) that are absent from LLVM; this
+runtime-symbol discrepancy must be resolved in backend code before acceptance.
+
 Generic AST specialization is now owned by the backend-neutral
 `src/codegen/generic/` module. Generic verb expansion, type substitution,
 transitive instance discovery, specialized naming, and specialized declaration
