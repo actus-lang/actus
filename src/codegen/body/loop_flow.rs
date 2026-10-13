@@ -16,6 +16,16 @@ struct LoopState {
     exit_values: Vec<BackendValueId>,
 }
 
+struct LoopBodyInput<'a> {
+    body_id: BackendBlockId,
+    header_id: BackendBlockId,
+    continuation_id: BackendBlockId,
+    nested: &'a Block,
+    carried: &'a [super::loops::CarriedBinding],
+    body_values: &'a [BackendValueId],
+    span: crate::lexer::SourceSpan,
+}
+
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_loop_statement(
         &mut self,
@@ -40,15 +50,15 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                 .collect(),
             span: nested.span,
         });
-        let (body, _) = self.lower_loop_body(
-            state.body_id,
-            state.header_id,
-            state.continuation_id,
+        let (body, _) = self.lower_loop_body(LoopBodyInput {
+            body_id: state.body_id,
+            header_id: state.header_id,
+            continuation_id: state.continuation_id,
             nested,
-            &carried,
-            &state.body_values,
-            nested.span,
-        )?;
+            carried: &carried,
+            body_values: &state.body_values,
+            span: nested.span,
+        })?;
         for (binding, value) in carried.iter().zip(&state.exit_values) {
             self.provider.set_binding_value(&binding.name, *value);
         }
@@ -122,14 +132,17 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn lower_loop_body(
         &mut self,
-        body_id: BackendBlockId,
-        header_id: BackendBlockId,
-        continuation_id: BackendBlockId,
-        nested: &Block,
-        carried: &[super::loops::CarriedBinding],
-        body_values: &[BackendValueId],
-        span: crate::lexer::SourceSpan,
+        input: LoopBodyInput<'_>,
     ) -> Result<(BackendBlock, Vec<BackendEdgeArgument>), BackendContractError> {
+        let LoopBodyInput {
+            body_id,
+            header_id,
+            continuation_id,
+            nested,
+            carried,
+            body_values,
+            span,
+        } = input;
         self.loop_targets.push(LoopTargets {
             continue_target: header_id,
             break_target: continuation_id,
