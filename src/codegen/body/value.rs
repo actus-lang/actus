@@ -6,6 +6,22 @@ use super::{
 use crate::ast::{Block, Expr, IfBranch, Stmt};
 use crate::lexer::SourceSpan;
 
+struct IfOwnerInput<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    name: &'a str,
+    declared_type: Option<&'a str>,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    merge_id: BackendBlockId,
+    instructions: Vec<BackendInstruction>,
+    then_block: BackendBlock,
+    then_value: BackendValueId,
+    else_block: BackendBlock,
+    else_value: BackendValueId,
+}
+
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_if_owner_statement(
         &mut self,
@@ -39,13 +55,13 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             return Err(unsupported(*span, "value-producing if requires a block else branch"));
         };
         let (else_block, else_value) = self.lower_if_value_branch(else_id, else_branch, *span)?;
-        self.finish_if_owner(
+        self.finish_if_owner(IfOwnerInput {
             id,
             block,
             index,
             name,
-            ty.as_deref(),
-            *span,
+            declared_type: ty.as_deref(),
+            span: *span,
             fallthrough,
             merge_id,
             instructions,
@@ -53,25 +69,28 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             then_value,
             else_block,
             else_value,
-        )
+        })
     }
 
     fn finish_if_owner(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        name: &str,
-        declared_type: Option<&str>,
-        span: SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        merge_id: BackendBlockId,
-        instructions: Vec<BackendInstruction>,
-        mut then_block: BackendBlock,
-        then_value: BackendValueId,
-        mut else_block: BackendBlock,
-        else_value: BackendValueId,
+        input: IfOwnerInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let IfOwnerInput {
+            id,
+            block,
+            index,
+            name,
+            declared_type,
+            span,
+            fallthrough,
+            merge_id,
+            instructions,
+            mut then_block,
+            then_value,
+            mut else_block,
+            else_value,
+        } = input;
         let result_type = self
             .provider
             .value_type(then_value)
