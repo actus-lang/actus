@@ -1279,6 +1279,16 @@ Cranelift now applies the same element-layout-checked bounded copy. Nested
 aggregate fields, generic aggregate values, and aggregate compound stores
 remain outside this slice.
 
+Nested non-generic aggregate element values now reuse the same recursive
+neutral layout and bounded copy path. The classifier regression
+`accepts_nested_aggregate_array_element_stores_in_the_shared_contract` and the
+hosted parity fixture
+`both_native_backends_build_and_run_a_shared_nested_aggregate_array_element_store`
+cover `Array[Line, 2]` where `Line` contains a `Point` field; LLVM and Cranelift
+both build and execute it with exit status 42. Generic aggregate applications,
+nested aggregate mutation through separate field stores, and aggregate
+compound stores remain outside this slice.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`

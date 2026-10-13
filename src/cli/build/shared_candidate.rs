@@ -18,6 +18,11 @@ use shared_candidate_cases::{
     result_case_expression, scalar_case_expression, scalar_statement_call,
 };
 
+#[path = "shared_candidate_types.rs"]
+mod shared_candidate_types;
+
+use shared_candidate_types::{supported_perform, unit_structs};
+
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     let unit_enums = unit_enums(program);
     let unit_structs = unit_structs(program);
@@ -61,10 +66,10 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
                     .iter()
                     .all(|variant| matches!(variant.payload, EnumPayload::Unit))
         }
-        crate::ast::TopLevelDecl::Struct(definition) => {
-            supported_struct(definition) || supported_value_struct(definition)
+        crate::ast::TopLevelDecl::Struct(definition) => unit_structs.contains(&definition.name),
+        crate::ast::TopLevelDecl::Perform(perform) => {
+            supported_perform(perform, program, &unit_structs)
         }
-        crate::ast::TopLevelDecl::Perform(perform) => supported_perform(perform, program),
         _ => false,
     })
 }
@@ -95,21 +100,6 @@ fn unit_enums(program: &Program) -> BTreeSet<String> {
         .collect()
 }
 
-fn unit_structs(program: &Program) -> BTreeSet<String> {
-    program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            crate::ast::TopLevelDecl::Struct(definition)
-                if supported_struct(definition) || supported_value_struct(definition) =>
-            {
-                Some(definition.name.clone())
-            }
-            _ => None,
-        })
-        .collect()
-}
-
 fn returns_value(program: &Program) -> BTreeMap<String, bool> {
     program
         .declarations
@@ -124,35 +114,6 @@ fn returns_value(program: &Program) -> BTreeMap<String, bool> {
             _ => None,
         })
         .collect()
-}
-
-fn supported_struct(definition: &crate::ast::StructDef) -> bool {
-    definition.generic_parameters.is_empty()
-        && definition.fields.iter().all(|field| {
-            (matches!(field.role, crate::ast::StructFieldRole::Erg) && scalar_type(&field.ty))
-                || (matches!(field.role, crate::ast::StructFieldRole::Abs)
-                    && scalar_option_type(&field.ty))
-        })
-}
-
-fn supported_value_struct(definition: &crate::ast::StructDef) -> bool {
-    definition.generic_parameters.is_empty()
-        && definition.fields.iter().all(|field| {
-            (matches!(field.role, crate::ast::StructFieldRole::Value) && scalar_type(&field.ty))
-                || (matches!(field.role, crate::ast::StructFieldRole::Abs)
-                    && scalar_option_type(&field.ty))
-        })
-}
-
-fn supported_perform(perform: &crate::ast::PerformDecl, program: &Program) -> bool {
-    perform.target.arguments.is_empty()
-        && program.declarations.iter().any(|declaration| {
-            matches!(
-                declaration,
-                crate::ast::TopLevelDecl::Struct(definition)
-                    if definition.name == perform.target.name && supported_struct(definition)
-            )
-        })
 }
 
 fn scalar_parameter(
