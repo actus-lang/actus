@@ -111,6 +111,32 @@ fn arena_tree_example_builds_and_executes() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn arena_tree_example_builds_and_executes_with_llvm() {
+    let root =
+        std::env::temp_dir().join(format!("actus-arena-tree-llvm-example-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/arena_tree.act", env!("CARGO_MANIFEST_DIR"));
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            &source,
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("LLVM arena output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("LLVM arena tree build should start");
+    assert_eq!(result.code(), Some(0));
+    let status = std::process::Command::new(&output).status().expect("run LLVM arena tree example");
+    assert_eq!(status.code(), Some(60));
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(unix)]
 #[test]
 fn generics_showcase_builds_and_executes_with_cranelift() {

@@ -88,14 +88,18 @@ fn nominal_payload_type(
     discriminant: u32,
 ) -> Option<BackendValueType> {
     let type_name = provider.nominal_type(subject)?;
-    let payload =
-        if type_name.name == "Option" && type_name.arguments.len() == 1 && discriminant == 0 {
-            type_name.arguments.first()
-        } else if type_name.name == "Result" && type_name.arguments.len() == 2 && discriminant < 2 {
-            type_name.arguments.get(discriminant as usize)
-        } else {
-            None
-        }?;
+    let niche_option =
+        matches!(provider.value_type(subject), Some(BackendValueType::NichePointerOption { .. }));
+    let option_payload = type_name.name == "Option"
+        && type_name.arguments.len() == 1
+        && ((niche_option && discriminant == 1) || (!niche_option && discriminant == 0));
+    let payload = if option_payload {
+        type_name.arguments.first()
+    } else if type_name.name == "Result" && type_name.arguments.len() == 2 && discriminant < 2 {
+        type_name.arguments.get(discriminant as usize)
+    } else {
+        None
+    }?;
     super::super::support::backend_value_type(provider.layouts, payload)
 }
 
