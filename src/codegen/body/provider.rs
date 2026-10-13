@@ -79,6 +79,10 @@ pub trait BackendExpressionProvider {
         Ok(())
     }
 
+    fn exit_scope_without_cleanup(&mut self) -> Result<(), BackendContractError> {
+        Ok(())
+    }
+
     fn distribute_scope_cleanup(
         &mut self,
         _span: SourceSpan,

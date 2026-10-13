@@ -6,21 +6,26 @@ use actus::cli::run_with_args;
 
 #[cfg(unix)]
 fn build_and_run(source: &str, artifact: &str) -> i32 {
+    build_and_run_with_backend(source, artifact, None)
+}
+
+#[cfg(unix)]
+fn build_and_run_with_backend(source: &str, artifact: &str, backend: Option<&str>) -> i32 {
     let root = std::env::temp_dir().join(format!("actus-cli-{artifact}-{}", std::process::id()));
     let input = root.with_extension("act");
     let output = root.with_extension("bin");
     fs::write(&input, source).expect("write source");
-    let result = run_with_args(
-        vec![
-            "build".to_owned(),
-            input.display().to_string(),
-            "--emit".to_owned(),
-            "exe".to_owned(),
-            "-o".to_owned(),
-            output.display().to_string(),
-        ]
-        .into_iter(),
-    );
+    let mut arguments = vec!["build".to_owned(), input.display().to_string()];
+    if let Some(backend) = backend {
+        arguments.extend(["--backend".to_owned(), backend.to_owned()]);
+    }
+    arguments.extend([
+        "--emit".to_owned(),
+        "exe".to_owned(),
+        "-o".to_owned(),
+        output.display().to_string(),
+    ]);
+    let result = run_with_args(arguments.into_iter());
     assert_eq!(result, 0);
     let status = std::process::Command::new(&output).status().expect("run executable");
     let code = status.code().expect("process exit code");
@@ -83,4 +88,11 @@ fn restores_an_ins_buffer_after_a_typed_failure_return() {
 fn returns_and_reuses_a_zero_copy_abs_buffer_view() {
     let source = "verb identity(abs input: Buffer) -> abs Buffer { return input; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; { abs view = ref identity(input: abs buffer); } append(buffer, 41); return 42; }\n";
     assert_eq!(build_and_run(source, "buffer-abs-view"), 42);
+}
+
+#[cfg(unix)]
+#[test]
+fn llvm_returns_and_reuses_a_zero_copy_abs_buffer_view() {
+    let source = "verb identity(abs input: Buffer) -> abs Buffer { return input; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; { abs view = ref identity(input: abs buffer); } append(buffer, 41); return 42; }\n";
+    assert_eq!(build_and_run_with_backend(source, "buffer-abs-view-llvm", Some("llvm")), 42);
 }

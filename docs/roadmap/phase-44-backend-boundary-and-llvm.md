@@ -1391,6 +1391,16 @@ compile and execute the same `Array[Point, 2]` mutation/read source with exit
 status `42`. Nested ownership fields, generic structs, packed fields, and full
 aggregate element replacement remain outside this slice.
 
+Nested lexical blocks now keep outer-scope cleanup on the continuation path
+instead of emitting it on the entry block before the nested block executes.
+This preserves owned `Buffer` values across an `abs Buffer` view call and its
+subsequent mutation. The regression
+`tests/buffer_cli.rs::llvm_returns_and_reuses_a_zero_copy_abs_buffer_view`
+passes through LLVM, the existing Cranelift view regression remains green, and
+`examples/view_pipeline.act` builds and runs through both backends with exit
+status `42`. The fix changes cleanup placement at the shared body-lowering
+boundary; it does not alter the Buffer ABI or ownership roles.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

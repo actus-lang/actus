@@ -209,12 +209,14 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             span: nested.span,
         });
         let nested_block = self.lower_block(nested_id, nested, Some(continuation_id))?;
+        self.blocks.push(nested_block);
+        let continuation_start = self.blocks.len();
         let continuation =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
         let continuation_block =
             self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
-        self.blocks.push(nested_block);
         self.blocks.push(continuation_block);
+        self.provider.distribute_scope_cleanup(block.span, &mut self.blocks, continuation_start)?;
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 }

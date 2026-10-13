@@ -65,6 +65,11 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         Ok(())
     }
 
+    fn exit_scope_without_cleanup(&mut self) -> Result<(), BackendContractError> {
+        self.locals.pop();
+        Ok(())
+    }
+
     fn distribute_scope_cleanup(
         &mut self,
         span: SourceSpan,

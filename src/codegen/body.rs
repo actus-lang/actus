@@ -103,7 +103,15 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let result = self.lower_block_in_scope(id, block, fallthrough);
         match result {
             Ok(mut lowered) => {
-                self.provider.exit_scope(block.span, &mut lowered.instructions)?;
+                let structured_transfer = matches!(
+                    lowered.instructions.last(),
+                    Some(BackendInstruction::Jump { .. } | BackendInstruction::Branch { .. })
+                );
+                if fallthrough.is_none() && structured_transfer {
+                    self.provider.exit_scope_without_cleanup()?;
+                } else {
+                    self.provider.exit_scope(block.span, &mut lowered.instructions)?;
+                }
                 Ok(lowered)
             }
             Err(error) => {
