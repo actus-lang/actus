@@ -200,8 +200,7 @@ impl SharedExpressionProvider<'_> {
         let Expr::MethodCall { receiver, method, arguments, span } = expression else {
             return Err(unsupported(expression_span(expression), "method call expected"));
         };
-        let receiver_is_binding = matches!(receiver.as_ref(), Expr::Identifier { name, .. }
-            if self.binding_value(name).is_some());
+        let receiver_is_binding = self.is_binding_receiver(receiver);
         if !receiver_is_binding {
             return super::constructors::lower_method_call(self, expression, instructions);
         }
@@ -251,6 +250,16 @@ impl SharedExpressionProvider<'_> {
                     .flatten()
             })
             .ok_or_else(|| unsupported(span, "method has no static symbol"))
+    }
+
+    fn is_binding_receiver(&self, expression: &Expr) -> bool {
+        match expression {
+            Expr::Identifier { name, .. } => self.binding_value(name).is_some(),
+            Expr::FieldAccess { object, .. } | Expr::Index { target: object, .. } => {
+                self.is_binding_receiver(object)
+            }
+            _ => false,
+        }
     }
 
     fn method_result_type(&self, key: &(String, String), method: &str) -> Option<BackendValueType> {
