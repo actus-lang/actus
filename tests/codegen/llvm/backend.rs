@@ -1090,7 +1090,7 @@ fn lowers_niche_option_failure_to_a_null_pointer() {
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
-            ty: BackendValueType::NichePointerOption { layout },
+            ty: BackendValueType::NichePointerOption { layout, payload_layout: None },
             passing: BackendReturnMode::Direct,
         },
         entry: BackendBlockId(0),
@@ -1911,7 +1911,7 @@ fn compares_llvm_and_cranelift_on_niche_option_none_fixture() {
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
-            ty: BackendValueType::NichePointerOption { layout },
+            ty: BackendValueType::NichePointerOption { layout, payload_layout: None },
             passing: BackendReturnMode::Direct,
         },
         entry: BackendBlockId(0),
@@ -2008,7 +2008,7 @@ fn compares_llvm_and_cranelift_on_niche_option_some_fixture() {
         parameters: vec![pointer],
         return_value: BackendReturn {
             role: Some(Role::Erg),
-            ty: BackendValueType::NichePointerOption { layout },
+            ty: BackendValueType::NichePointerOption { layout, payload_layout: None },
             passing: BackendReturnMode::Direct,
         },
         entry: BackendBlockId(0),

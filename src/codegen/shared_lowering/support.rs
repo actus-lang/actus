@@ -67,6 +67,7 @@ pub(super) fn backend_value_type(
         if layout.niche_pointer {
             return Some(super::super::BackendValueType::NichePointerOption {
                 layout: layout.layout,
+                payload_layout: None,
             });
         }
         return Some(super::super::BackendValueType::Enum { layout });

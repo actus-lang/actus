@@ -56,7 +56,11 @@ pub(super) fn emit_return(
                 if copied.is_null() {
                     return Err(BackendEmitError("LLVM failed to copy return slot".to_owned()));
                 }
-                unsafe { LLVMBuildRetVoid(builder) };
+                if declaration.borrowed_view_return {
+                    unsafe { LLVMBuildRet(builder, slot) };
+                } else {
+                    unsafe { LLVMBuildRetVoid(builder) };
+                }
             } else {
                 let value = direct_return_value(context, builder, function, declaration, value)?;
                 unsafe { LLVMBuildRet(builder, value) };

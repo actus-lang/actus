@@ -16,6 +16,7 @@ mod loops;
 mod nested_case;
 mod provider;
 mod statements;
+mod try_value;
 mod value;
 pub use provider::{BackendBodyProvider, BackendExpressionProvider};
 use statements::lower_expression_statement;
@@ -132,6 +133,20 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let block = &normalized;
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
+            if matches!(
+                statement,
+                Stmt::OwnerDecl { initializer: Expr::Try { .. }, .. }
+                    | Stmt::Assignment { value: Expr::Try { .. }, .. }
+            ) {
+                return self.lower_try_statement(
+                    id,
+                    block,
+                    index,
+                    statement,
+                    fallthrough,
+                    instructions,
+                );
+            }
             if matches!(
                 statement,
                 Stmt::Loop(_)

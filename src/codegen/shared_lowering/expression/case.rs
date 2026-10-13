@@ -149,7 +149,7 @@ fn neutral_enum_layout(
         .value_type(subject)
         .and_then(|ty| match ty {
             BackendValueType::Enum { layout } => Some(layout),
-            BackendValueType::NichePointerOption { layout } => {
+            BackendValueType::NichePointerOption { layout, .. } => {
                 Some(super::super::super::BackendEnumLayout {
                     layout,
                     discriminant_offset: 0,

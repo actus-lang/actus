@@ -141,7 +141,7 @@ fn emit_niche_discriminant(
     })?;
     let pointer_type = super::values::llvm_type(
         context,
-        BackendValueType::NichePointerOption { layout: layout.layout },
+        BackendValueType::NichePointerOption { layout: layout.layout, payload_layout: None },
     )?;
     let null = unsafe { LLVMConstNull(pointer_type) };
     let is_none = unsafe {
@@ -182,7 +182,10 @@ fn emit_niche_construct(
         None => unsafe {
             LLVMConstNull(super::values::llvm_type(
                 context,
-                BackendValueType::NichePointerOption { layout: layout.layout },
+                BackendValueType::NichePointerOption {
+                    layout: layout.layout,
+                    payload_layout: None,
+                },
             )?)
         },
     };

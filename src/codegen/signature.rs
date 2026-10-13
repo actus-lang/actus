@@ -212,6 +212,15 @@ pub(crate) fn lower_return(
         ReturnAccess::Owned => Role::Erg,
         ReturnAccess::Abs => Role::Abs,
     });
+    if let BackendValueType::NichePointerOption { layout, .. } = ty {
+        let payload_layout =
+            return_type.ty.arguments.first().and_then(|payload| layouts.layout_for(payload));
+        return Ok(BackendReturn {
+            role,
+            ty: BackendValueType::NichePointerOption { layout, payload_layout },
+            passing,
+        });
+    }
     Ok(BackendReturn { role, ty, passing })
 }
 
@@ -240,7 +249,13 @@ fn lower_type(
     }
     if let Some(layout) = layouts.enum_layout_for(type_name) {
         if layout.niche_pointer {
-            return Ok((BackendValueType::NichePointerOption { layout: layout.layout }, None));
+            return Ok((
+                BackendValueType::NichePointerOption {
+                    layout: layout.layout,
+                    payload_layout: None,
+                },
+                None,
+            ));
         }
         return Ok((BackendValueType::Enum { layout }, Some(layout.layout)));
     }

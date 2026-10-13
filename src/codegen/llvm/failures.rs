@@ -74,7 +74,7 @@ fn validate_failure_return(
         BackendValueType::Aggregate { layout }
         | BackendValueType::Region { layout }
         | BackendValueType::Enum { layout: super::super::BackendEnumLayout { layout, .. } }
-        | BackendValueType::NichePointerOption { layout } => layout,
+        | BackendValueType::NichePointerOption { layout, .. } => layout,
         _ => {
             return Err(BackendEmitError(
                 "LLVM typed failure requires an aggregate enum return type".to_owned(),

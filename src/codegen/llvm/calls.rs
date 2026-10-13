@@ -129,6 +129,10 @@ fn record_call_result(
         record_runtime_pointer_result(&result_context, declaration, result, call, values)?;
         return Ok(());
     }
+    if declaration.borrowed_view_return {
+        values.insert(result, call);
+        return Ok(());
+    }
     if let Some(slot) = return_slot {
         values.insert(result, slot);
     } else if declaration.returns_void {

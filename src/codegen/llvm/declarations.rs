@@ -22,7 +22,18 @@ pub(super) struct FunctionDeclaration {
     pub(super) runtime_pointer_return: bool,
     pub(super) runtime_return_size: Option<u32>,
     pub(super) return_alignment: Option<u32>,
+    pub(super) borrowed_view_return: bool,
     pub(super) returns_void: bool,
+}
+
+struct ReturnAbi {
+    slot_type: LLVMTypeRef,
+    return_type: LLVMTypeRef,
+    return_slot: bool,
+    borrowed_view_return: bool,
+    size: Option<u32>,
+    alignment: Option<u32>,
+    returns_void: bool,
 }
 
 pub(super) fn declare_function(
@@ -33,25 +44,21 @@ pub(super) fn declare_function(
     return_value: &BackendReturn,
     runtime_pointer_return: bool,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
-    let return_slot = !runtime_pointer_return
-        && matches!(&return_value.passing, BackendReturnMode::ReturnSlot { .. });
-    let value_type = llvm_type(context, return_value.ty)?;
-    let return_type = if return_slot {
-        unsafe { LLVMVoidTypeInContext(context) }
-    } else if runtime_pointer_return {
-        unsafe { LLVMPointerTypeInContext(context, 0) }
-    } else {
-        value_type
-    };
+    let abi = return_abi(context, return_value, runtime_pointer_return)?;
     let mut parameter_types = parameters
         .iter()
         .map(|parameter| parameter_type(context, parameter))
         .collect::<Result<Vec<_>, _>>()?;
-    if return_slot {
+    if abi.return_slot {
         parameter_types.insert(0, unsafe { LLVMPointerTypeInContext(context, 0) });
     }
     let function_type = unsafe {
-        LLVMFunctionType(return_type, parameter_types.as_mut_ptr(), parameter_types.len() as u32, 0)
+        LLVMFunctionType(
+            abi.return_type,
+            parameter_types.as_mut_ptr(),
+            parameter_types.len() as u32,
+            0,
+        )
     };
     let function_name = CString::new(symbol)
         .map_err(|_| BackendEmitError("LLVM function symbol contains NUL".to_owned()))?;
@@ -59,24 +66,64 @@ pub(super) fn declare_function(
     if value.is_null() {
         return Err(BackendEmitError(format!("LLVM rejected function `{symbol}`")));
     }
-    apply_parameter_alignments(value, parameters, return_value, return_slot);
+    apply_parameter_alignments(value, parameters, return_value, abi.return_slot);
     Ok(FunctionDeclaration {
         value,
         function_type,
-        return_type: value_type,
+        return_type: abi.slot_type,
         parameter_count: parameters.len(),
-        return_slot,
+        return_slot: abi.return_slot,
         runtime_pointer_return,
-        runtime_return_size: match &return_value.passing {
-            BackendReturnMode::ReturnSlot { layout } => Some(layout.size),
-            _ => None,
+        runtime_return_size: abi.size,
+        return_alignment: abi.alignment,
+        borrowed_view_return: abi.borrowed_view_return,
+        returns_void: abi.returns_void,
+    })
+}
+
+fn return_abi(
+    context: LLVMContextRef,
+    return_value: &BackendReturn,
+    runtime_pointer_return: bool,
+) -> Result<ReturnAbi, BackendEmitError> {
+    let borrowed_layout = match return_value.ty {
+        BackendValueType::NichePointerOption { payload_layout, .. } => payload_layout,
+        _ => None,
+    };
+    let borrowed = borrowed_layout.is_some();
+    let return_slot = borrowed
+        || (!runtime_pointer_return
+            && matches!(return_value.passing, BackendReturnMode::ReturnSlot { .. }));
+    let value_type = llvm_type(context, return_value.ty)?;
+    let slot_type = borrowed_layout
+        .map(|layout| llvm_type(context, BackendValueType::Aggregate { layout }))
+        .transpose()?
+        .unwrap_or(value_type);
+    let return_type = if borrowed {
+        unsafe { LLVMPointerTypeInContext(context, 0) }
+    } else if return_slot {
+        unsafe { LLVMVoidTypeInContext(context) }
+    } else if runtime_pointer_return {
+        unsafe { LLVMPointerTypeInContext(context, 0) }
+    } else {
+        value_type
+    };
+    let (size, alignment) = match borrowed_layout {
+        Some(layout) => (Some(layout.size), Some(layout.alignment)),
+        None => match return_value.passing {
+            BackendReturnMode::ReturnSlot { layout } => (Some(layout.size), Some(layout.alignment)),
+            _ => (None, None),
         },
-        return_alignment: match &return_value.passing {
-            BackendReturnMode::ReturnSlot { layout } => Some(layout.alignment),
-            _ => None,
-        },
-        returns_void: matches!(return_value.ty, super::super::BackendValueType::Unit)
-            || return_slot,
+    };
+    Ok(ReturnAbi {
+        slot_type,
+        return_type,
+        return_slot,
+        borrowed_view_return: borrowed,
+        size,
+        alignment,
+        returns_void: matches!(return_value.ty, BackendValueType::Unit)
+            || (return_slot && !borrowed),
     })
 }
 

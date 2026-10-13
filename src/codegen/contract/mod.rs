@@ -59,7 +59,7 @@ pub enum BackendValueType {
     Aggregate { layout: BackendLayout },
     Region { layout: BackendLayout },
     Enum { layout: BackendEnumLayout },
-    NichePointerOption { layout: BackendLayout },
+    NichePointerOption { layout: BackendLayout, payload_layout: Option<BackendLayout> },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -422,7 +422,7 @@ pub(super) fn validate_value_type(ty: BackendValueType) -> Result<(), BackendCon
         }
         BackendValueType::Aggregate { layout }
         | BackendValueType::Region { layout }
-        | BackendValueType::NichePointerOption { layout } => layout.validate(),
+        | BackendValueType::NichePointerOption { layout, .. } => layout.validate(),
         BackendValueType::Enum { layout } => layout.validate(),
         BackendValueType::Unit
         | BackendValueType::Bool

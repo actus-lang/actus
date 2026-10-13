@@ -124,7 +124,10 @@ fn lower_niche_option_constructor(
         _ => return Err(unsupported(span, "invalid pointer Option constructor")),
     };
     let result = provider.allocate();
-    provider.remember_value(result, BackendValueType::NichePointerOption { layout: layout.layout });
+    provider.remember_value(
+        result,
+        BackendValueType::NichePointerOption { layout: layout.layout, payload_layout: None },
+    );
     provider.remember_nominal_type(result, option_type.clone());
     if let Some(payload) = payload {
         let payload_type = provider
@@ -320,7 +323,7 @@ fn enum_case_layout(
 ) -> Result<BackendEnumLayout, BackendContractError> {
     match subject_type {
         BackendValueType::Enum { layout } => Ok(layout),
-        BackendValueType::NichePointerOption { layout } => Ok(BackendEnumLayout {
+        BackendValueType::NichePointerOption { layout, .. } => Ok(BackendEnumLayout {
             layout,
             discriminant_offset: 0,
             discriminant_size: 4,

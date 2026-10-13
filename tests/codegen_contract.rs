@@ -439,7 +439,7 @@ fn accepts_niche_pointer_payload_without_inline_enum_storage() {
         }],
         return_value: BackendReturn {
             role: Some(Role::Erg),
-            ty: BackendValueType::NichePointerOption { layout },
+            ty: BackendValueType::NichePointerOption { layout, payload_layout: None },
             passing: BackendReturnMode::Direct,
         },
         entry: BackendBlockId(0),
