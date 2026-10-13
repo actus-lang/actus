@@ -123,17 +123,30 @@ fn block_return_type(
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<Option<NativeType>, BackendEmitError> {
-    block
-        .statements
-        .iter()
-        .rev()
-        .find_map(|statement| match statement {
-            crate::ast::Stmt::Return { value: Some(expression), .. } => {
-                Some(initializer_type(expression, types, functions, layouts))
+    let mut block_types = types.clone();
+    for statement in &block.statements {
+        match statement {
+            crate::ast::Stmt::OwnerDecl { name, ty, initializer, .. } => {
+                let native_type = ty
+                    .as_deref()
+                    .and_then(|name| {
+                        NativeType::from_name(name)
+                            .or_else(|| layouts.type_for_name(name))
+                            .or_else(|| layouts.array_id(name).map(NativeType::Array))
+                    })
+                    .map(Ok)
+                    .unwrap_or_else(|| {
+                        initializer_type(initializer, &block_types, functions, layouts)
+                    })?;
+                block_types.insert(name, native_type);
             }
-            _ => None,
-        })
-        .transpose()
+            crate::ast::Stmt::Return { value: Some(expression), .. } => {
+                return Ok(Some(initializer_type(expression, &block_types, functions, layouts)?));
+            }
+            _ => {}
+        }
+    }
+    Ok(None)
 }
 
 fn expression_end(expression: &Expr) -> usize {
