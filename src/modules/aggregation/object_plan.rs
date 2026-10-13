@@ -52,7 +52,7 @@ impl ModuleObjectPlan {
 
 pub(super) fn build_object_plan(
     compilation: &ModuleCompilationPlan,
-    _generic_types: &[crate::ast::TypeName],
+    generic_types: &[crate::ast::TypeName],
 ) -> Result<ModuleObjectPlan, ModuleError> {
     let mut owners = HashSet::new();
     owners.insert(String::new());
@@ -73,7 +73,7 @@ pub(super) fn build_object_plan(
         units.push(ModuleObjectUnit {
             owner: ModuleObjectOwner::Imported { module_path },
             namespace: module.identity().namespace().clone(),
-            program: implementation_declarations(module, compilation, _generic_types),
+            program: implementation_declarations(module, compilation, generic_types),
             exported_verbs: exported_implementation_names(module),
         });
     }
@@ -95,7 +95,7 @@ fn exported_implementation_names(module: &super::unit::ModuleUnit) -> Vec<String
 fn implementation_declarations(
     module: &super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
-    _generic_types: &[crate::ast::TypeName],
+    generic_types: &[crate::ast::TypeName],
 ) -> Program {
     let local_declarations = module
         .implementation()
@@ -117,7 +117,74 @@ fn implementation_declarations(
         &mut declarations,
     );
     declarations.extend(local_declarations);
+    for declaration in &declarations {
+        if let Some(identity) = type_declaration_identity(declaration) {
+            declaration_identities.insert(identity);
+        }
+    }
+    append_generic_type_declarations(
+        compilation,
+        generic_types,
+        &mut declaration_identities,
+        &mut declarations,
+    );
     Program { file_metadata: Vec::new(), declarations }
+}
+
+fn append_generic_type_declarations(
+    compilation: &ModuleCompilationPlan,
+    generic_types: &[crate::ast::TypeName],
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    for type_name in generic_types {
+        append_generic_type_declaration(
+            compilation,
+            type_name,
+            declaration_identities,
+            declarations,
+        );
+    }
+}
+
+fn append_generic_type_declaration(
+    compilation: &ModuleCompilationPlan,
+    type_name: &crate::ast::TypeName,
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    for argument in &type_name.arguments {
+        append_generic_type_declaration(
+            compilation,
+            argument,
+            declaration_identities,
+            declarations,
+        );
+    }
+    let Some(declaration) =
+        compilation.caller().declarations.iter().find(|declaration| match declaration {
+            TopLevelDecl::Struct(definition) => definition.name == type_name.name,
+            TopLevelDecl::Enum(definition) => definition.name == type_name.name,
+            TopLevelDecl::Pack(definition) => definition.name == type_name.name,
+            _ => false,
+        })
+    else {
+        return;
+    };
+    if let Some(identity) = type_declaration_identity(declaration)
+        && declaration_identities.insert(identity)
+    {
+        declarations.push(declaration.clone());
+    }
+}
+
+fn type_declaration_identity(declaration: &TopLevelDecl) -> Option<(String, String)> {
+    match declaration {
+        TopLevelDecl::Struct(definition) => Some(("struct".to_owned(), definition.name.clone())),
+        TopLevelDecl::Enum(definition) => Some(("enum".to_owned(), definition.name.clone())),
+        TopLevelDecl::Pack(definition) => Some(("pack".to_owned(), definition.name.clone())),
+        _ => None,
+    }
 }
 
 fn append_imported_declarations(
