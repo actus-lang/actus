@@ -6,6 +6,9 @@ use super::{
 use crate::ast::{Block, CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Stmt, VariantPayload};
 use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
+
+type CaseBranchBlocks = (BackendBlockId, Option<BackendBlockId>, BackendBlockId);
+
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_case_return(
         &mut self,
@@ -99,10 +102,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         index: usize,
         branch_count: usize,
         branch: &crate::ast::CaseBranch,
-    ) -> Result<
-        (bool, (BackendBlockId, Option<BackendBlockId>, BackendBlockId)),
-        BackendContractError,
-    > {
+    ) -> Result<(bool, CaseBranchBlocks), BackendContractError> {
         ensure_case_branch_supported(branch)?;
         let is_last = index + 1 == branch_count;
         Ok((is_last, self.allocate_case_branch_blocks(is_last)))
@@ -128,10 +128,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         finish_case_blocks(self, entry, current, instructions, entry_instructions)
     }
 
-    fn allocate_case_branch_blocks(
-        &mut self,
-        is_last: bool,
-    ) -> (BackendBlockId, Option<BackendBlockId>, BackendBlockId) {
+    fn allocate_case_branch_blocks(&mut self, is_last: bool) -> CaseBranchBlocks {
         let matched_id = self.allocate_block();
         let following_id = (!is_last).then(|| self.allocate_block());
         let else_block = following_id.unwrap_or_else(|| self.allocate_block());
