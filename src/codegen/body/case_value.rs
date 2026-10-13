@@ -16,19 +16,34 @@ struct CaseOwnerBranches {
     instructions: Vec<BackendInstruction>,
 }
 
+pub(super) struct CaseOwnerInput<'a> {
+    pub(super) id: BackendBlockId,
+    pub(super) block: &'a Block,
+    pub(super) index: usize,
+    pub(super) name: &'a str,
+    pub(super) declared_type: Option<&'a str>,
+    pub(super) expression: &'a Expr,
+    pub(super) span: SourceSpan,
+    pub(super) fallthrough: Option<BackendBlockId>,
+    pub(super) instructions: Vec<BackendInstruction>,
+}
+
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_case_owner(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        name: &str,
-        declared_type: Option<&str>,
-        expression: &Expr,
-        span: SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        instructions: Vec<BackendInstruction>,
+        input: CaseOwnerInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let CaseOwnerInput {
+            id,
+            block,
+            index,
+            name,
+            declared_type,
+            expression,
+            span,
+            fallthrough,
+            instructions,
+        } = input;
         let Expr::Case { mode, subject, branches, .. } = expression else {
             return Err(unsupported(span, "enum case value expected"));
         };

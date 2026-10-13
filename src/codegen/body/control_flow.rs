@@ -1,5 +1,6 @@
 // Structured control-flow lowering for the body backend.
 
+use super::case_value::CaseOwnerInput;
 use super::{BackendBlock, BackendBlockId, BackendContractError, BackendInstruction, BodyLowering};
 use crate::ast::{Block, Expr, Stmt};
 use crate::lexer::SourceSpan;
@@ -109,17 +110,17 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let Stmt::OwnerDecl { name, ty, initializer: expression, span, .. } = statement else {
             unreachable!()
         };
-        self.lower_case_owner(
+        self.lower_case_owner(CaseOwnerInput {
             id,
             block,
             index,
             name,
-            ty.as_deref(),
+            declared_type: ty.as_deref(),
             expression,
-            *span,
+            span: *span,
             fallthrough,
             instructions,
-        )
+        })
     }
 
     fn lower_case_assignment_statement(
@@ -145,17 +146,17 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             },
         );
         let synthetic = Block { statements, span: block.span };
-        self.lower_case_owner(
+        self.lower_case_owner(CaseOwnerInput {
             id,
-            &synthetic,
+            block: &synthetic,
             index,
-            &name,
-            None,
+            name: &name,
+            declared_type: None,
             expression,
-            *span,
+            span: *span,
             fallthrough,
             instructions,
-        )
+        })
     }
 
     fn lower_case_expression_statement(
