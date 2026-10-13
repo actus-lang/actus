@@ -181,7 +181,7 @@ fn scalar_statement(
     allow_assignment: bool,
 ) -> bool {
     match statement {
-        Stmt::OwnerDecl { initializer, .. } => scalar_expression(initializer, context),
+        Stmt::OwnerDecl { initializer, .. } => scalar_initializer_expression(initializer, context),
         Stmt::Assignment { target, value, .. } if allow_assignment => {
             scalar_assignment_place(target, context) && scalar_expression(value, context)
         }
@@ -201,9 +201,9 @@ fn scalar_statement(
                         if scalar_return_block(block, context)
                 )
         }
-        Stmt::Return { value, .. } => value.as_ref().is_none_or(|value| {
-            scalar_expression(value, context) || result_case_expression(value, context)
-        }),
+        Stmt::Return { value, .. } => {
+            value.as_ref().is_none_or(|value| scalar_return_expression(value, context))
+        }
         Stmt::Loop(block) => scalar_block(block, context, true),
         Stmt::Block(block) => scalar_block(block, context, true),
         Stmt::Break { .. } | Stmt::Continue { .. } => true,
@@ -294,6 +294,36 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         }
         _ => false,
     }
+}
+
+fn scalar_initializer_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+    scalar_expression(expression, context) || value_if_expression(expression, context)
+}
+
+fn scalar_return_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+    scalar_expression(expression, context)
+        || result_case_expression(expression, context)
+        || value_if_expression(expression, context)
+}
+
+fn value_if_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+    let Expr::If { condition, then_branch, else_branch, .. } = expression else { return false };
+    scalar_expression(condition, context)
+        && value_if_branch(then_branch, context)
+        && matches!(
+            else_branch,
+            Some(IfBranch::Block(block)) if value_if_branch(block, context)
+        )
+}
+
+fn value_if_branch(block: &Block, context: &CandidateContext<'_>) -> bool {
+    let Some(Stmt::Expression { expression, .. }) = block.statements.last() else {
+        return false;
+    };
+    block.statements[..block.statements.len() - 1]
+        .iter()
+        .all(|statement| scalar_statement(statement, context, true))
+        && scalar_expression(expression, context)
 }
 
 fn scalar_binary_expression(

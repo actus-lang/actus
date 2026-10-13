@@ -1108,6 +1108,15 @@ branch-merge contract and remains rejected. The Cranelift CLI fixture executes
 a loop with an explicit `break` and returns 42, while the existing shared
 lowering regression continues to reject unsupported outer branch mutation.
 
+Value-producing `if` initializers and return expressions are now admitted by
+the shared CLI candidate when both block tails are scalar expressions. The
+existing neutral body lowering already creates the branch continuation and
+typed merge parameter for this shape; the new classifier boundary is covered
+by `cranelift_backend_builds_and_runs_shared_value_if_expression` and
+`llvm_backend_builds_and_runs_shared_value_if_expression`, which execute the
+same source and return 42. Nested value-producing conditionals inside binary
+expressions and branch mutation remain outside this slice.
+
 The shared scalar contract now preserves declared integer widths for owner
 initializers and binary operations. Return lowering inserts a checked integer
 cast when a narrow scalar expression is returned through a wider declared
