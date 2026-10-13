@@ -154,15 +154,15 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         }
         names.sort();
         names.dedup();
-        if else_branch.is_none() {
-            if let Some(name) = names.first() {
-                return Err(unsupported(
-                    span,
-                    format!(
-                        "scalar assignment for `{name}` requires a local owner in the current lexical scope"
-                    ),
-                ));
-            }
+        if else_branch.is_none()
+            && let Some(name) = names.first()
+        {
+            return Err(unsupported(
+                span,
+                format!(
+                    "scalar assignment for `{name}` requires a local owner in the current lexical scope"
+                ),
+            ));
         }
         Ok(names
             .into_iter()
