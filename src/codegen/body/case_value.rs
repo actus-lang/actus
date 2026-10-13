@@ -4,7 +4,7 @@ use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendEdgeArgument,
     BackendExpressionProvider, BackendInstruction, BackendValueId, BodyLowering,
 };
-use crate::ast::{Block, CaseBody, Expr, Pattern, Place, Stmt, VariantPayload};
+use crate::ast::{Block, CaseBody, Expr, Pattern, Stmt, VariantPayload};
 use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
 
@@ -17,41 +17,6 @@ struct CaseOwnerBranches {
 }
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
-    pub(super) fn lower_case_assignment(
-        &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        target: &Place,
-        expression: &Expr,
-        span: SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        instructions: Vec<BackendInstruction>,
-    ) -> Result<BackendBlock, BackendContractError> {
-        let name = format!("__case_value_{}", id.0);
-        let mut statements = block.statements.clone();
-        statements.insert(
-            index + 1,
-            Stmt::Assignment {
-                target: target.clone(),
-                value: Expr::Identifier { name: name.clone(), span },
-                span,
-            },
-        );
-        let synthetic = Block { statements, span: block.span };
-        self.lower_case_owner(
-            id,
-            &synthetic,
-            index,
-            &name,
-            None,
-            expression,
-            span,
-            fallthrough,
-            instructions,
-        )
-    }
-
     pub(super) fn lower_case_owner(
         &mut self,
         id: BackendBlockId,

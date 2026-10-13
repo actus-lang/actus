@@ -134,11 +134,23 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let Stmt::Assignment { target, value: expression, span } = statement else {
             unreachable!()
         };
-        self.lower_case_assignment(
+        let name = format!("__case_value_{}", id.0);
+        let mut statements = block.statements.clone();
+        statements.insert(
+            index + 1,
+            Stmt::Assignment {
+                target: target.clone(),
+                value: Expr::Identifier { name: name.clone(), span: *span },
+                span: *span,
+            },
+        );
+        let synthetic = Block { statements, span: block.span };
+        self.lower_case_owner(
             id,
-            block,
+            &synthetic,
             index,
-            target,
+            &name,
+            None,
             expression,
             *span,
             fallthrough,
