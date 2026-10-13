@@ -1318,12 +1318,15 @@ explicitly rejected by LLVM at the shared semantic boundary because its
 `f32`/`f64` state is outside the integer-only shared contract; no float
 fallback or `allow` bypass was added.
 
-The full LLVM-only integration matrix is still open. The current run reports
-23 failing integration targets, including nested case/body lowering, generic
-aggregate layout, Buffer and IO module linking, array and pack lowering,
-Option and enum representation, return-slot and void-call ABI behavior, and
-runtime failure paths. These failures remain recorded as implementation work;
-they do not close Gate 44.7.1 and no related checkbox is marked complete.
+The current LLVM-enabled integration matrix
+(`cargo test --features llvm --tests -- --test-threads=1`) passes in the
+hosted environment, including CLI, application, standard-library, module,
+codegen, and backend regression targets. This is hosted regression evidence;
+it does not by itself close Gate 44.7.1, because the semantic-to-backend
+pipeline and LLVM CLI implementation checkboxes still require their explicit
+contract and documentation evidence. The deferred sensor fixture is covered
+separately: Cranelift executes it, while LLVM rejects its floating-point state
+at the shared integer-only boundary with a typed backend diagnostic.
 
 ## Out of scope
 
