@@ -19,9 +19,11 @@ pub(super) fn lower_method_call(
     let Expr::Identifier { name, .. } = receiver.as_ref() else {
         return Err(unsupported(*span, "Result constructor receiver must be a type name"));
     };
-    let result_type = parse_type_name(name, *span).ok_or_else(|| {
-        unsupported(*span, "Result constructor receiver has an invalid type name")
-    })?;
+    let result_type = crate::semantic::parse_type_name_key(name, *span)
+        .or_else(|| parse_type_name(name, *span))
+        .ok_or_else(|| {
+            unsupported(*span, "Result constructor receiver has an invalid type name")
+        })?;
     if result_type.name == "Option" && result_type.arguments.len() == 1 {
         return lower_niche_option_constructor(
             provider,

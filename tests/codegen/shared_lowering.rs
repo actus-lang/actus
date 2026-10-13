@@ -142,6 +142,21 @@ fn lowers_pointer_option_constructors_through_the_neutral_contract() {
 }
 
 #[test]
+fn lowers_nested_case_expression_through_a_merge_owner() {
+    let source = "struct Node { value: Int, abs next: Option[abs Node], } verb sum(abs node: Node) -> Int { abs next = ref node.next; return node.value + case next { Option.Some(_) => 1, Option.None => 0, }; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "nested case fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("nested case fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("nested case should lower through a merge owner");
+    let sum = module.functions.first().expect("nested case fixture should include a function");
+    assert!(sum.blocks.len() >= 5, "nested case should create branch and merge blocks");
+    assert!(sum.blocks.iter().flat_map(|block| block.instructions.iter()).any(
+        |instruction| matches!(instruction, BackendInstruction::Jump { arguments, .. } if !arguments.is_empty())
+    ));
+}
+
+#[test]
 fn derives_nested_struct_layouts_in_the_neutral_signature_contract() {
     let source = "struct Inner { erg first: u32, abs view: Buffer, } struct Outer { erg inner: Inner, erg tail: u16, } verb inspect(erg value: Outer) { return; }";
     let (tokens, errors) = actus::lexer::scan(source);

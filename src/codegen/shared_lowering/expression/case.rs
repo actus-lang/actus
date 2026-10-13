@@ -45,10 +45,22 @@ pub(super) fn bind_enum_variant_payload(
         "None" => 0,
         _ => return Err(unsupported(span, "unknown enum case variant")),
     };
-    let Some(payload_type) = provider.enum_payload_types.get(&(subject, discriminant)).copied()
-    else {
-        return Err(unsupported(span, "enum case payload source type"));
-    };
+    let payload_type = provider
+        .enum_payload_types
+        .get(&(subject, discriminant))
+        .copied()
+        .or_else(|| {
+            let type_name = provider.nominal_type(subject)?;
+            (type_name.name == "Option" && type_name.arguments.len() == 1 && discriminant == 1)
+                .then(|| {
+                    super::super::support::backend_value_type(
+                        provider.layouts,
+                        &type_name.arguments[0],
+                    )
+                })
+                .flatten()
+        })
+        .ok_or_else(|| unsupported(span, "enum case payload source type"))?;
     let layout = neutral_enum_layout(provider, subject, span)?;
     let result = provider.allocate();
     provider.remember_value(result, payload_type);

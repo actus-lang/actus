@@ -13,6 +13,7 @@ mod if_flow;
 mod loop_flow;
 mod loop_support;
 mod loops;
+mod nested_case;
 mod provider;
 mod statements;
 mod value;
@@ -110,6 +111,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         block: &Block,
         fallthrough: Option<BackendBlockId>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let normalized = nested_case::normalize_block(block);
+        let block = &normalized;
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
             if matches!(
