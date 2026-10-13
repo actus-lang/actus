@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
-use llvm_sys::LLVMTypeKind;
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildRet, LLVMBuildRetVoid,
-    LLVMBuildStore, LLVMConstInt, LLVMGetTypeKind, LLVMInt64TypeInContext, LLVMSetAlignment,
+    LLVMAppendBasicBlockInContext, LLVMBuildAlloca, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildLoad2,
+    LLVMBuildMemMove, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStore, LLVMConstInt, LLVMConstNull,
+    LLVMGetTypeKind, LLVMInt64TypeInContext, LLVMPositionBuilderAtEnd, LLVMSetAlignment,
     LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
+use llvm_sys::{LLVMIntPredicate, LLVMTypeKind};
 
 use super::super::{
     BackendEmitError, BackendFunction, BackendReturnMode, BackendValueId, BackendValueType,
@@ -36,6 +37,9 @@ pub(super) fn emit_return(
             })?;
             if declaration.return_slot {
                 let slot = unsafe { llvm_sys::core::LLVMGetParam(declaration.value, 0) };
+                if declaration.borrowed_view_return {
+                    return emit_borrowed_view_return(context, builder, declaration, slot, value);
+                }
                 let size = declaration.runtime_return_size.ok_or_else(|| {
                     BackendEmitError("LLVM return slot has no known storage size".to_owned())
                 })?;
@@ -68,6 +72,56 @@ pub(super) fn emit_return(
             Ok(())
         }
     }
+}
+
+fn emit_borrowed_view_return(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    declaration: FunctionDeclaration,
+    slot: LLVMValueRef,
+    value: LLVMValueRef,
+) -> Result<(), BackendEmitError> {
+    let null_block = unsafe {
+        LLVMAppendBasicBlockInContext(context, declaration.value, c"borrowed.none".as_ptr())
+    };
+    let some_block = unsafe {
+        LLVMAppendBasicBlockInContext(context, declaration.value, c"borrowed.some".as_ptr())
+    };
+    let null = unsafe { LLVMConstNull(LLVMTypeOf(value)) };
+    let is_null = unsafe {
+        LLVMBuildICmp(
+            builder,
+            LLVMIntPredicate::LLVMIntEQ,
+            value,
+            null,
+            c"borrowed.is_null".as_ptr(),
+        )
+    };
+    unsafe { LLVMBuildCondBr(builder, is_null, null_block, some_block) };
+    unsafe { LLVMPositionBuilderAtEnd(builder, null_block) };
+    unsafe { LLVMBuildRet(builder, null) };
+    unsafe { LLVMPositionBuilderAtEnd(builder, some_block) };
+    let size = declaration
+        .runtime_return_size
+        .ok_or_else(|| BackendEmitError("borrowed view return has no payload size".to_owned()))?;
+    let alignment = declaration.return_alignment.ok_or_else(|| {
+        BackendEmitError("borrowed view return has no payload alignment".to_owned())
+    })?;
+    let copied = unsafe {
+        LLVMBuildMemMove(
+            builder,
+            slot,
+            alignment,
+            value,
+            alignment,
+            LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(size), 0),
+        )
+    };
+    if copied.is_null() {
+        return Err(BackendEmitError("LLVM failed to copy borrowed view return".to_owned()));
+    }
+    unsafe { LLVMBuildRet(builder, slot) };
+    Ok(())
 }
 
 fn return_slot_source(
