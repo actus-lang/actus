@@ -72,6 +72,19 @@ impl Analyzer {
 
     pub(super) fn leave_scope(&mut self) {
         let frame = self.scopes.pop().expect("scope stack cannot be empty");
+        let scope_depth = self.scopes.len() + 1;
+        let released = self
+            .active_field_loans
+            .iter()
+            .filter(|(_, _, depth)| *depth == scope_depth)
+            .map(|(index, _, _)| *index)
+            .collect::<Vec<_>>();
+        self.active_field_loans.retain(|(_, _, depth)| *depth != scope_depth);
+        for index in released {
+            if !self.active_field_loans.iter().any(|(owner, _, _)| *owner == index) {
+                self.model.bindings[index].access = super::state::AccessState::Mutable;
+            }
+        }
         for borrow_id in &frame.borrow_ids {
             let Some(record) = self.model.borrows.iter().find(|record| record.id == *borrow_id)
             else {

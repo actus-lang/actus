@@ -18,6 +18,7 @@ pub(crate) struct Analyzer {
     pub(crate) scopes: Vec<ScopeFrame>,
     pub(crate) next_borrow_id: usize,
     pub(crate) next_loan_id: usize,
+    pub(crate) active_field_loans: Vec<(usize, String, usize)>,
     pub(crate) active_borrow_ids: HashSet<usize>,
     pub(crate) signatures: HashMap<String, super::super::calls::VerbSignature>,
     pub(crate) local_signatures: HashSet<String>,

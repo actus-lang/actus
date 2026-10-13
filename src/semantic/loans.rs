@@ -17,15 +17,17 @@ impl Analyzer {
         parameter_indices: &[usize],
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
-        let mut roots: HashMap<usize, String> = HashMap::new();
+        let mut roots: HashMap<usize, (String, String)> = HashMap::new();
         for (argument, parameter_index) in arguments.iter().zip(parameter_indices) {
             let role = &signature.params[*parameter_index].1;
             if !matches!(role, Role::Ins | Role::Abs) {
                 continue;
             }
             let Some(root) = self.root_binding_index(&argument.expression) else { continue };
-            if let Some(previous) = roots.insert(root, role_name(role).to_owned())
-                && (previous == "ins" || *role == Role::Ins)
+            let path = field_loan_path(&argument.expression).unwrap_or_default();
+            if let Some((previous_path, previous_role)) = roots.get(&root)
+                && paths_overlap(previous_path, &path)
+                && (previous_role == "ins" || *role == Role::Ins)
             {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::ExclusiveLoanAlias {
@@ -34,6 +36,7 @@ impl Analyzer {
                     span: argument_span(argument),
                 });
             }
+            roots.insert(root, (path, role_name(role).to_owned()));
         }
         Ok(())
     }
@@ -80,7 +83,16 @@ impl Analyzer {
             return Ok(None);
         }
         let Some(root) = self.root_binding_index(&argument.expression) else { return Ok(None) };
-        if !matches!(self.model.bindings[root].access, AccessState::Mutable)
+        let field_path = field_loan_path(&argument.expression);
+        let field_available = field_path.as_ref().is_some_and(|path| {
+            !path.is_empty()
+                && self
+                    .active_field_loans
+                    .iter()
+                    .filter(|(owner, _, _)| *owner == root)
+                    .all(|(_, active, _)| !paths_overlap(active, path))
+        });
+        if (!matches!(self.model.bindings[root].access, AccessState::Mutable) && !field_available)
             || !self.model.bindings[root].ownership.is_live()
         {
             return Err(SemanticError {
@@ -94,9 +106,31 @@ impl Analyzer {
         let loan_id = self.next_loan_id;
         self.next_loan_id += 1;
         let owner = self.model.bindings[root].name.clone();
-        self.model.bindings[root].access = AccessState::Suspended { loan_id };
+        if matches!(self.model.bindings[root].access, AccessState::Mutable) {
+            self.model.bindings[root].access = AccessState::Suspended { loan_id };
+        }
+        if let Some(field_path) = field_path.filter(|path| !path.is_empty()) {
+            self.active_field_loans.push((root, field_path, self.scopes.len()));
+        }
         Ok(Some((root, loan_id, owner, parameter_index, argument_span(argument))))
     }
+}
+
+fn field_loan_path(expression: &crate::ast::Expr) -> Option<String> {
+    match expression {
+        crate::ast::Expr::Identifier { .. } => Some(String::new()),
+        crate::ast::Expr::FieldAccess { object, field, .. } => {
+            let prefix = field_loan_path(object)?;
+            Some(if prefix.is_empty() { field.clone() } else { format!("{prefix}.{field}") })
+        }
+        _ => None,
+    }
+}
+
+fn paths_overlap(left: &str, right: &str) -> bool {
+    left == right
+        || left.strip_prefix(right).is_some_and(|suffix| suffix.starts_with('.'))
+        || right.strip_prefix(left).is_some_and(|suffix| suffix.starts_with('.'))
 }
 
 fn role_name(role: &Role) -> &'static str {
