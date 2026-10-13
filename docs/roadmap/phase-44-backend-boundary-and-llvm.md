@@ -1378,6 +1378,19 @@ compile and execute the same parameter mutation with exit status `42`; the
 expanded parameter matrix passes all 8 read, literal-store, compound-store,
 and dynamic-store tests across both backends.
 
+Fixed arrays of supported scalar-field structs now cross the shared aggregate
+boundary for element field access. The classifier admits `Array[Struct, N]`
+only when the struct is non-generic and contains supported scalar fields;
+Cranelift preserves the array element address so the existing aggregate field
+load/store contract mutates the owning element in place. The hosted parity
+regressions
+`cranelift_backend_builds_and_runs_a_shared_array_struct_element_field_access`
+and
+`llvm_backend_builds_and_runs_a_shared_array_struct_element_field_access`
+compile and execute the same `Array[Point, 2]` mutation/read source with exit
+status `42`. Nested ownership fields, generic structs, packed fields, and full
+aggregate element replacement remain outside this slice.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

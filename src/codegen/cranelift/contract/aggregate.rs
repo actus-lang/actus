@@ -203,6 +203,11 @@ pub(super) fn lower_array_element_load(
     let index = coerce_array_index(builder, index, pointer_type);
     let offset = builder.ins().imul_imm_u(index, i64::from(element_layout.size));
     let address = builder.ins().iadd(base, offset);
+    if matches!(element_type, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. })
+    {
+        values.insert(*result, address);
+        return Ok(());
+    }
     let value_type = super::scalar_type(module, *element_type)?
         .ok_or_else(|| BackendEmitError("Cranelift array element must be scalar".to_owned()))?;
     values.insert(*result, builder.ins().load(value_type, MemFlagsData::new(), address, 0));

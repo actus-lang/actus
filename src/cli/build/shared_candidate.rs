@@ -8,7 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 mod shared_candidate_arrays;
 
 use shared_candidate_arrays::{
-    array_bindings, fixed_array_expression, fixed_array_index_expression, fixed_array_type,
+    aggregate_array_bindings, aggregate_array_expression, array_bindings, fixed_array_expression,
+    fixed_array_index_expression, integer_binding, scalar_place, supported_array_type,
 };
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
@@ -17,9 +18,14 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     let returns_value = returns_value(program);
     program.declarations.iter().all(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => {
-            let array_bindings = array_bindings(verb);
-            let context =
-                CandidateContext { returns_value: &returns_value, array_bindings: &array_bindings };
+            let array_bindings = array_bindings(verb, &unit_structs);
+            let aggregate_array_bindings = aggregate_array_bindings(verb, &unit_structs);
+            let context = CandidateContext {
+                returns_value: &returns_value,
+                array_bindings: &array_bindings,
+                aggregate_array_bindings: &aggregate_array_bindings,
+                aggregate_types: &unit_structs,
+            };
             verb.generic_parameters.is_empty()
                 && verb
                     .params
@@ -60,6 +66,8 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
 struct CandidateContext<'a> {
     returns_value: &'a BTreeMap<String, bool>,
     array_bindings: &'a BTreeSet<String>,
+    aggregate_array_bindings: &'a BTreeSet<String>,
+    aggregate_types: &'a BTreeSet<String>,
 }
 
 fn unit_enums(program: &Program) -> BTreeSet<String> {
@@ -145,7 +153,7 @@ fn scalar_parameter(
     matches!(parameter.role, Role::Erg | Role::Abs | Role::Ins | Role::Dat)
         && parameter.dispatch == DispatchMode::Static
         && (scalar_or_result_type(&parameter.ty, unit_enums)
-            || fixed_array_type(&parameter.ty)
+            || supported_array_type(&parameter.ty, unit_structs)
             || unit_structs.contains(&parameter.ty.name))
 }
 
@@ -175,7 +183,9 @@ fn scalar_statement(
     allow_assignment: bool,
 ) -> bool {
     match statement {
-        Stmt::OwnerDecl { initializer, .. } => scalar_initializer_expression(initializer, context),
+        Stmt::OwnerDecl { initializer, .. } => {
+            scalar_expression(initializer, context) || value_if_expression(initializer, context)
+        }
         Stmt::Assignment { target, value, .. } if allow_assignment => {
             scalar_assignment_place(target, context) && scalar_expression(value, context)
         }
@@ -227,25 +237,20 @@ fn scalar_return_block(block: &Block, context: &CandidateContext<'_>) -> bool {
         )
 }
 
-fn integer_binding(binding: &crate::ast::ForBinding) -> bool {
-    matches!(
-        binding.ty.as_deref(),
-        None | Some("u8") | Some("u16") | Some("u32") | Some("u64") | Some("Int")
-    )
-}
-
-fn scalar_place(place: &Place) -> bool {
-    matches!(place, Place::Binding { .. } | Place::Field { .. })
-}
-
 fn scalar_assignment_place(place: &Place, context: &CandidateContext<'_>) -> bool {
-    scalar_place(place)
-        || matches!(
-            place,
-            Place::Index { target, index, .. }
-                if fixed_array_expression(&target.to_expr(), context)
-                    && fixed_array_index_expression(index)
-        )
+    match place {
+        Place::Binding { .. } => true,
+        Place::Field { .. } => scalar_expression(&place.to_expr(), context),
+        Place::Index { target, index, .. } => {
+            fixed_array_expression(&target.to_expr(), context)
+                && fixed_array_index_expression(index)
+                && !aggregate_array_expression(
+                    &place.to_expr(),
+                    context.aggregate_array_bindings,
+                    context.aggregate_types,
+                )
+        }
+    }
 }
 
 fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
@@ -273,9 +278,22 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         Expr::StructLit { name, fields, .. } => {
             !name.is_empty() && fields.iter().all(|field| scalar_expression(&field.value, context))
         }
-        Expr::FieldAccess { object, .. } => scalar_expression(object, context),
+        Expr::FieldAccess { object, .. } => {
+            scalar_expression(object, context)
+                || aggregate_array_expression(
+                    object,
+                    context.aggregate_array_bindings,
+                    context.aggregate_types,
+                )
+        }
         Expr::Index { target, index, .. } => {
-            fixed_array_expression(target, context) && fixed_array_index_expression(index)
+            fixed_array_expression(target, context)
+                && fixed_array_index_expression(index)
+                && !aggregate_array_expression(
+                    expression,
+                    context.aggregate_array_bindings,
+                    context.aggregate_types,
+                )
         }
         _ => false,
     }
@@ -290,10 +308,6 @@ fn scalar_nested_expression(expression: &Expr, context: &CandidateContext<'_>) -
         }
         _ => scalar_expression(expression, context),
     }
-}
-
-fn scalar_initializer_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
-    scalar_expression(expression, context) || value_if_expression(expression, context)
 }
 
 fn scalar_return_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
@@ -358,7 +372,7 @@ fn scalar_call_expression(
     let array_constructor = arguments.is_empty()
         && callee.starts_with("Array[")
         && crate::semantic::parse_type_name_key(callee, crate::lexer::SourceSpan::new(0, 0))
-            .is_some_and(|type_name| fixed_array_type(&type_name));
+            .is_some_and(|type_name| supported_array_type(&type_name, context.aggregate_types));
     (context.returns_value.get(callee).copied().unwrap_or(false) || array_constructor)
         && arguments.iter().all(|argument| scalar_expression(&argument.expression, context))
 }
@@ -408,7 +422,13 @@ fn range_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
 fn array_loop_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
     match expression {
         Expr::Index { target, index, .. } => {
-            fixed_array_expression(target, context) && scalar_expression(index, context)
+            fixed_array_expression(target, context)
+                && scalar_expression(index, context)
+                && !aggregate_array_expression(
+                    expression,
+                    context.aggregate_array_bindings,
+                    context.aggregate_types,
+                )
         }
         Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
             array_loop_expression(expression, context)

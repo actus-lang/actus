@@ -1142,6 +1142,38 @@ fn cranelift_backend_builds_and_runs_a_shared_dynamic_fixed_array_parameter_stor
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_builds_and_runs_a_shared_array_struct_element_field_access() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-array-struct-field-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Point { x: u32, } verb mutate(ins values: Array[Point, 2]) { values[1u32].x = 41u32; } verb read(abs values: Array[Point, 2]) -> Int { return values[1u32].x as Int; } verb main() -> Int { erg values: Array[Point, 2] = Array[Point, 2](); mutate(values: ins values); return read(values: abs values) + 1; }\n",
+    )
+    .expect("write Cranelift array-struct field fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("run Cranelift array-struct field fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store() {
@@ -1239,6 +1271,39 @@ fn llvm_backend_builds_and_runs_a_shared_dynamic_fixed_array_parameter_store() {
     let status = std::process::Command::new(&output)
         .status()
         .expect("run LLVM dynamic fixed-array parameter fixture");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_builds_and_runs_a_shared_array_struct_element_field_access() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-llvm-array-struct-field-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Point { x: u32, } verb mutate(ins values: Array[Point, 2]) { values[1u32].x = 41u32; } verb read(abs values: Array[Point, 2]) -> Int { return values[1u32].x as Int; } verb main() -> Int { erg values: Array[Point, 2] = Array[Point, 2](); mutate(values: ins values); return read(values: abs values) + 1; }\n",
+    )
+    .expect("write LLVM array-struct field fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run LLVM array-struct field fixture");
     assert_eq!(status.code(), Some(42));
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
