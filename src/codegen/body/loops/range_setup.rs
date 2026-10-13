@@ -17,6 +17,17 @@ pub(super) struct RangeSetup {
     pub(super) instructions: Vec<BackendInstruction>,
 }
 
+pub(super) struct RangeBodyInput<'a> {
+    pub(super) body_id: super::BackendBlockId,
+    pub(super) increment_id: super::BackendBlockId,
+    pub(super) continuation_id: super::BackendBlockId,
+    pub(super) binding: &'a ForBinding,
+    pub(super) body: &'a Block,
+    pub(super) ids: &'a LoopValues,
+    pub(super) carried: &'a [super::CarriedBinding],
+    pub(super) span: SourceSpan,
+}
+
 impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn prepare_range_loop(
         &mut self,

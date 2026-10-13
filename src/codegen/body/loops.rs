@@ -11,7 +11,7 @@ use crate::ast::{Block, Expr, ForBinding, Stmt};
 use crate::lexer::SourceSpan;
 
 mod range_setup;
-use range_setup::RangeSetup;
+use range_setup::{RangeBodyInput, RangeSetup};
 
 pub(super) struct ForArrayInput<'a> {
     id: BackendBlockId,
@@ -139,16 +139,16 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let RangeSetup { index_type, end_value, carried, ids, blocks, instructions } =
             self.prepare_range_loop(binding, start, end, body, span, instructions)?;
         let header = header_block(blocks, &ids, end_value, index_type, &carried, span);
-        let body = self.lower_range_body(
-            blocks.body,
-            blocks.increment,
-            blocks.continuation,
+        let body = self.lower_range_body(RangeBodyInput {
+            body_id: blocks.body,
+            increment_id: blocks.increment,
+            continuation_id: blocks.continuation,
             binding,
             body,
-            &ids,
-            &carried,
+            ids: &ids,
+            carried: &carried,
             span,
-        )?;
+        })?;
         let increment = increment_block(blocks, &ids, index_type, &carried, span);
         let continuation =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
@@ -232,15 +232,18 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn lower_range_body(
         &mut self,
-        body_id: BackendBlockId,
-        increment_id: BackendBlockId,
-        continuation_id: BackendBlockId,
-        binding: &ForBinding,
-        body: &Block,
-        ids: &LoopValues,
-        carried: &[CarriedBinding],
-        span: SourceSpan,
+        input: RangeBodyInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let RangeBodyInput {
+            body_id,
+            increment_id,
+            continuation_id,
+            binding,
+            body,
+            ids,
+            carried,
+            span,
+        } = input;
         self.push_range_targets(increment_id, continuation_id, binding, carried);
         self.provider.enter_loop();
         for (binding, value) in carried.iter().zip(&ids.body_carried) {
