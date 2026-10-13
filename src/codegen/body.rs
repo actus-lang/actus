@@ -31,8 +31,16 @@ pub fn lower_verb_body_with_expressions(
     verb: &VerbDecl,
     provider: &mut impl BackendExpressionProvider,
 ) -> Result<Vec<BackendBlock>, BackendContractError> {
-    let mut lowering =
-        BodyLowering { provider, next_block: 1, blocks: Vec::new(), loop_targets: Vec::new() };
+    let mut lowering = BodyLowering {
+        provider,
+        next_block: 1,
+        blocks: Vec::new(),
+        loop_targets: Vec::new(),
+        implicit_unit_return: verb
+            .return_type
+            .as_ref()
+            .is_none_or(|return_type| return_type.ty.name == "Void"),
+    };
     let entry = BackendBlockId(0);
     let entry_block = lowering.lower_block(entry, &verb.body, None)?;
     lowering.blocks.insert(0, entry_block);
@@ -44,6 +52,7 @@ pub(super) struct BodyLowering<'a, P> {
     next_block: u32,
     pub(super) blocks: Vec<BackendBlock>,
     loop_targets: Vec<LoopTargets>,
+    implicit_unit_return: bool,
 }
 
 #[derive(Clone)]
@@ -157,6 +166,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             && let Some(target) = fallthrough
         {
             instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
+        } else if !terminates(instructions.last()) && self.implicit_unit_return {
+            instructions.push(BackendInstruction::Return { value: None, span });
         }
         BackendBlock { parameters: Vec::new(), id, instructions }
     }

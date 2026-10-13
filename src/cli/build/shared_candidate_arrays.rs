@@ -21,25 +21,6 @@ pub(super) fn array_bindings(verb: &crate::ast::VerbDecl) -> BTreeSet<String> {
     bindings
 }
 
-pub(super) fn local_array_bindings(verb: &crate::ast::VerbDecl) -> BTreeSet<String> {
-    verb.body
-        .statements
-        .iter()
-        .filter_map(|statement| match statement {
-            Stmt::OwnerDecl { name, ty: Some(ty), .. }
-                if crate::semantic::parse_type_name_key(
-                    ty,
-                    crate::lexer::SourceSpan::new(0, 0),
-                )
-                .is_some_and(|type_name| fixed_array_type(&type_name)) =>
-            {
-                Some(name.clone())
-            }
-            _ => None,
-        })
-        .collect()
-}
-
 pub(super) fn fixed_array_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
     match expression {
         Expr::Identifier { name, .. } => context.array_bindings.contains(name),

@@ -94,15 +94,6 @@ fn accepts_dynamic_fixed_array_indices_in_the_shared_contract() {
 }
 
 #[test]
-fn keeps_exclusive_array_parameter_stores_on_the_legacy_route() {
-    let source = "verb mutate(ins values: Array[Int, 2]) { values[1] = 41; } verb main() -> Int { erg values: Array[Int, 2] = Array[Int, 2](); mutate(values: ins values); return values[1] + 1; }";
-    let (tokens, errors) = scan(source);
-    assert!(errors.is_empty());
-    let program = parse(tokens).expect("exclusive array parameter fixture should parse");
-    assert!(!supports_scalar_shared_lowering(&program));
-}
-
-#[test]
 fn accepts_fixed_array_parameter_reads_in_the_shared_contract() {
     let source = "verb read(abs values: Array[u32, 4]) -> Int { return values[2u32] as Int; } verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return read(values: abs values); }";
     let (tokens, errors) = scan(source);

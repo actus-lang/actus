@@ -1346,6 +1346,18 @@ contract and documentation evidence. The deferred sensor fixture is covered
 separately: Cranelift executes it, while LLVM rejects its floating-point state
 at the shared integer-only boundary with a typed backend diagnostic.
 
+Exclusive `ins Array[T, N]` parameters now admit literal-index scalar stores in
+the shared candidate contract. The neutral body lowering also emits an
+implicit unit return for a fallthrough unit verb, so both native emitters
+receive a terminated block even when the source omits an explicit `return;`.
+The classifier coverage and hosted CLI regressions
+`cranelift_backend_builds_and_runs_a_shared_fixed_array_parameter_store` and
+`llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store` compile
+and execute the same `Array[u32, 4]` mutation with exit status `42`. The
+focused shared-candidate tests pass with 16 tests and both backend regressions
+pass with 2 tests; dynamic indexing, indexed compound assignment, and
+aggregate element stores remain outside this slice.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

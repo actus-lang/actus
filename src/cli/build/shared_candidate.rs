@@ -9,7 +9,6 @@ mod shared_candidate_arrays;
 
 use shared_candidate_arrays::{
     array_bindings, fixed_array_expression, fixed_array_index_expression, fixed_array_type,
-    local_array_bindings,
 };
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
@@ -19,12 +18,8 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     program.declarations.iter().all(|declaration| match declaration {
         crate::ast::TopLevelDecl::Verb(verb) => {
             let array_bindings = array_bindings(verb);
-            let local_array_bindings = local_array_bindings(verb);
-            let context = CandidateContext {
-                returns_value: &returns_value,
-                array_bindings: &array_bindings,
-                local_array_bindings: &local_array_bindings,
-            };
+            let context =
+                CandidateContext { returns_value: &returns_value, array_bindings: &array_bindings };
             verb.generic_parameters.is_empty()
                 && verb
                     .params
@@ -65,7 +60,6 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
 struct CandidateContext<'a> {
     returns_value: &'a BTreeMap<String, bool>,
     array_bindings: &'a BTreeSet<String>,
-    local_array_bindings: &'a BTreeSet<String>,
 }
 
 fn unit_enums(program: &Program) -> BTreeSet<String> {
@@ -249,17 +243,9 @@ fn scalar_assignment_place(place: &Place, context: &CandidateContext<'_>) -> boo
         || matches!(
             place,
             Place::Index { target, index, .. }
-                if local_array_expression(&target.to_expr(), context)
+                if fixed_array_expression(&target.to_expr(), context)
                     && fixed_array_index_expression(index)
         )
-}
-
-fn local_array_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
-    match expression {
-        Expr::Identifier { name, .. } => context.local_array_bindings.contains(name),
-        Expr::Call { .. } => fixed_array_expression(expression, context),
-        _ => false,
-    }
 }
 
 fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
