@@ -15,11 +15,12 @@ pub(super) fn emit_objects_llvm(
     let bindings = llvm_module_bindings(&object_plan, &generic_instances)?;
     let root = &object_plan.units()[0];
     let root_program = specialize_llvm_program(root.program(), configuration, &generic_instances)?;
-    let root_module = crate::codegen::lower_program_to_backend_module(
+    let root_module = crate::codegen::lower_program_to_backend_module_for_target(
         root.namespace().symbol_prefix(),
         &root_program,
         Some(symbol),
         Some(&bindings),
+        configuration.target(),
     )
     .map_err(|error| {
         let error = error.with_backend_context("llvm", configuration.target().triple().to_string());
@@ -28,11 +29,12 @@ pub(super) fn emit_objects_llvm(
     let mut objects = vec![llvm_object("root", &root_module, configuration.target())?];
     for unit in &object_plan.units()[1..] {
         let program = specialize_llvm_program(unit.program(), configuration, &generic_instances)?;
-        let module = crate::codegen::lower_program_to_backend_module(
+        let module = crate::codegen::lower_program_to_backend_module_for_target(
             unit.namespace().symbol_prefix(),
             &program,
             None,
             Some(&bindings),
+            configuration.target(),
         )
         .map_err(|error| {
             let error =

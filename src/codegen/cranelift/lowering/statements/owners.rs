@@ -127,7 +127,8 @@ fn lower_initializer_value(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
-    if let Some(value) = lower_special_initializer(function, declared_native, initializer, layouts)?
+    if let Some(value) =
+        lower_special_initializer(function, declared_native, initializer, layouts, functions)?
     {
         return Ok(value);
     }
@@ -148,6 +149,7 @@ fn lower_special_initializer(
     declared_native: Option<NativeType>,
     initializer: &Expr,
     layouts: &LayoutRegistry,
+    functions: &HashMap<String, FunctionRef>,
 ) -> Result<Option<cranelift_codegen::ir::Value>, BackendEmitError> {
     let value = match (declared_native, initializer) {
         (Some(NativeType::Array(id)), Expr::Call { callee, arguments, .. })
@@ -161,7 +163,12 @@ fn lower_special_initializer(
                     "array initializer type does not match binding".to_owned(),
                 ));
             }
-            Some(crate::codegen::cranelift::arrays::lower_array_constructor(function, id, layouts)?)
+            Some(crate::codegen::cranelift::arrays::lower_array_constructor(
+                function,
+                id,
+                layouts,
+                Some(functions),
+            )?)
         }
         (Some(NativeType::Integer { width: 65..=128, .. }), Expr::Integer { value, .. }) => {
             Some(super::super::super::expressions::lower_wide_integer(function, value)?)

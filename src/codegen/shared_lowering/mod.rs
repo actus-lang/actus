@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 use crate::ast::{ExternalVerbDecl, PerformDecl, Program, TopLevelDecl, TypeName, VerbDecl};
+use crate::target::{EntryContract, TargetSpec};
 
 mod constructors;
 mod expression;
@@ -42,8 +43,61 @@ pub(crate) fn lower_program_to_backend_module(
     entry_name: Option<&str>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendModule, BackendContractError> {
+    let target = TargetSpec::host()
+        .map_err(|error| BackendContractError::InvalidCleanupContract(error.to_string()))?;
+    lower_program_to_backend_module_for_target(namespace, program, entry_name, bindings, &target)
+}
+
+pub(crate) fn lower_program_to_backend_module_for_target(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+    target: &TargetSpec,
+) -> Result<BackendModule, BackendContractError> {
     let layouts = ProgramLayouts::new(program, namespace);
+    let semantic = crate::semantic::analyze(program).map_err(|error| {
+        unsupported(
+            crate::lexer::SourceSpan::new(0, 0),
+            format!("semantic analysis failed: {error:?}"),
+        )
+    })?;
+    reject_implicit_large_aggregate_allocation(&semantic, &layouts, target)?;
     lower_program_to_backend_module_with_layouts(namespace, program, entry_name, bindings, &layouts)
+}
+
+fn reject_implicit_large_aggregate_allocation(
+    semantic: &crate::semantic::SemanticModel,
+    layouts: &ProgramLayouts<'_>,
+    target: &TargetSpec,
+) -> Result<(), BackendContractError> {
+    if target.entry_contract() == EntryContract::Hosted {
+        return Ok(());
+    }
+    for (binding_index, type_name) in &semantic.binding_type_names {
+        let Some(layout) = layouts.layout_for(type_name) else { continue };
+        if layout.size < super::LARGE_AGGREGATE_THRESHOLD {
+            continue;
+        }
+        let span = semantic
+            .bindings
+            .get(*binding_index)
+            .map(|binding| binding.span)
+            .unwrap_or(type_name.span);
+        return Err(BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
+            "large aggregate implicit allocation",
+            span,
+            super::BackendTargetContext {
+                backend: "shared".to_owned(),
+                target: target.triple().to_string(),
+            },
+            format!(
+                "aggregate layout size {} exceeds target stack limit, and implicit dynamic allocation is forbidden on freestanding targets",
+                layout.size
+            ),
+        )));
+    }
+    Ok(())
 }
 
 pub(crate) fn lower_program_to_backend_module_with_layouts(

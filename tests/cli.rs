@@ -36,6 +36,7 @@ fn llvm_backend_builds_and_runs_a_scalar_root_program() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_preserve_local_assignment_in_an_if_without_else() {
     for backend in ["cranelift", "llvm"] {

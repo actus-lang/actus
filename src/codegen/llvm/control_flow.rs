@@ -264,6 +264,7 @@ fn emit_non_control_instruction(
             context.builder,
             context.pointer_width,
             instruction,
+            context.declarations,
             context.values,
         );
     }

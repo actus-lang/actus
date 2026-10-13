@@ -39,12 +39,18 @@ pub use contract::{
     BackendValueType, lower_semantic_cleanup, lower_semantic_cleanup_with_provider,
     validate_edge_arguments,
 };
+
+/// Aggregates at or above this size use explicit runtime storage instead of a
+/// native function stack slot.
+pub const LARGE_AGGREGATE_THRESHOLD: u32 = 64 * 1024;
 pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};
 pub use model::{
     LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,
     lower_cleanup_plans, lower_loop_unwind_plans, lower_return_unwind_plans,
 };
+#[cfg(test)]
 pub(crate) use shared_lowering::lower_program_to_backend_module;
+pub(crate) use shared_lowering::lower_program_to_backend_module_for_target;
 #[doc(hidden)]
 pub use shared_lowering::lower_scalar_program;
 pub(crate) use signature::lower_verb_with_expressions_as;

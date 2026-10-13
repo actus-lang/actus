@@ -101,6 +101,43 @@ fn declare_module_functions(
         let declaration = declare_cleanup_bridge(context, module, bridge, pointer_width)?;
         declarations.insert(symbol.to_owned(), declaration);
     }
+    if backend_module.functions.iter().any(|function| {
+        function.blocks.iter().any(|block| {
+            block.instructions.iter().any(|instruction| {
+                matches!(instruction, BackendInstruction::AggregateConstruct { layout, .. }
+                if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
+            })
+        })
+    }) {
+        let parameters = vec![
+            crate::codegen::BackendParameter {
+                name: "size".to_owned(),
+                role: crate::ast::Role::Erg,
+                ty: BackendValueType::Integer { signed: false, width: pointer_width },
+                passing: crate::codegen::BackendPassingMode::Direct,
+            },
+            crate::codegen::BackendParameter {
+                name: "alignment".to_owned(),
+                role: crate::ast::Role::Erg,
+                ty: BackendValueType::Integer { signed: false, width: pointer_width },
+                passing: crate::codegen::BackendPassingMode::Direct,
+            },
+        ];
+        let return_value = crate::codegen::BackendReturn {
+            role: None,
+            ty: BackendValueType::Pointer,
+            passing: crate::codegen::BackendReturnMode::Direct,
+        };
+        let declaration = declare_function(
+            context,
+            module,
+            crate::runtime::AGGREGATE_ALLOCATE_SYMBOL,
+            &parameters,
+            &return_value,
+            false,
+        )?;
+        declarations.insert(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL.to_owned(), declaration);
+    }
     for function in &backend_module.functions {
         let declaration = declare_function(
             context,
@@ -140,6 +177,7 @@ fn cleanup_bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+        BackendCleanupBridge::AggregateDrop { .. } => crate::runtime::AGGREGATE_DROP_SYMBOL,
         BackendCleanupBridge::PerformanceDrop => "",
     }
 }

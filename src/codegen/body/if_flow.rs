@@ -51,9 +51,15 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         for (name, value) in &initial {
             self.provider.set_binding_value(name, *value);
         }
+        let else_start = self.blocks.len();
         let else_block =
             self.lower_if_else_block(else_id, else_branch, continuation_id, &carried, span)?;
         let branches_terminate = then_terminates
+            && !generated_blocks_reach_continuation(
+                &self.blocks[else_start..],
+                &else_block,
+                continuation_id,
+            )
             && terminates_without_continuation(else_block.instructions.last(), continuation_id);
         self.blocks.push(else_block);
         let parameters = carried
@@ -75,6 +81,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         carried: &[loops::CarriedBinding],
         span: SourceSpan,
     ) -> Result<(BackendBlock, BTreeMap<String, BackendValueId>, bool), BackendContractError> {
+        let generated_start = self.blocks.len();
         let mut lowered = self.lower_block(id, branch, Some(continuation_id))?;
         let values = carried
             .iter()
@@ -84,8 +91,13 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                     .map(|value| (binding.name.clone(), value))
             })
             .collect::<BTreeMap<_, _>>();
-        let terminates =
-            terminates_without_continuation(lowered.instructions.last(), continuation_id);
+        let reaches_continuation = generated_blocks_reach_continuation(
+            &self.blocks[generated_start..],
+            &lowered,
+            continuation_id,
+        );
+        let terminates = !reaches_continuation
+            && terminates_without_continuation(lowered.instructions.last(), continuation_id);
         replace_if_edge_arguments(&mut lowered, continuation_id, carried, &values, span);
         Ok((lowered, values, terminates))
     }
@@ -169,6 +181,21 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         self.next_block += 1;
         id
     }
+}
+
+fn generated_blocks_reach_continuation(
+    generated: &[BackendBlock],
+    lowered: &BackendBlock,
+    continuation: BackendBlockId,
+) -> bool {
+    generated
+        .iter()
+        .chain(std::iter::once(lowered))
+        .any(|block| {
+            block.instructions.iter().any(|instruction| {
+                matches!(instruction, BackendInstruction::Jump { target, .. } if *target == continuation)
+            })
+        })
 }
 
 pub(super) struct IfLowering {

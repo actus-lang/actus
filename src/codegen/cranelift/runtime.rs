@@ -6,10 +6,11 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::IntrinsicKind;
 use crate::runtime::{
-    BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL, BUFFER_CRC32_MATCHES_SYMBOL, BUFFER_CRC32_SYMBOL,
-    BUFFER_DROP_SYMBOL, BUFFER_LENGTH_SYMBOL, BUFFER_VALIDATE_FIXED_FRAME_SYMBOL,
-    ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL,
-    PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL, WRITE_STRING_STDOUT_SYMBOL,
+    AGGREGATE_ALLOCATE_SYMBOL, AGGREGATE_DROP_SYMBOL, BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL,
+    BUFFER_CRC32_MATCHES_SYMBOL, BUFFER_CRC32_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_LENGTH_SYMBOL,
+    BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
+    PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL,
+    WRITE_STRING_STDOUT_SYMBOL,
 };
 
 use super::super::cranelift::native::{BackendEmitError, FunctionMeta};
@@ -47,6 +48,8 @@ pub(crate) fn declare_runtime_functions(
         write_string: declare_write_string(module, pointer_type)?,
         enum_allocate: declare_enum_allocate(module, pointer_type)?,
         enum_drop: declare_enum_drop(module, pointer_type)?,
+        aggregate_allocate: declare_aggregate_allocate(module, pointer_type)?,
+        aggregate_drop: declare_aggregate_drop(module, pointer_type)?,
     };
     declare_print_buffer(module, pointer_type)?;
     let append_spec = IntrinsicKind::Append.spec();
@@ -102,6 +105,8 @@ struct RuntimeFunctionIds {
     write_string: cranelift_module::FuncId,
     enum_allocate: cranelift_module::FuncId,
     enum_drop: cranelift_module::FuncId,
+    aggregate_allocate: cranelift_module::FuncId,
+    aggregate_drop: cranelift_module::FuncId,
 }
 
 fn runtime_metadata(
@@ -127,6 +132,14 @@ fn runtime_metadata(
         (
             ENUM_DROP_SYMBOL.to_owned(),
             named_meta(ids.enum_drop, &["pointer", "size"], NativeType::Int),
+        ),
+        (
+            format!("__{AGGREGATE_ALLOCATE_SYMBOL}"),
+            named_meta(ids.aggregate_allocate, &["size", "alignment"], NativeType::Buffer),
+        ),
+        (
+            AGGREGATE_DROP_SYMBOL.to_owned(),
+            named_meta(ids.aggregate_drop, &["pointer", "size", "alignment"], NativeType::Int),
         ),
         (
             append_spec.name.to_owned(),
@@ -178,6 +191,32 @@ fn declare_enum_drop(
     signature.params.push(AbiParam::new(pointer_type));
     module
         .declare_function(ENUM_DROP_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| BackendEmitError(error.to_string()))
+}
+
+fn declare_aggregate_allocate(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(pointer_type));
+    module
+        .declare_function(AGGREGATE_ALLOCATE_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| BackendEmitError(error.to_string()))
+}
+
+fn declare_aggregate_drop(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(pointer_type));
+    module
+        .declare_function(AGGREGATE_DROP_SYMBOL, Linkage::Import, &signature)
         .map_err(|error| BackendEmitError(error.to_string()))
 }
 

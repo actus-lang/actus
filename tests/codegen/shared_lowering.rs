@@ -741,15 +741,14 @@ fn lowers_scalar_parameter_assignment_in_the_function_scope() {
 }
 
 #[test]
-fn rejects_outer_scalar_assignment_without_a_branch_merge_contract() {
+fn lowers_outer_scalar_assignment_through_a_branch_merge_contract() {
     let source = "verb main() -> Int { erg answer = 0; if true { answer = 1; }; return answer; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "lexer errors: {errors:?}");
     let program = parse(tokens).expect("outer assignment fixture should parse");
-    let error = lower_scalar_program("actus_root", &program, None)
-        .expect_err("outer assignment without a merge must be rejected");
-    let message = error.to_string();
-    assert!(message.contains("current lexical scope"), "unexpected error: {message}");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("outer assignment should lower through the branch merge");
+    assert!(module.functions[0].blocks.iter().any(|block| !block.parameters.is_empty()));
 }
 
 #[test]

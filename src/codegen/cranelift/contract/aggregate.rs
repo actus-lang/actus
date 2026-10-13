@@ -6,12 +6,14 @@ use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
 use super::super::native::BackendEmitError;
+use super::Declaration;
 use crate::codegen::{BackendInstruction, BackendValueId, BackendValueType};
 
 pub(super) fn lower_aggregate_construct(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, Declaration>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::AggregateConstruct { result, layout, fields, .. } = instruction else {
@@ -19,12 +21,25 @@ pub(super) fn lower_aggregate_construct(
     };
     let alignment = u8::try_from(layout.alignment)
         .map_err(|_| BackendEmitError("Cranelift aggregate alignment exceeds u8".to_owned()))?;
-    let slot = builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-        layout.size,
-        alignment.trailing_zeros() as u8,
-    ));
-    let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+    let address = if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+        let declaration =
+            declarations.get(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL).ok_or_else(|| {
+                BackendEmitError("large aggregate allocator is unavailable".to_owned())
+            })?;
+        let reference = module.declare_func_in_func(declaration.id, builder.func);
+        let size = builder.ins().iconst(module.isa().pointer_type(), i64::from(layout.size));
+        let alignment =
+            builder.ins().iconst(module.isa().pointer_type(), i64::from(layout.alignment));
+        let call = builder.ins().call(reference, &[size, alignment]);
+        builder.inst_results(call)[0]
+    } else {
+        let slot = builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+            layout.size,
+            alignment.trailing_zeros() as u8,
+        ));
+        builder.ins().stack_addr(module.isa().pointer_type(), slot, 0)
+    };
     zero_initialize_aggregate(module, builder, address, *layout);
     for field in fields {
         let value = values.get(&field.value).copied().ok_or_else(|| {
@@ -417,11 +432,12 @@ pub(super) fn lower_aggregate_instruction(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, Declaration>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::AggregateConstruct { .. } => {
-            lower_aggregate_construct(module, builder, instruction, values)
+            lower_aggregate_construct(module, builder, instruction, declarations, values)
         }
         BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. } => {

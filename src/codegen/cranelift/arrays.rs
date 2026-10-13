@@ -224,15 +224,30 @@ pub(crate) fn lower_array_constructor(
     function: &mut FunctionBuilder<'_>,
     id: usize,
     layouts: &LayoutRegistry,
+    functions: Option<&HashMap<String, FunctionRef>>,
 ) -> Result<Value, BackendEmitError> {
     let layout =
         layouts.array(id).ok_or_else(|| BackendEmitError(format!("missing array layout `{id}")))?;
-    let slot = function.func.create_sized_stack_slot(StackSlotData::new(
-        StackSlotKind::ExplicitSlot,
-        layout.size,
-        layout.alignment.trailing_zeros() as u8,
-    ));
-    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    let address = if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+        let allocator = functions
+            .and_then(|items| {
+                items.get(&format!("__{}", crate::runtime::AGGREGATE_ALLOCATE_SYMBOL))
+            })
+            .ok_or_else(|| {
+                BackendEmitError("large aggregate allocator is unavailable".to_owned())
+            })?;
+        let size = function.ins().iconst(layouts.pointer_type, i64::from(layout.size));
+        let alignment = function.ins().iconst(layouts.pointer_type, i64::from(layout.alignment));
+        let call = function.ins().call(allocator.reference, &[size, alignment]);
+        function.inst_results(call)[0]
+    } else {
+        let slot = function.func.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            layout.size,
+            layout.alignment.trailing_zeros() as u8,
+        ));
+        function.ins().stack_addr(layouts.pointer_type, slot, 0)
+    };
     function.emit_small_memset(
         layouts.frontend_config()?,
         address,

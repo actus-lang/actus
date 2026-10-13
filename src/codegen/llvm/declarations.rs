@@ -192,6 +192,34 @@ fn cleanup_signature(
                 passing: BackendReturnMode::Direct,
             },
         ),
+        BackendCleanupBridge::AggregateDrop { .. } => (
+            crate::runtime::AGGREGATE_DROP_SYMBOL,
+            vec![
+                BackendParameter {
+                    name: "pointer".to_owned(),
+                    role: crate::ast::Role::Erg,
+                    ty: BackendValueType::Pointer,
+                    passing: BackendPassingMode::Direct,
+                },
+                BackendParameter {
+                    name: "size".to_owned(),
+                    role: crate::ast::Role::Erg,
+                    ty: BackendValueType::Integer { signed: false, width: pointer_width },
+                    passing: BackendPassingMode::Direct,
+                },
+                BackendParameter {
+                    name: "alignment".to_owned(),
+                    role: crate::ast::Role::Erg,
+                    ty: BackendValueType::Integer { signed: false, width: pointer_width },
+                    passing: BackendPassingMode::Direct,
+                },
+            ],
+            BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+        ),
         BackendCleanupBridge::PerformanceDrop => performance_cleanup_signature(),
     }
 }

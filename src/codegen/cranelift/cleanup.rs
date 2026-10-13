@@ -223,6 +223,9 @@ fn emit_resolved_binding_drop(
         super::super::contract::BackendCleanupBridge::EnumDrop { .. } => {
             crate::runtime::ENUM_DROP_SYMBOL.to_owned()
         }
+        super::super::contract::BackendCleanupBridge::AggregateDrop { .. } => {
+            crate::runtime::AGGREGATE_DROP_SYMBOL.to_owned()
+        }
         super::super::contract::BackendCleanupBridge::PerformanceDrop => {
             return Err(BackendEmitError(
                 "Cranelift user-defined Drop performance emission is not implemented".to_owned(),
@@ -238,6 +241,14 @@ fn emit_resolved_binding_drop(
     {
         arguments
             .push(function.ins().iconst(layouts.pointer_type, i64::from(descriptor.layout.size)));
+    } else if let super::super::contract::BackendCleanupBridge::AggregateDrop { .. } =
+        descriptor.descriptor.bridge
+    {
+        arguments
+            .push(function.ins().iconst(layouts.pointer_type, i64::from(descriptor.layout.size)));
+        arguments.push(
+            function.ins().iconst(layouts.pointer_type, i64::from(descriptor.layout.alignment)),
+        );
     }
     function.ins().call(target.reference, &arguments);
     Ok(())

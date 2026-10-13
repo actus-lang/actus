@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use super::declarations::FunctionDeclaration;
 use llvm_sys::core::{
     LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMemSet,
     LLVMBuildStore, LLVMConstInt, LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment,
@@ -12,6 +13,7 @@ pub(super) fn emit_aggregate_construct(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     let BackendInstruction::AggregateConstruct { result, layout, fields, .. } = instruction else {
@@ -19,8 +21,30 @@ pub(super) fn emit_aggregate_construct(
     };
     let aggregate_type =
         super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
-    let address =
-        unsafe { LLVMBuildAlloca(builder, aggregate_type, c"aggregate.construct".as_ptr().cast()) };
+    let address = if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+        let declaration =
+            declarations.get(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL).ok_or_else(|| {
+                BackendEmitError("large aggregate allocator is unavailable".to_owned())
+            })?;
+        let size =
+            unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+        let alignment = unsafe {
+            LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.alignment), 0)
+        };
+        let mut arguments = [size, alignment];
+        unsafe {
+            llvm_sys::core::LLVMBuildCall2(
+                builder,
+                declaration.function_type,
+                declaration.value,
+                arguments.as_mut_ptr(),
+                2,
+                c"aggregate.allocate".as_ptr().cast(),
+            )
+        }
+    } else {
+        unsafe { LLVMBuildAlloca(builder, aggregate_type, c"aggregate.construct".as_ptr().cast()) }
+    };
     if address.is_null() {
         return Err(BackendEmitError("LLVM failed to allocate aggregate value".to_owned()));
     }
@@ -70,6 +94,7 @@ pub(super) fn emit_aggregate_instruction(
     builder: LLVMBuilderRef,
     pointer_width: u8,
     instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     match instruction {
@@ -77,7 +102,7 @@ pub(super) fn emit_aggregate_instruction(
             super::arena::emit(context, builder, pointer_width, instruction, values)
         }
         BackendInstruction::AggregateConstruct { .. } => {
-            emit_aggregate_construct(context, builder, instruction, values)
+            emit_aggregate_construct(context, builder, instruction, declarations, values)
         }
         BackendInstruction::AggregateFieldLoad { .. } => {
             emit_aggregate_field_load(context, builder, instruction, values)

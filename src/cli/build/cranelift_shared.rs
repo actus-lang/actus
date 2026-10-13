@@ -125,11 +125,12 @@ pub(super) fn emit_shared_scalar_unit(
     bindings: &BackendSymbolBindings,
 ) -> Result<EmittedObject, BackendEmitError> {
     let program = crate::codegen::normalize_program(source);
-    let module = crate::codegen::lower_program_to_backend_module(
+    let module = crate::codegen::lower_program_to_backend_module_for_target(
         namespace,
         &program,
         entry_symbol,
         Some(bindings),
+        configuration.target(),
     )
     .map_err(|error| {
         BackendEmitError(format!(

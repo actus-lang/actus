@@ -27,8 +27,19 @@ pub(crate) fn lower_struct_literal(
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let layout = resolve_struct_layout(name, type_arguments, layouts)?;
-    let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
-    let address = function.ins().stack_addr(layouts.pointer_type, slot, 0);
+    let address = if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+        let allocator =
+            functions.get(&format!("__{}", crate::runtime::AGGREGATE_ALLOCATE_SYMBOL)).ok_or_else(
+                || BackendEmitError("large aggregate allocator is unavailable".to_owned()),
+            )?;
+        let size = function.ins().iconst(layouts.pointer_type, i64::from(layout.size));
+        let alignment = function.ins().iconst(layouts.pointer_type, i64::from(layout.alignment));
+        let call = function.ins().call(allocator.reference, &[size, alignment]);
+        function.inst_results(call)[0]
+    } else {
+        let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
+        function.ins().stack_addr(layouts.pointer_type, slot, 0)
+    };
     lower_struct_fields(
         function,
         fields,

@@ -69,9 +69,13 @@ pub(super) fn lower_instruction(
             aggregate_values,
             function,
         ),
-        _ if is_aggregate_instruction(instruction) => {
-            aggregate::lower_aggregate_instruction(module, builder, instruction, values)
-        }
+        _ if is_aggregate_instruction(instruction) => aggregate::lower_aggregate_instruction(
+            module,
+            builder,
+            instruction,
+            declarations,
+            values,
+        ),
         _ => unreachable!("Cranelift instruction dispatch is exhaustive"),
     }
 }

@@ -46,7 +46,7 @@ fn lower_call_or_array_constructor(
     if arguments.is_empty()
         && let Some(id) = context.layouts.array_id(callee)
     {
-        return lower_array_constructor(function, id, context.layouts);
+        return lower_array_constructor(function, id, context.layouts, Some(context.functions));
     }
     lower_call(function, callee, arguments, context)
 }

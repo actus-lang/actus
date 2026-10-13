@@ -122,6 +122,38 @@ pub(super) fn declare_cleanup_bridges(
         }
     }
 
+    let needs_aggregate_allocator = backend_module.functions.iter().any(|function| {
+        function.blocks.iter().any(|block| {
+            block.instructions.iter().any(|instruction| {
+                matches!(instruction, BackendInstruction::AggregateConstruct { layout, .. }
+                    if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
+            })
+        })
+    });
+    if needs_aggregate_allocator {
+        let pointer_type = module.isa().pointer_type();
+        let mut signature = module.make_signature();
+        signature.params.push(AbiParam::new(pointer_type));
+        signature.params.push(AbiParam::new(pointer_type));
+        signature.returns.push(AbiParam::new(pointer_type));
+        let id = module
+            .declare_function(
+                crate::runtime::AGGREGATE_ALLOCATE_SYMBOL,
+                Linkage::Import,
+                &signature,
+            )
+            .map_err(|error| BackendEmitError(error.to_string()))?;
+        declarations.insert(
+            crate::runtime::AGGREGATE_ALLOCATE_SYMBOL.to_owned(),
+            Declaration {
+                id,
+                parameter_fragments: vec![1, 1],
+                return_fragments: 1,
+                return_slot: None,
+            },
+        );
+    }
+
     for bridge in bridges {
         if matches!(bridge, BackendCleanupBridge::PerformanceDrop) {
             continue;
@@ -136,6 +168,10 @@ pub(super) fn declare_cleanup_bridges(
         let parameter_fragments = if matches!(bridge, BackendCleanupBridge::EnumDrop { .. }) {
             signature.params.push(AbiParam::new(pointer_type));
             vec![1, 1]
+        } else if matches!(bridge, BackendCleanupBridge::AggregateDrop { .. }) {
+            signature.params.push(AbiParam::new(pointer_type));
+            signature.params.push(AbiParam::new(pointer_type));
+            vec![1, 1, 1]
         } else {
             vec![1]
         };
@@ -192,6 +228,9 @@ pub(super) fn lower_cleanup(
     let mut arguments = vec![argument];
     if let BackendCleanupBridge::EnumDrop { size } = operand.bridge {
         arguments.push(builder.ins().iconst(module.isa().pointer_type(), i64::from(size)));
+    } else if let BackendCleanupBridge::AggregateDrop { size, alignment } = operand.bridge {
+        arguments.push(builder.ins().iconst(module.isa().pointer_type(), i64::from(size)));
+        arguments.push(builder.ins().iconst(module.isa().pointer_type(), i64::from(alignment)));
     }
     builder.ins().call(reference, &arguments);
     Ok(())
@@ -202,6 +241,7 @@ fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+        BackendCleanupBridge::AggregateDrop { .. } => crate::runtime::AGGREGATE_DROP_SYMBOL,
         BackendCleanupBridge::PerformanceDrop => "",
     }
 }

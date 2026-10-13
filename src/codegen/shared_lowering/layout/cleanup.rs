@@ -4,6 +4,24 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
         type_name: Option<&TypeName>,
         builtin: Option<BuiltinType>,
     ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
+        if let Some(type_name) = type_name
+            && !matches!(type_name.name.as_str(), "Buffer" | "Region")
+            && self
+                .type_layout(type_name, &mut Vec::new())
+                .is_some_and(|layout| layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
+        {
+            let layout = self
+                .type_layout(type_name, &mut Vec::new())
+                .ok_or(BackendContractError::InvalidCleanupOperand)?;
+            return Ok(Some(self.cleanup_descriptor(
+                BackendCleanupBridge::AggregateDrop {
+                    size: layout.size,
+                    alignment: layout.alignment,
+                },
+                layout,
+                None,
+            )));
+        }
         if builtin == Some(BuiltinType::Buffer)
             || type_name.is_some_and(|name| name.name == "Buffer")
         {

@@ -39,6 +39,18 @@ pub(super) fn emit_runtime_bridge(
             }
         };
         arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(size), 0) });
+    } else if let BackendCleanupBridge::AggregateDrop { size, alignment } = operand.bridge {
+        let integer_type = match pointer_width {
+            32 => unsafe { llvm_sys::core::LLVMInt32TypeInContext(context) },
+            64 => unsafe { llvm_sys::core::LLVMInt64TypeInContext(context) },
+            width => {
+                return Err(BackendEmitError(format!(
+                    "LLVM cleanup bridge does not support pointer width {width}"
+                )));
+            }
+        };
+        arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(size), 0) });
+        arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(alignment), 0) });
     }
     let name = CString::new(if declaration.returns_void { "" } else { "cleanup_call" })
         .map_err(|_| BackendEmitError("LLVM cleanup call name contains NUL".to_owned()))?;
@@ -63,6 +75,7 @@ fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::BufferDrop => crate::runtime::BUFFER_DROP_SYMBOL,
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
+        BackendCleanupBridge::AggregateDrop { .. } => crate::runtime::AGGREGATE_DROP_SYMBOL,
         BackendCleanupBridge::PerformanceDrop => "",
     }
 }
