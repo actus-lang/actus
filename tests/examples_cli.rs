@@ -80,6 +80,12 @@ fn sensor_telemetry_example_rejects_llvm_float_lowering_explicitly() {
     let stderr = String::from_utf8_lossy(&result.stderr);
     assert!(stderr.contains("`float-literal`"), "missing operation in diagnostic: {stderr}");
     assert!(stderr.contains("backend `llvm`"), "missing backend in diagnostic: {stderr}");
+    assert!(
+        stderr.contains("target `x86_64-unknown-linux-gnu`"),
+        "missing target in diagnostic: {stderr}"
+    );
+    assert!(stderr.contains("at SourceSpan"), "missing source span in diagnostic: {stderr}");
+    assert!(!output_path.exists(), "unsupported LLVM build must not leave an artifact");
     let _ = fs::remove_file(output_path);
 }
 

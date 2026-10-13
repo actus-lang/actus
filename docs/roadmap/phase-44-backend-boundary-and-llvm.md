@@ -682,7 +682,7 @@ the same fixture through LLVM and Cranelift object emission.
 - [x] Implement the LLVM CLI emission path for the supported shared contract,
       including module units, generic specializations, runtime bridges, entry
       selection, object merging, and linker integration.
-- [ ] Make unsupported operations fail with the typed backend diagnostic that
+- [x] Make unsupported operations fail with the typed backend diagnostic that
       names the operation, source span, selected backend, and target; never
       silently fall back to the other backend.
 - [x] Add configuration tests for default selection, manifest selection,
@@ -1414,6 +1414,13 @@ environment is Rust `1.98.0`, LLVM `23.1.1`, target
 `x86_64-unknown-linux-gnu`, with `CARGO_BUILD_JOBS=2` and
 `--test-threads=1`; the full all-target run remains blocked by the existing
 source-limit test failures listed in its diagnostic.
+
+Unsupported-operation diagnostics now have a CLI regression for the LLVM
+integer-only boundary. `sensor_telemetry.act` must fail before artifact
+creation, and its diagnostic names `float-literal`, the selected `llvm`
+backend, target `x86_64-unknown-linux-gnu`, and the source span. This confirms
+that an unsupported operation is rejected at the selected backend boundary
+instead of silently falling back to Cranelift.
 
 ## Out of scope
 
