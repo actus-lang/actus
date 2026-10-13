@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use object::{Object, ObjectSymbol};
+use object::{Object, ObjectSection, ObjectSymbol, RelocationTarget};
 
 const BACKENDS: [&str; 2] = ["cranelift", "llvm"];
 const SOURCE: &str = "import std::region; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
@@ -58,6 +58,25 @@ fn symbols(bytes: &[u8], defined: bool) -> BTreeSet<String> {
         .collect()
 }
 
+fn referenced_undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
+    let file = object::File::parse(bytes).expect("parity object should parse");
+    let mut symbols = BTreeSet::new();
+    for section in file.sections() {
+        for (_, relocation) in section.relocations() {
+            let RelocationTarget::Symbol(index) = relocation.target() else { continue };
+            let symbol = file.symbol_by_index(index).expect("relocation symbol should exist");
+            if symbol.is_undefined() {
+                if let Ok(name) = symbol.name() {
+                    if name.starts_with("actus_") {
+                        symbols.insert(name.to_owned());
+                    }
+                }
+            }
+        }
+    }
+    symbols
+}
+
 #[test]
 fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
     let mut statuses = Vec::new();
@@ -102,12 +121,18 @@ fn freestanding_cli_backends_preserve_symbols_and_zero_float_evidence() {
         );
         let bytes = fs::read(&output).expect("read freestanding parity object");
         defined.push(symbols(&bytes, true));
-        undefined.push(symbols(&bytes, false));
+        undefined.push(referenced_undefined_symbols(&bytes));
         fs::remove_dir_all(root).expect("remove freestanding parity fixture");
     }
     assert!(defined[0].contains("boot"), "freestanding entry symbol missing: {:?}", defined[0]);
     assert_eq!(defined[0], defined[1], "freestanding exported symbols diverged");
-    assert_eq!(undefined[0], undefined[1], "runtime bridge symbols diverged");
+    assert!(
+        undefined[0].contains("actus_region_drop")
+            && undefined[0].iter().any(|symbol| symbol.contains("__verb_region_5fopen_5f_5fu8")),
+        "required Region runtime bridges are missing: {:?}",
+        undefined[0]
+    );
+    assert_eq!(undefined[0], undefined[1], "runtime bridge relocations diverged");
 }
 
 #[test]

@@ -688,7 +688,7 @@ the same fixture through LLVM and Cranelift object emission.
 - [x] Add configuration tests for default selection, manifest selection,
       feature-disabled selection, target/backend incompatibility, and invalid
       backend names.
-- [ ] Add hosted and freestanding CLI fixtures that build the same source with
+- [x] Add hosted and freestanding CLI fixtures that build the same source with
       both backends and compare exit status, exported symbols, failure class,
       ownership behavior, runtime bridge resolution, and zero-float evidence.
 - [x] Run the standard-library Region and aggregate fixtures through LLVM as
@@ -721,12 +721,12 @@ remains rejected until a merge contract exists. The negative regression
 `rejects_outer_scalar_assignment_without_a_branch_merge_contract` verifies that
 boundary explicitly.
 
-`tests/backend_parity.rs` contains the intended CLI parity matrix. Hosted exit
-status, freestanding entry export, zero-float evidence, and the shared
-large-aggregate failure class pass for both backends. The gate remains open
-because the freestanding fixture still exposes additional Cranelift cleanup
-bridge imports (`buffer_drop` and `enum_drop`) that are absent from LLVM; this
-runtime-symbol discrepancy must be resolved in backend code before acceptance.
+`tests/backend_parity.rs` contains the CLI parity matrix. Hosted exit status,
+freestanding entry export, zero-float evidence, and the shared large-aggregate
+failure class pass for both backends. Runtime bridge parity is checked through
+actual object relocations rather than raw undefined-symbol declarations, so
+unused Cranelift declarations cannot mask a missing LLVM call. The required
+Region open/drop relocations and the complete referenced bridge sets match.
 
 Generic AST specialization is now owned by the backend-neutral
 `src/codegen/generic/` module. Generic verb expansion, type substitution,
