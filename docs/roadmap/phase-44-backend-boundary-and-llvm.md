@@ -1268,6 +1268,17 @@ both backends. This slice covers integer literals and simple integer bindings
 for local arrays; indexed parameter mutation, compound index expressions, and
 aggregate element values remain outside it.
 
+Aggregate array element stores now use the existing neutral `ArrayElementStore`
+contract when the element is a non-generic value struct with scalar fields. The
+classifier regression `accepts_aggregate_array_element_stores_in_the_shared_contract`
+and the hosted parity fixture
+`both_native_backends_build_and_run_a_shared_aggregate_array_element_store`
+build the same `Array[Point, 2]` source through LLVM and Cranelift and return
+42. LLVM already copied aggregate elements through its bounded memory move;
+Cranelift now applies the same element-layout-checked bounded copy. Nested
+aggregate fields, generic aggregate values, and aggregate compound stores
+remain outside this slice.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`

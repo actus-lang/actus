@@ -645,6 +645,44 @@ fn cranelift_backend_builds_and_runs_a_shared_array_struct_element_field_access(
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_and_run_a_shared_aggregate_array_element_store() {
+    let source = "struct Point { x: u32, } verb main() -> Int { erg values: Array[Point, 2] = Array[Point, 2](); values[1u32] = Point { x: 41u32, }; return values[1u32].x as Int + 1; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-aggregate-array-store-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create aggregate array store fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"aggregate-array-store-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write aggregate array store manifest");
+        fs::write(&input, source).expect("write aggregate array store source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build aggregate array store");
+        let status =
+            std::process::Command::new(&output).status().expect("run aggregate array store");
+        assert_eq!(status.code(), Some(42), "backend {backend} aggregate array result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store() {

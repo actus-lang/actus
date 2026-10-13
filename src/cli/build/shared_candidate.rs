@@ -204,7 +204,7 @@ fn scalar_statement(
             scalar_expression(initializer, context) || value_if_expression(initializer, context)
         }
         Stmt::Assignment { target, value, .. } if allow_assignment => {
-            scalar_assignment_place(target, context) && scalar_expression(value, context)
+            assignment_place(target, context) && scalar_assignment_value(target, value, context)
         }
         Stmt::CompoundAssignment { target, value, .. } if allow_assignment => {
             scalar_assignment_place(target, context) && scalar_expression(value, context)
@@ -268,6 +268,29 @@ fn scalar_assignment_place(place: &Place, context: &CandidateContext<'_>) -> boo
                 )
         }
     }
+}
+
+fn assignment_place(place: &Place, context: &CandidateContext<'_>) -> bool {
+    scalar_assignment_place(place, context)
+        || matches!(place, Place::Index { .. })
+            && aggregate_array_expression(
+                &place.to_expr(),
+                context.aggregate_array_bindings,
+                context.aggregate_types,
+            )
+}
+
+fn scalar_assignment_value(target: &Place, value: &Expr, context: &CandidateContext<'_>) -> bool {
+    let target_expression = target.to_expr();
+    if aggregate_array_expression(
+        &target_expression,
+        context.aggregate_array_bindings,
+        context.aggregate_types,
+    ) {
+        let Expr::StructLit { fields, .. } = value else { return false };
+        return fields.iter().all(|field| scalar_expression(&field.value, context));
+    }
+    scalar_expression(value, context)
 }
 
 fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {

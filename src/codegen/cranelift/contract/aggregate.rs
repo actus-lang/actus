@@ -259,6 +259,28 @@ pub(super) fn lower_array_element_store(
     let index = coerce_array_index(builder, index, pointer_type);
     let offset = builder.ins().imul_imm_u(index, i64::from(element_layout.size));
     let address = builder.ins().iadd(base, offset);
+    if matches!(element_type, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. })
+    {
+        if builder.func.dfg.value_type(value) != pointer_type {
+            return Err(BackendEmitError(
+                "Cranelift aggregate array value must be a pointer".to_owned(),
+            ));
+        }
+        let alignment = u8::try_from(element_layout.alignment).map_err(|_| {
+            BackendEmitError("Cranelift aggregate array alignment exceeds u8".to_owned())
+        })?;
+        builder.emit_small_memory_copy(
+            module.isa().frontend_config(),
+            address,
+            value,
+            u64::from(element_layout.size),
+            alignment,
+            alignment,
+            false,
+            MemFlagsData::new(),
+        );
+        return Ok(());
+    }
     let value_type = super::scalar_type(module, *element_type)?
         .ok_or_else(|| BackendEmitError("Cranelift array element must be scalar".to_owned()))?;
     if builder.func.dfg.value_type(value) != value_type {
