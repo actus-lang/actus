@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::LLVMIntPredicate;
+use llvm_sys::LLVMTypeKind::LLVMPointerTypeKind;
 use llvm_sys::core::{
     LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove,
-    LLVMBuildStore, LLVMConstInt, LLVMConstNull, LLVMInt8TypeInContext, LLVMSetAlignment,
+    LLVMBuildStore, LLVMConstInt, LLVMConstNull, LLVMGetTypeKind, LLVMInt8TypeInContext,
+    LLVMSetAlignment, LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
@@ -250,8 +252,22 @@ fn enum_temporary(
         .get(&subject)
         .copied()
         .ok_or_else(|| BackendEmitError(format!("LLVM enum value {} is unavailable", subject.0)))?;
-    let _ = (context, builder, layout);
-    Ok(subject)
+    if unsafe { LLVMGetTypeKind(LLVMTypeOf(subject)) } == LLVMPointerTypeKind {
+        return Ok(subject);
+    }
+    let enum_type = super::values::llvm_type(
+        context,
+        super::super::BackendValueType::Aggregate { layout: layout.layout },
+    )?;
+    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, c"enum.parameter".as_ptr()) };
+    if temporary.is_null() {
+        return Err(BackendEmitError("LLVM failed to allocate enum parameter storage".to_owned()));
+    }
+    unsafe { LLVMSetAlignment(temporary, layout.layout.alignment) };
+    if unsafe { LLVMBuildStore(builder, subject, temporary) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to materialize enum parameter".to_owned()));
+    }
+    Ok(temporary)
 }
 
 fn enum_field_address(

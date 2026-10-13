@@ -25,14 +25,29 @@ pub(super) fn lower_method_call(
             unsupported(*span, "Result constructor receiver has an invalid type name")
         })?;
     if result_type.name == "Option" && result_type.arguments.len() == 1 {
-        return lower_niche_option_constructor(
-            provider,
-            &result_type,
-            method,
-            arguments,
-            *span,
-            instructions,
-        );
+        let layout = provider
+            .enum_layout(&result_type)
+            .ok_or_else(|| unsupported(*span, "Option has no neutral layout"))?;
+        return if layout.niche_pointer {
+            lower_niche_option_constructor(
+                provider,
+                &result_type,
+                method,
+                arguments,
+                *span,
+                instructions,
+            )
+        } else {
+            lower_regular_option_constructor(
+                provider,
+                &result_type,
+                layout,
+                method,
+                arguments,
+                *span,
+                instructions,
+            )
+        };
     }
     if result_type.name != "Result" || result_type.arguments.len() != 2 {
         return lower_named_unit_enum(
@@ -45,6 +60,47 @@ pub(super) fn lower_method_call(
         );
     }
     lower_result_constructor(provider, &result_type, method, arguments, *span, instructions)
+}
+
+fn lower_regular_option_constructor(
+    provider: &mut SharedExpressionProvider<'_>,
+    option_type: &TypeName,
+    layout: BackendEnumLayout,
+    method: &str,
+    arguments: &[crate::ast::Argument],
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let (discriminant, payload) = match method {
+        "None" if arguments.is_empty() => (1, None),
+        "Some" if arguments.len() == 1 => {
+            (0, Some(provider.lower_expression(&arguments[0].expression, instructions)?))
+        }
+        _ => return Err(unsupported(span, "invalid Option constructor")),
+    };
+    let result = provider.allocate();
+    let result_type = BackendValueType::Enum { layout };
+    provider.remember_value(result, result_type);
+    provider.remember_nominal_type(result, option_type.clone());
+    let payload_type = payload
+        .map(|value| {
+            provider
+                .value_type(value)
+                .ok_or_else(|| unsupported(span, "Option payload type is unavailable"))
+        })
+        .transpose()?;
+    if let Some(payload_type) = payload_type {
+        provider.remember_enum_payload(result, discriminant, payload_type);
+    }
+    instructions.push(BackendInstruction::EnumConstruct {
+        result,
+        discriminant,
+        payload,
+        layout,
+        payload_type,
+        span,
+    });
+    Ok(result)
 }
 
 fn lower_niche_option_constructor(
@@ -69,6 +125,7 @@ fn lower_niche_option_constructor(
     };
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::NichePointerOption { layout: layout.layout });
+    provider.remember_nominal_type(result, option_type.clone());
     if let Some(payload) = payload {
         let payload_type = provider
             .value_type(payload)
@@ -129,6 +186,7 @@ fn lower_result_constructor(
         .ok_or_else(|| unsupported(span, "Result payload layout is unavailable"))?;
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Enum { layout });
+    provider.remember_nominal_type(result, result_type.clone());
     provider.remember_enum_payload(result, discriminant, payload_type);
     instructions.push(BackendInstruction::EnumConstruct {
         result,
@@ -153,6 +211,7 @@ fn construct_result_unit(
         .ok_or_else(|| unsupported(span, "Result unit payload has no neutral layout"))?;
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Enum { layout });
+    provider.remember_nominal_type(result, result_type.clone());
     instructions.push(BackendInstruction::EnumConstruct {
         result,
         discriminant,
@@ -204,29 +263,11 @@ pub(super) fn lower_enum_variant_condition_value(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let Some(subject_type) = provider.value_type(subject_value) else {
-        return Err(unsupported(span, "enum case subject is not a neutral enum value"));
-    };
-    let layout = match subject_type {
-        BackendValueType::Enum { layout } => layout,
-        BackendValueType::NichePointerOption { layout } => BackendEnumLayout {
-            layout,
-            discriminant_offset: 0,
-            discriminant_size: 4,
-            payload_offset: 0,
-            payload: None,
-            niche_pointer: true,
-        },
-        _ => return Err(unsupported(span, "enum case subject is not a neutral enum value")),
-    };
-    let discriminant = match variant {
-        "Ok" => 0,
-        "Err" => 1,
-        _ => provider
-            .enum_variant_for_layout(layout, variant)
-            .map(|(id, _)| id)
-            .ok_or_else(|| unsupported(span, "unknown enum case variant"))?,
-    };
+    let subject_type = provider
+        .value_type(subject_value)
+        .ok_or_else(|| unsupported(span, "enum case subject is not a neutral enum value"))?;
+    let layout = enum_case_layout(subject_type, span)?;
+    let discriminant = enum_case_discriminant(provider, layout, subject_type, variant, span)?;
     let actual = provider.allocate();
     let integer = BackendValueType::Integer { signed: false, width: 32 };
     provider.remember_value(actual, integer);
@@ -255,6 +296,46 @@ pub(super) fn lower_enum_variant_condition_value(
         span,
     });
     Ok(condition)
+}
+
+fn enum_case_layout(
+    subject_type: BackendValueType,
+    span: SourceSpan,
+) -> Result<BackendEnumLayout, BackendContractError> {
+    match subject_type {
+        BackendValueType::Enum { layout } => Ok(layout),
+        BackendValueType::NichePointerOption { layout } => Ok(BackendEnumLayout {
+            layout,
+            discriminant_offset: 0,
+            discriminant_size: 4,
+            payload_offset: 0,
+            payload: None,
+            niche_pointer: true,
+        }),
+        _ => Err(unsupported(span, "enum case subject is not a neutral enum value")),
+    }
+}
+
+fn enum_case_discriminant(
+    provider: &SharedExpressionProvider<'_>,
+    layout: BackendEnumLayout,
+    subject_type: BackendValueType,
+    variant: &str,
+    span: SourceSpan,
+) -> Result<u32, BackendContractError> {
+    let niche_option = matches!(subject_type, BackendValueType::NichePointerOption { .. });
+    match variant {
+        "Ok" => Ok(0),
+        "Err" => Ok(1),
+        "Some" if niche_option => Ok(1),
+        "None" if niche_option => Ok(0),
+        "Some" => Ok(0),
+        "None" => Ok(1),
+        _ => provider
+            .enum_variant_for_layout(layout, variant)
+            .map(|(id, _)| id)
+            .ok_or_else(|| unsupported(span, "unknown enum case variant")),
+    }
 }
 
 fn parse_type_name(input: &str, span: SourceSpan) -> Option<TypeName> {

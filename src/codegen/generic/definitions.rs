@@ -83,6 +83,16 @@ pub(crate) fn collect_concrete_type_instances(program: &Program) -> Vec<GenericI
             &generic_parameter_names,
             &mut instances,
         );
+        if let TopLevelDecl::Verb(verb) = declaration {
+            super::instance_expressions::collect_block_type_names(&verb.body, |type_name| {
+                collect_type_instances(
+                    type_name,
+                    &generic_names,
+                    &generic_parameter_names,
+                    &mut instances,
+                )
+            });
+        }
     }
     instances
 }

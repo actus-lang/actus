@@ -38,28 +38,12 @@ pub(super) fn bind_enum_variant_payload(
         _ => return Err(unsupported(span, "enum case payload shape")),
     };
     let Some(binding) = binding.filter(|name| *name != "_") else { return Ok(()) };
-    let discriminant = match variant {
-        "Ok" => 0,
-        "Err" => 1,
-        "Some" => 1,
-        "None" => 0,
-        _ => return Err(unsupported(span, "unknown enum case variant")),
-    };
+    let discriminant = enum_case_discriminant(provider, subject, variant, span)?;
     let payload_type = provider
         .enum_payload_types
         .get(&(subject, discriminant))
         .copied()
-        .or_else(|| {
-            let type_name = provider.nominal_type(subject)?;
-            (type_name.name == "Option" && type_name.arguments.len() == 1 && discriminant == 1)
-                .then(|| {
-                    super::super::support::backend_value_type(
-                        provider.layouts,
-                        &type_name.arguments[0],
-                    )
-                })
-                .flatten()
-        })
+        .or_else(|| nominal_payload_type(provider, subject, discriminant))
         .ok_or_else(|| unsupported(span, "enum case payload source type"))?;
     let layout = neutral_enum_layout(provider, subject, span)?;
     let result = provider.allocate();
@@ -77,6 +61,42 @@ pub(super) fn bind_enum_variant_payload(
         span,
     });
     provider.bind_owner(binding, result, None, span, instructions)
+}
+
+fn enum_case_discriminant(
+    provider: &SharedExpressionProvider<'_>,
+    subject: BackendValueId,
+    variant: &str,
+    span: SourceSpan,
+) -> Result<u32, BackendContractError> {
+    let niche_option =
+        matches!(provider.value_type(subject), Some(BackendValueType::NichePointerOption { .. }));
+    match variant {
+        "Ok" => Ok(0),
+        "Err" => Ok(1),
+        "Some" if niche_option => Ok(1),
+        "None" if niche_option => Ok(0),
+        "Some" => Ok(0),
+        "None" => Ok(1),
+        _ => Err(unsupported(span, "unknown enum case variant")),
+    }
+}
+
+fn nominal_payload_type(
+    provider: &SharedExpressionProvider<'_>,
+    subject: BackendValueId,
+    discriminant: u32,
+) -> Option<BackendValueType> {
+    let type_name = provider.nominal_type(subject)?;
+    let payload =
+        if type_name.name == "Option" && type_name.arguments.len() == 1 && discriminant == 0 {
+            type_name.arguments.first()
+        } else if type_name.name == "Result" && type_name.arguments.len() == 2 && discriminant < 2 {
+            type_name.arguments.get(discriminant as usize)
+        } else {
+            None
+        }?;
+    super::super::support::backend_value_type(provider.layouts, payload)
 }
 
 fn neutral_enum_layout(

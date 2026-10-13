@@ -1304,6 +1304,17 @@ all-feature `arena_graph` fixtures both pass, as do the 47 LLVM backend
 contract tests, the 40 Cranelift application tests, the 95 Cranelift codegen
 tests, architecture conformance, strict Clippy, and source-limit checks.
 
+The shared lowering boundary now resolves generic struct applications and
+regular value `Option[T]` layouts, including nominal payload types for
+`Option` and `Result` case bindings. The Cranelift generic collector also
+discovers concrete generic types used by expression constructors and case
+subjects. `tests/examples_cli.rs` proves that `examples/generics_showcase.act`
+builds and executes through both backends with exit status `123`. The LLVM
+backend additionally materializes direct enum parameters before field
+extraction, preserving the neutral enum contract for both pointer-backed and
+direct aggregate ABI values. `sensor_telemetry.act` remains intentionally
+deferred.
+
 The full LLVM-only integration matrix is still open. The current run reports
 23 failing integration targets, including nested case/body lowering, generic
 aggregate layout, Buffer and IO module linking, array and pack lowering,

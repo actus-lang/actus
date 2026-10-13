@@ -9,15 +9,20 @@ use super::payload::add_payload_types;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
 pub(crate) fn infer_case_type(
+    subject: &crate::ast::Expr,
     branches: &[CaseBranch],
     types: &HashMap<&String, NativeType>,
     functions: &HashMap<String, FunctionRef>,
     layouts: &LayoutRegistry,
 ) -> Result<NativeType, BackendEmitError> {
+    let subject_type = initializer_type(subject, types, functions, layouts)?;
     let mut inferred = None;
     let mut has_block_body = false;
     for branch in branches {
-        let (candidate, is_block) = body_type(&branch.body, types, functions, layouts, true)?;
+        let mut branch_types = types.clone();
+        add_payload_types(branch, subject_type, &mut branch_types, layouts);
+        let (candidate, is_block) =
+            body_type(&branch.body, &branch_types, functions, layouts, true)?;
         has_block_body |= is_block;
         inferred = merge_case_type(inferred, candidate)?;
     }

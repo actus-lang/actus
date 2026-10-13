@@ -106,6 +106,9 @@ fn lower_borrow(
             BackendValueType::Bool
                 | BackendValueType::Integer { .. }
                 | BackendValueType::Pointer
+                | BackendValueType::Aggregate { .. }
+                | BackendValueType::Enum { .. }
+                | BackendValueType::Region { .. }
                 | BackendValueType::NichePointerOption { .. },
         )
     ) {

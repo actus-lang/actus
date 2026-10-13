@@ -17,6 +17,26 @@ impl ProgramLayouts<'_> {
             niche_pointer: true,
         })
     }
+
+    fn generic_option_layout(
+        &self,
+        type_name: &TypeName,
+    ) -> Option<super::super::abi::BackendEnumLayout> {
+        let payload = self.type_layout(&type_name.arguments[0], &mut Vec::new())?;
+        let payload_offset = Self::align_up(4, payload.alignment)?;
+        let alignment = 4u32.max(payload.alignment);
+        Some(super::super::abi::BackendEnumLayout {
+            layout: BackendLayout {
+                size: Self::align_up(payload_offset.checked_add(payload.size)?, alignment)?,
+                alignment,
+            },
+            discriminant_offset: 0,
+            discriminant_size: 4,
+            payload_offset,
+            payload: Some(payload),
+            niche_pointer: false,
+        })
+    }
 }
 
 fn is_niche_pointer_option(type_name: &TypeName) -> bool {

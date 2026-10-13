@@ -87,6 +87,58 @@ fn arena_tree_example_builds_and_executes() {
 
 #[cfg(unix)]
 #[test]
+fn generics_showcase_builds_and_executes_with_cranelift() {
+    let root = std::env::temp_dir().join(format!("actus-generics-example-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/generics_showcase.act", env!("CARGO_MANIFEST_DIR"));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source,
+            "--backend".to_owned(),
+            "cranelift".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run Cranelift generics example");
+    assert_eq!(status.code(), Some(123));
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn generics_showcase_builds_and_executes_with_llvm() {
+    let root =
+        std::env::temp_dir().join(format!("actus-generics-llvm-example-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/generics_showcase.act", env!("CARGO_MANIFEST_DIR"));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source,
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM generics example");
+    assert_eq!(status.code(), Some(123));
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
 fn phase18_arrays_and_packs_example_builds_and_executes() {
     let root = std::env::temp_dir().join(format!("actus-phase18-example-{}", std::process::id()));
     let output = root.with_extension("bin");

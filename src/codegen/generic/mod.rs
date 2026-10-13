@@ -1,5 +1,6 @@
 #[cfg_attr(not(feature = "cranelift"), allow(dead_code))]
 mod definitions;
+mod instance_expressions;
 mod verb_body;
 mod verbs;
 
