@@ -14,6 +14,16 @@ use crate::codegen::cranelift::lowering::{Flow, lower_case_block};
 const CASE_EXHAUSTIVENESS_TRAP: TrapCode = TrapCode::unwrap_user(1);
 type CaseBranchResult<'a> = Option<(cranelift_codegen::ir::Value, BranchLocals<'a>)>;
 
+struct CaseBranchFinishInput<'a> {
+    branch_value: CaseBranchResult<'a>,
+    branch: &'a crate::ast::CaseBranch,
+    matched: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+    bindings: &'a [&'a String],
+    result_type: NativeType,
+    context: &'a CaseLoweringContext<'a, 'a>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_case_branches(
     function: &mut FunctionBuilder<'_>,
@@ -81,6 +91,24 @@ fn emit_case_branch(
     )?;
     finish_case_branch(
         function,
+        CaseBranchFinishInput {
+            branch_value,
+            branch,
+            matched,
+            merge,
+            bindings,
+            result_type,
+            context,
+        },
+    )?;
+    Ok(())
+}
+
+fn finish_case_branch(
+    function: &mut FunctionBuilder<'_>,
+    input: CaseBranchFinishInput<'_>,
+) -> Result<(), BackendEmitError> {
+    let CaseBranchFinishInput {
         branch_value,
         branch,
         matched,
@@ -88,20 +116,7 @@ fn emit_case_branch(
         bindings,
         result_type,
         context,
-    )?;
-    Ok(())
-}
-
-fn finish_case_branch(
-    function: &mut FunctionBuilder<'_>,
-    branch_value: CaseBranchResult<'_>,
-    branch: &crate::ast::CaseBranch,
-    matched: cranelift_codegen::ir::Block,
-    merge: cranelift_codegen::ir::Block,
-    bindings: &[&String],
-    result_type: NativeType,
-    context: &CaseLoweringContext<'_, '_>,
-) -> Result<(), BackendEmitError> {
+    } = input;
     if let Some((branch_value, branch_locals)) = branch_value {
         let mut arguments = bindings
             .iter()
