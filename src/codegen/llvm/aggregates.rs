@@ -108,31 +108,11 @@ pub(super) fn emit_aggregate_field_load(
         BackendEmitError(format!("LLVM aggregate base {} is unavailable", base.0))
     })?;
     let address = field_address(context, builder, base, *offset)?;
-    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
-        let value_type = super::values::llvm_type(context, *ty)?;
-        let destination = unsafe {
-            LLVMBuildAlloca(builder, value_type, c"aggregate.field.copy".as_ptr().cast())
-        };
-        if destination.is_null() {
-            return Err(BackendEmitError("LLVM failed to allocate aggregate field".to_owned()));
-        }
-        unsafe { LLVMSetAlignment(destination, layout.alignment) };
-        let size =
-            unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
-        let copy = unsafe {
-            LLVMBuildMemMove(
-                builder,
-                destination,
-                layout.alignment,
-                address,
-                layout.alignment,
-                size,
-            )
-        };
-        if copy.is_null() {
-            return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
-        }
-        values.insert(*result, destination);
+    if let BackendValueType::Aggregate { .. } | BackendValueType::Region { .. } = ty {
+        // Aggregate values are represented by their storage address in the
+        // neutral contract. Preserve that address for nested indexed stores so
+        // mutations update the owning aggregate instead of a detached copy.
+        values.insert(*result, address);
     } else {
         let value_type = super::values::llvm_type(context, *ty)?;
         let value = unsafe {

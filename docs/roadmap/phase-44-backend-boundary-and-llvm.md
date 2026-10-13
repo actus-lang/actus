@@ -1277,6 +1277,13 @@ No checkbox in Gate 44.8 may be closed from the existing contract-level LLVM
 fixtures until this gate proves that a real CLI build can select and execute
 the corresponding backend through the shared semantic pipeline.
 
+The LLVM aggregate emitter now preserves the storage address when loading a
+nested aggregate field. This keeps indexed mutation attached to the owning
+aggregate instead of mutating a detached temporary. The Phase 23 capability
+package regression `phase23_capability_package_runs_through_llvm` now builds
+and executes through LLVM with exit status 42, matching the existing Cranelift
+result. The focused LLVM backend suite remains green with 47 tests.
+
 ## Gate 44.8 — Cross-backend acceptance and regression protection
 
 - [ ] Run semantic, ownership, cleanup, layout, ABI, serialization, and

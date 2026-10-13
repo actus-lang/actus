@@ -418,6 +418,26 @@ fn phase23_capability_package_passes_strict_test_native_and_object_acceptance() 
     let _ = std::fs::remove_file(object);
 }
 
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn phase23_capability_package_runs_through_llvm() {
+    let root =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/phase23_capability");
+    let binary =
+        std::env::temp_dir().join(format!("actus-phase23-llvm-{}.bin", std::process::id()));
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--backend", "llvm", "--emit", "exe", "-o"])
+        .arg(&binary)
+        .current_dir(&root)
+        .output()
+        .expect("build Phase 23 LLVM executable");
+    assert!(build.status.success(), "LLVM build failed: {:?}", build);
+    let execution =
+        std::process::Command::new(&binary).output().expect("run Phase 23 LLVM executable");
+    assert_eq!(execution.status.code(), Some(42));
+    let _ = std::fs::remove_file(binary);
+}
+
 #[cfg(unix)]
 #[test]
 fn phase23_readiness_package_passes_strict_and_native_acceptance() {
