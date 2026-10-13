@@ -39,6 +39,26 @@ fn sensor_telemetry_example_builds_and_executes() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
+fn file_utility_example_builds_with_llvm() {
+    let root = std::env::temp_dir().join(format!("actus-file-utility-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create file utility working directory");
+    let output = root.join("file-utility-llvm");
+    let source =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/file_utility.act");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--backend", "llvm"])
+        .arg(&source)
+        .args(["--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&root)
+        .output()
+        .expect("build file utility example with LLVM");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    fs::remove_dir_all(root).expect("remove LLVM file utility working directory");
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
 fn sensor_telemetry_example_rejects_llvm_float_lowering_explicitly() {
     let source = format!("{}/examples/sensor_telemetry.act", env!("CARGO_MANIFEST_DIR"));
     let output_path =

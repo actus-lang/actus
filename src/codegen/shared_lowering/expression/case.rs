@@ -43,6 +43,11 @@ pub(super) fn bind_enum_variant_payload(
         .enum_payload_types
         .get(&(subject, discriminant))
         .copied()
+        .or_else(|| {
+            provider
+                .nominal_type(subject)
+                .and_then(|type_name| provider.enum_variant_payload_type(type_name, variant))
+        })
         .or_else(|| nominal_payload_type(provider, subject, discriminant))
         .ok_or_else(|| unsupported(span, "enum case payload source type"))?;
     let layout = neutral_enum_layout(provider, subject, span)?;
@@ -71,15 +76,22 @@ fn enum_case_discriminant(
 ) -> Result<u32, BackendContractError> {
     let niche_option =
         matches!(provider.value_type(subject), Some(BackendValueType::NichePointerOption { .. }));
-    match variant {
+    let discriminant = match variant {
         "Ok" => Ok(0),
         "Err" => Ok(1),
         "Some" if niche_option => Ok(1),
         "None" if niche_option => Ok(0),
         "Some" => Ok(0),
         "None" => Ok(1),
-        _ => Err(unsupported(span, "unknown enum case variant")),
-    }
+        _ => {
+            let layout = neutral_enum_layout(provider, subject, span)?;
+            provider
+                .enum_variant_for_layout(layout, variant)
+                .map(|(id, _)| id)
+                .ok_or_else(|| unsupported(span, "unknown enum case variant"))
+        }
+    }?;
+    Ok(discriminant)
 }
 
 fn nominal_payload_type(

@@ -231,26 +231,42 @@ pub(super) fn lower_named_unit_enum(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    if !arguments.is_empty() {
-        return Err(unsupported(span, "named enum unit variants cannot carry a payload"));
-    }
     let Some((discriminant, is_unit)) = provider.enum_variant(type_name, variant) else {
         return Err(unsupported(span, "unknown named enum variant"));
     };
-    if !is_unit {
-        return Err(unsupported(span, "named enum payload constructors are not lowered"));
-    }
     let layout = provider
         .enum_layout(type_name)
         .ok_or_else(|| unsupported(span, "named enum has no neutral layout"))?;
+    let payload = if is_unit {
+        if !arguments.is_empty() {
+            return Err(unsupported(span, "named enum unit variants cannot carry a payload"));
+        }
+        None
+    } else {
+        let [argument] = arguments else {
+            return Err(unsupported(span, "named enum constructors require exactly one payload"));
+        };
+        Some(provider.lower_expression(&argument.expression, instructions)?)
+    };
+    let payload_type = payload
+        .map(|value| {
+            provider
+                .value_type(value)
+                .ok_or_else(|| unsupported(span, "named enum payload type is unavailable"))
+        })
+        .transpose()?;
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Enum { layout });
+    provider.remember_nominal_type(result, type_name.clone());
+    if let Some(payload_type) = payload_type {
+        provider.remember_enum_payload(result, discriminant, payload_type);
+    }
     instructions.push(BackendInstruction::EnumConstruct {
         result,
         discriminant,
-        payload: None,
+        payload,
         layout,
-        payload_type: None,
+        payload_type,
         span,
     });
     Ok(result)

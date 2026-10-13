@@ -34,8 +34,12 @@ pub(super) fn emit_array_element_load(
         .copied()
         .ok_or_else(|| BackendEmitError(format!("LLVM array index {} is unavailable", index.0)))?;
     let address = array_element_address(context, builder, base, index, *element_layout)?;
-    if matches!(element_type, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. })
-    {
+    if matches!(
+        element_type,
+        BackendValueType::Aggregate { .. }
+            | BackendValueType::Enum { .. }
+            | BackendValueType::Region { .. }
+    ) {
         values.insert(*result, address);
         return Ok(false);
     }
@@ -92,8 +96,12 @@ fn store_array_element_value(
     element_type: BackendValueType,
     value: LLVMValueRef,
 ) -> Result<(), BackendEmitError> {
-    if matches!(element_type, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. })
-    {
+    if matches!(
+        element_type,
+        BackendValueType::Aggregate { .. }
+            | BackendValueType::Enum { .. }
+            | BackendValueType::Region { .. }
+    ) {
         let size = unsafe {
             LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(element_layout.size), 0)
         };

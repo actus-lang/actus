@@ -32,6 +32,8 @@ pub(super) fn lower_shared_functions(
             cleanup_plans,
             &declarations.return_types,
             &declarations.return_payload_types,
+            &declarations.performance_symbols,
+            &declarations.performance_return_types,
             external_symbols,
             bindings,
         )?);
@@ -48,6 +50,8 @@ pub(super) fn lower_shared_functions(
             cleanup_plans,
             &declarations.return_types,
             &declarations.return_payload_types,
+            &declarations.performance_symbols,
+            &declarations.performance_return_types,
             external_symbols,
             bindings,
         )?);
@@ -64,6 +68,8 @@ fn lower_shared_performance(
     cleanup_plans: &[BackendCleanupPlan],
     return_types: &BTreeMap<String, Option<BackendValueType>>,
     return_payload_types: &BTreeMap<String, [Option<BackendValueType>; 2]>,
+    performance_symbols: &BTreeMap<(String, String), SymbolIdentity>,
+    performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendFunction, BackendContractError> {
@@ -73,6 +79,8 @@ fn lower_shared_performance(
         layouts,
         return_types,
         return_payload_types,
+        performance_symbols,
+        performance_return_types,
         external_symbols,
         bindings,
         cleanup_plans,

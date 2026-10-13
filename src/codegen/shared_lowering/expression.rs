@@ -35,6 +35,8 @@ pub(super) struct SharedExpressionProvider<'a> {
     verb_name: String,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
     return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
+    performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
+    performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
     external_symbols: &'a BTreeMap<String, SymbolIdentity>,
     bindings: Option<&'a BackendSymbolBindings>,
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
@@ -59,6 +61,8 @@ impl<'a> SharedExpressionProvider<'a> {
         layouts: &'a impl super::super::BackendLayoutProvider,
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
         return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
+        performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
+        performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
         external_symbols: &'a BTreeMap<String, SymbolIdentity>,
         bindings: Option<&'a BackendSymbolBindings>,
         cleanup_plans: &'a [super::super::BackendCleanupPlan],
@@ -87,6 +91,8 @@ impl<'a> SharedExpressionProvider<'a> {
             verb_name: verb.name.clone(),
             return_types,
             return_payload_types,
+            performance_symbols,
+            performance_return_types,
             external_symbols,
             bindings,
             cleanup_plans,
@@ -137,6 +143,13 @@ impl<'a> SharedExpressionProvider<'a> {
     ) -> Option<(u32, bool)> {
         self.layouts.enum_variant(type_name, variant)
     }
+    pub(super) fn enum_variant_payload_type(
+        &self,
+        type_name: &crate::ast::TypeName,
+        variant: &str,
+    ) -> Option<BackendValueType> {
+        self.layouts.enum_variant_payload_type(type_name, variant)
+    }
     pub(super) fn enum_variant_for_layout(
         &self,
         layout: super::super::BackendEnumLayout,
@@ -175,7 +188,53 @@ impl SharedExpressionProvider<'_> {
         if arena::is_place_call(self, expression) {
             return arena::lower_place(self, expression, instructions);
         }
-        super::constructors::lower_method_call(self, expression, instructions)
+        let Expr::MethodCall { receiver, method, arguments, span } = expression else {
+            return Err(unsupported(expression_span(expression), "method call expected"));
+        };
+        let receiver_is_binding = matches!(receiver.as_ref(), Expr::Identifier { name, .. }
+            if self.binding_value(name).is_some());
+        if !receiver_is_binding {
+            return super::constructors::lower_method_call(self, expression, instructions);
+        }
+        let receiver_value = dispatch::lower_expression(self, receiver, instructions)?;
+        let receiver_type = self
+            .nominal_type(receiver_value)
+            .ok_or_else(|| unsupported(*span, "performance receiver has no nominal type"))?;
+        let key = (receiver_type.canonical_key(), method.clone());
+        let callee = self
+            .performance_symbols
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| unsupported(*span, "performance method has no static symbol"))?;
+        let mut lowered_arguments = Vec::with_capacity(arguments.len() + 1);
+        lowered_arguments.push(receiver_value);
+        lowered_arguments.extend(
+            arguments
+                .iter()
+                .map(|argument| {
+                    dispatch::lower_expression(self, &argument.expression, instructions)
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+        let result_type = self.performance_return_types.get(&key).copied().flatten();
+        let result = result_type.map(|_| self.allocate());
+        if let (Some(result), Some(result_type)) = (result, result_type) {
+            self.remember_value(result, result_type);
+            if let Some(payload_types) = self.return_payload_types.get(method) {
+                for (discriminant, payload_type) in payload_types.iter().enumerate() {
+                    if let Some(payload_type) = payload_type {
+                        self.remember_enum_payload(result, discriminant as u32, *payload_type);
+                    }
+                }
+            }
+        }
+        instructions.push(BackendInstruction::Call {
+            callee,
+            arguments: lowered_arguments,
+            result,
+            span: *span,
+        });
+        result.ok_or_else(|| unsupported(*span, "unit performance method cannot produce a value"))
     }
 
     fn lower_unary(

@@ -58,28 +58,9 @@ fn llvm_generic_inputs(
     let targeted_caller = crate::codegen::normalize_program(
         &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
     );
-    let mut generic_instances = crate::semantic::analyze(&targeted_caller)
+    let generic_instances = crate::semantic::analyze(&targeted_caller)
         .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
         .generic_instances;
-    for unit in plan.units() {
-        let targeted_unit =
-            crate::codegen::normalize_program(&crate::semantic::filter_program_for_target(
-                unit.implementation(),
-                configuration.target(),
-            ));
-        let unit_instances = crate::semantic::analyze(&targeted_unit)
-            .map_err(|error| {
-                BackendEmitError(format!("module semantic analysis failed: {error:?}"))
-            })?
-            .generic_instances;
-        for instance in unit_instances {
-            if !generic_instances.iter().any(|known| {
-                known.identity() == instance.identity() && known.caller == instance.caller
-            }) {
-                generic_instances.push(instance);
-            }
-        }
-    }
     let expansion_program = crate::codegen::normalize_program(
         &crate::semantic::filter_program_for_target(&plan.implementation(), configuration.target()),
     );

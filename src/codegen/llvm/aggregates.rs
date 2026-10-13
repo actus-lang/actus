@@ -35,8 +35,12 @@ pub(super) fn emit_aggregate_construct(
             BackendEmitError(format!("LLVM aggregate field value {} is unavailable", field.value.0))
         })?;
         let destination = field_address(context, builder, address, field.offset)?;
-        if matches!(field.ty, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. })
-        {
+        if matches!(
+            field.ty,
+            BackendValueType::Aggregate { .. }
+                | BackendValueType::Enum { .. }
+                | BackendValueType::Region { .. }
+        ) {
             let size = unsafe {
                 LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(field.layout.size), 0)
             };
@@ -108,7 +112,12 @@ pub(super) fn emit_aggregate_field_load(
         BackendEmitError(format!("LLVM aggregate base {} is unavailable", base.0))
     })?;
     let address = field_address(context, builder, base, *offset)?;
-    if let BackendValueType::Aggregate { .. } | BackendValueType::Region { .. } = ty {
+    if matches!(
+        ty,
+        BackendValueType::Aggregate { .. }
+            | BackendValueType::Enum { .. }
+            | BackendValueType::Region { .. }
+    ) {
         // Aggregate values are represented by their storage address in the
         // neutral contract. Preserve that address for nested indexed stores so
         // mutations update the owning aggregate instead of a detached copy.
@@ -143,17 +152,33 @@ pub(super) fn emit_aggregate_field_store(
         BackendEmitError(format!("LLVM aggregate field value {} is unavailable", value.0))
     })?;
     let address = field_address(context, builder, base, *offset)?;
-    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
-        let size =
-            unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+    let copy_layout = match ty {
+        BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } => *layout,
+        BackendValueType::Enum { layout } => layout.layout,
+        _ => {
+            if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
+                return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
+            }
+            return Ok(false);
+        }
+    };
+    {
+        let size = unsafe {
+            LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(copy_layout.size), 0)
+        };
         let copy = unsafe {
-            LLVMBuildMemMove(builder, address, layout.alignment, value, layout.alignment, size)
+            LLVMBuildMemMove(
+                builder,
+                address,
+                copy_layout.alignment,
+                value,
+                copy_layout.alignment,
+                size,
+            )
         };
         if copy.is_null() {
             return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
         }
-    } else if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
-        return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
     }
     let _ = ty;
     Ok(false)

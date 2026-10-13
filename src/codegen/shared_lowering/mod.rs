@@ -127,6 +127,8 @@ pub(super) struct SharedDeclarations<'program> {
     external_signatures: Vec<BackendSignature>,
     return_types: BTreeMap<String, Option<BackendValueType>>,
     return_payload_types: BTreeMap<String, [Option<BackendValueType>; 2]>,
+    performance_symbols: BTreeMap<(String, String), SymbolIdentity>,
+    performance_return_types: BTreeMap<(String, String), Option<BackendValueType>>,
 }
 
 impl<'program> SharedDeclarations<'program> {
@@ -161,6 +163,8 @@ impl<'program> SharedDeclarations<'program> {
         );
         let return_payload_types =
             shared_return_payload_types(&verbs, &externals, layouts, &performances);
+        let (performance_symbols, performance_return_types) =
+            performance_dispatch_maps(&performances, &performance_signatures);
         Ok(Self {
             verbs,
             externals,
@@ -169,8 +173,38 @@ impl<'program> SharedDeclarations<'program> {
             external_signatures,
             return_types,
             return_payload_types,
+            performance_symbols,
+            performance_return_types,
         })
     }
+}
+
+fn performance_dispatch_maps(
+    performances: &[(&PerformDecl, &VerbDecl)],
+    signatures: &[BackendSignature],
+) -> (
+    BTreeMap<(String, String), SymbolIdentity>,
+    BTreeMap<(String, String), Option<BackendValueType>>,
+) {
+    let symbols = performances
+        .iter()
+        .zip(signatures)
+        .map(|((perform, method), signature)| {
+            ((perform.target.canonical_key(), method.name.clone()), signature.symbol.clone())
+        })
+        .collect();
+    let return_types = performances
+        .iter()
+        .zip(signatures)
+        .map(|((perform, method), signature)| {
+            (
+                (perform.target.canonical_key(), method.name.clone()),
+                (signature.return_value.ty != BackendValueType::Unit)
+                    .then_some(signature.return_value.ty),
+            )
+        })
+        .collect();
+    (symbols, return_types)
 }
 
 fn build_backend_externals(
@@ -411,6 +445,8 @@ pub(super) fn lower_shared_verb(
     cleanup_plans: &[super::BackendCleanupPlan],
     return_types: &BTreeMap<String, Option<BackendValueType>>,
     return_payload_types: &BTreeMap<String, [Option<BackendValueType>; 2]>,
+    performance_symbols: &BTreeMap<(String, String), SymbolIdentity>,
+    performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<super::BackendFunction, BackendContractError> {
@@ -420,6 +456,8 @@ pub(super) fn lower_shared_verb(
         layouts,
         return_types,
         return_payload_types,
+        performance_symbols,
+        performance_return_types,
         external_symbols,
         bindings,
         cleanup_plans,

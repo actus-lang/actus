@@ -42,6 +42,21 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         Some((index as u32, matches!(definition.payload, EnumPayload::Unit)))
     }
 
+    fn enum_variant_payload_type(
+        &self,
+        type_name: &TypeName,
+        variant: &str,
+    ) -> Option<super::super::BackendValueType> {
+        let definition = self.enums.get(type_name.name.as_str())?;
+        let variant = definition.variants.iter().find(|candidate| candidate.name == variant)?;
+        let payload = match &variant.payload {
+            EnumPayload::Tuple(items) if items.len() == 1 => &items[0],
+            EnumPayload::Struct(items) if items.len() == 1 => &items[0].ty,
+            _ => return None,
+        };
+        super::support::backend_value_type(self, payload)
+    }
+
     fn enum_variant_for_layout(
         &self,
         layout: super::super::abi::BackendEnumLayout,

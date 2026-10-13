@@ -30,6 +30,14 @@ pub trait BackendLayoutProvider {
         None
     }
 
+    fn enum_variant_payload_type(
+        &self,
+        _type_name: &TypeName,
+        _variant: &str,
+    ) -> Option<BackendValueType> {
+        None
+    }
+
     fn enum_variant_for_layout(
         &self,
         _layout: BackendEnumLayout,
