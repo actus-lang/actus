@@ -493,11 +493,12 @@ The shared lowering path now also recognizes generic `Option[abs T]` and
 `Option[ins T]` constructors, field loads, variant tests, and payload bindings;
 the regression lives in `tests/codegen/shared_lowering.rs` and both LLVM and
 Cranelift emitters consume the same niche-pointer enum instruction contract.
-`examples/arena_tree.act` still cannot be accepted by LLVM because its return
-expression nests `case` expressions inside arithmetic; the current shared body
-lowering supports case control flow only at statement, owner, and top-level
-return boundaries. The exact LLVM diagnostic remains the follow-up boundary,
-not an Option representation failure.
+Nested value-producing `case` expressions inside binary and grouping
+expressions are hoisted into synthetic owners, then lowered through the
+existing branch and merge-block path. `examples/arena_tree.act` now builds and
+runs through both LLVM and Cranelift with exit status 60. More complex nested
+cases inside additional expression forms remain a separate follow-up rather
+than being claimed by this slice.
 The LLVM parameter-value mapper skips the hidden return-slot parameter when
 assigning neutral `BackendValueId`s, so typed-failure payloads cannot alias the
 slot pointer. This is covered by the hosted parity fixture.
