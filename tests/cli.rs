@@ -36,6 +36,50 @@ fn llvm_backend_builds_and_runs_a_scalar_root_program() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[test]
+fn both_native_backends_preserve_local_assignment_in_an_if_without_else() {
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-if-assignment-{}-{}",
+            backend,
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create if-assignment fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"if-assignment-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write if-assignment fixture manifest");
+        fs::write(
+            &input,
+            "verb main() -> Int { erg value: u32 = 0u32; if true { value = 41u32; } return value as Int + 1; }\n",
+        )
+        .expect("write if-assignment fixture source");
+
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build the fixture");
+        let status =
+            std::process::Command::new(&output).status().expect("run if-assignment fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} should preserve the assignment");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_array_pack_bit_fields() {

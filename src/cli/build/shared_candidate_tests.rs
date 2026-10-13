@@ -137,12 +137,3 @@ fn accepts_bounded_range_iteration_in_the_shared_contract() {
     let program = parse(tokens).expect("range fixture should parse");
     assert!(supports_scalar_shared_lowering(&program));
 }
-
-#[test]
-fn rejects_branch_mutation_outside_the_shared_contract_slice() {
-    let source = "verb main() -> Int { erg value: u32 = 0u32; if true { value = 1u32; } return value as Int; }";
-    let (tokens, errors) = scan(source);
-    assert!(errors.is_empty());
-    let program = parse(tokens).expect("branch mutation fixture should parse");
-    assert!(!supports_scalar_shared_lowering(&program));
-}

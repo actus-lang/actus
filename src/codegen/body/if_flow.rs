@@ -21,7 +21,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         continuation_id: BackendBlockId,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<IfLowering, BackendContractError> {
-        let carried = self.collect_if_carried_bindings(then_branch, else_branch, span)?;
+        let carried = self.collect_if_carried_bindings(then_branch, else_branch)?;
         let initial = carried
             .iter()
             .filter_map(|binding| {
@@ -99,6 +99,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         span: SourceSpan,
     ) -> Result<BackendBlock, BackendContractError> {
         let mut lowered = self.lower_if_else_branch(id, branch, continuation_id, span)?;
+        lowered = ensure_jump(lowered, continuation_id, span);
         let values = carried
             .iter()
             .filter_map(|binding| {
@@ -108,7 +109,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             })
             .collect::<BTreeMap<_, _>>();
         replace_if_edge_arguments(&mut lowered, continuation_id, carried, &values, span);
-        Ok(ensure_jump(lowered, continuation_id, span))
+        Ok(lowered)
     }
 
     fn lower_if_else_branch(
@@ -145,7 +146,6 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         &mut self,
         then_branch: &Block,
         else_branch: Option<&IfBranch>,
-        span: SourceSpan,
     ) -> Result<Vec<loops::CarriedBinding>, BackendContractError> {
         let mut names = Vec::new();
         collect_assignment_names(then_branch, &mut names);
@@ -154,16 +154,6 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         }
         names.sort();
         names.dedup();
-        if else_branch.is_none()
-            && let Some(name) = names.first()
-        {
-            return Err(unsupported(
-                span,
-                format!(
-                    "scalar assignment for `{name}` requires a local owner in the current lexical scope"
-                ),
-            ));
-        }
         Ok(names
             .into_iter()
             .filter_map(|name| {
