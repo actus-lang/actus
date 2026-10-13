@@ -37,6 +37,29 @@ fn sensor_telemetry_example_builds_and_executes() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn sensor_telemetry_example_rejects_llvm_float_lowering_explicitly() {
+    let source = format!("{}/examples/sensor_telemetry.act", env!("CARGO_MANIFEST_DIR"));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source,
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            std::env::temp_dir()
+                .join(format!("actus-sensor-llvm-{}.bin", std::process::id()))
+                .display()
+                .to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 1);
+}
+
 #[cfg(unix)]
 #[test]
 fn hardware_register_example_builds_and_executes() {

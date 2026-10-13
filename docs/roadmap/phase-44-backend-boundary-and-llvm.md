@@ -1312,8 +1312,11 @@ subjects. `tests/examples_cli.rs` proves that `examples/generics_showcase.act`
 builds and executes through both backends with exit status `123`. The LLVM
 backend additionally materializes direct enum parameters before field
 extraction, preserving the neutral enum contract for both pointer-backed and
-direct aggregate ABI values. `sensor_telemetry.act` remains intentionally
-deferred.
+direct aggregate ABI values. The same test suite records that
+`sensor_telemetry.act` executes through the default Cranelift path but is
+explicitly rejected by LLVM at the shared semantic boundary because its
+`f32`/`f64` state is outside the integer-only shared contract; no float
+fallback or `allow` bypass was added.
 
 The full LLVM-only integration matrix is still open. The current run reports
 23 failing integration targets, including nested case/body lowering, generic
