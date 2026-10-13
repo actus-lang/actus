@@ -10,12 +10,28 @@ use super::{BodyLowering, LoopTargets};
 use crate::ast::{Block, Expr, ForBinding, Stmt};
 use crate::lexer::SourceSpan;
 
+mod range_setup;
+use range_setup::RangeSetup;
+
 pub(super) struct ForArrayInput<'a> {
     id: BackendBlockId,
     block: &'a Block,
     index: usize,
     binding: &'a ForBinding,
     collection: &'a Expr,
+    body: &'a Block,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    instructions: Vec<BackendInstruction>,
+}
+
+pub(super) struct ForRangeInput<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    binding: &'a ForBinding,
+    start: &'a Expr,
+    end: &'a Expr,
     body: &'a Block,
     span: SourceSpan,
     fallthrough: Option<BackendBlockId>,
@@ -33,18 +49,20 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         instructions: Vec<BackendInstruction>,
     ) -> Result<BackendBlock, BackendContractError> {
         match statement {
-            Stmt::ForRange { binding, start, end, body, span } => self.lower_for_range_statement(
-                id,
-                block,
-                index,
-                binding,
-                start,
-                end,
-                body,
-                *span,
-                fallthrough,
-                instructions,
-            ),
+            Stmt::ForRange { binding, start, end, body, span } => {
+                self.lower_for_range_statement(ForRangeInput {
+                    id,
+                    block,
+                    index,
+                    binding,
+                    start,
+                    end,
+                    body,
+                    span: *span,
+                    fallthrough,
+                    instructions,
+                })
+            }
             Stmt::ForArray { binding, collection, body, span } => {
                 self.lower_for_array_statement(ForArrayInput {
                     id,
@@ -88,48 +106,38 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let start = Expr::Integer { value: "0".to_owned(), suffix: Some("u32".to_owned()), span };
         let end =
             Expr::Integer { value: capacity.to_string(), suffix: Some("u32".to_owned()), span };
-        self.lower_for_range_statement(
+        self.lower_for_range_statement(ForRangeInput {
             id,
             block,
             index,
             binding,
-            &start,
-            &end,
+            start: &start,
+            end: &end,
             body,
             span,
             fallthrough,
             instructions,
-        )
+        })
     }
 
     pub(super) fn lower_for_range_statement(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        binding: &ForBinding,
-        start: &Expr,
-        end: &Expr,
-        body: &Block,
-        span: SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        mut instructions: Vec<BackendInstruction>,
+        input: ForRangeInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
-        if !self.provider.supports_range_loops() {
-            return Err(unsupported(span, "range loop"));
-        }
-        let index_type = range_binding_type(binding, span)?;
-        let start_value = self.provider.lower_expression(start, &mut instructions)?;
-        let end_value = self.provider.lower_expression(end, &mut instructions)?;
-        let carried = self.collect_carried_bindings(body, span)?;
-        let ids = self.allocate_loop_values(index_type, &carried);
-        let blocks = self.allocate_loop_blocks();
-        let initial_arguments = initial_loop_arguments(start_value, index_type, &carried, span);
-        instructions.push(BackendInstruction::Jump {
-            target: blocks.header,
-            arguments: initial_arguments,
+        let ForRangeInput {
+            id,
+            block,
+            index,
+            binding,
+            start,
+            end,
+            body,
             span,
-        });
+            fallthrough,
+            instructions,
+        } = input;
+        let RangeSetup { index_type, end_value, carried, ids, blocks, instructions } =
+            self.prepare_range_loop(binding, start, end, body, span, instructions)?;
         let header = header_block(blocks, &ids, end_value, index_type, &carried, span);
         let body = self.lower_range_body(
             blocks.body,
@@ -162,7 +170,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
-    fn allocate_loop_values(
+    pub(super) fn allocate_loop_values(
         &mut self,
         ty: BackendValueType,
         carried: &[CarriedBinding],
@@ -213,7 +221,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             .collect()
     }
 
-    fn allocate_loop_blocks(&mut self) -> LoopBlocks {
+    pub(super) fn allocate_loop_blocks(&mut self) -> LoopBlocks {
         LoopBlocks {
             header: self.allocate_block(),
             body: self.allocate_block(),
@@ -295,7 +303,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
 }
 
 #[derive(Clone, Copy)]
-struct LoopBlocks {
+pub(super) struct LoopBlocks {
     header: BackendBlockId,
     body: BackendBlockId,
     increment: BackendBlockId,
@@ -303,7 +311,7 @@ struct LoopBlocks {
 }
 
 #[derive(Clone)]
-struct LoopValues {
+pub(super) struct LoopValues {
     header: super::super::BackendValueId,
     body: super::super::BackendValueId,
     increment: super::super::BackendValueId,
@@ -322,7 +330,7 @@ pub(super) struct CarriedBinding {
     pub(super) ty: BackendValueType,
 }
 
-fn initial_loop_arguments(
+pub(super) fn initial_loop_arguments(
     start: super::super::BackendValueId,
     index_type: BackendValueType,
     carried: &[CarriedBinding],
