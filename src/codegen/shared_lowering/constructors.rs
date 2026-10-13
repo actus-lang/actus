@@ -240,6 +240,16 @@ pub(super) fn lower_named_unit_enum(
     let layout = provider
         .enum_layout(type_name)
         .ok_or_else(|| unsupported(span, "named enum has no neutral layout"))?;
+    if layout.niche_pointer {
+        return lower_niche_option_constructor(
+            provider,
+            type_name,
+            variant,
+            arguments,
+            span,
+            instructions,
+        );
+    }
     let payload = if is_unit {
         if !arguments.is_empty() {
             return Err(unsupported(span, "named enum unit variants cannot carry a payload"));
