@@ -699,10 +699,10 @@ the same fixture through LLVM and Cranelift object emission.
 - [x] Verify architecture boundaries: shared semantic/codegen modules contain
       no Cranelift or LLVM imports, and backend implementations remain inside
       their canonical directories.
-- [ ] Update the handbook, ADR, and troubleshooting documentation with the
+- [x] Update the handbook, ADR, and troubleshooting documentation with the
       final selection syntax, feature requirements, supported combinations,
       failure behavior, and rollback procedure.
-- [ ] Record exact compiler, LLVM, linker, target, and fixture conditions for
+- [x] Record exact compiler, LLVM, linker, target, and fixture conditions for
       every completed acceptance test before marking this gate complete.
 
 ### Current shared-lowering evidence
@@ -1428,6 +1428,17 @@ creation, and its diagnostic names `float-literal`, the selected `llvm`
 backend, target `x86_64-unknown-linux-gnu`, and the source span. This confirms
 that an unsupported operation is rejected at the selected backend boundary
 instead of silently falling back to Cranelift.
+
+Documentation and acceptance evidence now live in
+`docs/guide/compiler/native-builds.md`, `docs/architecture/compiler-pipeline.md`,
+ADR-0080, and ADR-0081. The verified environment is Rust `1.98.0` / Cargo
+`1.98.0`, host `x86_64-unknown-linux-gnu`, rustc LLVM `22.1.8`, system LLVM
+and Clang `23.1.1`, GCC `16.2.1`, GNU ld `2.47`, Cranelift `0.136.2`, and
+`llvm-sys 231.0.0`. Fixtures use `std`, `verify_no_float_ir = true`, hosted executable
+emission, freestanding `x86_64-unknown-uefi` object emission, and negative
+freestanding `thumbv7em-none-eabihf` large-aggregate emission. The parity
+matrix is `tests/backend_parity.rs`; Region coverage is
+`tests/std_region_native.rs`.
 
 ## Out of scope
 
