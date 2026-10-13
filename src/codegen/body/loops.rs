@@ -10,6 +10,18 @@ use super::{BodyLowering, LoopTargets};
 use crate::ast::{Block, Expr, ForBinding, Stmt};
 use crate::lexer::SourceSpan;
 
+pub(super) struct ForArrayInput<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    binding: &'a ForBinding,
+    collection: &'a Expr,
+    body: &'a Block,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    instructions: Vec<BackendInstruction>,
+}
+
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_for_statement(
         &mut self,
@@ -33,33 +45,38 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                 fallthrough,
                 instructions,
             ),
-            Stmt::ForArray { binding, collection, body, span } => self.lower_for_array_statement(
-                id,
-                block,
-                index,
-                binding,
-                collection,
-                body,
-                *span,
-                fallthrough,
-                instructions,
-            ),
+            Stmt::ForArray { binding, collection, body, span } => {
+                self.lower_for_array_statement(ForArrayInput {
+                    id,
+                    block,
+                    index,
+                    binding,
+                    collection,
+                    body,
+                    span: *span,
+                    fallthrough,
+                    instructions,
+                })
+            }
             _ => Err(unsupported(SourceSpan::new(0, 0), "for loop")),
         }
     }
 
     pub(super) fn lower_for_array_statement(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        binding: &ForBinding,
-        collection: &Expr,
-        body: &Block,
-        span: SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        mut instructions: Vec<BackendInstruction>,
+        input: ForArrayInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let ForArrayInput {
+            id,
+            block,
+            index,
+            binding,
+            collection,
+            body,
+            span,
+            fallthrough,
+            mut instructions,
+        } = input;
         if !self.provider.supports_array_loops() {
             return Err(unsupported(span, "array loop"));
         }
