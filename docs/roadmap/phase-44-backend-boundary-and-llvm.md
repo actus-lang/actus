@@ -1720,3 +1720,19 @@ legacy path. The unit regression
 `accepts_logical_case_predicates_in_the_shared_contract` and parity regression
 `both_native_backends_share_logical_case_predicates` pass on LLVM and Cranelift;
 the aggregate CLI suite passes for this shape without a fallback diagnostic.
+
+The next fallback inventory pass moved hosted `Void` entry ABI adaptation,
+statement-level scalar `case` control flow, intrinsic `print` calls, and
+`break`/`continue` case branches onto the shared candidate and neutral body
+contract. Hosted `Void` entries now carry an explicit neutral
+`hosted_entry_return` ABI marker; both emitters materialize the required
+`i32 0` process result. Loop-carried bindings are collected from case and
+conditional expression branch blocks, and case lowering restores the enclosing
+loop state between branches so `continue` and `break` edges cannot reference
+non-dominating SSA values. The unit candidate suite passes 43 tests, the CLI
+parity fixture `both_native_backends_share_case_continue_loop_state` passes on
+both native backends, and the full LLVM-enabled CLI suite passes 121 tests.
+The only remaining diagnostic fallback in this inventory is the existing
+`f32` relational fixture; floating-point state remains outside the documented
+integer-only shared contract and is covered by the existing Cranelift-only
+behavior plus LLVM's typed rejection boundary.

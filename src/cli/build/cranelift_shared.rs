@@ -35,7 +35,6 @@ pub(super) fn supports_shared_specialized_units(
         .collect::<Result<Vec<_>, BackendEmitError>>()
         .map(|results| results.into_iter().all(|supported| supported))
 }
-
 pub(super) fn emit_shared_scalar_units(
     object_plan: &ModuleObjectPlan,
     symbol: &str,
@@ -75,7 +74,6 @@ pub(super) fn emit_shared_scalar_units(
         })
         .collect()
 }
-
 pub(super) fn emit_shared_specialized_units(
     object_plan: &ModuleObjectPlan,
     symbol: &str,
@@ -139,3 +137,4 @@ pub(super) fn emit_cranelift_root(
         symbols: declared_symbols(program, namespace, symbol, bindings)?,
     })
 }
+// Legacy Cranelift compatibility remains isolated from shared emission.

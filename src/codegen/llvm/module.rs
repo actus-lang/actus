@@ -79,6 +79,7 @@ fn declare_module_functions(
             &external.parameters,
             &external.return_value,
             external.runtime_pointer_return,
+            false,
         )?;
         declarations.insert(external.symbol.as_str().to_owned(), declaration);
     }
@@ -135,6 +136,7 @@ fn declare_module_functions(
             &parameters,
             &return_value,
             false,
+            false,
         )?;
         declarations.insert(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL.to_owned(), declaration);
     }
@@ -146,6 +148,7 @@ fn declare_module_functions(
             &function.parameters,
             &function.return_value,
             false,
+            function.hosted_entry_return,
         )?;
         declarations.insert(function.symbol.as_str().to_owned(), declaration);
     }

@@ -63,6 +63,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 else_arguments: Vec::new(),
                 span: branch.span,
             });
+            let loop_bindings = self.snapshot_loop_bindings();
             self.insert_case_branch_body(
                 matched_id,
                 branch,
@@ -72,6 +73,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 fallthrough,
                 following_id.unwrap_or(else_block),
             )?;
+            self.restore_loop_bindings(loop_bindings);
             if let Some(following_id) = following_id {
                 if entry_instructions.is_none() {
                     entry_instructions = Some(std::mem::take(&mut instructions));

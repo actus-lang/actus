@@ -63,7 +63,16 @@ pub(crate) fn lower_program_to_backend_module_for_target(
         )
     })?;
     reject_implicit_large_aggregate_allocation(&semantic, &layouts, target)?;
-    lower_program_to_backend_module_with_layouts(namespace, program, entry_name, bindings, &layouts)
+    let mut module = lower_program_to_backend_module_with_layouts(
+        namespace, program, entry_name, bindings, &layouts,
+    )?;
+    for function in &mut module.functions {
+        function.hosted_entry_return = target.entry_contract() == EntryContract::Hosted
+            && entry_name == Some(function.symbol.as_str())
+            && function.return_value.ty == BackendValueType::Unit;
+    }
+    module.validate()?;
+    Ok(module)
 }
 
 fn reject_implicit_large_aggregate_allocation(

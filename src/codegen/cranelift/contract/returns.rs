@@ -66,6 +66,11 @@ pub(super) fn lower_return(
         builder.ins().return_(fragments);
         return Ok(());
     }
+    if function.hosted_entry_return && value.is_none() {
+        let result = builder.ins().iconst(cranelift_codegen::ir::types::I32, 0);
+        builder.ins().return_(&[result]);
+        return Ok(());
+    }
     let value = value
         .map(|value| {
             values.get(&value).copied().ok_or_else(|| {

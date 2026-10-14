@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMBuildAlloca, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildLoad2,
     LLVMBuildMemMove, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStore, LLVMConstInt, LLVMConstNull,
-    LLVMGetTypeKind, LLVMInt64TypeInContext, LLVMPositionBuilderAtEnd, LLVMSetAlignment,
-    LLVMTypeOf,
+    LLVMGetTypeKind, LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMPositionBuilderAtEnd,
+    LLVMSetAlignment, LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 use llvm_sys::{LLVMIntPredicate, LLVMTypeKind};
@@ -25,6 +25,12 @@ pub(super) fn emit_return(
     match value_id {
         None if declaration.return_slot => {
             Err(BackendEmitError("LLVM return-slot function requires a return value".to_owned()))
+        }
+        None if function.hosted_entry_return => {
+            unsafe {
+                LLVMBuildRet(builder, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0));
+            }
+            Ok(())
         }
         None if matches!(function.return_value.ty, BackendValueType::Unit) => {
             unsafe { LLVMBuildRetVoid(builder) };

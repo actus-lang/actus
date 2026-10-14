@@ -15,8 +15,9 @@ use shared_candidate_arrays::{
 mod shared_candidate_cases;
 
 use shared_candidate_cases::{
-    result_case_expression, scalar_case_expression, scalar_option_constructor_expression,
-    scalar_result_constructor_expression, scalar_statement_call,
+    result_case_expression, scalar_case_expression, scalar_case_statement,
+    scalar_option_constructor_expression, scalar_result_constructor_expression,
+    scalar_statement_call,
 };
 
 #[path = "shared_candidate_types.rs"]
@@ -220,7 +221,8 @@ fn supported_value_type(
     unit_enums: &BTreeSet<String>,
     aggregate_types: &BTreeSet<String>,
 ) -> bool {
-    scalar_or_result_type(type_name, unit_enums, aggregate_types)
+    type_name.name == "Void"
+        || scalar_or_result_type(type_name, unit_enums, aggregate_types)
         || supported_array_type(type_name, aggregate_types)
         || aggregate_types.contains(&type_name.name)
 }
@@ -249,6 +251,7 @@ fn scalar_statement(
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
         Stmt::Expression { expression, .. } => {
             (matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context))
+                || scalar_case_statement(expression, context)
                 || scalar_case_expression(expression, context)
                 || scalar_result_constructor_expression(expression, context)
                 || scalar_option_constructor_expression(expression, context)

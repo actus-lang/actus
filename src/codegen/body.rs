@@ -127,6 +127,21 @@ impl<P: BackendBodyProvider> BackendExpressionProvider for LegacyExpressionProvi
 }
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
+    fn snapshot_loop_bindings(&self) -> Vec<(String, BackendValueId)> {
+        self.loop_targets
+            .last()
+            .into_iter()
+            .flat_map(|targets| targets.continue_values.iter())
+            .filter_map(|name| self.provider.binding_value(name).map(|value| (name.clone(), value)))
+            .collect()
+    }
+
+    fn restore_loop_bindings(&mut self, bindings: Vec<(String, BackendValueId)>) {
+        for (name, value) in bindings {
+            self.provider.set_binding_value(&name, value);
+        }
+    }
+
     pub(super) fn lower_block(
         &mut self,
         id: BackendBlockId,

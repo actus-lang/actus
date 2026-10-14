@@ -94,6 +94,7 @@ impl BackendSignature {
             symbol: self.symbol,
             parameters: self.parameters,
             return_value: self.return_value,
+            hosted_entry_return: false,
             entry,
             blocks,
             cleanup,

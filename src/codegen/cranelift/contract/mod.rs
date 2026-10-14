@@ -47,7 +47,7 @@ fn declare_functions(
 ) -> Result<BTreeMap<String, Declaration>, BackendEmitError> {
     let mut declarations = BTreeMap::new();
     for external in &backend_module.externals {
-        let signature = signature(module, &external.parameters, &external.return_value)?;
+        let signature = signature(module, &external.parameters, &external.return_value, false)?;
         let id = module
             .declare_function(external.symbol.as_str(), Linkage::Import, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
@@ -57,7 +57,12 @@ fn declare_functions(
         );
     }
     for function in &backend_module.functions {
-        let signature = signature(module, &function.parameters, &function.return_value)?;
+        let signature = signature(
+            module,
+            &function.parameters,
+            &function.return_value,
+            function.hosted_entry_return,
+        )?;
         let id = module
             .declare_function(function.symbol.as_str(), Linkage::Export, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
@@ -73,6 +78,7 @@ fn signature(
     module: &ObjectModule,
     parameters: &[crate::codegen::BackendParameter],
     return_value: &crate::codegen::BackendReturn,
+    hosted_entry_return: bool,
 ) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     let mut signature = module.make_signature();
     for parameter in parameters {
@@ -82,7 +88,9 @@ fn signature(
     }
     match &return_value.passing {
         crate::codegen::BackendReturnMode::Direct => {
-            if let Some(ty) = scalar_type(module, return_value.ty)? {
+            if hosted_entry_return {
+                signature.returns.push(AbiParam::new(types::I32));
+            } else if let Some(ty) = scalar_type(module, return_value.ty)? {
                 signature.returns.push(AbiParam::new(ty));
             }
         }
@@ -184,7 +192,12 @@ fn define_function(
         .cloned()
         .ok_or_else(|| BackendEmitError("Cranelift function declaration is missing".to_owned()))?;
     let mut context = module.make_context();
-    context.func.signature = signature(module, &function.parameters, &function.return_value)?;
+    context.func.signature = signature(
+        module,
+        &function.parameters,
+        &function.return_value,
+        function.hosted_entry_return,
+    )?;
     let mut function_context = FunctionBuilderContext::new();
     lower_function_body(module, function, declarations, &mut context, &mut function_context)?;
     module

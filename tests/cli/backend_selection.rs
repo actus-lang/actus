@@ -171,6 +171,37 @@ fn both_native_backends_build_standalone_case_statement_through_shared_lowering(
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_share_case_continue_loop_state() {
+    let source = "verb main() -> Int { erg flag = 1; loop { case flag { 1 => { flag += 1; continue; }, _ => { break; }, }; } return flag; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-case-continue-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write case-continue fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build case-continue fixture");
+        let status =
+            std::process::Command::new(&output).status().expect("run case-continue fixture");
+        assert_eq!(status.code(), Some(2), "backend {backend} should preserve loop state");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_guarded_case_through_shared_lowering() {
     let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb select_true() -> Int { erg result = produce(); return case result { Result.Ok(value) if value == 41 => 42, Result.Ok(_) => 1, Result.Err(_) => 0, }; } verb select_false() -> Int { erg result = produce(); return case result { Result.Ok(value) if value == 40 => 1, Result.Ok(_) => 42, Result.Err(_) => 0, }; } verb main() -> Int { return select_true() + select_false() - 42; }\n";
     for backend in ["cranelift", "llvm"] {
@@ -628,6 +659,43 @@ fn both_native_backends_share_structured_dat_parameter_and_return_layouts() {
         assert_eq!(status.code(), Some(42), "backend {backend} aggregate dat result");
         let _ = fs::remove_file(input);
         let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_share_void_entry_lowering() {
+    let source = "verb main() -> Void { return; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-void-shared-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create shared void directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"void-shared-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write shared void manifest");
+        fs::write(&input, source).expect("write shared void source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build shared Void entry");
+        let status = std::process::Command::new(&output).status().expect("run shared Void entry");
+        assert_eq!(status.code(), Some(0), "backend {backend} shared Void result");
+        let _ = fs::remove_dir_all(root);
     }
 }
 

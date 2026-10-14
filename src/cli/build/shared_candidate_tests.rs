@@ -314,6 +314,20 @@ fn accepts_logical_case_predicates_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_void_entries_and_statement_case_control_flow_in_the_shared_contract() {
+    for source in [
+        "verb main() -> Void { return; }",
+        "verb main() -> Int { loop { case 1 { 1 => { break; }, _ => { continue; }, }; } return 42; }",
+        "verb main() -> Int { erg ready = 0; if ready == 1 { print(1); } else { print(42); }; return 0; }",
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "shared candidate fixture should lex: {errors:?}");
+        let program = parse(tokens).expect("shared candidate fixture should parse");
+        assert!(supports_scalar_shared_lowering(&program), "fixture should use shared lowering");
+    }
+}
+
+#[test]
 fn accepts_fixed_array_element_compound_stores_in_the_shared_contract() {
     let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }";
     let (tokens, errors) = scan(source);

@@ -43,8 +43,9 @@ pub(super) fn declare_function(
     parameters: &[BackendParameter],
     return_value: &BackendReturn,
     runtime_pointer_return: bool,
+    hosted_entry_return: bool,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
-    let abi = return_abi(context, return_value, runtime_pointer_return)?;
+    let abi = return_abi(context, return_value, runtime_pointer_return, hosted_entry_return)?;
     let mut parameter_types = parameters
         .iter()
         .map(|parameter| parameter_type(context, parameter))
@@ -85,6 +86,7 @@ fn return_abi(
     context: LLVMContextRef,
     return_value: &BackendReturn,
     runtime_pointer_return: bool,
+    hosted_entry_return: bool,
 ) -> Result<ReturnAbi, BackendEmitError> {
     let borrowed_layout = match return_value.ty {
         BackendValueType::NichePointerOption { payload_layout, .. } => payload_layout,
@@ -99,7 +101,9 @@ fn return_abi(
         .map(|layout| llvm_type(context, BackendValueType::Aggregate { layout }))
         .transpose()?
         .unwrap_or(value_type);
-    let return_type = if borrowed {
+    let return_type = if hosted_entry_return {
+        unsafe { llvm_sys::core::LLVMInt32TypeInContext(context) }
+    } else if borrowed {
         unsafe { LLVMPointerTypeInContext(context, 0) }
     } else if return_slot {
         unsafe { LLVMVoidTypeInContext(context) }
@@ -134,7 +138,7 @@ pub(super) fn declare_cleanup_bridge(
     pointer_width: u8,
 ) -> Result<FunctionDeclaration, BackendEmitError> {
     let (symbol, parameters, return_value) = cleanup_signature(bridge, pointer_width);
-    declare_function(context, module, symbol, &parameters, &return_value, false)
+    declare_function(context, module, symbol, &parameters, &return_value, false, false)
 }
 
 fn cleanup_signature(

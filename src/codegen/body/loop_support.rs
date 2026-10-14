@@ -3,7 +3,7 @@
 use super::super::BackendValueType;
 use super::super::body_contract::unsupported;
 use super::BackendContractError;
-use crate::ast::{Block, ForBinding, IfBranch, Place, Stmt};
+use crate::ast::{Block, CaseBody, Expr, ForBinding, IfBranch, Place, Stmt};
 use crate::lexer::SourceSpan;
 
 pub(super) fn range_binding_type(
@@ -53,6 +53,31 @@ fn collect_statement_assignment_names(statement: &Stmt, names: &mut Vec<String>)
         Stmt::Loop(block) | Stmt::Block(block) => collect_assignment_names(block, names),
         Stmt::ForRange { body, .. } | Stmt::ForArray { body, .. } => {
             collect_assignment_names(body, names)
+        }
+        Stmt::Expression { expression, .. }
+        | Stmt::OwnerDecl { initializer: expression, .. }
+        | Stmt::Assignment { value: expression, .. }
+        | Stmt::CompoundAssignment { value: expression, .. } => {
+            collect_expression_assignment_names(expression, names)
+        }
+        _ => {}
+    }
+}
+
+fn collect_expression_assignment_names(expression: &Expr, names: &mut Vec<String>) {
+    match expression {
+        Expr::Case { branches, .. } => {
+            for branch in branches {
+                if let CaseBody::Block(block) = &branch.body {
+                    collect_assignment_names(block, names);
+                }
+            }
+        }
+        Expr::If { then_branch, else_branch, .. } => {
+            collect_assignment_names(then_branch, names);
+            if let Some(IfBranch::Block(block)) = else_branch {
+                collect_assignment_names(block, names);
+            }
         }
         _ => {}
     }

@@ -36,8 +36,24 @@ pub(super) fn scalar_statement_call(expression: &Expr, context: &CandidateContex
     let Expr::Call { callee, arguments, .. } = expression else {
         return false;
     };
-    context.returns_value.contains_key(callee)
+    (context.returns_value.contains_key(callee)
+        || crate::ast::lookup_call_intrinsic(callee) == Some(crate::ast::IntrinsicKind::Print))
         && arguments.iter().all(|argument| super::scalar_expression(&argument.expression, context))
+}
+
+pub(super) fn scalar_case_statement(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+    let Expr::Case { subject, branches, .. } = expression else { return false };
+    !branches.is_empty()
+        && super::scalar_expression(subject, context)
+        && branches.iter().enumerate().all(|(index, branch)| {
+            (match &branch.body {
+                CaseBody::Expression(body) => super::scalar_expression(body, context),
+                CaseBody::Block(block) => super::scalar_block(block, context, true),
+            }) && (match &branch.pattern {
+                Pattern::Variant { .. } | Pattern::Literal { .. } => true,
+                Pattern::Wildcard { .. } => index + 1 == branches.len(),
+            })
+        })
 }
 
 pub(super) fn scalar_result_constructor_expression(

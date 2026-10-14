@@ -210,6 +210,7 @@ pub struct BackendFunction {
     pub symbol: SymbolIdentity,
     pub parameters: Vec<BackendParameter>,
     pub return_value: BackendReturn,
+    pub hosted_entry_return: bool,
     pub entry: BackendBlockId,
     pub blocks: Vec<BackendBlock>,
     pub cleanup: Vec<BackendCleanupPlan>,
