@@ -1698,3 +1698,15 @@ and payload materialization. The unit regression
 `accepts_discarded_option_constructor_in_the_shared_contract` and native parity
 regression `both_native_backends_build_and_run_shared_discarded_option_constructors`
 pass on LLVM and Cranelift with exit status `42`.
+
+Aggregate `ins` arguments now pass through an explicit shared caller-owned
+storage check. The shared call lowering validates the neutral aggregate, Region,
+or enum layout (including pointer-backed field locations) before forwarding the
+address; a non-matching value fails with a stable semantic diagnostic rather
+than reaching backend-specific lowering. The parity regressions
+`both_native_backends_share_structured_ins_caller_owned_storage` and
+`both_native_backends_share_aggregate_array_ins_caller_owned_storage` exercise
+named aggregate and aggregate-array mutation on LLVM and Cranelift with exit
+status `42`. This closes the supported aggregate `ins` call slice; nested
+ownership-bearing loan paths and unsupported indirect shapes remain governed by
+their existing fail-closed checks.

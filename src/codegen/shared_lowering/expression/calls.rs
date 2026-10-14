@@ -163,6 +163,17 @@ fn lower_arguments(
     let mut values = Vec::with_capacity(arguments.len());
     let mut writebacks = Vec::new();
     for (index, argument) in arguments.iter().enumerate() {
+        if let Some(BackendPassingMode::ExclusiveLoan { layout }) = modes.get(index) {
+            let value = lower_aggregate_loan_argument(
+                provider,
+                &argument.expression,
+                *layout,
+                span,
+                instructions,
+            )?;
+            values.push(value);
+            continue;
+        }
         let Some(BackendPassingMode::ExclusiveScalarLoan { ty }) = modes.get(index) else {
             let value = provider.lower_expression(&argument.expression, instructions)?;
             values.push(value);
@@ -220,6 +231,35 @@ fn lower_arguments(
         writebacks.push(ScalarLoanWriteback { name, address, ty: *ty, place });
     }
     Ok(LoweredArguments { values, writebacks })
+}
+
+fn lower_aggregate_loan_argument(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &crate::ast::Expr,
+    layout: crate::codegen::BackendLayout,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let value = provider.lower_expression(expression, instructions)?;
+    let caller_owned_storage = match provider.value_type(value) {
+        Some(BackendValueType::Aggregate { layout: value_layout })
+        | Some(BackendValueType::Region { layout: value_layout })
+        | Some(BackendValueType::Enum {
+            layout: crate::codegen::BackendEnumLayout { layout: value_layout, .. },
+        }) => value_layout == layout,
+        Some(BackendValueType::Pointer) => provider
+            .nominal_type(value)
+            .and_then(|type_name| provider.layouts.layout_for(type_name))
+            .is_some_and(|value_layout| value_layout == layout),
+        _ => false,
+    };
+    if !caller_owned_storage {
+        return Err(super::super::support::unsupported(
+            span,
+            "aggregate `ins` call argument must resolve to caller-owned storage",
+        ));
+    }
+    Ok(value)
 }
 
 fn append_scalar_loan_writebacks(

@@ -426,6 +426,44 @@ fn llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_share_structured_ins_caller_owned_storage() {
+    let source = "struct Counter { value: Int, } verb increment(ins counter: Counter) { counter.value += 1; return; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-structured-ins-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create structured ins directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"structured-ins-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write structured ins manifest");
+        fs::write(&input, source).expect("write structured ins source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build structured ins fixture");
+        let status =
+            std::process::Command::new(&output).status().expect("run structured ins fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} structured ins result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_scalar_aggregate_field_access() {
