@@ -15,7 +15,8 @@ use shared_candidate_arrays::{
 mod shared_candidate_cases;
 
 use shared_candidate_cases::{
-    result_case_expression, scalar_case_expression, scalar_statement_call,
+    result_case_expression, scalar_case_expression, scalar_result_constructor_expression,
+    scalar_statement_call,
 };
 
 #[path = "shared_candidate_types.rs"]
@@ -135,6 +136,13 @@ fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
     ) || matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String")
 }
 
+pub(super) fn discardable_result_payload_type(type_name: &crate::ast::TypeName) -> bool {
+    matches!(
+        type_name.name.as_str(),
+        "Bool" | "Int" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
+    )
+}
+
 fn scalar_option_type(type_name: &crate::ast::TypeName) -> bool {
     type_name.name == "Option"
         && type_name.arguments.len() == 1
@@ -174,6 +182,7 @@ fn scalar_statement(
         Stmt::Expression { expression, .. } => {
             (matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context))
                 || scalar_case_expression(expression, context)
+                || scalar_result_constructor_expression(expression, context)
         }
         Stmt::If { .. } => scalar_if_statement(statement, context),
         Stmt::Return { value, .. } => {

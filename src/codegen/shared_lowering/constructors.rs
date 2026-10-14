@@ -184,6 +184,31 @@ fn lower_result_constructor(
     let payload_type = provider
         .value_type(payload)
         .ok_or_else(|| unsupported(span, "Result payload type is unavailable"))?;
+    lower_result_constructor_payload(
+        provider,
+        result_type,
+        method,
+        payload,
+        payload_type,
+        span,
+        instructions,
+    )
+}
+
+pub(super) fn lower_result_constructor_payload(
+    provider: &mut SharedExpressionProvider<'_>,
+    result_type: &TypeName,
+    method: &str,
+    payload: BackendValueId,
+    payload_type: BackendValueType,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let discriminant = match method {
+        "Ok" => 0,
+        "Err" => 1,
+        _ => return Err(unsupported(span, "unknown Result constructor")),
+    };
     let layout = provider
         .enum_layout(result_type)
         .ok_or_else(|| unsupported(span, "Result payload layout is unavailable"))?;

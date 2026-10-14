@@ -1559,6 +1559,13 @@ cover the existing dynamic fixed-array read path through both backends with
 exit status `42`; aggregate indexed arguments remain governed by their existing
 aggregate candidate rules.
 
+Discarded primitive `Result.Ok/Err` constructors now lower through an explicit
+shared discarded-expression path: scalar payload evaluation is preserved, but
+the unused enum materialization is not emitted. The candidate admits only
+primitive integer/Bool payload types, leaving ownership-bearing payloads on the
+existing fallback path. The unit and parity regressions cover LLVM and
+Cranelift with exit status `42` without changing enum ABI or cleanup rules.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

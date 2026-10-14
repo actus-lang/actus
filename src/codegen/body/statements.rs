@@ -41,5 +41,5 @@ pub(super) fn lower_expression_statement(
         });
         return Ok(());
     }
-    provider.lower_expression(expression, instructions).map(|_| ())
+    provider.lower_discarded_expression(expression, instructions)
 }

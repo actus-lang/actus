@@ -194,6 +194,40 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         dispatch::lower_expression(self, expression, instructions)
     }
 
+    fn lower_discarded_expression(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        if let Expr::MethodCall { receiver, method, arguments, span } = expression
+            && let Expr::Identifier { name, .. } = receiver.as_ref()
+            && name.starts_with("Result[")
+            && matches!(method.as_str(), "Ok" | "Err")
+            && arguments.len() == 1
+        {
+            let result_type = crate::semantic::parse_type_name_key(name, *span)
+                .ok_or_else(|| unsupported(*span, "Result constructor receiver is invalid"))?;
+            let payload = self.lower_expression(&arguments[0].expression, instructions)?;
+            let payload_type = self
+                .value_type(payload)
+                .ok_or_else(|| unsupported(*span, "Result payload type is unavailable"))?;
+            if matches!(payload_type, BackendValueType::Bool | BackendValueType::Integer { .. }) {
+                return Ok(());
+            }
+            crate::codegen::shared_lowering::constructors::lower_result_constructor_payload(
+                self,
+                &result_type,
+                method,
+                payload,
+                payload_type,
+                *span,
+                instructions,
+            )?;
+            return Ok(());
+        }
+        self.lower_expression(expression, instructions).map(|_| ())
+    }
+
     fn coerce_return_value(
         &mut self,
         value: BackendValueId,

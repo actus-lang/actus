@@ -197,6 +197,14 @@ pub trait BackendExpressionProvider {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<BackendValueId, BackendContractError>;
 
+    fn lower_discarded_expression(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        self.lower_expression(expression, instructions).map(|_| ())
+    }
+
     fn coerce_return_value(
         &mut self,
         value: BackendValueId,
