@@ -1710,3 +1710,13 @@ named aggregate and aggregate-array mutation on LLVM and Cranelift with exit
 status `42`. This closes the supported aggregate `ins` call slice; nested
 ownership-bearing loan paths and unsupported indirect shapes remain governed by
 their existing fail-closed checks.
+
+Logical `&&` and `||` predicates are now admitted by the shared candidate when
+their operands are already supported Boolean expressions. The neutral integer
+binary contract and both backend emitters already implemented
+`LogicalAnd`/`LogicalOr`; the migration gap was the candidate rejecting those
+expressions and sending otherwise-supported case predicates to Cranelift's
+legacy path. The unit regression
+`accepts_logical_case_predicates_in_the_shared_contract` and parity regression
+`both_native_backends_share_logical_case_predicates` pass on LLVM and Cranelift;
+the aggregate CLI suite passes for this shape without a fallback diagnostic.

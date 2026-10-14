@@ -305,6 +305,15 @@ fn accepts_discarded_option_constructor_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_logical_case_predicates_in_the_shared_contract() {
+    let source = "verb main() -> Int { erg left: u8 = 13u8; erg right: u8 = 5u8; erg value = case (left < right) || (left <= right) { true => 1, _ => 0, }; return value; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("logical case predicate fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_fixed_array_element_compound_stores_in_the_shared_contract() {
     let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }";
     let (tokens, errors) = scan(source);

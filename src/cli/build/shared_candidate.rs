@@ -472,6 +472,8 @@ fn scalar_binary_expression(
             | BinaryOp::BitwiseAnd
             | BinaryOp::BitwiseOr
             | BinaryOp::BitwiseXor
+            | BinaryOp::LogicalAnd
+            | BinaryOp::LogicalOr
             | BinaryOp::LessThan
             | BinaryOp::LessEquals
             | BinaryOp::GreaterThan
