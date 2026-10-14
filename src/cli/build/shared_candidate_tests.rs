@@ -131,7 +131,7 @@ fn accepts_nested_generic_aggregate_array_element_stores_in_the_shared_contract(
 
 #[test]
 fn accepts_generic_aggregate_option_view_fields_in_the_shared_contract() {
-    let source = "struct Box[T] { abs item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: 41, }; return 42; }";
+    let source = "struct Box[T] { abs item: Option[abs T], } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: Option[abs Int].None, }; return case boxes[1u32].item { Option.Some(_) => 0, Option.None => 42, }; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("generic ownership aggregate fixture should parse");

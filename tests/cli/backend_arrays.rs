@@ -847,7 +847,7 @@ fn both_native_backends_build_and_run_a_shared_nested_generic_aggregate_array_el
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_build_and_run_a_shared_generic_aggregate_option_view_field() {
-    let source = "struct Box[T] { abs item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: 41, }; return 42; }\n";
+    let source = "struct Box[T] { abs item: Option[abs T], } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: Option[abs Int].None, }; return case boxes[1u32].item { Option.Some(_) => 0, Option.None => 42, }; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir().join(format!(
             "actus-cli-{backend}-generic-aggregate-option-view-{}",

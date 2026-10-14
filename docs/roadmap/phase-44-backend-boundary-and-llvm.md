@@ -1316,13 +1316,12 @@ backends with exit status 42. Generic ownership-bearing fields remain outside
 this slice.
 
 Generic ownership-bearing view fields now admit the bounded `Option[abs T]`
-shape. The shared classifier and hosted parity regression cover
-`Array[Box[Int], 2]` with an `abs item: T` field, including the shared
-ownership-bearing layout and construction through LLVM and Cranelift with exit
-status 42. Enum case reads from an ownership-bearing generic field remain
-outside this slice because they require a separate neutral-enum value boundary.
-Mutable or transferring generic ownership fields also remain outside this
-slice.
+shape. Generic substitution now preserves the declared field role, so
+`Option[abs T]` remains a niche-pointer enum after specialization. The shared
+classifier and hosted parity regression cover an `abs item: Option[abs T]`
+field, its `Some`/`None` case read, and exit status 42 through LLVM and
+Cranelift. Mutable or transferring generic ownership fields remain outside
+this slice.
 
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
