@@ -1535,11 +1535,16 @@ array loop now follows the same shared route. The parity regression
 builds and runs through LLVM and Cranelift with exit status `84`.
 
 Statement `if` forms without an `else` now also enter the shared candidate
-route; `else if` remains explicitly outside this slice and retains the
-established fallback. The unit classifier regression and
+route. The unit classifier regression and
 `both_native_backends_preserve_local_assignment_in_an_if_without_else` verify
 the existing shared body-lowering behavior without changing branch ABI,
 ownership roles, or cleanup semantics.
+
+The classifier now also admits statement `else if` chains recursively, using
+the existing shared `if_flow` lowering. The unit predicate and
+`both_native_backends_preserve_local_assignment_in_an_else_if` verify LLVM and
+Cranelift parity with exit status `42`; unsupported conditional expression
+shapes remain outside the candidate slice.
 
 ## Out of scope
 

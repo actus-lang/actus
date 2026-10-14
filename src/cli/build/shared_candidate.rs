@@ -174,15 +174,7 @@ fn scalar_statement(
         Stmt::Expression { expression, .. } => {
             matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context)
         }
-        Stmt::If { condition, then_branch, else_branch, .. } => {
-            scalar_expression(condition, context)
-                && scalar_block(then_branch, context, true)
-                && match else_branch {
-                    None => true,
-                    Some(IfBranch::Block(block)) => scalar_block(block, context, true),
-                    Some(IfBranch::ElseIf(_)) => false,
-                }
-        }
+        Stmt::If { .. } => scalar_if_statement(statement, context),
         Stmt::Return { value, .. } => {
             value.as_ref().is_none_or(|value| scalar_return_expression(value, context))
         }
@@ -202,6 +194,28 @@ fn scalar_statement(
         }
         Stmt::Drop { .. } => true,
     }
+}
+
+fn scalar_if_statement(statement: &Stmt, context: &CandidateContext<'_>) -> bool {
+    let Stmt::If { condition, then_branch, else_branch, .. } = statement else { return false };
+    scalar_expression(condition, context)
+        && scalar_block(then_branch, context, true)
+        && scalar_if_branch(else_branch.as_ref(), context)
+}
+
+fn scalar_if_branch(branch: Option<&IfBranch>, context: &CandidateContext<'_>) -> bool {
+    match branch {
+        None => true,
+        Some(IfBranch::Block(block)) => scalar_block(block, context, true),
+        Some(IfBranch::ElseIf(expression)) => scalar_if_expression(expression, context),
+    }
+}
+
+fn scalar_if_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+    let Expr::If { condition, then_branch, else_branch, .. } = expression else { return false };
+    scalar_expression(condition, context)
+        && scalar_block(then_branch, context, true)
+        && scalar_if_branch(else_branch.as_ref(), context)
 }
 
 fn scalar_return_block(block: &Block, context: &CandidateContext<'_>) -> bool {

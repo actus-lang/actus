@@ -79,6 +79,36 @@ fn both_native_backends_preserve_local_assignment_in_an_if_without_else() {
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_preserve_local_assignment_in_an_else_if() {
+    let source = "verb main() -> Int { erg value: u32 = 0u32; if false { value = 7u32; } else if true { value = 41u32; } return value as Int + 1; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-else-if-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write else-if fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build else-if");
+        let status = std::process::Command::new(&output).status().expect("run else-if fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} else-if result");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_nested_option_case_arithmetic_through_shared_lowering() {
     let source = "struct Node { value: Int, abs next: Option[abs Node], } verb sum(abs node: Node) -> Int { abs next = ref node.next; return node.value + case next { Option.Some(_) => 1, Option.None => 0, }; } verb main() -> Int { erg node = Node { value: 41, next: Option[abs Node].None, }; return sum(node: abs node); }\n";
     for backend in ["cranelift", "llvm"] {
