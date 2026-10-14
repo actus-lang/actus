@@ -806,6 +806,45 @@ fn both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_s
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_build_and_run_a_shared_discarded_aggregate_result_constructor() {
+    let source = "enum Failure { Bad, } struct Counter { value: u32, } verb main() -> Int { Result[Counter, Failure].Ok(Counter { value: 41u32, }); return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-discarded-aggregate-result-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create discarded aggregate Result directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"discarded-aggregate-result-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write discarded aggregate Result manifest");
+        fs::write(&input, source).expect("write discarded aggregate Result source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build discarded aggregate Result");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run discarded aggregate Result fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} aggregate Result result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_compound_store() {
     let source = "struct Box[T] { erg item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: 41, }; boxes[1u32].item += 1; return boxes[1u32].item; }\n";
     for backend in ["cranelift", "llvm"] {

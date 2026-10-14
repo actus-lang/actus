@@ -55,6 +55,15 @@ pub(super) fn scalar_result_constructor_expression(
         && result_type.arguments.len() == 2
         && matches!(method.as_str(), "Ok" | "Err")
         && arguments.len() == 1
-        && super::discardable_result_payload_type(&result_type.arguments[0])
+        && result_type
+            .arguments
+            .get(match method.as_str() {
+                "Ok" => 0,
+                "Err" => 1,
+                _ => return false,
+            })
+            .is_some_and(|payload| {
+                super::discardable_result_payload(payload, context.aggregate_types)
+            })
         && super::scalar_expression(&arguments[0].expression, context)
 }

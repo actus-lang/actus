@@ -285,6 +285,16 @@ fn accepts_generic_aggregate_option_view_fields_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_discarded_aggregate_result_constructor_in_the_shared_contract() {
+    let source = "enum Failure { Bad, } struct Counter { value: u32, } verb main() -> Int { Result[Counter, Failure].Ok(Counter { value: 41u32, }); return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program =
+        crate::parser::parse(tokens).expect("aggregate Result constructor fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_fixed_array_element_compound_stores_in_the_shared_contract() {
     let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }";
     let (tokens, errors) = scan(source);

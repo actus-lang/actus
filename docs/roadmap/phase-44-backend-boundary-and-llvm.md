@@ -1679,3 +1679,13 @@ an aggregate `Ok` payload, returns it through the neutral enum return slot, and
 reads the payload in a `dat` case on both LLVM and Cranelift. This proves the
 aggregate failure/return layout slice without widening the contract to generic
 or unsupported payload shapes.
+
+Discarded `Result` constructors now use the same shared candidate when their
+payload is a supported aggregate or fixed aggregate array. The neutral discarded
+expression path already evaluates the payload and materializes the enum only
+when ownership-bearing cleanup requires it; the candidate now admits that
+existing contract instead of routing it to Cranelift legacy lowering. The unit
+regression `accepts_discarded_aggregate_result_constructor_in_the_shared_contract`
+and native parity regression
+`both_native_backends_build_and_run_a_shared_discarded_aggregate_result_constructor`
+pass on LLVM and Cranelift with exit status `42`.

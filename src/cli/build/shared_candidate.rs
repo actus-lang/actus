@@ -167,6 +167,15 @@ pub(super) fn discardable_result_payload_type(type_name: &crate::ast::TypeName) 
     )
 }
 
+fn discardable_result_payload(
+    type_name: &crate::ast::TypeName,
+    aggregate_types: &BTreeSet<String>,
+) -> bool {
+    discardable_result_payload_type(type_name)
+        || aggregate_types.contains(&type_name.name)
+        || supported_array_type(type_name, aggregate_types)
+}
+
 fn scalar_option_type(type_name: &crate::ast::TypeName) -> bool {
     type_name.name == "Option"
         && type_name.arguments.len() == 1
