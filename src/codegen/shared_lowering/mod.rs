@@ -147,6 +147,7 @@ fn append_print_externals(
     for (symbol, ty) in [
         (crate::runtime::PRINT_INT_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
         (crate::runtime::PRINT_STRING_SYMBOL, BackendValueType::Pointer),
+        (crate::runtime::WRITE_STRING_STDOUT_SYMBOL, BackendValueType::Pointer),
         (crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL, BackendValueType::Pointer),
     ] {
         if externals.iter().any(|external| external.symbol.as_str() == symbol) {

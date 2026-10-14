@@ -154,12 +154,12 @@ fn scalar_type(
         BackendValueType::Integer { width: 32, .. } => Some(types::I32),
         BackendValueType::Integer { width: 64, .. } => Some(types::I64),
         BackendValueType::Pointer => Some(module.isa().pointer_type()),
+        BackendValueType::Enum { .. } => Some(module.isa().pointer_type()),
         BackendValueType::NichePointerOption { .. } => Some(module.isa().pointer_type()),
         BackendValueType::Integer { .. }
         | BackendValueType::Float { .. }
         | BackendValueType::Aggregate { .. }
-        | BackendValueType::Region { .. }
-        | BackendValueType::Enum { .. } => {
+        | BackendValueType::Region { .. } => {
             return Err(BackendEmitError(
                 "Cranelift neutral contract slice supports scalar values only".to_owned(),
             ));

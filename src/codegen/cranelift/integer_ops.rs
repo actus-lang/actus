@@ -301,25 +301,19 @@ pub(super) fn lower_integer_unary(
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
-    let BackendInstruction::IntegerUnary { result, operation, operand, ty, .. } = instruction
-    else {
+    let BackendInstruction::IntegerUnary { result, operation, operand, .. } = instruction else {
         return Err(BackendEmitError("Cranelift integer unary operation expected".to_owned()));
     };
     let operand = values.get(operand).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift unary operand {} is unavailable", operand.0))
     })?;
-    let operand_type = match ty {
-        BackendValueType::Integer { width: 8, .. } | BackendValueType::Bool => types::I8,
-        BackendValueType::Integer { width: 16, .. } => types::I16,
-        BackendValueType::Integer { width: 32, .. } => types::I32,
-        BackendValueType::Integer { width: 64, .. } => types::I64,
-        _ => return Err(BackendEmitError("Cranelift unary operand must be an integer".to_owned())),
-    };
     let value = match operation {
         BackendIntegerUnaryOp::Negate => builder.ins().ineg(operand),
         BackendIntegerUnaryOp::LogicalNot => {
-            let zero = builder.ins().iconst(operand_type, 0);
-            builder.ins().icmp(IntCC::Equal, operand, zero)
+            let value_type = builder.func.dfg.value_type(operand);
+            let zero = builder.ins().iconst(value_type, 0);
+            let condition = builder.ins().icmp(IntCC::Equal, operand, zero);
+            condition
         }
         BackendIntegerUnaryOp::BitwiseNot => builder.ins().bnot(operand),
     };

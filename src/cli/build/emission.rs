@@ -299,23 +299,6 @@ fn reachable_module_roots(
 }
 
 #[cfg(feature = "cranelift")]
-fn reachable_wire_verbs(
-    program: &crate::ast::Program,
-    reachable_module_roots: &std::collections::HashSet<String>,
-) -> Vec<String> {
-    program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            crate::ast::TopLevelDecl::Verb(verb) if reachable_module_roots.contains(&verb.name) => {
-                Some(verb.name.clone())
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-#[cfg(feature = "cranelift")]
 fn emit_module_objects(
     object_plan: &crate::modules::ModuleObjectPlan,
     configuration: &CompilerConfiguration,
@@ -324,29 +307,28 @@ fn emit_module_objects(
     reachable_module_roots: &std::collections::HashSet<String>,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
     let mut objects = Vec::new();
+    let caller_type_definitions =
+        super::module_type_context::caller_definitions(object_plan, generic_instances);
     for unit in &object_plan.units()[1..] {
-        let roots = if unit.namespace().module_path().starts_with("std::wire") {
-            if reachable_wire_verbs(unit.program(), reachable_module_roots).is_empty() {
-                Vec::new()
-            } else {
-                unit.program()
-                    .declarations
-                    .iter()
-                    .filter_map(|declaration| match declaration {
-                        crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.clone()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-            }
-        } else {
-            unit.exported_verbs().to_vec()
-        };
+        let roots = super::module_type_context::roots_for_unit(unit, reachable_module_roots);
         if roots.is_empty() && unit.namespace().module_path().starts_with("std::wire") {
             continue;
         }
+        let mut module_program = unit.program().clone();
+        if super::module_type_context::requires_caller_context(
+            unit,
+            generic_instances,
+            &caller_type_definitions,
+        ) {
+            super::module_type_context::append_caller_definitions(
+                &mut module_program,
+                &caller_type_definitions,
+                true,
+            );
+        }
         let bytes =
             crate::codegen::cranelift::emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
-                unit.program(),
+                &module_program,
                 unit.namespace().symbol_prefix(),
                 configuration.native_backend(),
                 configuration.target(),
@@ -364,7 +346,7 @@ fn emit_module_objects(
             name: unit.namespace().symbol_prefix().to_owned(),
             bytes,
             symbols: declared_symbols(
-                unit.program(),
+                &module_program,
                 unit.namespace().symbol_prefix(),
                 "",
                 bindings,

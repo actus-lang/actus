@@ -64,3 +64,4 @@ gated implementation roadmaps:
 - [ ] [Phase 23: Systems Language Capability Foundation](docs/roadmap/phase-23-systems-language-capability-foundation.md)
 - [ ] [Phase 33: Language Ergonomics and Readable Systems Syntax](docs/roadmap/phase-33-language-ergonomics-and-readable-systems-syntax.md)
 - [ ] [Phase 39: Actus `std::wire` Standard Library](docs/roadmap/phase-39-standard-wire.md)
+- [ ] [Phase 45: Ownership-Safe Aggregate Semantics and Backend Parity](docs/roadmap/phase-45-ownership-safe-aggregate-semantics.md)

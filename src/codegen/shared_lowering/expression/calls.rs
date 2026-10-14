@@ -220,6 +220,11 @@ fn lower_print_call(
         {
             crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL
         }
+        Some(crate::codegen::BackendValueType::Pointer)
+            if provider.nominal_type(*value).is_some_and(|ty| ty.name == "String") =>
+        {
+            crate::runtime::WRITE_STRING_STDOUT_SYMBOL
+        }
         Some(crate::codegen::BackendValueType::Pointer) => crate::runtime::PRINT_STRING_SYMBOL,
         _ => return Err(super::super::support::unsupported(span, "print value type")),
     };

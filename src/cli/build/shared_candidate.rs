@@ -23,6 +23,9 @@ use shared_candidate_cases::{
 mod shared_candidate_types;
 
 use shared_candidate_types::{supported_perform, unit_structs};
+#[path = "shared_candidate_control.rs"]
+mod shared_candidate_control;
+use shared_candidate_control::{block_has_nested_try, range_body_has_exit};
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     let unit_enums = unit_enums(program);
@@ -122,6 +125,12 @@ fn scalar_parameter(
     unit_enums: &BTreeSet<String>,
     unit_structs: &BTreeSet<String>,
 ) -> bool {
+    // Scalar `ins` parameters require an addressable call-site place and a
+    // scalar store in the neutral contract. Keep them on the established
+    // Cranelift lowering path until that contract is represented explicitly.
+    if parameter.role == Role::Ins && scalar_or_result_type(&parameter.ty, unit_enums) {
+        return false;
+    }
     matches!(parameter.role, Role::Erg | Role::Abs | Role::Ins | Role::Dat)
         && parameter.dispatch == DispatchMode::Static
         && (scalar_or_result_type(&parameter.ty, unit_enums)
@@ -198,6 +207,7 @@ fn scalar_statement(
             integer_binding(binding)
                 && scalar_expression(start, context)
                 && scalar_expression(end, context)
+                && !range_body_has_exit(body)
                 && range_loop_block(body, context)
         }
         Stmt::ForArray { binding, collection, body, .. } => {
@@ -212,23 +222,27 @@ fn scalar_statement(
 fn scalar_if_statement(statement: &Stmt, context: &CandidateContext<'_>) -> bool {
     let Stmt::If { condition, then_branch, else_branch, .. } = statement else { return false };
     scalar_expression(condition, context)
+        && !block_has_nested_try(then_branch)
         && scalar_block(then_branch, context, true)
-        && scalar_if_branch(else_branch.as_ref(), context)
+        && scalar_if_branch_without_try(else_branch.as_ref(), context)
 }
 
-fn scalar_if_branch(branch: Option<&IfBranch>, context: &CandidateContext<'_>) -> bool {
+fn scalar_if_branch_without_try(branch: Option<&IfBranch>, context: &CandidateContext<'_>) -> bool {
     match branch {
+        Some(IfBranch::Block(block)) => {
+            !block_has_nested_try(block) && scalar_block(block, context, true)
+        }
+        Some(IfBranch::ElseIf(expression)) => scalar_if_expression_without_try(expression, context),
         None => true,
-        Some(IfBranch::Block(block)) => scalar_block(block, context, true),
-        Some(IfBranch::ElseIf(expression)) => scalar_if_expression(expression, context),
     }
 }
 
-fn scalar_if_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+fn scalar_if_expression_without_try(expression: &Expr, context: &CandidateContext<'_>) -> bool {
     let Expr::If { condition, then_branch, else_branch, .. } = expression else { return false };
     scalar_expression(condition, context)
+        && !block_has_nested_try(then_branch)
         && scalar_block(then_branch, context, true)
-        && scalar_if_branch(else_branch.as_ref(), context)
+        && scalar_if_branch_without_try(else_branch.as_ref(), context)
 }
 
 fn scalar_return_block(block: &Block, context: &CandidateContext<'_>) -> bool {
@@ -314,11 +328,14 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         Expr::Call { callee, arguments, .. } => scalar_call_expression(callee, arguments, context),
         Expr::Case { .. } => scalar_case_expression(expression, context),
         Expr::MethodCall { receiver, method, arguments, .. } => {
-            let Expr::Identifier { name, .. } = receiver.as_ref() else { return false };
-            name.starts_with("Result[")
-                && matches!(method.as_str(), "Ok" | "Err")
-                && arguments.len() == 1
-                && scalar_expression(&arguments[0].expression, context)
+            let type_receiver = matches!(
+                receiver.as_ref(),
+                Expr::Identifier { name, .. } if name.contains('[')
+            );
+            !type_receiver
+                && !matches!(method.as_str(), "Ok" | "Err" | "Some" | "None")
+                && scalar_expression(receiver, context)
+                && arguments.iter().all(|argument| scalar_expression(&argument.expression, context))
         }
         Expr::StructLit { name, fields, .. } => {
             !name.is_empty() && fields.iter().all(|field| scalar_expression(&field.value, context))
@@ -460,7 +477,10 @@ fn range_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
                 && scalar_expression(end, context)
                 && range_loop_block(body, context)
         }
-        Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
+        // Keep loop exits on the established lowering path until the neutral
+        // range contract guarantees carried-value mapping for both exits.
+        Stmt::Break { .. } | Stmt::Continue { .. } => false,
+        Stmt::Drop { .. } => true,
     })
 }
 

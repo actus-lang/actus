@@ -154,7 +154,10 @@ fn lower_string_literal(
     value: &str,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
-    let symbol = format!("actus.string.{}", result.0);
+    // Keep the neutral path's local data symbols in the established encoded
+    // form used by the native emitter. The result id is deterministic within
+    // a lowered module, so repeated builds retain stable object names.
+    let symbol = format!("actus__data_string_5f{}", result.0);
     let data_id = module
         .declare_data(&symbol, Linkage::Local, false, false)
         .map_err(|error| BackendEmitError(error.to_string()))?;

@@ -310,12 +310,17 @@ impl SharedExpressionProvider<'_> {
             UnaryOp::BitwiseNot => BackendIntegerUnaryOp::BitwiseNot,
         };
         let result = self.allocate();
-        self.remember_value(result, BackendValueType::Integer { signed: true, width: 32 });
+        let result_type = if matches!(operator, UnaryOp::LogicalNot) {
+            BackendValueType::Bool
+        } else {
+            BackendValueType::Integer { signed: true, width: 32 }
+        };
+        self.remember_value(result, result_type);
         instructions.push(BackendInstruction::IntegerUnary {
             result,
             operation,
             operand,
-            ty: BackendValueType::Integer { signed: true, width: 32 },
+            ty: result_type,
             span: *span,
         });
         Ok(result)

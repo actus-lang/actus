@@ -5,6 +5,8 @@ mod emission;
 #[cfg(feature = "llvm")]
 mod llvm_emission;
 mod loading;
+#[cfg(feature = "cranelift")]
+mod module_type_context;
 mod object_manifest;
 mod options;
 #[cfg(feature = "cranelift")]
