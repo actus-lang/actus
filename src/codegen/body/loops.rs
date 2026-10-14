@@ -139,6 +139,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let RangeSetup { index_type, end_value, carried, ids, blocks, instructions } =
             self.prepare_range_loop(binding, start, end, body, span, instructions)?;
         let header = header_block(blocks, &ids, end_value, index_type, &carried, span);
+        let nested_block_start = self.blocks.len();
         let body = self.lower_range_body(RangeBodyInput {
             body_id: blocks.body,
             increment_id: blocks.increment,
@@ -163,8 +164,11 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             .zip(&carried)
             .map(|(value, binding)| BackendBlockParameter { value: *value, ty: binding.ty, span })
             .collect();
-        self.blocks.push(header);
-        self.blocks.push(body);
+        // Emit the enclosing preheader and body before blocks created by a
+        // nested loop. Their instructions define the values consumed by the
+        // nested header comparisons.
+        self.blocks.insert(nested_block_start, header);
+        self.blocks.insert(nested_block_start + 1, body);
         self.blocks.push(increment);
         self.blocks.push(continuation_block);
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })

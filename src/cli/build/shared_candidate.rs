@@ -388,11 +388,12 @@ fn array_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
             value.as_ref().is_none_or(|value| array_loop_expression(value, context))
         }
         Stmt::Expression { expression, .. } => scalar_statement_call(expression, context),
-        Stmt::If { .. } | Stmt::Loop(_) | Stmt::Block(_) | Stmt::ForArray { .. } => {
-            scalar_statement(statement, context, true)
-        }
+        Stmt::If { .. }
+        | Stmt::Loop(_)
+        | Stmt::Block(_)
+        | Stmt::ForArray { .. }
+        | Stmt::ForRange { .. } => scalar_statement(statement, context, true),
         Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
-        Stmt::ForRange { .. } => false,
     })
 }
 
@@ -406,7 +407,7 @@ fn range_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
             value.as_ref().is_none_or(|value| scalar_expression(value, context))
         }
         Stmt::Expression { expression, .. } => scalar_statement_call(expression, context),
-        Stmt::If { .. } | Stmt::Loop(_) | Stmt::Block(_) => {
+        Stmt::If { .. } | Stmt::Loop(_) | Stmt::Block(_) | Stmt::ForArray { .. } => {
             scalar_statement(statement, context, true)
         }
         Stmt::ForRange { binding, start, end, body, .. } => {
@@ -415,7 +416,6 @@ fn range_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
                 && scalar_expression(end, context)
                 && range_loop_block(body, context)
         }
-        Stmt::ForArray { .. } => false,
         Stmt::Break { .. } | Stmt::Continue { .. } | Stmt::Drop { .. } => true,
     })
 }

@@ -1520,6 +1520,20 @@ freestanding `thumbv7em-none-eabihf` large-aggregate emission. The parity
 matrix is `tests/backend_parity.rs`; Region coverage is
 `tests/std_region_native.rs`.
 
+Nested array and range loops now enter the shared Cranelift route instead of
+falling back to legacy lowering. The shared loop builder now emits an
+enclosing loop's header and body before blocks created by nested loops, so
+preheader values are defined before nested header comparisons consume them.
+`both_native_backends_build_nested_array_and_range_loops_through_shared_lowering`
+builds and runs the same fixture through LLVM and Cranelift with exit status
+`41`; this is one additional migrated construct and does not close the broader
+44.7.1 pipeline checkbox while other legacy fallback shapes remain.
+
+The reciprocal nesting shape is covered as well: a range loop containing an
+array loop now follows the same shared route. The parity regression
+`both_native_backends_build_nested_range_and_array_loops_through_shared_lowering`
+builds and runs through LLVM and Cranelift with exit status `84`.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.
