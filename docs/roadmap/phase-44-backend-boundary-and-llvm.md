@@ -661,6 +661,14 @@ constructed backend-neutral contracts.
 - [ ] Move semantic-to-`BackendModule` lowering behind a shared lowering
       boundary so LLVM and Cranelift consume the same roles, layouts, cleanup
       plans, calls, returns, failures, and external symbols.
+
+The first orchestration slice is now centralized in
+`src/cli/build/shared_emission.rs`: target filtering, normalization, generic
+specialization, and semantic-to-`BackendModule` lowering are performed once
+for every shared-route object. LLVM and Cranelift consume that same lowered
+module sequence before backend-specific object emission. This does not close
+the gate yet: unsupported Cranelift candidate shapes still use the explicitly
+retained legacy path and must be migrated with parity evidence.
 - [x] Define neutral block parameters and typed edge arguments for values that
       cross branch and loop back-edges, including source spans and ownership
       transitions.

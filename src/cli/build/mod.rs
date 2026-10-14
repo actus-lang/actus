@@ -11,6 +11,7 @@ mod object_manifest;
 mod options;
 #[cfg(feature = "cranelift")]
 mod shared_candidate;
+mod shared_emission;
 
 pub(crate) use emission::{EmittedObject, build_file, build_file_quiet, emit_objects};
 pub(super) use options::{EmitKind, build_command};

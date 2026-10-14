@@ -13,45 +13,26 @@ pub(super) fn emit_objects_llvm(
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = llvm_module_bindings(&object_plan, &generic_instances)?;
-    let root = &object_plan.units()[0];
-    let root_program = specialize_llvm_program(root.program(), configuration, &generic_instances)?;
-    let root_module = crate::codegen::lower_program_to_backend_module_for_target(
-        root.namespace().symbol_prefix(),
-        &root_program,
-        Some(symbol),
-        Some(&bindings),
-        configuration.target(),
-    )
-    .map_err(|error| {
-        let error = error.with_backend_context("llvm", configuration.target().triple().to_string());
-        BackendEmitError(format!("LLVM root semantic lowering failed: {error}"))
-    })?;
-    let root_module = crate::codegen::llvm::retain_reachable_root_functions(root_module, symbol);
-    let mut objects = vec![llvm_object("root", &root_module, configuration.target())?];
-    for unit in &object_plan.units()[1..] {
-        let program = specialize_llvm_program(unit.program(), configuration, &generic_instances)?;
-        let module = crate::codegen::lower_program_to_backend_module_for_target(
-            unit.namespace().symbol_prefix(),
-            &program,
-            None,
-            Some(&bindings),
-            configuration.target(),
-        )
-        .map_err(|error| {
-            let error =
-                error.with_backend_context("llvm", configuration.target().triple().to_string());
-            BackendEmitError(format!(
-                "LLVM module `{}` semantic lowering failed: {error}",
-                unit.namespace().module_path()
-            ))
-        })?;
-        objects.push(llvm_object(
-            unit.namespace().symbol_prefix(),
-            &module,
-            configuration.target(),
-        )?);
-    }
-    Ok(objects)
+    let modules = super::shared_emission::lower_shared_modules(
+        &object_plan,
+        symbol,
+        configuration,
+        &bindings,
+        &generic_instances,
+        "LLVM",
+    )?;
+    modules
+        .into_iter()
+        .enumerate()
+        .map(|(index, lowered)| {
+            let module = if index == 0 {
+                crate::codegen::llvm::retain_reachable_root_functions(lowered.module, symbol)
+            } else {
+                lowered.module
+            };
+            llvm_object(&lowered.object_name, &module, configuration.target())
+        })
+        .collect()
 }
 
 fn llvm_generic_inputs(
@@ -103,16 +84,6 @@ fn contains_generic_declaration(program: &crate::ast::Program) -> bool {
         crate::ast::TopLevelDecl::Enum(definition) => !definition.generic_parameters.is_empty(),
         _ => false,
     })
-}
-
-fn specialize_llvm_program(
-    program: &crate::ast::Program,
-    configuration: &CompilerConfiguration,
-    generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<crate::ast::Program, BackendEmitError> {
-    let targeted = crate::semantic::filter_program_for_target(program, configuration.target());
-    let normalized = crate::codegen::normalize_program(&targeted);
-    crate::codegen::specialize_program(&normalized, generic_instances)
 }
 
 fn llvm_object(
