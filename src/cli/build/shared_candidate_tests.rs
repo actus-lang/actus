@@ -222,6 +222,15 @@ fn accepts_aggregate_array_element_stores_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_aggregate_array_element_replacement_in_the_shared_contract() {
+    let source = "struct Point { x: u32, } verb main() -> Int { erg values: Array[Point, 2] = Array[Point, 2](); values[0u32] = Point { x: 41u32, }; values[1u32] = values[0u32]; return values[1u32].x as Int + 1; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("aggregate replacement fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_nested_aggregate_array_element_stores_in_the_shared_contract() {
     let source = "struct Point { x: u32, } struct Line { start: Point, } verb main() -> Int { erg values: Array[Line, 2] = Array[Line, 2](); values[1u32] = Line { start: Point { x: 41u32, }, }; return values[1u32].start.x as Int + 1; }";
     let (tokens, errors) = scan(source);

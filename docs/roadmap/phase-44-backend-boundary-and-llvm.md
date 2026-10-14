@@ -1476,7 +1476,10 @@ and
 `llvm_backend_builds_and_runs_a_shared_array_struct_element_field_access`
 compile and execute the same `Array[Point, 2]` mutation/read source with exit
 status `42`. Nested ownership fields, generic structs, packed fields, and full
-aggregate element replacement remain outside this slice.
+aggregate element replacement are covered separately by
+`both_native_backends_build_and_run_a_shared_aggregate_array_element_replacement`,
+which copies one aggregate element into another through the shared load/store
+contract on both native backends.
 
 Nested lexical blocks now keep outer-scope cleanup on the continuation path
 instead of emitting it on the entry block before the nested block executes.

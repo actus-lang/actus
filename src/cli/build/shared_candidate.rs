@@ -275,8 +275,17 @@ fn scalar_assignment_value(target: &Place, value: &Expr, context: &CandidateCont
         context.aggregate_array_bindings,
         context.aggregate_types,
     ) {
-        let Expr::StructLit { fields, .. } = value else { return false };
-        return fields.iter().all(|field| scalar_expression(&field.value, context));
+        return match value {
+            Expr::StructLit { fields, .. } => {
+                fields.iter().all(|field| scalar_expression(&field.value, context))
+            }
+            Expr::Index { .. } => aggregate_array_expression(
+                value,
+                context.aggregate_array_bindings,
+                context.aggregate_types,
+            ),
+            _ => false,
+        };
     }
     scalar_expression(value, context) || scalar_try_expression(value, context)
 }
