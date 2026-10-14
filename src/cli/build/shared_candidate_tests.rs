@@ -195,6 +195,15 @@ fn accepts_fixed_array_iteration_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_range_loop_exits_in_the_shared_contract() {
+    let source = "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { if index == 1u32 { continue; } if index == 3u32 { break; } total += index; } return total as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("range loop exit fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_direct_fixed_array_index_reads_in_the_shared_contract() {
     let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[2u32] as Int; }";
     let (tokens, errors) = scan(source);

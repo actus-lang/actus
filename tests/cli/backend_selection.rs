@@ -532,6 +532,44 @@ fn both_native_backends_build_nested_range_and_array_loops_through_shared_loweri
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_range_loop_exits_through_shared_lowering() {
+    let source = "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { if index == 1u32 { continue; } if index == 3u32 { break; } total += index; } return total as Int + 40; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-range-exits-{backend}-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create range exit fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"range-exits-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write range exit fixture manifest");
+        fs::write(&input, source).expect("write range exit fixture source");
+
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build range exits");
+        let status = std::process::Command::new(&output).status().expect("run range exit fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} range exit result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_array_pack_bit_fields() {

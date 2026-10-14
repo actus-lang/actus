@@ -1545,6 +1545,13 @@ array loop now follows the same shared route. The parity regression
 `both_native_backends_build_nested_range_and_array_loops_through_shared_lowering`
 builds and runs through LLVM and Cranelift with exit status `84`.
 
+Range-loop `break` and `continue` exits now also enter the shared route. The
+neutral range lowering already carries the loop binding and enclosing owners
+to its increment and continuation blocks; the candidate restriction was
+therefore removed rather than adding a backend-specific exit path. The parity
+regression `both_native_backends_build_range_loop_exits_through_shared_lowering`
+verifies identical LLVM and Cranelift behavior with exit status `42`.
+
 Statement `if` forms without an `else` now also enter the shared candidate
 route. The unit classifier regression and
 `both_native_backends_preserve_local_assignment_in_an_if_without_else` verify

@@ -25,7 +25,7 @@ mod shared_candidate_types;
 use shared_candidate_types::{supported_perform, unit_structs};
 #[path = "shared_candidate_control.rs"]
 mod shared_candidate_control;
-use shared_candidate_control::{block_has_nested_try, range_body_has_exit};
+use shared_candidate_control::block_has_nested_try;
 
 pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
     let unit_enums = unit_enums(program);
@@ -207,7 +207,6 @@ fn scalar_statement(
             integer_binding(binding)
                 && scalar_expression(start, context)
                 && scalar_expression(end, context)
-                && !range_body_has_exit(body)
                 && range_loop_block(body, context)
         }
         Stmt::ForArray { binding, collection, body, .. } => {
@@ -476,9 +475,7 @@ fn range_loop_block(block: &Block, context: &CandidateContext<'_>) -> bool {
                 && scalar_expression(end, context)
                 && range_loop_block(body, context)
         }
-        // Keep loop exits on the established lowering path until the neutral
-        // range contract guarantees carried-value mapping for both exits.
-        Stmt::Break { .. } | Stmt::Continue { .. } => false,
+        Stmt::Break { .. } | Stmt::Continue { .. } => true,
         Stmt::Drop { .. } => true,
     })
 }
