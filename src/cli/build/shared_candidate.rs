@@ -15,8 +15,8 @@ use shared_candidate_arrays::{
 mod shared_candidate_cases;
 
 use shared_candidate_cases::{
-    result_case_expression, scalar_case_expression, scalar_result_constructor_expression,
-    scalar_statement_call,
+    result_case_expression, scalar_case_expression, scalar_option_constructor_expression,
+    scalar_result_constructor_expression, scalar_statement_call,
 };
 
 #[path = "shared_candidate_types.rs"]
@@ -176,6 +176,15 @@ fn discardable_result_payload(
         || supported_array_type(type_name, aggregate_types)
 }
 
+fn discardable_option_payload(
+    type_name: &crate::ast::TypeName,
+    aggregate_types: &BTreeSet<String>,
+) -> bool {
+    scalar_type(type_name)
+        || aggregate_types.contains(&type_name.name)
+        || supported_array_type(type_name, aggregate_types)
+}
+
 fn scalar_option_type(type_name: &crate::ast::TypeName) -> bool {
     type_name.name == "Option"
         && type_name.arguments.len() == 1
@@ -242,6 +251,7 @@ fn scalar_statement(
             (matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context))
                 || scalar_case_expression(expression, context)
                 || scalar_result_constructor_expression(expression, context)
+                || scalar_option_constructor_expression(expression, context)
                 || scalar_try_expression(expression, context)
         }
         Stmt::If { .. } => scalar_if_statement(statement, context),

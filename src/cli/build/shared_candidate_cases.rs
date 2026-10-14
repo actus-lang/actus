@@ -67,3 +67,35 @@ pub(super) fn scalar_result_constructor_expression(
             })
         && super::scalar_expression(&arguments[0].expression, context)
 }
+
+pub(super) fn scalar_option_constructor_expression(
+    expression: &Expr,
+    context: &CandidateContext<'_>,
+) -> bool {
+    let (receiver, method, arguments) = match expression {
+        Expr::MethodCall { receiver, method, arguments, .. } => {
+            (receiver.as_ref(), method.as_str(), Some(arguments.as_slice()))
+        }
+        Expr::FieldAccess { object, field, .. } => (object.as_ref(), field.as_str(), None),
+        _ => return false,
+    };
+    let Expr::Identifier { name, span } = receiver else { return false };
+    let Some(option_type) = crate::semantic::parse_type_name_key(name, *span) else {
+        return false;
+    };
+    if option_type.name != "Option" || option_type.arguments.len() != 1 {
+        return false;
+    }
+    match method {
+        "None" => arguments.is_none_or(|arguments| arguments.is_empty()),
+        "Some" => arguments.is_some_and(|arguments| {
+            arguments.len() == 1
+                && super::discardable_option_payload(
+                    &option_type.arguments[0],
+                    context.aggregate_types,
+                )
+                && super::scalar_expression(&arguments[0].expression, context)
+        }),
+        _ => false,
+    }
+}

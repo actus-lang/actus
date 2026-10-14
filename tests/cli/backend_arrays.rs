@@ -845,6 +845,45 @@ fn both_native_backends_build_and_run_a_shared_discarded_aggregate_result_constr
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_build_and_run_shared_discarded_option_constructors() {
+    let source =
+        "verb main() -> Int { Option[abs u32].Some(41u32); Option[abs u32].None; return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-discarded-option-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create discarded Option directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"discarded-option-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write discarded Option manifest");
+        fs::write(&input, source).expect("write discarded Option source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build discarded Option");
+        let status =
+            std::process::Command::new(&output).status().expect("run discarded Option fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} discarded Option result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_compound_store() {
     let source = "struct Box[T] { erg item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: 41, }; boxes[1u32].item += 1; return boxes[1u32].item; }\n";
     for backend in ["cranelift", "llvm"] {

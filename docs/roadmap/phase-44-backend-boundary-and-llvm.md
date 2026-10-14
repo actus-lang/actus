@@ -1689,3 +1689,12 @@ regression `accepts_discarded_aggregate_result_constructor_in_the_shared_contrac
 and native parity regression
 `both_native_backends_build_and_run_a_shared_discarded_aggregate_result_constructor`
 pass on LLVM and Cranelift with exit status `42`.
+
+Discarded `Option.Some` and field-style `Option.None` constructors now enter
+the same shared route for scalar, supported aggregate, and fixed aggregate-array
+payloads. The candidate recognizes both AST forms used by the language, while
+the existing neutral constructor lowering remains responsible for enum layout
+and payload materialization. The unit regression
+`accepts_discarded_option_constructor_in_the_shared_contract` and native parity
+regression `both_native_backends_build_and_run_shared_discarded_option_constructors`
+pass on LLVM and Cranelift with exit status `42`.
