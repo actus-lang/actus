@@ -66,6 +66,15 @@ fn accepts_scalar_try_return_expressions_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_scalar_try_expression_statements_in_the_shared_contract() {
+    let source = "verb produce() -> Result[Int, Int] { return Result[Int, Int].Err(9); } verb worker() -> Result[Int, Int] { produce()?; return Result[Int, Int].Ok(42); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(_) => 0, Result.Err(error) => error, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("try expression fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_a_call_with_an_indexed_scalar_argument_in_the_shared_contract() {
     let source = "verb observe(abs value: u32) { return; } verb main() -> Int { erg values: Array[u32, 2] = Array[u32, 2](); values[1u32] = 41u32; erg index: u32 = 1u32; observe(value: abs values[index]); return 42; }";
     let (tokens, errors) = scan(source);

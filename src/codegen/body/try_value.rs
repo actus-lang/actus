@@ -70,8 +70,68 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             Stmt::Return { value: Some(Expr::Try { expression, span }), .. } => {
                 self.lower_try_return_statement(id, expression, *span, instructions)
             }
+            Stmt::Expression { expression: Expr::Try { expression, span }, .. } => self
+                .lower_try_expression_statement(
+                    id,
+                    block,
+                    index,
+                    expression,
+                    *span,
+                    fallthrough,
+                    instructions,
+                ),
             _ => unreachable!(),
         }
+    }
+
+    fn lower_try_expression_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        expression: &Expr,
+        span: crate::lexer::SourceSpan,
+        fallthrough: Option<BackendBlockId>,
+        mut instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let source = self.provider.lower_expression(expression, &mut instructions)?;
+        let condition = self.provider.lower_enum_variant_condition_value(
+            source,
+            "Ok",
+            span,
+            &mut instructions,
+        )?;
+        let ok_block = self.allocate_block();
+        let error_block = self.allocate_block();
+        let continuation = self.allocate_block();
+        self.blocks.push(BackendBlock {
+            parameters: Vec::new(),
+            id: ok_block,
+            instructions: vec![BackendInstruction::Jump {
+                target: continuation,
+                arguments: Vec::new(),
+                span,
+            }],
+        });
+        self.blocks.push(BackendBlock {
+            parameters: Vec::new(),
+            id: error_block,
+            instructions: vec![BackendInstruction::Return { value: Some(source), span }],
+        });
+        let continuation_block =
+            Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
+        let continuation_block =
+            self.lower_block_in_scope(continuation, &continuation_block, fallthrough)?;
+        self.blocks.push(continuation_block);
+        instructions.push(BackendInstruction::Branch {
+            condition,
+            then_block: ok_block,
+            else_block: error_block,
+            then_arguments: Vec::new(),
+            else_arguments: Vec::new(),
+            span,
+        });
+        Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
     fn lower_try_return_statement(

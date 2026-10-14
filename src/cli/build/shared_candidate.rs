@@ -185,6 +185,7 @@ fn scalar_statement(
             (matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context))
                 || scalar_case_expression(expression, context)
                 || scalar_result_constructor_expression(expression, context)
+                || scalar_try_expression(expression, context)
         }
         Stmt::If { .. } => scalar_if_statement(statement, context),
         Stmt::Return { value, .. } => {

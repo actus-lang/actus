@@ -1590,6 +1590,13 @@ return slot so the neutral `Return` contract remains complete. The regression
 and runs both backends with exit status `42`; standalone `?` statements remain
 outside this slice because they require statement-level early-return CFG.
 
+Standalone `Try` expression statements now use the shared control-flow route as
+well. The `Ok` branch jumps to the continuation block, while the `Err` branch
+returns the original `Result` after the existing cleanup boundary. The
+regression `both_native_backends_build_scalar_try_expression_through_shared_lowering`
+uses an `Err(9)` producer and verifies that LLVM and Cranelift both propagate
+the error with exit status `9` instead of executing the following `Ok(42)`.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

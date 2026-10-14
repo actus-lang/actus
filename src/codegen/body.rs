@@ -138,6 +138,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 Stmt::OwnerDecl { initializer: Expr::Try { .. }, .. }
                     | Stmt::Assignment { value: Expr::Try { .. }, .. }
                     | Stmt::Return { value: Some(Expr::Try { .. }), .. }
+                    | Stmt::Expression { expression: Expr::Try { .. }, .. }
             ) {
                 return self.lower_try_statement(
                     id,
