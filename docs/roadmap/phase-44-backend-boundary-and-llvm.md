@@ -1309,6 +1309,12 @@ compile and execute `boxes[1u32].item += 1` through LLVM and Cranelift with
 exit status 42. Generic ownership-bearing fields and generic nested
 applications remain outside this slice.
 
+Nested generic aggregate applications now have explicit shared-candidate and
+hosted parity coverage. `Array[Pair[Box[Int]], 2]` element construction and
+the nested read `pairs[1u32].item.item` build and execute through both native
+backends with exit status 42. Generic ownership-bearing fields remain outside
+this slice.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`

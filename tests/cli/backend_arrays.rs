@@ -804,6 +804,46 @@ fn both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_c
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_and_run_a_shared_nested_generic_aggregate_array_element_store() {
+    let source = "struct Box[T] { item: T, } struct Pair[T] { item: T, } verb main() -> Int { erg pairs: Array[Pair[Box[Int]], 2] = Array[Pair[Box[Int]], 2](); pairs[1u32] = Pair[Box[Int]] { item: Box[Int] { item: 41, }, }; return pairs[1u32].item.item + 1; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-{backend}-nested-generic-aggregate-array-store-{}",
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create nested generic aggregate directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"nested-generic-aggregate-array-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write nested generic aggregate manifest");
+        fs::write(&input, source).expect("write nested generic aggregate source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build nested generic aggregate");
+        let status =
+            std::process::Command::new(&output).status().expect("run nested generic aggregate");
+        assert_eq!(status.code(), Some(42), "backend {backend} nested generic result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store() {

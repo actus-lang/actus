@@ -121,6 +121,15 @@ fn accepts_generic_aggregate_array_element_compound_stores_in_the_shared_contrac
 }
 
 #[test]
+fn accepts_nested_generic_aggregate_array_element_stores_in_the_shared_contract() {
+    let source = "struct Box[T] { item: T, } struct Pair[T] { item: T, } verb main() -> Int { erg pairs: Array[Pair[Box[Int]], 2] = Array[Pair[Box[Int]], 2](); pairs[1u32] = Pair[Box[Int]] { item: Box[Int] { item: 41, }, }; return pairs[1u32].item.item + 1; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("nested generic aggregate fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_fixed_array_element_compound_stores_in_the_shared_contract() {
     let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }";
     let (tokens, errors) = scan(source);
