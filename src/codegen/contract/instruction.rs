@@ -23,6 +23,12 @@ pub enum BackendInstruction {
         value: u64,
         span: SourceSpan,
     },
+    FloatConstant {
+        result: super::BackendValueId,
+        ty: BackendValueType,
+        bits: u64,
+        span: SourceSpan,
+    },
     StringLiteral {
         result: super::BackendValueId,
         value: String,
@@ -37,6 +43,13 @@ pub enum BackendInstruction {
         span: SourceSpan,
     },
     IntegerCast {
+        result: super::BackendValueId,
+        source: super::BackendValueId,
+        source_type: BackendValueType,
+        target_type: BackendValueType,
+        span: SourceSpan,
+    },
+    FloatCast {
         result: super::BackendValueId,
         source: super::BackendValueId,
         source_type: BackendValueType,
@@ -73,6 +86,14 @@ pub enum BackendInstruction {
         left: super::BackendValueId,
         right: super::BackendValueId,
         signed: bool,
+        span: SourceSpan,
+    },
+    FloatCompare {
+        result: super::BackendValueId,
+        operation: BackendIntegerCompareOp,
+        left: super::BackendValueId,
+        right: super::BackendValueId,
+        ty: BackendValueType,
         span: SourceSpan,
     },
     EnumDiscriminant {

@@ -27,6 +27,14 @@ Native lowering selects Cranelift signed integer conditions (`slt`, `sle`,
 `ule`, `ugt`, `uge`) for unsigned primitives and `Usize`, and floating-point
 conditions for `f32` and `f64`.
 
+Floating-point lowering is target-profile aware. Hosted targets may use `f32`
+and `f64` through the shared backend contract, and LLVM and Cranelift must
+consume the same neutral float constants, comparisons, and layouts. Freestanding
+and embedded targets reject floating-point lowering at the shared semantic
+boundary; they must use integer or fixed-point representations instead. This
+keeps the zero-float target guarantee explicit rather than relying on a backend
+fallback.
+
 ### Loop-control CFG
 
 The active loop target is propagated through nested lexical blocks and `case`
@@ -48,6 +56,8 @@ null byte; C-string APIs remain separate and are used only for String values.
 3. Loop exits resolve to the nearest active loop, even across `case` blocks.
 4. Buffer output never reads beyond `length` and never requires `capacity > length`.
 5. Runtime status values remain explicit ABI statuses or exact byte counts.
+6. A freestanding or embedded target never reaches backend emission with a
+   floating-point value in its neutral module.
 
 ## Consequences
 

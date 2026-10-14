@@ -233,6 +233,7 @@ fn verb_with_signature() -> VerbDecl {
 fn unit_function(parameters: Vec<BackendParameter>, blocks: Vec<BackendBlock>) -> BackendFunction {
     BackendFunction {
         symbol: verb_symbol(),
+        hosted_entry_return: false,
         parameters,
         return_value: BackendReturn {
             role: None,
@@ -431,6 +432,7 @@ fn accepts_niche_pointer_payload_without_inline_enum_storage() {
     };
     let function = BackendFunction {
         symbol: verb_symbol(),
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "payload".to_owned(),
             role: Role::Erg,
@@ -473,6 +475,7 @@ fn rejects_direct_aggregate_descriptor_for_a_scalar() {
     };
     let function = BackendFunction {
         symbol: verb_symbol(),
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -740,6 +743,7 @@ fn validates_aggregate_return_slots_without_a_backend() {
     let layout = BackendLayout { size: 16, alignment: 8 };
     let function = BackendFunction {
         symbol: verb_symbol(),
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: None,
@@ -761,6 +765,7 @@ fn validates_aggregate_return_slots_without_a_backend() {
 fn rejects_return_slots_for_non_aggregate_values() {
     let function = BackendFunction {
         symbol: verb_symbol(),
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: None,

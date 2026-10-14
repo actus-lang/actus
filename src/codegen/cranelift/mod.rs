@@ -16,6 +16,7 @@ pub(super) mod emitter_declarations;
 pub(super) mod enum_layout;
 pub(super) mod enums;
 pub(super) mod expressions;
+mod float_ops;
 pub(super) mod function_definition;
 pub(super) mod generic;
 mod integer_ops;

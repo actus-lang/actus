@@ -78,6 +78,38 @@ pub(super) fn coerce_owner_value(
     if source_type == target_type {
         return Ok(value);
     }
+    if matches!(source_type, BackendValueType::Float { .. })
+        && matches!(target_type, BackendValueType::Float { .. })
+    {
+        if let Some(BackendInstruction::FloatConstant { ty, bits, .. }) = instructions
+            .iter_mut()
+            .rev()
+            .find(|instruction| matches!(instruction, BackendInstruction::FloatConstant { result, .. } if *result == value))
+        {
+            if let BackendValueType::Float { width: 32 } = target_type {
+                *ty = target_type;
+                *bits = u64::from((f64::from_bits(*bits) as f32).to_bits());
+                provider.remember_value(value, target_type);
+                return Ok(value);
+            }
+            if let BackendValueType::Float { width: 64 } = target_type {
+                *ty = target_type;
+                *bits = f64::from_bits(*bits).to_bits();
+                provider.remember_value(value, target_type);
+                return Ok(value);
+            }
+        }
+        let converted = provider.allocate();
+        provider.remember_value(converted, target_type);
+        instructions.push(BackendInstruction::FloatCast {
+            result: converted,
+            source: value,
+            source_type,
+            target_type,
+            span,
+        });
+        return Ok(converted);
+    }
     let converted = provider.allocate();
     provider.remember_value(converted, target_type);
     instructions.push(BackendInstruction::IntegerCast {

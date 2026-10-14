@@ -26,6 +26,35 @@ pub(super) fn integer_literal_type(suffix: Option<&str>) -> BackendValueType {
     BackendValueType::Integer { signed, width }
 }
 
+pub(super) fn lower_float_literal(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: &str,
+    suffix: Option<&str>,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let ty = match suffix {
+        Some("f32") => BackendValueType::Float { width: 32 },
+        Some("f64") | None => BackendValueType::Float { width: 64 },
+        Some(other) => return Err(unsupported(span, format!("invalid float suffix `{other}`"))),
+    };
+    let bits = match ty {
+        BackendValueType::Float { width: 32 } => value
+            .parse::<f32>()
+            .map(|value| u64::from(value.to_bits()))
+            .map_err(|_| unsupported(span, format!("invalid f32 literal `{value}`")))?,
+        BackendValueType::Float { width: 64 } => value
+            .parse::<f64>()
+            .map(f64::to_bits)
+            .map_err(|_| unsupported(span, format!("invalid f64 literal `{value}`")))?,
+        _ => unreachable!(),
+    };
+    let result = provider.allocate();
+    provider.remember_value(result, ty);
+    instructions.push(BackendInstruction::FloatConstant { result, ty, bits, span });
+    Ok(result)
+}
+
 pub(super) fn lower_buffer_literal(
     provider: &mut SharedExpressionProvider<'_>,
     expression: &Expr,

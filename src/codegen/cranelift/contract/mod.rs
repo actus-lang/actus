@@ -34,6 +34,25 @@ pub fn emit_contract_module_object(
     target: &TargetSpec,
 ) -> Result<Vec<u8>, BackendEmitError> {
     backend_module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
+    if configuration.verifies_no_float_ir() {
+        for function in &backend_module.functions {
+            if function.blocks.iter().any(|block| {
+                block.instructions.iter().any(|instruction| {
+                    matches!(
+                        instruction,
+                        BackendInstruction::FloatConstant { .. }
+                            | BackendInstruction::FloatCompare { .. }
+                            | BackendInstruction::FloatCast { .. }
+                    )
+                })
+            }) {
+                return Err(BackendEmitError(format!(
+                    "native function `{}` contains floating-point IR instructions: shared float instruction",
+                    function.symbol.as_str()
+                )));
+            }
+        }
+    }
     let mut module = create_module(configuration, target)?;
     let declarations = declare_functions(&mut module, backend_module)?;
     for function in &backend_module.functions {
@@ -165,6 +184,8 @@ fn scalar_type(
         BackendValueType::Pointer => Some(module.isa().pointer_type()),
         BackendValueType::Enum { .. } => Some(module.isa().pointer_type()),
         BackendValueType::NichePointerOption { .. } => Some(module.isa().pointer_type()),
+        BackendValueType::Float { width: 32 } => Some(types::F32),
+        BackendValueType::Float { width: 64 } => Some(types::F64),
         BackendValueType::Integer { .. }
         | BackendValueType::Float { .. }
         | BackendValueType::Aggregate { .. }
@@ -387,6 +408,52 @@ pub(super) fn lower_constant(
     let ty = scalar_type(module, *ty)?
         .ok_or_else(|| BackendEmitError("Cranelift constant cannot have unit type".to_owned()))?;
     values.insert(*result, builder.ins().iconst(ty, *value as i64));
+    Ok(())
+}
+
+pub(super) fn lower_float_cast(
+    _builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::FloatCast { result, source, source_type, target_type, .. } =
+        instruction
+    else {
+        return Err(BackendEmitError(
+            "Cranelift float cast instruction is not supported".to_owned(),
+        ));
+    };
+    let source_value = values.get(source).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift float cast source {} is unavailable", source.0))
+    })?;
+    let _ = (result, source_type, target_type, source_value, values);
+    Err(BackendEmitError(
+        "Cranelift shared float conversion is not available for a non-literal value".to_owned(),
+    ))
+}
+
+pub(super) fn lower_float_constant(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::FloatConstant { result, ty, bits, .. } = instruction else {
+        return Err(BackendEmitError(
+            "Cranelift float constant instruction is not supported".to_owned(),
+        ));
+    };
+    let value = match ty {
+        BackendValueType::Float { width: 32 } => {
+            builder.ins().f32const(f32::from_bits(*bits as u32))
+        }
+        BackendValueType::Float { width: 64 } => builder.ins().f64const(f64::from_bits(*bits)),
+        _ => {
+            return Err(BackendEmitError(
+                "Cranelift float constant requires a float type".to_owned(),
+            ));
+        }
+    };
+    values.insert(*result, value);
     Ok(())
 }
 

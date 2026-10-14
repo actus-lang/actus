@@ -10,6 +10,7 @@ use super::cleanup::emit_cleanup;
 use super::declarations::FunctionDeclaration;
 use super::enums::{emit_enum_construct, emit_enum_discriminant, emit_enum_payload};
 use super::failures::emit_failure;
+use super::float::{emit_float_cast, emit_float_compare, emit_float_constant};
 use super::guards::{
     emit_trap_if_array_index_out_of_bounds, emit_trap_if_shift_count_out_of_range,
     emit_trap_if_signed_division_overflow, emit_trap_if_zero,
@@ -141,10 +142,13 @@ fn ordered_blocks(function: &BackendFunction) -> Vec<&super::super::BackendBlock
 fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId> {
     match instruction {
         BackendInstruction::Constant { result, .. }
+        | BackendInstruction::FloatConstant { result, .. }
         | BackendInstruction::StringLiteral { result, .. }
         | BackendInstruction::IntegerBinary { result, .. }
         | BackendInstruction::IntegerCast { result, .. }
+        | BackendInstruction::FloatCast { result, .. }
         | BackendInstruction::IntegerCompare { result, .. }
+        | BackendInstruction::FloatCompare { result, .. }
         | BackendInstruction::EnumDiscriminant { result, .. }
         | BackendInstruction::EnumPayload { result, .. }
         | BackendInstruction::EnumPayloadBinding { result, .. }
@@ -166,8 +170,10 @@ fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId
 fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
     match instruction {
         BackendInstruction::IntegerBinary { left, right, .. }
-        | BackendInstruction::IntegerCompare { left, right, .. } => vec![*left, *right],
+        | BackendInstruction::IntegerCompare { left, right, .. }
+        | BackendInstruction::FloatCompare { left, right, .. } => vec![*left, *right],
         BackendInstruction::IntegerCast { source, .. }
+        | BackendInstruction::FloatCast { source, .. }
         | BackendInstruction::IntegerUnary { operand: source, .. }
         | BackendInstruction::TrapIfZero { value: source, .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { count: source, .. }
@@ -208,6 +214,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
             operand.iter().map(|item| item.value).collect()
         }
         BackendInstruction::Constant { .. }
+        | BackendInstruction::FloatConstant { .. }
         | BackendInstruction::StringLiteral { .. }
         | BackendInstruction::ArenaConstruct { .. }
         | BackendInstruction::Fail { .. }
@@ -425,6 +432,9 @@ fn emit_scalar_instruction(
         BackendInstruction::Constant { result, ty, value, .. } => {
             emit_constant(context, *result, *ty, *value, values)
         }
+        BackendInstruction::FloatConstant { .. } => {
+            emit_float_constant(context, instruction, values)
+        }
         BackendInstruction::StringLiteral { result, value, .. } => {
             emit_string_literal(builder, *result, value, values)
         }
@@ -433,6 +443,9 @@ fn emit_scalar_instruction(
         }
         BackendInstruction::IntegerCast { .. } => {
             emit_integer_cast(context, builder, function, instruction, values)
+        }
+        BackendInstruction::FloatCast { .. } => {
+            emit_float_cast(context, builder, instruction, values)
         }
         BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
@@ -443,6 +456,7 @@ fn emit_scalar_instruction(
         BackendInstruction::IntegerCompare { .. } => {
             emit_integer_compare(builder, instruction, values)
         }
+        BackendInstruction::FloatCompare { .. } => emit_float_compare(builder, instruction, values),
         BackendInstruction::IntegerUnary { .. } => emit_integer_unary(builder, instruction, values),
         BackendInstruction::EnumDiscriminant { .. } => {
             emit_enum_discriminant(context, builder, instruction, values)

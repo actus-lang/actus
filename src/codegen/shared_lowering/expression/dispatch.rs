@@ -28,6 +28,13 @@ pub(super) fn lower_expression(
             provider.remember_value(result, ty);
             Ok(result)
         }
+        Expr::FloatLiteral { value, suffix, span } => super::literals::lower_float_literal(
+            provider,
+            value,
+            suffix.as_deref(),
+            *span,
+            instructions,
+        ),
         Expr::BoolLiteral { value, span } => {
             lower_bool_literal(provider, *value, *span, instructions)
         }

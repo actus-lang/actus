@@ -59,7 +59,7 @@ fn file_utility_example_builds_with_llvm() {
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
-fn sensor_telemetry_example_rejects_llvm_float_lowering_explicitly() {
+fn sensor_telemetry_example_builds_and_executes_with_llvm() {
     let source = format!("{}/examples/sensor_telemetry.act", env!("CARGO_MANIFEST_DIR"));
     let output_path =
         std::env::temp_dir().join(format!("actus-sensor-llvm-{}.bin", std::process::id()));
@@ -76,16 +76,15 @@ fn sensor_telemetry_example_rejects_llvm_float_lowering_explicitly() {
         ])
         .output()
         .expect("LLVM sensor build should start");
-    assert_eq!(result.status.code(), Some(1));
-    let stderr = String::from_utf8_lossy(&result.stderr);
-    assert!(stderr.contains("`float-literal`"), "missing operation in diagnostic: {stderr}");
-    assert!(stderr.contains("backend `llvm`"), "missing backend in diagnostic: {stderr}");
     assert!(
-        stderr.contains("target `x86_64-unknown-linux-gnu`"),
-        "missing target in diagnostic: {stderr}"
+        result.status.success(),
+        "LLVM sensor build failed: {}",
+        String::from_utf8_lossy(&result.stderr)
     );
-    assert!(stderr.contains("at SourceSpan"), "missing source span in diagnostic: {stderr}");
-    assert!(!output_path.exists(), "unsupported LLVM build must not leave an artifact");
+    let status = std::process::Command::new(&output_path)
+        .status()
+        .expect("run LLVM sensor telemetry example");
+    assert_eq!(status.code(), Some(0));
     let _ = fs::remove_file(output_path);
 }
 

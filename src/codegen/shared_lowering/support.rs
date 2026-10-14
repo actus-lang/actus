@@ -29,6 +29,11 @@ pub(super) fn scalar_integer_type(type_name: &TypeName) -> Option<(bool, u8)> {
 }
 
 pub(super) fn scalar_backend_type(type_name: &TypeName) -> Option<super::super::BackendValueType> {
+    if let Some(crate::ast::PrimitiveType::Float { width }) =
+        crate::ast::primitive_type(&type_name.name)
+    {
+        return Some(super::super::BackendValueType::Float { width });
+    }
     let (signed, width) = scalar_integer_type(type_name)?;
     Some(super::super::BackendValueType::Integer { signed, width })
 }

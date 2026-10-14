@@ -157,7 +157,18 @@ fn scalar_ins_body(block: &Block, parameters: &[crate::ast::Param]) -> bool {
 fn scalar_type(type_name: &crate::ast::TypeName) -> bool {
     matches!(
         type_name.name.as_str(),
-        "Bool" | "Int" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
+        "Bool"
+            | "Int"
+            | "u8"
+            | "u16"
+            | "u32"
+            | "u64"
+            | "i8"
+            | "i16"
+            | "i32"
+            | "i64"
+            | "f32"
+            | "f64"
     ) || matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String")
 }
 
@@ -373,6 +384,7 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
     match expression {
         Expr::Identifier { .. }
         | Expr::Integer { .. }
+        | Expr::FloatLiteral { .. }
         | Expr::BoolLiteral { .. }
         | Expr::BufferLiteral { .. }
         | Expr::StringLiteral { .. } => true,

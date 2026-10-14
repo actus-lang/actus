@@ -1,7 +1,7 @@
 use llvm_sys::core::{
-    LLVMArrayType2, LLVMInt1TypeInContext, LLVMInt8TypeInContext, LLVMInt16TypeInContext,
-    LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMPointerTypeInContext,
-    LLVMVoidTypeInContext,
+    LLVMArrayType2, LLVMDoubleTypeInContext, LLVMFloatTypeInContext, LLVMInt1TypeInContext,
+    LLVMInt8TypeInContext, LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
+    LLVMPointerTypeInContext, LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMContextRef, LLVMTypeRef};
 
@@ -18,6 +18,8 @@ pub(super) fn llvm_type(
         BackendValueType::Integer { width: 16, .. } => unsafe { LLVMInt16TypeInContext(context) },
         BackendValueType::Integer { width: 32, .. } => unsafe { LLVMInt32TypeInContext(context) },
         BackendValueType::Integer { width: 64, .. } => unsafe { LLVMInt64TypeInContext(context) },
+        BackendValueType::Float { width: 32 } => unsafe { LLVMFloatTypeInContext(context) },
+        BackendValueType::Float { width: 64 } => unsafe { LLVMDoubleTypeInContext(context) },
         BackendValueType::Pointer => unsafe { LLVMPointerTypeInContext(context, 0) },
         BackendValueType::NichePointerOption { .. } => unsafe {
             LLVMPointerTypeInContext(context, 0)

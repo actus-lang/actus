@@ -30,14 +30,17 @@ pub(super) fn lower_instruction(
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::Constant { .. }
+        | BackendInstruction::FloatConstant { .. }
         | BackendInstruction::StringLiteral { .. }
         | BackendInstruction::IntegerBinary { .. }
         | BackendInstruction::IntegerCast { .. }
+        | BackendInstruction::FloatCast { .. }
         | BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. }
         | BackendInstruction::IntegerCompare { .. }
+        | BackendInstruction::FloatCompare { .. }
         | BackendInstruction::IntegerUnary { .. }
         | BackendInstruction::MemoryCopy { .. }
         | BackendInstruction::ScalarLoanLoad { .. }
@@ -122,6 +125,9 @@ fn lower_scalar(
         BackendInstruction::Constant { .. } => {
             super::lower_constant(module, builder, instruction, values)
         }
+        BackendInstruction::FloatConstant { .. } => {
+            super::lower_float_constant(builder, instruction, values)
+        }
         BackendInstruction::StringLiteral { result, value, .. } => {
             lower_string_literal(module, builder, *result, value, values)
         }
@@ -131,6 +137,9 @@ fn lower_scalar(
         BackendInstruction::IntegerCast { .. } => {
             super::lower_integer_cast(builder, instruction, values)
         }
+        BackendInstruction::FloatCast { .. } => {
+            super::lower_float_cast(builder, instruction, values)
+        }
         BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
@@ -139,6 +148,9 @@ fn lower_scalar(
         }
         BackendInstruction::IntegerCompare { .. } => {
             super::lower_integer_compare(builder, instruction, values)
+        }
+        BackendInstruction::FloatCompare { .. } => {
+            super::super::float_ops::lower_float_compare(builder, instruction, values)
         }
         BackendInstruction::IntegerUnary { .. } => {
             super::lower_integer_unary(builder, instruction, values)

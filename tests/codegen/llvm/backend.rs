@@ -230,6 +230,7 @@ fn emits_a_valid_unit_function_as_llvm_ir() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: None,
@@ -259,6 +260,7 @@ fn emits_a_neutral_integer_constant_and_returns_it() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: Some(Role::Erg),
@@ -306,6 +308,7 @@ fn emits_neutral_enum_discriminant_and_payload_extraction() {
         SymbolIdentity::new("test", SymbolKind::Verb, "enum_extract").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "result".to_owned(),
             role: Role::Erg,
@@ -365,6 +368,7 @@ fn emits_neutral_enum_payload_binding_with_ownership_mode() {
         SymbolIdentity::new("test", SymbolKind::Verb, "enum_binding").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "result".to_owned(),
             role: Role::Erg,
@@ -430,6 +434,7 @@ fn emits_neutral_result_constructor_with_payload() {
         SymbolIdentity::new("test", SymbolKind::Verb, "result_construct").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -512,6 +517,7 @@ fn emits_signed_division_overflow_guard_for_runtime_operands() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: vec![parameter("left"), parameter("right")],
             return_value: BackendReturn {
                 role: Some(Role::Erg),
@@ -574,6 +580,7 @@ fn emits_scalar_parameter_return_and_direct_call() {
     };
     let callee = BackendFunction {
         symbol: callee_symbol.clone(),
+        hosted_entry_return: false,
         parameters: vec![parameter.clone()],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -593,6 +600,7 @@ fn emits_scalar_parameter_return_and_direct_call() {
     };
     let caller = BackendFunction {
         symbol: caller_symbol,
+        hosted_entry_return: false,
         parameters: vec![parameter],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -647,6 +655,7 @@ fn declares_and_calls_a_neutral_external_runtime_symbol() {
     let function = BackendFunction {
         symbol: SymbolIdentity::new("test", SymbolKind::Verb, "runtime_call")
             .expect("valid symbol"),
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "byte".to_owned(),
             role: Role::Erg,
@@ -689,6 +698,7 @@ fn emits_block_parameter_phi_from_typed_edge_arguments() {
     let integer = BackendValueType::Integer { signed: true, width: 32 };
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "condition".to_owned(),
             role: Role::Erg,
@@ -784,6 +794,7 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "control").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "condition".to_owned(),
             role: Role::Erg,
@@ -849,6 +860,7 @@ fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "cleanup").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: None,
@@ -885,6 +897,7 @@ fn emits_region_runtime_cleanup_bridge_call() {
         SymbolIdentity::new("test", SymbolKind::Verb, "runtime_cleanup").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "region".to_owned(),
             role: Role::Erg,
@@ -938,6 +951,7 @@ fn emits_target_width_enum_runtime_cleanup_bridge_call() {
         SymbolIdentity::new("test", SymbolKind::Verb, "enum_cleanup").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "value".to_owned(),
             role: Role::Erg,
@@ -996,6 +1010,7 @@ fn lowers_pointer_memory_copy_with_declared_extent_and_alignment() {
     };
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![
             pointer.clone(),
             BackendParameter { name: "target".to_owned(), ..pointer },
@@ -1045,6 +1060,7 @@ fn lowers_regular_enum_failure_with_discriminant_and_integer_payload() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "failure").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "error".to_owned(),
             role: Role::Erg,
@@ -1087,6 +1103,7 @@ fn lowers_niche_option_failure_to_a_null_pointer() {
         SymbolIdentity::new("test", SymbolKind::Verb, "niche_failure").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -1129,6 +1146,7 @@ fn rejects_floating_point_types_before_llvm_lowering() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: None,
@@ -1186,6 +1204,7 @@ fn emits_fixed_layout_aggregate_parameter_and_return() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "aggregate").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "value".to_owned(),
             role: Role::Erg,
@@ -1220,6 +1239,7 @@ fn emits_non_direct_aggregate_parameter_as_aligned_pointer() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "loan").expect("valid symbol");
     let function = BackendFunction {
         symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "storage".to_owned(),
             role: Role::Ins,
@@ -1260,6 +1280,7 @@ fn lowers_aggregate_return_slot_between_caller_and_callee() {
     };
     let callee = BackendFunction {
         symbol: callee_symbol.clone(),
+        hosted_entry_return: false,
         parameters: vec![parameter.clone()],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -1279,6 +1300,7 @@ fn lowers_aggregate_return_slot_between_caller_and_callee() {
     };
     let caller = BackendFunction {
         symbol: caller_symbol,
+        hosted_entry_return: false,
         parameters: vec![parameter],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -1319,6 +1341,7 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: None,
@@ -1356,6 +1379,7 @@ fn emits_an_arm32_thumb_object_for_the_cortex_m_profile() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: None,
@@ -1399,6 +1423,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     };
     let scalar_callee = BackendFunction {
         symbol: scalar_callee_symbol.clone(),
+        hosted_entry_return: false,
         parameters: vec![scalar_parameter.clone()],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -1418,6 +1443,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     };
     let scalar_caller = BackendFunction {
         symbol: scalar_caller_symbol,
+        hosted_entry_return: false,
         parameters: vec![scalar_parameter],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -1457,6 +1483,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         SymbolIdentity::new("arm", SymbolKind::Verb, "aggregate_caller").expect("aggregate symbol");
     let aggregate_callee = BackendFunction {
         symbol: aggregate_callee_symbol.clone(),
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "input".to_owned(),
             role: Role::Erg,
@@ -1483,6 +1510,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     };
     let aggregate_caller = BackendFunction {
         symbol: aggregate_caller_symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "input".to_owned(),
             role: Role::Erg,
@@ -1615,6 +1643,7 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: None,
@@ -1754,6 +1783,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
         functions: vec![BackendFunction {
             symbol: SymbolIdentity::new("arm", SymbolKind::Verb, "boot")
                 .expect("valid boot symbol"),
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: Some(Role::Erg),
@@ -1856,6 +1886,7 @@ fn links_and_runs_a_host_object_through_the_shared_linker() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: Vec::new(),
             return_value: BackendReturn {
                 role: None,
@@ -1908,6 +1939,7 @@ fn compares_llvm_and_cranelift_on_niche_option_none_fixture() {
     let layout = actus::codegen::BackendLayout { size: 8, alignment: 8 };
     let function = BackendFunction {
         symbol: SymbolIdentity::new("test", SymbolKind::Verb, "none").expect("valid symbol"),
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -2005,6 +2037,7 @@ fn compares_llvm_and_cranelift_on_niche_option_some_fixture() {
     };
     let function = BackendFunction {
         symbol: SymbolIdentity::new("test", SymbolKind::Verb, "some").expect("valid symbol"),
+        hosted_entry_return: false,
         parameters: vec![pointer],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -2108,6 +2141,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
     };
     let identity = BackendFunction {
         symbol: identity_symbol.clone(),
+        hosted_entry_return: false,
         parameters: vec![parameter.clone()],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -2127,6 +2161,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
     };
     let entry = BackendFunction {
         symbol: entry_symbol,
+        hosted_entry_return: false,
         parameters: vec![parameter],
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -2154,6 +2189,7 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
     };
     let control = BackendFunction {
         symbol: control_symbol,
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "condition".to_owned(),
             role: Role::Erg,
@@ -2315,6 +2351,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: vec![parameter("buffer"), parameter("region"), parameter("enum_value")],
             return_value: BackendReturn {
                 role: None,
@@ -2425,6 +2462,7 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
     let aggregate_type = BackendValueType::Aggregate { layout };
     let aggregate_function = BackendFunction {
         symbol: SymbolIdentity::new("test", SymbolKind::Verb, "aggregate").expect("symbol"),
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "value".to_owned(),
             role: Role::Erg,
@@ -2449,6 +2487,7 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
     };
     let caller = BackendFunction {
         symbol: SymbolIdentity::new("test", SymbolKind::Verb, "caller").expect("symbol"),
+        hosted_entry_return: false,
         parameters: vec![BackendParameter {
             name: "value".to_owned(),
             role: Role::Erg,
@@ -2557,6 +2596,7 @@ fn compares_llvm_and_cranelift_on_result_return_slot_call_fixture() {
         SymbolIdentity::new("test", SymbolKind::Verb, "caller").expect("caller symbol");
     let callee = BackendFunction {
         symbol: callee_symbol.clone(),
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -2595,6 +2635,7 @@ fn compares_llvm_and_cranelift_on_result_return_slot_call_fixture() {
     };
     let caller = BackendFunction {
         symbol: caller_symbol,
+        hosted_entry_return: false,
         parameters: Vec::new(),
         return_value: BackendReturn {
             role: Some(Role::Erg),
@@ -2727,6 +2768,7 @@ fn compares_llvm_and_cranelift_on_the_same_indirect_aggregate_copy_fixture() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: vec![
                 BackendParameter {
                     name: "destination".to_owned(),
@@ -2843,6 +2885,7 @@ fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
         externals: Vec::new(),
         functions: vec![BackendFunction {
             symbol,
+            hosted_entry_return: false,
             parameters: vec![BackendParameter {
                 name: "payload".to_owned(),
                 role: Role::Erg,

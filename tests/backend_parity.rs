@@ -99,6 +99,32 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
 }
 
 #[test]
+fn hosted_cli_backends_share_float_constants_and_comparisons() {
+    let source = "verb main() -> Int { erg temperature: f32 = 21.5; erg pressure: f64 = 1013.25; return case temperature < 22.0f32 && pressure > 1000.0 { true => 42, _ => 1, }; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("float-hosted", backend);
+        let input = write_fixture(&root, backend, None, source);
+        let manifest = root.join("Actus.toml");
+        let contents = fs::read_to_string(&manifest).expect("read float parity manifest");
+        fs::write(
+            &manifest,
+            contents.replace("verify_no_float_ir = true", "verify_no_float_ir = false"),
+        )
+        .expect("disable zero-float audit for hosted float parity");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} hosted float build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run hosted float parity fixture");
+        assert_eq!(status.code(), Some(42), "{backend} hosted float runtime result");
+        fs::remove_dir_all(root).expect("remove hosted float fixture");
+    }
+}
+
+#[test]
 fn freestanding_cli_backends_preserve_symbols_and_zero_float_evidence() {
     let mut defined = Vec::new();
     let mut undefined = Vec::new();
@@ -155,5 +181,28 @@ fn freestanding_cli_backends_share_large_aggregate_failure_class() {
             "{backend} failure class changed: {diagnostics}"
         );
         fs::remove_dir_all(root).expect("remove failure parity fixture");
+    }
+}
+
+#[test]
+fn freestanding_cli_backends_reject_float_at_shared_target_boundary() {
+    let source = "verb boot() -> Int { erg sample: f32 = 1.5f32; return case sample > 1.0f32 { true => 0, _ => 1, }; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("float-freestanding", backend);
+        let input = write_fixture(&root, backend, Some("x86_64-unknown-uefi"), source);
+        let output = root.join("main.o");
+        let build = build(&root, &input, &output, "obj");
+        assert!(!build.status.success(), "{backend} must reject freestanding float");
+        let diagnostics = format!(
+            "{}{}",
+            String::from_utf8_lossy(&build.stdout),
+            String::from_utf8_lossy(&build.stderr)
+        );
+        assert!(
+            diagnostics
+                .contains("floating-point values are forbidden by the freestanding target profile"),
+            "{backend} float policy diagnostic changed: {diagnostics}"
+        );
+        fs::remove_dir_all(root).expect("remove freestanding float fixture");
     }
 }

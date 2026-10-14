@@ -1736,3 +1736,14 @@ The only remaining diagnostic fallback in this inventory is the existing
 `f32` relational fixture; floating-point state remains outside the documented
 integer-only shared contract and is covered by the existing Cranelift-only
 behavior plus LLVM's typed rejection boundary.
+
+The float policy is now target-aware rather than backend-specific. Hosted
+`sensor_telemetry.act` builds and executes through LLVM as well as Cranelift;
+shared lowering emits neutral `FloatConstant` and `FloatCompare` instructions,
+and both native emitters consume them. A freestanding parity regression covers
+both backends and verifies the same compile-time diagnostic:
+`floating-point values are forbidden by the freestanding target profile`.
+The zero-float guarantee therefore remains intact for embedded/freestanding
+profiles while hosted applications retain the language's existing float
+support. Non-literal float width conversion remains an explicit follow-up
+before this float slice is considered complete.

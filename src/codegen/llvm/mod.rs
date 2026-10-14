@@ -10,6 +10,7 @@ mod declarations;
 mod emission;
 mod enums;
 mod failures;
+mod float;
 mod guards;
 mod integer;
 mod literals;
