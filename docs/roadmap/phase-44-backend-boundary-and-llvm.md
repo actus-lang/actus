@@ -1566,6 +1566,11 @@ primitive integer/Bool payload types, leaving ownership-bearing payloads on the
 existing fallback path. The unit and parity regressions cover LLVM and
 Cranelift with exit status `42` without changing enum ABI or cleanup rules.
 
+String literals now enter the shared scalar candidate route. The Cranelift
+neutral dispatcher also routes `StringLiteral` to its existing string emitter;
+the parity regression `both_native_backends_build_string_literal_through_shared_lowering`
+builds and runs LLVM and Cranelift with exit status `42`.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

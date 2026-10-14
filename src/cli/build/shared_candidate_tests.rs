@@ -67,6 +67,15 @@ fn accepts_a_standalone_scalar_result_constructor_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_a_string_literal_in_the_shared_contract() {
+    let source = "verb main() -> Int { erg text = \"Actus shared string\"; return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("string literal fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_checked_scalar_arithmetic_in_the_shared_contract() {
     let source =
         "verb main() -> Int { erg value: u8 = 1u8; erg count: u8 = 8u8; return value << count; }";

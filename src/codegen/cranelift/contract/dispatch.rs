@@ -30,6 +30,7 @@ pub(super) fn lower_instruction(
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::Constant { .. }
+        | BackendInstruction::StringLiteral { .. }
         | BackendInstruction::IntegerBinary { .. }
         | BackendInstruction::IntegerCast { .. }
         | BackendInstruction::TrapIfZero { .. }

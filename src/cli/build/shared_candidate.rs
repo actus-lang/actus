@@ -283,7 +283,8 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         Expr::Identifier { .. }
         | Expr::Integer { .. }
         | Expr::BoolLiteral { .. }
-        | Expr::BufferLiteral { .. } => true,
+        | Expr::BufferLiteral { .. }
+        | Expr::StringLiteral { .. } => true,
         Expr::Borrow { expression, .. } => scalar_expression(expression, context),
         Expr::Grouping { expression, .. } => scalar_nested_expression(expression, context),
         Expr::Unary { expression, .. } => scalar_expression(expression, context),

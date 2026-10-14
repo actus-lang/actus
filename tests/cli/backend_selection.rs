@@ -203,6 +203,37 @@ fn both_native_backends_build_standalone_result_constructor_through_shared_lower
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_build_string_literal_through_shared_lowering() {
+    let source = "verb main() -> Int { erg text = \"Actus shared string\"; return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-string-literal-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write string literal fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build string literal");
+        let status =
+            std::process::Command::new(&output).status().expect("run string literal fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} string literal result");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_nested_option_case_arithmetic_through_shared_lowering() {
     let source = "struct Node { value: Int, abs next: Option[abs Node], } verb sum(abs node: Node) -> Int { abs next = ref node.next; return node.value + case next { Option.Some(_) => 1, Option.None => 0, }; } verb main() -> Int { erg node = Node { value: 41, next: Option[abs Node].None, }; return sum(node: abs node); }\n";
     for backend in ["cranelift", "llvm"] {
