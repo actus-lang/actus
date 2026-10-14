@@ -120,12 +120,5 @@ fn resolve_fields(
             "moved-field cleanup is missing its root type".to_owned(),
         )
     })?;
-    moved_fields
-        .iter()
-        .filter_map(|path| match provider.resolve_field(root_type, path) {
-            Ok(Some(descriptor)) => Some(Ok(descriptor)),
-            Ok(None) => None,
-            Err(error) => Some(Err(error)),
-        })
-        .collect()
+    provider.resolve_partial_binding(root_type, moved_fields)
 }

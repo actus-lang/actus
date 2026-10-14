@@ -236,21 +236,28 @@ fn parameter_cleanup(
         .filter(|plan| !matches!(plan.origin, super::super::BackendCleanupOrigin::Explicit { .. }))
     {
         for (index, action) in plan.actions.iter().enumerate() {
-            let super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
-                continue;
+            let name = match action {
+                super::super::BackendCleanupAction::DropBinding { name, .. }
+                | super::super::BackendCleanupAction::DropBindingFields { name, .. } => name,
+                _ => continue,
             };
             if !provider.parameter_is_owned(name) {
                 continue;
             }
-            let Some(value) = provider.parameter_value(name) else { continue };
-            let Some(descriptor) = plan.resolved_bridges.get(index).and_then(|items| items.first())
-            else {
-                continue;
-            };
             if cleanup.iter().any(|(existing, _, _, _)| existing == name) {
                 continue;
             }
-            cleanup.push((name.clone(), action.clone(), descriptor.operand(value), plan.span));
+            let Some(value) = provider.parameter_value(name) else { continue };
+            if let Some(descriptors) = plan.resolved_bridges.get(index) {
+                for descriptor in descriptors {
+                    cleanup.push((
+                        name.clone(),
+                        action.clone(),
+                        descriptor.operand(value),
+                        plan.span,
+                    ));
+                }
+            }
         }
     }
     cleanup

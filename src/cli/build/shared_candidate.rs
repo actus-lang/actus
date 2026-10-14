@@ -47,10 +47,9 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
                     .iter()
                     .all(|parameter| scalar_parameter(parameter, &unit_enums, &unit_structs))
                 && scalar_ins_body(&verb.body, &verb.params)
-                && verb
-                    .return_type
-                    .as_ref()
-                    .is_none_or(|return_type| scalar_or_result_type(&return_type.ty, &unit_enums))
+                && verb.return_type.as_ref().is_none_or(|return_type| {
+                    supported_value_type(&return_type.ty, &unit_enums, &unit_structs)
+                })
                 && scalar_block(&verb.body, &context, true)
         }
         crate::ast::TopLevelDecl::ExternalVerb(verb) => {
@@ -59,10 +58,9 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
                     .params
                     .iter()
                     .all(|parameter| scalar_parameter(parameter, &unit_enums, &unit_structs))
-                && verb
-                    .return_type
-                    .as_ref()
-                    .is_none_or(|return_type| scalar_or_result_type(&return_type.ty, &unit_enums))
+                && verb.return_type.as_ref().is_none_or(|return_type| {
+                    supported_value_type(&return_type.ty, &unit_enums, &unit_structs)
+                })
         }
         crate::ast::TopLevelDecl::Enum(definition) => {
             definition.generic_parameters.is_empty()
@@ -128,7 +126,7 @@ fn scalar_parameter(
 ) -> bool {
     matches!(parameter.role, Role::Erg | Role::Abs | Role::Ins | Role::Dat)
         && parameter.dispatch == DispatchMode::Static
-        && (scalar_or_result_type(&parameter.ty, unit_enums)
+        && (scalar_or_result_type(&parameter.ty, unit_enums, unit_structs)
             || supported_array_type(&parameter.ty, unit_structs)
             || unit_structs.contains(&parameter.ty.name))
 }
@@ -176,13 +174,37 @@ fn scalar_option_type(type_name: &crate::ast::TypeName) -> bool {
         && type_name.arguments[0].arguments.is_empty()
 }
 
-fn scalar_or_result_type(type_name: &crate::ast::TypeName, unit_enums: &BTreeSet<String>) -> bool {
+fn scalar_or_result_type(
+    type_name: &crate::ast::TypeName,
+    unit_enums: &BTreeSet<String>,
+    aggregate_types: &BTreeSet<String>,
+) -> bool {
     scalar_type(type_name)
         || (type_name.name == "Result"
             && type_name.arguments.len() == 2
-            && scalar_type(&type_name.arguments[0])
-            && (scalar_type(&type_name.arguments[1])
-                || unit_enums.contains(&type_name.arguments[1].name)))
+            && supported_result_payload(&type_name.arguments[0], unit_enums, aggregate_types)
+            && supported_result_payload(&type_name.arguments[1], unit_enums, aggregate_types))
+}
+
+fn supported_result_payload(
+    type_name: &crate::ast::TypeName,
+    unit_enums: &BTreeSet<String>,
+    aggregate_types: &BTreeSet<String>,
+) -> bool {
+    scalar_type(type_name)
+        || aggregate_types.contains(&type_name.name)
+        || supported_array_type(type_name, aggregate_types)
+        || unit_enums.contains(&type_name.name)
+}
+
+fn supported_value_type(
+    type_name: &crate::ast::TypeName,
+    unit_enums: &BTreeSet<String>,
+    aggregate_types: &BTreeSet<String>,
+) -> bool {
+    scalar_or_result_type(type_name, unit_enums, aggregate_types)
+        || supported_array_type(type_name, aggregate_types)
+        || aggregate_types.contains(&type_name.name)
 }
 
 fn scalar_block(block: &Block, context: &CandidateContext<'_>, allow_assignment: bool) -> bool {

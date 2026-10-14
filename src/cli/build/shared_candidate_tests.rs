@@ -312,6 +312,15 @@ fn accepts_fixed_array_parameter_reads_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_structured_dat_returns_in_the_shared_contract() {
+    let source = "struct Counter { value: Int, } verb forward(dat value: Counter) -> Counter { return value; } verb main() -> Int { erg value: Counter = Counter { value: 41, }; erg result: Counter = forward(value: dat value); return result.value; }";
+    let (tokens, errors) = crate::lexer::scan(source);
+    assert!(errors.is_empty(), "structured aggregate fixture should lex: {errors:?}");
+    let program = crate::parser::parse(tokens).expect("structured aggregate fixture should parse");
+    assert!(super::supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_scalar_struct_parameter_reads_in_the_shared_contract() {
     let source = "struct Counter { value: Int, } verb read(abs counter: Counter) -> Int { return counter.value; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; return read(counter: abs counter) + 1; }";
     let (tokens, errors) = scan(source);

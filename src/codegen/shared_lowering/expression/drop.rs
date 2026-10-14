@@ -21,13 +21,15 @@ pub(super) fn lower_binding(
         return Err(unsupported(span, "explicit drop has no semantic cleanup plan"));
     };
     for (index, action) in plan.actions.iter().enumerate() {
-        let BackendCleanupAction::DropBinding { name: action_name, .. } = action else {
-            continue;
+        let action_name = match action {
+            BackendCleanupAction::DropBinding { name, .. }
+            | BackendCleanupAction::DropBindingFields { name, .. } => name,
+            _ => continue,
         };
         if action_name != name {
             continue;
         }
-        if let Some(descriptor) = plan.resolved_bridges.get(index).and_then(|items| items.first()) {
+        for descriptor in plan.resolved_bridges.get(index).into_iter().flatten() {
             instructions.push(BackendInstruction::Cleanup {
                 action: action.clone(),
                 operand: Some(descriptor.operand(value)),

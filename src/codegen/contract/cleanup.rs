@@ -60,6 +60,21 @@ pub trait BackendCleanupProvider {
         root_type: &TypeName,
         path: &str,
     ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError>;
+
+    fn resolve_partial_binding(
+        &self,
+        root_type: &TypeName,
+        moved_fields: &[String],
+    ) -> Result<Vec<BackendCleanupResolvedDescriptor>, BackendContractError> {
+        moved_fields
+            .iter()
+            .filter_map(|path| match self.resolve_field(root_type, path) {
+                Ok(Some(descriptor)) => Some(Ok(descriptor)),
+                Ok(None) => None,
+                Err(error) => Some(Err(error)),
+            })
+            .collect()
+    }
 }
 
 impl BackendCleanupResolvedDescriptor {

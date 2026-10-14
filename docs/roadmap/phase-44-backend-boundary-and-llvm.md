@@ -352,7 +352,8 @@ runtime emission now materializes resolved builtin parameter drops and
 function-scope local builtin drops as neutral `Cleanup` instructions before
 return and typed-failure terminators. Nested block cleanup placement and
 loop `break`/`continue` unwind cleanup are now covered by neutral lowering;
-aggregate field cleanup emission remains open.
+complete aggregate field cleanup emission remains open, while the shared slice
+now carries validated partial-field descriptors for remaining owned fields.
 Regular enum typed failures with integer payloads now lower through the
 declared aggregate `ReturnSlot`; compile-time `EndBorrow` cleanup boundaries are lowered as no-op
 semantic boundaries, while incomplete semantic cleanup descriptors fail closed
@@ -1655,3 +1656,26 @@ same contract with typed `alloca`/stack-slot operations. The parity regression
 the identifier case on both backends, while the existing phase18 indexed-loan
 fixture verifies array-element writeback. Remaining aggregate and structured
 loan places are still outside this slice; Gate 44.7.1 remains open.
+
+Structured aggregate return values now enter the Cranelift shared candidate
+when their neutral declaration layout is already supported. The parity
+regression `both_native_backends_share_structured_dat_parameter_and_return_layouts`
+passes an owned `Counter` through a `dat` parameter and returns the same
+caller-owned aggregate layout through both LLVM and Cranelift. Partial aggregate
+cleanup also uses the neutral provider: when a nested owned field is moved, the
+remaining owned fields receive root-layout-relative `FieldAddress` descriptors,
+and both emitters consume the same `DropBindingFields` cleanup instruction. The
+neutral regression `lowers_partial_aggregate_cleanup_with_remaining_field_descriptor`
+verifies that the moved field is excluded and the remaining field is cleaned at
+the declared offset. This closes only the structured aggregate return and
+partial builtin-field cleanup slices; aggregate arrays, generic aggregate roles,
+all aggregate failure payloads, and remaining Cranelift legacy shapes still
+require separate parity evidence, so Gate 44.7.1 remains open.
+
+Aggregate `Result` payloads now also enter the shared Cranelift candidate when
+their payload layouts are supported. The parity regression
+`both_native_backends_share_aggregate_result_payload_failure_layouts` constructs
+an aggregate `Ok` payload, returns it through the neutral enum return slot, and
+reads the payload in a `dat` case on both LLVM and Cranelift. This proves the
+aggregate failure/return layout slice without widening the contract to generic
+or unsupported payload shapes.

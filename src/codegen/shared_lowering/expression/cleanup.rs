@@ -20,22 +20,24 @@ pub(super) fn emit_scope_cleanup(
         .filter(|plan| plan.span == span && matches!(plan.origin, BackendCleanupOrigin::Scope))
     {
         for (index, action) in plan.actions.iter().enumerate() {
-            let super::super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
-                continue;
+            let name = match action {
+                super::super::super::BackendCleanupAction::DropBinding { name, .. }
+                | super::super::super::BackendCleanupAction::DropBindingFields { name, .. } => name,
+                _ => continue,
             };
             let Some(value) = local_value(provider, name) else { continue };
             if returned_value == Some(value) {
                 continue;
             }
-            let Some(descriptor) = plan.resolved_bridges.get(index).and_then(|items| items.first())
-            else {
-                continue;
-            };
-            cleanup.push(BackendInstruction::Cleanup {
-                action: action.clone(),
-                operand: Some(descriptor.operand(value)),
-                span: plan.span,
-            });
+            if let Some(descriptors) = plan.resolved_bridges.get(index) {
+                for descriptor in descriptors {
+                    cleanup.push(BackendInstruction::Cleanup {
+                        action: action.clone(),
+                        operand: Some(descriptor.operand(value)),
+                        span: plan.span,
+                    });
+                }
+            }
         }
     }
     let terminates = matches!(
@@ -63,19 +65,21 @@ pub(super) fn append_loop_cleanup(
         )
     }) {
         for (index, action) in plan.actions.iter().enumerate() {
-            let super::super::super::BackendCleanupAction::DropBinding { name, .. } = action else {
-                continue;
+            let name = match action {
+                super::super::super::BackendCleanupAction::DropBinding { name, .. }
+                | super::super::super::BackendCleanupAction::DropBindingFields { name, .. } => name,
+                _ => continue,
             };
             let Some(value) = binding_value(provider, name) else { continue };
-            let Some(descriptor) = plan.resolved_bridges.get(index).and_then(|items| items.first())
-            else {
-                continue;
-            };
-            instructions.push(BackendInstruction::Cleanup {
-                action: action.clone(),
-                operand: Some(descriptor.operand(value)),
-                span: plan.span,
-            });
+            if let Some(descriptors) = plan.resolved_bridges.get(index) {
+                for descriptor in descriptors {
+                    instructions.push(BackendInstruction::Cleanup {
+                        action: action.clone(),
+                        operand: Some(descriptor.operand(value)),
+                        span: plan.span,
+                    });
+                }
+            }
         }
     }
 }

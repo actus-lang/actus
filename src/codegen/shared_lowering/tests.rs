@@ -3,7 +3,10 @@ use super::{
     lower_program_to_backend_module_with_layouts,
 };
 use crate::ast::TypeName;
-use crate::codegen::{BackendInstruction, BackendPassingMode, BackendReturnMode, BackendValueType};
+use crate::codegen::{
+    BackendCleanupAction, BackendInstruction, BackendPassingMode, BackendReturnMode,
+    BackendValueType,
+};
 use crate::lexer::scan;
 use crate::parser::parse;
 
@@ -240,6 +243,33 @@ fn lowers_buffer_cleanup_before_shared_return() {
                 descriptor.descriptor.bridge == super::BackendCleanupBridge::BufferDrop
             })
     );
+}
+
+#[test]
+fn lowers_partial_aggregate_cleanup_with_remaining_field_descriptor() {
+    let source = "struct Inner { erg first: Buffer, erg second: Buffer, } struct Outer { erg inner: Inner, } verb consume(dat payload: Buffer) { drop(payload); } verb main() -> Int { erg holder = Outer { inner: Inner { first: Buffer[1], second: Buffer[2], }, }; consume(payload: dat holder.inner.first); return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "partial aggregate fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("partial aggregate fixture should parse");
+    let module =
+        super::super::lower_program_to_backend_module("actus_root", &program, Some("main"), None)
+            .expect("partial aggregate cleanup should lower through the shared pipeline");
+    let cleanup = module
+        .functions
+        .iter()
+        .flat_map(|function| function.blocks.iter().flat_map(|block| block.instructions.iter()))
+        .find_map(|instruction| match instruction {
+            BackendInstruction::Cleanup { action, operand: Some(operand), .. }
+                if matches!(action, BackendCleanupAction::DropBindingFields { .. }) =>
+            {
+                Some(operand)
+            }
+            _ => None,
+        })
+        .expect("remaining aggregate field should have a neutral cleanup descriptor");
+    assert_eq!(cleanup.bridge, super::BackendCleanupBridge::BufferDrop);
+    assert_eq!(cleanup.argument, super::BackendCleanupArgument::FieldAddress);
+    assert_eq!(cleanup.field.expect("remaining field metadata").offset, 8);
 }
 
 #[test]

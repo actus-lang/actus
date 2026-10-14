@@ -600,6 +600,68 @@ fn both_native_backends_share_scalar_ins_caller_storage_and_writeback() {
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_share_structured_dat_parameter_and_return_layouts() {
+    let source = "struct Counter { value: Int, } verb forward(dat value: Counter) -> Counter { return value; } verb main() -> Int { erg value: Counter = Counter { value: 41, }; erg result: Counter = forward(value: dat value); return result.value + 1; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-aggregate-dat-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write aggregate dat fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build aggregate dat fixture");
+        let status =
+            std::process::Command::new(&output).status().expect("run aggregate dat fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} aggregate dat result");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_share_aggregate_result_payload_failure_layouts() {
+    let source = "enum Failure { Bad, } struct Counter { value: Int, } verb produce() -> Result[Counter, Failure] { return Result[Counter, Failure].Ok(Counter { value: 41, }); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(value) => value.value + 1, Result.Err(_) => 0, }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-aggregate-result-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write aggregate result fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build aggregate Result fixture");
+        let status =
+            std::process::Command::new(&output).status().expect("run aggregate Result fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} aggregate Result result");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_array_pack_bit_fields() {
