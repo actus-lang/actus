@@ -1300,6 +1300,15 @@ exercise the same `Box[T]` source through LLVM and Cranelift with exit status
 42. Generic ownership-bearing fields, generic nested applications, and generic
 aggregate compound stores remain outside this slice.
 
+Generic aggregate element field compound stores now use the same shared
+aggregate contract. The classifier regression
+`accepts_generic_aggregate_array_element_compound_stores_in_the_shared_contract`
+and the hosted parity fixture
+`both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_compound_store`
+compile and execute `boxes[1u32].item += 1` through LLVM and Cranelift with
+exit status 42. Generic ownership-bearing fields and generic nested
+applications remain outside this slice.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`
