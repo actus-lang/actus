@@ -1581,6 +1581,15 @@ unchanged. The unit and parity regressions in
 `both_native_backends_build_scalar_try_owner_through_shared_lowering` build and
 run LLVM and Cranelift with exit status `42`.
 
+Direct `Try` return expressions now use the same structured shared lowering.
+The `Ok` path reconstructs the existing `Result` layout, while the `Err` path
+propagates the source value; no enum representation or return ABI changes are
+introduced. Cranelift now records enum values materialized in its caller-owned
+return slot so the neutral `Return` contract remains complete. The regression
+`both_native_backends_build_scalar_try_return_through_shared_lowering` builds
+and runs both backends with exit status `42`; standalone `?` statements remain
+outside this slice because they require statement-level early-return CFG.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

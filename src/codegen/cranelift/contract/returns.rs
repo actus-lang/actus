@@ -2,22 +2,52 @@ use std::collections::BTreeMap;
 
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, Type};
 use cranelift_frontend::FunctionBuilder;
+use cranelift_module::Module;
+use cranelift_object::ObjectModule;
 
 use super::super::native::BackendEmitError;
 use crate::codegen::{BackendFunction, BackendInstruction, BackendValueId};
 
 pub(super) fn lower_return(
+    module: &ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     function: &BackendFunction,
+    return_slot: Option<cranelift_codegen::ir::Value>,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
     aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::Return { value, .. } = instruction else {
         return Err(BackendEmitError("Cranelift return instruction expected".to_owned()));
     };
-    if matches!(function.return_value.passing, crate::codegen::BackendReturnMode::ReturnSlot { .. })
+    if let crate::codegen::BackendReturnMode::ReturnSlot { layout } = function.return_value.passing
     {
+        let value_id = value.ok_or_else(|| {
+            BackendEmitError("Cranelift return-slot instruction has no value".to_owned())
+        })?;
+        let source = values.get(&value_id).copied().ok_or_else(|| {
+            BackendEmitError(format!("Cranelift return-slot value {} is unavailable", value_id.0))
+        })?;
+        let destination = return_slot
+            .ok_or_else(|| BackendEmitError("Cranelift return slot is unavailable".to_owned()))?;
+        if builder.func.dfg.value_type(source) != module.isa().pointer_type() {
+            return Err(BackendEmitError(
+                "Cranelift return-slot value must be an aggregate pointer".to_owned(),
+            ));
+        }
+        let alignment = u8::try_from(layout.alignment).map_err(|_| {
+            BackendEmitError("Cranelift return-slot alignment exceeds u8".to_owned())
+        })?;
+        builder.emit_small_memory_copy(
+            module.isa().frontend_config(),
+            destination,
+            source,
+            u64::from(layout.size),
+            alignment,
+            alignment,
+            false,
+            MemFlagsData::new(),
+        );
         builder.ins().return_(&[]);
         return Ok(());
     }

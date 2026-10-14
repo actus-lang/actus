@@ -75,6 +75,9 @@ fn lower_construct(
         layout.discriminant_offset as i32,
     );
     lower_construct_payload(module, builder, slot, *layout, payload, payload_type, values)?;
+    if let BackendInstruction::EnumConstruct { result, .. } = instruction {
+        values.insert(*result, slot);
+    }
     Ok(())
 }
 

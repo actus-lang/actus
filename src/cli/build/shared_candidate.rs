@@ -346,7 +346,9 @@ fn scalar_nested_expression(expression: &Expr, context: &CandidateContext<'_>) -
 }
 
 fn scalar_return_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
-    scalar_expression(expression, context) || value_if_expression(expression, context)
+    scalar_expression(expression, context)
+        || scalar_try_expression(expression, context)
+        || value_if_expression(expression, context)
 }
 
 fn value_if_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {

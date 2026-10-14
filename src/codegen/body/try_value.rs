@@ -67,8 +67,67 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 }
                 result
             }
+            Stmt::Return { value: Some(Expr::Try { expression, span }), .. } => {
+                self.lower_try_return_statement(id, expression, *span, instructions)
+            }
             _ => unreachable!(),
         }
+    }
+
+    fn lower_try_return_statement(
+        &mut self,
+        id: BackendBlockId,
+        expression: &Expr,
+        span: crate::lexer::SourceSpan,
+        mut instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let source = self.provider.lower_expression(expression, &mut instructions)?;
+        let BackendValueType::Enum { layout } = self
+            .provider
+            .value_type(source)
+            .ok_or_else(|| unsupported(span, "try return value type is unavailable"))?
+        else {
+            return Err(unsupported(span, "try return requires a Result value"));
+        };
+        let condition = self.provider.lower_enum_variant_condition_value(
+            source,
+            "Ok",
+            span,
+            &mut instructions,
+        )?;
+        let ok_block = self.allocate_block();
+        let error_block = self.allocate_block();
+        let (mut ok_instructions, payload_value, payload_type) =
+            self.lower_try_payload(source, span)?;
+        let result = self.provider.allocate_value(BackendValueType::Enum { layout });
+        ok_instructions.push(BackendInstruction::EnumConstruct {
+            result,
+            discriminant: 0,
+            payload: Some(payload_value),
+            layout,
+            payload_type: Some(payload_type),
+            span,
+        });
+        ok_instructions.push(BackendInstruction::Return { value: Some(result), span });
+        self.blocks.push(BackendBlock {
+            parameters: Vec::new(),
+            id: ok_block,
+            instructions: ok_instructions,
+        });
+        self.blocks.push(BackendBlock {
+            parameters: Vec::new(),
+            id: error_block,
+            instructions: vec![BackendInstruction::Return { value: Some(source), span }],
+        });
+        instructions.push(BackendInstruction::Branch {
+            condition,
+            then_block: ok_block,
+            else_block: error_block,
+            then_arguments: Vec::new(),
+            else_arguments: Vec::new(),
+            span,
+        });
+        Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
     pub(super) fn lower_try_owner_statement(

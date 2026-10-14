@@ -180,9 +180,15 @@ fn lower_termination(
     function: &BackendFunction,
 ) -> Result<(), BackendEmitError> {
     match instruction {
-        BackendInstruction::Return { .. } => {
-            returns::lower_return(builder, instruction, function, values, aggregate_values)
-        }
+        BackendInstruction::Return { .. } => returns::lower_return(
+            module,
+            builder,
+            instruction,
+            function,
+            return_slot,
+            values,
+            aggregate_values,
+        ),
         BackendInstruction::Fail { .. } => returns::lower_failure(
             module.isa().pointer_type(),
             builder,
