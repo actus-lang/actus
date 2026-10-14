@@ -766,7 +766,7 @@ fn both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_s
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_compound_store() {
-    let source = "struct Box[T] { item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: 41, }; boxes[1u32].item += 1; return boxes[1u32].item; }\n";
+    let source = "struct Box[T] { erg item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: 41, }; boxes[1u32].item += 1; return boxes[1u32].item; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir().join(format!(
             "actus-cli-{backend}-generic-aggregate-array-compound-store-{}",

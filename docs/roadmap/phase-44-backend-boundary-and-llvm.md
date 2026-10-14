@@ -1323,6 +1323,13 @@ field, its `Some`/`None` case read, and exit status 42 through LLVM and
 Cranelift. Mutable or transferring generic ownership fields remain outside
 this slice.
 
+Generic mutable owner fields now reuse the existing aggregate field mutation
+contract. The parity regression covers `erg item: T` in `Box[Int]`, including
+construction, indexed field compound assignment, and the post-mutation read
+through both LLVM and Cranelift with exit status 42. Persistent `ins` fields
+and generic ownership transfer/cleanup remain governed by their existing
+semantic rejection and cleanup contracts.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`
