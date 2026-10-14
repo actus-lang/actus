@@ -170,7 +170,9 @@ fn scalar_statement(
 ) -> bool {
     match statement {
         Stmt::OwnerDecl { initializer, .. } => {
-            scalar_expression(initializer, context) || value_if_expression(initializer, context)
+            scalar_expression(initializer, context)
+                || scalar_try_expression(initializer, context)
+                || value_if_expression(initializer, context)
         }
         Stmt::Assignment { target, value, .. } if allow_assignment => {
             assignment_place(target, context) && scalar_assignment_value(target, value, context)
@@ -275,7 +277,12 @@ fn scalar_assignment_value(target: &Place, value: &Expr, context: &CandidateCont
         let Expr::StructLit { fields, .. } = value else { return false };
         return fields.iter().all(|field| scalar_expression(&field.value, context));
     }
-    scalar_expression(value, context)
+    scalar_expression(value, context) || scalar_try_expression(value, context)
+}
+
+fn scalar_try_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {
+    let Expr::Try { expression, .. } = expression else { return false };
+    scalar_expression(expression, context)
 }
 
 fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool {

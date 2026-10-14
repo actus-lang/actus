@@ -1571,6 +1571,16 @@ neutral dispatcher also routes `StringLiteral` to its existing string emitter;
 the parity regression `both_native_backends_build_string_literal_through_shared_lowering`
 builds and runs LLVM and Cranelift with exit status `42`.
 
+Scalar `Try` owner declarations now enter the shared route as well. The
+candidate admits only the existing structured forms (`erg` declarations and
+assignments), leaving standalone `?` statements on the legacy path because
+their early-return CFG is not part of this slice. The existing shared
+`try_value` lowering preserves the `Result` error return, binds the `Ok`
+payload through the merge block, and keeps the ownership cleanup boundary
+unchanged. The unit and parity regressions in
+`both_native_backends_build_scalar_try_owner_through_shared_lowering` build and
+run LLVM and Cranelift with exit status `42`.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.
