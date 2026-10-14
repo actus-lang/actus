@@ -149,41 +149,13 @@ fn emit_objects_cranelift(
     symbol: &str,
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let targeted_caller = crate::codegen::normalize_program(
-        &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
-    );
-    let generic_instances = crate::semantic::analyze(&targeted_caller)
-        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
-        .generic_instances;
-    let generic_instances =
-        crate::codegen::expand_generic_instances(&targeted_caller, &generic_instances)?;
-    let generic_types = region_generic_types(&generic_instances);
+    let (generic_types, generic_instances) =
+        super::shared_emission::generic_inputs(plan, configuration)?;
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings = module_bindings(&object_plan, &generic_instances)?;
-    if let Some(objects) =
-        emit_shared_cranelift(&object_plan, symbol, configuration, &bindings, &generic_instances)?
-    {
-        return Ok(objects);
-    }
-    let root = &object_plan.units()[0];
-    let reachable_module_roots = reachable_module_roots(&object_plan, symbol)?;
-    let mut objects = vec![super::cranelift_shared::emit_cranelift_root(
-        root.program(),
-        root.namespace().symbol_prefix(),
-        symbol,
-        configuration,
-        &bindings,
-    )?];
-    objects.extend(emit_module_objects(
-        &object_plan,
-        configuration,
-        &bindings,
-        &generic_instances,
-        &reachable_module_roots,
-    )?);
-    Ok(objects)
+    emit_shared_cranelift(&object_plan, symbol, configuration, &bindings, &generic_instances)
 }
 
 #[cfg(feature = "cranelift")]
@@ -193,33 +165,22 @@ fn emit_shared_cranelift(
     configuration: &CompilerConfiguration,
     bindings: &crate::codegen::BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<Option<Vec<EmittedObject>>, BackendEmitError> {
-    if generic_instances.is_empty()
-        && super::cranelift_shared::supports_shared_scalar_units(object_plan, configuration)
-    {
+) -> Result<Vec<EmittedObject>, BackendEmitError> {
+    if generic_instances.is_empty() {
         return super::cranelift_shared::emit_shared_scalar_units(
             object_plan,
             symbol,
             configuration,
             bindings,
-        )
-        .map(Some);
+        );
     }
-    if super::cranelift_shared::supports_shared_specialized_units(
+    super::cranelift_shared::emit_shared_specialized_units(
         object_plan,
+        symbol,
         configuration,
+        bindings,
         generic_instances,
-    )? {
-        return super::cranelift_shared::emit_shared_specialized_units(
-            object_plan,
-            symbol,
-            configuration,
-            bindings,
-            generic_instances,
-        )
-        .map(Some);
-    }
-    Ok(None)
+    )
 }
 
 #[cfg(not(feature = "cranelift"))]
@@ -231,129 +192,6 @@ fn emit_objects_cranelift(
     Err(BackendEmitError(
         "backend `cranelift` is not enabled; rebuild with feature `cranelift`".to_owned(),
     ))
-}
-
-#[cfg(feature = "cranelift")]
-fn region_generic_types(
-    generic_instances: &[crate::semantic::GenericInstance],
-) -> Vec<crate::ast::TypeName> {
-    generic_instances
-        .iter()
-        .filter(|instance| {
-            matches!(
-                instance.name.as_str(),
-                "region_open"
-                    | "region_read"
-                    | "region_read_range"
-                    | "region_write"
-                    | "region_write_range"
-                    | "region_publish"
-                    | "region_cancel"
-                    | "region_close"
-                    | "region_remap"
-                    | "region_logical_length"
-                    | "region_window_start"
-                    | "region_window_count"
-                    | "region_generation"
-                    | "region_dirty"
-                    | "region_pin"
-                    | "region_unpin"
-                    | "region_pinned"
-            )
-        })
-        .flat_map(|instance| instance.arguments.iter().cloned())
-        .collect()
-}
-
-#[cfg(feature = "cranelift")]
-fn reachable_module_roots(
-    object_plan: &crate::modules::ModuleObjectPlan,
-    symbol: &str,
-) -> Result<std::collections::HashSet<String>, BackendEmitError> {
-    let root = &object_plan.units()[0];
-    let normalized_root = crate::codegen::normalize_program(root.program());
-    let mut roots = crate::codegen::reachable_call_names(&normalized_root, symbol)?;
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for unit in &object_plan.units()[1..] {
-            let selected = unit
-                .program()
-                .declarations
-                .iter()
-                .filter_map(|declaration| match declaration {
-                    crate::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
-                    _ => None,
-                })
-                .filter(|name| roots.contains(*name))
-                .map(str::to_owned)
-                .collect::<Vec<_>>();
-            for name in selected {
-                for call in crate::codegen::reachable_call_names(unit.program(), &name)? {
-                    changed |= roots.insert(call);
-                }
-            }
-        }
-    }
-    Ok(roots)
-}
-
-#[cfg(feature = "cranelift")]
-fn emit_module_objects(
-    object_plan: &crate::modules::ModuleObjectPlan,
-    configuration: &CompilerConfiguration,
-    bindings: &crate::codegen::BackendSymbolBindings,
-    generic_instances: &[crate::semantic::GenericInstance],
-    reachable_module_roots: &std::collections::HashSet<String>,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let mut objects = Vec::new();
-    let caller_type_definitions =
-        super::module_type_context::caller_definitions(object_plan, generic_instances);
-    for unit in &object_plan.units()[1..] {
-        let roots = super::module_type_context::roots_for_unit(unit, reachable_module_roots);
-        if roots.is_empty() && unit.namespace().module_path().starts_with("std::wire") {
-            continue;
-        }
-        let mut module_program = unit.program().clone();
-        if super::module_type_context::requires_caller_context(
-            unit,
-            generic_instances,
-            &caller_type_definitions,
-        ) {
-            super::module_type_context::append_caller_definitions(
-                &mut module_program,
-                &caller_type_definitions,
-                true,
-            );
-        }
-        let bytes =
-            crate::codegen::cranelift::emit_module_object_for_target_in_namespace_with_bindings_and_instances_and_roots(
-                &module_program,
-                unit.namespace().symbol_prefix(),
-                configuration.native_backend(),
-                configuration.target(),
-                bindings,
-                generic_instances,
-                Some(&roots),
-            )
-            .map_err(|error| {
-                BackendEmitError(format!(
-                    "module `{}` emission failed: {error}",
-                    unit.namespace().module_path()
-                ))
-            })?;
-        objects.push(EmittedObject {
-            name: unit.namespace().symbol_prefix().to_owned(),
-            bytes,
-            symbols: declared_symbols(
-                &module_program,
-                unit.namespace().symbol_prefix(),
-                "",
-                bindings,
-            )?,
-        });
-    }
-    Ok(objects)
 }
 
 #[cfg(feature = "cranelift")]

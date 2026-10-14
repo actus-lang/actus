@@ -5,7 +5,9 @@ use crate::ast::VerbDecl;
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendValueId, BackendValueType,
 };
-use super::super::support::{backend_value_type, scalar_backend_type_name, unsupported};
+use super::super::support::{
+    backend_value_type, integer_value_fits, scalar_backend_type_name, unsupported,
+};
 use super::SharedExpressionProvider;
 
 pub(super) fn set_binding_value(
@@ -106,6 +108,39 @@ pub(super) fn coerce_owner_value(
                 source_type, target_type
             ),
         ));
+    }
+    if let (
+        BackendValueType::Integer { signed: source_signed, .. },
+        BackendValueType::Integer { signed: target_signed, width: target_width },
+    ) = (source_type, target_type)
+        && let Some(BackendInstruction::Constant { ty, value: literal, .. }) = instructions
+            .iter_mut()
+            .rev()
+            .find(|instruction| matches!(instruction, BackendInstruction::Constant { result, .. } if *result == value))
+    {
+        let fits = if target_signed {
+            i64::try_from(*literal).is_ok_and(|literal| {
+                let minimum = if target_width == 64 {
+                    i64::MIN
+                } else {
+                    -(1i64 << (target_width - 1))
+                };
+                let maximum = if target_width == 64 {
+                    i64::MAX
+                } else {
+                    (1i64 << (target_width - 1)) - 1
+                };
+                (minimum..=maximum).contains(&literal)
+            })
+        } else {
+            (!source_signed || *literal <= i64::MAX as u64)
+                && integer_value_fits(*literal, false, target_width)
+        };
+        if fits {
+            *ty = target_type;
+            provider.remember_value(value, target_type);
+            return Ok(value);
+        }
     }
     let converted = provider.allocate();
     provider.remember_value(converted, target_type);

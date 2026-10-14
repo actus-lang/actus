@@ -96,7 +96,6 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                 block.instructions.last(),
                 Some(BackendInstruction::Return { .. })
                     | Some(BackendInstruction::Fail { .. })
-                    | Some(BackendInstruction::Jump { .. })
             ) {
                 cleanup::emit_scope_cleanup(self, span, &mut block.instructions);
             }

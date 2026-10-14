@@ -63,16 +63,19 @@ fn lower_construct(
         );
         return Ok(());
     }
-    let _ = return_slot;
     let alignment = u8::try_from(layout.layout.alignment)
         .map_err(|_| BackendEmitError("Cranelift enum alignment exceeds u8".to_owned()))?;
-    let stack_slot =
-        builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-            layout.layout.size,
-            alignment.trailing_zeros() as u8,
-        ));
-    let slot = builder.ins().stack_addr(module.isa().pointer_type(), stack_slot, 0);
+    let slot = if let Some(return_slot) = return_slot {
+        return_slot
+    } else {
+        let stack_slot =
+            builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+                cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+                layout.layout.size,
+                alignment.trailing_zeros() as u8,
+            ));
+        builder.ins().stack_addr(module.isa().pointer_type(), stack_slot, 0)
+    };
     let discriminant_type = integer_type_for(layout.discriminant_size)?;
     let discriminant_value = builder.ins().iconst(discriminant_type, i64::from(*discriminant));
     builder.ins().store(
@@ -183,9 +186,13 @@ pub(super) fn lower_payload(
             builder.ins().load(ty, MemFlagsData::new(), subject, layout.payload_offset as i32)
         }
         BackendValueType::Pointer | BackendValueType::NichePointerOption { .. } => subject,
-        BackendValueType::Aggregate { .. }
-        | BackendValueType::Region { .. }
-        | BackendValueType::Enum { .. } => {
+        BackendValueType::Region { .. } => builder.ins().load(
+            module.isa().pointer_type(),
+            MemFlagsData::new(),
+            subject,
+            layout.payload_offset as i32,
+        ),
+        BackendValueType::Aggregate { .. } | BackendValueType::Enum { .. } => {
             builder.ins().iadd_imm_s(subject, i64::from(layout.payload_offset))
         }
         _ => {
@@ -224,7 +231,10 @@ fn scalar_type(ty: BackendValueType) -> Result<Type, BackendEmitError> {
 }
 
 fn is_scalar_payload(ty: BackendValueType) -> bool {
-    matches!(ty, BackendValueType::Bool | BackendValueType::Integer { .. })
+    matches!(
+        ty,
+        BackendValueType::Bool | BackendValueType::Integer { .. } | BackendValueType::Region { .. }
+    )
 }
 
 pub(super) fn integer_type_for(size: u8) -> Result<Type, BackendEmitError> {

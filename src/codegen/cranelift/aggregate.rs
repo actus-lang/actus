@@ -19,6 +19,8 @@ pub(super) struct Declaration {
     pub(super) parameter_fragments: Vec<usize>,
     pub(super) return_fragments: usize,
     pub(super) return_slot: Option<crate::codegen::BackendLayout>,
+    pub(super) runtime_pointer_return: bool,
+    pub(super) runtime_result_layout: Option<crate::codegen::BackendLayout>,
 }
 
 pub(super) fn declaration(
@@ -39,9 +41,28 @@ pub(super) fn declaration(
             .iter()
             .map(parameter_fragment_count)
             .collect::<Result<_, _>>()?,
-        return_fragments: return_fragment_count(return_value)?,
+        return_fragments: return_fragment_count(return_value, false)?,
         return_slot,
+        runtime_pointer_return: false,
+        runtime_result_layout: None,
     })
+}
+
+pub(super) fn runtime_declaration(
+    id: cranelift_module::FuncId,
+    external: &crate::codegen::BackendExternal,
+) -> Result<Declaration, BackendEmitError> {
+    let mut declaration = declaration(id, &external.parameters, &external.return_value)?;
+    declaration.runtime_pointer_return = external.runtime_pointer_return;
+    if external.runtime_pointer_return {
+        declaration.return_slot = None;
+        declaration.return_fragments = 1;
+        declaration.runtime_result_layout = match external.return_value.passing {
+            crate::codegen::BackendReturnMode::ReturnSlot { layout } => Some(layout),
+            _ => None,
+        };
+    }
+    Ok(declaration)
 }
 
 fn parameter_fragment_count(
@@ -58,6 +79,7 @@ fn parameter_fragment_count(
 
 fn return_fragment_count(
     return_value: &crate::codegen::BackendReturn,
+    runtime_pointer_return: bool,
 ) -> Result<usize, BackendEmitError> {
     match &return_value.passing {
         crate::codegen::BackendReturnMode::DirectAggregate { abi } => {
@@ -67,7 +89,9 @@ fn return_fragment_count(
         crate::codegen::BackendReturnMode::Direct => {
             Ok(usize::from(!matches!(return_value.ty, BackendValueType::Unit)))
         }
-        crate::codegen::BackendReturnMode::ReturnSlot { .. } => Ok(0),
+        crate::codegen::BackendReturnMode::ReturnSlot { .. } => {
+            Ok(usize::from(runtime_pointer_return))
+        }
     }
 }
 
@@ -101,6 +125,34 @@ pub(super) fn lower_call(
         (None, native_arguments)
     };
     let call = builder.ins().call(reference, &native_arguments);
+    if declaration.runtime_pointer_return {
+        let result = result.ok_or_else(|| {
+            BackendEmitError("Cranelift runtime-pointer call requires a result value".to_owned())
+        })?;
+        let raw = builder.inst_results(call).first().copied().ok_or_else(|| {
+            BackendEmitError("Cranelift runtime result is unavailable".to_owned())
+        })?;
+        let layout = declaration.runtime_result_layout.ok_or_else(|| {
+            BackendEmitError("Cranelift runtime-pointer result layout is unavailable".to_owned())
+        })?;
+        let slot = create_return_slot(builder, layout)?;
+        let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+        let alignment = u8::try_from(layout.alignment).map_err(|_| {
+            BackendEmitError("Cranelift runtime result alignment exceeds u8".to_owned())
+        })?;
+        builder.emit_small_memory_copy(
+            module.isa().frontend_config(),
+            address,
+            raw,
+            u64::from(layout.size),
+            alignment,
+            alignment,
+            false,
+            cranelift_codegen::ir::MemFlagsData::new(),
+        );
+        values.insert(result, address);
+        return Ok(());
+    }
     record_call_results(builder, call, result, return_slot, declaration, values, aggregate_values)?;
     Ok(())
 }

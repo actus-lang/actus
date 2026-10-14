@@ -24,6 +24,7 @@ pub(super) fn lower_integer_binary(
     let right = values.get(right).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift binary right operand {} is unavailable", right.0))
     })?;
+    let right = coerce_integer_width(builder, right, builder.func.dfg.value_type(left));
     let value = match operation {
         BackendIntegerBinaryOp::Add => builder.ins().iadd(left, right),
         BackendIntegerBinaryOp::Subtract => builder.ins().isub(left, right),
@@ -280,6 +281,7 @@ pub(super) fn lower_integer_compare(
     let right = values.get(right).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift comparison right operand {} is unavailable", right.0))
     })?;
+    let right = coerce_integer_width(builder, right, builder.func.dfg.value_type(left));
     let condition = match (operation, signed) {
         (BackendIntegerCompareOp::LessThan, true) => IntCC::SignedLessThan,
         (BackendIntegerCompareOp::LessEquals, true) => IntCC::SignedLessThanOrEqual,
@@ -294,6 +296,22 @@ pub(super) fn lower_integer_compare(
     };
     values.insert(*result, builder.ins().icmp(condition, left, right));
     Ok(())
+}
+
+fn coerce_integer_width(
+    builder: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+    target: cranelift_codegen::ir::Type,
+) -> cranelift_codegen::ir::Value {
+    let source = builder.func.dfg.value_type(value);
+    if source == target {
+        return value;
+    }
+    if source.bits() < target.bits() {
+        builder.ins().uextend(target, value)
+    } else {
+        builder.ins().ireduce(target, value)
+    }
 }
 
 pub(super) fn lower_integer_unary(

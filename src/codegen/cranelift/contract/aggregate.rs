@@ -113,28 +113,13 @@ pub(super) fn lower_aggregate_field_load(
     })?;
     let offset = i32::try_from(*offset)
         .map_err(|_| BackendEmitError("Cranelift aggregate field offset exceeds i32".to_owned()))?;
-    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
-        let alignment = u8::try_from(layout.alignment).map_err(|_| {
-            BackendEmitError("Cranelift aggregate field alignment exceeds u8".to_owned())
-        })?;
-        let slot = builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-            layout.size,
-            alignment.trailing_zeros() as u8,
-        ));
-        let destination = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+    if let BackendValueType::Aggregate { layout }
+    | BackendValueType::Region { layout }
+    | BackendValueType::Enum { layout: crate::codegen::BackendEnumLayout { layout, .. } } = ty
+    {
         let source = builder.ins().iadd_imm_s(base, i64::from(offset));
-        builder.emit_small_memory_copy(
-            module.isa().frontend_config(),
-            destination,
-            source,
-            u64::from(layout.size),
-            alignment,
-            alignment,
-            false,
-            MemFlagsData::new(),
-        );
-        values.insert(*result, destination);
+        let _ = (module, layout);
+        values.insert(*result, source);
     } else {
         let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
             BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
@@ -349,15 +334,17 @@ fn lower_packed_field_load(
     let base = values.get(base).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift packed field base {} is unavailable", base.0))
     })?;
-    let storage_type = packed_storage_type(*storage_layout)?;
-    let storage = builder.ins().load(storage_type, MemFlagsData::new(), base, 0);
-    let mask = packed_mask(builder, storage_type, *width)?;
-    let shifted = if *bit_offset == 0 {
+    let (storage_type, byte_offset, local_bit_offset) =
+        packed_storage_type(*storage_layout, u32::from(*bit_offset), *width)?;
+    let storage_base = builder.ins().iadd_imm_s(base, i64::from(byte_offset));
+    let storage = builder.ins().load(storage_type, MemFlagsData::new(), storage_base, 0);
+    let shifted = if local_bit_offset == 0 {
         storage
     } else {
-        let shift = builder.ins().iconst(storage_type, i64::from(*bit_offset));
+        let shift = builder.ins().iconst(storage_type, i64::from(local_bit_offset));
         builder.ins().ushr(storage, shift)
     };
+    let mask = packed_mask(builder, builder.func.dfg.value_type(shifted), *width)?;
     let extracted = builder.ins().band(shifted, mask);
     let target_type = super::scalar_type(module, *ty)?
         .ok_or_else(|| BackendEmitError("Cranelift packed field must be scalar".to_owned()))?;
@@ -395,35 +382,55 @@ fn lower_packed_field_store(
     let value = values.get(value).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift packed field value {} is unavailable", value.0))
     })?;
-    let storage_type = packed_storage_type(*storage_layout)?;
-    let current = builder.ins().load(storage_type, MemFlagsData::new(), base, 0);
-    let mask = packed_mask(builder, storage_type, *width)?;
-    let shift = builder.ins().iconst(storage_type, i64::from(*bit_offset));
-    let shifted_mask = if *bit_offset == 0 { mask } else { builder.ins().ishl(mask, shift) };
+    let (storage_type, byte_offset, local_bit_offset) =
+        packed_storage_type(*storage_layout, u32::from(*bit_offset), *width)?;
+    let storage_base = builder.ins().iadd_imm_s(base, i64::from(byte_offset));
+    let current = builder.ins().load(storage_type, MemFlagsData::new(), storage_base, 0);
+    let current_type = builder.func.dfg.value_type(current);
+    let mask = packed_mask(builder, current_type, *width)?;
+    let shift = builder.ins().iconst(current_type, i64::from(local_bit_offset));
+    let shifted_mask = if local_bit_offset == 0 { mask } else { builder.ins().ishl(mask, shift) };
     let inverse = builder.ins().bnot(shifted_mask);
     let cleared = builder.ins().band(current, inverse);
     let _ = module;
-    let value = coerce_integer(builder, value, storage_type);
+    let value = coerce_integer(builder, value, current_type);
     let value = builder.ins().band(value, mask);
     let value = if *bit_offset == 0 { value } else { builder.ins().ishl(value, shift) };
     let updated = builder.ins().bor(cleared, value);
-    builder.ins().store(MemFlagsData::new(), updated, base, 0);
+    builder.ins().store(MemFlagsData::new(), updated, storage_base, 0);
     let _ = ty;
     Ok(())
 }
 
 fn packed_storage_type(
     layout: crate::codegen::BackendLayout,
-) -> Result<cranelift_codegen::ir::Type, BackendEmitError> {
-    match layout.size {
-        1 => Ok(cranelift_codegen::ir::types::I8),
-        2 => Ok(cranelift_codegen::ir::types::I16),
-        4 => Ok(cranelift_codegen::ir::types::I32),
-        8 => Ok(cranelift_codegen::ir::types::I64),
-        _ => {
-            Err(BackendEmitError("Cranelift packed storage must be 1, 2, 4, or 8 bytes".to_owned()))
-        }
+    bit_offset: u32,
+    width: u8,
+) -> Result<(cranelift_codegen::ir::Type, u32, u8), BackendEmitError> {
+    let total_bits = layout.size.checked_mul(8).ok_or_else(|| {
+        BackendEmitError("Cranelift packed storage layout size overflows bit width".to_owned())
+    })?;
+    let end = bit_offset.checked_add(u32::from(width)).ok_or_else(|| {
+        BackendEmitError("Cranelift packed field bit range overflows layout".to_owned())
+    })?;
+    if end > total_bits {
+        return Err(BackendEmitError("Cranelift packed field exceeds storage layout".to_owned()));
     }
+    let byte_offset = bit_offset / 8;
+    let local_bit_offset = (bit_offset % 8) as u8;
+    let required_bytes = (u32::from(local_bit_offset) + u32::from(width)).div_ceil(8);
+    let storage_type = match required_bytes {
+        1 => cranelift_codegen::ir::types::I8,
+        2 => cranelift_codegen::ir::types::I16,
+        3 | 4 => cranelift_codegen::ir::types::I32,
+        5..=8 => cranelift_codegen::ir::types::I64,
+        _ => {
+            return Err(BackendEmitError(
+                "Cranelift packed field exceeds the supported 8-byte span".to_owned(),
+            ));
+        }
+    };
+    Ok((storage_type, byte_offset, local_bit_offset))
 }
 
 fn packed_mask(

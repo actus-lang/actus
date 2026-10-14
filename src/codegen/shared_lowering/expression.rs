@@ -465,7 +465,7 @@ impl SharedExpressionProvider<'_> {
             operation,
             left,
             right,
-            signed: true,
+            signed: matches!(left_type, BackendValueType::Integer { signed: true, .. }),
             span,
         });
         Ok(result)

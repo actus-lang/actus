@@ -8,7 +8,9 @@ mod cleanup;
 mod dispatch;
 mod enums;
 mod returns;
-use super::aggregate::{Declaration, declaration, direct_aggregate_types, initialize_values};
+use super::aggregate::{
+    Declaration, declaration, direct_aggregate_types, initialize_values, runtime_declaration,
+};
 use super::integer_ops::{
     lower_integer_binary, lower_integer_cast, lower_integer_compare, lower_integer_unary,
     lower_trap_if_array_index_out_of_bounds, lower_trap_if_shift_count_out_of_range,
@@ -66,14 +68,18 @@ fn declare_functions(
 ) -> Result<BTreeMap<String, Declaration>, BackendEmitError> {
     let mut declarations = BTreeMap::new();
     for external in &backend_module.externals {
-        let signature = signature(module, &external.parameters, &external.return_value, false)?;
+        let signature = signature(
+            module,
+            &external.parameters,
+            &external.return_value,
+            false,
+            external.runtime_pointer_return,
+        )?;
         let id = module
             .declare_function(external.symbol.as_str(), Linkage::Import, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
-        declarations.insert(
-            external.symbol.as_str().to_owned(),
-            declaration(id, &external.parameters, &external.return_value)?,
-        );
+        declarations
+            .insert(external.symbol.as_str().to_owned(), runtime_declaration(id, external)?);
     }
     for function in &backend_module.functions {
         let signature = signature(
@@ -81,6 +87,7 @@ fn declare_functions(
             &function.parameters,
             &function.return_value,
             function.hosted_entry_return,
+            false,
         )?;
         let id = module
             .declare_function(function.symbol.as_str(), Linkage::Export, &signature)
@@ -98,6 +105,7 @@ fn signature(
     parameters: &[crate::codegen::BackendParameter],
     return_value: &crate::codegen::BackendReturn,
     hosted_entry_return: bool,
+    runtime_pointer_return: bool,
 ) -> Result<cranelift_codegen::ir::Signature, BackendEmitError> {
     let mut signature = module.make_signature();
     for parameter in parameters {
@@ -117,6 +125,9 @@ fn signature(
             for ty in direct_aggregate_types(module, abi, false)? {
                 signature.returns.push(AbiParam::new(ty));
             }
+        }
+        crate::codegen::BackendReturnMode::ReturnSlot { layout } if runtime_pointer_return => {
+            signature.returns.push(AbiParam::new(module.isa().pointer_type()));
         }
         crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
             if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } | BackendValueType::Enum { layout: crate::codegen::BackendEnumLayout { layout: value_layout, .. } } if value_layout == *layout)
@@ -218,12 +229,13 @@ fn define_function(
         &function.parameters,
         &function.return_value,
         function.hosted_entry_return,
+        false,
     )?;
     let mut function_context = FunctionBuilderContext::new();
     lower_function_body(module, function, declarations, &mut context, &mut function_context)?;
     module
         .define_function(declaration.id, &mut context)
-        .map_err(|error| BackendEmitError(error.to_string()))?;
+        .map_err(|error| BackendEmitError(format!("Cranelift verifier failed: {error:?}")))?;
     module.clear_context(&mut context);
     Ok(())
 }

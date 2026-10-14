@@ -6,11 +6,8 @@ mod emission;
 mod llvm_emission;
 mod loading;
 #[cfg(feature = "cranelift")]
-mod module_type_context;
 mod object_manifest;
 mod options;
-#[cfg(feature = "cranelift")]
-mod shared_candidate;
 mod shared_emission;
 
 pub(crate) use emission::{EmittedObject, build_file, build_file_quiet, emit_objects};

@@ -8,7 +8,8 @@ pub(super) fn emit_objects_llvm(
     symbol: &str,
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let (generic_types, generic_instances) = llvm_generic_inputs(plan, configuration)?;
+    let (generic_types, generic_instances) =
+        super::shared_emission::generic_inputs(plan, configuration)?;
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
@@ -23,67 +24,8 @@ pub(super) fn emit_objects_llvm(
     )?;
     modules
         .into_iter()
-        .enumerate()
-        .map(|(index, lowered)| {
-            let module = if index == 0 {
-                crate::codegen::llvm::retain_reachable_root_functions(lowered.module, symbol)
-            } else {
-                lowered.module
-            };
-            llvm_object(&lowered.object_name, &module, configuration.target())
-        })
+        .map(|lowered| llvm_object(&lowered.object_name, &lowered.module, configuration.target()))
         .collect()
-}
-
-fn llvm_generic_inputs(
-    plan: &ModuleCompilationPlan,
-    configuration: &CompilerConfiguration,
-) -> Result<(Vec<crate::ast::TypeName>, Vec<crate::semantic::GenericInstance>), BackendEmitError> {
-    let targeted_caller = crate::codegen::normalize_program(
-        &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
-    );
-    let caller_instances = crate::semantic::analyze(&targeted_caller)
-        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
-        .generic_instances;
-    let mut generic_instances = caller_instances;
-    for unit in plan.units() {
-        if !contains_generic_declaration(unit.implementation()) {
-            continue;
-        }
-        let targeted_implementation =
-            crate::codegen::normalize_program(&crate::semantic::filter_program_for_target(
-                unit.implementation(),
-                configuration.target(),
-            ));
-        let implementation_instances = crate::semantic::analyze(&targeted_implementation)
-            .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
-            .generic_instances;
-        for instance in implementation_instances {
-            if !generic_instances.iter().any(|known| {
-                known.identity() == instance.identity() && known.caller == instance.caller
-            }) {
-                generic_instances.push(instance);
-            }
-        }
-    }
-    let expansion_program = crate::codegen::normalize_program(
-        &crate::semantic::filter_program_for_target(&plan.implementation(), configuration.target()),
-    );
-    let generic_instances =
-        crate::codegen::expand_generic_instances(&expansion_program, &generic_instances)?;
-    let generic_types =
-        generic_instances.iter().flat_map(|instance| instance.arguments.iter().cloned()).collect();
-    Ok((generic_types, generic_instances))
-}
-
-fn contains_generic_declaration(program: &crate::ast::Program) -> bool {
-    program.declarations.iter().any(|declaration| match declaration {
-        crate::ast::TopLevelDecl::Verb(verb) => !verb.generic_parameters.is_empty(),
-        crate::ast::TopLevelDecl::ExternalVerb(verb) => !verb.generic_parameters.is_empty(),
-        crate::ast::TopLevelDecl::Struct(definition) => !definition.generic_parameters.is_empty(),
-        crate::ast::TopLevelDecl::Enum(definition) => !definition.generic_parameters.is_empty(),
-        _ => false,
-    })
 }
 
 fn llvm_object(

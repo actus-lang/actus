@@ -54,7 +54,39 @@ fn normalize_statement(statement: &Stmt, output: &mut Vec<Stmt>) {
             output.extend(owners);
             output.push(Stmt::Expression { expression, span: *span });
         }
+        Stmt::If { condition, then_branch, else_branch, span } => {
+            let mut owners = Vec::new();
+            let condition = extract_nested_cases(condition, &mut owners, true);
+            output.extend(owners);
+            output.push(Stmt::If {
+                condition,
+                then_branch: normalize_block(then_branch),
+                else_branch: else_branch.as_ref().map(normalize_if_branch),
+                span: *span,
+            });
+        }
         _ => output.push(statement.clone()),
+    }
+}
+
+fn normalize_if_branch(branch: &crate::ast::IfBranch) -> crate::ast::IfBranch {
+    match branch {
+        crate::ast::IfBranch::Block(block) => crate::ast::IfBranch::Block(normalize_block(block)),
+        crate::ast::IfBranch::ElseIf(expression) => {
+            crate::ast::IfBranch::ElseIf(Box::new(normalize_expression(expression)))
+        }
+    }
+}
+
+fn normalize_expression(expression: &Expr) -> Expr {
+    match expression {
+        Expr::If { condition, then_branch, else_branch, span } => Expr::If {
+            condition: Box::new(normalize_expression(condition)),
+            then_branch: normalize_block(then_branch),
+            else_branch: else_branch.as_ref().map(normalize_if_branch),
+            span: *span,
+        },
+        _ => expression.clone(),
     }
 }
 

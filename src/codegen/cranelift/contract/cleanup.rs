@@ -150,6 +150,8 @@ pub(super) fn declare_cleanup_bridges(
                 parameter_fragments: vec![1, 1],
                 return_fragments: 1,
                 return_slot: None,
+                runtime_pointer_return: false,
+                runtime_result_layout: None,
             },
         );
     }
@@ -186,7 +188,14 @@ pub(super) fn declare_cleanup_bridges(
             .map_err(|error| BackendEmitError(error.to_string()))?;
         declarations.insert(
             symbol.to_owned(),
-            Declaration { id, parameter_fragments, return_fragments, return_slot: None },
+            Declaration {
+                id,
+                parameter_fragments,
+                return_fragments,
+                return_slot: None,
+                runtime_pointer_return: false,
+                runtime_result_layout: None,
+            },
         );
     }
     Ok(())

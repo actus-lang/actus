@@ -28,29 +28,6 @@ pub(crate) struct FunctionRef {
     pub(crate) ins_params: Vec<bool>,
 }
 
-pub(crate) fn reachable_call_names(
-    program: &Program,
-    symbol: &str,
-) -> Result<std::collections::HashSet<String>, BackendEmitError> {
-    let verbs = program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            crate::ast::TopLevelDecl::Verb(verb) => Some(verb),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    let external_verbs = program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            crate::ast::TopLevelDecl::ExternalVerb(verb) => Some(verb),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    super::dependencies::reachable_call_names(&verbs, &external_verbs, Some(symbol))
-}
-
 pub fn emit_zero_return_object(symbol: &str) -> Result<Vec<u8>, BackendEmitError> {
     let target = TargetSpec::host().map_err(|error| BackendEmitError(error.to_string()))?;
     super::object::emit_i32_object(symbol, 0, &NativeBackendConfiguration::default(), &target)

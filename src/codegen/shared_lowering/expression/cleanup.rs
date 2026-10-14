@@ -40,12 +40,14 @@ pub(super) fn emit_scope_cleanup(
             }
         }
     }
+    if matches!(instructions.last(), Some(BackendInstruction::Branch { .. })) {
+        return;
+    }
     let terminates = matches!(
         instructions.last(),
         Some(BackendInstruction::Return { .. })
             | Some(BackendInstruction::Fail { .. })
             | Some(BackendInstruction::Jump { .. })
-            | Some(BackendInstruction::Branch { .. })
     );
     let insertion = instructions.len().saturating_sub(usize::from(terminates));
     instructions.splice(insertion..insertion, cleanup);
@@ -85,7 +87,7 @@ pub(super) fn append_loop_cleanup(
 }
 
 fn local_value(provider: &SharedExpressionProvider<'_>, name: &str) -> Option<BackendValueId> {
-    provider.locals.iter().rev().find_map(|scope| scope.get(name).copied())
+    provider.locals.last().and_then(|scope| scope.get(name).copied())
 }
 
 fn binding_value(provider: &SharedExpressionProvider<'_>, name: &str) -> Option<BackendValueId> {
