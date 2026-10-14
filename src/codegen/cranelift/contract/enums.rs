@@ -63,9 +63,16 @@ fn lower_construct(
         );
         return Ok(());
     }
-    let slot = return_slot.ok_or_else(|| {
-        BackendEmitError("Cranelift enum construction requires a return slot".to_owned())
-    })?;
+    let _ = return_slot;
+    let alignment = u8::try_from(layout.layout.alignment)
+        .map_err(|_| BackendEmitError("Cranelift enum alignment exceeds u8".to_owned()))?;
+    let stack_slot =
+        builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+            layout.layout.size,
+            alignment.trailing_zeros() as u8,
+        ));
+    let slot = builder.ins().stack_addr(module.isa().pointer_type(), stack_slot, 0);
     let discriminant_type = integer_type_for(layout.discriminant_size)?;
     let discriminant_value = builder.ins().iconst(discriminant_type, i64::from(*discriminant));
     builder.ins().store(

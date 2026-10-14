@@ -328,13 +328,12 @@ fn scalar_expression(expression: &Expr, context: &CandidateContext<'_>) -> bool 
         Expr::Call { callee, arguments, .. } => scalar_call_expression(callee, arguments, context),
         Expr::Case { .. } => scalar_case_expression(expression, context),
         Expr::MethodCall { receiver, method, arguments, .. } => {
-            let type_receiver = matches!(
+            let result_constructor = matches!(
                 receiver.as_ref(),
-                Expr::Identifier { name, .. } if name.contains('[')
+                Expr::Identifier { name, .. }
+                    if name.starts_with("Result[") && matches!(method.as_str(), "Ok" | "Err")
             );
-            !type_receiver
-                && !matches!(method.as_str(), "Ok" | "Err" | "Some" | "None")
-                && scalar_expression(receiver, context)
+            (result_constructor || scalar_expression(receiver, context))
                 && arguments.iter().all(|argument| scalar_expression(&argument.expression, context))
         }
         Expr::StructLit { name, fields, .. } => {

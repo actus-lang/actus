@@ -45,7 +45,40 @@ pub fn lower_verb_body_with_expressions(
     let entry = BackendBlockId(0);
     let entry_block = lowering.lower_block(entry, &verb.body, None)?;
     lowering.blocks.insert(0, entry_block);
-    Ok(lowering.blocks)
+    Ok(order_blocks(lowering.blocks, entry))
+}
+
+fn order_blocks(blocks: Vec<BackendBlock>, entry: BackendBlockId) -> Vec<BackendBlock> {
+    fn visit(
+        id: BackendBlockId,
+        blocks: &[BackendBlock],
+        visited: &mut std::collections::BTreeSet<BackendBlockId>,
+        order: &mut Vec<BackendBlockId>,
+    ) {
+        if !visited.insert(id) {
+            return;
+        }
+        order.push(id);
+        let Some(block) = blocks.iter().find(|block| block.id == id) else { return };
+        let successors = match block.instructions.last() {
+            Some(BackendInstruction::Branch { then_block, else_block, .. }) => {
+                vec![*then_block, *else_block]
+            }
+            Some(BackendInstruction::Jump { target, .. }) => vec![*target],
+            _ => Vec::new(),
+        };
+        for successor in successors {
+            visit(successor, blocks, visited, order);
+        }
+    }
+
+    let mut visited = std::collections::BTreeSet::new();
+    let mut ids = Vec::with_capacity(blocks.len());
+    visit(entry, &blocks, &mut visited, &mut ids);
+    for block in &blocks {
+        visit(block.id, &blocks, &mut visited, &mut ids);
+    }
+    ids.into_iter().filter_map(|id| blocks.iter().find(|block| block.id == id).cloned()).collect()
 }
 
 pub(super) struct BodyLowering<'a, P> {
