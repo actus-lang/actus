@@ -883,6 +883,46 @@ fn both_native_backends_build_and_run_a_shared_generic_aggregate_option_view_fie
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_and_run_a_shared_generic_owned_buffer_field_transfer() {
+    let source = "struct Box[T] { erg item: T, } verb consume(dat value: Buffer) { drop(value); return; } verb main() -> Int { erg boxed: Box[Buffer] = Box[Buffer] { item: Buffer[1], }; consume(value: dat boxed.item); return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-{backend}-generic-owned-buffer-transfer-{}",
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create generic owned transfer directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"generic-owned-buffer-transfer-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write generic owned transfer manifest");
+        fs::write(&input, source).expect("write generic owned transfer source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build generic owned transfer");
+        let status =
+            std::process::Command::new(&output).status().expect("run generic owned transfer");
+        assert_eq!(status.code(), Some(42), "backend {backend} generic transfer result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store() {

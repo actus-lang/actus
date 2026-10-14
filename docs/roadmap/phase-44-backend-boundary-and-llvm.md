@@ -1330,6 +1330,12 @@ through both LLVM and Cranelift with exit status 42. Persistent `ins` fields
 and generic ownership transfer/cleanup remain governed by their existing
 semantic rejection and cleanup contracts.
 
+Generic owned resource transfer now has hosted parity coverage. A `Buffer`
+stored in `erg item: T` is moved with the explicit `dat boxed.item` argument
+into a consuming verb, which drops the resource before returning through both
+LLVM and Cranelift. The regression validates the existing field-path move and
+cleanup plan; it introduces no aggregate copy or hidden ownership operation.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`
