@@ -167,6 +167,7 @@ fn lower_arguments(
             let value = lower_aggregate_loan_argument(
                 provider,
                 &argument.expression,
+                callee,
                 *layout,
                 span,
                 instructions,
@@ -236,6 +237,7 @@ fn lower_arguments(
 fn lower_aggregate_loan_argument(
     provider: &mut SharedExpressionProvider<'_>,
     expression: &crate::ast::Expr,
+    callee: &str,
     layout: crate::codegen::BackendLayout,
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
@@ -256,7 +258,12 @@ fn lower_aggregate_loan_argument(
     if !caller_owned_storage {
         return Err(super::super::support::unsupported(
             span,
-            "aggregate `ins` call argument must resolve to caller-owned storage",
+            format!(
+                "aggregate `ins` call argument for `{callee}` must resolve to caller-owned storage (value type: {:?}, nominal type: {:?}, expected layout: {:?})",
+                provider.value_type(value),
+                provider.nominal_type(value),
+                layout
+            ),
         ));
     }
     Ok(value)

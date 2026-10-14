@@ -57,6 +57,26 @@ fn file_utility_example_builds_with_llvm() {
     fs::remove_dir_all(root).expect("remove LLVM file utility working directory");
 }
 
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn file_utility_example_builds_with_cranelift() {
+    let root = std::env::temp_dir().join(format!("actus-file-utility-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create file utility working directory");
+    let output = root.join("file-utility-cranelift");
+    let source =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/file_utility.act");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--backend", "cranelift"])
+        .arg(&source)
+        .args(["--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&root)
+        .output()
+        .expect("build file utility example with Cranelift");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    fs::remove_dir_all(root).expect("remove Cranelift file utility working directory");
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn sensor_telemetry_example_builds_and_executes_with_llvm() {

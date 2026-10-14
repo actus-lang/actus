@@ -325,18 +325,6 @@ impl<'program> SharedDeclarations<'program> {
                         .collect(),
                 )
             }))
-            .chain(performances.iter().zip(&performance_signatures).map(
-                |((_, method), signature)| {
-                    (
-                        method.name.clone(),
-                        signature
-                            .parameters
-                            .iter()
-                            .map(|parameter| parameter.passing.clone())
-                            .collect(),
-                    )
-                },
-            ))
             .collect();
         Ok(Self {
             verbs,
