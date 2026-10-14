@@ -1289,6 +1289,17 @@ both build and execute it with exit status 42. Generic aggregate applications,
 nested aggregate mutation through separate field stores, and aggregate
 compound stores remain outside this slice.
 
+The shared candidate now admits a bounded generic aggregate element slice after
+specialization: generic structs with scalar, concrete aggregate, or generic
+parameter fields can participate in `Array[Box[Int], N]` construction and
+element stores. The classifier regression
+`accepts_generic_aggregate_array_element_stores_in_the_shared_contract` and the
+hosted parity fixture
+`both_native_backends_build_and_run_a_shared_generic_aggregate_array_element_store`
+exercise the same `Box[T]` source through LLVM and Cranelift with exit status
+42. Generic ownership-bearing fields, generic nested applications, and generic
+aggregate compound stores remain outside this slice.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`

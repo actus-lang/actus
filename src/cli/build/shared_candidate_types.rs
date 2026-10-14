@@ -10,7 +10,9 @@ pub(super) fn unit_structs(program: &Program) -> BTreeSet<String> {
         let previous_len = names.len();
         for declaration in &program.declarations {
             let crate::ast::TopLevelDecl::Struct(definition) = declaration else { continue };
-            if (supported_struct(definition, &names) || supported_value_struct(definition, &names))
+            if (supported_struct(definition, &names)
+                || supported_value_struct(definition, &names)
+                || supported_generic_struct(definition, &names))
                 && names.insert(definition.name.clone())
             {}
         }
@@ -44,6 +46,26 @@ fn supported_value_struct(
                 || (matches!(field.role, crate::ast::StructFieldRole::Abs)
                     && scalar_option_type(&field.ty))
         })
+}
+
+fn supported_generic_struct(
+    definition: &crate::ast::StructDef,
+    aggregate_types: &BTreeSet<String>,
+) -> bool {
+    if definition.generic_parameters.is_empty() {
+        return false;
+    }
+    let parameters = definition
+        .generic_parameters
+        .iter()
+        .map(|parameter| parameter.name.as_str())
+        .collect::<BTreeSet<_>>();
+    definition.fields.iter().all(|field| {
+        matches!(field.role, crate::ast::StructFieldRole::Erg | crate::ast::StructFieldRole::Value)
+            && (super::scalar_type(&field.ty)
+                || parameters.contains(field.ty.name.as_str())
+                || aggregate_types.contains(&field.ty.name))
+    })
 }
 
 pub(super) fn supported_perform(
