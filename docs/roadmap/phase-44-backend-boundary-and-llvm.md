@@ -1546,6 +1546,12 @@ the existing shared `if_flow` lowering. The unit predicate and
 Cranelift parity with exit status `42`; unsupported conditional expression
 shapes remain outside the candidate slice.
 
+Standalone scalar `case` statements now use the shared case-control-flow
+lowering instead of the Cranelift legacy fallback. The classifier unit
+coverage and `both_native_backends_build_standalone_case_statement_through_shared_lowering`
+verify the Result branch path through LLVM and Cranelift with exit status `42`;
+guarded and literal-pattern case forms remain outside this candidate slice.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

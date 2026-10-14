@@ -172,7 +172,8 @@ fn scalar_statement(
         }
         Stmt::Assignment { .. } | Stmt::CompoundAssignment { .. } => false,
         Stmt::Expression { expression, .. } => {
-            matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context)
+            (matches!(expression, Expr::Call { .. }) && scalar_statement_call(expression, context))
+                || scalar_case_expression(expression, context)
         }
         Stmt::If { .. } => scalar_if_statement(statement, context),
         Stmt::Return { value, .. } => {
