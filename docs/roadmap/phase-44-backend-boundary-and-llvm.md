@@ -1534,6 +1534,13 @@ array loop now follows the same shared route. The parity regression
 `both_native_backends_build_nested_range_and_array_loops_through_shared_lowering`
 builds and runs through LLVM and Cranelift with exit status `84`.
 
+Statement `if` forms without an `else` now also enter the shared candidate
+route; `else if` remains explicitly outside this slice and retains the
+established fallback. The unit classifier regression and
+`both_native_backends_preserve_local_assignment_in_an_if_without_else` verify
+the existing shared body-lowering behavior without changing branch ABI,
+ownership roles, or cleanup semantics.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

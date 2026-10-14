@@ -176,12 +176,12 @@ fn scalar_statement(
         }
         Stmt::If { condition, then_branch, else_branch, .. } => {
             scalar_expression(condition, context)
-                && scalar_return_block(then_branch, context)
-                && matches!(
-                    else_branch,
-                    Some(IfBranch::Block(block))
-                        if scalar_return_block(block, context)
-                )
+                && scalar_block(then_branch, context, true)
+                && match else_branch {
+                    None => true,
+                    Some(IfBranch::Block(block)) => scalar_block(block, context, true),
+                    Some(IfBranch::ElseIf(_)) => false,
+                }
         }
         Stmt::Return { value, .. } => {
             value.as_ref().is_none_or(|value| scalar_return_expression(value, context))
