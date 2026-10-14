@@ -1,9 +1,12 @@
 use super::super::super::{
     BackendContractError, BackendExpressionProvider, BackendInstruction, BackendValueId,
+    BackendValueType,
 };
 use super::super::support::expression_span;
 use super::SharedExpressionProvider;
+use super::aggregate::lower_array_element_location;
 use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
+use crate::codegen::BackendPassingMode;
 use crate::codegen::{SymbolIdentity, SymbolKind};
 use crate::lexer::SourceSpan;
 
@@ -54,7 +57,8 @@ pub(super) fn lower_call(
     if arguments.is_empty() && callee.starts_with("Arena[") {
         return super::arena::lower_constructor(provider, callee, *span, instructions);
     }
-    let arguments = lower_arguments(provider, arguments, instructions)?;
+    let lowered = lower_arguments(provider, callee, arguments, *span, instructions)?;
+    let arguments = lowered.values;
     if let Some((symbol, result_type)) = runtime_intrinsic(callee) {
         return lower_runtime_call(
             provider,
@@ -81,6 +85,7 @@ pub(super) fn lower_call(
         result,
         span: *span,
     });
+    append_scalar_loan_writebacks(provider, lowered.writebacks, *span, instructions);
     result.ok_or_else(|| {
         super::super::support::unsupported(*span, "unit call cannot produce a value")
     })
@@ -114,25 +119,135 @@ pub(super) fn lower_unit_call(
             "unit call expected",
         ));
     };
-    let arguments = lower_arguments(provider, arguments, instructions)?;
+    let lowered = lower_arguments(provider, callee, arguments, *span, instructions)?;
+    let arguments = lowered.values;
     instructions.push(BackendInstruction::Call {
         callee: provider.callee_for(callee, *span)?,
         arguments,
         result: None,
         span: *span,
     });
+    append_scalar_loan_writebacks(provider, lowered.writebacks, *span, instructions);
     Ok(())
+}
+
+struct LoweredArguments {
+    values: Vec<BackendValueId>,
+    writebacks: Vec<ScalarLoanWriteback>,
+}
+
+struct ScalarLoanWriteback {
+    name: Option<String>,
+    address: BackendValueId,
+    ty: BackendValueType,
+    place: Option<ArrayLoanPlace>,
+}
+
+struct ArrayLoanPlace {
+    base: BackendValueId,
+    index: BackendValueId,
+    aggregate_layout: crate::codegen::BackendLayout,
+    element_layout: crate::codegen::BackendLayout,
+    element_type: BackendValueType,
+    capacity: u32,
 }
 
 fn lower_arguments(
     provider: &mut SharedExpressionProvider<'_>,
+    callee: &str,
     arguments: &[crate::ast::Argument],
+    span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
-) -> Result<Vec<BackendValueId>, BackendContractError> {
-    arguments
-        .iter()
-        .map(|argument| provider.lower_expression(&argument.expression, instructions))
-        .collect()
+) -> Result<LoweredArguments, BackendContractError> {
+    let modes = provider.parameter_modes.get(callee).cloned().unwrap_or_default();
+    let mut values = Vec::with_capacity(arguments.len());
+    let mut writebacks = Vec::new();
+    for (index, argument) in arguments.iter().enumerate() {
+        let Some(BackendPassingMode::ExclusiveScalarLoan { ty }) = modes.get(index) else {
+            let value = provider.lower_expression(&argument.expression, instructions)?;
+            values.push(value);
+            continue;
+        };
+        let (value, name, place) = match &argument.expression {
+            crate::ast::Expr::Identifier { name, .. } => (
+                provider.lower_expression(&argument.expression, instructions)?,
+                Some(name.clone()),
+                None,
+            ),
+            crate::ast::Expr::Index { target, index, .. } => {
+                let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
+                    lower_array_element_location(provider, target, index, span, instructions)?;
+                let value = provider.allocate();
+                provider.remember_value(value, element_type);
+                instructions.push(BackendInstruction::ArrayElementLoad {
+                    result: value,
+                    base,
+                    index,
+                    aggregate_layout,
+                    element_layout,
+                    element_type,
+                    capacity,
+                    span,
+                });
+                (
+                    value,
+                    None,
+                    Some(ArrayLoanPlace {
+                        base,
+                        index,
+                        aggregate_layout,
+                        element_layout,
+                        element_type,
+                        capacity,
+                    }),
+                )
+            }
+            _ => {
+                return Err(super::super::support::unsupported(
+                    span,
+                    "scalar `ins` call arguments require an addressable place",
+                ));
+            }
+        };
+        let address = provider.allocate();
+        instructions.push(BackendInstruction::ScalarLoanMaterialize {
+            result: address,
+            value,
+            ty: *ty,
+            span,
+        });
+        values.push(address);
+        writebacks.push(ScalarLoanWriteback { name, address, ty: *ty, place });
+    }
+    Ok(LoweredArguments { values, writebacks })
+}
+
+fn append_scalar_loan_writebacks(
+    provider: &mut SharedExpressionProvider<'_>,
+    writebacks: Vec<ScalarLoanWriteback>,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    for writeback in writebacks {
+        let ScalarLoanWriteback { name, address, ty, place } = writeback;
+        let value = provider.allocate();
+        provider.remember_value(value, ty);
+        instructions.push(BackendInstruction::ScalarLoanLoad { result: value, address, ty, span });
+        if let Some(place) = place {
+            instructions.push(BackendInstruction::ArrayElementStore {
+                base: place.base,
+                index: place.index,
+                aggregate_layout: place.aggregate_layout,
+                element_layout: place.element_layout,
+                element_type: place.element_type,
+                value,
+                capacity: place.capacity,
+                span,
+            });
+        } else if let Some(name) = name {
+            super::state::set_binding_value(provider, &name, value);
+        }
+    }
 }
 
 fn lower_runtime_call(

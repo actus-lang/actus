@@ -21,7 +21,8 @@ use super::literals::emit_string_literal;
 use super::memory::emit_memory_copy;
 use super::returns::emit_return;
 use llvm_sys::core::{
-    LLVMBuildRetVoid, LLVMBuildUnreachable, LLVMConstInt, LLVMGetParam, LLVMPositionBuilderAtEnd,
+    LLVMBuildAlloca, LLVMBuildLoad2, LLVMBuildRetVoid, LLVMBuildStore, LLVMBuildUnreachable,
+    LLVMConstInt, LLVMGetParam, LLVMPositionBuilderAtEnd,
 };
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
@@ -154,7 +155,9 @@ fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId
         | BackendInstruction::AggregateConstruct { result, .. }
         | BackendInstruction::AggregateFieldLoad { result, .. }
         | BackendInstruction::PackedFieldLoad { result, .. }
-        | BackendInstruction::ArrayElementLoad { result, .. } => Some(*result),
+        | BackendInstruction::ArrayElementLoad { result, .. }
+        | BackendInstruction::ScalarLoanLoad { result, .. }
+        | BackendInstruction::ScalarLoanMaterialize { result, .. } => Some(*result),
         BackendInstruction::Call { result, .. } => *result,
         _ => None,
     }
@@ -186,6 +189,9 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         }
         BackendInstruction::Return { value, .. } => value.iter().copied().collect(),
         BackendInstruction::MemoryCopy { destination, source, .. } => vec![*destination, *source],
+        BackendInstruction::ScalarLoanLoad { address, .. } => vec![*address],
+        BackendInstruction::ScalarLoanStore { address, value, .. } => vec![*address, *value],
+        BackendInstruction::ScalarLoanMaterialize { value, .. } => vec![*value],
         BackendInstruction::ArenaPlace { arena, value, .. } => vec![*arena, *value],
         BackendInstruction::AggregateConstruct { fields, .. } => {
             fields.iter().map(|field| field.value).collect()
@@ -450,9 +456,81 @@ fn emit_scalar_instruction(
         BackendInstruction::EnumConstruct { .. } => {
             emit_enum_construct(context, builder, instruction, values)
         }
+        BackendInstruction::ScalarLoanLoad { .. }
+        | BackendInstruction::ScalarLoanStore { .. }
+        | BackendInstruction::ScalarLoanMaterialize { .. } => {
+            emit_scalar_loan(context, builder, instruction, values)
+        }
         _ => return None,
     };
     Some(result)
+}
+
+fn emit_scalar_loan(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    match instruction {
+        BackendInstruction::ScalarLoanLoad { result, address, ty, .. } => {
+            let address = values.get(address).copied().ok_or_else(|| {
+                BackendEmitError(format!("LLVM scalar loan address {} is unavailable", address.0))
+            })?;
+            let value_type = super::values::llvm_type(context, *ty)?;
+            let value = unsafe {
+                LLVMBuildLoad2(builder, value_type, address, c"scalar.loan.load".as_ptr())
+            };
+            if value.is_null() {
+                return Err(BackendEmitError("LLVM failed to load scalar loan".to_owned()));
+            }
+            values.insert(*result, value);
+            Ok(false)
+        }
+        BackendInstruction::ScalarLoanStore { address, value, .. } => {
+            let address = values.get(address).copied().ok_or_else(|| {
+                BackendEmitError(format!("LLVM scalar loan address {} is unavailable", address.0))
+            })?;
+            let value = values.get(value).copied().ok_or_else(|| {
+                BackendEmitError(format!("LLVM scalar loan value {} is unavailable", value.0))
+            })?;
+            if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
+                return Err(BackendEmitError("LLVM failed to store scalar loan".to_owned()));
+            }
+            Ok(false)
+        }
+        BackendInstruction::ScalarLoanMaterialize { result, value, .. } => {
+            let value = values.get(value).copied().ok_or_else(|| {
+                BackendEmitError(format!(
+                    "LLVM scalar loan materialization value {} is unavailable",
+                    value.0
+                ))
+            })?;
+            let value_type = super::values::llvm_type(
+                context,
+                match instruction {
+                    BackendInstruction::ScalarLoanMaterialize { ty, .. } => *ty,
+                    _ => unreachable!(),
+                },
+            )?;
+            let name =
+                std::ffi::CString::new(format!("scalar.loan.slot{}", result.0)).map_err(|_| {
+                    BackendEmitError("LLVM scalar loan slot name contains NUL".to_owned())
+                })?;
+            let address = unsafe { LLVMBuildAlloca(builder, value_type, name.as_ptr()) };
+            if address.is_null() {
+                return Err(BackendEmitError(
+                    "LLVM failed to allocate scalar loan slot".to_owned(),
+                ));
+            }
+            if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
+                return Err(BackendEmitError("LLVM failed to store scalar loan value".to_owned()));
+            }
+            values.insert(*result, address);
+            Ok(false)
+        }
+        _ => Err(BackendEmitError("LLVM scalar loan instruction expected".to_owned())),
+    }
 }
 
 fn emit_guard(

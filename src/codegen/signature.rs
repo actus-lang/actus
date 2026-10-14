@@ -187,7 +187,7 @@ pub(crate) fn lower_parameter(
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendParameter, BackendContractError> {
     let (ty, layout) = lower_type(&parameter.ty, layouts)?;
-    let passing = passing_for(parameter.role.clone(), layout, parameter.span)?;
+    let passing = passing_for(parameter.role.clone(), ty, layout, parameter.span)?;
     Ok(BackendParameter { name: parameter.name.clone(), role: parameter.role.clone(), ty, passing })
 }
 
@@ -279,6 +279,7 @@ fn is_opaque_runtime_type(type_name: &TypeName) -> bool {
 
 fn passing_for(
     role: Role,
+    ty: BackendValueType,
     layout: Option<BackendLayout>,
     _span: crate::lexer::SourceSpan,
 ) -> Result<BackendPassingMode, BackendContractError> {
@@ -288,7 +289,8 @@ fn passing_for(
         (Role::Abs, Some(layout)) => Ok(BackendPassingMode::Borrowed { layout }),
         (Role::Ins, Some(layout)) => Ok(BackendPassingMode::ExclusiveLoan { layout }),
         (Role::Dat, Some(layout)) => Ok(BackendPassingMode::OwnershipTransfer { layout }),
-        (Role::Ins | Role::Dat, None) => Ok(BackendPassingMode::Direct),
+        (Role::Ins, None) => Ok(BackendPassingMode::ExclusiveScalarLoan { ty }),
+        (Role::Dat, None) => Ok(BackendPassingMode::Direct),
     }
 }
 

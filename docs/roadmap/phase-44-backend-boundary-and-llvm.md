@@ -1645,3 +1645,13 @@ Cranelift; enum representation and ownership roles remain unchanged.
 - Replacing Cranelift before LLVM reaches equivalent shared-contract coverage.
 - Adding dynamic allocation, hidden runtime state, or unbounded collections to
   make backend integration easier.
+Scalar `ins` caller-owned storage is now represented in the neutral ABI for
+the migrated call slice. Shared lowering materializes scalar identifiers and
+indexed array elements into caller-owned storage, passes the resulting pointer,
+and emits the corresponding post-call load/writeback. Callee entry loads and
+return-path stores are neutral instructions; LLVM and Cranelift implement the
+same contract with typed `alloca`/stack-slot operations. The parity regression
+`both_native_backends_share_scalar_ins_caller_storage_and_writeback` executes
+the identifier case on both backends, while the existing phase18 indexed-loan
+fixture verifies array-element writeback. Remaining aggregate and structured
+loan places are still outside this slice; Gate 44.7.1 remains open.

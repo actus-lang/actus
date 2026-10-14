@@ -256,6 +256,9 @@ fn parameter_type(
         | BackendPassingMode::RuntimeBridge { .. } => {
             Ok(unsafe { LLVMPointerTypeInContext(context, 0) })
         }
+        BackendPassingMode::ExclusiveScalarLoan { .. } => {
+            Ok(unsafe { LLVMPointerTypeInContext(context, 0) })
+        }
     }
 }
 
@@ -276,6 +279,7 @@ fn apply_parameter_alignments(
             | BackendPassingMode::ExclusiveLoan { layout }
             | BackendPassingMode::OwnershipTransfer { layout }
             | BackendPassingMode::RuntimeBridge { layout } => Some(*layout),
+            BackendPassingMode::ExclusiveScalarLoan { .. } => None,
             BackendPassingMode::Direct | BackendPassingMode::DirectAggregate { .. } => None,
         };
         let Some(layout) = layout else {

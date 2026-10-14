@@ -61,6 +61,9 @@ fn validate_instruction(
         {
             Err(BackendContractError::InvalidMemoryCopy)
         }
+        BackendInstruction::ScalarLoanLoad { ty, .. }
+        | BackendInstruction::ScalarLoanStore { ty, .. }
+        | BackendInstruction::ScalarLoanMaterialize { ty, .. } => validate_scalar_loan_type(*ty),
         BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } => {
             validate_arena_instruction(instruction)
         }
@@ -71,6 +74,14 @@ fn validate_instruction(
             validate_aggregate_instruction(instruction)
         }
         _ => Ok(()),
+    }
+}
+
+fn validate_scalar_loan_type(ty: super::BackendValueType) -> Result<(), BackendContractError> {
+    if matches!(ty, super::BackendValueType::Bool | super::BackendValueType::Integer { .. }) {
+        validate_value_type(ty)
+    } else {
+        Err(BackendContractError::InvalidValueType)
     }
 }
 

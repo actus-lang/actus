@@ -22,20 +22,22 @@ mod packed;
 mod state;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
-    BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendSymbolBindings,
-    BackendValueId, BackendValueType, SymbolIdentity,
+    BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendPassingMode,
+    BackendSymbolBindings, BackendValueId, BackendValueType, SymbolIdentity,
 };
 use super::support::{expression_span, unsupported};
 pub(super) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
     layouts: &'a dyn super::super::BackendLayoutProvider,
     parameters: BTreeMap<String, BackendValueId>,
+    scalar_loan_parameters: Vec<(String, BackendValueId, BackendValueId, BackendValueType)>,
     owned_parameters: std::collections::BTreeSet<String>,
     locals: Vec<BTreeMap<String, BackendValueId>>,
     verb_name: String,
     return_types: &'a BTreeMap<String, Option<BackendValueType>>,
     return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
     return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
+    parameter_modes: &'a BTreeMap<String, Vec<BackendPassingMode>>,
     performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: &'a BTreeMap<(String, String), Option<crate::ast::TypeName>>,
@@ -64,6 +66,7 @@ impl<'a> SharedExpressionProvider<'a> {
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
         return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
         return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
+        parameter_modes: &'a BTreeMap<String, Vec<BackendPassingMode>>,
         performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
         performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
         performance_return_nominal_types: &'a BTreeMap<
@@ -74,7 +77,7 @@ impl<'a> SharedExpressionProvider<'a> {
         bindings: Option<&'a BackendSymbolBindings>,
         cleanup_plans: &'a [super::super::BackendCleanupPlan],
     ) -> Self {
-        let parameter_bindings = verb
+        let mut parameter_bindings = verb
             .params
             .iter()
             .enumerate()
@@ -86,19 +89,45 @@ impl<'a> SharedExpressionProvider<'a> {
             .filter(|parameter| parameter.role == Role::Erg)
             .map(|parameter| parameter.name.clone())
             .collect();
-        let parameter_types = state::parameter_types(verb, layouts);
+        let mut parameter_types = state::parameter_types(verb, layouts);
         let nominal_types = aggregate::parameter_nominal_types(verb, layouts);
         let enum_payload_types = state::enum_payload_types(verb, layouts);
+        let mut scalar_loan_parameters = Vec::new();
+        let mut next_value = verb.params.len() as u32;
+        for (index, parameter) in verb.params.iter().enumerate() {
+            let Some(BackendValueType::Bool | BackendValueType::Integer { .. }) =
+                parameter_types.get(&BackendValueId(index as u32)).copied()
+            else {
+                continue;
+            };
+            if !matches!(
+                crate::codegen::lower_parameter(parameter, layouts)
+                    .ok()
+                    .map(|parameter| parameter.passing),
+                Some(BackendPassingMode::ExclusiveScalarLoan { .. })
+            ) {
+                continue;
+            }
+            let address = BackendValueId(index as u32);
+            let loaded = BackendValueId(next_value);
+            next_value += 1;
+            let ty = parameter_types[&address];
+            parameter_bindings.insert(parameter.name.clone(), loaded);
+            parameter_types.insert(loaded, ty);
+            scalar_loan_parameters.push((parameter.name.clone(), address, loaded, ty));
+        }
         Self {
             namespace,
             layouts,
             parameters: parameter_bindings,
+            scalar_loan_parameters,
             owned_parameters,
             locals: Vec::new(),
             verb_name: verb.name.clone(),
             return_types,
             return_nominal_types,
             return_payload_types,
+            parameter_modes,
             performance_symbols,
             performance_return_types,
             performance_return_nominal_types,
@@ -108,7 +137,7 @@ impl<'a> SharedExpressionProvider<'a> {
             value_types: parameter_types,
             nominal_types,
             enum_payload_types,
-            next_value: verb.params.len() as u32,
+            next_value,
             loop_depth: 0,
         }
     }
@@ -122,6 +151,31 @@ impl<'a> SharedExpressionProvider<'a> {
     }
     pub(super) fn parameter_is_owned(&self, name: &str) -> bool {
         self.owned_parameters.contains(name)
+    }
+    pub(super) fn scalar_loan_prologue(&self) -> Vec<BackendInstruction> {
+        self.scalar_loan_parameters
+            .iter()
+            .map(|(_, address, loaded, ty)| BackendInstruction::ScalarLoanLoad {
+                result: *loaded,
+                address: *address,
+                ty: *ty,
+                span: crate::lexer::SourceSpan::new(0, 0),
+            })
+            .collect()
+    }
+
+    pub(super) fn scalar_loan_writebacks(&self) -> Vec<BackendInstruction> {
+        self.scalar_loan_parameters
+            .iter()
+            .filter_map(|(name, address, _, ty)| {
+                self.binding_value(name).map(|value| BackendInstruction::ScalarLoanStore {
+                    address: *address,
+                    value,
+                    ty: *ty,
+                    span: crate::lexer::SourceSpan::new(0, 0),
+                })
+            })
+            .collect()
     }
     pub(super) fn binding_value(&self, name: &str) -> Option<BackendValueId> {
         self.locals

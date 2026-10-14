@@ -22,7 +22,7 @@ use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendExternal, BackendLayout,
-    BackendLayoutProvider, BackendModule, BackendParameter, BackendSignature,
+    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendSignature,
     BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind, lower_parameter,
     lower_return, lower_verb_signature, lower_verb_with_expressions,
     lower_verb_with_expressions_as,
@@ -186,6 +186,7 @@ pub(super) struct SharedDeclarations<'program> {
     performance_symbols: BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: BTreeMap<(String, String), Option<TypeName>>,
+    parameter_modes: BTreeMap<String, Vec<BackendPassingMode>>,
 }
 
 impl<'program> SharedDeclarations<'program> {
@@ -224,6 +225,42 @@ impl<'program> SharedDeclarations<'program> {
             performance::shared_return_nominal_types(&verbs, &externals, &performances);
         let (performance_symbols, performance_return_types, performance_return_nominal_types) =
             performance::performance_dispatch_maps(&performances, &performance_signatures);
+        let parameter_modes = verbs
+            .iter()
+            .zip(&signatures)
+            .map(|(verb, signature)| {
+                (
+                    verb.name.clone(),
+                    signature
+                        .parameters
+                        .iter()
+                        .map(|parameter| parameter.passing.clone())
+                        .collect(),
+                )
+            })
+            .chain(externals.iter().zip(&external_signatures).map(|(external, signature)| {
+                (
+                    external.name.clone(),
+                    signature
+                        .parameters
+                        .iter()
+                        .map(|parameter| parameter.passing.clone())
+                        .collect(),
+                )
+            }))
+            .chain(performances.iter().zip(&performance_signatures).map(
+                |((_, method), signature)| {
+                    (
+                        method.name.clone(),
+                        signature
+                            .parameters
+                            .iter()
+                            .map(|parameter| parameter.passing.clone())
+                            .collect(),
+                    )
+                },
+            ))
+            .collect();
         Ok(Self {
             verbs,
             externals,
@@ -236,6 +273,7 @@ impl<'program> SharedDeclarations<'program> {
             performance_symbols,
             performance_return_types,
             performance_return_nominal_types,
+            parameter_modes,
         })
     }
 }
@@ -482,6 +520,7 @@ pub(super) fn lower_shared_verb(
     performance_symbols: &BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: &BTreeMap<(String, String), Option<TypeName>>,
+    parameter_modes: &BTreeMap<String, Vec<BackendPassingMode>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<super::BackendFunction, BackendContractError> {
@@ -492,6 +531,7 @@ pub(super) fn lower_shared_verb(
         return_types,
         return_nominal_types,
         return_payload_types,
+        parameter_modes,
         performance_symbols,
         performance_return_types,
         performance_return_nominal_types,
@@ -512,6 +552,26 @@ pub(super) fn lower_shared_verb(
             lower_verb_with_expressions(namespace, verb, layouts, &mut provider, BackendBlockId(0))
         }
     }?;
+    if let Some(entry) = function.blocks.first_mut() {
+        let mut prologue = provider.scalar_loan_prologue();
+        prologue.append(&mut entry.instructions);
+        entry.instructions = prologue;
+    }
+    let writebacks = provider.scalar_loan_writebacks();
+    if !writebacks.is_empty() {
+        for block in &mut function.blocks {
+            let Some(index) = block.instructions.iter().position(|instruction| {
+                matches!(
+                    instruction,
+                    super::BackendInstruction::Return { .. }
+                        | super::BackendInstruction::Fail { .. }
+                )
+            }) else {
+                continue;
+            };
+            block.instructions.splice(index..index, writebacks.clone());
+        }
+    }
     function.cleanup = cleanup_plans
         .iter()
         .filter(|plan| plan.span.start >= verb.span.start && plan.span.end <= verb.span.end)

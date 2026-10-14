@@ -1,4 +1,19 @@
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
+    fn lower_unit_call(
+        &mut self,
+        callee: &str,
+        arguments: &[crate::ast::Argument],
+        span: crate::lexer::SourceSpan,
+        instructions: &mut Vec<crate::codegen::BackendInstruction>,
+    ) -> Result<(), crate::codegen::BackendContractError> {
+        let expression = crate::ast::Expr::Call {
+            callee: callee.to_owned(),
+            arguments: arguments.to_vec(),
+            span,
+        };
+        calls::lower_unit_call(self, &expression, instructions)
+    }
+
     fn supports_range_loops(&self) -> bool {
         true
     }

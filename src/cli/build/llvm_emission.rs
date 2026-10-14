@@ -19,7 +19,7 @@ pub(super) fn emit_objects_llvm(
         configuration,
         &bindings,
         &generic_instances,
-        "LLVM",
+        "llvm",
     )?;
     modules
         .into_iter()

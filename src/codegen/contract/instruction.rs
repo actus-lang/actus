@@ -154,6 +154,24 @@ pub enum BackendInstruction {
         alignment: u32,
         span: SourceSpan,
     },
+    ScalarLoanLoad {
+        result: super::BackendValueId,
+        address: super::BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+    },
+    ScalarLoanStore {
+        address: super::BackendValueId,
+        value: super::BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+    },
+    ScalarLoanMaterialize {
+        result: super::BackendValueId,
+        value: super::BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+    },
     ArenaConstruct {
         result: super::BackendValueId,
         capacity: u32,

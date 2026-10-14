@@ -46,6 +46,7 @@ pub(super) fn supports_scalar_shared_lowering(program: &Program) -> bool {
                     .params
                     .iter()
                     .all(|parameter| scalar_parameter(parameter, &unit_enums, &unit_structs))
+                && scalar_ins_body(&verb.body, &verb.params)
                 && verb
                     .return_type
                     .as_ref()
@@ -125,17 +126,33 @@ fn scalar_parameter(
     unit_enums: &BTreeSet<String>,
     unit_structs: &BTreeSet<String>,
 ) -> bool {
-    // Scalar `ins` parameters require an addressable call-site place and a
-    // scalar store in the neutral contract. Keep them on the established
-    // Cranelift lowering path until that contract is represented explicitly.
-    if parameter.role == Role::Ins && scalar_or_result_type(&parameter.ty, unit_enums) {
-        return false;
-    }
     matches!(parameter.role, Role::Erg | Role::Abs | Role::Ins | Role::Dat)
         && parameter.dispatch == DispatchMode::Static
         && (scalar_or_result_type(&parameter.ty, unit_enums)
             || supported_array_type(&parameter.ty, unit_structs)
             || unit_structs.contains(&parameter.ty.name))
+}
+
+fn scalar_ins_body(block: &Block, parameters: &[crate::ast::Param]) -> bool {
+    if !parameters.iter().any(|parameter| {
+        parameter.role == Role::Ins
+            && matches!(
+                parameter.ty.name.as_str(),
+                "Bool" | "Int" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
+            )
+    }) {
+        return true;
+    }
+    block.statements.iter().all(|statement| {
+        matches!(
+            statement,
+            Stmt::OwnerDecl { .. }
+                | Stmt::Assignment { .. }
+                | Stmt::CompoundAssignment { .. }
+                | Stmt::Return { .. }
+                | Stmt::Drop { .. }
+        )
+    })
 }
 
 fn scalar_type(type_name: &crate::ast::TypeName) -> bool {

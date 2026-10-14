@@ -139,6 +139,7 @@ fn parameter_types(
                 )),
             }
         }
+        BackendPassingMode::ExclusiveScalarLoan { .. } => Ok(vec![module.isa().pointer_type()]),
     }
 }
 
@@ -408,6 +409,80 @@ pub(super) fn lower_memory_copy(
         MemFlagsData::new(),
     );
     Ok(())
+}
+
+pub(super) fn lower_scalar_loan(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    match instruction {
+        BackendInstruction::ScalarLoanLoad { result, address, ty, .. } => {
+            let address = values.get(address).copied().ok_or_else(|| {
+                BackendEmitError(format!(
+                    "Cranelift scalar loan address {} is unavailable",
+                    address.0
+                ))
+            })?;
+            let load_type = scalar_type(module, *ty)?.ok_or_else(|| {
+                BackendEmitError("Cranelift scalar loan load requires a scalar type".to_owned())
+            })?;
+            let value = builder.ins().load(load_type, MemFlagsData::new(), address, 0);
+            values.insert(*result, value);
+            Ok(())
+        }
+        BackendInstruction::ScalarLoanStore { address, value, ty, .. } => {
+            let address = values.get(address).copied().ok_or_else(|| {
+                BackendEmitError(format!(
+                    "Cranelift scalar loan address {} is unavailable",
+                    address.0
+                ))
+            })?;
+            let value = values.get(value).copied().ok_or_else(|| {
+                BackendEmitError(format!("Cranelift scalar loan value {} is unavailable", value.0))
+            })?;
+            let store_type = scalar_type(module, *ty)?.ok_or_else(|| {
+                BackendEmitError("Cranelift scalar loan store requires a scalar type".to_owned())
+            })?;
+            if builder.func.dfg.value_type(value) != store_type {
+                return Err(BackendEmitError(
+                    "Cranelift scalar loan value type mismatch".to_owned(),
+                ));
+            }
+            builder.ins().store(MemFlagsData::new(), value, address, 0);
+            Ok(())
+        }
+        BackendInstruction::ScalarLoanMaterialize { result, value, ty, .. } => {
+            let value = values.get(value).copied().ok_or_else(|| {
+                BackendEmitError(format!(
+                    "Cranelift scalar loan materialization value {} is unavailable",
+                    value.0
+                ))
+            })?;
+            let scalar_type = scalar_type(module, *ty)?.ok_or_else(|| {
+                BackendEmitError(
+                    "Cranelift scalar loan materialization requires a scalar type".to_owned(),
+                )
+            })?;
+            if builder.func.dfg.value_type(value) != scalar_type {
+                return Err(BackendEmitError(
+                    "Cranelift scalar loan materialization type mismatch".to_owned(),
+                ));
+            }
+            let slot =
+                builder.func.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+                    cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+                    scalar_type.bytes(),
+                    0,
+                ));
+            let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+            builder.ins().store(MemFlagsData::new(), value, address, 0);
+            values.insert(*result, address);
+            Ok(())
+        }
+        _ => Err(BackendEmitError("Cranelift scalar loan instruction expected".to_owned())),
+    }
 }
 
 pub(super) fn lower_branch(

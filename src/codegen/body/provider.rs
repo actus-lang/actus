@@ -252,4 +252,24 @@ pub trait BackendExpressionProvider {
     fn call_produces_value(&self, _callee: &str) -> bool {
         false
     }
+
+    fn lower_unit_call(
+        &mut self,
+        callee: &str,
+        arguments: &[crate::ast::Argument],
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        let values = arguments
+            .iter()
+            .map(|argument| self.lower_expression(&argument.expression, instructions))
+            .collect::<Result<Vec<_>, _>>()?;
+        instructions.push(BackendInstruction::Call {
+            callee: self.callee_for(callee, span)?,
+            arguments: values,
+            result: None,
+            span,
+        });
+        Ok(())
+    }
 }

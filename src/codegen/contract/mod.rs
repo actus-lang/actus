@@ -104,6 +104,7 @@ pub enum BackendPassingMode {
     Indirect { layout: BackendLayout },
     Borrowed { layout: BackendLayout },
     ExclusiveLoan { layout: BackendLayout },
+    ExclusiveScalarLoan { ty: BackendValueType },
     OwnershipTransfer { layout: BackendLayout },
     RuntimeBridge { layout: BackendLayout },
 }
@@ -118,6 +119,7 @@ impl BackendPassingMode {
             | Self::ExclusiveLoan { layout }
             | Self::OwnershipTransfer { layout }
             | Self::RuntimeBridge { layout } => Some(*layout),
+            Self::ExclusiveScalarLoan { .. } => None,
         }
     }
 }
@@ -378,8 +380,10 @@ fn validate_parameter(parameter: &BackendParameter) -> Result<(), BackendContrac
         ),
         Role::Ins => {
             matches!(&parameter.passing, BackendPassingMode::ExclusiveLoan { .. })
-                || (matches!(&parameter.passing, BackendPassingMode::Direct)
-                    && is_direct_role_value(parameter.ty))
+                || matches!(
+                    &parameter.passing,
+                    BackendPassingMode::ExclusiveScalarLoan { ty } if *ty == parameter.ty
+                )
         }
         Role::Dat => {
             matches!(&parameter.passing, BackendPassingMode::OwnershipTransfer { .. })

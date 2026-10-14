@@ -8,8 +8,8 @@ use crate::ast::{PerformDecl, VerbDecl};
 
 use super::super::{
     BackendBlockId, BackendCleanupPlan, BackendContractError, BackendFunction, BackendInstruction,
-    BackendLayoutProvider, BackendSignature, BackendSymbolBindings, BackendValueType,
-    SymbolIdentity,
+    BackendLayoutProvider, BackendPassingMode, BackendSignature, BackendSymbolBindings,
+    BackendValueType, SymbolIdentity,
 };
 use super::expression::SharedExpressionProvider;
 use super::{SharedDeclarations, lower_shared_verb};
@@ -102,6 +102,7 @@ pub(super) fn lower_shared_functions(
             &declarations.performance_symbols,
             &declarations.performance_return_types,
             &declarations.performance_return_nominal_types,
+            &declarations.parameter_modes,
             external_symbols,
             bindings,
         )?);
@@ -122,6 +123,7 @@ pub(super) fn lower_shared_functions(
             &declarations.performance_symbols,
             &declarations.performance_return_types,
             &declarations.performance_return_nominal_types,
+            &declarations.parameter_modes,
             external_symbols,
             bindings,
         )?);
@@ -142,6 +144,7 @@ fn lower_shared_performance(
     performance_symbols: &BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: &BTreeMap<(String, String), Option<crate::ast::TypeName>>,
+    parameter_modes: &BTreeMap<String, Vec<BackendPassingMode>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendFunction, BackendContractError> {
@@ -152,6 +155,7 @@ fn lower_shared_performance(
         return_types,
         return_nominal_types,
         return_payload_types,
+        parameter_modes,
         performance_symbols,
         performance_return_types,
         performance_return_nominal_types,

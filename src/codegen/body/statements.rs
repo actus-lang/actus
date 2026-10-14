@@ -1,4 +1,4 @@
-use super::super::{BackendContractError, BackendInstruction, BackendValueId};
+use super::super::{BackendContractError, BackendInstruction};
 use super::provider::BackendExpressionProvider;
 use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 use crate::lexer::SourceSpan;
@@ -9,7 +9,7 @@ pub(super) fn lower_expression_statement(
     _statement_span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
-    if let Expr::Call { callee, arguments, span } = expression {
+    if let Expr::Call { callee, arguments, span: _ } = expression {
         if lookup_call_intrinsic(callee).is_some_and(|kind| {
             matches!(
                 kind,
@@ -28,17 +28,7 @@ pub(super) fn lower_expression_statement(
             provider.lower_expression(expression, instructions).map(|_| ())?;
             return Ok(());
         }
-        let arguments = arguments
-            .iter()
-            .map(|argument| provider.lower_expression(&argument.expression, instructions))
-            .collect::<Result<Vec<BackendValueId>, _>>()?;
-        let callee = provider.callee_for(callee, *span)?;
-        instructions.push(BackendInstruction::Call {
-            callee,
-            arguments,
-            result: None,
-            span: _statement_span,
-        });
+        provider.lower_unit_call(callee, arguments, _statement_span, instructions)?;
         return Ok(());
     }
     provider.lower_discarded_expression(expression, instructions)

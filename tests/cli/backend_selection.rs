@@ -570,6 +570,36 @@ fn both_native_backends_build_range_loop_exits_through_shared_lowering() {
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_share_scalar_ins_caller_storage_and_writeback() {
+    let source = "verb mutate(ins value: Int) { value = 41; } verb main() -> Int { erg value: Int = 0; mutate(value: ins value); return value + 1; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-scalar-ins-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write scalar-ins fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build scalar-ins fixture");
+        let status = std::process::Command::new(&output).status().expect("run scalar-ins fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} scalar-ins result");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_array_pack_bit_fields() {

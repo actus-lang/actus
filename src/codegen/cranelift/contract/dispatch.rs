@@ -39,7 +39,10 @@ pub(super) fn lower_instruction(
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. }
         | BackendInstruction::IntegerCompare { .. }
         | BackendInstruction::IntegerUnary { .. }
-        | BackendInstruction::MemoryCopy { .. } => {
+        | BackendInstruction::MemoryCopy { .. }
+        | BackendInstruction::ScalarLoanLoad { .. }
+        | BackendInstruction::ScalarLoanStore { .. }
+        | BackendInstruction::ScalarLoanMaterialize { .. } => {
             lower_scalar(module, builder, instruction, values)
         }
         BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } => {
@@ -142,6 +145,11 @@ fn lower_scalar(
         }
         BackendInstruction::MemoryCopy { .. } => {
             super::lower_memory_copy(module, builder, instruction, values)
+        }
+        BackendInstruction::ScalarLoanLoad { .. }
+        | BackendInstruction::ScalarLoanStore { .. }
+        | BackendInstruction::ScalarLoanMaterialize { .. } => {
+            super::lower_scalar_loan(module, builder, instruction, values)
         }
         _ => Err(BackendEmitError("Cranelift scalar instruction expected".to_owned())),
     }
