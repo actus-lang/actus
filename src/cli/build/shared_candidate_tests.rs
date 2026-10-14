@@ -85,6 +85,15 @@ fn accepts_scalar_literal_case_patterns_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_scalar_guarded_case_branches_in_the_shared_contract() {
+    let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); return case result { Result.Ok(value) if value == 41 => 42, Result.Ok(_) => 1, Result.Err(_) => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("guarded case fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_a_call_with_an_indexed_scalar_argument_in_the_shared_contract() {
     let source = "verb observe(abs value: u32) { return; } verb main() -> Int { erg values: Array[u32, 2] = Array[u32, 2](); values[1u32] = 41u32; erg index: u32 = 1u32; observe(value: abs values[index]); return 42; }";
     let (tokens, errors) = scan(source);

@@ -1602,9 +1602,15 @@ condition builder already derives the literal width from the subject and emits
 the checked integer comparison; the candidate no longer rejects this existing
 contract. The regression
 `both_native_backends_build_scalar_literal_case_through_shared_lowering` builds
-and runs LLVM and Cranelift with exit status `42`. Guarded branches remain a
-separate slice because payload bindings must be established before guard
-evaluation.
+and runs LLVM and Cranelift with exit status `42`.
+
+Scalar guarded `case` branches now also enter the shared route. The neutral
+lowering binds a variant payload before evaluating the guard, sends the true
+edge to the branch body, and sends the false edge through the branch-scope
+cleanup block to the next pattern (or the existing exhaustiveness trap). The
+regression `both_native_backends_build_guarded_case_through_shared_lowering`
+covers both guard-true payload access and guard-false fallthrough on LLVM and
+Cranelift; enum representation and ownership roles remain unchanged.
 
 ## Out of scope
 

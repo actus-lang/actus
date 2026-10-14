@@ -140,6 +140,37 @@ fn both_native_backends_build_standalone_case_statement_through_shared_lowering(
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_build_guarded_case_through_shared_lowering() {
+    let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb select_true() -> Int { erg result = produce(); return case result { Result.Ok(value) if value == 41 => 42, Result.Ok(_) => 1, Result.Err(_) => 0, }; } verb select_false() -> Int { erg result = produce(); return case result { Result.Ok(value) if value == 40 => 1, Result.Ok(_) => 42, Result.Err(_) => 0, }; } verb main() -> Int { return select_true() + select_false() - 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-guarded-case-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write guarded case fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build guarded case");
+        let status =
+            std::process::Command::new(&output).status().expect("run guarded case fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} should evaluate the guard");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_scalar_try_owner_through_shared_lowering() {
     let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb worker() -> Result[Int, Failure] { erg value = produce()?; return Result[Int, Failure].Ok(value + 1); } verb main() -> Int { erg result = worker(); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }\n";
     for backend in ["cranelift", "llvm"] {

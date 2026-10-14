@@ -16,7 +16,7 @@ fn case_expression(expression: &Expr, context: &CandidateContext<'_>, variants: 
         return false;
     }
     branches.iter().enumerate().all(|(index, branch)| {
-        if branch.guard.is_some() {
+        if branch.guard.as_deref().is_some_and(|guard| !super::scalar_expression(guard, context)) {
             return false;
         }
         match &branch.body {
