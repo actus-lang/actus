@@ -1597,6 +1597,15 @@ regression `both_native_backends_build_scalar_try_expression_through_shared_lowe
 uses an `Err(9)` producer and verifies that LLVM and Cranelift both propagate
 the error with exit status `9` instead of executing the following `Ok(42)`.
 
+Scalar literal `case` patterns now enter the shared route. The neutral case
+condition builder already derives the literal width from the subject and emits
+the checked integer comparison; the candidate no longer rejects this existing
+contract. The regression
+`both_native_backends_build_scalar_literal_case_through_shared_lowering` builds
+and runs LLVM and Cranelift with exit status `42`. Guarded branches remain a
+separate slice because payload bindings must be established before guard
+evaluation.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

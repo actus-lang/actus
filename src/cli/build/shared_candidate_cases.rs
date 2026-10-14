@@ -27,7 +27,7 @@ fn case_expression(expression: &Expr, context: &CandidateContext<'_>, variants: 
         match &branch.pattern {
             Pattern::Variant { variant, .. } => variants.contains(&variant.as_str()),
             Pattern::Wildcard { .. } => index + 1 == branches.len(),
-            Pattern::Literal { .. } => false,
+            Pattern::Literal { .. } => true,
         }
     })
 }
