@@ -99,16 +99,13 @@ pub(super) fn coerce_owner_value(
                 return Ok(value);
             }
         }
-        let converted = provider.allocate();
-        provider.remember_value(converted, target_type);
-        instructions.push(BackendInstruction::FloatCast {
-            result: converted,
-            source: value,
-            source_type,
-            target_type,
+        return Err(unsupported(
             span,
-        });
-        return Ok(converted);
+            format!(
+                "non-literal floating-point width conversion from {:?} to {:?} is not supported by the shared contract",
+                source_type, target_type
+            ),
+        ));
     }
     let converted = provider.allocate();
     provider.remember_value(converted, target_type);
