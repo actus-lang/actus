@@ -1315,6 +1315,15 @@ the nested read `pairs[1u32].item.item` build and execute through both native
 backends with exit status 42. Generic ownership-bearing fields remain outside
 this slice.
 
+Generic ownership-bearing view fields now admit the bounded `Option[abs T]`
+shape. The shared classifier and hosted parity regression cover
+`Array[Box[Int], 2]` with an `abs item: T` field, including the shared
+ownership-bearing layout and construction through LLVM and Cranelift with exit
+status 42. Enum case reads from an ownership-bearing generic field remain
+outside this slice because they require a separate neutral-enum value boundary.
+Mutable or transferring generic ownership fields also remain outside this
+slice.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`

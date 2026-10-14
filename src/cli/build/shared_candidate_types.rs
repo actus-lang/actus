@@ -61,11 +61,26 @@ fn supported_generic_struct(
         .map(|parameter| parameter.name.as_str())
         .collect::<BTreeSet<_>>();
     definition.fields.iter().all(|field| {
-        matches!(field.role, crate::ast::StructFieldRole::Erg | crate::ast::StructFieldRole::Value)
-            && (super::scalar_type(&field.ty)
-                || parameters.contains(field.ty.name.as_str())
-                || aggregate_types.contains(&field.ty.name))
+        let supported_value = matches!(
+            field.role,
+            crate::ast::StructFieldRole::Erg | crate::ast::StructFieldRole::Value
+        ) && (super::scalar_type(&field.ty)
+            || parameters.contains(field.ty.name.as_str())
+            || aggregate_types.contains(&field.ty.name));
+        let supported_view = matches!(field.role, crate::ast::StructFieldRole::Abs)
+            && (parameters.contains(field.ty.name.as_str())
+                || aggregate_types.contains(&field.ty.name)
+                || generic_option_type(&field.ty, &parameters));
+        supported_value || supported_view
     })
+}
+
+fn generic_option_type(type_name: &crate::ast::TypeName, parameters: &BTreeSet<&str>) -> bool {
+    super::scalar_option_type(type_name)
+        && type_name
+            .arguments
+            .first()
+            .is_some_and(|argument| parameters.contains(argument.name.as_str()))
 }
 
 pub(super) fn supported_perform(

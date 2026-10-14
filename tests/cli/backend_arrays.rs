@@ -844,6 +844,45 @@ fn both_native_backends_build_and_run_a_shared_nested_generic_aggregate_array_el
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_and_run_a_shared_generic_aggregate_option_view_field() {
+    let source = "struct Box[T] { abs item: T, } verb main() -> Int { erg boxes: Array[Box[Int], 2] = Array[Box[Int], 2](); boxes[1u32] = Box[Int] { item: 41, }; return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-{backend}-generic-aggregate-option-view-{}",
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create generic option view directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"generic-aggregate-option-view-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write generic option view manifest");
+        fs::write(&input, source).expect("write generic option view source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build generic option view");
+        let status = std::process::Command::new(&output).status().expect("run generic option view");
+        assert_eq!(status.code(), Some(42), "backend {backend} generic option view result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_parameter_store() {
