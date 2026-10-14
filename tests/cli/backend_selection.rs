@@ -109,6 +109,37 @@ fn both_native_backends_preserve_local_assignment_in_an_else_if() {
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_preserve_local_assignment_in_both_if_branches() {
+    let source = "verb main() -> Int { erg value: u32 = 0u32; if true { value = 41u32; } else { value = 7u32; } return value as Int + 1; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-if-else-assignment-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write if/else assignment fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build if/else assignment");
+        let status =
+            std::process::Command::new(&output).status().expect("run if/else assignment fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} should preserve the merge value");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_standalone_case_statement_through_shared_lowering() {
     let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; return 42; }\n";
     for backend in ["cranelift", "llvm"] {

@@ -39,6 +39,15 @@ fn accepts_an_else_if_statement_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_outer_scalar_mutation_in_both_if_branches_in_the_shared_contract() {
+    let source = "verb main() -> Int { erg value: u32 = 0u32; if true { value = 41u32; } else { value = 7u32; } return value as Int + 1; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("if/else branch-merge fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_a_standalone_case_statement_in_the_shared_contract() {
     let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb main() -> Int { erg result = produce(); case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; return 42; }";
     let (tokens, errors) = scan(source);

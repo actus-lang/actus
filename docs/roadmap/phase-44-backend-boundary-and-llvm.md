@@ -1546,6 +1546,13 @@ the existing shared `if_flow` lowering. The unit predicate and
 Cranelift parity with exit status `42`; unsupported conditional expression
 shapes remain outside the candidate slice.
 
+The branch-merge contract now has explicit parity coverage for mutations in
+both arms of an `if`/`else`. The neutral `if` lowering already carries the
+updated scalar binding through the typed continuation parameter and replaces
+the provider binding at the merge; the regression
+`both_native_backends_preserve_local_assignment_in_both_if_branches` verifies
+that behavior through LLVM and Cranelift with exit status `42`.
+
 Standalone scalar `case` statements now use the shared case-control-flow
 lowering instead of the Cranelift legacy fallback. The classifier unit
 coverage and `both_native_backends_build_standalone_case_statement_through_shared_lowering`
