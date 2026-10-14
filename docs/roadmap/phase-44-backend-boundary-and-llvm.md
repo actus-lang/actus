@@ -1336,6 +1336,12 @@ into a consuming verb, which drops the resource before returning through both
 LLVM and Cranelift. The regression validates the existing field-path move and
 cleanup plan; it introduces no aggregate copy or hidden ownership operation.
 
+Nested generic owned field transfer now has parity coverage: the `Buffer`
+inside `Pair[Box[Buffer]]` is moved through the explicit field path
+`dat pair.item.item`, consumed, and dropped on both native backends. This
+extends the existing cleanup evidence without changing the ownership or ABI
+contracts.
+
 Shared conditional lowering now preserves a fallthrough continuation block
 when both branches reach that block through an explicit jump. The neutral
 regression `preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it`

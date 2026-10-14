@@ -67,6 +67,15 @@ fn accepts_generic_owned_buffer_field_transfer_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_nested_generic_owned_buffer_field_transfer_in_the_shared_contract() {
+    let source = "struct Box[T] { erg item: T, } struct Pair[T] { erg item: T, } verb consume(dat value: Buffer) { drop(value); return; } verb main() -> Int { erg pair: Pair[Box[Buffer]] = Pair[Box[Buffer]] { item: Box[Buffer] { item: Buffer[1], }, }; consume(value: dat pair.item.item); return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("nested generic owned transfer fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_fixed_array_iteration_in_the_shared_contract() {
     let source = "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }";
     let (tokens, errors) = scan(source);
