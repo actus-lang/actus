@@ -13,6 +13,7 @@ pub(super) fn lower(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     return_slot: Option<cranelift_codegen::ir::Value>,
+    return_value_ids: &std::collections::BTreeSet<BackendValueId>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
@@ -22,9 +23,19 @@ pub(super) fn lower(
         BackendInstruction::EnumPayload { .. } | BackendInstruction::EnumPayloadBinding { .. } => {
             lower_payload(module, builder, instruction, values)
         }
-        BackendInstruction::EnumConstruct { .. } => {
-            lower_construct(module, builder, instruction, return_slot, values)
-        }
+        BackendInstruction::EnumConstruct { .. } => lower_construct(
+            module,
+            builder,
+            instruction,
+            return_slot.filter(|_| {
+                matches!(
+                    instruction,
+                    BackendInstruction::EnumConstruct { result, .. }
+                        if return_value_ids.contains(result)
+                )
+            }),
+            values,
+        ),
         _ => Err(BackendEmitError("Cranelift enum instruction expected".to_owned())),
     }
 }

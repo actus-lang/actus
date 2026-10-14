@@ -260,6 +260,15 @@ fn lower_function_body(
     builder.switch_to_block(entry);
     let (return_slot, mut values, mut aggregate_values) =
         initialize_values(&mut builder, entry, function)?;
+    let return_value_ids = function
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .filter_map(|instruction| match instruction {
+            BackendInstruction::Return { value: Some(value), .. } => Some(*value),
+            _ => None,
+        })
+        .collect::<std::collections::BTreeSet<_>>();
     append_block_parameters_for_entry(&mut builder, &entry, module, function)?;
     bind_block_parameters(&builder, &blocks, function, &mut values)?;
     lower_blocks(
@@ -269,6 +278,7 @@ fn lower_function_body(
         declarations,
         &blocks,
         return_slot,
+        &return_value_ids,
         &mut values,
         &mut aggregate_values,
     )?;
@@ -284,6 +294,7 @@ fn lower_blocks(
     declarations: &BTreeMap<String, Declaration>,
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
     return_slot: Option<cranelift_codegen::ir::Value>,
+    return_value_ids: &std::collections::BTreeSet<BackendValueId>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
     aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
 ) -> Result<(), BackendEmitError> {
@@ -300,6 +311,7 @@ fn lower_blocks(
                 declarations,
                 blocks,
                 return_slot,
+                return_value_ids,
                 values,
                 aggregate_values,
                 function,

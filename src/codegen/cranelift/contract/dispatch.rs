@@ -24,6 +24,7 @@ pub(super) fn lower_instruction(
     declarations: &BTreeMap<String, Declaration>,
     blocks: &BTreeMap<crate::codegen::BackendBlockId, Block>,
     return_slot: Option<cranelift_codegen::ir::Value>,
+    return_value_ids: &std::collections::BTreeSet<BackendValueId>,
     values: &mut ValueMap,
     aggregate_values: &mut AggregateValueMap,
     function: &BackendFunction,
@@ -55,7 +56,7 @@ pub(super) fn lower_instruction(
         | BackendInstruction::EnumPayload { .. }
         | BackendInstruction::EnumPayloadBinding { .. }
         | BackendInstruction::EnumConstruct { .. } => {
-            enums::lower(module, builder, instruction, return_slot, values)
+            enums::lower(module, builder, instruction, return_slot, return_value_ids, values)
         }
         BackendInstruction::Call { .. } => {
             lower_call(module, builder, instruction, declarations, values, aggregate_values)
