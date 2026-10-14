@@ -48,6 +48,15 @@ fn accepts_a_standalone_case_statement_in_the_shared_contract() {
 }
 
 #[test]
+fn accepts_a_call_with_an_indexed_scalar_argument_in_the_shared_contract() {
+    let source = "verb observe(abs value: u32) { return; } verb main() -> Int { erg values: Array[u32, 2] = Array[u32, 2](); values[1u32] = 41u32; erg index: u32 = 1u32; observe(value: abs values[index]); return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("indexed-call fixture should parse");
+    assert!(supports_scalar_shared_lowering(&program));
+}
+
+#[test]
 fn accepts_checked_scalar_arithmetic_in_the_shared_contract() {
     let source =
         "verb main() -> Int { erg value: u8 = 1u8; erg count: u8 = 8u8; return value << count; }";

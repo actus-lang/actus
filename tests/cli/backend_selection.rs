@@ -140,6 +140,37 @@ fn both_native_backends_build_standalone_case_statement_through_shared_lowering(
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_build_call_with_indexed_scalar_argument_through_shared_lowering() {
+    let source = "verb observe(abs value: u32) { return; } verb main() -> Int { erg values: Array[u32, 2] = Array[u32, 2](); values[1u32] = 41u32; erg index: u32 = 1u32; observe(value: abs values[index]); return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-indexed-call-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write indexed-call fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build indexed call");
+        let status =
+            std::process::Command::new(&output).status().expect("run indexed-call fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} indexed-call result");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_nested_option_case_arithmetic_through_shared_lowering() {
     let source = "struct Node { value: Int, abs next: Option[abs Node], } verb sum(abs node: Node) -> Int { abs next = ref node.next; return node.value + case next { Option.Some(_) => 1, Option.None => 0, }; } verb main() -> Int { erg node = Node { value: 41, next: Option[abs Node].None, }; return sum(node: abs node); }\n";
     for backend in ["cranelift", "llvm"] {

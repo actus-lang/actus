@@ -1552,6 +1552,13 @@ coverage and `both_native_backends_build_standalone_case_statement_through_share
 verify the Result branch path through LLVM and Cranelift with exit status `42`;
 guarded and literal-pattern case forms remain outside this candidate slice.
 
+Standalone calls with scalar indexed arguments now also enter the shared route.
+`accepts_a_call_with_an_indexed_scalar_argument_in_the_shared_contract` and
+`both_native_backends_build_call_with_indexed_scalar_argument_through_shared_lowering`
+cover the existing dynamic fixed-array read path through both backends with
+exit status `42`; aggregate indexed arguments remain governed by their existing
+aggregate candidate rules.
+
 ## Out of scope
 
 - Rewriting the Actus semantic analyzer for a particular backend.

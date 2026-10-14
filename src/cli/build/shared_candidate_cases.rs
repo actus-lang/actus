@@ -37,8 +37,5 @@ pub(super) fn scalar_statement_call(expression: &Expr, context: &CandidateContex
         return false;
     };
     context.returns_value.contains_key(callee)
-        && arguments.iter().all(|argument| {
-            !matches!(argument.expression, Expr::Index { .. })
-                && super::scalar_expression(&argument.expression, context)
-        })
+        && arguments.iter().all(|argument| super::scalar_expression(&argument.expression, context))
 }
