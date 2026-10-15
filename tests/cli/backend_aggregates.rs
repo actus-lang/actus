@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use super::*;
 
 #[cfg(all(unix, feature = "cranelift"))]
