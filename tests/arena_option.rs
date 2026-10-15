@@ -58,6 +58,45 @@ fn executes_recursive_option_list_with_pointer_niche() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn recursive_option_list_with_pointer_niche_has_backend_parity() {
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-arena-option-{backend}-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create recursive option parity directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"arena-option-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write recursive option parity manifest");
+        fs::write(&input, recursive_option_source()).expect("write recursive option parity source");
+
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build recursive option fixture");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run recursive option parity fixture");
+        assert_eq!(status.code(), Some(60), "backend {backend} recursive option result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(unix)]
 fn recursive_option_source() -> &'static str {
     r#"

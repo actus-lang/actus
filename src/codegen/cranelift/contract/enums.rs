@@ -190,6 +190,13 @@ pub(super) fn lower_payload(
             return Err(BackendEmitError("Cranelift enum payload instruction expected".to_owned()));
         }
     };
+    if layout.niche_pointer {
+        let subject = values.get(subject).copied().ok_or_else(|| {
+            BackendEmitError(format!("Cranelift niche Option {} is unavailable", subject.0))
+        })?;
+        values.insert(*result, subject);
+        return Ok(());
+    }
     let subject = enum_storage_pointer(builder, module.isa().pointer_type(), *subject, values)?;
     let payload = match payload_type {
         BackendValueType::Bool | BackendValueType::Integer { .. } => {
