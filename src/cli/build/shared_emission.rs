@@ -55,26 +55,30 @@ pub(super) fn generic_inputs(
     plan: &crate::modules::ModuleCompilationPlan,
     configuration: &CompilerConfiguration,
 ) -> Result<(Vec<crate::ast::TypeName>, Vec<crate::semantic::GenericInstance>), BackendEmitError> {
-    let expansion_program = crate::codegen::normalize_program(
-        &crate::semantic::filter_program_for_target(&plan.implementation(), configuration.target()),
-    );
-    let generic_instances = crate::semantic::analyze(&expansion_program)
-        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
-        .generic_instances;
-    let mut unique_instances = Vec::with_capacity(generic_instances.len());
-    for instance in generic_instances {
-        if !unique_instances.iter().any(|known: &crate::semantic::GenericInstance| {
-            known.identity() == instance.identity() && known.caller == instance.caller
-        }) {
-            unique_instances.push(instance);
+    let object_plan = plan
+        .object_plan()
+        .map_err(|error| BackendEmitError(format!("module object planning failed: {error:?}")))?;
+    let mut unique_instances = Vec::new();
+    for unit in object_plan.units() {
+        let expansion_program = crate::codegen::normalize_program(
+            &crate::semantic::filter_program_for_target(unit.program(), configuration.target()),
+        );
+        let generic_instances = crate::semantic::analyze(&expansion_program)
+            .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
+            .generic_instances;
+        let expanded_instances =
+            crate::codegen::expand_generic_instances(&expansion_program, &generic_instances)?;
+        for instance in expanded_instances {
+            if !unique_instances.iter().any(|known: &crate::semantic::GenericInstance| {
+                known.identity() == instance.identity() && known.caller == instance.caller
+            }) {
+                unique_instances.push(instance);
+            }
         }
     }
-    let generic_instances = unique_instances;
-    let generic_instances =
-        crate::codegen::expand_generic_instances(&expansion_program, &generic_instances)?;
     let generic_types =
-        generic_instances.iter().flat_map(|instance| instance.arguments.iter().cloned()).collect();
-    Ok((generic_types, generic_instances))
+        unique_instances.iter().flat_map(|instance| instance.arguments.iter().cloned()).collect();
+    Ok((generic_types, unique_instances))
 }
 
 pub(super) fn lower_shared_modules(
