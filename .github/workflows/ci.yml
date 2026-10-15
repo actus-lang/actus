@@ -165,6 +165,9 @@ jobs:
       - name: Verify native link tools
         shell: bash
         run: |
+          RUST_BIN="$(dirname "$(rustup which rustc)")"
+          echo "$RUST_BIN" >> "$GITHUB_PATH"
+          export PATH="$RUST_BIN:$PATH"
           command -v clang
           command -v rust-lld
           command -v ld.lld
@@ -215,7 +218,11 @@ jobs:
           echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
 
       - name: Verify target toolchain
+        shell: bash
         run: |
+          RUST_BIN="$(dirname "$(rustup which rustc)")"
+          echo "$RUST_BIN" >> "$GITHUB_PATH"
+          export PATH="$RUST_BIN:$PATH"
           llvm-config --version
           test "$(llvm-config --version | cut -d. -f1)" = "23"
           command -v clang
