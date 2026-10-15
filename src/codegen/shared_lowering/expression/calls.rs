@@ -412,6 +412,18 @@ fn runtime_intrinsic(callee: &str) -> Option<(&'static str, crate::codegen::Back
             crate::runtime::BUFFER_LENGTH_SYMBOL,
             crate::codegen::BackendValueType::Integer { signed: true, width: 32 },
         )),
+        Some(IntrinsicKind::Crc32) => Some((
+            crate::runtime::BUFFER_CRC32_SYMBOL,
+            crate::codegen::BackendValueType::Integer { signed: true, width: 64 },
+        )),
+        Some(IntrinsicKind::Crc32Matches) => Some((
+            crate::runtime::BUFFER_CRC32_MATCHES_SYMBOL,
+            crate::codegen::BackendValueType::Integer { signed: true, width: 64 },
+        )),
+        Some(IntrinsicKind::ValidateFixedFrame) => Some((
+            crate::runtime::BUFFER_VALIDATE_FIXED_FRAME_SYMBOL,
+            crate::codegen::BackendValueType::Integer { signed: true, width: 64 },
+        )),
         _ => None,
     }
 }

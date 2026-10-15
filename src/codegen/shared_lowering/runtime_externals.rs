@@ -12,6 +12,9 @@ pub(super) fn append_buffer_runtime_externals(
     append_buffer_length(externals)?;
     append_buffer_byte_at(externals)?;
     append_buffer_byte_set(externals)?;
+    append_buffer_crc32(externals)?;
+    append_buffer_crc32_matches(externals)?;
+    append_buffer_validate_fixed_frame(externals)?;
     Ok(())
 }
 
@@ -53,6 +56,52 @@ fn append_buffer_byte_set(
     )
 }
 
+fn append_buffer_crc32(externals: &mut Vec<BackendExternal>) -> Result<(), BackendContractError> {
+    append_runtime_external(
+        externals,
+        crate::runtime::BUFFER_CRC32_SYMBOL,
+        vec![buffer_param("buffer"), index64_param("start"), index64_param("end")],
+        int64_type(),
+    )
+}
+
+fn append_buffer_crc32_matches(
+    externals: &mut Vec<BackendExternal>,
+) -> Result<(), BackendContractError> {
+    append_runtime_external(
+        externals,
+        crate::runtime::BUFFER_CRC32_MATCHES_SYMBOL,
+        vec![
+            buffer_param("buffer"),
+            index64_param("start"),
+            index64_param("end"),
+            index64_param("expected"),
+        ],
+        int64_type(),
+    )
+}
+
+fn append_buffer_validate_fixed_frame(
+    externals: &mut Vec<BackendExternal>,
+) -> Result<(), BackendContractError> {
+    append_runtime_external(
+        externals,
+        crate::runtime::BUFFER_VALIDATE_FIXED_FRAME_SYMBOL,
+        vec![
+            buffer_param("buffer"),
+            index64_param("little"),
+            index64_param("version_offset"),
+            index64_param("expected_version"),
+            index64_param("payload_offset"),
+            index64_param("payload_length"),
+            index64_param("checksum_start"),
+            index64_param("checksum_end"),
+            index64_param("checksum_offset"),
+        ],
+        int64_type(),
+    )
+}
+
 fn buffer_param(name: &str) -> BackendParameter {
     BackendParameter {
         name: name.to_owned(),
@@ -67,6 +116,15 @@ fn index_param() -> BackendParameter {
         name: "index".to_owned(),
         role: crate::ast::Role::Erg,
         ty: BackendValueType::Integer { signed: true, width: 32 },
+        passing: BackendPassingMode::Direct,
+    }
+}
+
+fn index64_param(name: &str) -> BackendParameter {
+    BackendParameter {
+        name: name.to_owned(),
+        role: crate::ast::Role::Erg,
+        ty: int64_type(),
         passing: BackendPassingMode::Direct,
     }
 }
@@ -86,6 +144,10 @@ fn byte_type() -> BackendValueType {
 
 fn int_type() -> BackendValueType {
     BackendValueType::Integer { signed: true, width: 32 }
+}
+
+fn int64_type() -> BackendValueType {
+    BackendValueType::Integer { signed: true, width: 64 }
 }
 
 fn append_runtime_external(
