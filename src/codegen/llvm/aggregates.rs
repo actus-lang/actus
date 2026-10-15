@@ -40,9 +40,14 @@ fn allocate_aggregate_storage(
     declarations: &BTreeMap<String, FunctionDeclaration>,
 ) -> Result<LLVMValueRef, BackendEmitError> {
     if layout.size < crate::codegen::LARGE_AGGREGATE_THRESHOLD {
-        return Ok(unsafe {
+        let address = unsafe {
             LLVMBuildAlloca(builder, aggregate_type, c"aggregate.construct".as_ptr().cast())
-        });
+        };
+        if address.is_null() {
+            return Err(BackendEmitError("LLVM failed to allocate aggregate value".to_owned()));
+        }
+        unsafe { LLVMSetAlignment(address, layout.alignment) };
+        return Ok(address);
     }
     let declaration = declarations
         .get(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL)
@@ -71,7 +76,6 @@ fn initialize_aggregate_storage(
     fields: &[crate::codegen::BackendAggregateField],
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
-    unsafe { LLVMSetAlignment(address, layout.alignment) };
     let zero = unsafe { LLVMConstInt(LLVMInt8TypeInContext(context), 0, 0) };
     let size = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
     if unsafe { LLVMBuildMemSet(builder, address, zero, size, layout.alignment) }.is_null() {

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use object::{Object, ObjectSection, ObjectSymbol, RelocationTarget};
+use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol, RelocationTarget};
 
 const BACKENDS: [&str; 2] = ["cranelift", "llvm"];
 const SOURCE: &str = "import std::region; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
@@ -56,17 +56,27 @@ fn build(root: &Path, input: &Path, output: &Path, emit: &str) -> std::process::
         .expect("Actus parity build should start")
 }
 
+fn canonical_symbol_name(format: BinaryFormat, name: &str) -> String {
+    if format == BinaryFormat::MachO {
+        name.strip_prefix('_').unwrap_or(name).to_owned()
+    } else {
+        name.to_owned()
+    }
+}
+
 fn symbols(bytes: &[u8], defined: bool) -> BTreeSet<String> {
     let file = object::File::parse(bytes).expect("parity object should parse");
+    let format = file.format();
     file.symbols()
         .filter(|symbol| if defined { symbol.is_definition() } else { symbol.is_undefined() })
-        .filter_map(|symbol| symbol.name().ok().map(str::to_owned))
+        .filter_map(|symbol| symbol.name().ok().map(|name| canonical_symbol_name(format, name)))
         .filter(|name| name == "boot" || name.starts_with("actus_"))
         .collect()
 }
 
 fn referenced_undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
     let file = object::File::parse(bytes).expect("parity object should parse");
+    let format = file.format();
     let mut symbols = BTreeSet::new();
     for section in file.sections() {
         for (_, relocation) in section.relocations() {
@@ -74,9 +84,10 @@ fn referenced_undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
             let symbol = file.symbol_by_index(index).expect("relocation symbol should exist");
             if symbol.is_undefined()
                 && let Ok(name) = symbol.name()
+                && let name = canonical_symbol_name(format, name)
                 && name.starts_with("actus_")
             {
-                symbols.insert(name.to_owned());
+                symbols.insert(name);
             }
         }
     }

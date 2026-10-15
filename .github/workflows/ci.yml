@@ -108,6 +108,10 @@ jobs:
           "LLVM_SYS_231_PREFIX=$llvmPrefix" | Out-File -FilePath $env:GITHUB_ENV -Append
           $llvmVersion = (& $llvmConfig --version).Trim()
           Write-Host "LLVM version: $llvmVersion"
+          Write-Host "LLVM static libraries:"
+          & $llvmConfig --libnames --link-static
+          Write-Host "LLVM static system libraries:"
+          & $llvmConfig --system-libs --link-static
           if (-not $llvmVersion.StartsWith('23.')) { throw "LLVM 23 is required" }
 
       - name: Check formatting
