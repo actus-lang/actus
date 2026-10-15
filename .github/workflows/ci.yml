@@ -63,28 +63,58 @@ jobs:
         with:
           llvm-version: 23
 
-      - name: Set up LLVM 23.1.2 Windows installer
+      - name: Set up LLVM 23.1.2 development archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = '23.1.2'
-          $installer = Join-Path $env:RUNNER_TEMP "LLVM-$version-win64.msi"
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-win64.msi"
-          Invoke-WebRequest -Uri $url -OutFile $installer
-          $expected = 'e9d9141524f2c9fe4bf9f37012efe34f0aa745617be9e21fface9104703c55e5'
-          $actual = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
+          $archiveName = "clang+llvm-$version-x86_64-pc-windows-msvc.tar.xz"
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/$archiveName"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $expected = '8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095'
+          $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
           if ($actual -ne $expected) {
             throw "LLVM archive checksum mismatch: expected $expected, got $actual"
           }
-          $process = Start-Process msiexec.exe -Wait -PassThru -ArgumentList '/i', $installer, '/qn', '/norestart'
-          if ($process.ExitCode -ne 0) {
-            throw "LLVM installer failed with exit code $($process.ExitCode)"
-          }
-          $installRoot = Join-Path $env:ProgramFiles 'LLVM'
+          $installRoot = Join-Path $env:RUNNER_TEMP "llvm-$version"
+          New-Item -ItemType Directory -Force $installRoot | Out-Null
+          tar -xf $archive -C $installRoot --strip-components=1
           $bin = Join-Path $installRoot 'bin'
           if (-not (Test-Path (Join-Path $bin 'llvm-config.exe'))) {
-            throw "LLVM installer did not provide llvm-config.exe"
+            throw "LLVM development archive does not contain llvm-config.exe"
           }
+          $realConfig = Join-Path $bin 'llvm-config-real.exe'
+          Move-Item (Join-Path $bin 'llvm-config.exe') $realConfig
+          $wrapper = Join-Path $bin 'llvm-config.exe'
+          $wrapperSource = @"
+          using System;
+          using System.Diagnostics;
+          using System.Text.RegularExpressions;
+          internal static class Program {
+            public static int Main(string[] args) {
+              var start = new ProcessStartInfo {
+                FileName = @"$realConfig",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+              };
+              foreach (var arg in args) start.ArgumentList.Add(arg);
+              using var process = Process.Start(start);
+              var stdout = process.StandardOutput.ReadToEnd();
+              var stderr = process.StandardError.ReadToEnd();
+              process.WaitForExit();
+              if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
+                stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\]zstd_static\.lib", "zstd_static.lib");
+              }
+              Console.Write(stdout);
+              Console.Error.Write(stderr);
+              return process.ExitCode;
+            }
+          }
+          "@
+          Add-Type -TypeDefinition $wrapperSource -OutputAssembly $wrapper -OutputType ConsoleApplication
           "$bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           "LLVM_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 

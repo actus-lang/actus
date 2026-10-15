@@ -1639,7 +1639,7 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     let linker_script = root.join("memory.x");
     fs::write(
         &linker_script,
-        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
     )
     .expect("ARM linker script should be written");
     let startup_object = root.join("startup.o");
@@ -1648,7 +1648,13 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
 
     run_native_command(
         Command::new("clang")
-            .args(["--target=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-mthumb", "-c"])
+            .args([
+                "--target=thumbv7em-none-eabihf",
+                "-mcpu=cortex-m7",
+                "-mthumb",
+                "-mfloat-abi=soft",
+                "-c",
+            ])
             .arg(&startup)
             .arg("-o")
             .arg(&startup_object),
@@ -1753,7 +1759,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let linker_script = root.join("memory.x");
     fs::write(
         &linker_script,
-        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
     )
     .expect("external provider linker script should be written");
     let provider_object = root.join("provider.o");
@@ -1767,6 +1773,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
                 "--target=thumbv7em-none-eabihf",
                 "-mcpu=cortex-m7",
                 "-mthumb",
+                "-mfloat-abi=soft",
                 "-ffreestanding",
                 "-fno-builtin",
                 "-nostdlib",
@@ -1778,7 +1785,13 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     );
     run_native_command(
         Command::new("clang")
-            .args(["--target=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-mthumb", "-c"])
+            .args([
+                "--target=thumbv7em-none-eabihf",
+                "-mcpu=cortex-m7",
+                "-mthumb",
+                "-mfloat-abi=soft",
+                "-c",
+            ])
             .arg(&startup)
             .arg("-o")
             .arg(&startup_object),
