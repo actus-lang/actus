@@ -49,7 +49,6 @@ jobs:
           $vcLinkDirectory = Join-Path $vcToolset.FullName 'bin\Hostx64\x64'
           $msvcLinker = Join-Path $vcLinkDirectory 'link.exe'
           "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "ACTUS_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $env:Path = "$vcLinkDirectory;$env:Path"
           "PATH=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $linker = (Get-Command link.exe -ErrorAction Stop).Source
@@ -188,8 +187,13 @@ jobs:
         run: |
           $llvmConfig = (Get-Command llvm-config.exe -ErrorAction Stop).Source
           $llvmPrefix = (& $llvmConfig --prefix).Trim()
+          $actusLinker = Join-Path $llvmPrefix 'bin\lld-link.exe'
+          if (-not (Test-Path $actusLinker)) {
+            throw "LLVM lld-link was not found: $actusLinker"
+          }
           "LLVM_CONFIG_PATH=$llvmConfig" | Out-File -FilePath $env:GITHUB_ENV -Append
           "LLVM_SYS_231_PREFIX=$llvmPrefix" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "ACTUS_LINKER=$actusLinker" | Out-File -FilePath $env:GITHUB_ENV -Append
           $llvmVersion = (& $llvmConfig --version).Trim()
           Write-Host "LLVM version: $llvmVersion"
           Write-Host "LLVM static libraries:"
