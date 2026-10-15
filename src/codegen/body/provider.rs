@@ -130,6 +130,7 @@ pub trait BackendExpressionProvider {
         _name: &str,
         _value: BackendValueId,
         span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         Err(unsupported(span, "assignment"))
     }

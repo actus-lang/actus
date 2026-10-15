@@ -51,9 +51,7 @@ impl<'program> ProgramLayouts<'program> {
             .declarations
             .iter()
             .filter_map(|declaration| match declaration {
-                TopLevelDecl::Enum(definition) if definition.generic_parameters.is_empty() => {
-                    Some((definition.name.as_str(), definition))
-                }
+                TopLevelDecl::Enum(definition) => Some((definition.name.as_str(), definition)),
                 _ => None,
             })
             .collect();
@@ -118,9 +116,7 @@ impl<'program> ProgramLayouts<'program> {
             return self.generic_struct_layout(type_name, visiting);
         }
         if self.enums.contains_key(type_name.name.as_str()) {
-            return self
-                .named_enum_layout(type_name.name.as_str(), visiting)
-                .map(|layout| layout.layout);
+            return self.named_enum_layout(type_name, visiting).map(|layout| layout.layout);
         }
         if let Some(pack) = self.packs.get(type_name.name.as_str()) {
             return self.type_layout(pack.storage.type_name(), visiting);
@@ -170,31 +166,27 @@ impl<'program> ProgramLayouts<'program> {
 
     fn named_enum_layout(
         &self,
-        name: &str,
+        type_name: &TypeName,
         visiting: &mut Vec<String>,
     ) -> Option<super::super::abi::BackendEnumLayout> {
-        if visiting.iter().any(|candidate| candidate == name) {
+        let key = type_name.canonical_key();
+        if visiting.iter().any(|candidate| candidate == &key) {
             return None;
         }
-        let definition = self.enums.get(name)?;
-        visiting.push(name.to_owned());
-        let mut payload: Option<BackendLayout> = None;
-        for variant in &definition.variants {
-            let variant_payload = match &variant.payload {
-                EnumPayload::Unit => None,
-                EnumPayload::Tuple(types) => self.sequence_layout(types, visiting),
-                EnumPayload::Struct(fields) => self.sequence_layout(
-                    &fields.iter().map(|field| field.ty.clone()).collect::<Vec<_>>(),
-                    visiting,
-                ),
-            };
-            if let Some(candidate) = variant_payload {
-                payload = Some(match payload {
-                    Some(current) if current.size >= candidate.size => current,
-                    _ => candidate,
-                });
-            }
-        }
+        let definition = self.enums.get(type_name.name.as_str())?;
+        let substitution = (!definition.generic_parameters.is_empty())
+            .then(|| {
+                crate::semantic::TypeSubstitution::for_type(
+                    &definition.name,
+                    &definition.generic_parameters,
+                    &type_name.arguments,
+                    definition.span,
+                )
+                .ok()
+            })
+            .flatten();
+        visiting.push(key);
+        let payload = self.largest_enum_payload(definition, substitution.as_ref(), visiting);
         visiting.pop();
         let payload_offset = match payload {
             Some(layout) => Self::align_up(4, layout.alignment)?,
@@ -213,6 +205,39 @@ impl<'program> ProgramLayouts<'program> {
             payload,
             niche_pointer: false,
         })
+    }
+
+    fn largest_enum_payload(
+        &self,
+        definition: &EnumDef,
+        substitution: Option<&crate::semantic::TypeSubstitution>,
+        visiting: &mut Vec<String>,
+    ) -> Option<BackendLayout> {
+        definition
+            .variants
+            .iter()
+            .filter_map(|variant| self.enum_variant_payload_layout(variant, substitution, visiting))
+            .max_by_key(|layout| (layout.size, layout.alignment))
+    }
+
+    fn enum_variant_payload_layout(
+        &self,
+        variant: &crate::ast::EnumVariant,
+        substitution: Option<&crate::semantic::TypeSubstitution>,
+        visiting: &mut Vec<String>,
+    ) -> Option<BackendLayout> {
+        let types = match &variant.payload {
+            EnumPayload::Unit => return None,
+            EnumPayload::Tuple(types) => types
+                .iter()
+                .map(|ty| substitution.map_or_else(|| ty.clone(), |s| s.apply(ty)))
+                .collect::<Vec<_>>(),
+            EnumPayload::Struct(fields) => fields
+                .iter()
+                .map(|field| substitution.map_or_else(|| field.ty.clone(), |s| s.apply(&field.ty)))
+                .collect::<Vec<_>>(),
+        };
+        self.sequence_layout(&types, visiting)
     }
 
     fn sequence_layout(

@@ -19,7 +19,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         if type_name.name == "Result" && type_name.arguments.len() == 2 {
             return self.result_layout(type_name);
         }
-        self.named_enum_layout(type_name.name.as_str(), &mut Vec::new())
+        self.named_enum_layout(type_name, &mut Vec::new())
     }
 
     fn enum_variant(&self, type_name: &TypeName, variant: &str) -> Option<(u32, bool)> {
@@ -49,12 +49,27 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     ) -> Option<super::super::BackendValueType> {
         let definition = self.enums.get(type_name.name.as_str())?;
         let variant = definition.variants.iter().find(|candidate| candidate.name == variant)?;
+        let substitution = (!definition.generic_parameters.is_empty())
+            .then(|| {
+                crate::semantic::TypeSubstitution::for_type(
+                    &definition.name,
+                    &definition.generic_parameters,
+                    &type_name.arguments,
+                    definition.span,
+                )
+                .ok()
+            })
+            .flatten();
         let payload = match &variant.payload {
-            EnumPayload::Tuple(items) if items.len() == 1 => &items[0],
-            EnumPayload::Struct(items) if items.len() == 1 => &items[0].ty,
+            EnumPayload::Tuple(items) if items.len() == 1 => substitution
+                .as_ref()
+                .map_or_else(|| items[0].clone(), |s| s.apply(&items[0])),
+            EnumPayload::Struct(items) if items.len() == 1 => substitution
+                .as_ref()
+                .map_or_else(|| items[0].ty.clone(), |s| s.apply(&items[0].ty)),
             _ => return None,
         };
-        super::support::backend_value_type(self, payload)
+        super::support::backend_value_type(self, &payload)
     }
 
     fn enum_variant_for_layout(

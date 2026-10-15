@@ -188,6 +188,14 @@ pub(crate) fn lower_parameter(
     parameter: &Param,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendParameter, BackendContractError> {
+    if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
+        return Ok(BackendParameter {
+            name: parameter.name.clone(),
+            role: parameter.role.clone(),
+            ty: BackendValueType::Pointer,
+            passing: BackendPassingMode::Direct,
+        });
+    }
     let (ty, layout) = lower_type(&parameter.ty, layouts)?;
     let passing = passing_for(parameter.role.clone(), ty, layout, parameter.span)?;
     Ok(BackendParameter { name: parameter.name.clone(), role: parameter.role.clone(), ty, passing })

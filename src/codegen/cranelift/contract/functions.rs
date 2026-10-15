@@ -247,7 +247,7 @@ fn append_block_parameters(
         BackendEmitError("Cranelift neutral contract block is missing".to_owned())
     })?;
     for parameter in &block.parameters {
-        let ty = super::declarations::scalar_type(module, parameter.ty)?.ok_or_else(|| {
+        let ty = block_parameter_type(module, parameter.ty)?.ok_or_else(|| {
             BackendEmitError("Cranelift block parameter cannot be unit".to_owned())
         })?;
         builder.append_block_param(native_block, ty);
@@ -266,12 +266,22 @@ fn append_block_parameters_for_entry(
             BackendEmitError("Cranelift neutral contract entry block is missing".to_owned())
         })?;
     for parameter in &block.parameters {
-        let ty = super::declarations::scalar_type(module, parameter.ty)?.ok_or_else(|| {
+        let ty = block_parameter_type(module, parameter.ty)?.ok_or_else(|| {
             BackendEmitError("Cranelift block parameter cannot be unit".to_owned())
         })?;
         builder.append_block_param(*entry, ty);
     }
     Ok(())
+}
+
+fn block_parameter_type(
+    module: &ObjectModule,
+    ty: crate::codegen::BackendValueType,
+) -> Result<Option<cranelift_codegen::ir::Type>, BackendEmitError> {
+    if matches!(ty, crate::codegen::BackendValueType::Aggregate { .. }) {
+        return Ok(Some(module.isa().pointer_type()));
+    }
+    super::declarations::scalar_type(module, ty)
 }
 
 fn bind_block_parameters(

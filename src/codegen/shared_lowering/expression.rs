@@ -273,6 +273,15 @@ impl SharedExpressionProvider<'_> {
             .get(key)
             .cloned()
             .or_else(|| {
+                let candidates = self
+                    .performance_symbols
+                    .iter()
+                    .filter(|((_, candidate), _)| candidate == method)
+                    .map(|(_, symbol)| symbol)
+                    .collect::<Vec<_>>();
+                (candidates.len() == 1).then(|| candidates[0].clone())
+            })
+            .or_else(|| {
                 self.return_types
                     .contains_key(method)
                     .then(|| calls::callee_for(self, method, span).ok())
@@ -296,6 +305,15 @@ impl SharedExpressionProvider<'_> {
             .get(key)
             .copied()
             .flatten()
+            .or_else(|| {
+                let candidates = self
+                    .performance_return_types
+                    .iter()
+                    .filter(|((_, candidate), _)| candidate == method)
+                    .filter_map(|(_, ty)| *ty)
+                    .collect::<Vec<_>>();
+                (candidates.len() == 1).then(|| candidates[0])
+            })
             .or_else(|| self.return_types.get(method).copied().flatten())
     }
 

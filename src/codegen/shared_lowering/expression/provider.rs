@@ -157,7 +157,11 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         name: &str,
         value: BackendValueId,
         span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
+        if let Some(previous) = self.binding_value(name).filter(|previous| *previous != value) {
+            cleanup::emit_replacement_cleanup(self, name, previous, span, instructions);
+        }
         if self.locals.is_empty() {
             return Err(unsupported(span, "scalar assignment has no active lexical scope"));
         }

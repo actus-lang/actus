@@ -349,7 +349,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     return self.provider.assign_aggregate_owner(name, value, span, instructions);
                 }
                 let value = self.provider.lower_expression(value, instructions)?;
-                self.provider.assign_owner(name, value, span)
+                self.provider.assign_owner(name, value, span, instructions)
             }
             Place::Field { object, field, .. } => {
                 self.provider.assign_field(&object.to_expr(), field, value, span, instructions)
@@ -410,7 +410,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         };
         let result =
             self.provider.lower_integer_binary(operation, current, value, span, instructions)?;
-        self.provider.assign_owner(name, result, span)
+        self.provider.assign_owner(name, result, span, instructions)
     }
 }
 

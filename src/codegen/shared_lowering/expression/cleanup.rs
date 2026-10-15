@@ -78,6 +78,49 @@ pub(super) fn emit_scope_cleanup(
     instructions.splice(insertion..insertion, cleanup);
 }
 
+pub(super) fn emit_replacement_cleanup(
+    provider: &SharedExpressionProvider<'_>,
+    name: &str,
+    value: super::super::super::BackendValueId,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    for plan in provider.cleanup_plans.iter().filter(|plan| {
+        matches!(plan.origin, BackendCleanupOrigin::Scope)
+            && plan.actions.iter().enumerate().any(|(index, action)| {
+                let action_name = match action {
+                    super::super::super::BackendCleanupAction::DropBinding { name, .. }
+                    | super::super::super::BackendCleanupAction::DropBindingFields {
+                        name, ..
+                    } => name,
+                    _ => return false,
+                };
+                action_name == name
+                    && plan.resolved_bridges.get(index).is_some_and(|items| !items.is_empty())
+            })
+    }) {
+        for (index, action) in plan.actions.iter().enumerate() {
+            let action_name = match action {
+                super::super::super::BackendCleanupAction::DropBinding { name, .. }
+                | super::super::super::BackendCleanupAction::DropBindingFields { name, .. } => name,
+                _ => continue,
+            };
+            if action_name != name {
+                continue;
+            }
+            for descriptor in plan.resolved_bridges.get(index).into_iter().flatten() {
+                if descriptor_applies(provider, value, descriptor) {
+                    instructions.push(BackendInstruction::Cleanup {
+                        action: action.clone(),
+                        operand: Some(descriptor.operand(value)),
+                        span,
+                    });
+                }
+            }
+        }
+    }
+}
+
 pub(super) fn append_loop_cleanup(
     provider: &SharedExpressionProvider<'_>,
     span: SourceSpan,
