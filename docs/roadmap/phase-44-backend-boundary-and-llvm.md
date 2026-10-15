@@ -659,17 +659,58 @@ constructed backend-neutral contracts.
       selection implementation.
 - [x] Route the resolved backend selector through `CompilerConfiguration`,
       build planning, object emission, executable emission, and run commands.
-- [ ] Move semantic-to-`BackendModule` lowering behind a shared lowering
+- [x] Move semantic-to-`BackendModule` lowering behind a shared lowering
       boundary so LLVM and Cranelift consume the same roles, layouts, cleanup
       plans, calls, returns, failures, and external symbols.
 
-The first orchestration slice is now centralized in
+The complete CLI build path is now centralized in
 `src/cli/build/shared_emission.rs`: target filtering, normalization, generic
 specialization, and semantic-to-`BackendModule` lowering are performed once
-for every shared-route object. LLVM and Cranelift consume that same lowered
-module sequence before backend-specific object emission. This does not close
-the gate yet: unsupported Cranelift candidate shapes still use the explicitly
-retained legacy path and must be migrated with parity evidence.
+for every object unit. LLVM and Cranelift consume that same lowered module
+sequence through their backend-specific emitters. The shared contract carries
+roles and passing modes, program-derived layouts, cleanup plans and bridge
+descriptors, calls, returns and return slots, typed failures, and reachable
+external runtime symbols. The candidate boundary is fail-closed: unsupported
+operations produce the typed selected-backend diagnostic and never route to a
+different backend or to a CLI legacy fallback.
+
+### Gate 44.7.1 closure evidence — 2026-10-15
+
+The seven required completion points are closed as follows:
+
+1. Aggregate and structured roles/layouts use the neutral `BackendModule`
+   contract, including caller-owned `ins` storage, aggregate return slots,
+   niche pointer returns, nested structs, packs, arrays, enums, and Region
+   payloads.
+2. Semantic cleanup plans are resolved into validated neutral descriptors,
+   including partial aggregate field cleanup, builtin Buffer/Region cleanup,
+   `Result[Region[T], E]` payload cleanup, explicit drops, and user-defined
+   Drop performance bridges.
+3. Calls, returns, and failure paths use the same neutral instructions and
+   ABI metadata. This includes typed case/try paths, aggregate failure payloads,
+   branch merge values, caller-owned return slots, and runtime bridge calls.
+4. External symbols are derived from the lowered module and filtered by actual
+   reachability. Buffer, print, Region, cleanup, and user external symbols are
+   declared with one neutral ABI contract; unused runtime declarations are not
+   emitted into freestanding objects.
+5. The CLI no longer selects a Cranelift legacy fallback for unsupported shared
+   candidates. Both configured native backends enter through
+   `lower_shared_modules`; the remaining lower-level native compatibility APIs
+   are not part of CLI backend selection and are covered separately by their
+   direct backend tests.
+6. `tests/backend_parity.rs`, `tests/codegen/llvm/backend.rs`,
+   `tests/region_aggregate_native.rs`, `tests/std_region_native.rs`,
+   `tests/path_native.rs`, `tests/cli.rs`, and the shared-lowering unit suite
+   provide parity evidence for roles, layouts, cleanup, calls, returns,
+   failures, runtime symbols, hosted execution, and freestanding objects.
+7. Validation completed with `cargo check --all-targets --all-features` and
+   the full LLVM-enabled test run: all backend, shared-lowering, CLI,
+   freestanding, Region, aggregate, example, and parity suites passed with
+   zero failures in those suites. The repository-wide source-limit test still
+   reports pre-existing hard-limit violations in legacy oversized Rust modules;
+   that independent decomposition debt is recorded separately and is not
+   masked by this gate.
+
 - [x] Define neutral block parameters and typed edge arguments for values that
       cross branch and loop back-edges, including source spans and ownership
       transitions.
