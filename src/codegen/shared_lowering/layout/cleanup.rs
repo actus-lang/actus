@@ -5,6 +5,25 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
         builtin: Option<BuiltinType>,
     ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
         if let Some(type_name) = type_name
+            && type_name.name == "Result"
+            && let Some(payload) = type_name.arguments.first()
+            && payload.name == "Region"
+            && let (Some(enum_layout), Some(payload_layout)) = (
+                self.enum_layout_for(type_name),
+                self.layout_for(payload),
+            )
+        {
+            return Ok(Some(self.cleanup_descriptor(
+                BackendCleanupBridge::RegionDrop,
+                enum_layout.layout,
+                Some(BackendCleanupField {
+                    offset: enum_layout.payload_offset,
+                    size: payload_layout.size,
+                    alignment: payload_layout.alignment,
+                }),
+            )));
+        }
+        if let Some(type_name) = type_name
             && !matches!(type_name.name.as_str(), "Buffer" | "Region")
             && self
                 .type_layout(type_name, &mut Vec::new())

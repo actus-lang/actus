@@ -21,11 +21,11 @@ use support::{backend_value_type, unsupported};
 use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
-    BackendCleanupResult, BackendContractError, BackendExternal, BackendLayout,
-    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendSignature,
-    BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind, lower_parameter,
-    lower_return, lower_verb_signature, lower_verb_with_expressions,
-    lower_verb_with_expressions_as,
+    BackendCleanupResult, BackendContractError, BackendExternal, BackendFunction,
+    BackendInstruction, BackendLayout, BackendLayoutProvider, BackendModule, BackendParameter,
+    BackendPassingMode, BackendReturn, BackendReturnMode, BackendSignature, BackendSymbolBindings,
+    BackendValueType, SymbolIdentity, SymbolKind, lower_parameter, lower_return,
+    lower_verb_signature, lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
 
 #[doc(hidden)]
@@ -211,15 +211,25 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
         )?,
         functions,
     };
-    append_buffer_allocate_external(&mut module.externals)?;
-    runtime_externals::append_buffer_runtime_externals(&mut module.externals)?;
-    append_print_externals(&mut module.externals)?;
+    let mut runtime_symbols = referenced_runtime_symbols(&module.functions);
+    if module
+        .externals
+        .iter()
+        .any(|external| external.symbol.as_str() == crate::runtime::REGION_OPEN_SYMBOL)
+    {
+        runtime_symbols.insert(crate::runtime::BUFFER_DROP_SYMBOL.to_owned());
+    }
+    append_buffer_drop_external(&mut module.externals, &runtime_symbols)?;
+    append_buffer_allocate_external(&mut module.externals, &runtime_symbols)?;
+    runtime_externals::append_buffer_runtime_externals(&mut module.externals, &runtime_symbols)?;
+    append_print_externals(&mut module.externals, &runtime_symbols)?;
     module.validate()?;
     Ok(module)
 }
 
 fn append_print_externals(
     externals: &mut Vec<BackendExternal>,
+    required_symbols: &std::collections::BTreeSet<String>,
 ) -> Result<(), BackendContractError> {
     for (symbol, ty) in [
         (crate::runtime::PRINT_INT_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
@@ -227,6 +237,9 @@ fn append_print_externals(
         (crate::runtime::WRITE_STRING_STDOUT_SYMBOL, BackendValueType::Pointer),
         (crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL, BackendValueType::Pointer),
     ] {
+        if !required_symbols.contains(symbol) {
+            continue;
+        }
         if externals.iter().any(|external| external.symbol.as_str() == symbol) {
             continue;
         }
@@ -249,6 +262,31 @@ fn append_print_externals(
         });
     }
     Ok(())
+}
+
+fn referenced_runtime_symbols(functions: &[BackendFunction]) -> std::collections::BTreeSet<String> {
+    let mut symbols = functions
+        .iter()
+        .flat_map(|function| function.blocks.iter())
+        .flat_map(|block| block.instructions.iter())
+        .filter_map(|instruction| match instruction {
+            BackendInstruction::Call { callee, .. } if callee.kind() == SymbolKind::External => {
+                Some(callee.as_str().to_owned())
+            }
+            _ => None,
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    if symbols.contains(crate::runtime::REGION_OPEN_SYMBOL)
+        || functions.iter().any(|function| {
+            function.parameters.iter().any(|parameter| {
+                parameter.ty == BackendValueType::Pointer
+                    && matches!(parameter.passing, BackendPassingMode::OwnershipTransfer { .. })
+            })
+        })
+    {
+        symbols.insert(crate::runtime::BUFFER_DROP_SYMBOL.to_owned());
+    }
+    symbols
 }
 
 pub(super) struct SharedDeclarations<'program> {
@@ -385,7 +423,11 @@ fn build_backend_externals(
 
 fn append_buffer_allocate_external(
     externals: &mut Vec<BackendExternal>,
+    required_symbols: &std::collections::BTreeSet<String>,
 ) -> Result<(), BackendContractError> {
+    if !required_symbols.contains(crate::runtime::BUFFER_ALLOCATE_SYMBOL) {
+        return Ok(());
+    }
     if externals
         .iter()
         .any(|external| external.symbol.as_str() == crate::runtime::BUFFER_ALLOCATE_SYMBOL)
@@ -393,6 +435,35 @@ fn append_buffer_allocate_external(
         return Ok(());
     }
     externals.push(buffer_allocate_external()?);
+    Ok(())
+}
+
+fn append_buffer_drop_external(
+    externals: &mut Vec<BackendExternal>,
+    required_symbols: &std::collections::BTreeSet<String>,
+) -> Result<(), BackendContractError> {
+    let symbol = crate::runtime::BUFFER_DROP_SYMBOL;
+    if !required_symbols.contains(symbol)
+        || externals.iter().any(|external| external.symbol.as_str() == symbol)
+    {
+        return Ok(());
+    }
+    externals.push(BackendExternal {
+        symbol: SymbolIdentity::external_raw(symbol)
+            .map_err(|error| unsupported(crate::lexer::SourceSpan::new(0, 0), error.to_string()))?,
+        parameters: vec![BackendParameter {
+            name: "handle".to_owned(),
+            role: crate::ast::Role::Erg,
+            ty: BackendValueType::Pointer,
+            passing: BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        runtime_pointer_return: false,
+    });
     Ok(())
 }
 

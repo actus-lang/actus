@@ -7,7 +7,9 @@ use super::support::unsupported;
 
 pub(super) fn append_buffer_runtime_externals(
     externals: &mut Vec<BackendExternal>,
+    required_symbols: &std::collections::BTreeSet<String>,
 ) -> Result<(), BackendContractError> {
+    let start = externals.len();
     append_buffer_append(externals)?;
     append_buffer_length(externals)?;
     append_buffer_byte_at(externals)?;
@@ -15,6 +17,11 @@ pub(super) fn append_buffer_runtime_externals(
     append_buffer_crc32(externals)?;
     append_buffer_crc32_matches(externals)?;
     append_buffer_validate_fixed_frame(externals)?;
+    let candidates = externals
+        .drain(start..)
+        .filter(|external| required_symbols.contains(external.symbol.as_str()))
+        .collect::<Vec<_>>();
+    externals.extend(candidates);
     Ok(())
 }
 

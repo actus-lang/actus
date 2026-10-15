@@ -563,14 +563,18 @@ fn lower_array_constructor(
             "fixed-array capacity must be non-zero",
         ));
     }
+    let element_layout = provider.layouts.layout_for(&type_name.arguments[0]).ok_or_else(|| {
+        super::super::support::unsupported(span, "array element has no neutral layout")
+    })?;
+    let size = element_layout
+        .size
+        .checked_mul(capacity)
+        .ok_or_else(|| super::super::support::unsupported(span, "array layout size overflow"))?;
     let layout = provider
         .layouts
         .layout_for(&type_name)
         .ok_or_else(|| super::super::support::unsupported(span, "array has no neutral layout"))?;
-    let element_layout = provider.layouts.layout_for(&type_name.arguments[0]).ok_or_else(|| {
-        super::super::support::unsupported(span, "array element has no neutral layout")
-    })?;
-    if u64::from(element_layout.size) * u64::from(capacity) != u64::from(layout.size) {
+    if size != layout.size {
         return Err(super::super::support::unsupported(
             span,
             "array layout does not match capacity",

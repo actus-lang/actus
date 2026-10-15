@@ -83,7 +83,9 @@ fn declare_module_functions(
         )?;
         declarations.insert(external.symbol.as_str().to_owned(), declaration);
     }
-    if backend_module.externals.iter().any(|external| external.runtime_pointer_return)
+    let bridges = cleanup_bridges(backend_module);
+    if (backend_module.externals.iter().any(|external| external.runtime_pointer_return)
+        || bridges.iter().any(|bridge| matches!(bridge, BackendCleanupBridge::RegionDrop)))
         && !declarations.contains_key(crate::runtime::ENUM_DROP_SYMBOL)
     {
         let declaration = declare_cleanup_bridge(
@@ -94,7 +96,7 @@ fn declare_module_functions(
         )?;
         declarations.insert(crate::runtime::ENUM_DROP_SYMBOL.to_owned(), declaration);
     }
-    for bridge in cleanup_bridges(backend_module) {
+    for bridge in bridges {
         let symbol = cleanup_bridge_symbol(bridge);
         if declarations.contains_key(symbol) {
             continue;

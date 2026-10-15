@@ -121,6 +121,14 @@ pub(super) fn declare_cleanup_bridges(
             }
         }
     }
+    if backend_module.externals.iter().any(|external| external.runtime_pointer_return)
+        || bridges.iter().any(|bridge| matches!(bridge, BackendCleanupBridge::RegionDrop))
+    {
+        let enum_drop = BackendCleanupBridge::EnumDrop { size: 0 };
+        if !bridges.contains(&enum_drop) {
+            bridges.push(enum_drop);
+        }
+    }
 
     let needs_aggregate_allocator = backend_module.functions.iter().any(|function| {
         function.blocks.iter().any(|block| {
