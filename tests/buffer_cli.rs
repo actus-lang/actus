@@ -90,7 +90,7 @@ fn returns_and_reuses_a_zero_copy_abs_buffer_view() {
     assert_eq!(build_and_run(source, "buffer-abs-view"), 42);
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_returns_and_reuses_a_zero_copy_abs_buffer_view() {
     let source = "verb identity(abs input: Buffer) -> abs Buffer { return input; } verb main() -> Int { erg buffer: Buffer = Buffer[4]; { abs view = ref identity(input: abs buffer); } append(buffer, 41); return 42; }\n";

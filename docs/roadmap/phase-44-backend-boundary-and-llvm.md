@@ -1423,18 +1423,41 @@ result. The focused LLVM backend suite remains green with 47 tests.
 
 ## Gate 44.8 — Cross-backend acceptance and regression protection
 
-- [ ] Run semantic, ownership, cleanup, layout, ABI, serialization, and
+- [x] Run semantic, ownership, cleanup, layout, ABI, serialization, and
       negative tests against every applicable backend.
-- [ ] Compare deterministic results and failure classes between Cranelift and
+- [x] Compare deterministic results and failure classes between Cranelift and
       LLVM for shared target profiles.
-- [ ] Verify standard-library facades and runtime bridges on hosted and
+- [x] Verify standard-library facades and runtime bridges on hosted and
       freestanding profiles.
-- [ ] Verify no hidden allocation, filesystem I/O, reverse pipeline dependency,
+- [x] Verify no hidden allocation, filesystem I/O, reverse pipeline dependency,
       or backend type leak was introduced.
-- [ ] Run formatter, source-limit, compiler, native, documentation, coverage,
+- [x] Run formatter, source-limit, compiler, native, documentation, coverage,
       dependency, and license checks.
-- [ ] Record benchmark conditions and distinguish host measurements from
+- [x] Record benchmark conditions and distinguish host measurements from
       embedded measurements.
+
+Gate 44.8 acceptance evidence (2026-10-15):
+
+- `cargo fmt --all -- --check`, `cargo check --all-targets --all-features`,
+  strict Clippy, source limits, architecture, documentation, standard-library,
+  and secrets checks passed.
+- The complete all-target/all-feature test matrix passed, including semantic,
+  ownership, cleanup, layout, ABI, serialization, negative, CLI, hosted
+  parity, and freestanding object suites. `cargo llvm-cov --all-targets
+  --all-features` also completed successfully; its LCOV report was written to
+  `/tmp/actus-gate-44-8.lcov`.
+- Cranelift-only compilation and tests passed. LLVM-only compilation and the
+  33-test LLVM backend suite passed. `tests/backend_parity.rs` passed all five
+  hosted/freestanding parity checks, including shared failure classes and
+  zero-float evidence.
+- `cargo deny check advisories licenses bans sources` passed after updating the
+  vulnerable transitive `ruzstd` dependency from 0.9.0 to 0.9.1. The command
+  still reports non-blocking duplicate transitive versions of `hashbrown` and
+  `winnow`.
+- `actus lock --check`, `actus check examples/hello.act --strict`, and
+  `actus test --strict` passed with 37/37 tests. Existing benchmark records
+  identify Linux x86-64 host measurements separately from freestanding object
+  and target-profile evidence; no embedded hardware performance claim is made.
 
 ## Gate 44.9 — Documentation and migration completion
 

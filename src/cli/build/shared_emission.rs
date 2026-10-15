@@ -53,8 +53,10 @@ fn retain_reachable_functions(
 }
 
 pub(super) struct LoweredSharedModule {
+    #[cfg(feature = "cranelift")]
     pub(super) namespace: String,
     pub(super) object_name: String,
+    #[cfg(feature = "cranelift")]
     pub(super) program: crate::ast::Program,
     pub(super) module: BackendModule,
 }
@@ -111,7 +113,7 @@ pub(super) fn lower_shared_modules(
     }
     let root_calls = modules.first().map(|root| called_symbols(&root.module)).unwrap_or_default();
     let reachable_modules = reachable_module_symbols(&modules, &root_calls);
-    for (module, reachable) in modules.iter_mut().skip(1).zip(reachable_modules.into_iter()) {
+    for (module, reachable) in modules.iter_mut().skip(1).zip(reachable_modules) {
         module.module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
     }
     Ok(modules)
@@ -142,8 +144,10 @@ fn lower_unit_module(
     let module =
         lower_unit_backend_module(object_plan, index, &program, performance_context, context)?;
     Ok(LoweredSharedModule {
+        #[cfg(feature = "cranelift")]
         namespace: unit.namespace().symbol_prefix().to_owned(),
         object_name: unit_object_name(unit, index),
+        #[cfg(feature = "cranelift")]
         program,
         module,
     })
