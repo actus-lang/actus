@@ -163,10 +163,7 @@ pub(super) fn lower_call(
             BackendEmitError("Cranelift runtime result is unavailable".to_owned())
         })?;
         if declaration.niche_pointer_return {
-            let return_slot = return_slot.ok_or_else(|| {
-                BackendEmitError("Cranelift niche runtime return slot is unavailable".to_owned())
-            })?;
-            values.insert(result, return_slot);
+            values.insert(result, raw);
             return Ok(());
         }
         let layout = declaration.runtime_result_layout.ok_or_else(|| {
