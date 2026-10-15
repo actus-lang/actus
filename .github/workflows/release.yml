@@ -5,14 +5,12 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   build-artifact:
     name: Build release artifact (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -28,13 +26,13 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
 
       - name: Set up LLVM 23
-        uses: ZhongRuoyu/setup-llvm@v0
+        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
         with:
           llvm-version: 23
 
@@ -123,7 +121,7 @@ jobs:
           (Get-FileHash "release/$name.zip" -Algorithm SHA256).Hash.ToLower() + "  $name.zip" | Out-File "release/$name.zip.sha256" -Encoding ascii
 
       - name: Upload platform artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: actus-${{ matrix.target }}
           path: release/*
@@ -133,9 +131,12 @@ jobs:
     name: Create GitHub release
     needs: build-artifact
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -143,7 +144,7 @@ jobs:
         run: git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
 
       - name: Install git-cliff
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2
         with:
           tool: git-cliff@2.13.0
 
@@ -190,7 +191,7 @@ jobs:
           bash scripts/update_changelog_index.sh
 
       - name: Open changelog pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           branch: "automation/changelog-${{ github.ref_name }}"
           delete-branch: true
@@ -204,7 +205,7 @@ jobs:
             This pull request was created automatically from the release tag.
 
       - name: Download platform artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: actus-*
           path: release-assets
