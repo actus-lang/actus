@@ -13,6 +13,7 @@ fn large_fixed_array_uses_runtime_storage_on_both_native_backends() {
         last_index = LARGE_ARRAY_CAPACITY - 1,
     );
     for backend in ["cranelift", "llvm"] {
+        eprintln!("large aggregate test: building {backend}");
         let root = std::env::temp_dir()
             .join(format!("actus-large-aggregate-{backend}-{}", std::process::id()));
         let input = root.join("main.act");
@@ -38,6 +39,7 @@ fn large_fixed_array_uses_runtime_storage_on_both_native_backends() {
             ]
             .into_iter(),
         );
+        eprintln!("large aggregate test: built {backend}");
         assert_eq!(result, 0, "{backend} large aggregate build should pass");
         let status =
             std::process::Command::new(&output).status().expect("run large aggregate fixture");

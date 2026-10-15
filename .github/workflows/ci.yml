@@ -165,7 +165,7 @@ jobs:
       - name: Verify native link tools
         shell: bash
         run: |
-          RUST_BIN="$(dirname "$(rustup which rustc)")"
+          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
           echo "$RUST_BIN" >> "$GITHUB_PATH"
           export PATH="$RUST_BIN:$PATH"
           command -v clang
@@ -220,7 +220,7 @@ jobs:
       - name: Verify target toolchain
         shell: bash
         run: |
-          RUST_BIN="$(dirname "$(rustup which rustc)")"
+          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
           echo "$RUST_BIN" >> "$GITHUB_PATH"
           export PATH="$RUST_BIN:$PATH"
           llvm-config --version
