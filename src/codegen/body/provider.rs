@@ -49,6 +49,12 @@ pub trait BackendExpressionProvider {
         None
     }
 
+    fn nominal_type(&self, _value: BackendValueId) -> Option<crate::ast::TypeName> {
+        None
+    }
+
+    fn remember_nominal_type(&mut self, _value: BackendValueId, _type_name: crate::ast::TypeName) {}
+
     fn allocate_value(&mut self, _ty: BackendValueType) -> BackendValueId {
         BackendValueId(u32::MAX)
     }

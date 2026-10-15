@@ -360,7 +360,8 @@ impl SharedExpressionProvider<'_> {
         let result_type = if matches!(operator, UnaryOp::LogicalNot) {
             BackendValueType::Bool
         } else {
-            BackendValueType::Integer { signed: true, width: 32 }
+            self.value_type(operand)
+                .ok_or_else(|| unsupported(*span, "integer unary operand type is unavailable"))?
         };
         self.remember_value(result, result_type);
         instructions.push(BackendInstruction::IntegerUnary {

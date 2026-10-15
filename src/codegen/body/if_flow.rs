@@ -33,19 +33,12 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let then_id = self.allocate_block();
         let else_id = self.allocate_block();
         self.lower_condition(condition, then_id, else_id, span, instructions)?;
-        let branch_start = self.blocks.len();
-        let (then_block, then_values, then_terminates) =
-            self.lower_if_then_branch(then_id, then_branch, continuation_id, &carried, span)?;
+        let (then_block, _then_values, then_terminates) =
+            self.lower_if_then_with_edges(then_id, then_branch, continuation_id, &carried, span)?;
         self.blocks.push(then_block);
-        for block in self.blocks.iter_mut().skip(branch_start) {
-            replace_if_edge_arguments(block, continuation_id, &carried, &then_values, span);
-        }
-        for (name, value) in &initial {
-            self.provider.set_binding_value(name, *value);
-        }
-        let else_start = self.blocks.len();
-        let else_block =
-            self.lower_if_else_block(else_id, else_branch, continuation_id, &carried, span)?;
+        self.reset_bindings(&initial);
+        let (else_start, else_block, _else_values) =
+            self.lower_if_else_with_edges(else_id, else_branch, continuation_id, &carried, span)?;
         let branches_terminate = then_terminates
             && !generated_blocks_reach_continuation(
                 &self.blocks[else_start..],
@@ -54,15 +47,127 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             )
             && terminates_without_continuation(else_block.instructions.last(), continuation_id);
         self.blocks.push(else_block);
-        let parameters = carried
+        let parameters = self.allocate_if_parameters(&carried, span);
+        Ok(IfLowering { terminates: branches_terminate, parameters })
+    }
+
+    fn lower_if_then_with_edges(
+        &mut self,
+        id: BackendBlockId,
+        branch: &Block,
+        continuation_id: BackendBlockId,
+        carried: &[loops::CarriedBinding],
+        span: SourceSpan,
+    ) -> Result<(BackendBlock, BTreeMap<String, BackendValueId>, bool), BackendContractError> {
+        let branch_start = self.blocks.len();
+        let carries_outer_state = !self.loop_targets.is_empty();
+        self.push_carried_scope(carried, carries_outer_state);
+        let result = self.lower_if_then_branch(id, branch, continuation_id, carried, span);
+        self.pop_carried_scope(carries_outer_state);
+        let (mut then_block, values, terminates) = result?;
+        replace_if_edge_arguments(
+            &mut then_block,
+            continuation_id,
+            carried,
+            &values,
+            span,
+            !self.loop_targets.is_empty(),
+        );
+        self.replace_generated_if_edges(branch_start, continuation_id, carried, &values, span);
+        Ok((then_block, values, terminates))
+    }
+
+    fn lower_if_else_with_edges(
+        &mut self,
+        id: BackendBlockId,
+        branch: Option<&IfBranch>,
+        continuation_id: BackendBlockId,
+        carried: &[loops::CarriedBinding],
+        span: SourceSpan,
+    ) -> Result<(usize, BackendBlock, BTreeMap<String, BackendValueId>), BackendContractError> {
+        let else_start = self.blocks.len();
+        let carries_outer_state = !self.loop_targets.is_empty();
+        self.push_carried_scope(carried, carries_outer_state);
+        let result = self.lower_if_else_block(id, branch, continuation_id, carried, span);
+        self.pop_carried_scope(carries_outer_state);
+        let else_block = result?;
+        let values = self.current_carried_values(carried);
+        self.replace_generated_if_edges(else_start, continuation_id, carried, &values, span);
+        Ok((else_start, else_block, values))
+    }
+
+    fn push_carried_scope(&mut self, carried: &[loops::CarriedBinding], enabled: bool) {
+        if enabled {
+            self.carried_scopes.push(
+                carried
+                    .iter()
+                    .filter(|binding| is_scalar_carried(binding.ty))
+                    .map(|binding| binding.name.clone())
+                    .collect(),
+            );
+        }
+    }
+
+    fn pop_carried_scope(&mut self, enabled: bool) {
+        if enabled {
+            self.carried_scopes.pop();
+        }
+    }
+
+    fn reset_bindings(&mut self, bindings: &BTreeMap<String, BackendValueId>) {
+        for (name, value) in bindings {
+            self.provider.set_binding_value(name, *value);
+        }
+    }
+
+    fn current_carried_values(
+        &self,
+        carried: &[loops::CarriedBinding],
+    ) -> BTreeMap<String, BackendValueId> {
+        carried
+            .iter()
+            .filter_map(|binding| {
+                self.provider
+                    .binding_value(&binding.name)
+                    .map(|value| (binding.name.clone(), value))
+            })
+            .collect()
+    }
+
+    fn replace_generated_if_edges(
+        &mut self,
+        start: usize,
+        continuation_id: BackendBlockId,
+        carried: &[loops::CarriedBinding],
+        values: &BTreeMap<String, BackendValueId>,
+        span: SourceSpan,
+    ) {
+        let forward_parameters = !self.loop_targets.is_empty();
+        for block in self.blocks.iter_mut().skip(start) {
+            replace_if_edge_arguments(
+                block,
+                continuation_id,
+                carried,
+                values,
+                span,
+                forward_parameters,
+            );
+        }
+    }
+
+    fn allocate_if_parameters(
+        &mut self,
+        carried: &[loops::CarriedBinding],
+        span: SourceSpan,
+    ) -> Vec<BackendBlockParameter> {
+        carried
             .iter()
             .map(|binding| {
                 let value = self.provider.allocate_value(binding.ty);
                 self.provider.set_binding_value(&binding.name, value);
                 BackendBlockParameter { value, ty: binding.ty, span }
             })
-            .collect();
-        Ok(IfLowering { terminates: branches_terminate, parameters })
+            .collect()
     }
 
     fn lower_condition(
@@ -132,7 +237,14 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         );
         let terminates = !reaches_continuation
             && terminates_without_continuation(lowered.instructions.last(), continuation_id);
-        replace_if_edge_arguments(&mut lowered, continuation_id, carried, &values, span);
+        replace_if_edge_arguments(
+            &mut lowered,
+            continuation_id,
+            carried,
+            &values,
+            span,
+            !self.loop_targets.is_empty(),
+        );
         Ok((lowered, values, terminates))
     }
 
@@ -154,7 +266,14 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                     .map(|value| (binding.name.clone(), value))
             })
             .collect::<BTreeMap<_, _>>();
-        replace_if_edge_arguments(&mut lowered, continuation_id, carried, &values, span);
+        replace_if_edge_arguments(
+            &mut lowered,
+            continuation_id,
+            carried,
+            &values,
+            span,
+            !self.loop_targets.is_empty(),
+        );
         Ok(lowered)
     }
 
@@ -198,6 +317,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         if let Some(IfBranch::Block(block)) = else_branch {
             collect_assignment_names(block, &mut names);
         }
+        for scope in &self.carried_scopes {
+            names.extend(scope.iter().cloned());
+        }
         names.sort();
         names.dedup();
         Ok(names
@@ -215,6 +337,13 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         self.next_block += 1;
         id
     }
+}
+
+fn is_scalar_carried(ty: super::super::BackendValueType) -> bool {
+    matches!(
+        ty,
+        super::super::BackendValueType::Bool | super::super::BackendValueType::Integer { .. }
+    )
 }
 
 fn generated_blocks_reach_continuation(
@@ -243,16 +372,30 @@ fn replace_if_edge_arguments(
     carried: &[loops::CarriedBinding],
     values: &BTreeMap<String, BackendValueId>,
     span: SourceSpan,
+    forward_parameters: bool,
 ) {
-    let arguments = carried
-        .iter()
-        .filter_map(|binding| {
-            values.get(&binding.name).map(|value| BackendEdgeArgument {
-                value: *value,
+    let arguments = if forward_parameters && block.parameters.len() == carried.len() {
+        block
+            .parameters
+            .iter()
+            .zip(carried)
+            .map(|(parameter, binding)| BackendEdgeArgument {
+                value: parameter.value,
                 ty: binding.ty,
                 span,
             })
-        })
-        .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    } else {
+        carried
+            .iter()
+            .filter_map(|binding| {
+                values.get(&binding.name).map(|value| BackendEdgeArgument {
+                    value: *value,
+                    ty: binding.ty,
+                    span,
+                })
+            })
+            .collect::<Vec<_>>()
+    };
     loops::replace_jump_arguments_in_block(block, continuation, &arguments);
 }

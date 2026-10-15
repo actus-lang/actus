@@ -253,9 +253,6 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             .filter_map(|name| {
                 let value = self.provider.binding_value(&name)?;
                 let ty = self.provider.value_type(value)?;
-                if matches!(ty, super::super::BackendValueType::Aggregate { .. }) {
-                    return None;
-                }
                 Some(super::loops::CarriedBinding { name, value, ty })
             })
             .collect()

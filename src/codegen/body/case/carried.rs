@@ -28,6 +28,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             .iter()
             .map(|binding| self.provider.allocate_value(binding.ty))
             .collect::<Vec<_>>();
+        let continuation_nominal_types = carried
+            .iter()
+            .map(|binding| self.provider.nominal_type(binding.value))
+            .collect::<Vec<_>>();
         let continuation_parameters = carried
             .iter()
             .zip(&continuation_values)
@@ -53,10 +57,23 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         for (binding, value) in carried.iter().zip(&continuation_values) {
             self.provider.set_binding_value(&binding.name, *value);
         }
+        self.remember_case_nominal_types(&continuation_values, continuation_nominal_types);
         Ok((
             BackendBlock { parameters: Vec::new(), id, instructions: entry_instructions },
             continuation_parameters,
         ))
+    }
+
+    fn remember_case_nominal_types(
+        &mut self,
+        values: &[BackendValueId],
+        nominal_types: Vec<Option<crate::ast::TypeName>>,
+    ) {
+        for (value, type_name) in values.iter().zip(nominal_types) {
+            if let Some(type_name) = type_name {
+                self.provider.remember_nominal_type(*value, type_name);
+            }
+        }
     }
 }
 

@@ -48,6 +48,18 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         self.value_type(value)
     }
 
+    fn nominal_type(&self, value: BackendValueId) -> Option<crate::ast::TypeName> {
+        self.nominal_type(value).cloned()
+    }
+
+    fn remember_nominal_type(
+        &mut self,
+        value: BackendValueId,
+        type_name: crate::ast::TypeName,
+    ) {
+        self.remember_nominal_type(value, type_name);
+    }
+
     fn allocate_value(&mut self, ty: BackendValueType) -> BackendValueId {
         let value = self.allocate();
         self.remember_value(value, ty);

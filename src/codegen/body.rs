@@ -37,6 +37,7 @@ pub fn lower_verb_body_with_expressions(
         next_block: 1,
         blocks: Vec::new(),
         loop_targets: Vec::new(),
+        carried_scopes: Vec::new(),
         implicit_unit_return: verb
             .return_type
             .as_ref()
@@ -86,6 +87,7 @@ pub(super) struct BodyLowering<'a, P> {
     next_block: u32,
     pub(super) blocks: Vec<BackendBlock>,
     loop_targets: Vec<LoopTargets>,
+    carried_scopes: Vec<Vec<String>>,
     implicit_unit_return: bool,
 }
 

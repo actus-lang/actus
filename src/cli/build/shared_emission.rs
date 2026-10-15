@@ -80,7 +80,9 @@ pub(super) fn generic_inputs(
             crate::codegen::expand_generic_instances(&expansion_program, &generic_instances)?;
         for instance in expanded_instances {
             if !unique_instances.iter().any(|known: &crate::semantic::GenericInstance| {
-                known.identity() == instance.identity() && known.caller == instance.caller
+                known.identity() == instance.identity()
+                    && known.caller == instance.caller
+                    && known.call_span == instance.call_span
             }) {
                 unique_instances.push(instance);
             }
