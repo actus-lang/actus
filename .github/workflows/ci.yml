@@ -63,26 +63,27 @@ jobs:
         with:
           llvm-version: 23
 
-      - name: Set up LLVM 23.1.2 development archive (Windows)
+      - name: Set up LLVM 23.1.2 Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = '23.1.2'
-          $archiveName = "clang+llvm-$version-x86_64-pc-windows-msvc.tar.xz"
-          $archive = Join-Path $env:RUNNER_TEMP $archiveName
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/$archiveName"
-          Invoke-WebRequest -Uri $url -OutFile $archive
-          $expected = '8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095'
-          $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          $installer = Join-Path $env:RUNNER_TEMP "LLVM-$version-win64.msi"
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/LLVM-$version-win64.msi"
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          $expected = 'e9d9141524f2c9fe4bf9f37012efe34f0aa745617be9e21fface9104703c55e5'
+          $actual = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
           if ($actual -ne $expected) {
             throw "LLVM archive checksum mismatch: expected $expected, got $actual"
           }
-          $installRoot = Join-Path $env:RUNNER_TEMP "llvm-$version"
-          New-Item -ItemType Directory -Force $installRoot | Out-Null
-          tar -xf $archive -C $installRoot --strip-components=1
+          $process = Start-Process msiexec.exe -Wait -PassThru -ArgumentList '/i', $installer, '/qn', '/norestart'
+          if ($process.ExitCode -ne 0) {
+            throw "LLVM installer failed with exit code $($process.ExitCode)"
+          }
+          $installRoot = Join-Path $env:ProgramFiles 'LLVM'
           $bin = Join-Path $installRoot 'bin'
           if (-not (Test-Path (Join-Path $bin 'llvm-config.exe'))) {
-            throw "LLVM development archive does not contain llvm-config.exe"
+            throw "LLVM installer did not provide llvm-config.exe"
           }
           "$bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           "LLVM_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -113,6 +114,12 @@ jobs:
           Write-Host "LLVM static system libraries:"
           & $llvmConfig --system-libs --link-static
           if (-not $llvmVersion.StartsWith('23.')) { throw "LLVM 23 is required" }
+
+      - name: Install ARM32 native link tools (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -198,8 +205,7 @@ jobs:
           echo "$RUST_BIN" >> "$GITHUB_PATH"
           export PATH="$RUST_BIN:$PATH"
           command -v clang
-          command -v rust-lld
-          command -v ld.lld
+          command -v arm-none-eabi-ld
 
       - name: Export LLVM build environment
         shell: bash
@@ -255,8 +261,7 @@ jobs:
           llvm-config --version
           test "$(llvm-config --version | cut -d. -f1)" = "23"
           command -v clang
-          command -v rust-lld
-          command -v ld.lld
+          command -v arm-none-eabi-ld
           arm-none-eabi-gcc --version
           arm-none-eabi-objdump --version
 

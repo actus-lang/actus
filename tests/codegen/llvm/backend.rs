@@ -20,7 +20,19 @@ use actus::configuration::CompilerConfiguration;
 use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
-use object::{Object, ObjectSection, ObjectSymbol};
+use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol};
+
+fn symbol_name_matches(format: BinaryFormat, actual: &str, expected: &str) -> bool {
+    actual == expected
+        || (format == BinaryFormat::MachO && actual.strip_prefix('_') == Some(expected))
+}
+
+fn has_symbol<'data>(object: &object::File<'data>, expected: &str) -> bool {
+    object
+        .symbols()
+        .filter_map(|symbol| symbol.name().ok())
+        .any(|actual| symbol_name_matches(object.format(), actual, expected))
+}
 
 #[cfg(all(feature = "cranelift", target_os = "linux"))]
 use actus::codegen::BackendCleanupResolvedDescriptor;
@@ -48,7 +60,7 @@ fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
     let cranelift_bytes = emit_contract_module_object(&module, &configuration, &target)
         .expect("Cranelift should consume the shared module");
     let object = object::File::parse(cranelift_bytes.as_slice()).expect("object should parse");
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+    assert!(has_symbol(&object, "main"));
 }
 
 #[cfg(feature = "cranelift")]
@@ -69,7 +81,7 @@ fn both_backends_consume_shared_fixed_array_iteration() {
     let object_bytes = emit_contract_module_object(&module, &configuration, &target)
         .expect("Cranelift should consume fixed-array iteration");
     let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("inspect")));
+    assert!(has_symbol(&object, "inspect"));
 }
 
 #[test]
@@ -105,11 +117,13 @@ fn both_backends_emit_user_defined_drop_performance_calls() {
         let object_bytes = emit_contract_module_object(&module, &configuration, &target)
             .expect("Cranelift should emit the user-defined Drop call");
         let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-        assert!(
-            object
-                .symbols()
-                .any(|symbol| symbol.name() == Ok("actus_root__performance_drop__Drop_Counter"))
-        );
+        assert!(object.symbols().any(|symbol| {
+            symbol_name_matches(
+                object.format(),
+                symbol.name().unwrap_or_default(),
+                "actus_root__performance_drop__Drop_Counter",
+            )
+        }));
     }
 }
 
@@ -132,7 +146,7 @@ fn both_backends_emit_scalar_aggregate_field_access() {
         let object_bytes = emit_contract_module_object(&module, &configuration, &target)
             .expect("Cranelift should emit aggregate field access");
         let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-        assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+        assert!(has_symbol(&object, "main"));
     }
 }
 
@@ -153,7 +167,7 @@ fn both_backends_emit_scalar_aggregate_field_assignment() {
         let object_bytes = emit_contract_module_object(&module, &configuration, &target)
             .expect("Cranelift should emit aggregate field assignment");
         let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-        assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+        assert!(has_symbol(&object, "main"));
     }
 }
 
@@ -171,7 +185,7 @@ fn cranelift_consumes_scalar_result_case_from_shared_lowering() {
     let object_bytes = emit_contract_module_object(&module, &configuration, &target)
         .expect("Cranelift should consume scalar Result extraction");
     let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("inspect")));
+    assert!(has_symbol(&object, "inspect"));
 }
 
 #[cfg(feature = "cranelift")]
@@ -188,7 +202,7 @@ fn cranelift_emits_scalar_result_constructor_to_return_slot() {
     let object_bytes = emit_contract_module_object(&module, &configuration, &target)
         .expect("Cranelift should emit scalar Result construction");
     let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("main")));
+    assert!(has_symbol(&object, "main"));
 }
 
 #[cfg(feature = "cranelift")]
@@ -205,7 +219,7 @@ fn cranelift_emits_region_result_constructor_to_return_slot() {
     let object_bytes = emit_contract_module_object(&module, &configuration, &target)
         .expect("Cranelift should emit a Region Result constructor");
     let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("wrap")));
+    assert!(has_symbol(&object, "wrap"));
 }
 
 #[cfg(feature = "cranelift")]
@@ -222,7 +236,7 @@ fn cranelift_consumes_region_result_case_from_shared_lowering() {
     let object_bytes = emit_contract_module_object(&module, &configuration, &target)
         .expect("Cranelift should consume a Region Result case");
     let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("inspect")));
+    assert!(has_symbol(&object, "inspect"));
 }
 
 #[test]
@@ -1369,7 +1383,7 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
     let second_bytes = std::fs::read(&second_output).expect("second object should be readable");
     assert_eq!(bytes, second_bytes, "repeated object emission must be deterministic");
     let object = object::File::parse(bytes.as_slice()).expect("object should parse");
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("test__verb_main")));
+    assert!(has_symbol(&object, "test__verb_main"));
     std::fs::remove_file(output).expect("test object should be removed");
     std::fs::remove_file(second_output).expect("second test object should be removed");
 }
@@ -1406,7 +1420,7 @@ fn emits_an_arm32_thumb_object_for_the_cortex_m_profile() {
     let object = object::File::parse(bytes.as_slice()).expect("ARM object should parse");
     assert_eq!(object.architecture(), object::Architecture::Arm);
     assert!(object.section_by_name(".text").is_some());
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("test__verb_main")));
+    assert!(has_symbol(&object, "test__verb_main"));
     std::fs::remove_file(output).expect("ARM test object should be removed");
 }
 
@@ -1666,8 +1680,8 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     emit_object(&module, &target, &actus_object).expect("ARM Actus object should be emitted");
 
     run_native_command(
-        Command::new("rust-lld")
-            .args(["-flavor", "gnu", "-T"])
+        arm_linker()
+            .args(["-T"])
             .arg(&linker_script)
             .arg(&startup_object)
             .arg(&actus_object)
@@ -1692,7 +1706,9 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     assert_ne!(reset_vector & 1, 0, "Reset_Handler vector must select Thumb state");
     let reset_address = object
         .symbols()
-        .find(|symbol| symbol.name() == Ok("Reset_Handler"))
+        .find(|symbol| {
+            symbol_name_matches(object.format(), symbol.name().unwrap_or_default(), "Reset_Handler")
+        })
         .expect("Reset_Handler should be exported")
         .address();
     assert_eq!(
@@ -1700,7 +1716,7 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
         reset_address & !1,
         "vector must target Reset_Handler"
     );
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("arm__verb_boot")));
+    assert!(has_symbol(&object, "arm__verb_boot"));
     let relocation_count =
         object.sections().map(|section| section.relocations().count()).sum::<usize>();
     assert_eq!(relocation_count, 0, "linked image must not retain relocations");
@@ -1818,8 +1834,8 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
         .expect("Actus object with an external provider call should be emitted");
 
     run_native_command(
-        Command::new("rust-lld")
-            .args(["-flavor", "gnu", "-T"])
+        arm_linker()
+            .args(["-T"])
             .arg(&linker_script)
             .arg(&startup_object)
             .arg(&actus_object)
@@ -1832,8 +1848,8 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let object =
         object::File::parse(bytes.as_slice()).expect("external provider image should parse");
     assert_eq!(object.architecture(), object::Architecture::Arm);
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("runtime__extern_increment")));
-    assert!(object.symbols().any(|symbol| symbol.name() == Ok("arm__verb_boot")));
+    assert!(has_symbol(&object, "runtime__extern_increment"));
+    assert!(has_symbol(&object, "arm__verb_boot"));
     let undefined = object
         .symbols()
         .filter(|symbol| symbol.is_undefined())
@@ -2962,6 +2978,19 @@ fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
 fn run_native_command(command: &mut std::process::Command) {
     let status = command.status().expect("native compiler should start");
     assert!(status.success(), "native compiler should succeed: {command:?}");
+}
+
+#[cfg(target_os = "linux")]
+fn arm_linker() -> std::process::Command {
+    let has_gnu_linker =
+        std::process::Command::new("arm-none-eabi-ld").arg("--version").output().is_ok();
+    if has_gnu_linker {
+        std::process::Command::new("arm-none-eabi-ld")
+    } else {
+        let mut command = std::process::Command::new("rust-lld");
+        command.args(["-flavor", "gnu"]);
+        command
+    }
 }
 
 #[cfg(target_os = "linux")]

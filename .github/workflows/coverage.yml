@@ -32,6 +32,16 @@ jobs:
           echo "LLVM version: $(llvm-config --version)"
           test "$(llvm-config --version | cut -d. -f1)" = "23"
 
+      - name: Install ARM32 native link tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
+          echo "$RUST_BIN" >> "$GITHUB_PATH"
+          export PATH="$RUST_BIN:$PATH"
+          command -v clang
+          command -v arm-none-eabi-ld
+
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
 
