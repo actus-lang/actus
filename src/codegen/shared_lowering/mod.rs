@@ -215,6 +215,19 @@ fn reject_implicit_large_aggregate_allocation(
     Ok(())
 }
 
+#[cfg(test)]
+fn lower_program_to_backend_module_with_layouts(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+    layouts: &impl BackendLayoutProvider,
+) -> Result<BackendModule, BackendContractError> {
+    lower_program_to_backend_module_with_layouts_and_context(
+        namespace, program, entry_name, bindings, layouts, None, program,
+    )
+}
+
 fn lower_program_to_backend_module_with_layouts_and_context(
     namespace: &str,
     program: &Program,
