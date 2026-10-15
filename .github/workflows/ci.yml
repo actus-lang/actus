@@ -57,6 +57,34 @@ jobs:
             throw "MSVC linker was not selected: $linker"
           }
 
+      - name: Set up LLVM 23
+        uses: ZhongRuoyu/setup-llvm@v0
+        with:
+          llvm-version: 23
+
+      - name: Export LLVM build environment (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "LLVM version: $(llvm-config --version)"
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+
+      - name: Export LLVM build environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $llvmConfig = (Get-Command llvm-config.exe -ErrorAction Stop).Source
+          $llvmPrefix = (& $llvmConfig --prefix).Trim()
+          "LLVM_CONFIG_PATH=$llvmConfig" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "LLVM_SYS_231_PREFIX=$llvmPrefix" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $llvmVersion = (& $llvmConfig --version).Trim()
+          Write-Host "LLVM version: $llvmVersion"
+          if (-not $llvmVersion.StartsWith('23.')) { throw "LLVM 23 is required" }
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -120,11 +148,22 @@ jobs:
   llvm-only:
     name: LLVM-only feature contract
     runs-on: ubuntu-latest
-    env:
-      LLVM_SYS_231_PREFIX: /usr
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up LLVM 23
+        uses: ZhongRuoyu/setup-llvm@v0
+        with:
+          llvm-version: 23
+
+      - name: Export LLVM build environment
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
 
       - name: Verify LLVM installation
         shell: bash
@@ -141,16 +180,27 @@ jobs:
   arm32-target:
     name: ARM32 Thumb LLVM target contract
     runs-on: ubuntu-latest
-    env:
-      LLVM_SYS_231_PREFIX: /usr
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up LLVM 23
+        uses: ZhongRuoyu/setup-llvm@v0
+        with:
+          llvm-version: 23
 
       - name: Install ARM32 target toolchain
         run: |
           sudo apt-get update
           sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+
+      - name: Export LLVM build environment
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
 
       - name: Verify target toolchain
         run: |

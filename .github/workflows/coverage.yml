@@ -17,6 +17,21 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up LLVM 23
+        uses: ZhongRuoyu/setup-llvm@v0
+        with:
+          llvm-version: 23
+
+      - name: Export LLVM build environment
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "LLVM version: $(llvm-config --version)"
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
 
