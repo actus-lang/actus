@@ -90,6 +90,7 @@ jobs:
           $wrapperSource = @"
           using System;
           using System.Diagnostics;
+          using System.IO;
           using System.Linq;
           using System.Text.RegularExpressions;
           internal static class Program {
@@ -107,7 +108,7 @@ jobs:
                 var stderr = process.StandardError.ReadToEnd();
                 process.WaitForExit();
                 if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
-                  stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\]zstd_static\.lib", "zstd_static.lib");
+                  stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\][^/\\\s]+\.lib", match => Path.GetFileName(match.Value));
                 }
                 Console.Write(stdout);
                 Console.Error.Write(stderr);
