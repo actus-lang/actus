@@ -24,6 +24,7 @@ pub(super) fn parameter_nominal_types(
         .filter_map(|(index, parameter)| {
             layouts
                 .layout_for(&parameter.ty)
+                .or_else(|| layouts.enum_layout_for(&parameter.ty).map(|layout| layout.layout))
                 .map(|_| (BackendValueId(index as u32), parameter.ty.clone()))
         })
         .collect()

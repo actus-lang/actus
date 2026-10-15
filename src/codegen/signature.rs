@@ -231,6 +231,12 @@ fn lower_type(
     type_name: &TypeName,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<(BackendValueType, Option<BackendLayout>), BackendContractError> {
+    if type_name.name == "Region" {
+        let layout = layouts.layout_for(type_name).ok_or_else(|| {
+            unsupported(type_name.span, "no neutral layout is registered for `Region`")
+        })?;
+        return Ok((BackendValueType::Region { layout }, Some(layout)));
+    }
     if is_opaque_runtime_type(type_name) {
         return Ok((BackendValueType::Pointer, layouts.layout_for(type_name)));
     }
