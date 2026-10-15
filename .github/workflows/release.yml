@@ -64,6 +64,7 @@ jobs:
           $wrapperSource = @"
           using System;
           using System.Diagnostics;
+          using System.Linq;
           using System.Text.RegularExpressions;
           internal static class Program {
             public static int Main(string[] args) {
@@ -74,21 +75,34 @@ jobs:
                 RedirectStandardError = true,
                 CreateNoWindow = true
               };
-              foreach (var arg in args) start.ArgumentList.Add(arg);
-              using var process = Process.Start(start);
-              var stdout = process.StandardOutput.ReadToEnd();
-              var stderr = process.StandardError.ReadToEnd();
-              process.WaitForExit();
-              if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
-                stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\]zstd_static\.lib", "zstd_static.lib");
+              start.Arguments = string.Join(" ", args.Select(arg => "\"" + arg.Replace("\"", "\\\"") + "\""));
+              using (var process = Process.Start(start)) {
+                var stdout = process.StandardOutput.ReadToEnd();
+                var stderr = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
+                  stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\]zstd_static\.lib", "zstd_static.lib");
+                }
+                Console.Write(stdout);
+                Console.Error.Write(stderr);
+                return process.ExitCode;
               }
-              Console.Write(stdout);
-              Console.Error.Write(stderr);
-              return process.ExitCode;
             }
           }
           "@
-          Add-Type -TypeDefinition $wrapperSource -OutputAssembly $wrapper -OutputType ConsoleApplication
+          $wrapperSourcePath = Join-Path $env:RUNNER_TEMP 'llvm-config-wrapper.cs'
+          Set-Content -Path $wrapperSourcePath -Value $wrapperSource -Encoding utf8
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path $csc)) {
+            $csc = (Get-Command csc.exe -ErrorAction SilentlyContinue).Source
+          }
+          if (-not $csc) {
+            throw 'C# compiler is required to build the llvm-config wrapper'
+          }
+          & $csc /nologo /target:exe /out:$wrapper $wrapperSourcePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "llvm-config wrapper compilation failed with exit code $LASTEXITCODE"
+          }
           "$bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           "LLVM_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
