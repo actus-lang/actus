@@ -22,9 +22,9 @@ use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendExternal, BackendLayout,
-    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturnMode,
-    BackendSignature, BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind,
-    lower_parameter, lower_return, lower_verb_signature, lower_verb_with_expressions,
+    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendSignature,
+    BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind, lower_parameter,
+    lower_return, lower_verb_signature, lower_verb_with_expressions,
     lower_verb_with_expressions_as,
 };
 
@@ -520,16 +520,7 @@ fn lower_external_signature(
         .iter()
         .map(|parameter| lower_parameter(parameter, layouts))
         .collect::<Result<Vec<_>, _>>()?;
-    let mut return_value = lower_return(external.return_type.as_ref(), layouts)?;
-    let niche_layout = match (&return_value.ty, &return_value.passing) {
-        (BackendValueType::NichePointerOption { layout, .. }, BackendReturnMode::Direct) => {
-            Some(*layout)
-        }
-        _ => None,
-    };
-    if let Some(layout) = niche_layout {
-        return_value.passing = BackendReturnMode::ReturnSlot { layout };
-    }
+    let return_value = lower_return(external.return_type.as_ref(), layouts)?;
     Ok(BackendSignature { symbol, parameters, return_value })
 }
 

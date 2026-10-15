@@ -58,9 +58,15 @@ pub(super) fn lower_instruction(
         | BackendInstruction::EnumConstruct { .. } => {
             enums::lower(module, builder, instruction, return_slot, return_value_ids, values)
         }
-        BackendInstruction::Call { .. } => {
-            lower_call(module, builder, instruction, declarations, values, aggregate_values)
-        }
+        BackendInstruction::Call { .. } => lower_call(
+            module,
+            builder,
+            instruction,
+            declarations,
+            return_slot,
+            values,
+            aggregate_values,
+        ),
         BackendInstruction::Branch { .. } | BackendInstruction::Jump { .. } => {
             cf(builder, instruction, blocks, values)
         }

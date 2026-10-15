@@ -152,7 +152,7 @@ pub(super) fn declare_cleanup_bridges(
                 return_fragments: 1,
                 return_slot: None,
                 runtime_pointer_return: false,
-                runtime_niche_pointer_return: false,
+                niche_pointer_return: false,
                 runtime_result_layout: None,
             },
         );
@@ -198,7 +198,7 @@ pub(super) fn declare_cleanup_bridges(
                 return_fragments,
                 return_slot: None,
                 runtime_pointer_return: false,
-                runtime_niche_pointer_return: false,
+                niche_pointer_return: false,
                 runtime_result_layout: None,
             },
         );

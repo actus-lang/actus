@@ -21,7 +21,7 @@ pub(super) struct Declaration {
     pub(super) return_fragments: usize,
     pub(super) return_slot: Option<crate::codegen::BackendLayout>,
     pub(super) runtime_pointer_return: bool,
-    pub(super) runtime_niche_pointer_return: bool,
+    pub(super) niche_pointer_return: bool,
     pub(super) runtime_result_layout: Option<crate::codegen::BackendLayout>,
 }
 
@@ -51,7 +51,10 @@ pub(super) fn declaration(
         return_fragments: return_fragment_count(return_value, false)?,
         return_slot,
         runtime_pointer_return: false,
-        runtime_niche_pointer_return: false,
+        niche_pointer_return: matches!(
+            return_value.ty,
+            BackendValueType::NichePointerOption { .. }
+        ),
         runtime_result_layout: None,
     })
 }
@@ -63,8 +66,6 @@ pub(super) fn runtime_declaration(
 ) -> Result<Declaration, BackendEmitError> {
     let mut declaration = declaration(module, id, &external.parameters, &external.return_value)?;
     declaration.runtime_pointer_return = external.runtime_pointer_return;
-    declaration.runtime_niche_pointer_return =
-        matches!(external.return_value.ty, BackendValueType::NichePointerOption { .. });
     if external.runtime_pointer_return {
         let caller_owned_return_slot =
             matches!(external.return_value.ty, BackendValueType::NichePointerOption { .. });
@@ -115,6 +116,7 @@ pub(super) fn lower_call(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     declarations: &BTreeMap<String, Declaration>,
+    function_return_slot: Option<cranelift_codegen::ir::Value>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
     aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
 ) -> Result<(), BackendEmitError> {
@@ -133,7 +135,14 @@ pub(super) fn lower_call(
         values,
         aggregate_values,
     )?;
-    let (return_slot, native_arguments) = if let Some(layout) = declaration.return_slot {
+    let (return_slot, native_arguments) = if declaration.niche_pointer_return
+        && let Some(address) = function_return_slot
+    {
+        let mut arguments = Vec::with_capacity(native_arguments.len() + 1);
+        arguments.push(address);
+        arguments.extend(native_arguments);
+        (Some(address), arguments)
+    } else if let Some(layout) = declaration.return_slot {
         let slot = create_return_slot(builder, layout)?;
         let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
         (Some(address), {
@@ -153,7 +162,7 @@ pub(super) fn lower_call(
         let raw = builder.inst_results(call).first().copied().ok_or_else(|| {
             BackendEmitError("Cranelift runtime result is unavailable".to_owned())
         })?;
-        if declaration.runtime_niche_pointer_return {
+        if declaration.niche_pointer_return {
             let return_slot = return_slot.ok_or_else(|| {
                 BackendEmitError("Cranelift niche runtime return slot is unavailable".to_owned())
             })?;

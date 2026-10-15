@@ -324,8 +324,8 @@ fn validate_return(return_value: &BackendReturn) -> Result<(), BackendContractEr
                 | BackendValueType::Enum {
                     layout: BackendEnumLayout { layout: value_layout, .. },
                 } if value_layout == *layout => {}
-                BackendValueType::NichePointerOption { layout: value_layout, .. }
-                    if value_layout == *layout => {}
+                BackendValueType::NichePointerOption { payload_layout, .. }
+                    if payload_layout.is_some_and(|payload_layout| payload_layout == *layout) => {}
                 _ => return Err(BackendContractError::ReturnSlotTypeMismatch),
             }
         }

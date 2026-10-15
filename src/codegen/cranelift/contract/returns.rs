@@ -40,7 +40,9 @@ pub(super) fn lower_return(
             function.return_value.ty,
             crate::codegen::BackendValueType::NichePointerOption { .. }
         ) {
-            builder.ins().store(MemFlagsData::new(), source, destination, 0);
+            if source != destination {
+                builder.ins().store(MemFlagsData::new(), source, destination, 0);
+            }
             builder.ins().return_(&[]);
             return Ok(());
         }

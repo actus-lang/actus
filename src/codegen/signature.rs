@@ -205,10 +205,15 @@ pub(crate) fn lower_return(
         });
     };
     let (ty, layout) = lower_type(&return_type.ty, layouts)?;
+    let niche_payload_layout = if matches!(ty, BackendValueType::NichePointerOption { .. }) {
+        return_type.ty.arguments.first().and_then(|payload| layouts.layout_for(payload))
+    } else {
+        None
+    };
     let passing = if is_opaque_runtime_type(&return_type.ty) {
         BackendReturnMode::Direct
     } else if let BackendValueType::NichePointerOption { layout, .. } = ty {
-        BackendReturnMode::ReturnSlot { layout }
+        BackendReturnMode::ReturnSlot { layout: niche_payload_layout.unwrap_or(layout) }
     } else {
         layout.map_or(BackendReturnMode::Direct, |layout| BackendReturnMode::ReturnSlot { layout })
     };
@@ -217,11 +222,12 @@ pub(crate) fn lower_return(
         ReturnAccess::Abs => Role::Abs,
     });
     if let BackendValueType::NichePointerOption { layout, .. } = ty {
-        let payload_layout =
-            return_type.ty.arguments.first().and_then(|payload| layouts.layout_for(payload));
         return Ok(BackendReturn {
             role,
-            ty: BackendValueType::NichePointerOption { layout, payload_layout },
+            ty: BackendValueType::NichePointerOption {
+                layout,
+                payload_layout: niche_payload_layout,
+            },
             passing,
         });
     }
