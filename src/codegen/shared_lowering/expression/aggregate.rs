@@ -321,10 +321,23 @@ pub(super) fn lower_struct_literal(
                 format!("aggregate field `{}` has no neutral layout", field.name),
             )
         })?;
+        let declared_ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+            .ok_or_else(|| unsupported(field.span, "aggregate field type has no neutral layout"))?;
+        let ty = if metadata.indirect
+            && !matches!(declared_ty, BackendValueType::NichePointerOption { .. })
+        {
+            BackendValueType::Pointer
+        } else {
+            declared_ty
+        };
         let value = provider.lower_expression(&field.value, instructions)?;
-        let ty = provider
-            .value_type(value)
-            .ok_or_else(|| unsupported(field.span, "aggregate field value type is unavailable"))?;
+        let value = super::state::coerce_value_to_type(
+            provider,
+            value,
+            Some(ty),
+            field.span,
+            instructions,
+        )?;
         lowered_fields.push(BackendAggregateField {
             offset: metadata.offset,
             layout: metadata.layout,

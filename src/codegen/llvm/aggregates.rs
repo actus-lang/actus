@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use super::declarations::FunctionDeclaration;
 use llvm_sys::core::{
     LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMemSet,
-    LLVMBuildStore, LLVMConstInt, LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment,
+    LLVMBuildStore, LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt, LLVMGetIntTypeWidth,
+    LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment, LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
@@ -81,8 +82,11 @@ pub(super) fn emit_aggregate_construct(
             if copy.is_null() {
                 return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
             }
-        } else if unsafe { LLVMBuildStore(builder, value, destination) }.is_null() {
-            return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
+        } else {
+            let value = coerce_scalar_value(context, builder, value, field.ty)?;
+            if unsafe { LLVMBuildStore(builder, value, destination) }.is_null() {
+                return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
+            }
         }
     }
     values.insert(*result, address);
@@ -181,6 +185,7 @@ pub(super) fn emit_aggregate_field_store(
         BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } => *layout,
         BackendValueType::Enum { layout } => layout.layout,
         _ => {
+            let value = coerce_scalar_value(context, builder, value, *ty)?;
             if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
                 return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
             }
@@ -207,6 +212,28 @@ pub(super) fn emit_aggregate_field_store(
     }
     let _ = ty;
     Ok(false)
+}
+
+fn coerce_scalar_value(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    value: LLVMValueRef,
+    ty: BackendValueType,
+) -> Result<LLVMValueRef, BackendEmitError> {
+    let target = super::values::llvm_type(context, ty)?;
+    let source_width = unsafe { LLVMGetIntTypeWidth(LLVMTypeOf(value)) };
+    let target_width = unsafe { LLVMGetIntTypeWidth(target) };
+    if source_width == 0 || target_width == 0 || source_width == target_width {
+        return Ok(value);
+    }
+    let value = if source_width < target_width {
+        unsafe { LLVMBuildZExt(builder, value, target, c"aggregate.field.zext".as_ptr().cast()) }
+    } else {
+        unsafe { LLVMBuildTrunc(builder, value, target, c"aggregate.field.trunc".as_ptr().cast()) }
+    };
+    (!value.is_null())
+        .then_some(value)
+        .ok_or_else(|| BackendEmitError("LLVM failed to coerce aggregate field value".to_owned()))
 }
 
 fn field_address(

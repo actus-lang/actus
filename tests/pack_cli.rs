@@ -102,14 +102,23 @@ verb main() -> Int {
 
 #[cfg(unix)]
 fn run_pack_fixture(name: &str, source: &str, expected: i32) {
+    run_pack_fixture_with_backend(name, source, expected, "cranelift");
+    #[cfg(feature = "llvm")]
+    run_pack_fixture_with_backend(name, source, expected, "llvm");
+}
+
+#[cfg(unix)]
+fn run_pack_fixture_with_backend(name: &str, source: &str, expected: i32, backend: &str) {
     let root = std::env::temp_dir().join(format!("{name}-{}", std::process::id()));
-    let input = root.with_extension("act");
-    let output = root.with_extension("bin");
+    let input = root.with_extension(format!("{backend}.act"));
+    let output = root.with_extension(format!("{backend}.bin"));
     fs::write(&input, source).expect("write network frame fixture");
     let result = run_with_args(
         vec![
             "build".to_owned(),
             input.display().to_string(),
+            "--backend".to_owned(),
+            backend.to_owned(),
             "--emit".to_owned(),
             "exe".to_owned(),
             "-o".to_owned(),
@@ -119,7 +128,11 @@ fn run_pack_fixture(name: &str, source: &str, expected: i32) {
     );
     assert_eq!(result, 0);
     let status = std::process::Command::new(&output).status().expect("run network frame fixture");
-    assert_eq!(status.code(), Some(expected));
+    assert_eq!(status.code(), Some(expected), "packed fixture failed on {backend}");
     let _ = fs::remove_file(input);
-    let _ = fs::remove_file(output);
+    if status.code().is_none() {
+        eprintln!("preserving failed packed fixture executable: {}", output.display());
+    } else {
+        let _ = fs::remove_file(output);
+    }
 }

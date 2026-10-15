@@ -3,14 +3,15 @@ mod wide;
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
-    LLVMBuildAnd, LLVMBuildGEP2, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildNot, LLVMBuildOr,
-    LLVMBuildShl, LLVMBuildStore, LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt,
+    LLVMBuildAShr, LLVMBuildAnd, LLVMBuildGEP2, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildNot,
+    LLVMBuildOr, LLVMBuildShl, LLVMBuildStore, LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt,
     LLVMInt8TypeInContext, LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
 
+#[derive(Clone, Copy)]
 pub(super) struct PackedField {
     pub(super) storage_layout: super::super::BackendLayout,
     pub(super) bit_offset: u16,
@@ -137,7 +138,7 @@ fn emit_scalar_packed_field_load(
 ) -> Result<bool, BackendEmitError> {
     let storage_type = packed_storage_type(context, field.storage_layout)?;
     let address = field_address(context, builder, base, 0)?;
-    let storage = unsafe {
+    let mut storage = unsafe {
         LLVMBuildLoad2(builder, storage_type, address, c"packed.field.load".as_ptr().cast())
     };
     if storage.is_null() {
@@ -148,7 +149,12 @@ fn emit_scalar_packed_field_load(
         .size
         .checked_mul(8)
         .ok_or_else(|| BackendEmitError("LLVM packed storage bit width overflow".to_owned()))?;
-    let extracted = extract_packed_value(builder, storage, storage_type, storage_bits, &field)?;
+    if field.big_endian && storage_bits > 8 {
+        storage = byte_swap(context, builder, storage, storage_bits as u8);
+    }
+    let logical_field = PackedField { big_endian: false, ..field };
+    let extracted =
+        extract_packed_value(builder, storage, storage_type, storage_bits, &logical_field)?;
     let lowered_result = cast_integer(
         builder,
         extracted,
@@ -157,6 +163,13 @@ fn emit_scalar_packed_field_load(
         integer_width(field.ty)?,
         "packed.field.result",
     )?;
+    let lowered_result = sign_extend_packed_value(
+        builder,
+        lowered_result,
+        integer_width(field.ty)?,
+        field.width,
+        field.ty,
+    );
     values.insert(result, lowered_result);
     Ok(false)
 }
@@ -185,15 +198,24 @@ fn emit_scalar_packed_field_store(
         .size
         .checked_mul(8)
         .ok_or_else(|| BackendEmitError("LLVM packed storage bit width overflow".to_owned()))?;
-    let updated = update_packed_value(
+    let logical_current = if field.big_endian && storage_bits > 8 {
+        byte_swap(context, builder, current, storage_bits as u8)
+    } else {
+        current
+    };
+    let logical_field = PackedField { big_endian: false, ..field };
+    let mut updated = update_packed_value(
         builder,
-        current,
+        logical_current,
         value,
         integer_width(field.ty)?,
         storage_type,
         storage_bits,
-        &field,
+        &logical_field,
     )?;
+    if field.big_endian && storage_bits > 8 {
+        updated = byte_swap(context, builder, updated, storage_bits as u8);
+    }
     if unsafe { LLVMBuildStore(builder, updated, address) }.is_null() {
         return Err(BackendEmitError("LLVM failed to store packed storage".to_owned()));
     }
@@ -222,6 +244,68 @@ fn extract_packed_value(
     };
     let mask = packed_mask(storage_type, field.width)?;
     Ok(unsafe { LLVMBuildAnd(builder, shifted, mask, c"packed.field.mask".as_ptr().cast()) })
+}
+
+fn sign_extend_packed_value(
+    builder: LLVMBuilderRef,
+    value: LLVMValueRef,
+    target_width: u32,
+    field_width: u8,
+    ty: BackendValueType,
+) -> LLVMValueRef {
+    if !matches!(ty, BackendValueType::Integer { signed: true, .. })
+        || u32::from(field_width) >= target_width
+    {
+        return value;
+    }
+    let value_type = unsafe { llvm_sys::core::LLVMTypeOf(value) };
+    let shift =
+        unsafe { LLVMConstInt(value_type, u64::from(target_width - u32::from(field_width)), 0) };
+    let shifted =
+        unsafe { LLVMBuildShl(builder, value, shift, c"packed.field.sign.shift".as_ptr().cast()) };
+    unsafe { LLVMBuildAShr(builder, shifted, shift, c"packed.field.sign.extend".as_ptr().cast()) }
+}
+
+fn byte_swap(
+    _context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    value: LLVMValueRef,
+    width: u8,
+) -> LLVMValueRef {
+    let ty = unsafe { llvm_sys::core::LLVMTypeOf(value) };
+    let bytes = u32::from(width / 8);
+    let byte_mask = unsafe { LLVMConstInt(ty, 0xff, 0) };
+    let mut result = unsafe { LLVMConstInt(ty, 0, 0) };
+    for source in 0..bytes {
+        let source_shift = unsafe { LLVMConstInt(ty, u64::from(source * 8), 0) };
+        let shifted = if source == 0 {
+            value
+        } else {
+            unsafe {
+                LLVMBuildLShr(builder, value, source_shift, c"packed.bswap.read".as_ptr().cast())
+            }
+        };
+        let byte = unsafe {
+            LLVMBuildAnd(builder, shifted, byte_mask, c"packed.bswap.mask".as_ptr().cast())
+        };
+        let destination = bytes - source - 1;
+        let destination_shift = unsafe { LLVMConstInt(ty, u64::from(destination * 8), 0) };
+        let placed = if destination == 0 {
+            byte
+        } else {
+            unsafe {
+                LLVMBuildShl(
+                    builder,
+                    byte,
+                    destination_shift,
+                    c"packed.bswap.write".as_ptr().cast(),
+                )
+            }
+        };
+        result =
+            unsafe { LLVMBuildOr(builder, result, placed, c"packed.bswap.or".as_ptr().cast()) };
+    }
+    result
 }
 
 fn update_packed_value(
