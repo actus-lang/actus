@@ -44,7 +44,7 @@ pub(super) fn lower_packed_field_load(
     };
     let mask = packed_mask(builder, builder.func.dfg.value_type(shifted), *width)?;
     let extracted = builder.ins().band(shifted, mask);
-    let target_type = super::scalar_type(module, *ty)?
+    let target_type = super::declarations::scalar_type(module, *ty)?
         .ok_or_else(|| BackendEmitError("Cranelift packed field must be scalar".to_owned()))?;
     let extracted = coerce_integer(builder, extracted, target_type);
     let extracted = sign_extend_packed_value(builder, extracted, target_type, *width, *ty);

@@ -41,7 +41,7 @@ pub(super) fn lower_array_element_load(
         values.insert(*result, address);
         return Ok(());
     }
-    let value_type = super::scalar_type(module, *element_type)?
+    let value_type = super::declarations::scalar_type(module, *element_type)?
         .ok_or_else(|| BackendEmitError("Cranelift array element must be scalar".to_owned()))?;
     let mut value = builder.ins().load(value_type, MemFlagsData::new(), address, 0);
     if *big_endian && value_type.bits() > 8 {
@@ -87,7 +87,7 @@ pub(super) fn lower_array_element_store(
         store_array_aggregate(module, builder, address, value, *element_layout, pointer_type)?;
         return Ok(());
     }
-    let value_type = super::scalar_type(module, *element_type)?
+    let value_type = super::declarations::scalar_type(module, *element_type)?
         .ok_or_else(|| BackendEmitError("Cranelift array element must be scalar".to_owned()))?;
     if builder.func.dfg.value_type(value) != value_type {
         return Err(BackendEmitError("Cranelift array element store type mismatch".to_owned()));

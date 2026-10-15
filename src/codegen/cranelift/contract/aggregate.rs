@@ -5,8 +5,8 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
+use super::super::aggregate::Declaration;
 use super::super::native::BackendEmitError;
-use super::Declaration;
 use super::{arrays, packed};
 use crate::codegen::{BackendAggregateField, BackendInstruction, BackendValueId, BackendValueType};
 
@@ -87,7 +87,7 @@ fn store_aggregate_field(
             MemFlagsData::new(),
         );
     } else {
-        let ty = super::scalar_type(module, field.ty)?.ok_or_else(|| {
+        let ty = super::declarations::scalar_type(module, field.ty)?.ok_or_else(|| {
             BackendEmitError("Cranelift aggregate field must have a storable value type".to_owned())
         })?;
         if builder.func.dfg.value_type(value) != ty {
@@ -139,7 +139,7 @@ pub(super) fn lower_aggregate_field_load(
         let _ = (module, layout);
         values.insert(*result, source);
     } else {
-        let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
+        let value_type = super::declarations::scalar_type(module, *ty)?.ok_or_else(|| {
             BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
         })?;
         values.insert(*result, builder.ins().load(value_type, MemFlagsData::new(), base, offset));
@@ -181,7 +181,7 @@ pub(super) fn lower_aggregate_field_store(
             MemFlagsData::new(),
         );
     } else {
-        let value_type = super::scalar_type(module, *ty)?.ok_or_else(|| {
+        let value_type = super::declarations::scalar_type(module, *ty)?.ok_or_else(|| {
             BackendEmitError("Cranelift aggregate field must have a scalar value type".to_owned())
         })?;
         if builder.func.dfg.value_type(value) != value_type {
