@@ -137,3 +137,30 @@ jobs:
 
       - name: Run LLVM backend integration suite
         run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
+
+  arm32-target:
+    name: ARM32 Thumb LLVM target contract
+    runs-on: ubuntu-latest
+    env:
+      LLVM_SYS_231_PREFIX: /usr
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install ARM32 target toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+
+      - name: Verify target toolchain
+        run: |
+          llvm-config --version
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+          arm-none-eabi-gcc --version
+          arm-none-eabi-objdump --version
+
+      - name: Run target contract tests
+        run: cargo test --all-features --test target -- --test-threads=1
+
+      - name: Run ARM32 LLVM object and link tests
+        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
