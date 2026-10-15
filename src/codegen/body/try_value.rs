@@ -68,7 +68,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 result
             }
             Stmt::Return { value: Some(Expr::Try { expression, span }), .. } => {
-                self.lower_try_return_statement(id, expression, *span, instructions)
+                self.lower_try_return_statement(id, block.span, expression, *span, instructions)
             }
             Stmt::Expression { expression: Expr::Try { expression, span }, .. } => self
                 .lower_try_expression_statement(
@@ -123,6 +123,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let continuation_block =
             self.lower_block_in_scope(continuation, &continuation_block, fallthrough)?;
         self.blocks.push(continuation_block);
+        let cleanup_start = self.blocks.len().saturating_sub(3);
+        self.provider.distribute_scope_cleanup(block.span, &mut self.blocks, cleanup_start)?;
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: ok_block,
@@ -137,6 +139,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     fn lower_try_return_statement(
         &mut self,
         id: BackendBlockId,
+        block_span: crate::lexer::SourceSpan,
         expression: &Expr,
         span: crate::lexer::SourceSpan,
         mut instructions: Vec<BackendInstruction>,
@@ -179,6 +182,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             id: error_block,
             instructions: vec![BackendInstruction::Return { value: Some(source), span }],
         });
+        let cleanup_start = self.blocks.len().saturating_sub(2);
+        self.provider.distribute_scope_cleanup(block_span, &mut self.blocks, cleanup_start)?;
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: ok_block,
@@ -287,6 +292,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             payload_type,
             ok_instructions,
         );
+        let cleanup_start = self.blocks.len().saturating_sub(2);
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: ok_block,
@@ -316,6 +322,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             vec![BackendBlockParameter { value: result, ty: payload_type, span }];
         continuation_block.instructions.splice(0..0, binding_instructions);
         self.blocks.push(continuation_block);
+        self.provider.distribute_scope_cleanup(block.span, &mut self.blocks, cleanup_start)?;
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 

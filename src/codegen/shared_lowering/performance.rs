@@ -254,6 +254,9 @@ fn parameter_cleanup(
             let Some(value) = provider.parameter_value(name) else { continue };
             if let Some(descriptors) = plan.resolved_bridges.get(index) {
                 for descriptor in descriptors {
+                    if !super::expression::descriptor_applies(provider, value, descriptor) {
+                        continue;
+                    }
                     cleanup.push((
                         name.clone(),
                         action.clone(),

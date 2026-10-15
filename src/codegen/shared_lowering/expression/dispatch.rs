@@ -58,6 +58,28 @@ pub(super) fn lower_expression(
         }
         Expr::Unary { .. } => provider.lower_unary(expression, instructions),
         Expr::Binary { .. } => provider.lower_binary(expression, instructions),
+        Expr::If { condition, then_branch, else_branch, span }
+            if matches!(condition.as_ref(), Expr::BoolLiteral { .. }) =>
+        {
+            let selected = match condition.as_ref() {
+                Expr::BoolLiteral { value: true, .. } => Some(then_branch),
+                Expr::BoolLiteral { value: false, .. } => match else_branch.as_ref() {
+                    Some(crate::ast::IfBranch::Block(block)) => Some(block),
+                    Some(crate::ast::IfBranch::ElseIf(nested)) => {
+                        return lower_expression(provider, nested.as_ref(), instructions);
+                    }
+                    None => None,
+                },
+                _ => None,
+            };
+            let Some(crate::ast::Block { statements, .. }) = selected else {
+                return Err(unsupported(*span, "constant if expression has no selected branch"));
+            };
+            let Some(crate::ast::Stmt::Expression { expression, .. }) = statements.last() else {
+                return Err(unsupported(*span, "constant if branch requires a tail expression"));
+            };
+            lower_expression(provider, expression, instructions)
+        }
         Expr::Call { .. } => super::calls::lower_call(provider, expression, instructions),
         Expr::MethodCall { .. } => provider.lower_method_call(expression, instructions),
         Expr::StructLit { .. } | Expr::FieldAccess { .. } | Expr::Index { .. } => {

@@ -62,10 +62,9 @@ pub(super) fn generic_inputs(
         .generic_instances;
     let mut unique_instances = Vec::with_capacity(generic_instances.len());
     for instance in generic_instances {
-        if !unique_instances
-            .iter()
-            .any(|known: &crate::semantic::GenericInstance| known.identity() == instance.identity())
-        {
+        if !unique_instances.iter().any(|known: &crate::semantic::GenericInstance| {
+            known.identity() == instance.identity() && known.caller == instance.caller
+        }) {
             unique_instances.push(instance);
         }
     }

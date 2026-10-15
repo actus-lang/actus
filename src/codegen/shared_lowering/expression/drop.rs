@@ -30,6 +30,9 @@ pub(super) fn lower_binding(
             continue;
         }
         for descriptor in plan.resolved_bridges.get(index).into_iter().flatten() {
+            if !super::cleanup::descriptor_applies(provider, value, descriptor) {
+                continue;
+            }
             instructions.push(BackendInstruction::Cleanup {
                 action: action.clone(),
                 operand: Some(descriptor.operand(value)),

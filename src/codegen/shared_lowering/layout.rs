@@ -323,7 +323,10 @@ impl<'program> ProgramLayouts<'program> {
                 bridge,
                 argument: if field.is_some() {
                     BackendCleanupArgument::FieldAddress
-                } else if bridge == BackendCleanupBridge::BufferDrop {
+                } else if matches!(
+                    bridge,
+                    BackendCleanupBridge::BufferDrop | BackendCleanupBridge::AggregateDrop { .. }
+                ) {
                     BackendCleanupArgument::Value
                 } else {
                     BackendCleanupArgument::Address

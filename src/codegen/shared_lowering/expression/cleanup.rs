@@ -4,6 +4,28 @@ use crate::semantic::LoopExitKind;
 use super::super::super::{BackendCleanupOrigin, BackendInstruction, BackendValueId};
 use super::SharedExpressionProvider;
 
+pub(crate) fn descriptor_applies(
+    provider: &SharedExpressionProvider<'_>,
+    value: BackendValueId,
+    descriptor: &super::super::super::BackendCleanupResolvedDescriptor,
+) -> bool {
+    if !matches!(
+        descriptor.descriptor.bridge,
+        super::super::super::BackendCleanupBridge::AggregateDrop { .. }
+    ) {
+        return true;
+    }
+    let actual = match provider.value_type(value) {
+        Some(super::super::super::BackendValueType::Aggregate { layout })
+        | Some(super::super::super::BackendValueType::Region { layout }) => Some(layout),
+        Some(super::super::super::BackendValueType::Pointer) => provider
+            .nominal_type(value)
+            .and_then(|type_name| provider.layouts.layout_for(type_name)),
+        _ => None,
+    };
+    actual == Some(descriptor.layout)
+}
+
 pub(super) fn emit_scope_cleanup(
     provider: &SharedExpressionProvider<'_>,
     span: SourceSpan,
@@ -31,6 +53,9 @@ pub(super) fn emit_scope_cleanup(
             }
             if let Some(descriptors) = plan.resolved_bridges.get(index) {
                 for descriptor in descriptors {
+                    if !descriptor_applies(provider, value, descriptor) {
+                        continue;
+                    }
                     cleanup.push(BackendInstruction::Cleanup {
                         action: action.clone(),
                         operand: Some(descriptor.operand(value)),
@@ -75,6 +100,9 @@ pub(super) fn append_loop_cleanup(
             let Some(value) = binding_value(provider, name) else { continue };
             if let Some(descriptors) = plan.resolved_bridges.get(index) {
                 for descriptor in descriptors {
+                    if !descriptor_applies(provider, value, descriptor) {
+                        continue;
+                    }
                     instructions.push(BackendInstruction::Cleanup {
                         action: action.clone(),
                         operand: Some(descriptor.operand(value)),

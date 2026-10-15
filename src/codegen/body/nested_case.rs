@@ -56,7 +56,7 @@ fn normalize_statement(statement: &Stmt, output: &mut Vec<Stmt>) {
         }
         Stmt::If { condition, then_branch, else_branch, span } => {
             let mut owners = Vec::new();
-            let condition = extract_nested_cases(condition, &mut owners, true);
+            let condition = normalize_condition(condition, &mut owners);
             output.extend(owners);
             output.push(Stmt::If {
                 condition,
@@ -66,6 +66,31 @@ fn normalize_statement(statement: &Stmt, output: &mut Vec<Stmt>) {
             });
         }
         _ => output.push(statement.clone()),
+    }
+}
+
+fn normalize_condition(expression: &Expr, owners: &mut Vec<Stmt>) -> Expr {
+    match expression {
+        Expr::Binary { left, operator, right, span }
+            if matches!(
+                operator,
+                crate::ast::BinaryOp::LogicalAnd | crate::ast::BinaryOp::LogicalOr
+            ) =>
+        {
+            Expr::Binary {
+                left: Box::new(normalize_condition(left, owners)),
+                operator: *operator,
+                right: Box::new(normalize_condition(right, owners)),
+                span: *span,
+            }
+        }
+        Expr::If { condition, then_branch, else_branch, span } => Expr::If {
+            condition: Box::new(normalize_condition(condition, owners)),
+            then_branch: normalize_block(then_branch),
+            else_branch: else_branch.as_ref().map(normalize_if_branch),
+            span: *span,
+        },
+        _ => extract_nested_cases(expression, owners, false),
     }
 }
 
@@ -106,6 +131,49 @@ fn extract_nested_cases(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -
         return Expr::Identifier { name, span };
     }
     match expression {
+        Expr::Binary { left, operator, right, span }
+            if matches!(
+                operator,
+                crate::ast::BinaryOp::LogicalAnd | crate::ast::BinaryOp::LogicalOr
+            ) =>
+        {
+            let left = extract_nested_cases(left, owners, false);
+            let right = extract_nested_cases(right, owners, false);
+            let (then_expression, else_expression) = match operator {
+                crate::ast::BinaryOp::LogicalAnd => {
+                    (right, Expr::BoolLiteral { value: false, span: *span })
+                }
+                crate::ast::BinaryOp::LogicalOr => {
+                    (Expr::BoolLiteral { value: true, span: *span }, right)
+                }
+                _ => unreachable!(),
+            };
+            let lowered = Expr::If {
+                condition: Box::new(left),
+                then_branch: Block {
+                    statements: vec![Stmt::Expression { expression: then_expression, span: *span }],
+                    span: *span,
+                },
+                else_branch: Some(crate::ast::IfBranch::Block(Block {
+                    statements: vec![Stmt::Expression { expression: else_expression, span: *span }],
+                    span: *span,
+                })),
+                span: *span,
+            };
+            if !root {
+                let name = format!("__nested_if_{}_{}", span.start, span.end);
+                owners.push(Stmt::OwnerDecl {
+                    role: Role::Erg,
+                    name: name.clone(),
+                    ty: None,
+                    initializer: lowered,
+                    span: *span,
+                });
+                Expr::Identifier { name, span: *span }
+            } else {
+                lowered
+            }
+        }
         Expr::Binary { left, operator, right, span } => Expr::Binary {
             left: Box::new(extract_nested_cases(left, owners, false)),
             operator: *operator,
@@ -114,6 +182,12 @@ fn extract_nested_cases(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -
         },
         Expr::Grouping { expression, span } => Expr::Grouping {
             expression: Box::new(extract_nested_cases(expression, owners, false)),
+            span: *span,
+        },
+        Expr::Case { mode, subject, branches, span } => Expr::Case {
+            mode: *mode,
+            subject: Box::new(extract_nested_cases(subject, owners, false)),
+            branches: branches.clone(),
             span: *span,
         },
         _ => expression.clone(),

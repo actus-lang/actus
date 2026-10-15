@@ -14,6 +14,7 @@ mod calls;
 mod case;
 mod cast;
 mod cleanup;
+pub(crate) use cleanup::descriptor_applies;
 mod dispatch;
 mod drop;
 mod layout;

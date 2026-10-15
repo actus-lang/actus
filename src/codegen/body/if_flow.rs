@@ -30,17 +30,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                     .map(|value| (binding.name.clone(), value))
             })
             .collect::<BTreeMap<_, _>>();
-        let condition = self.provider.lower_expression(condition, instructions)?;
         let then_id = self.allocate_block();
         let else_id = self.allocate_block();
-        instructions.push(BackendInstruction::Branch {
-            condition,
-            then_block: then_id,
-            else_block: else_id,
-            then_arguments: Vec::new(),
-            else_arguments: Vec::new(),
-            span,
-        });
+        self.lower_condition(condition, then_id, else_id, span, instructions)?;
         let branch_start = self.blocks.len();
         let (then_block, then_values, then_terminates) =
             self.lower_if_then_branch(then_id, then_branch, continuation_id, &carried, span)?;
@@ -71,6 +63,48 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             })
             .collect();
         Ok(IfLowering { terminates: branches_terminate, parameters })
+    }
+
+    fn lower_condition(
+        &mut self,
+        condition: &Expr,
+        then_id: BackendBlockId,
+        else_id: BackendBlockId,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        if let Expr::Binary { left, operator, right, .. } = condition
+            && matches!(
+                operator,
+                crate::ast::BinaryOp::LogicalAnd | crate::ast::BinaryOp::LogicalOr
+            )
+        {
+            let rhs_id = self.allocate_block();
+            let (left_true, left_false) = match operator {
+                crate::ast::BinaryOp::LogicalAnd => (rhs_id, else_id),
+                crate::ast::BinaryOp::LogicalOr => (then_id, rhs_id),
+                _ => unreachable!(),
+            };
+            self.lower_condition(left, left_true, left_false, span, instructions)?;
+            let mut rhs_instructions = Vec::new();
+            self.lower_condition(right, then_id, else_id, span, &mut rhs_instructions)?;
+            self.blocks.push(BackendBlock {
+                parameters: Vec::new(),
+                id: rhs_id,
+                instructions: rhs_instructions,
+            });
+            return Ok(());
+        }
+        let condition = self.provider.lower_expression(condition, instructions)?;
+        instructions.push(BackendInstruction::Branch {
+            condition,
+            then_block: then_id,
+            else_block: else_id,
+            then_arguments: Vec::new(),
+            else_arguments: Vec::new(),
+            span,
+        });
+        Ok(())
     }
 
     fn lower_if_then_branch(
