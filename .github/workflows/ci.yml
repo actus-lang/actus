@@ -143,8 +143,9 @@ jobs:
             '-L', "native=$llvmDependencyLib",
             '-L', "native=$windowsSdkUm",
             '-L', "native=$windowsSdkUcrt"
-          ) -join ' '
-          "RUSTFLAGS=$rustFlags" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          )
+          $encodedRustFlags = $rustFlags -join [char]31
+          "CARGO_ENCODED_RUSTFLAGS=$encodedRustFlags" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $realConfig = Join-Path $bin 'llvm-config-real.exe'
           Move-Item (Join-Path $bin 'llvm-config.exe') $realConfig
           $wrapper = Join-Path $bin 'llvm-config.exe'
