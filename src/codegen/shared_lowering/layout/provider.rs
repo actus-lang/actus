@@ -119,7 +119,19 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             crate::ast::PrimitiveType::Integer { width, .. } => width,
             _ => return None,
         };
-        let scalar_ty = super::support::backend_value_type(self, primitive)?;
+        let scalar_ty = match primitive_type(&primitive.name)? {
+            crate::ast::PrimitiveType::Integer { signed, width } => {
+                let width = match width {
+                    1..=8 => 8,
+                    9..=16 => 16,
+                    17..=32 => 32,
+                    33..=64 => 64,
+                    _ => return None,
+                };
+                super::super::BackendValueType::Integer { signed, width }
+            }
+            _ => return None,
+        };
         let storage = self.type_layout(pack.storage.type_name(), &mut Vec::new())?;
         Some(super::super::BackendPackedFieldLayout {
             storage,

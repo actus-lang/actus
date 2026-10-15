@@ -335,18 +335,18 @@ fn lower_packed_field_load(
     else {
         return Err(BackendEmitError("Cranelift packed field load expected".to_owned()));
     };
-    if *big_endian {
-        return Err(BackendEmitError(
-            "Cranelift neutral packed big-endian fields are not implemented".to_owned(),
-        ));
-    }
     let base = values.get(base).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift packed field base {} is unavailable", base.0))
     })?;
+    let mapped_bit_offset = packed_bit_offset(*storage_layout, *bit_offset, *width, *big_endian)?;
     let (storage_type, byte_offset, local_bit_offset) =
-        packed_storage_type(*storage_layout, u32::from(*bit_offset), *width)?;
+        packed_storage_type(*storage_layout, mapped_bit_offset, *width)?;
     let storage_base = builder.ins().iadd_imm_s(base, i64::from(byte_offset));
     let storage = builder.ins().load(storage_type, MemFlagsData::new(), storage_base, 0);
+    let mut storage = storage;
+    if *big_endian && storage_type.bits() > 8 {
+        storage = builder.ins().bswap(storage);
+    }
     let shifted = if local_bit_offset == 0 {
         storage
     } else {
@@ -380,19 +380,15 @@ fn lower_packed_field_store(
     else {
         return Err(BackendEmitError("Cranelift packed field store expected".to_owned()));
     };
-    if *big_endian {
-        return Err(BackendEmitError(
-            "Cranelift neutral packed big-endian fields are not implemented".to_owned(),
-        ));
-    }
     let base = values.get(base).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift packed field base {} is unavailable", base.0))
     })?;
     let value = values.get(value).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift packed field value {} is unavailable", value.0))
     })?;
+    let mapped_bit_offset = packed_bit_offset(*storage_layout, *bit_offset, *width, *big_endian)?;
     let (storage_type, byte_offset, local_bit_offset) =
-        packed_storage_type(*storage_layout, u32::from(*bit_offset), *width)?;
+        packed_storage_type(*storage_layout, mapped_bit_offset, *width)?;
     let storage_base = builder.ins().iadd_imm_s(base, i64::from(byte_offset));
     let current = builder.ins().load(storage_type, MemFlagsData::new(), storage_base, 0);
     let current_type = builder.func.dfg.value_type(current);
@@ -405,10 +401,31 @@ fn lower_packed_field_store(
     let value = coerce_integer(builder, value, current_type);
     let value = builder.ins().band(value, mask);
     let value = if *bit_offset == 0 { value } else { builder.ins().ishl(value, shift) };
-    let updated = builder.ins().bor(cleared, value);
+    let mut updated = builder.ins().bor(cleared, value);
+    if *big_endian && storage_type.bits() > 8 {
+        updated = builder.ins().bswap(updated);
+    }
     builder.ins().store(MemFlagsData::new(), updated, storage_base, 0);
     let _ = ty;
     Ok(())
+}
+
+fn packed_bit_offset(
+    layout: crate::codegen::BackendLayout,
+    bit_offset: u16,
+    width: u8,
+    big_endian: bool,
+) -> Result<u32, BackendEmitError> {
+    let bit_offset = u32::from(bit_offset);
+    if !big_endian {
+        return Ok(bit_offset);
+    }
+    let total_bits = layout.size.checked_mul(8).ok_or_else(|| {
+        BackendEmitError("Cranelift packed storage layout size overflows bit width".to_owned())
+    })?;
+    total_bits
+        .checked_sub(bit_offset + u32::from(width))
+        .ok_or_else(|| BackendEmitError("Cranelift packed field exceeds storage layout".to_owned()))
 }
 
 fn packed_storage_type(

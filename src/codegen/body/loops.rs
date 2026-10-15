@@ -98,9 +98,6 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         if !self.provider.supports_array_loops() {
             return Err(unsupported(span, "array loop"));
         }
-        if !matches!(collection, Expr::Identifier { .. }) {
-            return Err(unsupported(span, "array loop collection must be an identifier"));
-        }
         let collection_value = self.provider.lower_expression(collection, &mut instructions)?;
         let capacity = self.provider.array_capacity(collection_value, span)?;
         let start = Expr::Integer { value: "0".to_owned(), suffix: Some("u32".to_owned()), span };

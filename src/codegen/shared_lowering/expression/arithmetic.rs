@@ -19,8 +19,14 @@ impl SharedExpressionProvider<'_> {
             Some(BackendValueType::Integer { width, .. }) => width,
             _ => 32,
         };
-        let result_type =
-            self.value_type(left).unwrap_or(BackendValueType::Integer { signed: true, width: 32 });
+        let result_type = if matches!(
+            operation,
+            BackendIntegerBinaryOp::LogicalAnd | BackendIntegerBinaryOp::LogicalOr
+        ) {
+            BackendValueType::Bool
+        } else {
+            self.value_type(left).unwrap_or(BackendValueType::Integer { signed: true, width: 32 })
+        };
         if matches!(operation, BackendIntegerBinaryOp::Divide | BackendIntegerBinaryOp::Remainder) {
             instructions.push(BackendInstruction::TrapIfZero {
                 value: right,

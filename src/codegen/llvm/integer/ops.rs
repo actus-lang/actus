@@ -36,6 +36,19 @@ pub(in crate::codegen::llvm) fn emit_integer_binary(
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to emit integer binary operation".to_owned()));
     }
+    let value = if matches!(ty, super::super::super::BackendValueType::Bool) {
+        unsafe {
+            LLVMBuildICmp(
+                builder,
+                LLVMIntPredicate::LLVMIntNE,
+                value,
+                LLVMConstNull(LLVMTypeOf(value)),
+                c"actus.logical.bool".as_ptr(),
+            )
+        }
+    } else {
+        value
+    };
     values.insert(*result, value);
     Ok(false)
 }

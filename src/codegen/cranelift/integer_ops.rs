@@ -52,6 +52,13 @@ pub(super) fn lower_integer_binary(
         BackendIntegerBinaryOp::LogicalAnd => builder.ins().band(left, right),
         BackendIntegerBinaryOp::LogicalOr => builder.ins().bor(left, right),
     };
+    let value = if matches!(ty, BackendValueType::Bool) {
+        let value_type = builder.func.dfg.value_type(value);
+        let zero = builder.ins().iconst(value_type, 0);
+        builder.ins().icmp(IntCC::NotEqual, value, zero)
+    } else {
+        value
+    };
     values.insert(*result, value);
     Ok(())
 }

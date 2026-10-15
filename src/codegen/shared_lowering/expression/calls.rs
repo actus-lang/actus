@@ -152,6 +152,15 @@ struct ScalarLoanWriteback {
     address: BackendValueId,
     ty: BackendValueType,
     place: Option<ArrayLoanPlace>,
+    field: Option<AggregateFieldLoanPlace>,
+}
+
+struct AggregateFieldLoanPlace {
+    base: BackendValueId,
+    aggregate_layout: crate::codegen::BackendLayout,
+    offset: u32,
+    field_layout: crate::codegen::BackendLayout,
+    ty: BackendValueType,
 }
 
 struct ArrayLoanPlace {
@@ -204,10 +213,11 @@ fn lower_arguments(
             ));
             continue;
         };
-        let (value, name, place) = match &argument.expression {
+        let (value, name, place, field) = match &argument.expression {
             crate::ast::Expr::Identifier { name, .. } => (
                 provider.lower_expression(&argument.expression, instructions)?,
                 Some(name.clone()),
+                None,
                 None,
             ),
             crate::ast::Expr::Index { target, index, .. } => {
@@ -245,6 +255,53 @@ fn lower_arguments(
                         element_type,
                         capacity,
                     }),
+                    None,
+                )
+            }
+            crate::ast::Expr::FieldAccess { object, field, .. } => {
+                let base = provider.lower_expression(object, instructions)?;
+                let type_name = provider.nominal_type(base).cloned().ok_or_else(|| {
+                    super::super::support::unsupported(
+                        span,
+                        "ins field place has no aggregate type",
+                    )
+                })?;
+                let aggregate_layout =
+                    provider.layouts.layout_for(&type_name).ok_or_else(|| {
+                        super::super::support::unsupported(
+                            span,
+                            "ins field place has no aggregate layout",
+                        )
+                    })?;
+                let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
+                    super::super::support::unsupported(span, "ins field place has no field layout")
+                })?;
+                let ty = super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+                    .ok_or_else(|| {
+                        super::super::support::unsupported(span, "ins field has no scalar type")
+                    })?;
+                let value = provider.allocate();
+                provider.remember_value(value, ty);
+                instructions.push(BackendInstruction::AggregateFieldLoad {
+                    result: value,
+                    base,
+                    aggregate_layout,
+                    offset: metadata.offset,
+                    field_layout: metadata.layout,
+                    ty,
+                    span,
+                });
+                (
+                    value,
+                    None,
+                    None,
+                    Some(AggregateFieldLoanPlace {
+                        base,
+                        aggregate_layout,
+                        offset: metadata.offset,
+                        field_layout: metadata.layout,
+                        ty,
+                    }),
                 )
             }
             _ => {
@@ -262,7 +319,7 @@ fn lower_arguments(
             span,
         });
         values.push(address);
-        writebacks.push(ScalarLoanWriteback { name, address, ty: *ty, place });
+        writebacks.push(ScalarLoanWriteback { name, address, ty: *ty, place, field });
     }
     Ok(LoweredArguments { values, writebacks })
 }
@@ -335,7 +392,7 @@ fn append_scalar_loan_writebacks(
     instructions: &mut Vec<BackendInstruction>,
 ) {
     for writeback in writebacks {
-        let ScalarLoanWriteback { name, address, ty, place } = writeback;
+        let ScalarLoanWriteback { name, address, ty, place, field } = writeback;
         let value = provider.allocate();
         provider.remember_value(value, ty);
         instructions.push(BackendInstruction::ScalarLoanLoad { result: value, address, ty, span });
@@ -349,6 +406,16 @@ fn append_scalar_loan_writebacks(
                 value,
                 capacity: place.capacity,
                 big_endian: false,
+                span,
+            });
+        } else if let Some(field) = field {
+            instructions.push(BackendInstruction::AggregateFieldStore {
+                base: field.base,
+                aggregate_layout: field.aggregate_layout,
+                offset: field.offset,
+                field_layout: field.field_layout,
+                value,
+                ty: field.ty,
                 span,
             });
         } else if let Some(name) = name {
