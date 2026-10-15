@@ -19,7 +19,7 @@ mod generic_struct;
 /// The provider owns no target backend types. It derives nominal struct layout
 /// from the Actus declarations and uses the host pointer width only for
 /// reference roles and runtime handles, matching the existing neutral ABI.
-pub(super) struct ProgramLayouts<'program> {
+pub(crate) struct ProgramLayouts<'program> {
     structs: BTreeMap<&'program str, &'program StructDef>,
     enums: BTreeMap<&'program str, &'program EnumDef>,
     packs: BTreeMap<&'program str, &'program PackDecl>,

@@ -27,7 +27,7 @@ use super::super::{
     BackendSymbolBindings, BackendValueId, BackendValueType, SymbolIdentity,
 };
 use super::support::{expression_span, unsupported};
-pub(super) struct SharedExpressionProvider<'a> {
+pub(crate) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
     layouts: &'a dyn super::super::BackendLayoutProvider,
     parameters: BTreeMap<String, BackendValueId>,

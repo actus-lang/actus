@@ -1,0 +1,269 @@
+use crate::ast::{Program, TopLevelDecl, TypeName};
+use crate::target::{EntryContract, TargetSpec};
+
+use super::declarations::{SharedDeclarations, build_backend_externals, scalar_external_symbols};
+use super::layout::ProgramLayouts;
+use super::performance::lower_shared_functions;
+use super::runtime::{
+    append_buffer_allocate_external, append_buffer_drop_external, append_performance_externals,
+    append_print_externals, referenced_runtime_symbols,
+};
+use super::runtime_externals;
+use super::support::unsupported;
+use super::{
+    BackendContractError, BackendLayoutProvider, BackendModule, BackendSymbolBindings,
+    BackendValueType,
+};
+
+#[doc(hidden)]
+pub fn lower_scalar_program(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+) -> Result<BackendModule, BackendContractError> {
+    lower_program_to_backend_module(namespace, program, entry_name, None)
+}
+
+pub(crate) fn lower_program_to_backend_module(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+) -> Result<BackendModule, BackendContractError> {
+    let target = TargetSpec::host()
+        .map_err(|error| BackendContractError::InvalidCleanupContract(error.to_string()))?;
+    lower_program_to_backend_module_for_target(namespace, program, entry_name, bindings, &target)
+}
+
+pub(crate) fn lower_program_to_backend_module_for_target(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+    target: &TargetSpec,
+) -> Result<BackendModule, BackendContractError> {
+    lower_program_to_backend_module_for_target_with_context(
+        namespace, program, entry_name, bindings, target, None,
+    )
+}
+
+pub(crate) fn lower_program_to_backend_module_for_target_with_context(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+    target: &TargetSpec,
+    performance_context: Option<(&str, &Program)>,
+) -> Result<BackendModule, BackendContractError> {
+    let layouts = ProgramLayouts::new(program, namespace);
+    let analysis_program = performance_context
+        .map(|(_, context)| program_with_performance_context(program, context))
+        .unwrap_or_else(|| program.clone());
+    let semantic = crate::semantic::analyze(&analysis_program).map_err(|error| {
+        unsupported(
+            crate::lexer::SourceSpan::new(0, 0),
+            format!("semantic analysis failed: {error:?}"),
+        )
+    })?;
+    reject_floating_point_on_freestanding(&analysis_program, &semantic, target)?;
+    reject_implicit_large_aggregate_allocation(
+        &semantic,
+        &ProgramLayouts::new(&analysis_program, namespace),
+        target,
+    )?;
+    let mut module = lower_program_to_backend_module_with_layouts_and_context(
+        namespace,
+        program,
+        entry_name,
+        bindings,
+        &layouts,
+        performance_context,
+        &analysis_program,
+    )?;
+    for function in &mut module.functions {
+        function.hosted_entry_return = target.entry_contract() == EntryContract::Hosted
+            && entry_name == Some(function.symbol.as_str())
+            && function.return_value.ty == BackendValueType::Unit;
+    }
+    module.validate()?;
+    Ok(module)
+}
+
+fn program_with_performance_context(program: &Program, context: &Program) -> Program {
+    let mut declarations = program.declarations.clone();
+    declarations.extend(
+        context
+            .declarations
+            .iter()
+            .filter(|declaration| matches!(declaration, TopLevelDecl::Perform(_)))
+            .cloned(),
+    );
+    Program { file_metadata: program.file_metadata.clone(), declarations }
+}
+
+fn reject_floating_point_on_freestanding(
+    program: &Program,
+    semantic: &crate::semantic::SemanticModel,
+    target: &TargetSpec,
+) -> Result<(), BackendContractError> {
+    if target.entry_contract() == EntryContract::Hosted {
+        return Ok(());
+    }
+    let type_name_is_float = |type_name: &TypeName| {
+        matches!(
+            crate::ast::primitive_type(&type_name.name),
+            Some(crate::ast::PrimitiveType::Float { .. })
+        )
+    };
+    let mut float_span =
+        semantic.literal_facts.iter().find(|fact| fact.kind == "float").map(|fact| fact.span);
+    if float_span.is_none() {
+        for declaration in &program.declarations {
+            let candidate = match declaration {
+                TopLevelDecl::Verb(verb) => verb
+                    .params
+                    .iter()
+                    .map(|parameter| &parameter.ty)
+                    .chain(verb.return_type.iter().map(|return_type| &return_type.ty))
+                    .find(|type_name| type_name_is_float(type_name)),
+                TopLevelDecl::ExternalVerb(verb) => verb
+                    .params
+                    .iter()
+                    .map(|parameter| &parameter.ty)
+                    .chain(verb.return_type.iter().map(|return_type| &return_type.ty))
+                    .find(|type_name| type_name_is_float(type_name)),
+                TopLevelDecl::Struct(definition) => definition
+                    .fields
+                    .iter()
+                    .map(|field| &field.ty)
+                    .find(|type_name| type_name_is_float(type_name)),
+                TopLevelDecl::Enum(definition) => {
+                    definition.variants.iter().find_map(|variant| match &variant.payload {
+                        crate::ast::EnumPayload::Tuple(types) => {
+                            types.iter().find(|ty| type_name_is_float(ty))
+                        }
+                        crate::ast::EnumPayload::Struct(fields) => {
+                            fields.iter().map(|field| &field.ty).find(|ty| type_name_is_float(ty))
+                        }
+                        crate::ast::EnumPayload::Unit => None,
+                    })
+                }
+                _ => None,
+            };
+            if let Some(type_name) = candidate {
+                float_span = Some(type_name.span);
+                break;
+            }
+        }
+    }
+    let Some(span) = float_span else { return Ok(()) };
+    Err(BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
+        "floating-point lowering",
+        span,
+        super::BackendTargetContext {
+            backend: "shared".to_owned(),
+            target: target.triple().to_string(),
+        },
+        "floating-point values are forbidden by the freestanding target profile; use an integer or fixed-point representation",
+    )))
+}
+
+fn reject_implicit_large_aggregate_allocation(
+    semantic: &crate::semantic::SemanticModel,
+    layouts: &ProgramLayouts<'_>,
+    target: &TargetSpec,
+) -> Result<(), BackendContractError> {
+    if target.entry_contract() == EntryContract::Hosted {
+        return Ok(());
+    }
+    for (binding_index, type_name) in &semantic.binding_type_names {
+        let Some(layout) = layouts.layout_for(type_name) else { continue };
+        if layout.size < super::LARGE_AGGREGATE_THRESHOLD {
+            continue;
+        }
+        let span = semantic
+            .bindings
+            .get(*binding_index)
+            .map(|binding| binding.span)
+            .unwrap_or(type_name.span);
+        return Err(BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
+            "large aggregate implicit allocation",
+            span,
+            super::BackendTargetContext {
+                backend: "shared".to_owned(),
+                target: target.triple().to_string(),
+            },
+            format!(
+                "aggregate layout size {} exceeds target stack limit, and implicit dynamic allocation is forbidden on freestanding targets",
+                layout.size
+            ),
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn lower_program_to_backend_module_with_layouts(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+    layouts: &impl BackendLayoutProvider,
+) -> Result<BackendModule, BackendContractError> {
+    lower_program_to_backend_module_with_layouts_and_context(
+        namespace, program, entry_name, bindings, layouts, None, program,
+    )
+}
+
+pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+    layouts: &impl BackendLayoutProvider,
+    performance_context: Option<(&str, &Program)>,
+    analysis_program: &Program,
+) -> Result<BackendModule, BackendContractError> {
+    let declarations = SharedDeclarations::new(namespace, program, layouts, performance_context)?;
+    let semantic = crate::semantic::analyze(analysis_program).map_err(|error| {
+        unsupported(
+            crate::lexer::SourceSpan::new(0, 0),
+            format!("semantic analysis failed: {error:?}"),
+        )
+    })?;
+    let cleanup_provider = ProgramLayouts::new(analysis_program, namespace);
+    let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
+    let external_symbols = scalar_external_symbols(namespace, &declarations.externals, bindings)?;
+    let functions = lower_shared_functions(
+        namespace,
+        entry_name,
+        layouts,
+        &declarations,
+        &cleanup_plans,
+        &external_symbols,
+        bindings,
+    )?;
+    let mut module = BackendModule {
+        externals: build_backend_externals(
+            &declarations.externals,
+            declarations.external_signatures,
+            &external_symbols,
+        )?,
+        functions,
+    };
+    append_performance_externals(&mut module.externals, &declarations.performance_externals)?;
+    let mut runtime_symbols = referenced_runtime_symbols(&module.functions);
+    if module
+        .externals
+        .iter()
+        .any(|external| external.symbol.as_str() == crate::runtime::REGION_OPEN_SYMBOL)
+    {
+        runtime_symbols.insert(crate::runtime::BUFFER_DROP_SYMBOL.to_owned());
+    }
+    append_buffer_drop_external(&mut module.externals, &runtime_symbols)?;
+    append_buffer_allocate_external(&mut module.externals, &runtime_symbols)?;
+    runtime_externals::append_buffer_runtime_externals(&mut module.externals, &runtime_symbols)?;
+    append_print_externals(&mut module.externals, &runtime_symbols)?;
+    module.validate()?;
+    Ok(module)
+}
