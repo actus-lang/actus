@@ -38,9 +38,9 @@ pub use errors::{SemanticError, SemanticErrorKind};
 pub(crate) use generated_locals::normalize_program as normalize_generated_locals;
 pub use model::{
     ArgumentRoleFact, ArgumentRoleSource, Binding, BorrowRecord, ConditionalFact, DynamicRoleType,
-    ExclusiveLoan, FatPointerLayout, GenericInstance, LiteralFact, Origin, OriginRecord,
-    OriginRoot, PackFieldContract, PackLayoutContract, ReachablePerformance, SemanticModel,
-    SerializationContract,
+    ExclusiveLoan, ExplicitDrop, FatPointerLayout, GenericInstance, LiteralFact, Origin,
+    OriginRecord, OriginRoot, PackFieldContract, PackLayoutContract, ReachablePerformance,
+    SemanticModel, SerializationContract,
 };
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use types::{SemanticType, TypeRegistry};

@@ -1,13 +1,93 @@
 use std::fs;
+use std::path::Path;
 
+use actus::codegen::LinkerPlan;
 use actus::configuration::{
-    BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel, RuntimeProfile,
+    BackendKind, BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel,
+    RuntimeProfile,
 };
 use actus::diagnostics::{
     DiagnosticSeverity, STRICT_LEGACY_DEPENDENCY, STRICT_LEGACY_MANIFEST,
     STRICT_RUNTIME_TARGET_INCOMPATIBLE, STRICT_RUNTIME_UNSUPPORTED,
 };
 use actus::target::TargetSpec;
+
+#[test]
+fn linker_plan_is_deterministic_across_supported_host_profiles() {
+    for (label, target, expected_output) in [
+        ("linux", "x86_64-unknown-linux-gnu", "/tmp/actus-plan-linux"),
+        ("macos", "x86_64-apple-darwin", "/tmp/actus-plan-macos"),
+        ("windows", "x86_64-pc-windows-msvc", "/tmp/actus-plan-windows"),
+    ] {
+        let manifest = std::env::temp_dir()
+            .join(format!("actus-linker-plan-{label}-{}.toml", std::process::id()));
+        fs::write(
+            &manifest,
+            format!(
+                "[package]\nname = \"plan_{label}\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"{target}\"\n"
+            ),
+        )
+        .expect("write linker-plan manifest");
+        let configuration =
+            CompilerConfiguration::from_manifest(&manifest).expect("target profile should load");
+        let object = Path::new("/tmp/actus-root.o");
+        let output_path = format!("/tmp/actus-plan-{label}");
+        let output = Path::new(&output_path);
+        let plan = LinkerPlan::from_configuration(&[object], output, &configuration)
+            .expect("linker plan should build");
+        let arguments = plan
+            .arguments()
+            .iter()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(plan.linker(), configuration.linker());
+        assert_eq!(arguments.first().map(String::as_str), Some("/tmp/actus-root.o"));
+        let output_argument =
+            if TargetSpec::parse(target).expect("host target should parse").linker_flavor()
+                == actus::target::LinkerFlavor::Msvc
+            {
+                format!("/OUT:{expected_output}")
+            } else {
+                expected_output.to_owned()
+            };
+        assert!(
+            arguments.iter().any(|argument| argument == &output_argument),
+            "unexpected linker arguments for {label}: {arguments:?}"
+        );
+        let _ = fs::remove_file(manifest);
+    }
+}
+
+#[test]
+fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
+    let root = std::env::temp_dir().join(format!("actus-arm-linker-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create ARM linker project directory");
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"arm_linker\"\nversion = \"1.0.0\"\nentry = \"boot\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("write ARM linker manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest(&manifest).expect("ARM manifest should load");
+    assert_eq!(configuration.linker_script(), Some(root.join("memory.x").as_path()));
+    let plan = LinkerPlan::from_configuration(
+        &[Path::new("/tmp/actus-arm-root.o")],
+        Path::new("/tmp/actus-arm-image"),
+        &configuration,
+    )
+    .expect("ARM GNU linker plan should accept a linker script");
+    let arguments = plan
+        .arguments()
+        .iter()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    assert!(arguments.windows(2).any(|window| {
+        window[0] == "-T" && window[1] == root.join("memory.x").display().to_string()
+    }));
+    let _ = fs::remove_dir_all(root);
+}
 
 #[test]
 fn loads_build_settings_from_an_actus_manifest() {
@@ -24,12 +104,80 @@ fn loads_build_settings_from_an_actus_manifest() {
     assert_eq!(configuration.runtime_profile(), RuntimeProfile::Core);
     assert_eq!(configuration.native_backend().module_name(), "sample_native");
     assert!(!configuration.native_backend().position_independent());
+    assert_eq!(
+        configuration.native_backend().relocation_model(),
+        actus::configuration::RelocationModel::Static
+    );
     assert_eq!(configuration.libraries()[0].name(), "m");
     assert_eq!(configuration.libraries()[0].kind(), LibraryKind::Shared);
     assert!(configuration.library_paths().is_empty());
     let expected_linker = TargetSpec::host().expect("host target should parse").linker_flavor();
     assert_eq!(configuration.linker_flavor(), expected_linker);
     let _ = fs::remove_file(path);
+}
+
+#[cfg(feature = "llvm")]
+#[test]
+fn loads_the_explicit_llvm_backend_from_an_actus_manifest() {
+    let path =
+        std::env::temp_dir().join(format!("actus-config-backend-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"backend\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write backend manifest");
+
+    let configuration =
+        CompilerConfiguration::from_manifest(&path).expect("LLVM backend manifest should load");
+    assert_eq!(configuration.native_backend().backend(), BackendKind::Llvm);
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn rejects_unknown_backend_names() {
+    let path = std::env::temp_dir()
+        .join(format!("actus-config-unknown-backend-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"backend\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"unknown\"\n",
+    )
+    .expect("write backend manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path)
+        .expect_err("unknown backend names must be rejected");
+    assert!(error.to_string().contains("unknown variant"));
+    let _ = fs::remove_file(path);
+}
+
+#[cfg(not(feature = "llvm"))]
+#[test]
+fn rejects_llvm_backend_when_the_feature_is_disabled() {
+    let path = std::env::temp_dir()
+        .join(format!("actus-config-llvm-disabled-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"backend\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
+    )
+    .expect("write backend manifest");
+
+    let error = CompilerConfiguration::from_manifest(&path)
+        .expect_err("LLVM must be rejected when its feature is disabled");
+    assert!(error.to_string().contains("backend `llvm` is not available"));
+    let _ = fs::remove_file(path);
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn defaults_to_cranelift_as_the_native_backend() {
+    let configuration = CompilerConfiguration::from_environment();
+    assert_eq!(configuration.native_backend().backend(), BackendKind::Cranelift);
+}
+
+#[cfg(all(not(feature = "cranelift"), feature = "llvm"))]
+#[test]
+fn defaults_to_llvm_when_cranelift_is_not_compiled() {
+    let configuration = CompilerConfiguration::from_environment();
+    assert_eq!(configuration.native_backend().backend(), BackendKind::Llvm);
 }
 
 #[test]

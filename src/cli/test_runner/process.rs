@@ -10,8 +10,12 @@ pub(super) enum TestProcessResult {
     Signaled,
 }
 
-pub(super) fn run_test_process(executable: &Path) -> Result<TestProcessResult, String> {
+pub(super) fn run_test_process(
+    executable: &Path,
+    working_directory: &Path,
+) -> Result<TestProcessResult, String> {
     let mut child = Command::new(executable)
+        .current_dir(working_directory)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

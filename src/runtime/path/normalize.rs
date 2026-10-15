@@ -7,7 +7,9 @@ use super::{ActusPath, PathErrorCode, path_units};
 /// `path` must be null or a valid mutable `ActusPath` with live storage.
 pub unsafe extern "C" fn actus_path_normalize(path: *mut ActusPath) -> i32 {
     let path_const = path.cast_const();
-    let Ok((buffer, platform)) = (unsafe { path_units(path_const) }) else { return -4 };
+    let Ok((buffer, platform)) = (unsafe { path_units(path_const) }) else {
+        return -4;
+    };
     let width = if platform == 0 { 1 } else { 2 };
     let payload_length = unsafe { (*path).length as usize * width };
     let bytes = unsafe { std::slice::from_raw_parts_mut(buffer.data, payload_length) };
@@ -21,7 +23,10 @@ pub unsafe extern "C" fn actus_path_normalize(path: *mut ActusPath) -> i32 {
     } else {
         normalize_units(bytes, 2, true, absolute)
     };
-    let Ok(written) = written else { return written_error(written) };
+    let Ok(written) = written else {
+        let status = written_error(written);
+        return status;
+    };
     unsafe {
         if platform == 0 {
             *buffer.data.add(written) = 0;

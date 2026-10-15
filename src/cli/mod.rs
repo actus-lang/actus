@@ -156,10 +156,10 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         ),
         "parse" => Some("usage: actus parse <file.act>\n\nParse a source file and print its AST."),
         "build" => Some(
-            "usage: actus build [file.act] [--strict] [--release|--profile <name>] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Actus.toml.",
+            "usage: actus build [file.act] [--strict] [--release|--profile <name>] [--backend cranelift|llvm] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Actus.toml.",
         ),
         "run" => Some(
-            "usage: actus run [file.act] [--release|--profile <name>] [-- program-args...]\n\nBuild and execute an Actus program once.",
+            "usage: actus run [file.act] [--release|--profile <name>] [--backend cranelift|llvm] [-- program-args...]\n\nBuild and execute an Actus program once.",
         ),
         "watch" => Some(
             "usage: actus watch [file.act] [--once|--build] [--interval <ms>] [--release|--profile <name>]\n\nCheck an Actus project after source changes.",

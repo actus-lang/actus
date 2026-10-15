@@ -116,7 +116,8 @@ phase.
 - Ownership regression tests for nested generic calls and aggregate returns.
 - Existing facade visibility, private-dependency, ownership, aggregate-return,
   and failed-build cleanup tests provide the accepted/rejected evidence; the
-  namespace-scoped generic symbol regression is in `tests/codegen_symbols.rs`.
+  namespace-scoped generic symbol regression is in
+  `tests/codegen/cranelift/symbols.rs`.
 - Gate 29.2 is complete. Gate 29.3 adds the cross-command and LSP parity
   verification.
 

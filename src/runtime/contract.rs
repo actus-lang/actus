@@ -63,6 +63,8 @@ pub const BUFFER_APPEND_SYMBOL: &str = "actus_buffer_append";
 pub const BUFFER_LENGTH_SYMBOL: &str = "actus_buffer_length";
 /// Stable runtime symbol for checked borrowed-buffer byte access.
 pub const BUFFER_BYTE_AT_SYMBOL: &str = "actus_buffer_byte_at";
+/// Stable runtime symbol for checked mutable-buffer byte access.
+pub const BUFFER_BYTE_SET_SYMBOL: &str = "actus_buffer_byte_set";
 /// Stable runtime symbol for allocation-free CRC32 over a validated buffer range.
 pub const BUFFER_CRC32_SYMBOL: &str = "actus_buffer_crc32";
 pub const BUFFER_CRC32_MATCHES_SYMBOL: &str = "actus_buffer_crc32_matches";
@@ -100,6 +102,9 @@ pub const BUFFERED_WRITE_STDOUT_SYMBOL: &str = "actus_buffered_write_stdout";
 pub const FLUSH_BUFFERED_STDOUT_SYMBOL: &str = "actus_flush_buffered_stdout";
 pub const ENUM_ALLOCATE_SYMBOL: &str = "actus_enum_allocate";
 pub const ENUM_DROP_SYMBOL: &str = "actus_enum_drop";
+/// Stable runtime symbols used for compiler-managed large aggregate storage.
+pub const AGGREGATE_ALLOCATE_SYMBOL: &str = "actus_aggregate_allocate";
+pub const AGGREGATE_DROP_SYMBOL: &str = "actus_aggregate_drop";
 /// Stable hosted runtime symbol for monotonic nanosecond reads.
 pub const MONOTONIC_NANOS_SYMBOL: &str = "actus_monotonic_nanos";
 /// Stable hosted runtime symbol for scheduler-aware monotonic sleeping.

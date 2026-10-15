@@ -3,17 +3,17 @@ use std::collections::HashMap;
 use crate::ast::{ExternalVerbDecl, Program, TopLevelDecl, TypeIdentity, TypeName, VerbDecl};
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::super::native::NativeEmitError;
 use super::definitions::canonical_type_name;
 use super::verb_body::{specialize_block, specialize_param, specialize_return_type};
+use crate::codegen::BackendEmitError;
 
 /// Materializes generic verbs for concrete type applications discovered by the
 /// semantic pass. The resulting declarations have no generic parameters and
-/// can therefore enter the ordinary Cranelift declaration pipeline.
-pub(in crate::codegen) fn specialize_program(
+/// can therefore enter a backend declaration pipeline that consumes specialized programs.
+pub(crate) fn specialize_program(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<Program, NativeEmitError> {
+) -> Result<Program, BackendEmitError> {
     let instances = expand_transitive_instances(program, instances)?;
     let call_bindings = unique_generic_call_bindings(program, &instances);
     let call_site_bindings = generic_call_site_bindings(&instances);
@@ -38,7 +38,7 @@ pub(in crate::codegen) fn specialize_program(
                     crate::lexer::SourceSpan::new(0, 0),
                 )
                 .map_err(|error| {
-                    NativeEmitError(format!("call specialization failed: {error:?}"))
+                    BackendEmitError(format!("call specialization failed: {error:?}"))
                 })?;
                 let substitution = substitution
                     .with_call_bindings(&call_bindings)
@@ -57,7 +57,7 @@ pub(in crate::codegen) fn specialize_program(
 pub(crate) fn expand_generic_instances(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<Vec<GenericInstance>, NativeEmitError> {
+) -> Result<Vec<GenericInstance>, BackendEmitError> {
     expand_transitive_instances(program, instances)
 }
 
@@ -119,7 +119,7 @@ fn unique_generic_call_bindings(
 fn expand_transitive_instances(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<Vec<GenericInstance>, NativeEmitError> {
+) -> Result<Vec<GenericInstance>, BackendEmitError> {
     let mut expanded = instances.to_vec();
     while expand_transitive_once(program, &mut expanded)? {
         // Keep expanding until the dependency graph reaches a fixed point.
@@ -130,7 +130,7 @@ fn expand_transitive_instances(
 fn expand_transitive_once(
     program: &Program,
     expanded: &mut Vec<GenericInstance>,
-) -> Result<bool, NativeEmitError> {
+) -> Result<bool, BackendEmitError> {
     let snapshot = expanded.clone();
     let mut changed = false;
     for caller_instance in snapshot.iter() {
@@ -144,7 +144,7 @@ fn expand_transitive_once(
             crate::lexer::SourceSpan::new(0, 0),
         )
         .map_err(|error| {
-            NativeEmitError(format!("generic instance expansion failed: {error:?}"))
+            BackendEmitError(format!("generic instance expansion failed: {error:?}"))
         })?;
         for nested_template in snapshot
             .iter()
@@ -222,7 +222,7 @@ fn specialize_external_verbs(
     verb: &ExternalVerbDecl,
     instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
-) -> Result<Vec<ExternalVerbDecl>, NativeEmitError> {
+) -> Result<Vec<ExternalVerbDecl>, BackendEmitError> {
     let mut specialized = Vec::new();
     let mut names = std::collections::HashSet::new();
     for instance in instances.iter().filter(|instance| instance_matches_external(instance, verb)) {
@@ -238,14 +238,14 @@ fn specialize_external_verb(
     instance: &GenericInstance,
     instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
-) -> Result<ExternalVerbDecl, NativeEmitError> {
+) -> Result<ExternalVerbDecl, BackendEmitError> {
     let substitution = TypeSubstitution::for_type(
         &verb.name,
         &verb.generic_parameters,
         &instance.arguments,
         verb.span,
     )
-    .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?;
+    .map_err(|error| BackendEmitError(format!("generic verb substitution failed: {error:?}")))?;
     let call_bindings = nested_call_bindings(
         &verb.name,
         &verb.generic_parameters,
@@ -279,7 +279,7 @@ fn specialize_verbs(
     verb: &VerbDecl,
     instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
-) -> Result<Vec<VerbDecl>, NativeEmitError> {
+) -> Result<Vec<VerbDecl>, BackendEmitError> {
     let mut specialized = Vec::new();
     let mut names = std::collections::HashSet::new();
     for instance in instances.iter().filter(|instance| instance_matches_verb(instance, verb)) {
@@ -295,14 +295,14 @@ fn specialize_verb(
     instance: &GenericInstance,
     instances: &[GenericInstance],
     call_bindings: &HashMap<String, String>,
-) -> Result<VerbDecl, NativeEmitError> {
+) -> Result<VerbDecl, BackendEmitError> {
     let substitution = TypeSubstitution::for_type(
         &verb.name,
         &verb.generic_parameters,
         &instance.arguments,
         verb.span,
     )
-    .map_err(|error| NativeEmitError(format!("generic verb substitution failed: {error:?}")))?;
+    .map_err(|error| BackendEmitError(format!("generic verb substitution failed: {error:?}")))?;
     let call_bindings = nested_call_bindings(
         &verb.name,
         &verb.generic_parameters,
@@ -334,14 +334,14 @@ fn nested_call_bindings(
     caller_instance: &GenericInstance,
     instances: &[GenericInstance],
     inherited: &HashMap<String, String>,
-) -> Result<HashMap<String, String>, NativeEmitError> {
+) -> Result<HashMap<String, String>, BackendEmitError> {
     let substitution = TypeSubstitution::for_type(
         caller_name,
         parameters,
         &caller_instance.arguments,
         crate::lexer::SourceSpan::new(0, 0),
     )
-    .map_err(|error| NativeEmitError(format!("nested generic substitution failed: {error:?}")))?;
+    .map_err(|error| BackendEmitError(format!("nested generic substitution failed: {error:?}")))?;
     let mut bindings = inherited.clone();
     for template in instances.iter().filter(|instance| {
         instance.caller.as_deref() == Some(caller_name)

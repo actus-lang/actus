@@ -1,0 +1,67 @@
+use std::collections::HashMap;
+
+use cranelift_frontend::FunctionBuilder;
+
+use crate::ast::Block;
+
+use super::super::cleanup::{CleanupContext, emit_scope_cleanup};
+use super::super::literals::StringDataValues;
+use super::super::native::{BackendEmitError, FunctionRef};
+use super::super::types::NativeType;
+use super::{Flow, LoopTargets, LoweredCleanupSchedule};
+use crate::codegen::cranelift::layout::LayoutRegistry;
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn lower_scoped_block<'source>(
+    function: &mut FunctionBuilder<'_>,
+    block: &'source Block,
+    locals: &mut HashMap<&'source String, cranelift_codegen::ir::Value>,
+    types: &mut HashMap<&'source String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    targets: Option<LoopTargets>,
+    cleanup_schedule: &LoweredCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, BackendEmitError> {
+    let mut nested_locals = locals.clone();
+    let mut nested_types = types.clone();
+    let flow = super::statements::lower_statements(
+        function,
+        &block.statements,
+        &mut nested_locals,
+        &mut nested_types,
+        functions,
+        targets,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    finish_scoped_block(
+        function,
+        flow,
+        block.span,
+        &nested_locals,
+        &nested_types,
+        functions,
+        cleanup_schedule,
+        layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_scoped_block(
+    function: &mut FunctionBuilder<'_>,
+    flow: Flow,
+    cleanup_span: crate::lexer::SourceSpan,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &LoweredCleanupSchedule,
+    layouts: &LayoutRegistry,
+) -> Result<Flow, BackendEmitError> {
+    if matches!(flow, Flow::Fallthrough) {
+        let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
+        emit_scope_cleanup(&mut cleanup, cleanup_schedule, cleanup_span)?;
+    }
+    Ok(flow)
+}

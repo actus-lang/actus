@@ -1,0 +1,365 @@
+use cranelift_codegen::ir::{InstBuilder, TrapCode, types};
+use cranelift_frontend::FunctionBuilder;
+
+use crate::ast::CaseBody;
+
+use super::super::expressions::{coerce_to_ir_type, lower_expression};
+use super::super::native::BackendEmitError;
+use super::super::types::NativeType;
+use super::context::CaseLoweringContext;
+use super::matching::match_pattern;
+use super::payload::{BranchLocals, bind_payload};
+use crate::codegen::cranelift::lowering::{Flow, lower_case_block};
+
+const CASE_EXHAUSTIVENESS_TRAP: TrapCode = TrapCode::unwrap_user(1);
+type CaseBranchResult<'a> = Option<(cranelift_codegen::ir::Value, BranchLocals<'a>)>;
+
+struct CaseBranchFinishInput<'a> {
+    branch_value: CaseBranchResult<'a>,
+    branch: &'a crate::ast::CaseBranch,
+    matched: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+    bindings: &'a [&'a String],
+    result_type: NativeType,
+    context: &'a CaseLoweringContext<'a, 'a>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn emit_case_branches(
+    function: &mut FunctionBuilder<'_>,
+    branches: &[crate::ast::CaseBranch],
+    subject_value: cranelift_codegen::ir::Value,
+    subject_type: NativeType,
+    result_type: NativeType,
+    merge: cranelift_codegen::ir::Block,
+    bindings: &[&String],
+    context: &CaseLoweringContext<'_, '_>,
+    value_producing: bool,
+) -> Result<(), BackendEmitError> {
+    let next_blocks =
+        (0..branches.len().saturating_sub(1)).map(|_| function.create_block()).collect::<Vec<_>>();
+    for (index, branch) in branches.iter().enumerate() {
+        let following = next_blocks.get(index).copied().unwrap_or(merge);
+        emit_case_branch(
+            function,
+            branch,
+            following,
+            merge,
+            subject_value,
+            subject_type,
+            result_type,
+            context,
+            value_producing,
+            bindings,
+        )?;
+        if following != merge {
+            function.switch_to_block(following);
+            function.seal_block(following);
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_case_branch(
+    function: &mut FunctionBuilder<'_>,
+    branch: &crate::ast::CaseBranch,
+    following: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+    subject_value: cranelift_codegen::ir::Value,
+    subject_type: NativeType,
+    result_type: NativeType,
+    context: &CaseLoweringContext<'_, '_>,
+    value_producing: bool,
+    bindings: &[&String],
+) -> Result<(), BackendEmitError> {
+    let matched = function.create_block();
+    let condition =
+        match_pattern(function, subject_value, subject_type, &branch.pattern, context.layouts)?;
+    branch_condition(function, condition, matched, following, merge);
+    function.switch_to_block(matched);
+    let branch_value = lower_case_branch(
+        function,
+        subject_value,
+        subject_type,
+        branch,
+        following,
+        merge,
+        result_type,
+        context,
+        value_producing,
+    )?;
+    finish_case_branch(
+        function,
+        CaseBranchFinishInput {
+            branch_value,
+            branch,
+            matched,
+            merge,
+            bindings,
+            result_type,
+            context,
+        },
+    )?;
+    Ok(())
+}
+
+fn finish_case_branch(
+    function: &mut FunctionBuilder<'_>,
+    input: CaseBranchFinishInput<'_>,
+) -> Result<(), BackendEmitError> {
+    let CaseBranchFinishInput {
+        branch_value,
+        branch,
+        matched,
+        merge,
+        bindings,
+        result_type,
+        context,
+    } = input;
+    if let Some((branch_value, branch_locals)) = branch_value {
+        let mut arguments = bindings
+            .iter()
+            .map(|binding| {
+                let branch_type = branch_locals.1.get(binding);
+                let outer_type = context.local_types.get(binding);
+                if branch_type == outer_type {
+                    branch_locals.0.get(binding).copied()
+                } else {
+                    context.locals.get(binding).copied()
+                }
+                .expect("case merge binding")
+            })
+            .map(cranelift_codegen::ir::BlockArg::Value)
+            .collect::<Vec<_>>();
+        let branch_value =
+            coerce_to_ir_type(function, branch_value, context.layouts.ir_type(result_type)?);
+        arguments.push(cranelift_codegen::ir::BlockArg::Value(branch_value));
+        function.ins().jump(merge, &arguments);
+    }
+    if branch.guard.is_none() {
+        function.seal_block(matched);
+    }
+    Ok(())
+}
+
+fn branch_condition(
+    function: &mut FunctionBuilder<'_>,
+    condition: cranelift_codegen::ir::Value,
+    matched: cranelift_codegen::ir::Block,
+    following: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+) {
+    if following == merge {
+        let failure = function.create_block();
+        function.ins().brif(condition, matched, &[], failure, &[]);
+        emit_case_exhaustiveness_trap(function, failure);
+    } else {
+        function.ins().brif(condition, matched, &[], following, &[]);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_case_branch<'a>(
+    function: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    subject_type: NativeType,
+    branch: &'a crate::ast::CaseBranch,
+    following: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+    result_type: NativeType,
+    context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
+    let branch_locals = bind_branch_payload(function, subject, subject_type, branch, context)?;
+    if let Some(guard) = &branch.guard {
+        return lower_guarded_case_branch(
+            function,
+            guard,
+            branch,
+            &branch_locals,
+            following,
+            merge,
+            result_type,
+            context,
+            value_producing,
+        );
+    }
+    lower_case_body(function, branch, &branch_locals, result_type, context, value_producing)
+}
+
+fn bind_branch_payload<'a>(
+    function: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    subject_type: NativeType,
+    branch: &'a crate::ast::CaseBranch,
+    context: &CaseLoweringContext<'_, 'a>,
+) -> Result<BranchLocals<'a>, BackendEmitError> {
+    bind_payload(
+        function,
+        subject,
+        subject_type,
+        branch,
+        context.locals,
+        context.local_types,
+        context.functions,
+        context.layouts,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_guarded_case_branch<'a>(
+    function: &mut FunctionBuilder<'_>,
+    guard: &crate::ast::Expr,
+    branch: &'a crate::ast::CaseBranch,
+    branch_locals: &BranchLocals<'a>,
+    following: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+    result_type: NativeType,
+    context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
+    let guard_block = function
+        .current_block()
+        .ok_or_else(|| BackendEmitError("guard lowering has no active block".to_owned()))?;
+    let condition = lower_expression(
+        function,
+        guard,
+        &branch_locals.0,
+        &branch_locals.1,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )?;
+    let body = function.create_block();
+    emit_guard_branch(function, condition, body, following, merge)?;
+    function.seal_block(guard_block);
+    function.switch_to_block(body);
+    let branch_value =
+        lower_case_body(function, branch, branch_locals, result_type, context, value_producing)?;
+    function.seal_block(body);
+    Ok(branch_value)
+}
+
+fn emit_guard_branch(
+    function: &mut FunctionBuilder<'_>,
+    condition: cranelift_codegen::ir::Value,
+    body: cranelift_codegen::ir::Block,
+    following: cranelift_codegen::ir::Block,
+    merge: cranelift_codegen::ir::Block,
+) -> Result<(), BackendEmitError> {
+    if following == merge {
+        let failure = function.create_block();
+        function.ins().brif(condition, body, &[], failure, &[]);
+        emit_case_exhaustiveness_trap(function, failure);
+    } else {
+        function.ins().brif(condition, body, &[], following, &[]);
+    }
+    Ok(())
+}
+
+fn emit_case_exhaustiveness_trap(
+    function: &mut FunctionBuilder<'_>,
+    failure: cranelift_codegen::ir::Block,
+) {
+    function.switch_to_block(failure);
+    function.ins().trap(CASE_EXHAUSTIVENESS_TRAP);
+    function.seal_block(failure);
+}
+
+fn lower_case_body<'a>(
+    function: &mut FunctionBuilder<'_>,
+    branch: &'a crate::ast::CaseBranch,
+    branch_locals: &BranchLocals<'a>,
+    result_type: NativeType,
+    context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
+    let branch_value = match &branch.body {
+        CaseBody::Expression(expression) => Some((
+            lower_case_expression(function, expression, branch_locals, context)?,
+            branch_locals.clone(),
+        )),
+        CaseBody::Block(block) => lower_case_block_body(
+            function,
+            block,
+            branch,
+            branch_locals,
+            result_type,
+            context,
+            value_producing,
+        )?,
+    };
+    Ok(branch_value)
+}
+
+fn lower_case_expression<'a>(
+    function: &mut FunctionBuilder<'_>,
+    expression: &crate::ast::Expr,
+    branch_locals: &BranchLocals<'a>,
+    context: &CaseLoweringContext<'_, 'a>,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    lower_expression(
+        function,
+        expression,
+        &branch_locals.0,
+        &branch_locals.1,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+    )
+}
+
+fn lower_case_block_body<'a>(
+    function: &mut FunctionBuilder<'_>,
+    block: &'a crate::ast::Block,
+    branch: &'a crate::ast::CaseBranch,
+    branch_locals: &BranchLocals<'a>,
+    result_type: NativeType,
+    context: &CaseLoweringContext<'_, 'a>,
+    value_producing: bool,
+) -> Result<CaseBranchResult<'a>, BackendEmitError> {
+    let (flow, locals, types, tail_value) = lower_case_block(
+        function,
+        block,
+        branch.span,
+        &branch_locals.0,
+        &branch_locals.1,
+        context.functions,
+        context.cleanup_schedule,
+        context.string_data,
+        context.layouts,
+        context.loop_targets.clone(),
+        value_producing,
+    )?;
+    finish_case_flow(function, flow, tail_value, result_type)
+        .map(|value| value.map(|value| (value, (locals, types))))
+}
+
+fn finish_case_flow(
+    function: &mut FunctionBuilder<'_>,
+    flow: Flow,
+    tail_value: Option<cranelift_codegen::ir::Value>,
+    result_type: NativeType,
+) -> Result<Option<cranelift_codegen::ir::Value>, BackendEmitError> {
+    match flow {
+        Flow::Return(value, _) => {
+            function.ins().return_(&[value]);
+            Ok(None)
+        }
+        Flow::Fallthrough if let Some(value) = tail_value => Ok(Some(value)),
+        Flow::Fallthrough if matches!(result_type, NativeType::Void) => {
+            Ok(Some(function.ins().iconst(types::I8, 0)))
+        }
+        Flow::Fallthrough => Err(BackendEmitError(
+            "case block must return a value in a value-producing case".to_owned(),
+        )),
+        Flow::VoidReturn => {
+            function.ins().return_(&[]);
+            Ok(None)
+        }
+        Flow::Break | Flow::Continue => Ok(None),
+    }
+}

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::configuration::{BuildProfile, CompilerConfiguration};
+use crate::configuration::{BackendKind, BuildProfile, CompilerConfiguration};
 
 use super::super::conformance::{ConformanceMode, parse_strict_option};
 use super::emission::build_file_with_mode;
@@ -16,6 +16,7 @@ struct BuildOptions {
     output: Option<String>,
     emit: EmitKind,
     profile: Option<BuildProfile>,
+    backend: Option<BackendKind>,
     mode: ConformanceMode,
 }
 
@@ -46,10 +47,14 @@ pub(crate) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
 
 fn configured_build(options: &BuildOptions) -> Result<CompilerConfiguration, String> {
     let configuration = configuration_for_build(options.input.as_deref(), options.mode)?;
-    Ok(options.profile.map_or_else(
+    let configuration = options.profile.map_or_else(
         || configuration.clone(),
         |profile| configuration.clone().with_profile(profile),
-    ))
+    );
+    match options.backend {
+        Some(backend) => configuration.with_backend(backend).map_err(|error| error.to_string()),
+        None => Ok(configuration),
+    }
 }
 
 fn build_input(options: &BuildOptions, configuration: &CompilerConfiguration) -> String {
@@ -95,6 +100,7 @@ fn parse_build_options(
         output: None,
         emit: EmitKind::Object,
         profile: None,
+        backend: None,
         mode: ConformanceMode::Standard,
     };
     while let Some(argument) = arguments.next() {
@@ -112,6 +118,11 @@ fn parse_build_argument(
         "--strict" => parse_strict_option(&argument, &mut options.mode).map(|_| ())?,
         "--release" => set_profile(options, BuildProfile::Release)?,
         "--profile" => set_profile(options, parse_profile(arguments)?)?,
+        "--backend" => {
+            let backend =
+                arguments.next().ok_or_else(|| "missing value after `--backend`".to_owned())?;
+            set_backend(options, super::super::input::parse_backend(&backend)?)?;
+        }
         "-o" => set_output(options, arguments.next())?,
         "--emit" => options.emit = parse_emit_kind(arguments.next())?,
         _ if options.input.is_none() && !argument.starts_with('-') => {
@@ -125,6 +136,13 @@ fn parse_build_argument(
 fn set_profile(options: &mut BuildOptions, profile: BuildProfile) -> Result<(), String> {
     if options.profile.replace(profile).is_some() {
         return Err("duplicate or conflicting profile option".to_owned());
+    }
+    Ok(())
+}
+
+fn set_backend(options: &mut BuildOptions, backend: BackendKind) -> Result<(), String> {
+    if options.backend.replace(backend).is_some() {
+        return Err("duplicate backend option".to_owned());
     }
     Ok(())
 }

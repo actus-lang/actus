@@ -117,8 +117,108 @@ fn implementation_declarations(
         &mut declarations,
     );
     declarations.extend(local_declarations);
-    append_root_generic_support(&mut declarations, module, compilation, generic_types);
+    for declaration in &declarations {
+        if let Some(identity) = type_declaration_identity(declaration) {
+            declaration_identities.insert(identity);
+        }
+    }
+    append_generic_type_declarations(
+        compilation,
+        generic_types,
+        &mut declaration_identities,
+        &mut declarations,
+    );
     Program { file_metadata: Vec::new(), declarations }
+}
+
+fn append_generic_type_declarations(
+    compilation: &ModuleCompilationPlan,
+    generic_types: &[crate::ast::TypeName],
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    for type_name in generic_types {
+        append_generic_type_declaration(
+            compilation,
+            type_name,
+            declaration_identities,
+            declarations,
+        );
+    }
+}
+
+fn append_generic_type_declaration(
+    compilation: &ModuleCompilationPlan,
+    type_name: &crate::ast::TypeName,
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    for argument in &type_name.arguments {
+        append_generic_type_declaration(
+            compilation,
+            argument,
+            declaration_identities,
+            declarations,
+        );
+    }
+    let Some(declaration) =
+        compilation.caller().declarations.iter().find(|declaration| match declaration {
+            TopLevelDecl::Struct(definition) => definition.name == type_name.name,
+            TopLevelDecl::Enum(definition) => definition.name == type_name.name,
+            TopLevelDecl::Pack(definition) => definition.name == type_name.name,
+            _ => false,
+        })
+    else {
+        return;
+    };
+    if let Some(identity) = type_declaration_identity(declaration)
+        && declaration_identities.insert(identity)
+    {
+        let declaration = declaration.clone();
+        declarations.push(declaration.clone());
+        for dependency in declaration_type_dependencies(&declaration) {
+            append_generic_type_declaration(
+                compilation,
+                dependency,
+                declaration_identities,
+                declarations,
+            );
+        }
+    }
+}
+
+fn declaration_type_dependencies(declaration: &TopLevelDecl) -> Vec<&crate::ast::TypeName> {
+    match declaration {
+        TopLevelDecl::Struct(definition) => {
+            definition.fields.iter().map(|field| &field.ty).collect()
+        }
+        TopLevelDecl::Enum(definition) => definition
+            .variants
+            .iter()
+            .flat_map(|variant| match &variant.payload {
+                crate::ast::EnumPayload::Unit => Vec::new(),
+                crate::ast::EnumPayload::Tuple(fields) => fields.iter().collect(),
+                crate::ast::EnumPayload::Struct(fields) => {
+                    fields.iter().map(|field| &field.ty).collect()
+                }
+            })
+            .collect(),
+        TopLevelDecl::Pack(definition) => {
+            let mut dependencies = vec![definition.storage.type_name()];
+            dependencies.extend(definition.fields.iter().map(|field| &field.ty));
+            dependencies
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn type_declaration_identity(declaration: &TopLevelDecl) -> Option<(String, String)> {
+    match declaration {
+        TopLevelDecl::Struct(definition) => Some(("struct".to_owned(), definition.name.clone())),
+        TopLevelDecl::Enum(definition) => Some(("enum".to_owned(), definition.name.clone())),
+        TopLevelDecl::Pack(definition) => Some(("pack".to_owned(), definition.name.clone())),
+        _ => None,
+    }
 }
 
 fn append_imported_declarations(
@@ -160,58 +260,6 @@ fn append_imported_declarations(
             declaration_identities,
             declarations,
         );
-    }
-}
-
-fn append_root_generic_support(
-    declarations: &mut Vec<TopLevelDecl>,
-    module: &super::unit::ModuleUnit,
-    compilation: &ModuleCompilationPlan,
-    generic_types: &[crate::ast::TypeName],
-) {
-    let existing = declarations.iter().filter_map(export_identity).collect::<HashSet<_>>();
-    for declaration in &compilation.local().declarations {
-        if matches!(declaration, TopLevelDecl::Import(_) | TopLevelDecl::OpenSibling(_)) {
-            continue;
-        }
-        let Some(identity) = export_identity(declaration) else { continue };
-        if existing.contains(&identity) || matches!(declaration, TopLevelDecl::Verb(_)) {
-            continue;
-        }
-        if module.identity().module_path() != "<root>" {
-            declarations.push(declaration.clone());
-        }
-    }
-    let current = declarations.iter().filter_map(export_identity).collect::<HashSet<_>>();
-    append_imported_type_support(declarations, compilation, &current, generic_types);
-}
-
-fn append_imported_type_support(
-    declarations: &mut Vec<TopLevelDecl>,
-    compilation: &ModuleCompilationPlan,
-    existing: &HashSet<(&str, String)>,
-    generic_types: &[crate::ast::TypeName],
-) {
-    let mut identities = existing.clone();
-    let required_names =
-        generic_types.iter().map(|type_name| type_name.name.as_str()).collect::<HashSet<_>>();
-    for unit in compilation.units() {
-        for declaration in &unit.implementation().declarations {
-            let is_layout_type = matches!(
-                declaration,
-                TopLevelDecl::Struct(_) | TopLevelDecl::Pack(_) | TopLevelDecl::Enum(_)
-            );
-            if !is_layout_type {
-                continue;
-            }
-            let Some((kind, name)) = export_identity(declaration) else { continue };
-            if !unit.exports().contains(kind, &name) || !required_names.contains(name.as_str()) {
-                continue;
-            }
-            if identities.insert((kind, name)) {
-                declarations.push(declaration.clone());
-            }
-        }
     }
 }
 

@@ -84,7 +84,7 @@ impl TypeSubstitution {
     #[allow(dead_code)]
     pub(crate) fn apply(&self, type_name: &TypeName) -> TypeName {
         if let Some(argument) = self.bindings.get(&type_name.name) {
-            return Self::replace_root(argument, type_name.span);
+            return Self::replace_root(argument, type_name);
         }
         if let Some(value) = self.apply_const(&type_name.name) {
             return TypeName {
@@ -102,8 +102,13 @@ impl TypeSubstitution {
         }
     }
 
-    fn replace_root(type_name: &TypeName, span: SourceSpan) -> TypeName {
-        TypeName { span, ..type_name.clone() }
+    fn replace_root(argument: &TypeName, source: &TypeName) -> TypeName {
+        let mut substituted = argument.clone();
+        substituted.span = source.span;
+        if source.reference_role.is_some() {
+            substituted.reference_role = source.reference_role.clone();
+        }
+        substituted
     }
 }
 
@@ -150,6 +155,30 @@ mod tests {
         };
         assert_eq!(substitution.apply(&applied).arguments[0].name, "Int");
         assert_eq!(substitution.apply(&applied).arguments[1].arguments[0].name, "Int");
+    }
+
+    #[test]
+    fn preserves_reference_role_when_substituting_a_generic_root() {
+        let parameters = vec![GenericParam {
+            name: "T".to_owned(),
+            kind: crate::ast::GenericParamKind::Type,
+            bound: None,
+            bounds: Vec::new(),
+            span: ty("T").span,
+        }];
+        let substitution =
+            TypeSubstitution::for_type("Box", &parameters, &[ty("Int")], ty("Box").span)
+                .expect("arity should match");
+        let source = TypeName {
+            name: "T".to_owned(),
+            arguments: Vec::new(),
+            reference_role: Some(crate::ast::Role::Abs),
+            span: SourceSpan::new(4, 5),
+        };
+        let substituted = substitution.apply(&source);
+        assert_eq!(substituted.name, "Int");
+        assert_eq!(substituted.reference_role, Some(crate::ast::Role::Abs));
+        assert_eq!(substituted.span, source.span);
     }
 
     #[test]

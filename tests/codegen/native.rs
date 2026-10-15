@@ -1,6 +1,6 @@
 #[cfg(not(target_os = "macos"))]
-use actus::codegen::emit_program_object_for_target;
-use actus::codegen::{emit_program_object_with_configuration, emit_zero_return_object};
+use actus::codegen::cranelift::emit_program_object_for_target;
+use actus::codegen::cranelift::{emit_program_object_with_configuration, emit_zero_return_object};
 use actus::configuration::NativeBackendConfiguration;
 use actus::lexer::scan;
 use actus::parser::parse;
@@ -29,7 +29,8 @@ fn x86_64_machine_code_matches_the_return_zero_golden() {
     let (tokens, errors) = scan("verb main() -> Int { return 0; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
-    let bytes = actus::codegen::emit_program_object(&program, "main").expect("object should emit");
+    let bytes = actus::codegen::cranelift::emit_program_object(&program, "main")
+        .expect("object should emit");
     let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
     let text = file
         .sections()
@@ -149,7 +150,7 @@ fn native_backend_rejects_registered_but_unlowered_collection_types() {
     let (tokens, errors) = scan("verb main(erg items: Array) -> Int { return 0; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
-    let error = actus::codegen::emit_program_object(&program, "main")
+    let error = actus::codegen::cranelift::emit_program_object(&program, "main")
         .expect_err("unlowered collection types must be rejected");
 
     assert!(error.to_string().contains("Array"));
@@ -161,7 +162,7 @@ fn declares_external_c_functions_as_imported_symbols() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
-    let bytes = actus::codegen::emit_program_object(&program, "main")
+    let bytes = actus::codegen::cranelift::emit_program_object(&program, "main")
         .expect("external calls should emit an object");
     let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
@@ -175,7 +176,7 @@ fn emits_a_deterministic_role_vtable_data_object() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("role performance source should parse");
-    let bytes = actus::codegen::emit_program_object(&program, "main")
+    let bytes = actus::codegen::cranelift::emit_program_object(&program, "main")
         .expect("role vtable data should emit");
     let file = object::File::parse(bytes.as_slice()).expect("object format should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
@@ -193,7 +194,7 @@ fn lowers_dynamic_role_call_through_fat_pointer_abi() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("dynamic source should parse");
-    let object = actus::codegen::emit_program_object(&program, "main")
+    let object = actus::codegen::cranelift::emit_program_object(&program, "main")
         .expect("dynamic call should lower to native code");
     object::File::parse(object.as_slice()).expect("native object should parse");
 }
@@ -204,7 +205,7 @@ fn lowers_ins_parameters_without_a_wrapper_or_extra_allocation() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("ins source should parse");
-    let bytes = actus::codegen::emit_program_object(&program, "main")
+    let bytes = actus::codegen::cranelift::emit_program_object(&program, "main")
         .expect("ins parameter should use the ordinary native argument representation");
     let file = object::File::parse(bytes.as_slice()).expect("native object should parse");
     let symbols = file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
@@ -217,7 +218,7 @@ fn lowers_region_owner_cleanup_to_the_runtime_release_bridge() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("region source should parse");
-    let bytes = actus::codegen::emit_program_object_with_configuration(
+    let bytes = actus::codegen::cranelift::emit_program_object_with_configuration(
         &program,
         "main",
         &NativeBackendConfiguration::default().with_no_float_ir_verification(),
@@ -254,7 +255,7 @@ fn lowers_size_of_to_a_compile_time_integer_constant() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("size_of source should parse");
-    let bytes = actus::codegen::emit_program_object_with_configuration(
+    let bytes = actus::codegen::cranelift::emit_program_object_with_configuration(
         &program,
         "main",
         &NativeBackendConfiguration::default().with_no_float_ir_verification(),
@@ -271,7 +272,7 @@ fn lowers_align_of_to_a_compile_time_integer_constant() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("align_of source should parse");
-    let bytes = actus::codegen::emit_program_object_with_configuration(
+    let bytes = actus::codegen::cranelift::emit_program_object_with_configuration(
         &program,
         "main",
         &NativeBackendConfiguration::default().with_no_float_ir_verification(),
@@ -306,7 +307,7 @@ fn keeps_region_symbols_bounded_by_logical_capacity() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("large logical region source should parse");
-    let bytes = actus::codegen::emit_program_object_with_configuration(
+    let bytes = actus::codegen::cranelift::emit_program_object_with_configuration(
         &program,
         "main",
         &NativeBackendConfiguration::default().with_no_float_ir_verification(),
@@ -323,7 +324,7 @@ fn rejects_ins_aliasing_before_native_lowering() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty());
     let program = parse(tokens).expect("aliasing source should parse");
-    let error = actus::codegen::emit_program_object(&program, "main")
+    let error = actus::codegen::cranelift::emit_program_object(&program, "main")
         .expect_err("semantic aliasing must stop native lowering");
     assert!(error.to_string().contains("ExclusiveLoanAlias"));
 }

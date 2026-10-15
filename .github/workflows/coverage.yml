@@ -15,7 +15,32 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up LLVM 23
+        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
+        with:
+          llvm-version: 23
+
+      - name: Export LLVM build environment
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "LLVM version: $(llvm-config --version)"
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+
+      - name: Install ARM32 native link tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
+          echo "$RUST_BIN" >> "$GITHUB_PATH"
+          export PATH="$RUST_BIN:$PATH"
+          command -v clang
+          command -v arm-none-eabi-ld
 
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
@@ -24,7 +49,7 @@ jobs:
         run: cargo llvm-cov --all-targets --all-features --lcov --output-path lcov.info
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: actus-coverage
           path: lcov.info

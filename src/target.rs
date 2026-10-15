@@ -3,13 +3,18 @@ use std::str::FromStr;
 
 use serde::Deserialize;
 use target_lexicon::{
-    Architecture, BinaryFormat, CallingConvention, Endianness, Environment, OperatingSystem,
-    PointerWidth, Triple,
+    Architecture, ArmArchitecture, BinaryFormat, CallingConvention, Endianness, Environment,
+    OperatingSystem, PointerWidth, Triple,
 };
 
+mod arm;
 mod counter;
 mod provider;
 
+pub use arm::{
+    Arm32AbiContract, Arm32ArgumentLocation, Arm32RegisterWords, Arm32ReturnLocation,
+    Arm32TargetProfile, Arm32ValueRepresentation, ArmInstructionMode,
+};
 pub use counter::{CounterExtender, CounterSampleError};
 pub use provider::{
     CalibrationPolicy, ClockUnit, DiscontinuityPolicy, Initialization, InterruptSafety,
@@ -30,6 +35,49 @@ pub enum LinkerFlavor {
 pub enum EntryContract {
     Hosted,
     Freestanding,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StartupContract {
+    HostedRuntime,
+    ExplicitEntry,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RuntimeProviderContract {
+    HostedPlatform,
+    ExplicitFreestanding,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FreestandingLinkerContract {
+    pub entry_symbol_required: bool,
+    pub linker_script_required: bool,
+    pub runtime_provider: RuntimeProviderContract,
+    pub stack_alignment_bytes: u8,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RelocationModel {
+    Static,
+    PositionIndependent,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SymbolVisibility {
+    Exported,
+    Imported,
+    Hidden,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TargetArtifactContract {
+    pub object_format: BinaryFormat,
+    pub linker_flavor: LinkerFlavor,
+    pub entry_contract: EntryContract,
+    pub startup: StartupContract,
+    pub entry_visibility: SymbolVisibility,
+    pub runtime_visibility: SymbolVisibility,
 }
 
 impl LinkerFlavor {
@@ -189,6 +237,43 @@ impl TargetSpec {
         &self.triple
     }
 
+    pub const fn arm32_profile(&self) -> Option<Arm32TargetProfile> {
+        match self.architecture {
+            Architecture::Arm(ArmArchitecture::Thumbv7em)
+                if matches!(self.triple.operating_system, OperatingSystem::None_) =>
+            {
+                Some(Arm32TargetProfile::CortexMv7em)
+            }
+            _ => None,
+        }
+    }
+
+    pub const fn arm_instruction_mode(&self) -> Option<ArmInstructionMode> {
+        match self.arm32_profile() {
+            Some(_) => Some(ArmInstructionMode::Thumb2),
+            None => None,
+        }
+    }
+
+    pub const fn arm32_abi_contract(&self) -> Option<Arm32AbiContract> {
+        match self.arm32_profile() {
+            Some(Arm32TargetProfile::CortexMv7em) => Some(Arm32AbiContract::cortex_mv7em()),
+            None => None,
+        }
+    }
+
+    pub const fn freestanding_linker_contract(&self) -> Option<FreestandingLinkerContract> {
+        match self.arm32_profile() {
+            Some(Arm32TargetProfile::CortexMv7em) => Some(FreestandingLinkerContract {
+                entry_symbol_required: true,
+                linker_script_required: true,
+                runtime_provider: RuntimeProviderContract::ExplicitFreestanding,
+                stack_alignment_bytes: 8,
+            }),
+            None => None,
+        }
+    }
+
     pub fn matches_platform(&self, selector: &str) -> bool {
         match selector {
             "windows" => self.triple.operating_system == OperatingSystem::Windows,
@@ -216,6 +301,21 @@ impl TargetSpec {
             | OperatingSystem::Espidf
             | OperatingSystem::VxWorks => EntryContract::Freestanding,
             _ => EntryContract::Hosted,
+        }
+    }
+
+    pub fn artifact_contract(&self) -> TargetArtifactContract {
+        let entry_contract = self.entry_contract();
+        TargetArtifactContract {
+            object_format: self.object_format,
+            linker_flavor: self.linker_flavor,
+            entry_contract,
+            startup: match entry_contract {
+                EntryContract::Hosted => StartupContract::HostedRuntime,
+                EntryContract::Freestanding => StartupContract::ExplicitEntry,
+            },
+            entry_visibility: SymbolVisibility::Exported,
+            runtime_visibility: SymbolVisibility::Imported,
         }
     }
 
@@ -254,7 +354,7 @@ fn is_freestanding_target(triple: &Triple) -> bool {
 mod tests {
     use target_lexicon::{CallingConvention, Endianness, PointerWidth};
 
-    use super::{EntryContract, LinkerFlavor, TargetSpec};
+    use super::{EntryContract, LinkerFlavor, StartupContract, TargetSpec};
 
     #[test]
     fn derives_target_contract_fields_from_a_triple() {
@@ -266,7 +366,16 @@ mod tests {
         assert_eq!(spec.linker_flavor(), LinkerFlavor::Gnu);
         assert_eq!(spec.default_linker(), "cc");
         assert_eq!(spec.entry_contract(), EntryContract::Hosted);
+        assert_eq!(spec.artifact_contract().startup, StartupContract::HostedRuntime);
         assert_eq!(spec.triple().to_string(), "x86_64-unknown-linux-gnu");
+    }
+
+    #[test]
+    fn derives_explicit_startup_for_freestanding_targets() {
+        let spec = TargetSpec::parse("thumbv7em-none-eabihf").expect("target should parse");
+        let contract = spec.artifact_contract();
+        assert_eq!(contract.entry_contract, EntryContract::Freestanding);
+        assert_eq!(contract.startup, StartupContract::ExplicitEntry);
     }
 
     #[test]

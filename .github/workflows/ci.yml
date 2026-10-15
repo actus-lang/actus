@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up MSVC developer environment
         if: runner.os == 'Windows'
@@ -49,13 +49,190 @@ jobs:
           $vcLinkDirectory = Join-Path $vcToolset.FullName 'bin\Hostx64\x64'
           $msvcLinker = Join-Path $vcLinkDirectory 'link.exe'
           "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "ACTUS_LINKER=$msvcLinker" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $env:Path = "$vcLinkDirectory;$env:Path"
           "PATH=$env:Path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $linker = (Get-Command link.exe -ErrorAction Stop).Source
           if (-not $linker.StartsWith($vcLinkDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
             throw "MSVC linker was not selected: $linker"
           }
+
+      - name: Set up LLVM 23 (Unix)
+        if: runner.os != 'Windows'
+        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
+        with:
+          llvm-version: 23
+
+      - name: Set up LLVM 23.1.2 development archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '23.1.2'
+          $archiveName = "clang+llvm-$version-x86_64-pc-windows-msvc.tar.xz"
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/$archiveName"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $expected = '8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095'
+          $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "LLVM archive checksum mismatch: expected $expected, got $actual"
+          }
+          $installRoot = Join-Path $env:RUNNER_TEMP "llvm-$version"
+          New-Item -ItemType Directory -Force $installRoot | Out-Null
+          tar -xf $archive -C $installRoot --strip-components=1
+          $bin = Join-Path $installRoot 'bin'
+          if (-not (Test-Path (Join-Path $bin 'llvm-config.exe'))) {
+            throw "LLVM development archive does not contain llvm-config.exe"
+          }
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if ($vcpkgRoot) {
+            $vcpkgPath = Join-Path $vcpkgRoot 'vcpkg.exe'
+          } else {
+            $vcpkg = Get-Command vcpkg.exe -ErrorAction SilentlyContinue
+            if (-not $vcpkg) {
+              throw 'vcpkg is required to provide LLVM static-link dependencies'
+            }
+            $vcpkgPath = $vcpkg.Source
+            $vcpkgRoot = Split-Path $vcpkgPath -Parent
+          }
+          if (-not (Test-Path $vcpkgPath)) {
+            throw "vcpkg executable was not found: $vcpkgPath"
+          }
+          & $vcpkgPath install zlib:x64-windows-static zstd:x64-windows-static libxml2:x64-windows-static --clean-after-build
+          if ($LASTEXITCODE -ne 0) {
+            throw "vcpkg dependency installation failed with exit code $LASTEXITCODE"
+          }
+          $vcpkgLib = Join-Path $vcpkgRoot 'installed\x64-windows-static\lib'
+          if (-not (Test-Path $vcpkgLib)) {
+            throw "vcpkg static library directory was not found: $vcpkgLib"
+          }
+          $llvmDependencyLib = Join-Path $env:RUNNER_TEMP 'llvm-static-dependencies'
+          New-Item -ItemType Directory -Force $llvmDependencyLib | Out-Null
+          function Copy-StaticLibrary([string[]] $Names, [string] $Destination) {
+            $library = Get-ChildItem -Path $vcpkgLib -Filter '*.lib' |
+              Where-Object { $Names -contains $_.BaseName } |
+              Select-Object -First 1
+            if (-not $library) {
+              throw "Required static library was not found in ${vcpkgLib}: $($Names -join ', ')"
+            }
+            Copy-Item $library.FullName (Join-Path $llvmDependencyLib $Destination) -Force
+          }
+          Copy-StaticLibrary @('zlib', 'zlibstatic', 'zs') 'zs.lib'
+          Copy-StaticLibrary @('zstd_static', 'zstd') 'zstd_static.lib'
+          Copy-StaticLibrary @('libxml2s', 'libxml2', 'xml2s') 'xml2s.lib'
+          "LIB=$llvmDependencyLib;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $windowsKitLib = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Lib'
+          $windowsKitVersion = Get-ChildItem -Path $windowsKitLib -Directory |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if (-not $windowsKitVersion) {
+            throw "Windows SDK library directory was not found: $windowsKitLib"
+          }
+          $windowsSdkUm = Join-Path $windowsKitVersion.FullName 'um\x64'
+          $windowsSdkUcrt = Join-Path $windowsKitVersion.FullName 'ucrt\x64'
+          foreach ($libraryPath in @($windowsSdkUm, $windowsSdkUcrt)) {
+            if (-not (Test-Path $libraryPath)) {
+              throw "Windows SDK library path was not found: $libraryPath"
+            }
+          }
+          # The LLVM archive and its vcpkg dependencies are built with the
+          # static MSVC CRT (/MT). Keep Rust test binaries on the same CRT and
+          # expose the SDK/static dependency directories to rustc's native
+          # library lookup as well as the linker environment.
+          $rustFlags = @(
+            '-C', 'target-feature=+crt-static',
+            '-L', "native=$llvmDependencyLib",
+            '-L', "native=$windowsSdkUm",
+            '-L', "native=$windowsSdkUcrt"
+          )
+          $encodedRustFlags = $rustFlags -join [char]31
+          "CARGO_ENCODED_RUSTFLAGS=$encodedRustFlags" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $realConfig = Join-Path $bin 'llvm-config-real.exe'
+          Move-Item (Join-Path $bin 'llvm-config.exe') $realConfig
+          $wrapper = Join-Path $bin 'llvm-config.exe'
+          $wrapperSource = @"
+          using System;
+          using System.Diagnostics;
+          using System.IO;
+          using System.Linq;
+          using System.Text.RegularExpressions;
+          internal static class Program {
+            public static int Main(string[] args) {
+              var start = new ProcessStartInfo {
+                FileName = @"$realConfig",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+              };
+              start.Arguments = string.Join(" ", args.Select(arg => "\"" + arg.Replace("\"", "\\\"") + "\""));
+              using (var process = Process.Start(start)) {
+                var stdout = process.StandardOutput.ReadToEnd();
+                var stderr = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
+                  // Normalize build-machine paths while retaining every required static dependency.
+                  stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\][^/\\\s]+\.lib", match => Path.GetFileName(match.Value));
+                }
+                Console.Write(stdout);
+                Console.Error.Write(stderr);
+                return process.ExitCode;
+              }
+            }
+          }
+          "@
+          $wrapperSourcePath = Join-Path $env:RUNNER_TEMP 'llvm-config-wrapper.cs'
+          Set-Content -Path $wrapperSourcePath -Value $wrapperSource -Encoding utf8
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path $csc)) {
+            $csc = (Get-Command csc.exe -ErrorAction SilentlyContinue).Source
+          }
+          if (-not $csc) {
+            throw 'C# compiler is required to build the llvm-config wrapper'
+          }
+          & $csc /nologo /target:exe /out:$wrapper $wrapperSourcePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "llvm-config wrapper compilation failed with exit code $LASTEXITCODE"
+          }
+          "$bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "LLVM_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Export LLVM build environment (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "LLVM version: $(llvm-config --version)"
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+
+      - name: Export LLVM build environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $llvmConfig = (Get-Command llvm-config.exe -ErrorAction Stop).Source
+          $llvmPrefix = (& $llvmConfig --prefix).Trim()
+          $actusLinker = Join-Path $llvmPrefix 'bin\lld-link.exe'
+          if (-not (Test-Path $actusLinker)) {
+            throw "LLVM lld-link was not found: $actusLinker"
+          }
+          "LLVM_CONFIG_PATH=$llvmConfig" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "LLVM_SYS_231_PREFIX=$llvmPrefix" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "ACTUS_LINKER=$actusLinker" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $llvmVersion = (& $llvmConfig --version).Trim()
+          Write-Host "LLVM version: $llvmVersion"
+          Write-Host "LLVM static libraries:"
+          & $llvmConfig --libnames --link-static
+          Write-Host "LLVM static system libraries:"
+          & $llvmConfig --system-libs --link-static
+          if (-not $llvmVersion.StartsWith('23.')) { throw "LLVM 23 is required" }
+
+      - name: Install ARM32 native link tools (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -103,3 +280,106 @@ jobs:
       - name: Check standard library conformance
         shell: bash
         run: ./scripts/check_stdlib.sh
+
+  cranelift-only:
+    name: Cranelift-only feature contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check compilation without LLVM
+        run: cargo check --no-default-features --features cranelift --all-targets
+
+      - name: Run Cranelift-only tests
+        run: cargo test --no-default-features --features cranelift --all-targets -- --test-threads=1
+
+  llvm-only:
+    name: LLVM-only feature contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up LLVM 23
+        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
+        with:
+          llvm-version: 23
+
+      - name: Install ARM32 native link tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+
+      - name: Verify native link tools
+        shell: bash
+        run: |
+          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
+          echo "$RUST_BIN" >> "$GITHUB_PATH"
+          export PATH="$RUST_BIN:$PATH"
+          command -v clang
+          command -v arm-none-eabi-ld
+
+      - name: Export LLVM build environment
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+
+      - name: Verify LLVM installation
+        shell: bash
+        run: |
+          llvm-config --version
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+
+      - name: Check LLVM compiler surface
+        run: cargo check --no-default-features --features llvm --lib --bin actus
+
+      - name: Run LLVM backend integration suite
+        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
+
+  arm32-target:
+    name: ARM32 Thumb LLVM target contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up LLVM 23
+        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
+        with:
+          llvm-version: 23
+
+      - name: Install ARM32 target toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+
+      - name: Export LLVM build environment
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+
+      - name: Verify target toolchain
+        shell: bash
+        run: |
+          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
+          echo "$RUST_BIN" >> "$GITHUB_PATH"
+          export PATH="$RUST_BIN:$PATH"
+          llvm-config --version
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+          command -v clang
+          command -v arm-none-eabi-ld
+          arm-none-eabi-gcc --version
+          arm-none-eabi-objdump --version
+
+      - name: Run target contract tests
+        run: cargo test --all-features --test target -- --test-threads=1
+
+      - name: Run ARM32 LLVM object and link tests
+        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1

@@ -13,13 +13,14 @@ pub(super) fn build_settings(
     profiles: ProfilesManifest,
     environment: &CompilerConfiguration,
     directory: &Path,
-) -> (BuildProfile, NativeBackendConfiguration, Vec<LinkLibrary>, Vec<PathBuf>) {
+) -> (BuildProfile, NativeBackendConfiguration, Vec<LinkLibrary>, Vec<PathBuf>, Option<PathBuf>) {
     let profile = build.profile.unwrap_or(environment.profile);
     let verify_no_float_ir = build.verify_no_float_ir.unwrap_or(false);
     let native_backend = NativeBackendConfiguration::new(
         build.native_module.unwrap_or_else(|| environment.native_backend.module_name().to_owned()),
         build.position_independent.unwrap_or(environment.native_backend.position_independent()),
     )
+    .with_backend(build.backend.unwrap_or(environment.native_backend.backend()))
     .with_optimization_level(optimization_level(profile, profiles));
     let native_backend = if verify_no_float_ir {
         native_backend.with_no_float_ir_verification()
@@ -32,7 +33,8 @@ pub(super) fn build_settings(
         .map(|library| LinkLibrary::new(library.name, library.kind))
         .collect();
     let library_paths = build.library_paths.into_iter().map(|path| directory.join(path)).collect();
-    (profile, native_backend, libraries, library_paths)
+    let linker_script = build.linker_script.map(|path| directory.join(path));
+    (profile, native_backend, libraries, library_paths, linker_script)
 }
 
 pub(super) fn optimization_level(

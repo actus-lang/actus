@@ -1,0 +1,228 @@
+use std::collections::HashMap;
+
+use cranelift_codegen::ir::{InstBuilder, MemFlagsData};
+use cranelift_frontend::FunctionBuilder;
+
+use super::super::expressions::emit_buffer_drop;
+use super::super::native::{BackendEmitError, FunctionRef};
+use super::super::types::NativeType;
+use crate::codegen::cranelift::layout::LayoutRegistry;
+use crate::codegen::cranelift::performance::dispatch_key;
+
+pub(crate) fn emit_struct_drop(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    id: usize,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    emit_struct_drop_except(function, address, id, &[], functions, layouts)
+}
+
+fn emit_struct_drop_except(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    id: usize,
+    moved_fields: &[String],
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let layout =
+        layouts.get(id).ok_or_else(|| BackendEmitError(format!("missing drop layout `{id}`")))?;
+    validate_moved_field_paths(id, moved_fields, layouts)?;
+    for field in layout.fields.iter().rev().filter(|field| field.owned) {
+        emit_owned_field_drop(function, address, field, moved_fields, functions, layouts)?;
+    }
+    Ok(())
+}
+
+fn validate_moved_field_paths(
+    root_id: usize,
+    moved_fields: &[String],
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    for path in moved_fields {
+        layouts.cleanup_field_layout_by_id(root_id, &format!("struct-{root_id}"), path)?;
+    }
+    Ok(())
+}
+
+fn emit_owned_field_drop(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    field: &crate::codegen::cranelift::layout::FieldLayout,
+    moved_fields: &[String],
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let nested_paths = moved_field_suffixes(moved_fields, &field.name);
+    if nested_paths.iter().any(String::is_empty) {
+        return Ok(());
+    }
+    let field_address = function.ins().iadd_imm_s(address, i64::from(field.offset));
+    match field.ty {
+        NativeType::Buffer => emit_buffer_field_drop(function, field_address, functions, layouts),
+        NativeType::Region => emit_region_field_drop(function, field_address, functions, layouts),
+        NativeType::Struct(nested_id) => emit_struct_drop_except(
+            function,
+            field_address,
+            nested_id,
+            &nested_paths,
+            functions,
+            layouts,
+        ),
+        NativeType::Enum(_)
+        | NativeType::Int
+        | NativeType::Integer { .. }
+        | NativeType::Float { .. }
+        | NativeType::Void
+        | NativeType::String
+        | NativeType::Pack(_)
+        | NativeType::Array(_)
+        | NativeType::Arena(_)
+        | NativeType::FatPointer => Ok(()),
+    }
+}
+
+fn emit_buffer_field_drop(
+    function: &mut FunctionBuilder<'_>,
+    field_address: cranelift_codegen::ir::Value,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
+    let target = functions.get("actus_buffer_drop").ok_or_else(|| {
+        BackendEmitError("native runtime function `actus_buffer_drop` is unavailable".to_owned())
+    })?;
+    function.ins().call(target.reference, &[handle]);
+    Ok(())
+}
+
+fn emit_region_field_drop(
+    function: &mut FunctionBuilder<'_>,
+    field_address: cranelift_codegen::ir::Value,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let handle = function.ins().load(layouts.pointer_type, MemFlagsData::new(), field_address, 0);
+    let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
+        BackendEmitError("native runtime function `actus_region_drop` is unavailable".to_owned())
+    })?;
+    function.ins().call(target.reference, &[handle]);
+    Ok(())
+}
+
+fn moved_field_suffixes(moved_fields: &[String], field_name: &str) -> Vec<String> {
+    moved_fields
+        .iter()
+        .filter_map(|moved| {
+            moved.strip_prefix(field_name).and_then(|suffix| {
+                suffix
+                    .strip_prefix('.')
+                    .map(str::to_owned)
+                    .or_else(|| (suffix.is_empty()).then(String::new))
+            })
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn emit_partial_binding_drop(
+    function: &mut FunctionBuilder<'_>,
+    name: &str,
+    moved_fields: &[String],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let Some(NativeType::Struct(id)) =
+        types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
+    else {
+        return Ok(());
+    };
+    let address = locals
+        .iter()
+        .find(|(binding, _)| binding.as_str() == name)
+        .map(|(_, value)| *value)
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))?;
+    emit_struct_drop_except(function, address, id, moved_fields, functions, layouts)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn emit_binding_drop(
+    function: &mut FunctionBuilder<'_>,
+    name: &str,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    if types.iter().any(|(binding, ty)| binding.as_str() == name && *ty == NativeType::Buffer) {
+        return emit_buffer_drop(function, name, locals, functions);
+    }
+    let Some(binding_type) =
+        types.iter().find(|(binding, _)| binding.as_str() == name).map(|(_, ty)| *ty)
+    else {
+        return Ok(());
+    };
+    let address = binding_address(name, locals)?;
+    if binding_type == NativeType::Region {
+        let target = functions.get(&dispatch_key(NativeType::Region, "drop")).ok_or_else(|| {
+            BackendEmitError(
+                "native runtime function `actus_region_drop` is unavailable".to_owned(),
+            )
+        })?;
+        function.ins().call(target.reference, &[address]);
+        return Ok(());
+    }
+    emit_typed_binding_drop(function, address, binding_type, functions, layouts)
+}
+
+fn binding_address(
+    name: &str,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    locals
+        .iter()
+        .find(|(binding, _)| binding.as_str() == name)
+        .map(|(_, value)| *value)
+        .ok_or_else(|| BackendEmitError(format!("native binding `{name}` is unavailable")))
+}
+
+fn emit_typed_binding_drop(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    binding_type: NativeType,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    if let Some(drop_function) = functions.get(&dispatch_key(binding_type, "drop")) {
+        function.ins().call(drop_function.reference, &[address]);
+        return Ok(());
+    }
+    match binding_type {
+        NativeType::Struct(id) => emit_struct_drop(function, address, id, functions, layouts),
+        NativeType::Enum(id) if layouts.is_niche_option(id) => Ok(()),
+        NativeType::Enum(_) => emit_enum_drop(function, address, binding_type, functions, layouts),
+        _ => Ok(()),
+    }
+}
+
+fn emit_enum_drop(
+    function: &mut FunctionBuilder<'_>,
+    address: cranelift_codegen::ir::Value,
+    binding_type: NativeType,
+    functions: &HashMap<String, FunctionRef>,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let size = layouts
+        .type_size(binding_type)
+        .ok_or_else(|| BackendEmitError("missing enum drop layout".to_owned()))?;
+    let target = functions
+        .get("actus_enum_drop")
+        .ok_or_else(|| BackendEmitError("native enum drop is unavailable".to_owned()))?;
+    let size = function.ins().iconst(layouts.pointer_type, i64::from(size));
+    function.ins().call(target.reference, &[address, size]);
+    Ok(())
+}

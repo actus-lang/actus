@@ -37,6 +37,77 @@ fn sensor_telemetry_example_builds_and_executes() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn file_utility_example_builds_with_llvm() {
+    let root = std::env::temp_dir().join(format!("actus-file-utility-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create file utility working directory");
+    let output = root.join("file-utility-llvm");
+    let source =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/file_utility.act");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--backend", "llvm"])
+        .arg(&source)
+        .args(["--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&root)
+        .output()
+        .expect("build file utility example with LLVM");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    fs::remove_dir_all(root).expect("remove LLVM file utility working directory");
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn file_utility_example_builds_with_cranelift() {
+    let root = std::env::temp_dir().join(format!("actus-file-utility-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create file utility working directory");
+    let output = root.join("file-utility-cranelift");
+    let source =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/file_utility.act");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--backend", "cranelift"])
+        .arg(&source)
+        .args(["--emit", "exe", "-o"])
+        .arg(&output)
+        .current_dir(&root)
+        .output()
+        .expect("build file utility example with Cranelift");
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    fs::remove_dir_all(root).expect("remove Cranelift file utility working directory");
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn sensor_telemetry_example_builds_and_executes_with_llvm() {
+    let source = format!("{}/examples/sensor_telemetry.act", env!("CARGO_MANIFEST_DIR"));
+    let output_path =
+        std::env::temp_dir().join(format!("actus-sensor-llvm-{}.bin", std::process::id()));
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            &source,
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output_path.to_str().expect("sensor output path should be valid UTF-8"),
+        ])
+        .output()
+        .expect("LLVM sensor build should start");
+    assert!(
+        result.status.success(),
+        "LLVM sensor build failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let status = std::process::Command::new(&output_path)
+        .status()
+        .expect("run LLVM sensor telemetry example");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(output_path);
+}
+
 #[cfg(unix)]
 #[test]
 fn hardware_register_example_builds_and_executes() {
@@ -82,6 +153,84 @@ fn arena_tree_example_builds_and_executes() {
     assert_eq!(result, 0);
     let status = std::process::Command::new(&output).status().expect("run arena tree example");
     assert_eq!(status.code(), Some(60));
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn arena_tree_example_builds_and_executes_with_llvm() {
+    let root =
+        std::env::temp_dir().join(format!("actus-arena-tree-llvm-example-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/arena_tree.act", env!("CARGO_MANIFEST_DIR"));
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            &source,
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("LLVM arena output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("LLVM arena tree build should start");
+    assert_eq!(result.code(), Some(0));
+    let status = std::process::Command::new(&output).status().expect("run LLVM arena tree example");
+    assert_eq!(status.code(), Some(60));
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
+fn generics_showcase_builds_and_executes_with_cranelift() {
+    let root = std::env::temp_dir().join(format!("actus-generics-example-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/generics_showcase.act", env!("CARGO_MANIFEST_DIR"));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source,
+            "--backend".to_owned(),
+            "cranelift".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status =
+        std::process::Command::new(&output).status().expect("run Cranelift generics example");
+    assert_eq!(status.code(), Some(123));
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn generics_showcase_builds_and_executes_with_llvm() {
+    let root =
+        std::env::temp_dir().join(format!("actus-generics-llvm-example-{}", std::process::id()));
+    let output = root.with_extension("bin");
+    let source = format!("{}/examples/generics_showcase.act", env!("CARGO_MANIFEST_DIR"));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source,
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output).status().expect("run LLVM generics example");
+    assert_eq!(status.code(), Some(123));
     let _ = fs::remove_file(output);
 }
 
@@ -312,6 +461,26 @@ fn phase23_capability_package_passes_strict_test_native_and_object_acceptance() 
 
     let _ = std::fs::remove_file(binary);
     let _ = std::fs::remove_file(object);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn phase23_capability_package_runs_through_llvm() {
+    let root =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/phase23_capability");
+    let binary =
+        std::env::temp_dir().join(format!("actus-phase23-llvm-{}.bin", std::process::id()));
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--backend", "llvm", "--emit", "exe", "-o"])
+        .arg(&binary)
+        .current_dir(&root)
+        .output()
+        .expect("build Phase 23 LLVM executable");
+    assert!(build.status.success(), "LLVM build failed: {:?}", build);
+    let execution =
+        std::process::Command::new(&binary).output().expect("run Phase 23 LLVM executable");
+    assert_eq!(execution.status.code(), Some(42));
+    let _ = std::fs::remove_file(binary);
 }
 
 #[cfg(unix)]

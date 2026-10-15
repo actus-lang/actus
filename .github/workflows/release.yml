@@ -5,37 +5,302 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
-  release:
-    name: Create GitHub release
-    runs-on: ubuntu-latest
+  build-artifact:
+    name: Build release artifact (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+
+      - name: Set up LLVM 23 (Unix)
+        if: runner.os != 'Windows'
+        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
+        with:
+          llvm-version: 23
+
+      - name: Set up LLVM 23.1.2 development archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '23.1.2'
+          $archiveName = "clang+llvm-$version-x86_64-pc-windows-msvc.tar.xz"
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/$archiveName"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $expected = '8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095'
+          $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "LLVM archive checksum mismatch: expected $expected, got $actual"
+          }
+          $installRoot = Join-Path $env:RUNNER_TEMP "llvm-$version"
+          New-Item -ItemType Directory -Force $installRoot | Out-Null
+          tar -xf $archive -C $installRoot --strip-components=1
+          $bin = Join-Path $installRoot 'bin'
+          if (-not (Test-Path (Join-Path $bin 'llvm-config.exe'))) {
+            throw "LLVM development archive does not contain llvm-config.exe"
+          }
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if ($vcpkgRoot) {
+            $vcpkgPath = Join-Path $vcpkgRoot 'vcpkg.exe'
+          } else {
+            $vcpkg = Get-Command vcpkg.exe -ErrorAction SilentlyContinue
+            if (-not $vcpkg) {
+              throw 'vcpkg is required to provide LLVM static-link dependencies'
+            }
+            $vcpkgPath = $vcpkg.Source
+            $vcpkgRoot = Split-Path $vcpkgPath -Parent
+          }
+          if (-not (Test-Path $vcpkgPath)) {
+            throw "vcpkg executable was not found: $vcpkgPath"
+          }
+          & $vcpkgPath install zlib:x64-windows-static zstd:x64-windows-static libxml2:x64-windows-static --clean-after-build
+          if ($LASTEXITCODE -ne 0) {
+            throw "vcpkg dependency installation failed with exit code $LASTEXITCODE"
+          }
+          $vcpkgLib = Join-Path $vcpkgRoot 'installed\x64-windows-static\lib'
+          if (-not (Test-Path $vcpkgLib)) {
+            throw "vcpkg static library directory was not found: $vcpkgLib"
+          }
+          $llvmDependencyLib = Join-Path $env:RUNNER_TEMP 'llvm-static-dependencies'
+          New-Item -ItemType Directory -Force $llvmDependencyLib | Out-Null
+          function Copy-StaticLibrary([string[]] $Names, [string] $Destination) {
+            $library = Get-ChildItem -Path $vcpkgLib -Filter '*.lib' |
+              Where-Object { $Names -contains $_.BaseName } |
+              Select-Object -First 1
+            if (-not $library) {
+              throw "Required static library was not found in ${vcpkgLib}: $($Names -join ', ')"
+            }
+            Copy-Item $library.FullName (Join-Path $llvmDependencyLib $Destination) -Force
+          }
+          Copy-StaticLibrary @('zlib', 'zlibstatic', 'zs') 'zs.lib'
+          Copy-StaticLibrary @('zstd_static', 'zstd') 'zstd_static.lib'
+          Copy-StaticLibrary @('libxml2s', 'libxml2', 'xml2s') 'xml2s.lib'
+          "LIB=$llvmDependencyLib;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $realConfig = Join-Path $bin 'llvm-config-real.exe'
+          Move-Item (Join-Path $bin 'llvm-config.exe') $realConfig
+          $wrapper = Join-Path $bin 'llvm-config.exe'
+          $wrapperSource = @"
+          using System;
+          using System.Diagnostics;
+          using System.IO;
+          using System.Linq;
+          using System.Text.RegularExpressions;
+          internal static class Program {
+            public static int Main(string[] args) {
+              var start = new ProcessStartInfo {
+                FileName = @"$realConfig",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+              };
+              start.Arguments = string.Join(" ", args.Select(arg => "\"" + arg.Replace("\"", "\\\"") + "\""));
+              using (var process = Process.Start(start)) {
+                var stdout = process.StandardOutput.ReadToEnd();
+                var stderr = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
+                  // Normalize build-machine paths while retaining every required static dependency.
+                  stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\][^/\\\s]+\.lib", match => Path.GetFileName(match.Value));
+                }
+                Console.Write(stdout);
+                Console.Error.Write(stderr);
+                return process.ExitCode;
+              }
+            }
+          }
+          "@
+          $wrapperSourcePath = Join-Path $env:RUNNER_TEMP 'llvm-config-wrapper.cs'
+          Set-Content -Path $wrapperSourcePath -Value $wrapperSource -Encoding utf8
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path $csc)) {
+            $csc = (Get-Command csc.exe -ErrorAction SilentlyContinue).Source
+          }
+          if (-not $csc) {
+            throw 'C# compiler is required to build the llvm-config wrapper'
+          }
+          & $csc /nologo /target:exe /out:$wrapper $wrapperSourcePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "llvm-config wrapper compilation failed with exit code $LASTEXITCODE"
+          }
+          "$bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "LLVM_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Export LLVM build environment (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          LLVM_CONFIG_PATH="$(command -v llvm-config)"
+          LLVM_PREFIX="$(llvm-config --prefix)"
+          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
+          echo "LLVM version: $(llvm-config --version)"
+          test "$(llvm-config --version | cut -d. -f1)" = "23"
+
+      - name: Export LLVM build environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $llvmConfig = (Get-Command llvm-config.exe -ErrorAction Stop).Source
+          $llvmPrefix = (& $llvmConfig --prefix).Trim()
+          "LLVM_CONFIG_PATH=$llvmConfig" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "LLVM_SYS_231_PREFIX=$llvmPrefix" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $llvmVersion = (& $llvmConfig --version).Trim()
+          Write-Host "LLVM version: $llvmVersion"
+          if (-not $llvmVersion.StartsWith('23.')) { throw "LLVM 23 is required" }
+
+      - name: Build compiler with both backends
+        run: cargo build --release --locked --all-features --bin actus
+
+      - name: Verify both backend features are present
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          test -x target/release/actus
+          cargo tree --locked --features llvm,cranelift | grep -E 'llvm-sys|cranelift-codegen'
+
+      - name: Verify both backend features are present (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path target/release/actus.exe)) { throw 'release binary missing' }
+          cargo tree --locked --features llvm,cranelift | Select-String 'llvm-sys|cranelift-codegen'
+
+      - name: Package Unix artifact
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install --yes patchelf
+          fi
+          name="actus-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          stage="release/${name}"
+          mkdir -p "${stage}/bin" "${stage}/lib"
+          cp target/release/actus "${stage}/bin/actus"
+          cp README.md LICENSE-APACHE LICENSE-MIT "${stage}/"
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            llvm_library="$(ldd target/release/actus | awk '/libLLVM-23|libLLVM.so.23/{print $3; exit}')"
+            test -n "${llvm_library}"
+            cp -L "${llvm_library}" "${stage}/lib/"
+            patchelf --set-rpath '$ORIGIN/../lib' "${stage}/bin/actus"
+          else
+            llvm_library="$(otool -L target/release/actus | awk '/libLLVM/{print $1; exit}')"
+            test -n "${llvm_library}"
+            cp -L "${llvm_library}" "${stage}/lib/"
+            install_name_tool -add_rpath '@loader_path/../lib' "${stage}/bin/actus"
+          fi
+          tar -C release -czf "release/${name}.tar.gz" "${name}"
+          sha256sum "release/${name}.tar.gz" > "release/${name}.tar.gz.sha256"
+
+      - name: Package Windows artifact
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "actus-$env:GITHUB_REF_NAME-${{ matrix.target }}"
+          $stage = "release/$name"
+          New-Item -ItemType Directory -Force "$stage/bin" | Out-Null
+          Copy-Item target/release/actus.exe "$stage/bin/actus.exe"
+          Copy-Item README.md,LICENSE-APACHE,LICENSE-MIT $stage
+          $llvmPrefix = (& llvm-config.exe --prefix).Trim()
+          $llvmDlls = Get-ChildItem "$llvmPrefix/bin" -Filter '*.dll'
+          if (-not $llvmDlls) { throw 'LLVM runtime DLLs were not found' }
+          Copy-Item $llvmDlls.FullName "$stage/bin/"
+          Compress-Archive -Path $stage -DestinationPath "release/$name.zip"
+          (Get-FileHash "release/$name.zip" -Algorithm SHA256).Hash.ToLower() + "  $name.zip" | Out-File "release/$name.zip.sha256" -Encoding ascii
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: actus-${{ matrix.target }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: build-artifact
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-
-      - name: Install git-cliff
-        uses: taiki-e/install-action@v2
-        with:
-          tool: git-cliff@2.13.0
 
       - name: Verify tag points to main history
         run: git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
 
-      - name: Generate versioned changelog
+      - name: Install git-cliff
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2
+        with:
+          tool: git-cliff@2.13.0
+
+      - name: Generate release notes
         run: |
           mkdir -p docs/changelog
-          git cliff --current --output "docs/changelog/${GITHUB_REF_NAME}.md" --tag "${GITHUB_REF_NAME}"
+          git cliff --current --tag-pattern '^v' --output "docs/changelog/${GITHUB_REF_NAME}.md" --tag "${GITHUB_REF_NAME}"
+          test -s "docs/changelog/${GITHUB_REF_NAME}.md"
+          grep -q '^-' "docs/changelog/${GITHUB_REF_NAME}.md"
+          cat >> "docs/changelog/${GITHUB_REF_NAME}.md" <<'EOF'
+
+          ## Installation
+
+          The release compiler includes both the Cranelift and LLVM backends.
+          The platform bundle also includes the LLVM runtime required by the
+          LLVM backend.
+
+          ### Linux and macOS
+
+          Download and inspect the installer, then run it:
+
+          ```sh
+          curl --fail --location --remote-name "https://github.com/__REPOSITORY__/releases/download/__VERSION__/actus-install.sh"
+          sh actus-install.sh
+          ```
+
+          ### Windows PowerShell
+
+          Download and inspect the installer, then run it:
+
+          ```powershell
+          Invoke-WebRequest "https://github.com/__REPOSITORY__/releases/download/__VERSION__/actus-install.ps1" -OutFile actus-install.ps1
+          powershell -ExecutionPolicy Bypass -File ./actus-install.ps1
+          ```
+
+          The installers verify the downloaded archive checksum before
+          installation. Manual platform archives and their SHA-256 files are
+          attached below for reproducible or offline installation.
+          EOF
+          sed -i \
+            -e "s|__REPOSITORY__|${GITHUB_REPOSITORY}|g" \
+            -e "s|__VERSION__|${GITHUB_REF_NAME}|g" \
+            "docs/changelog/${GITHUB_REF_NAME}.md"
           bash scripts/update_changelog_index.sh
 
       - name: Open changelog pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           branch: "automation/changelog-${{ github.ref_name }}"
           delete-branch: true
@@ -43,12 +308,35 @@ jobs:
           title: "docs(release): add ${{ github.ref_name }} changelog"
           body: |
             ## Summary
-            - add the generated changelog for `${{ github.ref_name }}`
-            - update the root changelog index
+            - add the generated changelog and installation instructions for `${{ github.ref_name }}`
+            - preserve the release evidence in `docs/changelog/`
 
             This pull request was created automatically from the release tag.
 
-      - name: Create GitHub release
+      - name: Download platform artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: actus-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Prepare platform installers
+        shell: bash
+        run: |
+          sed \
+            -e "s|__ACTUS_REPOSITORY__|${GITHUB_REPOSITORY}|g" \
+            -e "s|__ACTUS_VERSION__|${GITHUB_REF_NAME}|g" \
+            scripts/release/install.sh > release-assets/actus-install.sh
+          sed \
+            -e "s|__ACTUS_REPOSITORY__|${GITHUB_REPOSITORY}|g" \
+            -e "s|__ACTUS_VERSION__|${GITHUB_REF_NAME}|g" \
+            scripts/release/install.ps1 > release-assets/actus-install.ps1
+          chmod +x release-assets/actus-install.sh
+
+      - name: Create GitHub release with installers
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --title "Actus ${GITHUB_REF_NAME}" --notes-file "docs/changelog/${GITHUB_REF_NAME}.md"
+        run: |
+          gh release create "${GITHUB_REF_NAME}" release-assets/* \
+            --title "Actus ${GITHUB_REF_NAME}" \
+            --notes-file "docs/changelog/${GITHUB_REF_NAME}.md"

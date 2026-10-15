@@ -41,6 +41,8 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
         TargetSpec::parse("x86_64-pc-windows-msvc").expect("MSVC target should parse");
     let windows_gnu =
         TargetSpec::parse("x86_64-pc-windows-gnu").expect("GNU Windows target should parse");
+    let aarch64 =
+        TargetSpec::parse("aarch64-unknown-linux-gnu").expect("AArch64 target should parse");
     let freestanding =
         TargetSpec::parse("x86_64-unknown-none").expect("freestanding target should parse");
     let embedded =
@@ -50,6 +52,8 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
     assert_eq!(macos.linker_flavor(), actus::target::LinkerFlavor::Apple);
     assert_eq!(windows_msvc.linker_flavor(), actus::target::LinkerFlavor::Msvc);
     assert_eq!(windows_gnu.linker_flavor(), actus::target::LinkerFlavor::Gnu);
+    assert_eq!(aarch64.pointer_width, target_lexicon::PointerWidth::U64);
+    assert_eq!(aarch64.entry_contract(), actus::target::EntryContract::Hosted);
     assert_eq!(freestanding.entry_contract(), actus::target::EntryContract::Freestanding);
     assert_eq!(embedded.entry_contract(), actus::target::EntryContract::Freestanding);
     assert!(linux.matches_platform("unix"));
@@ -57,6 +61,93 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
     assert!(windows_msvc.matches_platform("windows"));
     assert!(windows_gnu.matches_platform("windows"));
     assert!(!freestanding.matches_platform("unix"));
+}
+
+#[test]
+fn arm32_target_profile_declares_the_supported_thumb_mode() {
+    let embedded =
+        TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
+    assert_eq!(embedded.arm32_profile(), Some(actus::target::Arm32TargetProfile::CortexMv7em));
+    assert_eq!(embedded.arm_instruction_mode(), Some(actus::target::ArmInstructionMode::Thumb2));
+    let abi = embedded.arm32_abi_contract().expect("ARM ABI should be defined");
+    assert_eq!(abi.word_bytes, 4);
+    assert_eq!(abi.pointer_width_bits, 32);
+    assert_eq!(abi.stack_alignment_bytes, 8);
+    assert_eq!(abi.argument_registers, [0, 1, 2, 3]);
+    assert_eq!(abi.return_registers, [0, 1]);
+    assert_eq!(abi.callee_saved_registers, [4, 5, 6, 7, 8, 9, 10, 11]);
+    assert_eq!(
+        actus::target::Arm32AbiContract::scalar_word_representation(),
+        actus::target::Arm32ValueRepresentation {
+            size_bytes: 4,
+            alignment_bytes: 4,
+            argument: actus::target::Arm32ArgumentLocation::CoreRegisters(
+                actus::target::Arm32RegisterWords { first_register: 0, word_count: 1 },
+            ),
+            return_value: actus::target::Arm32ReturnLocation::CoreRegisters(
+                actus::target::Arm32RegisterWords { first_register: 0, word_count: 1 },
+            ),
+        }
+    );
+    assert_eq!(
+        actus::target::Arm32AbiContract::aggregate_stack_representation(12, 4, 16),
+        actus::target::Arm32ValueRepresentation {
+            size_bytes: 12,
+            alignment_bytes: 4,
+            argument: actus::target::Arm32ArgumentLocation::Stack {
+                byte_offset: 16,
+                byte_size: 12,
+                alignment_bytes: 4,
+            },
+            return_value: actus::target::Arm32ReturnLocation::IndirectCoreRegister {
+                address_register: 0,
+            },
+        }
+    );
+
+    let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("host target should parse");
+    assert_eq!(hosted.arm32_profile(), None);
+    assert_eq!(hosted.arm_instruction_mode(), None);
+    assert_eq!(hosted.arm32_abi_contract(), None);
+}
+
+#[test]
+fn arm32_freestanding_contract_requires_explicit_startup_dependencies() {
+    let embedded =
+        TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
+    assert_eq!(
+        embedded.freestanding_linker_contract(),
+        Some(actus::target::FreestandingLinkerContract {
+            entry_symbol_required: true,
+            linker_script_required: true,
+            runtime_provider: actus::target::RuntimeProviderContract::ExplicitFreestanding,
+            stack_alignment_bytes: 8,
+        })
+    );
+
+    let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("host target should parse");
+    assert_eq!(hosted.freestanding_linker_contract(), None);
+}
+
+#[test]
+fn artifact_contract_records_startup_and_linker_requirements() {
+    let hosted = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
+    let freestanding = TargetSpec::parse("thumbv7em-none-eabihf").expect("target should parse");
+
+    assert_eq!(hosted.artifact_contract().startup, actus::target::StartupContract::HostedRuntime);
+    assert_eq!(
+        freestanding.artifact_contract().startup,
+        actus::target::StartupContract::ExplicitEntry
+    );
+    assert_eq!(hosted.artifact_contract().linker_flavor, actus::target::LinkerFlavor::Gnu);
+    assert_eq!(
+        hosted.artifact_contract().entry_visibility,
+        actus::target::SymbolVisibility::Exported
+    );
+    assert_eq!(
+        hosted.artifact_contract().runtime_visibility,
+        actus::target::SymbolVisibility::Imported
+    );
 }
 
 #[test]

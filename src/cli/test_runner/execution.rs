@@ -88,7 +88,7 @@ fn run_test(
     let plan = test_compilation_plan(test, configuration)?;
     let objects = crate::cli::build::emit_objects(&plan, "main", configuration)
         .map_err(|error| error.to_string())?;
-    let mut paths = TestArtifactPaths::new(index);
+    let mut paths = TestArtifactPaths::new(index)?;
     let result = paths
         .write_objects(&objects)
         .and_then(|()| {
@@ -97,7 +97,7 @@ fn run_test(
             link_objects(&references, &paths.executable, configuration)
                 .map_err(|error| error.to_string())
         })
-        .and_then(|()| run_test_process(&paths.executable));
+        .and_then(|()| run_test_process(&paths.executable, &paths.working_directory));
     match (result, paths.cleanup()) {
         (Ok(process), Ok(())) => Ok(process),
         (Err(error), Ok(())) => Err(error),
@@ -162,12 +162,15 @@ fn test_program(source_program: &crate::ast::Program, test_name: &str) -> crate:
 struct TestArtifactPaths {
     objects: Vec<std::path::PathBuf>,
     executable: std::path::PathBuf,
+    working_directory: std::path::PathBuf,
 }
 
 impl TestArtifactPaths {
-    fn new(index: usize) -> Self {
+    fn new(index: usize) -> Result<Self, String> {
         let root = std::env::temp_dir().join(format!("actus-test-{}-{index}", std::process::id()));
-        Self { objects: Vec::new(), executable: root.with_extension("bin") }
+        fs::create_dir_all(&root)
+            .map_err(|error| format!("cannot create test working directory: {error}"))?;
+        Ok(Self { objects: Vec::new(), executable: root.join("test.bin"), working_directory: root })
     }
 
     fn write_objects(
@@ -199,7 +202,13 @@ impl TestArtifactPaths {
         for object in &self.objects {
             remove_artifact(object)?;
         }
-        remove_artifact(&self.executable)
+        remove_artifact(&self.executable)?;
+        fs::remove_dir_all(&self.working_directory).map_err(|error| {
+            format!(
+                "cannot clean up test working directory `{}`: {error}",
+                self.working_directory.display()
+            )
+        })
     }
 }
 

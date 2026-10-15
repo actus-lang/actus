@@ -96,6 +96,12 @@ pub struct GenericInstance {
     pub call_span: SourceSpan,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExplicitDrop {
+    pub binding_index: usize,
+    pub span: SourceSpan,
+}
+
 impl GenericInstance {
     pub fn identity(&self) -> TypeIdentity {
         TypeIdentity::from_type_name(&TypeName {
@@ -181,6 +187,7 @@ pub struct SemanticModel {
     pub expression_origins: Vec<OriginRecord>,
     pub argument_roles: Vec<ArgumentRoleFact>,
     pub cleanup_plans: Vec<super::cleanup::ScopeCleanup>,
+    pub explicit_drops: Vec<ExplicitDrop>,
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
     pub generic_instances: Vec<GenericInstance>,

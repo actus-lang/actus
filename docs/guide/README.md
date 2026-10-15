@@ -49,8 +49,9 @@ test, format, and build a project.
 3. [Constants](language/constants.md)
 4. [Regions](library/region/README.md)
 5. [Native builds](compiler/native-builds.md)
-6. [Wire](library/wire/README.md)
-7. [Benchmarks](workflow/benchmarks.md)
+6. [Backends and support matrix](compiler/backends-and-support.md)
+7. [Wire](library/wire/README.md)
+8. [Benchmarks](workflow/benchmarks.md)
 
 ### Building a project
 
@@ -61,7 +62,8 @@ test, format, and build a project.
 5. [Targets and profiles](compiler/targets-and-profiles.md)
 6. [Check, test, and build](workflow/check-test-and-build.md)
 7. [Native builds](compiler/native-builds.md)
-8. [Diagnostics](compiler/diagnostics.md)
+8. [Backends and support matrix](compiler/backends-and-support.md)
+9. [Diagnostics](compiler/diagnostics.md)
 
 ### Using the standard library
 

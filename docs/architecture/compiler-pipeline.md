@@ -42,6 +42,14 @@ private verbs are omitted. Generic verbs are specialized before declaration and
 lowering, so each concrete instance has a deterministic symbol identity that
 is preserved across root-to-module linker bindings.
 
+The LLVM and Cranelift implementations consume the same backend-neutral
+lowering contract. Backend-specific object emission remains inside
+`src/codegen/llvm/` and `src/codegen/cranelift/`; CLI build orchestration stays
+inside `src/cli/build/`. Root reachability is enforced by the selected backend
+before object emission. Hosted parity is validated by exit status; freestanding
+parity is validated by entry exports and referenced runtime bridge relocations,
+not by eager unused declarations.
+
 ## Canonical generic identity
 
 The semantic, facade, cache, layout, and native dependency stages share the

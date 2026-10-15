@@ -1,0 +1,162 @@
+use cranelift_codegen::ir::InstBuilder;
+use cranelift_frontend::FunctionBuilder;
+
+use super::super::native::BackendEmitError;
+use super::super::types::NativeType;
+use crate::codegen::cranelift::layout::LayoutRegistry;
+use crate::codegen::cranelift::structs::copy_bytes;
+
+pub(super) fn emit_flow(
+    function: &mut FunctionBuilder<'_>,
+    return_type: Option<NativeType>,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    flow: crate::codegen::cranelift::lowering::Flow,
+    layouts: &LayoutRegistry,
+    force_void_entry_return: bool,
+) -> Result<(), BackendEmitError> {
+    match flow {
+        crate::codegen::cranelift::lowering::Flow::Return(result, _) => {
+            emit_value_return(function, return_type, return_slot, result, layouts)
+        }
+        crate::codegen::cranelift::lowering::Flow::Fallthrough => {
+            emit_fallthrough(function, return_type, return_slot, force_void_entry_return)
+        }
+        crate::codegen::cranelift::lowering::Flow::VoidReturn => {
+            emit_void_return(function, return_type, return_slot, force_void_entry_return)
+        }
+        crate::codegen::cranelift::lowering::Flow::Break
+        | crate::codegen::cranelift::lowering::Flow::Continue => {
+            Err(BackendEmitError("loop control escaped its loop during native lowering".to_owned()))
+        }
+    }
+}
+
+pub(crate) fn emit_value_return(
+    function: &mut FunctionBuilder<'_>,
+    return_type: Option<NativeType>,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    result: cranelift_codegen::ir::Value,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    match (return_type, return_slot) {
+        (Some(return_type), Some(destination))
+            if layouts.uses_return_slot(return_type)
+                && !layouts.returns_borrowed_view(return_type) =>
+        {
+            emit_sret_return(function, result, destination, return_type, layouts)
+        }
+        (Some(return_type), Some(destination)) if layouts.returns_borrowed_view(return_type) => {
+            emit_borrowed_slot_return(function, destination, result, return_type, layouts)
+        }
+        (Some(NativeType::Void), _) => {
+            Err(BackendEmitError("Void native function returned a value".to_owned()))
+        }
+        (Some(_), None) => {
+            function.ins().return_(&[result]);
+            Ok(())
+        }
+        (None, _) => Err(BackendEmitError("void native function returned a value".to_owned())),
+        _ => Err(BackendEmitError("invalid native return ABI state".to_owned())),
+    }
+}
+
+fn emit_sret_return(
+    function: &mut FunctionBuilder<'_>,
+    result: cranelift_codegen::ir::Value,
+    destination: cranelift_codegen::ir::Value,
+    return_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let size = layouts
+        .type_size(return_type)
+        .ok_or_else(|| BackendEmitError("missing sret return layout".to_owned()))?;
+    copy_bytes(function, result, destination, size, layouts)?;
+    function.ins().return_(&[]);
+    Ok(())
+}
+
+fn emit_borrowed_slot_return(
+    function: &mut FunctionBuilder<'_>,
+    destination: cranelift_codegen::ir::Value,
+    result: cranelift_codegen::ir::Value,
+    return_type: NativeType,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let size = layouts
+        .return_slot_size(return_type)
+        .ok_or_else(|| BackendEmitError("missing borrowed view return layout".to_owned()))?;
+    emit_borrowed_view_return(function, destination, result, size, layouts)?;
+    Ok(())
+}
+
+fn emit_fallthrough(
+    function: &mut FunctionBuilder<'_>,
+    return_type: Option<NativeType>,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    force_void_entry_return: bool,
+) -> Result<(), BackendEmitError> {
+    if force_void_entry_return {
+        let result = function.ins().iconst(cranelift_codegen::ir::types::I32, 0);
+        function.ins().return_(&[result]);
+        return Ok(());
+    }
+    match (return_type, return_slot) {
+        (None, None) | (Some(NativeType::Void), None) => {
+            function.ins().return_(&[]);
+            Ok(())
+        }
+        (Some(_), None) => {
+            Err(BackendEmitError("native function requires a return value".to_owned()))
+        }
+        _ => Err(BackendEmitError("invalid native return ABI state".to_owned())),
+    }
+}
+
+fn emit_void_return(
+    function: &mut FunctionBuilder<'_>,
+    return_type: Option<NativeType>,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    force_void_entry_return: bool,
+) -> Result<(), BackendEmitError> {
+    if force_void_entry_return {
+        let result = function.ins().iconst(cranelift_codegen::ir::types::I32, 0);
+        function.ins().return_(&[result]);
+        return Ok(());
+    }
+    match (return_type, return_slot) {
+        (None, None) | (Some(NativeType::Void), None) => {
+            function.ins().return_(&[]);
+            Ok(())
+        }
+        _ => Err(BackendEmitError("invalid native return ABI state".to_owned())),
+    }
+}
+
+fn emit_borrowed_view_return(
+    function: &mut FunctionBuilder<'_>,
+    destination: cranelift_codegen::ir::Value,
+    result: cranelift_codegen::ir::Value,
+    size: u32,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    let some = function.create_block();
+    let none = function.create_block();
+    let merge = function.create_block();
+    let pointer_type = function.func.dfg.value_type(destination);
+    function.append_block_param(merge, pointer_type);
+    function.ins().brif(result, some, &[], none, &[]);
+    function.switch_to_block(some);
+    crate::codegen::cranelift::structs::copy_bytes(function, result, destination, size, layouts)?;
+    let some_argument = cranelift_codegen::ir::BlockArg::Value(destination);
+    function.ins().jump(merge, [&some_argument]);
+    function.seal_block(some);
+    function.switch_to_block(none);
+    let none_argument = cranelift_codegen::ir::BlockArg::Value(result);
+    function.ins().jump(merge, [&none_argument]);
+    function.seal_block(none);
+    function.switch_to_block(merge);
+    let returned = function.block_params(merge)[0];
+    function.ins().return_(&[returned]);
+    function.seal_block(merge);
+    Ok(())
+}

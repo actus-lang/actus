@@ -1,4 +1,4 @@
-use actus::codegen::emit_program_object;
+use actus::codegen::cranelift::emit_program_object;
 use actus::lexer::scan;
 use actus::parser::parse;
 

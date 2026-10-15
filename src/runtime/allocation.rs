@@ -27,6 +27,29 @@ pub unsafe extern "C" fn actus_enum_drop(pointer: *mut u8, size: usize) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn actus_aggregate_allocate(size: usize, alignment: usize) -> *mut u8 {
+    let Ok(layout) = std::alloc::Layout::from_size_align(size, alignment) else {
+        return std::ptr::null_mut();
+    };
+    unsafe { std::alloc::alloc_zeroed(layout) }
+}
+
+/// Releases storage returned by [`actus_aggregate_allocate`].
+///
+/// # Safety
+///
+/// `pointer` must be null or a live allocation returned by
+/// [`actus_aggregate_allocate`] with the same `size` and `alignment`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_aggregate_drop(pointer: *mut u8, size: usize, alignment: usize) {
+    if pointer.is_null() {
+        return;
+    }
+    let Ok(layout) = std::alloc::Layout::from_size_align(size, alignment) else { return };
+    unsafe { std::alloc::dealloc(pointer, layout) };
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn actus_buffer_allocate(length: usize) -> BufferHandle {
     let mut data = Vec::<u8>::new();
     if data.try_reserve_exact(length).is_err() {

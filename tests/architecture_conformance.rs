@@ -89,6 +89,26 @@ fn assert_layer_excludes(directory: &str, forbidden: &[&str]) {
     }
 }
 
+fn assert_shared_codegen_excludes_backend_crates() {
+    let root = repository_path("src/codegen");
+    for path in rust_sources(&root) {
+        if path
+            .strip_prefix(&root)
+            .expect("codegen path should be below codegen root")
+            .components()
+            .any(|component| component.as_os_str() == "cranelift")
+        {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("codegen source should be readable");
+        for token in
+            ["cranelift_codegen", "cranelift_frontend", "cranelift_module", "cranelift_object"]
+        {
+            assert!(!source.contains(token), "{} imports backend crate `{token}`", path.display());
+        }
+    }
+}
+
 #[test]
 fn standard_library_directories_have_canonical_facades() {
     assert_canonical_facades(&repository_path("library/std/src"));
@@ -119,4 +139,92 @@ fn compiler_layers_do_not_import_reverse_pipeline_or_backend_logic() {
         "src/codegen",
         &["SemanticErrorKind", "SemanticError", "Analyzer", "render_diagnostic"],
     );
+}
+
+#[test]
+fn shared_codegen_excludes_backend_specific_crates() {
+    assert_shared_codegen_excludes_backend_crates();
+}
+
+#[test]
+fn shared_codegen_facade_uses_neutral_error_contracts() {
+    let facade = fs::read_to_string(repository_path("src/codegen/mod.rs"))
+        .expect("codegen facade should be readable");
+    assert!(facade.contains("BackendEmitError"));
+    assert!(facade.contains("BackendAbiError"));
+    assert!(facade.contains("BackendSymbolBindings"));
+    assert!(!facade.contains("NativeEmitError"));
+    assert!(!facade.contains("NativeAbiError"));
+    assert!(!facade.contains("NativeSymbolBindings"));
+    assert!(!facade.contains("NativeInstruction"));
+    assert!(!facade.contains("NativeCleanupPlan"));
+    assert!(!facade.contains("NativeCleanupSchedule"));
+}
+
+#[test]
+fn shared_codegen_facade_does_not_reexport_cranelift_emission() {
+    let facade = fs::read_to_string(repository_path("src/codegen/mod.rs"))
+        .expect("codegen facade should be readable");
+    assert!(facade.contains("pub mod cranelift;"));
+    assert!(!facade.contains("emit_program_object"));
+    assert!(!facade.contains("emit_module_object"));
+    assert!(!facade.contains("validate_native_signature"));
+}
+
+#[test]
+fn cranelift_dependencies_are_optional_and_defaulted() {
+    let manifest = fs::read_to_string(repository_path("Cargo.toml"))
+        .expect("Cargo manifest should be readable");
+    assert!(manifest.contains("default = [\"cranelift\"]"));
+    assert!(manifest.contains("cranelift = ["));
+    for dependency in
+        ["cranelift-codegen", "cranelift-frontend", "cranelift-module", "cranelift-object"]
+    {
+        let declaration = format!("{dependency} = {{ version = \"0.136.2\", optional = true }}");
+        assert!(manifest.contains(&declaration), "{dependency} must be optional");
+    }
+}
+
+#[test]
+fn llvm_integration_is_an_explicit_opt_in_feature() {
+    let manifest = fs::read_to_string(repository_path("Cargo.toml"))
+        .expect("Cargo manifest should be readable");
+    assert!(manifest.contains("default = [\"cranelift\"]"));
+    assert!(manifest.contains("llvm = [\"dep:llvm-sys\"]"));
+    assert!(manifest.contains(
+        "llvm-sys = { version = \"231.0.0\", optional = true, features = [\"strict-versioning\"] }"
+    ));
+    assert!(!manifest.contains("inkwell = \""));
+}
+
+#[test]
+fn cranelift_implementation_stays_inside_its_backend_boundary() {
+    let root = repository_path("src/codegen");
+    for path in rust_sources(&root) {
+        let relative = path.strip_prefix(&root).expect("codegen path should be below root");
+        if relative.components().any(|component| component.as_os_str() == "cranelift") {
+            continue;
+        }
+        if relative == Path::new("mod.rs") {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("codegen source should be readable");
+        for token in ["cranelift::", "cranelift_codegen", "cranelift_frontend"] {
+            assert!(
+                !source.contains(token),
+                "{} leaks Cranelift implementation `{token}`",
+                path.display()
+            );
+        }
+    }
+}
+
+#[test]
+fn target_and_runtime_layers_exclude_cranelift_implementation_types() {
+    for directory in ["src/target", "src/runtime"] {
+        assert_layer_excludes(
+            directory,
+            &["crate::codegen::cranelift", "cranelift_codegen", "cranelift_frontend"],
+        );
+    }
 }

@@ -23,7 +23,9 @@ pub unsafe extern "C" fn actus_path_ascii_to_native(storage: BufferHandle) -> i3
         return ABI_STATUS_FAILURE;
     }
     let bytes = unsafe { std::slice::from_raw_parts(buffer.data, buffer.length) };
-    let Some(payload) = bytes.strip_suffix(&[0]) else { return ABI_STATUS_FAILURE };
+    let Some(payload) = bytes.strip_suffix(&[0]) else {
+        return ABI_STATUS_FAILURE;
+    };
     if payload.iter().any(|byte| *byte == 0 || *byte > ASCII_LIMIT) {
         return ABI_STATUS_FAILURE;
     }

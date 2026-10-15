@@ -34,6 +34,21 @@ fn accepts_a_fixed_serialization_contract() {
 }
 
 #[test]
+fn rejects_pointer_bearing_or_dynamic_pack_fields_from_serialized_state() {
+    for field_type in ["Buffer", "String", "Region[u8]"] {
+        let source = format!(
+            "pack State {{ erg storage: Array[u8, 8]; layout little; fields {{ erg value: {field_type} at 0; }} }}"
+        );
+        let error = analyze_source(&source)
+            .expect_err("serialized pack fields must not contain pointers or dynamic state");
+        assert!(
+            matches!(error, SemanticErrorKind::InvalidPackFieldType { .. }),
+            "unexpected diagnostic for {field_type}: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn rejects_overlapping_serialization_sections() {
     let error = analyze_source(
         "pack FramePack { erg storage: Array[u8, 32]; layout little; fields { erg word_0: u64 at 0; erg word_1: u64 at 64; erg word_2: u64 at 128; erg word_3: u64 at 192; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 1 length 16; checksum crc32 over 0 .. 17 at 17; }",

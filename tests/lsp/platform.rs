@@ -56,6 +56,11 @@ fn lsp_module_resolution_preserves_case_sensitive_paths() {
     let root = temp_root();
     let source_root = root.join("src");
     fs::create_dir_all(source_root.join("Case")).expect("create case-sensitive module");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-case-sensitive\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write temporary workspace manifest");
     let main_path = source_root.join("main.act");
     let facade_path = source_root.join("Case/Case.act");
     let implementation_path = source_root.join("Case/api.act");

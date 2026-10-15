@@ -233,7 +233,18 @@ impl Analyzer {
         let Some(index) = self.root_binding_index(expression) else { return false };
         matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
             && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
-            && matches!(self.model.bindings[index].access, AccessState::Mutable)
+            && (matches!(self.model.bindings[index].access, AccessState::Mutable)
+                || self.field_loan_available(expression, index))
+    }
+
+    pub(super) fn field_loan_available(&self, expression: &Expr, index: usize) -> bool {
+        let Some(path) = field_loan_path(expression) else { return false };
+        !path.is_empty()
+            && self
+                .active_field_loans
+                .iter()
+                .filter(|(owner, _, _)| *owner == index)
+                .all(|(_, active, _)| !paths_overlap(active, &path))
     }
 
     pub(super) fn root_binding_index(&self, expression: &Expr) -> Option<usize> {
@@ -246,4 +257,21 @@ impl Analyzer {
         };
         self.binding(name, *span).ok()
     }
+}
+
+fn field_loan_path(expression: &Expr) -> Option<String> {
+    match expression {
+        Expr::Identifier { .. } => Some(String::new()),
+        Expr::FieldAccess { object, field, .. } => {
+            let prefix = field_loan_path(object)?;
+            Some(if prefix.is_empty() { field.clone() } else { format!("{prefix}.{field}") })
+        }
+        _ => None,
+    }
+}
+
+fn paths_overlap(left: &str, right: &str) -> bool {
+    left == right
+        || left.strip_prefix(right).is_some_and(|suffix| suffix.starts_with('.'))
+        || right.strip_prefix(left).is_some_and(|suffix| suffix.starts_with('.'))
 }

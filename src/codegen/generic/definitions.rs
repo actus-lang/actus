@@ -6,12 +6,12 @@ use crate::ast::{
 };
 use crate::semantic::{GenericInstance, TypeSubstitution};
 
-use super::super::native::NativeEmitError;
+use crate::codegen::BackendEmitError;
 
-pub(in crate::codegen) fn specialized_structs(
+pub(crate) fn specialized_structs(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<Vec<StructDef>, NativeEmitError> {
+) -> Result<Vec<StructDef>, BackendEmitError> {
     let definitions = struct_definitions(program);
     let generic_names = generic_struct_names(&definitions)
         .into_iter()
@@ -42,10 +42,10 @@ pub(in crate::codegen) fn specialized_structs(
         .collect()
 }
 
-pub(in crate::codegen) fn specialized_enums(
+pub(crate) fn specialized_enums(
     program: &Program,
     instances: &[GenericInstance],
-) -> Result<Vec<EnumDef>, NativeEmitError> {
+) -> Result<Vec<EnumDef>, BackendEmitError> {
     let definitions = enum_definitions(program);
     let generic_names = generic_enum_names(&definitions);
     instances
@@ -83,6 +83,16 @@ pub(crate) fn collect_concrete_type_instances(program: &Program) -> Vec<GenericI
             &generic_parameter_names,
             &mut instances,
         );
+        if let TopLevelDecl::Verb(verb) = declaration {
+            super::instance_expressions::collect_block_type_names(&verb.body, |type_name| {
+                collect_type_instances(
+                    type_name,
+                    &generic_names,
+                    &generic_parameter_names,
+                    &mut instances,
+                )
+            });
+        }
     }
     instances
 }
@@ -257,7 +267,7 @@ fn generic_enum_names(definitions: &HashMap<String, EnumDef>) -> HashSet<String>
 fn substitution_for_instance<T>(
     instance: &GenericInstance,
     definition: &T,
-) -> Result<TypeSubstitution, NativeEmitError>
+) -> Result<TypeSubstitution, BackendEmitError>
 where
     T: GenericDefinition,
 {
@@ -267,7 +277,7 @@ where
         &instance.arguments,
         definition.span(),
     )
-    .map_err(|error| NativeEmitError(format!("generic substitution failed: {error:?}")))
+    .map_err(|error| BackendEmitError(format!("generic substitution failed: {error:?}")))
 }
 
 trait GenericDefinition {
@@ -304,7 +314,7 @@ fn specialize_field(
     field: &StructField,
     substitution: &TypeSubstitution,
     generic_names: &HashSet<String>,
-) -> Result<StructField, NativeEmitError> {
+) -> Result<StructField, BackendEmitError> {
     Ok(StructField {
         doc: field.doc.clone(),
         role: field.role.clone(),
@@ -318,7 +328,7 @@ fn specialize_variant(
     variant: &EnumVariant,
     substitution: &TypeSubstitution,
     generic_names: &HashSet<String>,
-) -> Result<EnumVariant, NativeEmitError> {
+) -> Result<EnumVariant, BackendEmitError> {
     let payload = match &variant.payload {
         EnumPayload::Unit => EnumPayload::Unit,
         EnumPayload::Tuple(types) => EnumPayload::Tuple(
@@ -359,7 +369,7 @@ fn specialize_type(type_name: &TypeName, generic_names: &HashSet<String>) -> Typ
     }
 }
 
-pub(in crate::codegen) fn canonical_type_name(type_name: &TypeName) -> String {
+pub(crate) fn canonical_type_name(type_name: &TypeName) -> String {
     let role = type_name
         .reference_role
         .as_ref()

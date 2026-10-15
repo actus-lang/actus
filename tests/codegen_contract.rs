@@ -1,0 +1,1487 @@
+use actus::ast::{
+    Block, DispatchMode, Expr, ForBinding, Param, ReturnAccess, ReturnType, Role, Stmt, TypeName,
+    VerbDecl,
+};
+use actus::codegen::{
+    BackendAggregateFragment, BackendAggregateLocation, BackendBlock, BackendBlockId,
+    BackendBlockParameter, BackendBodyProvider, BackendCleanupAction, BackendCleanupProvider,
+    BackendCleanupResolvedDescriptor, BackendContractError, BackendDirectAggregateAbi,
+    BackendEdgeArgument, BackendEnumLayout, BackendExpressionProvider, BackendExternal,
+    BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider,
+    BackendModule, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
+    BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
+    LoweredCleanupInstruction, SymbolIdentity, SymbolKind, lower_scalar_program,
+    lower_semantic_cleanup, lower_semantic_cleanup_with_provider, lower_verb, lower_verb_body,
+    lower_verb_body_with_expressions, lower_verb_signature, lower_verb_with_cleanup,
+    validate_edge_arguments,
+};
+use actus::lexer::{SourceSpan, scan};
+use actus::parser::parse;
+use actus::semantic::{
+    AccessState, Binding, CleanupAction, OwnershipState, ScopeCleanup, SemanticModel,
+};
+
+fn verb_symbol() -> SymbolIdentity {
+    SymbolIdentity::new("test", SymbolKind::Verb, "run").expect("valid verb symbol")
+}
+
+struct TestLayouts;
+
+struct TestCleanupProvider;
+
+impl BackendCleanupProvider for TestCleanupProvider {
+    fn resolve_binding(
+        &self,
+        type_name: Option<&TypeName>,
+        builtin: Option<actus::ast::BuiltinType>,
+    ) -> Result<Option<actus::codegen::BackendCleanupResolvedDescriptor>, BackendContractError>
+    {
+        let descriptor = if builtin == Some(actus::ast::BuiltinType::Buffer)
+            || type_name.is_some_and(|name| name.name == "Buffer")
+        {
+            actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::BufferDrop,
+                argument: actus::codegen::BackendCleanupArgument::Value,
+                result: actus::codegen::BackendCleanupResult::Ignored,
+            }
+        } else if type_name.is_some_and(|name| name.name == "Region") {
+            actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                argument: actus::codegen::BackendCleanupArgument::Address,
+                result: actus::codegen::BackendCleanupResult::Status,
+            }
+        } else {
+            return Ok(None);
+        };
+        Ok(Some(actus::codegen::BackendCleanupResolvedDescriptor {
+            descriptor,
+            layout: BackendLayout { size: 8, alignment: 8 },
+            field: None,
+            performance_symbol: None,
+        }))
+    }
+
+    fn resolve_field(
+        &self,
+        _root_type: &TypeName,
+        path: &str,
+    ) -> Result<Option<actus::codegen::BackendCleanupResolvedDescriptor>, BackendContractError>
+    {
+        if !matches!(path, "inner.first" | "inner.second") {
+            return Ok(None);
+        }
+        let offset = if path == "inner.first" { 0 } else { 8 };
+        Ok(Some(actus::codegen::BackendCleanupResolvedDescriptor {
+            descriptor: actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::BufferDrop,
+                argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                result: actus::codegen::BackendCleanupResult::Ignored,
+            },
+            layout: BackendLayout { size: 16, alignment: 8 },
+            field: Some(actus::codegen::BackendCleanupField { offset, size: 8, alignment: 8 }),
+            performance_symbol: None,
+        }))
+    }
+}
+
+struct TestBodyProvider;
+
+struct ConstantExpressionProvider;
+
+impl BackendExpressionProvider for ConstantExpressionProvider {
+    fn lower_expression(
+        &mut self,
+        expression: &Expr,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<actus::codegen::BackendValueId, BackendContractError> {
+        let Expr::Integer { value, span, .. } = expression else {
+            return Err(BackendContractError::InvalidValueType);
+        };
+        let value = value.parse::<u64>().map_err(|_| BackendContractError::InvalidValueType)?;
+        let result = actus::codegen::BackendValueId(instructions.len() as u32);
+        instructions.push(BackendInstruction::Constant {
+            result,
+            ty: BackendValueType::Integer { signed: true, width: 32 },
+            value,
+            span: *span,
+        });
+        Ok(result)
+    }
+
+    fn callee_for(
+        &mut self,
+        callee: &str,
+        _span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError> {
+        SymbolIdentity::new("test", SymbolKind::Verb, callee)
+            .map_err(|_| BackendContractError::InvalidCallSymbol)
+    }
+}
+
+impl BackendBodyProvider for TestBodyProvider {
+    fn value_for(
+        &self,
+        _expression: &Expr,
+    ) -> Result<actus::codegen::BackendValueId, BackendContractError> {
+        Ok(actus::codegen::BackendValueId(7))
+    }
+
+    fn callee_for(
+        &self,
+        callee: &str,
+        _span: SourceSpan,
+    ) -> Result<SymbolIdentity, BackendContractError> {
+        SymbolIdentity::new("test", SymbolKind::Verb, callee)
+            .map_err(|_| BackendContractError::InvalidCallSymbol)
+    }
+
+    fn failure_for(
+        &self,
+        expression: &Expr,
+    ) -> Result<Option<BackendFailure>, BackendContractError> {
+        let Expr::Call { callee, .. } = expression else {
+            return Ok(None);
+        };
+        if callee != "Err" {
+            return Ok(None);
+        }
+        Ok(Some(BackendFailure {
+            result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Result")
+                .expect("valid result symbol"),
+            discriminant: 1,
+            payload: Some(actus::codegen::BackendValueId(7)),
+            layout: result_layout(),
+        }))
+    }
+}
+
+fn result_layout() -> BackendEnumLayout {
+    BackendEnumLayout {
+        layout: BackendLayout { size: 16, alignment: 8 },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 8,
+        payload: Some(BackendLayout { size: 4, alignment: 4 }),
+        niche_pointer: false,
+    }
+}
+
+impl BackendLayoutProvider for TestLayouts {
+    fn layout_for(&self, type_name: &TypeName) -> Option<actus::codegen::BackendLayout> {
+        (!type_name.name.is_empty())
+            .then_some(actus::codegen::BackendLayout { size: 16, alignment: 8 })
+    }
+}
+
+fn type_name(name: &str, role: Option<Role>) -> TypeName {
+    TypeName {
+        name: name.to_owned(),
+        arguments: Vec::new(),
+        reference_role: role,
+        span: SourceSpan::new(0, name.len()),
+    }
+}
+
+fn verb_with_signature() -> VerbDecl {
+    VerbDecl {
+        is_open: false,
+        doc: None,
+        contract: None,
+        metadata: Vec::new(),
+        name: "process".to_owned(),
+        generic_parameters: Vec::new(),
+        params: vec![
+            Param {
+                role: Role::Abs,
+                name: "view".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("Region", Some(Role::Abs)),
+                span: SourceSpan::new(0, 5),
+            },
+            Param {
+                role: Role::Ins,
+                name: "loan".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("Region", Some(Role::Ins)),
+                span: SourceSpan::new(6, 10),
+            },
+            Param {
+                role: Role::Dat,
+                name: "resource".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("Region", Some(Role::Dat)),
+                span: SourceSpan::new(11, 19),
+            },
+            Param {
+                role: Role::Erg,
+                name: "value".to_owned(),
+                dispatch: DispatchMode::Static,
+                ty: type_name("u32", Some(Role::Erg)),
+                span: SourceSpan::new(20, 25),
+            },
+        ],
+        return_type: Some(ReturnType {
+            access: ReturnAccess::Owned,
+            ty: type_name("Result", None),
+            span: SourceSpan::new(26, 32),
+        }),
+        body: Block { statements: Vec::new(), span: SourceSpan::new(0, 32) },
+        span: SourceSpan::new(0, 32),
+    }
+}
+
+fn unit_function(parameters: Vec<BackendParameter>, blocks: Vec<BackendBlock>) -> BackendFunction {
+    BackendFunction {
+        symbol: verb_symbol(),
+        hosted_entry_return: false,
+        parameters,
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Unit,
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks,
+        cleanup: Vec::new(),
+    }
+}
+
+#[test]
+fn reports_unsupported_operations_with_target_context() {
+    let error = BackendContractError::Unsupported(BackendUnsupportedOperation::new(
+        "aggregate-return",
+        SourceSpan::new(12, 20),
+        BackendTargetContext {
+            backend: "llvm".to_owned(),
+            target: "thumbv7em-none-eabihf".to_owned(),
+        },
+        "aggregate return lowering is not implemented",
+    ));
+    let rendered = error.to_string();
+    assert!(rendered.contains("aggregate-return"));
+    assert!(rendered.contains("thumbv7em-none-eabihf"));
+    assert!(rendered.contains("12"));
+}
+
+#[test]
+fn enriches_neutral_lowering_errors_with_selected_backend_context() {
+    let error = BackendContractError::Unsupported(BackendUnsupportedOperation::new(
+        "body-lowering",
+        SourceSpan::new(4, 9),
+        BackendTargetContext {
+            backend: "neutral-contract".to_owned(),
+            target: "semantic-model".to_owned(),
+        },
+        "drop statement has no neutral lowering contract yet",
+    ))
+    .with_backend_context("cranelift", "x86_64-unknown-linux-gnu");
+
+    let rendered = error.to_string();
+    assert!(rendered.contains("backend `cranelift`"));
+    assert!(rendered.contains("target `x86_64-unknown-linux-gnu`"));
+    assert!(rendered.contains("body-lowering"));
+    assert!(rendered.contains("start: 4"));
+    assert!(rendered.contains("end: 9"));
+}
+
+#[test]
+fn validates_aligned_aggregate_layouts() {
+    assert!(BackendLayout { size: 16, alignment: 8 }.validate().is_ok());
+    assert!(BackendLayout { size: 12, alignment: 8 }.validate().is_err());
+    assert!(BackendLayout { size: 16, alignment: 3 }.validate().is_err());
+}
+
+#[test]
+fn validates_direct_aggregate_abi_fragments_for_parameters_and_returns() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let abi = BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: vec![
+            BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Register { index: 0 },
+            },
+            BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Register { index: 1 },
+            },
+        ],
+        return_fragments: vec![
+            BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Register { index: 0 },
+            },
+            BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Stack { offset: 0 },
+            },
+        ],
+    };
+    assert!(abi.validate().is_ok());
+}
+
+#[test]
+fn rejects_direct_aggregate_abi_gaps_and_overlapping_locations() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let abi = BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: vec![BackendAggregateFragment {
+            offset: 8,
+            size: 8,
+            alignment: 8,
+            location: BackendAggregateLocation::Register { index: 0 },
+        }],
+        return_fragments: vec![
+            BackendAggregateFragment {
+                offset: 0,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Stack { offset: 0 },
+            },
+            BackendAggregateFragment {
+                offset: 8,
+                size: 8,
+                alignment: 8,
+                location: BackendAggregateLocation::Stack { offset: 4 },
+            },
+        ],
+    };
+    assert!(matches!(abi.validate(), Err(BackendContractError::InvalidAggregateAbi(_))));
+}
+
+#[test]
+fn rejects_zero_or_misaligned_memory_copy_extents() {
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::MemoryCopy {
+                destination: BackendValueId(0),
+                source: BackendValueId(1),
+                size: 12,
+                alignment: 8,
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidMemoryCopy));
+}
+
+#[test]
+fn rejects_aggregate_field_loads_outside_declared_layout() {
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::AggregateFieldLoad {
+                result: BackendValueId(0),
+                base: BackendValueId(1),
+                aggregate_layout: BackendLayout { size: 4, alignment: 4 },
+                offset: 4,
+                field_layout: BackendLayout { size: 4, alignment: 4 },
+                ty: BackendValueType::Integer { signed: true, width: 32 },
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidAggregateFieldAccess));
+}
+
+#[test]
+fn validates_niche_pointer_layout_boundaries() {
+    let valid = BackendEnumLayout {
+        layout: BackendLayout { size: 8, alignment: 8 },
+        discriminant_offset: 0,
+        discriminant_size: 4,
+        payload_offset: 0,
+        payload: None,
+        niche_pointer: true,
+    };
+    assert!(valid.validate().is_ok());
+
+    let invalid = BackendEnumLayout { discriminant_offset: 4, ..valid };
+    assert!(matches!(invalid.validate(), Err(BackendContractError::InvalidEnumLayout(_))));
+}
+
+#[test]
+fn accepts_niche_pointer_payload_without_inline_enum_storage() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let failure = BackendFailure {
+        result_type: SymbolIdentity::new("std", SymbolKind::Enum, "Option")
+            .expect("valid option symbol"),
+        discriminant: 1,
+        payload: Some(BackendValueId(1)),
+        layout: BackendEnumLayout {
+            layout,
+            discriminant_offset: 0,
+            discriminant_size: 4,
+            payload_offset: 0,
+            payload: None,
+            niche_pointer: true,
+        },
+    };
+    let function = BackendFunction {
+        symbol: verb_symbol(),
+        hosted_entry_return: false,
+        parameters: vec![BackendParameter {
+            name: "payload".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Pointer,
+            passing: BackendPassingMode::Direct,
+        }],
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: BackendValueType::NichePointerOption { layout, payload_layout: None },
+            passing: BackendReturnMode::Direct,
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail { failure, span: SourceSpan::new(0, 1) }],
+        }],
+        cleanup: Vec::new(),
+    };
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn rejects_direct_aggregate_descriptor_for_a_scalar() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let abi = BackendDirectAggregateAbi {
+        layout,
+        parameter_fragments: vec![BackendAggregateFragment {
+            offset: 0,
+            size: 8,
+            alignment: 8,
+            location: BackendAggregateLocation::Register { index: 0 },
+        }],
+        return_fragments: vec![BackendAggregateFragment {
+            offset: 0,
+            size: 8,
+            alignment: 8,
+            location: BackendAggregateLocation::Register { index: 0 },
+        }],
+    };
+    let function = BackendFunction {
+        symbol: verb_symbol(),
+        hosted_entry_return: false,
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: Some(Role::Erg),
+            ty: BackendValueType::Integer { signed: false, width: 64 },
+            passing: BackendReturnMode::DirectAggregate { abi },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
+        cleanup: Vec::new(),
+    };
+    assert_eq!(function.validate(), Err(BackendContractError::DirectAggregateTypeMismatch));
+}
+
+#[test]
+fn rejects_zero_width_values_and_invalid_parameter_aggregates() {
+    let zero_width = unit_function(
+        vec![BackendParameter {
+            name: "value".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Integer { signed: false, width: 0 },
+            passing: BackendPassingMode::Direct,
+        }],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
+    );
+    assert_eq!(zero_width.validate(), Err(BackendContractError::InvalidValueType));
+
+    let invalid_aggregate = unit_function(
+        vec![BackendParameter {
+            name: "value".to_owned(),
+            role: Role::Erg,
+            ty: BackendValueType::Aggregate { layout: BackendLayout { size: 12, alignment: 8 } },
+            passing: BackendPassingMode::Direct,
+        }],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
+    );
+    assert_eq!(
+        invalid_aggregate.validate(),
+        Err(BackendContractError::InvalidLayout(
+            "aggregate size must be aligned to its declared alignment",
+        ))
+    );
+}
+
+#[test]
+fn preserves_role_metadata_without_a_machine_backend() {
+    let function = unit_function(
+        vec![BackendParameter {
+            name: "input".to_owned(),
+            role: Role::Abs,
+            ty: BackendValueType::Integer { signed: false, width: 32 },
+            passing: BackendPassingMode::Borrowed {
+                layout: BackendLayout { size: 4, alignment: 4 },
+            },
+        }],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Return {
+                value: None,
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.parameters[0].role, Role::Abs);
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn rejects_role_and_passing_mode_mismatches() {
+    let function = unit_function(
+        vec![BackendParameter {
+            name: "loan".to_owned(),
+            role: Role::Ins,
+            ty: BackendValueType::Pointer,
+            passing: BackendPassingMode::Borrowed {
+                layout: BackendLayout { size: 8, alignment: 8 },
+            },
+        }],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::RolePassingMismatch));
+}
+
+#[test]
+fn preserves_capability_passing_modes_and_cleanup_actions() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let function = unit_function(
+        vec![
+            BackendParameter {
+                name: "view".to_owned(),
+                role: Role::Abs,
+                ty: BackendValueType::Region { layout },
+                passing: BackendPassingMode::Borrowed { layout },
+            },
+            BackendParameter {
+                name: "loan".to_owned(),
+                role: Role::Ins,
+                ty: BackendValueType::Region { layout },
+                passing: BackendPassingMode::ExclusiveLoan { layout },
+            },
+            BackendParameter {
+                name: "resource".to_owned(),
+                role: Role::Dat,
+                ty: BackendValueType::Region { layout },
+                passing: BackendPassingMode::OwnershipTransfer { layout },
+            },
+        ],
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::ResetArena {
+                    binding_index: 2,
+                    name: "region".to_owned(),
+                },
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: Some(actus::codegen::BackendCleanupField {
+                        offset: 0,
+                        size: 8,
+                        alignment: 8,
+                    }),
+                    performance_symbol: None,
+                    bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                    argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                    result: actus::codegen::BackendCleanupResult::Status,
+                }),
+                span: SourceSpan::new(4, 10),
+            }],
+        }],
+    );
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn rejects_runtime_cleanup_without_a_lowered_value_operand() {
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::ResetArena {
+                    binding_index: 0,
+                    name: "region".to_owned(),
+                },
+                operand: None,
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn rejects_cleanup_field_outside_the_declared_layout() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::ResetArena {
+                    binding_index: 0,
+                    name: "region".to_owned(),
+                },
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: Some(actus::codegen::BackendCleanupField {
+                        offset: 8,
+                        size: 16,
+                        alignment: 8,
+                    }),
+                    performance_symbol: None,
+                    bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                    argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                    result: actus::codegen::BackendCleanupResult::Status,
+                }),
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn rejects_cleanup_bridge_with_zero_enum_extent() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::DropBinding {
+                    binding_index: 0,
+                    name: "value".to_owned(),
+                },
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: None,
+                    bridge: actus::codegen::BackendCleanupBridge::EnumDrop { size: 0 },
+                    performance_symbol: None,
+                    argument: actus::codegen::BackendCleanupArgument::Address,
+                    result: actus::codegen::BackendCleanupResult::Ignored,
+                }),
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn rejects_field_address_bridge_without_a_field_sublayout() {
+    let layout = BackendLayout { size: 8, alignment: 8 };
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Cleanup {
+                action: LoweredCleanupInstruction::DropBinding {
+                    binding_index: 0,
+                    name: "value".to_owned(),
+                },
+                operand: Some(actus::codegen::BackendCleanupOperand {
+                    value: BackendValueId(0),
+                    layout,
+                    field: None,
+                    bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                    performance_symbol: None,
+                    argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+                    result: actus::codegen::BackendCleanupResult::Status,
+                }),
+                span: SourceSpan::new(0, 1),
+            }],
+        }],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn validates_aggregate_return_slots_without_a_backend() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let function = BackendFunction {
+        symbol: verb_symbol(),
+        hosted_entry_return: false,
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Aggregate { layout },
+            passing: BackendReturnMode::ReturnSlot { layout },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
+        cleanup: Vec::new(),
+    };
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn rejects_return_slots_for_non_aggregate_values() {
+    let function = BackendFunction {
+        symbol: verb_symbol(),
+        hosted_entry_return: false,
+        parameters: Vec::new(),
+        return_value: BackendReturn {
+            role: None,
+            ty: BackendValueType::Integer { signed: false, width: 32 },
+            passing: BackendReturnMode::ReturnSlot {
+                layout: BackendLayout { size: 4, alignment: 4 },
+            },
+        },
+        entry: BackendBlockId(0),
+        blocks: vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: Vec::new(),
+        }],
+        cleanup: Vec::new(),
+    };
+    assert_eq!(function.validate(), Err(BackendContractError::ReturnSlotTypeMismatch));
+}
+
+#[test]
+fn rejects_duplicate_parameters_and_blocks() {
+    let parameter = BackendParameter {
+        name: "value".to_owned(),
+        role: Role::Erg,
+        ty: BackendValueType::Integer { signed: false, width: 32 },
+        passing: BackendPassingMode::Direct,
+    };
+    let function = unit_function(
+        vec![parameter.clone(), parameter],
+        vec![
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            },
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(1),
+                instructions: Vec::new(),
+            },
+        ],
+    );
+    assert_eq!(function.validate(), Err(BackendContractError::DuplicateParameterName));
+
+    let mut blocks_only = function;
+    blocks_only.parameters.clear();
+    blocks_only.blocks[1].id = BackendBlockId(0);
+    assert_eq!(blocks_only.validate(), Err(BackendContractError::DuplicateBlockId));
+}
+
+#[test]
+fn validates_control_flow_targets_without_a_machine_backend() {
+    let valid = unit_function(
+        Vec::new(),
+        vec![
+            BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: vec![BackendInstruction::Jump {
+                    target: BackendBlockId(1),
+                    arguments: vec![BackendEdgeArgument {
+                        value: BackendValueId(4),
+                        ty: BackendValueType::Integer { signed: false, width: 32 },
+                        span: SourceSpan::new(0, 1),
+                    }],
+                    span: SourceSpan::new(0, 1),
+                }],
+            },
+            BackendBlock {
+                parameters: vec![BackendBlockParameter {
+                    value: BackendValueId(5),
+                    ty: BackendValueType::Integer { signed: false, width: 32 },
+                    span: SourceSpan::new(0, 1),
+                }],
+                id: BackendBlockId(1),
+                instructions: Vec::new(),
+            },
+        ],
+    );
+    assert!(valid.validate().is_ok());
+
+    let mut mismatch = valid.clone();
+    mismatch.blocks[0].instructions[0] = BackendInstruction::Jump {
+        target: BackendBlockId(1),
+        arguments: Vec::new(),
+        span: SourceSpan::new(0, 1),
+    };
+    assert!(matches!(mismatch.validate(), Err(BackendContractError::InvalidBlockArguments(_))));
+
+    let mut invalid = valid;
+    invalid.blocks[0].instructions[0] = BackendInstruction::Jump {
+        target: BackendBlockId(2),
+        arguments: Vec::new(),
+        span: SourceSpan::new(0, 1),
+    };
+    assert_eq!(invalid.validate(), Err(BackendContractError::InvalidBlockReference));
+}
+
+#[test]
+fn preserves_typed_failures_without_a_machine_backend() {
+    let result_type =
+        SymbolIdentity::new("std", SymbolKind::Enum, "Result").expect("valid enum symbol");
+    let function = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail {
+                failure: BackendFailure {
+                    result_type: result_type.clone(),
+                    discriminant: 1,
+                    payload: Some(BackendValueId(7)),
+                    layout: result_layout(),
+                },
+                span: SourceSpan::new(8, 18),
+            }],
+        }],
+    );
+    assert!(function.validate().is_ok());
+
+    let invalid = unit_function(
+        Vec::new(),
+        vec![BackendBlock {
+            parameters: Vec::new(),
+            id: BackendBlockId(0),
+            instructions: vec![BackendInstruction::Fail {
+                failure: BackendFailure {
+                    result_type: verb_symbol(),
+                    discriminant: 1,
+                    payload: Some(BackendValueId(7)),
+                    layout: result_layout(),
+                },
+                span: SourceSpan::new(8, 18),
+            }],
+        }],
+    );
+    assert_eq!(invalid.validate(), Err(BackendContractError::InvalidFailureType));
+}
+
+#[test]
+fn adapts_validated_semantic_cleanup_to_the_neutral_contract() {
+    let mut model = SemanticModel::default();
+    model.bindings.push(Binding {
+        name: "arena".to_owned(),
+        role: Role::Erg,
+        ty: Some(actus::ast::BuiltinType::Int),
+        span: SourceSpan::new(0, 5),
+        ownership: OwnershipState::Active,
+        access: AccessState::Mutable,
+    });
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 5),
+        actions: vec![CleanupAction::DropBinding { binding_index: 0 }],
+    });
+
+    let plans = lower_semantic_cleanup(&model).expect("valid cleanup should lower");
+    assert_eq!(plans.len(), 1);
+    assert_eq!(plans[0].depth, 1);
+    assert_eq!(
+        plans[0].actions,
+        vec![BackendCleanupAction::DropBinding { binding_index: 0, name: "arena".to_owned() }]
+    );
+    assert_eq!(plans[0].bridges, vec![None]);
+}
+
+#[test]
+fn derives_runtime_cleanup_bridges_from_authoritative_binding_types() {
+    let mut model = SemanticModel::default();
+    model.bindings.extend([
+        Binding {
+            name: "buffer".to_owned(),
+            role: Role::Erg,
+            ty: Some(actus::ast::BuiltinType::Buffer),
+            span: SourceSpan::new(0, 6),
+            ownership: OwnershipState::Active,
+            access: AccessState::Mutable,
+        },
+        Binding {
+            name: "region".to_owned(),
+            role: Role::Erg,
+            ty: None,
+            span: SourceSpan::new(7, 13),
+            ownership: OwnershipState::Active,
+            access: AccessState::Mutable,
+        },
+    ]);
+    model.binding_type_names.insert(
+        1,
+        TypeName {
+            name: "Region".to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: SourceSpan::new(7, 13),
+        },
+    );
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 13),
+        actions: vec![
+            CleanupAction::DropBinding { binding_index: 0 },
+            CleanupAction::DropBinding { binding_index: 1 },
+        ],
+    });
+
+    let plans = lower_semantic_cleanup(&model).expect("typed cleanup should lower");
+    assert_eq!(
+        plans[0].bridges,
+        vec![
+            Some(actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::BufferDrop,
+                argument: actus::codegen::BackendCleanupArgument::Value,
+                result: actus::codegen::BackendCleanupResult::Ignored,
+            }),
+            Some(actus::codegen::BackendCleanupBridgeDescriptor {
+                bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+                argument: actus::codegen::BackendCleanupArgument::Address,
+                result: actus::codegen::BackendCleanupResult::Status,
+            }),
+        ]
+    );
+}
+
+#[test]
+fn rejects_invalid_semantic_cleanup_before_backend_lowering() {
+    let mut model = SemanticModel::default();
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 1),
+        actions: vec![CleanupAction::DropBinding { binding_index: 99 }],
+    });
+
+    assert!(matches!(
+        lower_semantic_cleanup(&model),
+        Err(BackendContractError::InvalidCleanupContract(_))
+    ));
+}
+
+#[test]
+fn validates_complete_resolved_cleanup_descriptor_metadata() {
+    let layout = BackendLayout { size: 16, alignment: 8 };
+    let descriptor = actus::codegen::BackendCleanupBridgeDescriptor {
+        bridge: actus::codegen::BackendCleanupBridge::RegionDrop,
+        argument: actus::codegen::BackendCleanupArgument::FieldAddress,
+        result: actus::codegen::BackendCleanupResult::Status,
+    };
+    let resolved = BackendCleanupResolvedDescriptor {
+        descriptor,
+        layout,
+        field: Some(actus::codegen::BackendCleanupField { offset: 8, size: 8, alignment: 8 }),
+        performance_symbol: None,
+    };
+    assert!(resolved.validate().is_ok());
+    let operand = resolved.operand(BackendValueId(7));
+    assert_eq!(operand.value, BackendValueId(7));
+    assert_eq!(operand.layout, resolved.layout);
+    assert_eq!(operand.field, resolved.field);
+    assert_eq!(operand.bridge, resolved.descriptor.bridge);
+    assert_eq!(operand.argument, resolved.descriptor.argument);
+    assert_eq!(operand.result, resolved.descriptor.result);
+
+    let invalid = BackendCleanupResolvedDescriptor {
+        field: Some(actus::codegen::BackendCleanupField { offset: 12, size: 8, alignment: 4 }),
+        performance_symbol: None,
+        ..resolved
+    };
+    assert_eq!(invalid.validate(), Err(BackendContractError::InvalidCleanupOperand));
+}
+
+#[test]
+fn lowers_semantic_moved_fields_through_the_cleanup_provider() {
+    let mut model = SemanticModel::default();
+    model.bindings.push(Binding {
+        name: "outer".to_owned(),
+        role: Role::Erg,
+        ty: None,
+        span: SourceSpan::new(0, 5),
+        ownership: OwnershipState::PartiallyMoved {
+            fields: vec!["inner.first".to_owned(), "inner.second".to_owned()],
+        },
+        access: AccessState::Mutable,
+    });
+    model.binding_type_names.insert(
+        0,
+        TypeName {
+            name: "Outer".to_owned(),
+            arguments: Vec::new(),
+            reference_role: None,
+            span: SourceSpan::new(0, 5),
+        },
+    );
+    model.cleanup_plans.push(ScopeCleanup {
+        depth: 1,
+        span: SourceSpan::new(0, 5),
+        actions: vec![CleanupAction::DropBinding { binding_index: 0 }],
+    });
+
+    let plans = lower_semantic_cleanup_with_provider(&model, &TestCleanupProvider)
+        .expect("semantic moved fields should resolve through the provider");
+    assert_eq!(plans[0].resolved_bridges[0].len(), 2);
+    assert_eq!(plans[0].resolved_bridges[0][0].field.unwrap().offset, 0);
+    assert_eq!(plans[0].resolved_bridges[0][1].field.unwrap().offset, 8);
+}
+
+#[test]
+fn lowers_callable_roles_and_layouts_without_a_machine_backend() {
+    let signature = lower_verb_signature("app", &verb_with_signature(), &TestLayouts)
+        .expect("signature should lower through the neutral provider");
+    assert_eq!(signature.symbol.as_str(), "app__verb_process");
+    assert!(matches!(signature.parameters[0].passing, BackendPassingMode::Borrowed { .. }));
+    assert!(matches!(signature.parameters[1].passing, BackendPassingMode::ExclusiveLoan { .. }));
+    assert!(matches!(
+        signature.parameters[2].passing,
+        BackendPassingMode::OwnershipTransfer { .. }
+    ));
+    assert!(matches!(signature.return_value.passing, BackendReturnMode::ReturnSlot { .. }));
+    assert_eq!(signature.return_value.role, Some(Role::Erg));
+
+    let mut immutable_return = verb_with_signature();
+    immutable_return.return_type.as_mut().expect("return type").access = ReturnAccess::Abs;
+    let signature = lower_verb_signature("app", &immutable_return, &TestLayouts)
+        .expect("immutable return should lower");
+    assert_eq!(signature.return_value.role, Some(Role::Abs));
+}
+
+#[test]
+fn lowers_transferred_scalar_without_an_aggregate_layout() {
+    let mut verb = verb_with_signature();
+    verb.params[2].ty = type_name("u32", Some(Role::Dat));
+    let signature = lower_verb_signature("app", &verb, &TestLayouts)
+        .expect("scalar ownership transfer should use direct ABI passing");
+    assert!(matches!(signature.parameters[2].passing, BackendPassingMode::Direct));
+}
+
+#[test]
+fn validates_functions_and_external_symbols_as_one_neutral_module() {
+    let external_symbol =
+        SymbolIdentity::new("runtime", SymbolKind::External, "write_byte").expect("valid symbol");
+    let module = BackendModule {
+        externals: vec![BackendExternal {
+            symbol: external_symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Unit,
+                passing: BackendReturnMode::Direct,
+            },
+            runtime_pointer_return: false,
+        }],
+        functions: vec![unit_function(
+            Vec::new(),
+            vec![BackendBlock {
+                parameters: Vec::new(),
+                id: BackendBlockId(0),
+                instructions: Vec::new(),
+            }],
+        )],
+    };
+    assert!(module.validate().is_ok());
+
+    let duplicate = BackendModule {
+        externals: Vec::new(),
+        functions: vec![
+            unit_function(
+                Vec::new(),
+                vec![BackendBlock {
+                    parameters: Vec::new(),
+                    id: BackendBlockId(0),
+                    instructions: Vec::new(),
+                }],
+            ),
+            unit_function(
+                Vec::new(),
+                vec![BackendBlock {
+                    parameters: Vec::new(),
+                    id: BackendBlockId(0),
+                    instructions: Vec::new(),
+                }],
+            ),
+        ],
+    };
+    assert_eq!(duplicate.validate(), Err(BackendContractError::DuplicateModuleSymbol));
+}
+
+#[test]
+fn lowers_return_and_direct_calls_through_a_neutral_body_provider() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![
+            Stmt::Expression {
+                expression: Expr::Call {
+                    callee: "emit".to_owned(),
+                    arguments: Vec::new(),
+                    span: SourceSpan::new(40, 44),
+                },
+                span: SourceSpan::new(40, 45),
+            },
+            Stmt::Return { value: None, span: SourceSpan::new(46, 52) },
+        ],
+        span: SourceSpan::new(40, 52),
+    };
+
+    let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("body should lower");
+    assert_eq!(blocks.len(), 1);
+    assert!(matches!(blocks[0].instructions[0], BackendInstruction::Call { .. }));
+    assert!(matches!(blocks[0].instructions[1], BackendInstruction::Return { value: None, .. }));
+}
+
+#[test]
+fn lowers_expression_values_into_neutral_instructions() {
+    let mut verb = verb_with_signature();
+    verb.params.clear();
+    verb.return_type = Some(ReturnType {
+        access: ReturnAccess::Owned,
+        ty: type_name("u32", None),
+        span: SourceSpan::new(0, 3),
+    });
+    verb.body = Block {
+        statements: vec![Stmt::Return {
+            value: Some(Expr::Integer {
+                value: "42".to_owned(),
+                suffix: Some("u32".to_owned()),
+                span: SourceSpan::new(0, 2),
+            }),
+            span: SourceSpan::new(0, 2),
+        }],
+        span: SourceSpan::new(0, 2),
+    };
+
+    let blocks = lower_verb_body_with_expressions(&verb, &mut ConstantExpressionProvider)
+        .expect("expression provider should lower integer values");
+    assert!(matches!(blocks[0].instructions[0], BackendInstruction::Constant { value: 42, .. }));
+    assert!(matches!(blocks[0].instructions[1], BackendInstruction::Return { value: Some(_), .. }));
+}
+
+#[test]
+fn lowers_if_control_flow_with_explicit_value_provider() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![
+            Stmt::If {
+                condition: Expr::BoolLiteral { value: true, span: SourceSpan::new(0, 4) },
+                then_branch: Block {
+                    statements: vec![Stmt::Return { value: None, span: SourceSpan::new(5, 11) }],
+                    span: SourceSpan::new(5, 11),
+                },
+                else_branch: Some(actus::ast::IfBranch::Block(Block {
+                    statements: vec![Stmt::Return { value: None, span: SourceSpan::new(12, 18) }],
+                    span: SourceSpan::new(12, 18),
+                })),
+                span: SourceSpan::new(0, 18),
+            },
+            Stmt::Return { value: None, span: SourceSpan::new(19, 25) },
+        ],
+        span: SourceSpan::new(0, 25),
+    };
+
+    let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("if should lower");
+    assert_eq!(blocks.len(), 3);
+    assert!(matches!(blocks[0].instructions[0], BackendInstruction::Branch { .. }));
+    assert!(matches!(blocks[1].instructions[0], BackendInstruction::Return { .. }));
+    assert!(matches!(blocks[2].instructions[0], BackendInstruction::Return { .. }));
+}
+
+#[test]
+fn preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::If {
+            condition: Expr::BoolLiteral { value: true, span: SourceSpan::new(0, 4) },
+            then_branch: Block {
+                statements: vec![Stmt::Expression {
+                    expression: Expr::Call {
+                        callee: "emit".to_owned(),
+                        arguments: Vec::new(),
+                        span: SourceSpan::new(5, 9),
+                    },
+                    span: SourceSpan::new(5, 9),
+                }],
+                span: SourceSpan::new(5, 9),
+            },
+            else_branch: Some(actus::ast::IfBranch::Block(Block {
+                statements: vec![Stmt::Expression {
+                    expression: Expr::Call {
+                        callee: "emit".to_owned(),
+                        arguments: Vec::new(),
+                        span: SourceSpan::new(10, 14),
+                    },
+                    span: SourceSpan::new(10, 14),
+                }],
+                span: SourceSpan::new(10, 14),
+            })),
+            span: SourceSpan::new(0, 14),
+        }],
+        span: SourceSpan::new(0, 14),
+    };
+
+    let blocks = lower_verb_body(&verb, &TestBodyProvider).expect("if should lower");
+    let function = unit_function(Vec::new(), blocks);
+    assert!(function.validate().is_ok());
+    assert!(function.blocks.iter().any(|block| block.id == BackendBlockId(1)));
+}
+
+#[test]
+fn integrates_signature_and_body_into_a_valid_neutral_function() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Return { value: None, span: SourceSpan::new(0, 6) }],
+        span: SourceSpan::new(0, 6),
+    };
+
+    let function = lower_verb("app", &verb, &TestLayouts, &TestBodyProvider, BackendBlockId(0))
+        .expect("signature and body should form a valid function");
+    assert_eq!(function.symbol.as_str(), "app__verb_process");
+    assert_eq!(function.blocks.len(), 1);
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn preserves_cleanup_plans_on_the_neutral_function_contract() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Return { value: None, span: SourceSpan::new(0, 6) }],
+        span: SourceSpan::new(0, 6),
+    };
+    let cleanup = vec![actus::codegen::BackendCleanupPlan {
+        depth: 2,
+        span: SourceSpan::new(0, 6),
+        origin: actus::codegen::BackendCleanupOrigin::Scope,
+        actions: vec![BackendCleanupAction::DropBinding {
+            binding_index: 0,
+            name: "resource".to_owned(),
+        }],
+        bridges: vec![None],
+        resolved_bridges: vec![Vec::new()],
+    }];
+
+    let function = lower_verb_with_cleanup(
+        "app",
+        &verb,
+        &TestLayouts,
+        &TestBodyProvider,
+        BackendBlockId(0),
+        cleanup.clone(),
+    )
+    .expect("cleanup should remain part of the neutral function");
+    assert_eq!(function.cleanup, cleanup);
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn rejects_cleanup_plans_without_one_bridge_descriptor_per_action() {
+    let error = lower_verb_with_cleanup(
+        "app",
+        &verb_with_signature(),
+        &TestLayouts,
+        &TestBodyProvider,
+        BackendBlockId(0),
+        vec![actus::codegen::BackendCleanupPlan {
+            depth: 1,
+            span: SourceSpan::new(0, 1),
+            origin: actus::codegen::BackendCleanupOrigin::Scope,
+            actions: vec![BackendCleanupAction::DropBinding {
+                binding_index: 0,
+                name: "resource".to_owned(),
+            }],
+            bridges: Vec::new(),
+            resolved_bridges: vec![Vec::new()],
+        }],
+    )
+    .expect_err("misaligned cleanup plans must be rejected");
+    assert_eq!(error, BackendContractError::InvalidCleanupPlan);
+}
+
+#[test]
+fn lowers_typed_failures_without_backend_specific_handles() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Return {
+            value: Some(Expr::Call {
+                callee: "Err".to_owned(),
+                arguments: Vec::new(),
+                span: SourceSpan::new(0, 6),
+            }),
+            span: SourceSpan::new(0, 10),
+        }],
+        span: SourceSpan::new(0, 10),
+    };
+
+    let function = lower_verb("app", &verb, &TestLayouts, &TestBodyProvider, BackendBlockId(0))
+        .expect("typed failure should lower through the neutral contract");
+    let BackendInstruction::Fail { failure, .. } = &function.blocks[0].instructions[0] else {
+        panic!("expected a typed failure instruction");
+    };
+    assert_eq!(failure.discriminant, 1);
+    assert!(function.validate().is_ok());
+}
+
+#[test]
+fn rejects_body_constructs_without_a_neutral_lowering_contract() {
+    let mut verb = verb_with_signature();
+    verb.body = Block {
+        statements: vec![Stmt::Drop { name: "resource".to_owned(), span: SourceSpan::new(0, 4) }],
+        span: SourceSpan::new(0, 4),
+    };
+
+    let error =
+        lower_verb_body(&verb, &TestBodyProvider).expect_err("legacy provider has no drop hook");
+    assert!(matches!(error, BackendContractError::Unsupported(_)));
+    assert!(error.to_string().contains("explicit drop"));
+}
+
+#[test]
+fn reports_range_loop_as_a_typed_neutral_contract_gap() {
+    let mut verb = verb_with_signature();
+    let span = SourceSpan::new(40, 72);
+    verb.body = Block {
+        statements: vec![Stmt::ForRange {
+            binding: ForBinding {
+                role: Role::Erg,
+                name: "index".to_owned(),
+                ty: Some("u32".to_owned()),
+                span,
+            },
+            start: Expr::Integer { value: "0".to_owned(), suffix: Some("u32".to_owned()), span },
+            end: Expr::Integer { value: "4".to_owned(), suffix: Some("u32".to_owned()), span },
+            body: Block { statements: Vec::new(), span },
+            span,
+        }],
+        span,
+    };
+
+    let error = lower_verb_body(&verb, &TestBodyProvider)
+        .expect_err("range loops must not bypass the neutral lowering contract");
+    let BackendContractError::Unsupported(operation) = error else {
+        panic!("expected a typed unsupported-operation diagnostic");
+    };
+    assert_eq!(operation.operation, "body-lowering");
+    assert_eq!(operation.span, span);
+    assert_eq!(operation.context.backend, "neutral-contract");
+    assert_eq!(operation.context.target, "semantic-model");
+    assert!(operation.reason.contains("range loop"));
+}
+
+#[test]
+fn lowers_a_side_effect_free_range_loop_into_typed_blocks() {
+    let source = "verb main() -> Int { for erg index: u32 in 0u32 .. 4u32 { } return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "range fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("range fixture should parse");
+    let module = lower_scalar_program("test", &program, Some("main"))
+        .expect("side-effect-free range loop should lower through the neutral contract");
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("main"))
+        .expect("main function should be present");
+    assert!(function.blocks.iter().any(|block| !block.parameters.is_empty()));
+    module.validate().expect("range loop contract should validate");
+}
+
+#[test]
+fn lowers_range_loop_with_a_carried_owner() {
+    let source = "verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 4u32 { total += index; } return total as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "carried range fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("carried range fixture should parse");
+    let module = lower_scalar_program("test", &program, Some("main"))
+        .expect("carried owner should use typed loop edge arguments");
+    assert!(
+        module
+            .functions
+            .iter()
+            .any(|function| { function.blocks.iter().any(|block| block.parameters.len() >= 2) })
+    );
+    module.validate().expect("carried range loop contract should validate");
+}
+
+#[test]
+fn lowers_fixed_array_iteration_with_a_carried_owner_and_index_load() {
+    let source = "verb inspect(abs values: Array[u32, 4]) -> Int { erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "array fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("array fixture should parse");
+    let module = lower_scalar_program("test", &program, Some("inspect"))
+        .expect("fixed-array iteration should lower through the neutral contract");
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("inspect"))
+        .expect("inspect function should be present");
+    assert!(function.blocks.iter().any(|block| {
+        block.instructions.iter().any(|instruction| {
+            matches!(instruction, BackendInstruction::ArrayElementLoad { capacity: 4, .. })
+        })
+    }));
+    module.validate().expect("fixed-array loop contract should validate");
+}
+
+#[test]
+fn validates_loop_edge_argument_shape_before_backend_lowering() {
+    let span = SourceSpan::new(10, 18);
+    let parameters = [BackendBlockParameter {
+        value: BackendValueId(7),
+        ty: BackendValueType::Integer { signed: false, width: 32 },
+        span,
+    }];
+    let arguments = [BackendEdgeArgument {
+        value: BackendValueId(9),
+        ty: BackendValueType::Integer { signed: false, width: 32 },
+        span,
+    }];
+
+    assert!(validate_edge_arguments(&parameters, &arguments).is_ok());
+    assert!(matches!(
+        validate_edge_arguments(&parameters, &[]),
+        Err(BackendContractError::InvalidBlockArguments(_))
+    ));
+}

@@ -1,0 +1,51 @@
+use std::collections::HashMap;
+
+use cranelift_codegen::isa::TargetFrontendConfig;
+use cranelift_object::ObjectModule;
+
+use super::super::literals::StringDataIds;
+use super::super::native::{BackendEmitError, FunctionMeta};
+use super::super::types::NativeType;
+use super::super::vtable::VtableDataIds;
+use super::{PerformanceDefinition, dispatch_key};
+use crate::codegen::cranelift::function_definition::define_function;
+use crate::codegen::cranelift::layout::LayoutRegistry;
+use crate::codegen::model::LoweredCleanupSchedule;
+use crate::configuration::NativeBackendConfiguration;
+
+#[allow(clippy::too_many_arguments)]
+pub(in crate::codegen) fn define_performances(
+    module: &mut ObjectModule,
+    frontend_config: TargetFrontendConfig,
+    definitions: &[PerformanceDefinition<'_>],
+    functions: &HashMap<String, FunctionMeta>,
+    cleanup_schedule: &LoweredCleanupSchedule,
+    string_data: &StringDataIds,
+    layouts: &LayoutRegistry,
+    vtable_data: &VtableDataIds,
+    namespace_prefix: &str,
+    configuration: &NativeBackendConfiguration,
+) -> Result<(), BackendEmitError> {
+    for definition in definitions {
+        let target_type = NativeType::from_type_name_with_layout(Some(definition.target), layouts)?;
+        let key = dispatch_key(target_type, &definition.method.name);
+        let meta = functions.get(&key).ok_or_else(|| {
+            BackendEmitError(format!("missing performance function `{}`", definition.symbol))
+        })?;
+        define_function(
+            module,
+            frontend_config,
+            definition.method,
+            meta,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+            vtable_data,
+            namespace_prefix,
+            false,
+            configuration,
+        )?;
+    }
+    Ok(())
+}

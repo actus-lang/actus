@@ -226,9 +226,9 @@ fn tracks_nested_partial_moves_as_paths_for_lifo_cleanup() {
         .iter()
         .flat_map(|plan| plan.instructions.iter())
         .find_map(|instruction| match instruction {
-            actus::codegen::NativeInstruction::DropBindingFields { moved_fields, .. } => {
-                Some(moved_fields)
-            }
+            actus::codegen::LoweredCleanupInstruction::DropBindingFields {
+                moved_fields, ..
+            } => Some(moved_fields),
             _ => None,
         })
         .expect("nested partial moves should reach native cleanup");

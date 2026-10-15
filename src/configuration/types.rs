@@ -5,7 +5,10 @@ use std::path::PathBuf;
 
 use super::manifest;
 use super::manifest::{BuildProfile, LibraryKind, OptimizationLevel, RuntimeProfile};
-use crate::target::{EntryContract, LinkerFlavor, TargetSpec, TimeProviderContract};
+use crate::codegen::BackendKind;
+use crate::target::{
+    EntryContract, LinkerFlavor, RelocationModel, TargetSpec, TimeProviderContract,
+};
 
 pub(super) const LINKER_ENVIRONMENT_VARIABLE: &str = "ACTUS_LINKER";
 pub(super) const DEFAULT_RUN_ARTIFACT_PREFIX: &str = "actus-run";
@@ -36,6 +39,7 @@ pub struct LinkLibrary {
 
 #[derive(Clone, Debug)]
 pub struct NativeBackendConfiguration {
+    backend: BackendKind,
     module_name: String,
     position_independent: bool,
     optimization_level: OptimizationLevel,
@@ -45,6 +49,7 @@ pub struct NativeBackendConfiguration {
 impl Default for NativeBackendConfiguration {
     fn default() -> Self {
         Self {
+            backend: BackendKind::default(),
             module_name: DEFAULT_NATIVE_MODULE_NAME.to_owned(),
             position_independent: true,
             optimization_level: OptimizationLevel::None,
@@ -56,11 +61,21 @@ impl Default for NativeBackendConfiguration {
 impl NativeBackendConfiguration {
     pub fn new(module_name: impl Into<String>, position_independent: bool) -> Self {
         Self {
+            backend: BackendKind::default(),
             module_name: module_name.into(),
             position_independent,
             optimization_level: OptimizationLevel::None,
             verify_no_float_ir: false,
         }
+    }
+
+    pub const fn backend(&self) -> BackendKind {
+        self.backend
+    }
+
+    pub const fn with_backend(mut self, backend: BackendKind) -> Self {
+        self.backend = backend;
+        self
     }
 
     pub fn module_name(&self) -> &str {
@@ -69,6 +84,14 @@ impl NativeBackendConfiguration {
 
     pub fn position_independent(&self) -> bool {
         self.position_independent
+    }
+
+    pub const fn relocation_model(&self) -> RelocationModel {
+        if self.position_independent {
+            RelocationModel::PositionIndependent
+        } else {
+            RelocationModel::Static
+        }
     }
 
     pub fn with_optimization_level(mut self, optimization_level: OptimizationLevel) -> Self {
@@ -101,6 +124,7 @@ pub struct CompilerConfiguration {
     pub(super) profile: BuildProfile,
     pub(super) profiles: manifest::ProfilesManifest,
     pub(super) linker: OsString,
+    pub(super) linker_script: Option<PathBuf>,
     pub(super) linker_flavor: LinkerFlavor,
     pub(super) entry_contract: EntryContract,
     pub(super) runtime: RuntimeProfile,

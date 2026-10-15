@@ -4,12 +4,23 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["cranelift"]
+cranelift = [
+    "dep:cranelift-codegen",
+    "dep:cranelift-frontend",
+    "dep:cranelift-module",
+    "dep:cranelift-object",
+]
+llvm = ["dep:llvm-sys"]
+
 [dependencies]
 ctrlc = "3.4.6"
-cranelift-codegen = "0.136.2"
-cranelift-frontend = "0.136.2"
-cranelift-module = "0.136.2"
-cranelift-object = "0.136.2"
+cranelift-codegen = { version = "0.136.2", optional = true }
+cranelift-frontend = { version = "0.136.2", optional = true }
+cranelift-module = { version = "0.136.2", optional = true }
+cranelift-object = { version = "0.136.2", optional = true }
+llvm-sys = { version = "231.0.0", optional = true, features = ["strict-versioning"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 target-lexicon = "0.13.5"
@@ -25,3 +36,28 @@ harness = false
 [[bench]]
 name = "region"
 harness = false
+
+[[test]]
+name = "codegen_symbols"
+path = "tests/codegen/cranelift/symbols.rs"
+required-features = ["cranelift"]
+
+[[test]]
+name = "ffi_link"
+path = "tests/codegen/cranelift/ffi_link.rs"
+required-features = ["cranelift"]
+
+[[test]]
+name = "llvm_backend"
+path = "tests/codegen/llvm/backend.rs"
+required-features = ["llvm"]
+
+[[test]]
+name = "codegen"
+path = "tests/codegen.rs"
+required-features = ["cranelift"]
+
+[[test]]
+name = "applications"
+path = "tests/applications.rs"
+required-features = ["cranelift"]

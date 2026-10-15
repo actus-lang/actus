@@ -1,0 +1,110 @@
+use std::collections::HashMap;
+
+use cranelift_codegen::ir::InstBuilder;
+use cranelift_frontend::FunctionBuilder;
+
+use crate::ast::{StructFieldInit, TypeName};
+
+use super::super::expressions::lower_expression;
+use super::super::literals::StringDataValues;
+use super::super::native::{BackendEmitError, FunctionRef};
+use super::super::types::NativeType;
+use super::memory::store_struct_field;
+use crate::codegen::cranelift::layout::LayoutRegistry;
+use crate::codegen::model::LoweredCleanupSchedule;
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_struct_literal(
+    function: &mut FunctionBuilder<'_>,
+    name: &str,
+    type_arguments: &[TypeName],
+    fields: &[StructFieldInit],
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &LoweredCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    let layout = resolve_struct_layout(name, type_arguments, layouts)?;
+    let address = if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+        let allocator =
+            functions.get(&format!("__{}", crate::runtime::AGGREGATE_ALLOCATE_SYMBOL)).ok_or_else(
+                || BackendEmitError("large aggregate allocator is unavailable".to_owned()),
+            )?;
+        let size = function.ins().iconst(layouts.pointer_type, i64::from(layout.size));
+        let alignment = function.ins().iconst(layouts.pointer_type, i64::from(layout.alignment));
+        let call = function.ins().call(allocator.reference, &[size, alignment]);
+        function.inst_results(call)[0]
+    } else {
+        let slot = function.func.create_sized_stack_slot(layouts.stack_slot(layout));
+        function.ins().stack_addr(layouts.pointer_type, slot, 0)
+    };
+    lower_struct_fields(
+        function,
+        fields,
+        address,
+        layout,
+        locals,
+        local_types,
+        functions,
+        cleanup_schedule,
+        string_data,
+        layouts,
+    )?;
+    Ok(address)
+}
+
+fn resolve_struct_layout<'a>(
+    name: &str,
+    type_arguments: &[TypeName],
+    layouts: &'a LayoutRegistry,
+) -> Result<&'a crate::codegen::cranelift::layout::StructLayout, BackendEmitError> {
+    let type_name = TypeName {
+        name: name.to_owned(),
+        arguments: type_arguments.to_vec(),
+        reference_role: None,
+        span: crate::lexer::SourceSpan::new(0, 0),
+    };
+    let id = layouts
+        .type_for_type_name(&type_name)
+        .and_then(|ty| match ty {
+            NativeType::Struct(id) => Some(id),
+            _ => None,
+        })
+        .ok_or_else(|| BackendEmitError(format!("missing layout for struct `{name}`")))?;
+    layouts.get(id).ok_or_else(|| BackendEmitError(format!("missing layout `{id}`")))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_struct_fields(
+    function: &mut FunctionBuilder<'_>,
+    fields: &[StructFieldInit],
+    address: cranelift_codegen::ir::Value,
+    layout: &crate::codegen::cranelift::layout::StructLayout,
+    locals: &HashMap<&String, cranelift_codegen::ir::Value>,
+    local_types: &HashMap<&String, NativeType>,
+    functions: &HashMap<String, FunctionRef>,
+    cleanup_schedule: &LoweredCleanupSchedule,
+    string_data: &StringDataValues,
+    layouts: &LayoutRegistry,
+) -> Result<(), BackendEmitError> {
+    for field in fields {
+        let field_layout =
+            layout.fields.iter().find(|candidate| candidate.name == field.name).ok_or_else(
+                || BackendEmitError(format!("unknown native field `{}`", field.name)),
+            )?;
+        let value = lower_expression(
+            function,
+            &field.value,
+            locals,
+            local_types,
+            functions,
+            cleanup_schedule,
+            string_data,
+            layouts,
+        )?;
+        store_struct_field(function, address, value, field_layout, layouts)?;
+    }
+    Ok(())
+}
