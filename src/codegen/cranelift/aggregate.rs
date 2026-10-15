@@ -17,13 +17,16 @@ use crate::codegen::{
 pub(super) struct Declaration {
     pub(super) id: cranelift_module::FuncId,
     pub(super) parameter_fragments: Vec<usize>,
+    pub(super) parameter_types: Vec<Vec<Type>>,
     pub(super) return_fragments: usize,
     pub(super) return_slot: Option<crate::codegen::BackendLayout>,
     pub(super) runtime_pointer_return: bool,
+    pub(super) runtime_niche_pointer_return: bool,
     pub(super) runtime_result_layout: Option<crate::codegen::BackendLayout>,
 }
 
 pub(super) fn declaration(
+    module: &ObjectModule,
     id: cranelift_module::FuncId,
     parameters: &[crate::codegen::BackendParameter],
     return_value: &crate::codegen::BackendReturn,
@@ -41,21 +44,33 @@ pub(super) fn declaration(
             .iter()
             .map(parameter_fragment_count)
             .collect::<Result<_, _>>()?,
+        parameter_types: parameters
+            .iter()
+            .map(|parameter| super::contract::parameter_types(module, parameter))
+            .collect::<Result<_, _>>()?,
         return_fragments: return_fragment_count(return_value, false)?,
         return_slot,
         runtime_pointer_return: false,
+        runtime_niche_pointer_return: false,
         runtime_result_layout: None,
     })
 }
 
 pub(super) fn runtime_declaration(
+    module: &ObjectModule,
     id: cranelift_module::FuncId,
     external: &crate::codegen::BackendExternal,
 ) -> Result<Declaration, BackendEmitError> {
-    let mut declaration = declaration(id, &external.parameters, &external.return_value)?;
+    let mut declaration = declaration(module, id, &external.parameters, &external.return_value)?;
     declaration.runtime_pointer_return = external.runtime_pointer_return;
+    declaration.runtime_niche_pointer_return =
+        matches!(external.return_value.ty, BackendValueType::NichePointerOption { .. });
     if external.runtime_pointer_return {
-        declaration.return_slot = None;
+        let caller_owned_return_slot =
+            matches!(external.return_value.ty, BackendValueType::NichePointerOption { .. });
+        if !caller_owned_return_slot {
+            declaration.return_slot = None;
+        }
         declaration.return_fragments = 1;
         declaration.runtime_result_layout = match external.return_value.passing {
             crate::codegen::BackendReturnMode::ReturnSlot { layout } => Some(layout),
@@ -110,8 +125,14 @@ pub(super) fn lower_call(
         BackendEmitError(format!("Cranelift call `{}` is undeclared", callee.as_str()))
     })?;
     let reference = module.declare_func_in_func(declaration.id, builder.func);
-    let native_arguments =
-        collect_call_arguments(callee.as_str(), arguments, declaration, values, aggregate_values)?;
+    let native_arguments = collect_call_arguments(
+        builder,
+        callee.as_str(),
+        arguments,
+        declaration,
+        values,
+        aggregate_values,
+    )?;
     let (return_slot, native_arguments) = if let Some(layout) = declaration.return_slot {
         let slot = create_return_slot(builder, layout)?;
         let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
@@ -132,6 +153,13 @@ pub(super) fn lower_call(
         let raw = builder.inst_results(call).first().copied().ok_or_else(|| {
             BackendEmitError("Cranelift runtime result is unavailable".to_owned())
         })?;
+        if declaration.runtime_niche_pointer_return {
+            let return_slot = return_slot.ok_or_else(|| {
+                BackendEmitError("Cranelift niche runtime return slot is unavailable".to_owned())
+            })?;
+            values.insert(result, return_slot);
+            return Ok(());
+        }
         let layout = declaration.runtime_result_layout.ok_or_else(|| {
             BackendEmitError("Cranelift runtime-pointer result layout is unavailable".to_owned())
         })?;
@@ -172,6 +200,7 @@ fn create_return_slot(
 }
 
 fn collect_call_arguments(
+    builder: &mut FunctionBuilder<'_>,
     callee: &str,
     arguments: &[BackendValueId],
     declaration: &Declaration,
@@ -186,7 +215,9 @@ fn collect_call_arguments(
         )));
     }
     let mut native_arguments = Vec::new();
-    for (value, fragment_count) in arguments.iter().zip(&declaration.parameter_fragments) {
+    for ((value, fragment_count), expected_types) in
+        arguments.iter().zip(&declaration.parameter_fragments).zip(&declaration.parameter_types)
+    {
         if *fragment_count > 1 {
             let fragments = aggregate_values.get(value).ok_or_else(|| {
                 BackendEmitError(format!(
@@ -201,7 +232,11 @@ fn collect_call_arguments(
             }
             native_arguments.extend(fragments.iter().copied());
         } else if let Some(value) = values.get(value).copied() {
-            native_arguments.push(value);
+            native_arguments.push(coerce_call_value(
+                builder,
+                value,
+                expected_types.first().copied(),
+            ));
         } else {
             return Err(BackendEmitError(format!(
                 "Cranelift call value {} is unavailable",
@@ -210,6 +245,25 @@ fn collect_call_arguments(
         }
     }
     Ok(native_arguments)
+}
+
+fn coerce_call_value(
+    builder: &mut FunctionBuilder<'_>,
+    value: cranelift_codegen::ir::Value,
+    expected: Option<Type>,
+) -> cranelift_codegen::ir::Value {
+    let Some(expected) = expected else { return value };
+    let actual = builder.func.dfg.value_type(value);
+    if actual == expected {
+        return value;
+    }
+    if actual.is_int() && expected.is_int() {
+        if actual.bytes() < expected.bytes() {
+            return builder.ins().uextend(expected, value);
+        }
+        return builder.ins().ireduce(expected, value);
+    }
+    value
 }
 
 fn record_call_results(

@@ -321,10 +321,10 @@ impl<'program> ProgramLayouts<'program> {
         BackendCleanupResolvedDescriptor {
             descriptor: BackendCleanupBridgeDescriptor {
                 bridge,
-                argument: if field.is_some() {
-                    BackendCleanupArgument::FieldAddress
-                } else if bridge == BackendCleanupBridge::BufferDrop {
+                argument: if bridge == BackendCleanupBridge::BufferDrop {
                     BackendCleanupArgument::Value
+                } else if field.is_some() {
+                    BackendCleanupArgument::FieldAddress
                 } else {
                     BackendCleanupArgument::Address
                 },

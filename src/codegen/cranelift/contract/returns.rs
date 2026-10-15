@@ -31,9 +31,18 @@ pub(super) fn lower_return(
         let destination = return_slot
             .ok_or_else(|| BackendEmitError("Cranelift return slot is unavailable".to_owned()))?;
         if builder.func.dfg.value_type(source) != module.isa().pointer_type() {
-            return Err(BackendEmitError(
-                "Cranelift return-slot value must be an aggregate pointer".to_owned(),
-            ));
+            return Err(BackendEmitError(format!(
+                "Cranelift return-slot value in `{}` must be an aggregate pointer",
+                function.symbol.as_str()
+            )));
+        }
+        if matches!(
+            function.return_value.ty,
+            crate::codegen::BackendValueType::NichePointerOption { .. }
+        ) {
+            builder.ins().store(MemFlagsData::new(), source, destination, 0);
+            builder.ins().return_(&[]);
+            return Ok(());
         }
         let alignment = u8::try_from(layout.alignment).map_err(|_| {
             BackendEmitError("Cranelift return-slot alignment exceeds u8".to_owned())

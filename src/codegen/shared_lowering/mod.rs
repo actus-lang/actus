@@ -22,9 +22,9 @@ use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendExternal, BackendLayout,
-    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendSignature,
-    BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind, lower_parameter,
-    lower_return, lower_verb_signature, lower_verb_with_expressions,
+    BackendLayoutProvider, BackendModule, BackendParameter, BackendPassingMode, BackendReturnMode,
+    BackendSignature, BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind,
+    lower_parameter, lower_return, lower_verb_signature, lower_verb_with_expressions,
     lower_verb_with_expressions_as,
 };
 
@@ -264,6 +264,7 @@ pub(super) struct SharedDeclarations<'program> {
     performance_return_types: BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: BTreeMap<(String, String), Option<TypeName>>,
     parameter_modes: BTreeMap<String, Vec<BackendPassingMode>>,
+    parameter_types: BTreeMap<String, Vec<BackendValueType>>,
 }
 
 impl<'program> SharedDeclarations<'program> {
@@ -326,6 +327,22 @@ impl<'program> SharedDeclarations<'program> {
                 )
             }))
             .collect();
+        let parameter_types = verbs
+            .iter()
+            .zip(&signatures)
+            .map(|(verb, signature)| {
+                (
+                    verb.name.clone(),
+                    signature.parameters.iter().map(|parameter| parameter.ty).collect(),
+                )
+            })
+            .chain(externals.iter().zip(&external_signatures).map(|(external, signature)| {
+                (
+                    external.name.clone(),
+                    signature.parameters.iter().map(|parameter| parameter.ty).collect(),
+                )
+            }))
+            .collect();
         Ok(Self {
             verbs,
             externals,
@@ -339,6 +356,7 @@ impl<'program> SharedDeclarations<'program> {
             performance_return_types,
             performance_return_nominal_types,
             parameter_modes,
+            parameter_types,
         })
     }
 }
@@ -348,11 +366,21 @@ fn build_backend_externals(
     signatures: Vec<BackendSignature>,
     symbols: &BTreeMap<String, SymbolIdentity>,
 ) -> Result<Vec<BackendExternal>, BackendContractError> {
-    externals
-        .iter()
-        .zip(signatures)
-        .map(|(external, signature)| scalar_external(external, signature, symbols))
-        .collect()
+    let mut unique: BTreeMap<SymbolIdentity, BackendExternal> = BTreeMap::new();
+    for (external, signature) in externals.iter().zip(signatures) {
+        let lowered = scalar_external(external, signature, symbols)?;
+        if let Some(existing) = unique.get(&lowered.symbol) {
+            if existing.parameters != lowered.parameters
+                || existing.return_value != lowered.return_value
+                || existing.runtime_pointer_return != lowered.runtime_pointer_return
+            {
+                return Err(BackendContractError::InvalidExternalSymbol);
+            }
+            continue;
+        }
+        unique.insert(lowered.symbol.clone(), lowered);
+    }
+    Ok(unique.into_values().collect())
 }
 
 fn append_buffer_allocate_external(
@@ -466,15 +494,18 @@ fn scalar_external(
     let symbol = symbols.get(&external.name).cloned().ok_or_else(|| {
         unsupported(external.span, format!("external symbol `{}` is unavailable", external.name))
     })?;
+    let runtime_pointer_return = (external.unsafe_boundary
+        && !external.module_import
+        && matches!(
+            external.return_type.as_ref().map(|return_type| return_type.ty.name.as_str()),
+            Some("Result" | "Array" | "Pack" | "Struct" | "Region")
+        ))
+        || matches!(signature.return_value.ty, BackendValueType::NichePointerOption { .. });
     Ok(BackendExternal {
         symbol,
         parameters: signature.parameters,
         return_value: signature.return_value,
-        runtime_pointer_return: !external.module_import
-            && matches!(
-                external.return_type.as_ref().map(|return_type| return_type.ty.name.as_str()),
-                Some("Result" | "Array" | "Pack" | "Struct" | "Region")
-            ),
+        runtime_pointer_return,
     })
 }
 
@@ -489,7 +520,16 @@ fn lower_external_signature(
         .iter()
         .map(|parameter| lower_parameter(parameter, layouts))
         .collect::<Result<Vec<_>, _>>()?;
-    let return_value = lower_return(external.return_type.as_ref(), layouts)?;
+    let mut return_value = lower_return(external.return_type.as_ref(), layouts)?;
+    let niche_layout = match (&return_value.ty, &return_value.passing) {
+        (BackendValueType::NichePointerOption { layout, .. }, BackendReturnMode::Direct) => {
+            Some(*layout)
+        }
+        _ => None,
+    };
+    if let Some(layout) = niche_layout {
+        return_value.passing = BackendReturnMode::ReturnSlot { layout };
+    }
     Ok(BackendSignature { symbol, parameters, return_value })
 }
 
@@ -586,6 +626,7 @@ pub(super) fn lower_shared_verb(
     performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: &BTreeMap<(String, String), Option<TypeName>>,
     parameter_modes: &BTreeMap<String, Vec<BackendPassingMode>>,
+    parameter_types: &BTreeMap<String, Vec<BackendValueType>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<super::BackendFunction, BackendContractError> {
@@ -597,6 +638,7 @@ pub(super) fn lower_shared_verb(
         return_nominal_types,
         return_payload_types,
         parameter_modes,
+        parameter_types,
         performance_symbols,
         performance_return_types,
         performance_return_nominal_types,

@@ -78,8 +78,10 @@ fn declare_functions(
         let id = module
             .declare_function(external.symbol.as_str(), Linkage::Import, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
-        declarations
-            .insert(external.symbol.as_str().to_owned(), runtime_declaration(id, external)?);
+        declarations.insert(
+            external.symbol.as_str().to_owned(),
+            runtime_declaration(module, id, external)?,
+        );
     }
     for function in &backend_module.functions {
         let signature = signature(
@@ -92,10 +94,8 @@ fn declare_functions(
         let id = module
             .declare_function(function.symbol.as_str(), Linkage::Export, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
-        declarations.insert(
-            function.symbol.as_str().to_owned(),
-            declaration(id, &function.parameters, &function.return_value)?,
-        );
+        let lowered = declaration(module, id, &function.parameters, &function.return_value)?;
+        declarations.insert(function.symbol.as_str().to_owned(), lowered);
     }
     cleanup::declare_cleanup_bridges(module, backend_module, &mut declarations)?;
     Ok(declarations)
@@ -128,8 +128,18 @@ fn signature(
         }
         crate::codegen::BackendReturnMode::ReturnSlot { layout } if runtime_pointer_return => {
             signature.returns.push(AbiParam::new(module.isa().pointer_type()));
+            if matches!(
+                return_value.ty,
+                crate::codegen::BackendValueType::NichePointerOption { .. }
+            ) {
+                signature.params.insert(0, AbiParam::new(module.isa().pointer_type()));
+            }
         }
         crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
+            if matches!(return_value.ty, BackendValueType::NichePointerOption { .. }) {
+                signature.params.insert(0, AbiParam::new(module.isa().pointer_type()));
+                return Ok(signature);
+            }
             if !matches!(return_value.ty, BackendValueType::Aggregate { layout: value_layout } | BackendValueType::Region { layout: value_layout } | BackendValueType::Enum { layout: crate::codegen::BackendEnumLayout { layout: value_layout, .. } } if value_layout == *layout)
             {
                 return Err(BackendEmitError(
@@ -142,7 +152,7 @@ fn signature(
     }
     Ok(signature)
 }
-fn parameter_types(
+pub(super) fn parameter_types(
     module: &ObjectModule,
     parameter: &crate::codegen::BackendParameter,
 ) -> Result<Vec<Type>, BackendEmitError> {
@@ -298,7 +308,18 @@ fn lower_blocks(
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
     aggregate_values: &mut BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
 ) -> Result<(), BackendEmitError> {
-    for block in &function.blocks {
+    let mut remaining = function.blocks.iter().collect::<Vec<_>>();
+    while !remaining.is_empty() {
+        let Some(index) = remaining
+            .iter()
+            .position(|block| block_inputs_are_available(block, values, aggregate_values))
+        else {
+            return Err(BackendEmitError(
+                "Cranelift neutral contract contains an unresolved block value dependency"
+                    .to_owned(),
+            ));
+        };
+        let block = remaining.remove(index);
         let native_block = blocks.get(&block.id).copied().ok_or_else(|| {
             BackendEmitError("Cranelift neutral contract block is missing".to_owned())
         })?;
@@ -319,6 +340,110 @@ fn lower_blocks(
         }
     }
     Ok(())
+}
+
+fn block_inputs_are_available(
+    block: &crate::codegen::BackendBlock,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+) -> bool {
+    let mut available = values
+        .keys()
+        .chain(aggregate_values.keys())
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    for instruction in &block.instructions {
+        if instruction_inputs(instruction).iter().any(|value| !available.contains(value)) {
+            return false;
+        }
+        if let Some(result) = instruction_result(instruction) {
+            available.insert(result);
+        }
+    }
+    true
+}
+
+fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId> {
+    match instruction {
+        BackendInstruction::Constant { result, .. }
+        | BackendInstruction::FloatConstant { result, .. }
+        | BackendInstruction::StringLiteral { result, .. }
+        | BackendInstruction::IntegerBinary { result, .. }
+        | BackendInstruction::IntegerCast { result, .. }
+        | BackendInstruction::FloatCast { result, .. }
+        | BackendInstruction::IntegerCompare { result, .. }
+        | BackendInstruction::FloatCompare { result, .. }
+        | BackendInstruction::IntegerUnary { result, .. }
+        | BackendInstruction::Call { result: Some(result), .. }
+        | BackendInstruction::EnumDiscriminant { result, .. }
+        | BackendInstruction::EnumPayload { result, .. }
+        | BackendInstruction::EnumPayloadBinding { result, .. }
+        | BackendInstruction::EnumConstruct { result, .. }
+        | BackendInstruction::ArenaConstruct { result, .. }
+        | BackendInstruction::ArenaPlace { result, .. }
+        | BackendInstruction::AggregateConstruct { result, .. }
+        | BackendInstruction::AggregateFieldLoad { result, .. }
+        | BackendInstruction::PackedFieldLoad { result, .. }
+        | BackendInstruction::ArrayElementLoad { result, .. }
+        | BackendInstruction::ScalarLoanLoad { result, .. }
+        | BackendInstruction::ScalarLoanMaterialize { result, .. } => Some(*result),
+        _ => None,
+    }
+}
+
+fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
+    match instruction {
+        BackendInstruction::IntegerBinary { left, right, .. }
+        | BackendInstruction::IntegerCompare { left, right, .. }
+        | BackendInstruction::FloatCompare { left, right, .. } => vec![*left, *right],
+        BackendInstruction::IntegerCast { source, .. }
+        | BackendInstruction::FloatCast { source, .. }
+        | BackendInstruction::IntegerUnary { operand: source, .. }
+        | BackendInstruction::TrapIfZero { value: source, .. }
+        | BackendInstruction::TrapIfShiftCountOutOfRange { count: source, .. }
+        | BackendInstruction::TrapIfArrayIndexOutOfBounds { index: source, .. }
+        | BackendInstruction::EnumDiscriminant { subject: source, .. }
+        | BackendInstruction::EnumPayload { subject: source, .. }
+        | BackendInstruction::EnumPayloadBinding { subject: source, .. } => vec![*source],
+        BackendInstruction::TrapIfSignedDivisionOverflow { left, right, .. } => vec![*left, *right],
+        BackendInstruction::EnumConstruct { payload, .. } => payload.iter().copied().collect(),
+        BackendInstruction::Call { arguments, .. } => arguments.clone(),
+        BackendInstruction::Branch { condition, then_arguments, else_arguments, .. } => {
+            std::iter::once(*condition)
+                .chain(then_arguments.iter().map(|argument| argument.value))
+                .chain(else_arguments.iter().map(|argument| argument.value))
+                .collect()
+        }
+        BackendInstruction::Jump { arguments, .. } => {
+            arguments.iter().map(|argument| argument.value).collect()
+        }
+        BackendInstruction::Return { value, .. } => value.iter().copied().collect(),
+        BackendInstruction::MemoryCopy { destination, source, .. } => vec![*destination, *source],
+        BackendInstruction::ScalarLoanLoad { address, .. } => vec![*address],
+        BackendInstruction::ScalarLoanStore { address, value, .. } => vec![*address, *value],
+        BackendInstruction::ScalarLoanMaterialize { value, .. } => vec![*value],
+        BackendInstruction::ArenaPlace { arena, value, .. } => vec![*arena, *value],
+        BackendInstruction::AggregateConstruct { fields, .. } => {
+            fields.iter().map(|field| field.value).collect()
+        }
+        BackendInstruction::AggregateFieldLoad { base, .. }
+        | BackendInstruction::PackedFieldLoad { base, .. }
+        | BackendInstruction::ArrayElementLoad { base, .. } => vec![*base],
+        BackendInstruction::AggregateFieldStore { base, value, .. }
+        | BackendInstruction::PackedFieldStore { base, value, .. } => vec![*base, *value],
+        BackendInstruction::ArrayElementStore { base, index, value, .. } => {
+            vec![*base, *index, *value]
+        }
+        BackendInstruction::Cleanup { operand, .. } => {
+            operand.iter().map(|item| item.value).collect()
+        }
+        BackendInstruction::Constant { .. }
+        | BackendInstruction::FloatConstant { .. }
+        | BackendInstruction::StringLiteral { .. }
+        | BackendInstruction::ArenaConstruct { .. }
+        | BackendInstruction::Fail { .. }
+        | BackendInstruction::Trap { .. } => Vec::new(),
+    }
 }
 
 fn append_block_parameters(

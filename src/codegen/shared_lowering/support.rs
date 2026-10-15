@@ -63,7 +63,7 @@ pub(super) fn backend_value_type(
     }
     let layout = layouts.layout_for(type_name)?;
     if type_name.name == "Region" {
-        return Some(super::super::BackendValueType::Region { layout });
+        return Some(super::super::BackendValueType::Pointer);
     }
     if matches!(type_name.name.as_str(), "Arena" | "Buffer" | "String") {
         return Some(super::super::BackendValueType::Pointer);
@@ -74,6 +74,9 @@ pub(super) fn backend_value_type(
                 layout: layout.layout,
                 payload_layout: None,
             });
+        }
+        if layout.payload.is_none() {
+            return Some(super::super::BackendValueType::Integer { signed: false, width: 32 });
         }
         return Some(super::super::BackendValueType::Enum { layout });
     }

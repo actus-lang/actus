@@ -148,9 +148,11 @@ pub(super) fn declare_cleanup_bridges(
             Declaration {
                 id,
                 parameter_fragments: vec![1, 1],
+                parameter_types: vec![Vec::new(), Vec::new()],
                 return_fragments: 1,
                 return_slot: None,
                 runtime_pointer_return: false,
+                runtime_niche_pointer_return: false,
                 runtime_result_layout: None,
             },
         );
@@ -186,14 +188,17 @@ pub(super) fn declare_cleanup_bridges(
         let id = module
             .declare_function(symbol, Linkage::Import, &signature)
             .map_err(|error| BackendEmitError(error.to_string()))?;
+        let parameter_count = parameter_fragments.len();
         declarations.insert(
             symbol.to_owned(),
             Declaration {
                 id,
                 parameter_fragments,
+                parameter_types: vec![Vec::new(); parameter_count],
                 return_fragments,
                 return_slot: None,
                 runtime_pointer_return: false,
+                runtime_niche_pointer_return: false,
                 runtime_result_layout: None,
             },
         );

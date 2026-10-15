@@ -54,51 +54,27 @@ pub(super) fn generic_inputs(
     plan: &crate::modules::ModuleCompilationPlan,
     configuration: &CompilerConfiguration,
 ) -> Result<(Vec<crate::ast::TypeName>, Vec<crate::semantic::GenericInstance>), BackendEmitError> {
-    let targeted_caller = crate::codegen::normalize_program(
-        &crate::semantic::filter_program_for_target(plan.caller(), configuration.target()),
-    );
-    let caller_instances = crate::semantic::analyze(&targeted_caller)
-        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
-        .generic_instances;
-    let mut generic_instances = caller_instances;
-    for unit in plan.units() {
-        if !contains_generic_declaration(unit.implementation()) {
-            continue;
-        }
-        let targeted_implementation =
-            crate::codegen::normalize_program(&crate::semantic::filter_program_for_target(
-                unit.implementation(),
-                configuration.target(),
-            ));
-        let implementation_instances = crate::semantic::analyze(&targeted_implementation)
-            .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
-            .generic_instances;
-        for instance in implementation_instances {
-            if !generic_instances.iter().any(|known| {
-                known.identity() == instance.identity() && known.caller == instance.caller
-            }) {
-                generic_instances.push(instance);
-            }
-        }
-    }
     let expansion_program = crate::codegen::normalize_program(
         &crate::semantic::filter_program_for_target(&plan.implementation(), configuration.target()),
     );
+    let generic_instances = crate::semantic::analyze(&expansion_program)
+        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
+        .generic_instances;
+    let mut unique_instances = Vec::with_capacity(generic_instances.len());
+    for instance in generic_instances {
+        if !unique_instances
+            .iter()
+            .any(|known: &crate::semantic::GenericInstance| known.identity() == instance.identity())
+        {
+            unique_instances.push(instance);
+        }
+    }
+    let generic_instances = unique_instances;
     let generic_instances =
         crate::codegen::expand_generic_instances(&expansion_program, &generic_instances)?;
     let generic_types =
         generic_instances.iter().flat_map(|instance| instance.arguments.iter().cloned()).collect();
     Ok((generic_types, generic_instances))
-}
-
-fn contains_generic_declaration(program: &crate::ast::Program) -> bool {
-    program.declarations.iter().any(|declaration| match declaration {
-        crate::ast::TopLevelDecl::Verb(verb) => !verb.generic_parameters.is_empty(),
-        crate::ast::TopLevelDecl::ExternalVerb(verb) => !verb.generic_parameters.is_empty(),
-        crate::ast::TopLevelDecl::Struct(definition) => !definition.generic_parameters.is_empty(),
-        crate::ast::TopLevelDecl::Enum(definition) => !definition.generic_parameters.is_empty(),
-        _ => false,
-    })
 }
 
 pub(super) fn lower_shared_modules(

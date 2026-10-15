@@ -196,7 +196,13 @@ pub(super) fn lower_payload(
             let ty = scalar_type(*payload_type)?;
             builder.ins().load(ty, MemFlagsData::new(), subject, layout.payload_offset as i32)
         }
-        BackendValueType::Pointer | BackendValueType::NichePointerOption { .. } => subject,
+        BackendValueType::Pointer => builder.ins().load(
+            module.isa().pointer_type(),
+            MemFlagsData::new(),
+            subject,
+            layout.payload_offset as i32,
+        ),
+        BackendValueType::NichePointerOption { .. } => subject,
         BackendValueType::Region { .. } => builder.ins().load(
             module.isa().pointer_type(),
             MemFlagsData::new(),
@@ -244,7 +250,10 @@ fn scalar_type(ty: BackendValueType) -> Result<Type, BackendEmitError> {
 fn is_scalar_payload(ty: BackendValueType) -> bool {
     matches!(
         ty,
-        BackendValueType::Bool | BackendValueType::Integer { .. } | BackendValueType::Region { .. }
+        BackendValueType::Bool
+            | BackendValueType::Integer { .. }
+            | BackendValueType::Pointer
+            | BackendValueType::Region { .. }
     )
 }
 

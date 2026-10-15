@@ -125,12 +125,12 @@ fn record_call_result(
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
     let Some(result) = result else { return Ok(()) };
-    if declaration.runtime_pointer_return {
-        record_runtime_pointer_result(&result_context, declaration, result, call, values)?;
-        return Ok(());
-    }
     if declaration.borrowed_view_return {
         values.insert(result, call);
+        return Ok(());
+    }
+    if declaration.runtime_pointer_return {
+        record_runtime_pointer_result(&result_context, declaration, result, call, values)?;
         return Ok(());
     }
     if let Some(slot) = return_slot {

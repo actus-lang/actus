@@ -103,6 +103,7 @@ pub(super) fn lower_shared_functions(
             &declarations.performance_return_types,
             &declarations.performance_return_nominal_types,
             &declarations.parameter_modes,
+            &declarations.parameter_types,
             external_symbols,
             bindings,
         )?);
@@ -124,6 +125,7 @@ pub(super) fn lower_shared_functions(
             &declarations.performance_return_types,
             &declarations.performance_return_nominal_types,
             &declarations.parameter_modes,
+            &declarations.parameter_types,
             external_symbols,
             bindings,
         )?);
@@ -145,6 +147,7 @@ fn lower_shared_performance(
     performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: &BTreeMap<(String, String), Option<crate::ast::TypeName>>,
     parameter_modes: &BTreeMap<String, Vec<BackendPassingMode>>,
+    parameter_types: &BTreeMap<String, Vec<BackendValueType>>,
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendFunction, BackendContractError> {
@@ -156,6 +159,7 @@ fn lower_shared_performance(
         return_nominal_types,
         return_payload_types,
         parameter_modes,
+        parameter_types,
         performance_symbols,
         performance_return_types,
         performance_return_nominal_types,

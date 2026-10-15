@@ -51,6 +51,12 @@ pub(super) fn lower_call(
     if let Some(value) = super::layout::lower_intrinsic(provider, callee, *span, instructions)? {
         return Ok(value);
     }
+    if is_scalar_copy_intrinsic(provider, callee) {
+        let [argument] = arguments.as_slice() else {
+            return Err(super::super::support::unsupported(*span, "copy requires one value"));
+        };
+        return provider.lower_expression(&argument.expression, instructions);
+    }
     if arguments.is_empty() && callee.starts_with("Array[") {
         return lower_array_constructor(provider, callee, *span, instructions);
     }
@@ -89,6 +95,11 @@ pub(super) fn lower_call(
     result.ok_or_else(|| {
         super::super::support::unsupported(*span, "unit call cannot produce a value")
     })
+}
+
+fn is_scalar_copy_intrinsic(provider: &SharedExpressionProvider<'_>, callee: &str) -> bool {
+    (callee == "copy" || callee.starts_with("copy__"))
+        && !provider.return_types.contains_key(callee)
 }
 
 fn remember_return_metadata(
@@ -160,6 +171,7 @@ fn lower_arguments(
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<LoweredArguments, BackendContractError> {
     let modes = provider.parameter_modes.get(callee).cloned().unwrap_or_default();
+    let parameter_types = provider.parameter_types.get(callee).cloned().unwrap_or_default();
     let mut values = Vec::with_capacity(arguments.len());
     let mut writebacks = Vec::new();
     for (index, argument) in arguments.iter().enumerate() {
@@ -172,12 +184,24 @@ fn lower_arguments(
                 span,
                 instructions,
             )?;
-            values.push(value);
+            values.push(coerce_call_argument(
+                provider,
+                value,
+                parameter_types.get(index).copied(),
+                span,
+                instructions,
+            ));
             continue;
         }
         let Some(BackendPassingMode::ExclusiveScalarLoan { ty }) = modes.get(index) else {
             let value = provider.lower_expression(&argument.expression, instructions)?;
-            values.push(value);
+            values.push(coerce_call_argument(
+                provider,
+                value,
+                parameter_types.get(index).copied(),
+                span,
+                instructions,
+            ));
             continue;
         };
         let (value, name, place) = match &argument.expression {
@@ -232,6 +256,32 @@ fn lower_arguments(
         writebacks.push(ScalarLoanWriteback { name, address, ty: *ty, place });
     }
     Ok(LoweredArguments { values, writebacks })
+}
+
+fn coerce_call_argument(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: BackendValueId,
+    expected: Option<BackendValueType>,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> BackendValueId {
+    let Some(BackendValueType::Integer { .. }) = expected else { return value };
+    let Some(source_type @ BackendValueType::Integer { .. }) = provider.value_type(value) else {
+        return value;
+    };
+    if Some(source_type) == expected {
+        return value;
+    }
+    let converted = provider.allocate();
+    provider.remember_value(converted, expected.expect("integer expected"));
+    instructions.push(BackendInstruction::IntegerCast {
+        result: converted,
+        source: value,
+        source_type,
+        target_type: expected.expect("integer expected"),
+        span,
+    });
+    converted
 }
 
 fn lower_aggregate_loan_argument(

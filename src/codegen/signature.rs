@@ -206,6 +206,8 @@ pub(crate) fn lower_return(
     let (ty, layout) = lower_type(&return_type.ty, layouts)?;
     let passing = if is_opaque_runtime_type(&return_type.ty) {
         BackendReturnMode::Direct
+    } else if let BackendValueType::NichePointerOption { layout, .. } = ty {
+        BackendReturnMode::ReturnSlot { layout }
     } else {
         layout.map_or(BackendReturnMode::Direct, |layout| BackendReturnMode::ReturnSlot { layout })
     };
@@ -258,6 +260,9 @@ fn lower_type(
                 None,
             ));
         }
+        if layout.payload.is_none() {
+            return Ok((BackendValueType::Integer { signed: false, width: 32 }, None));
+        }
         return Ok((BackendValueType::Enum { layout }, Some(layout.layout)));
     }
     let layout = layouts.layout_for(type_name).ok_or_else(|| {
@@ -266,16 +271,12 @@ fn lower_type(
             format!("no neutral layout is registered for `{}`", type_name.name),
         )
     })?;
-    let ty = if type_name.name == "Region" {
-        BackendValueType::Region { layout }
-    } else {
-        BackendValueType::Aggregate { layout }
-    };
+    let ty = BackendValueType::Aggregate { layout };
     Ok((ty, Some(layout)))
 }
 
 fn is_opaque_runtime_type(type_name: &TypeName) -> bool {
-    matches!(type_name.name.as_str(), "Arena" | "Buffer" | "String")
+    matches!(type_name.name.as_str(), "Arena" | "Buffer" | "String" | "Region")
 }
 
 fn passing_for(

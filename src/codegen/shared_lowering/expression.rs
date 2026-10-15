@@ -38,6 +38,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
     return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
     parameter_modes: &'a BTreeMap<String, Vec<BackendPassingMode>>,
+    parameter_types: &'a BTreeMap<String, Vec<BackendValueType>>,
     performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
     performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
     performance_return_nominal_types: &'a BTreeMap<(String, String), Option<crate::ast::TypeName>>,
@@ -67,6 +68,7 @@ impl<'a> SharedExpressionProvider<'a> {
         return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
         return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
         parameter_modes: &'a BTreeMap<String, Vec<BackendPassingMode>>,
+        call_parameter_types: &'a BTreeMap<String, Vec<BackendValueType>>,
         performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
         performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
         performance_return_nominal_types: &'a BTreeMap<
@@ -128,6 +130,7 @@ impl<'a> SharedExpressionProvider<'a> {
             return_nominal_types,
             return_payload_types,
             parameter_modes,
+            parameter_types: call_parameter_types,
             performance_symbols,
             performance_return_types,
             performance_return_nominal_types,

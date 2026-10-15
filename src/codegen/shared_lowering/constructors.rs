@@ -294,6 +294,18 @@ pub(super) fn lower_named_unit_enum(
         })
         .transpose()?;
     let result = provider.allocate();
+    if layout.payload.is_none() {
+        let value_type = BackendValueType::Integer { signed: false, width: 32 };
+        provider.remember_value(result, value_type);
+        provider.remember_nominal_type(result, type_name.clone());
+        instructions.push(BackendInstruction::Constant {
+            result,
+            ty: value_type,
+            value: u64::from(discriminant),
+            span,
+        });
+        return Ok(result);
+    }
     provider.remember_value(result, BackendValueType::Enum { layout });
     provider.remember_nominal_type(result, type_name.clone());
     if let Some(payload_type) = payload_type {
@@ -320,17 +332,29 @@ pub(super) fn lower_enum_variant_condition_value(
     let subject_type = provider
         .value_type(subject_value)
         .ok_or_else(|| unsupported(span, "enum case subject is not a neutral enum value"))?;
-    let layout = enum_case_layout(subject_type, span)?;
+    let layout = if matches!(subject_type, BackendValueType::Integer { .. }) {
+        provider
+            .nominal_type(subject_value)
+            .and_then(|type_name| provider.enum_layout(type_name))
+            .ok_or_else(|| unsupported(span, "unit enum case has no neutral layout"))?
+    } else {
+        enum_case_layout(subject_type, span)?
+    };
     let discriminant = enum_case_discriminant(provider, layout, subject_type, variant, span)?;
-    let actual = provider.allocate();
     let integer = BackendValueType::Integer { signed: false, width: 32 };
-    provider.remember_value(actual, integer);
-    instructions.push(BackendInstruction::EnumDiscriminant {
-        result: actual,
-        subject: subject_value,
-        layout,
-        span,
-    });
+    let actual = if matches!(subject_type, BackendValueType::Integer { .. }) {
+        subject_value
+    } else {
+        let actual = provider.allocate();
+        provider.remember_value(actual, integer);
+        instructions.push(BackendInstruction::EnumDiscriminant {
+            result: actual,
+            subject: subject_value,
+            layout,
+            span,
+        });
+        actual
+    };
     let expected = provider.allocate();
     provider.remember_value(expected, integer);
     instructions.push(BackendInstruction::Constant {

@@ -15,7 +15,9 @@ pub unsafe extern "C" fn actus_path_validate_storage(
     storage: BufferHandle,
     unit_width: i32,
 ) -> i32 {
-    let Some(buffer) = (unsafe { valid_buffer(storage) }) else { return -4 };
+    let Some(buffer) = (unsafe { valid_buffer(storage) }) else {
+        return -4;
+    };
     if unit_width != 1 && unit_width != 2 {
         return -2;
     }
@@ -28,7 +30,8 @@ pub unsafe extern "C" fn actus_path_validate_storage(
             return -3;
         }
         let payload = &bytes[..bytes.len() - 1];
-        return validate_posix(payload).map_or(-1, |_| 0);
+        let result = validate_posix(payload).map_or(-1, |_| 0);
+        return result;
     }
     if bytes.len() < 2 || bytes.len() % 2 != 0 || bytes[bytes.len() - 2..] != [0, 0] {
         return -3;
