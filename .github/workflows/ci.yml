@@ -108,6 +108,8 @@ jobs:
                 var stderr = process.StandardError.ReadToEnd();
                 process.WaitForExit();
                 if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
+                  // The official Windows archive does not ship the optional zlib/XML2 import libraries.
+                  stdout = Regex.Replace(stdout, @"(?i)(?:[A-Za-z]:[/\\][^\s]*[/\\])?(?:lib)?(?:z|xml2s?)\.lib", "");
                   stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\][^/\\\s]+\.lib", match => Path.GetFileName(match.Value));
                 }
                 Console.Write(stdout);
