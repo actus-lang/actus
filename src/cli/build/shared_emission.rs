@@ -3,9 +3,10 @@ use crate::configuration::CompilerConfiguration;
 use crate::modules::ModuleObjectPlan;
 
 pub(super) fn retain_reachable_root_functions(
-    mut module: crate::codegen::BackendModule,
+    module: &mut crate::codegen::BackendModule,
     entry_symbol: &str,
-) -> crate::codegen::BackendModule {
+    required_symbols: &std::collections::BTreeSet<String>,
+) {
     let functions = module
         .functions
         .iter()
@@ -13,6 +14,7 @@ pub(super) fn retain_reachable_root_functions(
         .collect::<std::collections::BTreeMap<_, _>>();
     let mut reachable = std::collections::BTreeSet::new();
     let mut pending = std::collections::VecDeque::from([entry_symbol.to_owned()]);
+    pending.extend(required_symbols.iter().cloned());
     while let Some(symbol) = pending.pop_front() {
         if !reachable.insert(symbol.clone()) {
             continue;
@@ -40,7 +42,6 @@ pub(super) fn retain_reachable_root_functions(
         }
     }
     module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
-    module
 }
 
 pub(super) struct LoweredSharedModule {
@@ -94,12 +95,19 @@ pub(super) fn lower_shared_modules(
             );
             let program = crate::codegen::specialize_program(&targeted, generic_instances)?;
             let entry_symbol = (index == 0).then_some(symbol);
-            let module = crate::codegen::lower_program_to_backend_module_for_target(
+            let performance_context = (index != 0).then(|| {
+                (
+                    object_plan.units()[0].namespace().symbol_prefix(),
+                    object_plan.units()[0].program(),
+                )
+            });
+            let module = crate::codegen::lower_program_to_backend_module_for_target_with_context(
                 unit.namespace().symbol_prefix(),
                 &program,
                 entry_symbol,
                 Some(bindings),
                 configuration.target(),
+                performance_context,
             )
             .map_err(|error| {
                 let error = error
@@ -111,8 +119,6 @@ pub(super) fn lower_shared_modules(
                 };
                 BackendEmitError(format!("{backend} {location} failed: {error}"))
             })?;
-            let module =
-                if index == 0 { retain_reachable_root_functions(module, symbol) } else { module };
             Ok(LoweredSharedModule {
                 namespace: unit.namespace().symbol_prefix().to_owned(),
                 object_name: if index == 0 {
@@ -124,5 +130,26 @@ pub(super) fn lower_shared_modules(
                 module,
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>()
+        .map(|mut modules| {
+            let required_symbols = modules
+                .iter()
+                .skip(1)
+                .flat_map(|lowered| lowered.module.functions.iter())
+                .flat_map(|function| function.blocks.iter())
+                .flat_map(|block| block.instructions.iter())
+                .filter_map(|instruction| match instruction {
+                    crate::codegen::BackendInstruction::Call { callee, .. }
+                        if callee.kind() == crate::codegen::SymbolKind::Performance =>
+                    {
+                        Some(callee.as_str().to_owned())
+                    }
+                    _ => None,
+                })
+                .collect();
+            if let Some(root) = modules.first_mut() {
+                retain_reachable_root_functions(&mut root.module, symbol, &required_symbols);
+            }
+            modules
+        })
 }

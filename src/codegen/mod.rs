@@ -50,7 +50,7 @@ pub use model::{
 };
 #[cfg(test)]
 pub(crate) use shared_lowering::lower_program_to_backend_module;
-pub(crate) use shared_lowering::lower_program_to_backend_module_for_target;
+pub(crate) use shared_lowering::lower_program_to_backend_module_for_target_with_context;
 #[doc(hidden)]
 pub use shared_lowering::lower_scalar_program;
 pub(crate) use signature::lower_verb_with_expressions_as;

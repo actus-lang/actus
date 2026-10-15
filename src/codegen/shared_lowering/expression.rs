@@ -94,7 +94,10 @@ impl<'a> SharedExpressionProvider<'a> {
             .map(|parameter| parameter.name.clone())
             .collect();
         let mut parameter_types = state::parameter_types(verb, layouts);
-        let nominal_types = aggregate::parameter_nominal_types(verb, layouts);
+        let mut nominal_types = aggregate::parameter_nominal_types(verb, layouts);
+        for (index, parameter) in verb.params.iter().enumerate() {
+            nominal_types.insert(BackendValueId(index as u32), parameter.ty.clone());
+        }
         let enum_payload_types = state::enum_payload_types(verb, layouts);
         let mut scalar_loan_parameters = Vec::new();
         let mut next_value = verb.params.len() as u32;
@@ -118,6 +121,9 @@ impl<'a> SharedExpressionProvider<'a> {
             let ty = parameter_types[&address];
             parameter_bindings.insert(parameter.name.clone(), loaded);
             parameter_types.insert(loaded, ty);
+            if let Some(type_name) = nominal_types.get(&address).cloned() {
+                nominal_types.insert(loaded, type_name);
+            }
             scalar_loan_parameters.push((parameter.name.clone(), address, loaded, ty));
         }
         Self {

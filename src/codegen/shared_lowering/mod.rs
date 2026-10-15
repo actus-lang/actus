@@ -55,17 +55,43 @@ pub(crate) fn lower_program_to_backend_module_for_target(
     bindings: Option<&BackendSymbolBindings>,
     target: &TargetSpec,
 ) -> Result<BackendModule, BackendContractError> {
+    lower_program_to_backend_module_for_target_with_context(
+        namespace, program, entry_name, bindings, target, None,
+    )
+}
+
+pub(crate) fn lower_program_to_backend_module_for_target_with_context(
+    namespace: &str,
+    program: &Program,
+    entry_name: Option<&str>,
+    bindings: Option<&BackendSymbolBindings>,
+    target: &TargetSpec,
+    performance_context: Option<(&str, &Program)>,
+) -> Result<BackendModule, BackendContractError> {
     let layouts = ProgramLayouts::new(program, namespace);
-    let semantic = crate::semantic::analyze(program).map_err(|error| {
+    let analysis_program = performance_context
+        .map(|(_, context)| program_with_performance_context(program, context))
+        .unwrap_or_else(|| program.clone());
+    let semantic = crate::semantic::analyze(&analysis_program).map_err(|error| {
         unsupported(
             crate::lexer::SourceSpan::new(0, 0),
             format!("semantic analysis failed: {error:?}"),
         )
     })?;
-    reject_floating_point_on_freestanding(program, &semantic, target)?;
-    reject_implicit_large_aggregate_allocation(&semantic, &layouts, target)?;
-    let mut module = lower_program_to_backend_module_with_layouts(
-        namespace, program, entry_name, bindings, &layouts,
+    reject_floating_point_on_freestanding(&analysis_program, &semantic, target)?;
+    reject_implicit_large_aggregate_allocation(
+        &semantic,
+        &ProgramLayouts::new(&analysis_program, namespace),
+        target,
+    )?;
+    let mut module = lower_program_to_backend_module_with_layouts_and_context(
+        namespace,
+        program,
+        entry_name,
+        bindings,
+        &layouts,
+        performance_context,
+        &analysis_program,
     )?;
     for function in &mut module.functions {
         function.hosted_entry_return = target.entry_contract() == EntryContract::Hosted
@@ -74,6 +100,18 @@ pub(crate) fn lower_program_to_backend_module_for_target(
     }
     module.validate()?;
     Ok(module)
+}
+
+fn program_with_performance_context(program: &Program, context: &Program) -> Program {
+    let mut declarations = program.declarations.clone();
+    declarations.extend(
+        context
+            .declarations
+            .iter()
+            .filter(|declaration| matches!(declaration, TopLevelDecl::Perform(_)))
+            .cloned(),
+    );
+    Program { file_metadata: program.file_metadata.clone(), declarations }
 }
 
 fn reject_floating_point_on_freestanding(
@@ -177,21 +215,23 @@ fn reject_implicit_large_aggregate_allocation(
     Ok(())
 }
 
-pub(crate) fn lower_program_to_backend_module_with_layouts(
+fn lower_program_to_backend_module_with_layouts_and_context(
     namespace: &str,
     program: &Program,
     entry_name: Option<&str>,
     bindings: Option<&BackendSymbolBindings>,
     layouts: &impl BackendLayoutProvider,
+    performance_context: Option<(&str, &Program)>,
+    analysis_program: &Program,
 ) -> Result<BackendModule, BackendContractError> {
-    let declarations = SharedDeclarations::new(namespace, program, layouts)?;
-    let semantic = crate::semantic::analyze(program).map_err(|error| {
+    let declarations = SharedDeclarations::new(namespace, program, layouts, performance_context)?;
+    let semantic = crate::semantic::analyze(analysis_program).map_err(|error| {
         unsupported(
             crate::lexer::SourceSpan::new(0, 0),
             format!("semantic analysis failed: {error:?}"),
         )
     })?;
-    let cleanup_provider = ProgramLayouts::new(program, namespace);
+    let cleanup_provider = ProgramLayouts::new(analysis_program, namespace);
     let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
     let external_symbols = scalar_external_symbols(namespace, &declarations.externals, bindings)?;
     let functions = lower_shared_functions(
@@ -211,6 +251,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
         )?,
         functions,
     };
+    append_performance_externals(&mut module.externals, &declarations.performance_externals)?;
     let mut runtime_symbols = referenced_runtime_symbols(&module.functions);
     if module
         .externals
@@ -303,6 +344,7 @@ pub(super) struct SharedDeclarations<'program> {
     performance_return_nominal_types: BTreeMap<(String, String), Option<TypeName>>,
     parameter_modes: BTreeMap<String, Vec<BackendPassingMode>>,
     parameter_types: BTreeMap<String, Vec<BackendValueType>>,
+    performance_externals: Vec<BackendExternal>,
 }
 
 impl<'program> SharedDeclarations<'program> {
@@ -310,6 +352,7 @@ impl<'program> SharedDeclarations<'program> {
         namespace: &str,
         program: &'program Program,
         layouts: &impl BackendLayoutProvider,
+        performance_context: Option<(&str, &'program Program)>,
     ) -> Result<Self, BackendContractError> {
         let (verbs, externals) = scalar_declarations(program)?;
         let performances = scalar_performances(program);
@@ -323,11 +366,25 @@ impl<'program> SharedDeclarations<'program> {
                 lower_performance_signature(namespace, perform, method, layouts)
             })
             .collect::<Result<Vec<_>, _>>()?;
+        let context_performances = performance_context
+            .map(|(_, context)| scalar_performances(context))
+            .unwrap_or_default();
+        let context_performance_signatures = performance_context
+            .map(|(context_namespace, _)| {
+                context_performances
+                    .iter()
+                    .map(|(perform, method)| {
+                        lower_performance_signature(context_namespace, perform, method, layouts)
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
         let external_signatures = externals
             .iter()
             .map(|external| lower_external_signature(external, layouts))
             .collect::<Result<Vec<_>, _>>()?;
-        let return_types = shared_return_types(
+        let mut return_types = shared_return_types(
             &verbs,
             &externals,
             &signatures,
@@ -335,12 +392,45 @@ impl<'program> SharedDeclarations<'program> {
             &performances,
             &performance_signatures,
         );
-        let return_payload_types =
+        for ((_, method), signature) in
+            context_performances.iter().zip(&context_performance_signatures)
+        {
+            return_types.insert(
+                method.name.clone(),
+                (signature.return_value.ty != BackendValueType::Unit)
+                    .then_some(signature.return_value.ty),
+            );
+        }
+        let mut return_payload_types =
             shared_return_payload_types(&verbs, &externals, layouts, &performances);
-        let return_nominal_types =
+        return_payload_types
+            .extend(shared_return_payload_types_for_performances(&context_performances, layouts));
+        let mut return_nominal_types =
             performance::shared_return_nominal_types(&verbs, &externals, &performances);
-        let (performance_symbols, performance_return_types, performance_return_nominal_types) =
-            performance::performance_dispatch_maps(&performances, &performance_signatures);
+        return_nominal_types.extend(context_performances.iter().map(|(_, method)| {
+            (
+                method.name.clone(),
+                method.return_type.as_ref().map(|return_type| return_type.ty.clone()),
+            )
+        }));
+        let (
+            mut performance_symbols,
+            mut performance_return_types,
+            mut performance_return_nominal_types,
+        ) = performance::performance_dispatch_maps(&performances, &performance_signatures);
+        let (context_symbols, context_return_types, context_return_nominal_types) =
+            performance::performance_dispatch_maps(
+                &context_performances,
+                &context_performance_signatures,
+            );
+        performance_symbols.extend(context_symbols);
+        performance_return_types.extend(context_return_types);
+        performance_return_nominal_types.extend(context_return_nominal_types);
+        let performance_externals = context_performances
+            .iter()
+            .zip(context_performance_signatures.iter())
+            .map(|((_, _), signature)| performance_external(signature))
+            .collect::<Result<Vec<_>, _>>()?;
         let parameter_modes = verbs
             .iter()
             .zip(&signatures)
@@ -395,6 +485,7 @@ impl<'program> SharedDeclarations<'program> {
             performance_return_nominal_types,
             parameter_modes,
             parameter_types,
+            performance_externals,
         })
     }
 }
@@ -419,6 +510,45 @@ fn build_backend_externals(
         unique.insert(lowered.symbol.clone(), lowered);
     }
     Ok(unique.into_values().collect())
+}
+
+fn append_performance_externals(
+    externals: &mut Vec<BackendExternal>,
+    performance_externals: &[BackendExternal],
+) -> Result<(), BackendContractError> {
+    let mut known = externals
+        .iter()
+        .map(|external| external.symbol.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    for external in performance_externals {
+        if let Some(existing) =
+            externals.iter().find(|candidate| candidate.symbol == external.symbol)
+        {
+            if existing.parameters != external.parameters
+                || existing.return_value != external.return_value
+                || existing.runtime_pointer_return != external.runtime_pointer_return
+            {
+                return Err(BackendContractError::InvalidExternalSymbol);
+            }
+            continue;
+        }
+        if known.insert(external.symbol.clone()) {
+            externals.push(external.clone());
+        }
+    }
+    Ok(())
+}
+
+fn performance_external(
+    signature: &BackendSignature,
+) -> Result<BackendExternal, BackendContractError> {
+    Ok(BackendExternal {
+        symbol: SymbolIdentity::external_raw(signature.symbol.as_str())
+            .map_err(|_| BackendContractError::InvalidExternalSymbol)?,
+        parameters: signature.parameters.clone(),
+        return_value: signature.return_value.clone(),
+        runtime_pointer_return: false,
+    })
 }
 
 fn append_buffer_allocate_external(
@@ -659,6 +789,22 @@ fn shared_return_payload_types(
             )
             .map(|types| (method.name.clone(), types))
         }))
+        .collect()
+}
+
+fn shared_return_payload_types_for_performances(
+    performances: &[(&PerformDecl, &VerbDecl)],
+    layouts: &impl BackendLayoutProvider,
+) -> BTreeMap<String, [Option<BackendValueType>; 2]> {
+    performances
+        .iter()
+        .filter_map(|(_, method)| {
+            result_payload_types(
+                method.return_type.as_ref().map(|return_type| &return_type.ty),
+                layouts,
+            )
+            .map(|types| (method.name.clone(), types))
+        })
         .collect()
 }
 
