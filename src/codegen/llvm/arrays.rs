@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use llvm_sys::core::{
     LLVMBuildAnd, LLVMBuildGEP2, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMul,
-    LLVMBuildOr, LLVMBuildShl, LLVMBuildStore, LLVMBuildZExt, LLVMConstInt, LLVMInt8TypeInContext,
-    LLVMInt64TypeInContext,
+    LLVMBuildOr, LLVMBuildShl, LLVMBuildStore, LLVMBuildZExtOrBitCast, LLVMConstInt,
+    LLVMInt8TypeInContext, LLVMInt64TypeInContext,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
@@ -189,17 +189,25 @@ fn array_element_address(
     element_layout: super::super::BackendLayout,
 ) -> Result<LLVMValueRef, BackendEmitError> {
     let index_type = unsafe { LLVMInt64TypeInContext(context) };
-    let index =
-        unsafe { LLVMBuildZExt(builder, index, index_type, c"array.index".as_ptr().cast()) };
+    let index = unsafe {
+        LLVMBuildZExtOrBitCast(builder, index, index_type, c"array.index".as_ptr().cast())
+    };
+    if index.is_null() {
+        return Err(BackendEmitError("LLVM failed to normalize array index".to_owned()));
+    }
     let scale = unsafe { LLVMConstInt(index_type, u64::from(element_layout.size), 0) };
     let offset = unsafe { LLVMBuildMul(builder, index, scale, c"array.offset".as_ptr().cast()) };
+    if offset.is_null() {
+        return Err(BackendEmitError("LLVM failed to calculate array element offset".to_owned()));
+    }
+    let mut indices = [offset];
     let address = unsafe {
         LLVMBuildGEP2(
             builder,
             LLVMInt8TypeInContext(context),
             base,
-            &offset as *const _ as *mut _,
-            1,
+            indices.as_mut_ptr(),
+            indices.len() as u32,
             c"array.element".as_ptr().cast(),
         )
     };
