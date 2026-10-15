@@ -362,7 +362,8 @@ pub(super) fn lower_enum_variant_condition_value(
     } else {
         enum_case_layout(subject_type, span)?
     };
-    let discriminant = enum_case_discriminant(provider, layout, subject_type, variant, span)?;
+    let discriminant =
+        enum_case_discriminant(provider, subject_value, layout, subject_type, variant, span)?;
     let integer = BackendValueType::Integer { signed: false, width: 32 };
     let actual = if matches!(subject_type, BackendValueType::Integer { .. }) {
         subject_value
@@ -418,6 +419,7 @@ fn enum_case_layout(
 
 fn enum_case_discriminant(
     provider: &SharedExpressionProvider<'_>,
+    subject: BackendValueId,
     layout: BackendEnumLayout,
     subject_type: BackendValueType,
     variant: &str,
@@ -432,7 +434,9 @@ fn enum_case_discriminant(
         "Some" => Ok(0),
         "None" => Ok(1),
         _ => provider
-            .enum_variant_for_layout(layout, variant)
+            .nominal_type(subject)
+            .and_then(|type_name| provider.enum_variant(type_name, variant))
+            .or_else(|| provider.enum_variant_for_layout(layout, variant))
             .map(|(id, _)| id)
             .ok_or_else(|| unsupported(span, "unknown enum case variant")),
     }

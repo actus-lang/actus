@@ -90,7 +90,9 @@ fn enum_case_discriminant(
         _ => {
             let layout = neutral_enum_layout(provider, subject, span)?;
             provider
-                .enum_variant_for_layout(layout, variant)
+                .nominal_type(subject)
+                .and_then(|type_name| provider.enum_variant(type_name, variant))
+                .or_else(|| provider.enum_variant_for_layout(layout, variant))
                 .map(|(id, _)| id)
                 .ok_or_else(|| unsupported(span, "unknown enum case variant"))
         }

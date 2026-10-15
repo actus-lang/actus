@@ -139,10 +139,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 else_arguments: Vec::new(),
                 span: branch.span,
             });
-            let (matched, value) =
+            let (matched, branch_value) =
                 self.lower_case_value_branch(matched_id, branch, mode, subject_value, span)?;
-            if let Some(value) = value {
-                branch_values.push((matched.id, value));
+            if let Some((value_block, value)) = branch_value {
+                branch_values.push((value_block, value));
             }
             self.blocks.push(matched);
             self.advance_case_owner_branch(
@@ -202,7 +202,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         mode: crate::ast::CaseMode,
         subject: super::BackendValueId,
         span: SourceSpan,
-    ) -> Result<(BackendBlock, Option<super::BackendValueId>), BackendContractError> {
+    ) -> Result<(BackendBlock, Option<(BackendBlockId, super::BackendValueId)>), BackendContractError>
+    {
         self.provider.enter_scope(branch.span);
         let mut instructions = Vec::new();
         if matches!(branch.pattern, Pattern::Variant { .. }) {
@@ -216,6 +217,13 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             )?;
         }
         let value = match &branch.body {
+            CaseBody::Expression(expression)
+                if matches!(expression.as_ref(), Expr::Case { .. }) =>
+            {
+                let (entry, merge_id, value) =
+                    self.lower_nested_case_value(id, expression, span, instructions)?;
+                return Ok((entry, Some((merge_id, value))));
+            }
             CaseBody::Expression(expression) => {
                 self.provider.lower_expression(expression, &mut instructions)?
             }
@@ -241,7 +249,51 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         };
         self.provider.exit_scope(branch.span, &mut instructions)?;
         self.provider.value_type(value).ok_or_else(|| unsupported(span, "case branch type"))?;
-        Ok((BackendBlock { parameters: Vec::new(), id, instructions }, Some(value)))
+        Ok((BackendBlock { parameters: Vec::new(), id, instructions }, Some((id, value))))
+    }
+
+    fn lower_nested_case_value(
+        &mut self,
+        id: BackendBlockId,
+        expression: &Expr,
+        span: SourceSpan,
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<(BackendBlock, BackendBlockId, BackendValueId), BackendContractError> {
+        let Expr::Case { mode, subject, branches, .. } = expression else {
+            return Err(unsupported(span, "nested enum case expected"));
+        };
+        let lowered =
+            self.lower_case_owner_branches(id, *mode, subject, branches, span, instructions)?;
+        let Some((_, first_value)) = lowered.branch_values.first().copied() else {
+            return Err(unsupported(span, "empty nested enum case"));
+        };
+        let result_type = self
+            .provider
+            .value_type(first_value)
+            .ok_or_else(|| unsupported(span, "nested case result type is unavailable"))?;
+        let result = self.provider.allocate_value(result_type);
+        self.blocks.push(BackendBlock {
+            parameters: vec![BackendBlockParameter { value: result, ty: result_type, span }],
+            id: lowered.merge_id,
+            instructions: Vec::new(),
+        });
+        self.attach_case_value_branches(
+            lowered.branch_values,
+            lowered.merge_id,
+            result_type,
+            span,
+        )?;
+        let entry = if let Some(entry_instructions) = lowered.entry_instructions {
+            self.blocks.push(BackendBlock {
+                parameters: Vec::new(),
+                id: lowered.current_id,
+                instructions: lowered.instructions,
+            });
+            BackendBlock { parameters: Vec::new(), id, instructions: entry_instructions }
+        } else {
+            BackendBlock { parameters: Vec::new(), id, instructions: lowered.instructions }
+        };
+        Ok((entry, lowered.merge_id, result))
     }
 }
 
