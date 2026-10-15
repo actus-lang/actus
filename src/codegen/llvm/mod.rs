@@ -12,6 +12,7 @@ mod enums;
 mod failures;
 mod float;
 mod guards;
+mod instruction;
 mod integer;
 mod literals;
 mod memory;
@@ -19,6 +20,8 @@ mod module;
 mod object;
 mod packed;
 mod returns;
+mod scalar;
+mod scalar_loan;
 mod values;
 mod verification;
 
