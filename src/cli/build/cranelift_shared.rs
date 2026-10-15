@@ -1,4 +1,4 @@
-use super::emission::{EmittedObject, declared_symbols};
+use super::emission::EmittedObject;
 use crate::codegen::{BackendEmitError, BackendSymbolBindings};
 use crate::configuration::CompilerConfiguration;
 use crate::modules::ModuleObjectPlan;
@@ -28,16 +28,12 @@ pub(super) fn emit_shared_scalar_units(
             Ok(EmittedObject {
                 name: lowered.object_name,
                 bytes,
-                symbols: declared_symbols(
-                    &lowered.program,
-                    &lowered.namespace,
-                    if lowered.namespace == object_plan.units()[0].namespace().symbol_prefix() {
-                        symbol
-                    } else {
-                        ""
-                    },
-                    bindings,
-                )?,
+                symbols: lowered
+                    .module
+                    .functions
+                    .iter()
+                    .map(|function| function.symbol.as_str().to_owned())
+                    .collect(),
             })
         })
         .collect()
@@ -68,16 +64,12 @@ pub(super) fn emit_shared_specialized_units(
             Ok(EmittedObject {
                 name: lowered.object_name,
                 bytes,
-                symbols: declared_symbols(
-                    &lowered.program,
-                    &lowered.namespace,
-                    if lowered.namespace == object_plan.units()[0].namespace().symbol_prefix() {
-                        symbol
-                    } else {
-                        ""
-                    },
-                    bindings,
-                )?,
+                symbols: lowered
+                    .module
+                    .functions
+                    .iter()
+                    .map(|function| function.symbol.as_str().to_owned())
+                    .collect(),
             })
         })
         .collect()

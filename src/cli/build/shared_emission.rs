@@ -53,11 +53,7 @@ fn retain_reachable_functions(
 }
 
 pub(super) struct LoweredSharedModule {
-    #[cfg(feature = "cranelift")]
-    pub(super) namespace: String,
     pub(super) object_name: String,
-    #[cfg(feature = "cranelift")]
-    pub(super) program: crate::ast::Program,
     pub(super) module: BackendModule,
 }
 
@@ -118,6 +114,9 @@ pub(super) fn lower_shared_modules(
     for (module, reachable) in modules.iter_mut().skip(1).zip(reachable_modules) {
         module.module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
     }
+    for module in &mut modules {
+        retain_referenced_externals(&mut module.module);
+    }
     Ok(modules)
 }
 
@@ -145,14 +144,7 @@ fn lower_unit_module(
     });
     let module =
         lower_unit_backend_module(object_plan, index, &program, performance_context, context)?;
-    Ok(LoweredSharedModule {
-        #[cfg(feature = "cranelift")]
-        namespace: unit.namespace().symbol_prefix().to_owned(),
-        object_name: unit_object_name(unit, index),
-        #[cfg(feature = "cranelift")]
-        program,
-        module,
-    })
+    Ok(LoweredSharedModule { object_name: unit_object_name(unit, index), module })
 }
 
 fn lower_unit_backend_module(
@@ -273,4 +265,33 @@ fn called_symbols_in_function(
             _ => None,
         })
         .collect()
+}
+
+fn retain_referenced_externals(module: &mut crate::codegen::BackendModule) {
+    let mut referenced = module
+        .functions
+        .iter()
+        .flat_map(|function| function.blocks.iter())
+        .flat_map(|block| block.instructions.iter())
+        .filter_map(|instruction| match instruction {
+            crate::codegen::BackendInstruction::Call { callee, .. } => {
+                Some(callee.as_str().to_owned())
+            }
+            _ => None,
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    if referenced.contains(crate::runtime::REGION_OPEN_SYMBOL)
+        || module.functions.iter().any(|function| {
+            function.parameters.iter().any(|parameter| {
+                parameter.ty == crate::codegen::BackendValueType::Pointer
+                    && matches!(
+                        parameter.passing,
+                        crate::codegen::BackendPassingMode::OwnershipTransfer { .. }
+                    )
+            })
+        })
+    {
+        referenced.insert(crate::runtime::BUFFER_DROP_SYMBOL.to_owned());
+    }
+    module.externals.retain(|external| referenced.contains(external.symbol.as_str()));
 }

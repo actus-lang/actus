@@ -195,47 +195,6 @@ fn emit_objects_cranelift(
 }
 
 #[cfg(feature = "cranelift")]
-pub(super) fn declared_symbols(
-    program: &crate::ast::Program,
-    namespace: &str,
-    entry_symbol: &str,
-    bindings: &crate::codegen::BackendSymbolBindings,
-) -> Result<std::collections::BTreeSet<String>, BackendEmitError> {
-    let mut names = Vec::new();
-    for declaration in &program.declarations {
-        match declaration {
-            crate::ast::TopLevelDecl::Verb(verb) => {
-                let symbol = if verb.name == entry_symbol {
-                    verb.name.clone()
-                } else {
-                    crate::codegen::SymbolIdentity::new(
-                        namespace,
-                        crate::codegen::SymbolKind::Verb,
-                        &verb.name,
-                    )
-                    .map_err(|error| BackendEmitError(error.to_string()))?
-                    .as_str()
-                    .to_owned()
-                };
-                names.push(symbol);
-            }
-            crate::ast::TopLevelDecl::ExternalVerb(verb) => {
-                names.push(
-                    bindings
-                        .external_symbol(
-                            namespace,
-                            verb.native_symbol.as_deref().unwrap_or(&verb.name),
-                        )
-                        .to_owned(),
-                );
-            }
-            _ => {}
-        }
-    }
-    Ok(names.into_iter().collect())
-}
-
-#[cfg(feature = "cranelift")]
 fn module_bindings(
     plan: &crate::modules::ModuleObjectPlan,
     generic_instances: &[crate::semantic::GenericInstance],
