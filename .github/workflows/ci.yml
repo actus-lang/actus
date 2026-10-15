@@ -55,10 +55,6 @@ jobs:
           if (-not $linker.StartsWith($vcLinkDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
             throw "MSVC linker was not selected: $linker"
           }
-          # The LLVM archive and its vcpkg dependencies are built with the
-          # static MSVC CRT (/MT). Keep Rust test binaries on the same CRT so
-          # the in-process LLVM C API does not cross CRT allocator boundaries.
-          "RUSTFLAGS=-C target-feature=+crt-static" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Set up LLVM 23 (Unix)
         if: runner.os != 'Windows'
@@ -124,6 +120,31 @@ jobs:
           Copy-StaticLibrary @('zstd_static', 'zstd') 'zstd_static.lib'
           Copy-StaticLibrary @('libxml2s', 'libxml2', 'xml2s') 'xml2s.lib'
           "LIB=$llvmDependencyLib;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $windowsKitLib = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Lib'
+          $windowsKitVersion = Get-ChildItem -Path $windowsKitLib -Directory |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if (-not $windowsKitVersion) {
+            throw "Windows SDK library directory was not found: $windowsKitLib"
+          }
+          $windowsSdkUm = Join-Path $windowsKitVersion.FullName 'um\x64'
+          $windowsSdkUcrt = Join-Path $windowsKitVersion.FullName 'ucrt\x64'
+          foreach ($libraryPath in @($windowsSdkUm, $windowsSdkUcrt)) {
+            if (-not (Test-Path $libraryPath)) {
+              throw "Windows SDK library path was not found: $libraryPath"
+            }
+          }
+          # The LLVM archive and its vcpkg dependencies are built with the
+          # static MSVC CRT (/MT). Keep Rust test binaries on the same CRT and
+          # expose the SDK/static dependency directories to rustc's native
+          # library lookup as well as the linker environment.
+          $rustFlags = @(
+            '-C', 'target-feature=+crt-static',
+            '-L', "native=$llvmDependencyLib",
+            '-L', "native=$windowsSdkUm",
+            '-L', "native=$windowsSdkUcrt"
+          ) -join ' '
+          "RUSTFLAGS=$rustFlags" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $realConfig = Join-Path $bin 'llvm-config-real.exe'
           Move-Item (Join-Path $bin 'llvm-config.exe') $realConfig
           $wrapper = Join-Path $bin 'llvm-config.exe'
