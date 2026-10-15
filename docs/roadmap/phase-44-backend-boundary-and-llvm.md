@@ -1461,16 +1461,30 @@ Gate 44.8 acceptance evidence (2026-10-15):
 
 ## Gate 44.9 — Documentation and migration completion
 
-- [ ] Update the language handbook with backend selection and target profiles.
-- [ ] Document Cranelift and LLVM installation, version, and availability
+- [x] Update the language handbook with backend selection and target profiles.
+- [x] Document Cranelift and LLVM installation, version, and availability
       requirements separately.
-- [ ] Document supported targets, unsupported combinations, runtime providers,
+- [x] Document supported targets, unsupported combinations, runtime providers,
       object formats, linkers, and rollback behavior.
-- [ ] Add troubleshooting guidance for missing LLVM, linker, sysroot, runtime,
+- [x] Add troubleshooting guidance for missing LLVM, linker, sysroot, runtime,
       or target capability failures.
-- [ ] Record the final architecture decision and migration impact.
-- [ ] Close this phase only when every claim has reproducible evidence and the
+- [x] Record the final architecture decision and migration impact.
+- [x] Close this phase only when every claim has reproducible evidence and the
       original Cranelift checkpoint remains recoverable.
+
+Gate 44.9 acceptance evidence (2026-10-15):
+
+- The handbook now links `docs/guide/compiler/backends-and-support.md`, which
+  records separate Cranelift/LLVM installation requirements, feature/version
+  availability, backend selection, target profiles, runtime providers, object
+  formats, linkers, rollback, and troubleshooting guidance.
+- ADR-0082 records the final shared-lowering architecture, the separation
+  between neutral lowering and backend emission, the migration impact, the
+  recoverable Cranelift checkpoint, and the explicit limits of the evidence.
+- Gate 44.8 provides the reproducible validation baseline for this gate:
+  full test/coverage, backend-only matrices, strict Actus tests, dependency
+  and license checks, source/architecture/documentation checks, and hosted vs
+  freestanding evidence separation.
 
 The neutral aggregate layout now records whether a struct field is stored
 indirectly for `abs` and `ins` fields. Shared field lowering emits a pointer

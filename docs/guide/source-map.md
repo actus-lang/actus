@@ -34,7 +34,7 @@ destination unless a separate destination is named.
 | LSP and editor behavior | `compiler/diagnostics.md`, `workflow/debugging.md`, `agent-reference/diagnostic-decision-tree.md` | Explain editor behavior for users and diagnostic investigation for agents. |
 | Formatter rules | `language/formatting.md`, `workflow/formatting.md` | Separate language formatting behavior from commands and workflow. |
 | Diagnostics and error design | `compiler/diagnostics.md`, `agent-reference/diagnostic-decision-tree.md` | Provide user-facing error reading and agent-facing investigation paths. |
-| Native and embedded-oriented design rules | `compiler/native-builds.md`, `compiler/hosted-and-freestanding.md`, `language/packs.md`, `library/runtime-profiles.md` | Split language constructs, native output, and runtime/target boundaries. |
+| Native and embedded-oriented design rules | `compiler/native-builds.md`, `compiler/backends-and-support.md`, `compiler/hosted-and-freestanding.md`, `language/packs.md`, `library/runtime-profiles.md` | Split backend selection, native output, and runtime/target boundaries. |
 | What is not currently safe to assume | `agent-reference/evidence-and-scope.md`, `compiler/compiler-boundaries.md` | Keep unavailable or design-only features as explicit usage boundaries. |
 | Recommended coding patterns | `language/verbs-and-contracts.md`, `ownership/moves-and-reuse.md`, `library/errors/README.md` | Place each pattern beside the language or API it demonstrates. |
 | Agent workflow checklist | `agent-reference/reading-order.md`, `agent-reference/source-change-checklist.md`, `agent-reference/repository-boundaries.md` | Preserve the checklist as a separate agent reference. |

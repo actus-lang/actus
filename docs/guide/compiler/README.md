@@ -10,6 +10,7 @@ project configuration controls checking, native output, and runtime boundaries.
 - [Targets and profiles](targets-and-profiles.md)
 - [Hosted and freestanding builds](hosted-and-freestanding.md)
 - [Native builds](native-builds.md)
+- [Backends and support matrix](backends-and-support.md)
 - [Object and executable output](object-and-executable-output.md)
 - [Foreign functions and dispatch](ffi-and-dispatch.md)
 - [Diagnostics](diagnostics.md)
