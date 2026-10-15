@@ -1631,6 +1631,7 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     let startup_object = root.join("startup.o");
     let actus_object = root.join("boot.o");
     let image = root.join("image.elf");
+    let linker = arm_linker();
 
     run_native_command(
         Command::new("clang")
@@ -1666,7 +1667,7 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     emit_object(&module, &target, &actus_object).expect("ARM Actus object should be emitted");
 
     run_native_command(
-        Command::new("rust-lld")
+        Command::new(linker)
             .args(["-flavor", "gnu", "-T"])
             .arg(&linker_script)
             .arg(&startup_object)
@@ -1744,6 +1745,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let startup_object = root.join("startup.o");
     let actus_object = root.join("boot.o");
     let image = root.join("image.elf");
+    let linker = arm_linker();
 
     run_native_command(
         Command::new("clang")
@@ -1818,7 +1820,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
         .expect("Actus object with an external provider call should be emitted");
 
     run_native_command(
-        Command::new("rust-lld")
+        Command::new(linker)
             .args(["-flavor", "gnu", "-T"])
             .arg(&linker_script)
             .arg(&startup_object)
@@ -2956,6 +2958,19 @@ fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
             &cranelift_executable,
         ],
     );
+}
+
+#[cfg(target_os = "linux")]
+fn arm_linker() -> &'static str {
+    if std::process::Command::new("ld.lld")
+        .arg("--version")
+        .status()
+        .is_ok_and(|status| status.success())
+    {
+        "ld.lld"
+    } else {
+        "rust-lld"
+    }
 }
 
 #[cfg(target_os = "linux")]

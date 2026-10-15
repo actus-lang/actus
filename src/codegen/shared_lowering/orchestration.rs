@@ -44,7 +44,13 @@ pub(crate) fn lower_program_to_backend_module_for_target(
     target: &TargetSpec,
 ) -> Result<BackendModule, BackendContractError> {
     lower_program_to_backend_module_for_target_with_context(
-        namespace, program, entry_name, bindings, target, None,
+        namespace,
+        program,
+        entry_name,
+        bindings,
+        target,
+        target.entry_contract(),
+        None,
     )
 }
 
@@ -54,6 +60,7 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
     entry_name: Option<&str>,
     bindings: Option<&BackendSymbolBindings>,
     target: &TargetSpec,
+    entry_contract: EntryContract,
     performance_context: Option<(&str, &Program)>,
 ) -> Result<BackendModule, BackendContractError> {
     let layouts = ProgramLayouts::new(program, namespace);
@@ -66,11 +73,12 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
             format!("semantic analysis failed: {error:?}"),
         )
     })?;
-    reject_floating_point_on_freestanding(&analysis_program, &semantic, target)?;
+    reject_floating_point_on_freestanding(&analysis_program, &semantic, target, entry_contract)?;
     reject_implicit_large_aggregate_allocation(
         &semantic,
         &ProgramLayouts::new(&analysis_program, namespace),
         target,
+        entry_contract,
     )?;
     let mut module = lower_program_to_backend_module_with_layouts_and_context(
         namespace,
@@ -82,7 +90,7 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
         &analysis_program,
     )?;
     for function in &mut module.functions {
-        function.hosted_entry_return = target.entry_contract() == EntryContract::Hosted
+        function.hosted_entry_return = entry_contract == EntryContract::Hosted
             && entry_name == Some(function.symbol.as_str())
             && function.return_value.ty == BackendValueType::Unit;
     }
@@ -130,8 +138,9 @@ fn reject_floating_point_on_freestanding(
     program: &Program,
     semantic: &crate::semantic::SemanticModel,
     target: &TargetSpec,
+    entry_contract: EntryContract,
 ) -> Result<(), BackendContractError> {
-    if target.entry_contract() == EntryContract::Hosted {
+    if entry_contract == EntryContract::Hosted {
         return Ok(());
     }
     let Some(span) = find_floating_point_span(program, semantic) else { return Ok(()) };
@@ -197,8 +206,9 @@ fn reject_implicit_large_aggregate_allocation(
     semantic: &crate::semantic::SemanticModel,
     layouts: &ProgramLayouts<'_>,
     target: &TargetSpec,
+    entry_contract: EntryContract,
 ) -> Result<(), BackendContractError> {
-    if target.entry_contract() == EntryContract::Hosted {
+    if entry_contract == EntryContract::Hosted {
         return Ok(());
     }
     for (binding_index, type_name) in &semantic.binding_type_names {

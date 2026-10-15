@@ -31,10 +31,35 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
 
-      - name: Set up LLVM 23
+      - name: Set up LLVM 23 (Unix)
+        if: runner.os != 'Windows'
         uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
         with:
           llvm-version: 23
+
+      - name: Set up LLVM 23.1.2 development archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '23.1.2'
+          $archiveName = "clang+llvm-$version-x86_64-pc-windows-msvc.tar.xz"
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/$archiveName"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $expected = '8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095'
+          $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "LLVM archive checksum mismatch: expected $expected, got $actual"
+          }
+          $installRoot = Join-Path $env:RUNNER_TEMP "llvm-$version"
+          New-Item -ItemType Directory -Force $installRoot | Out-Null
+          tar -xf $archive -C $installRoot --strip-components=1
+          $bin = Join-Path $installRoot 'bin'
+          if (-not (Test-Path (Join-Path $bin 'llvm-config.exe'))) {
+            throw "LLVM development archive does not contain llvm-config.exe"
+          }
+          "$bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "LLVM_PATH=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Export LLVM build environment (Unix)
         if: runner.os != 'Windows'

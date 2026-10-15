@@ -15,16 +15,23 @@ fn fixture_root(name: &str, backend: &str) -> PathBuf {
         .join(format!("actus-backend-parity-{name}-{backend}-{}", std::process::id()))
 }
 
-fn write_fixture(root: &Path, backend: &str, target: Option<&str>, source: &str) -> PathBuf {
+fn write_fixture(
+    root: &Path,
+    backend: &str,
+    target: Option<&str>,
+    entry_contract: Option<&str>,
+    source: &str,
+) -> PathBuf {
     let source_root = root.join("src");
     fs::create_dir_all(&source_root).expect("create parity fixture source directory");
     let target_line = target.map_or(String::new(), |value| format!("target = \"{value}\"\n"));
+    let entry_line =
+        entry_contract.map_or(String::new(), |value| format!("entry_contract = \"{value}\"\n"));
     fs::write(
         root.join("Actus.toml"),
         format!(
-            "[package]\nname = \"backend-parity\"\nversion = \"0.1.0\"\nsource_root = \"src\"\nentry = \"{}\"\n\n[build]\nruntime = \"std\"\nbackend = \"{backend}\"\n{target_line}entry_contract = \"{}\"\nverify_no_float_ir = true\n",
-            if target.is_some() { "boot" } else { "main" },
-            if target.is_some() { "freestanding" } else { "hosted" }
+            "[package]\nname = \"backend-parity\"\nversion = \"0.1.0\"\nsource_root = \"src\"\nentry = \"{}\"\n\n[build]\nruntime = \"std\"\nbackend = \"{backend}\"\n{target_line}{entry_line}verify_no_float_ir = true\n",
+            if target.is_some() || entry_contract.is_some() { "boot" } else { "main" },
         ),
     )
     .expect("write parity fixture manifest");
@@ -81,7 +88,7 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
     let mut statuses = Vec::new();
     for backend in BACKENDS {
         let root = fixture_root("hosted", backend);
-        let input = write_fixture(&root, backend, None, SOURCE);
+        let input = write_fixture(&root, backend, None, None, SOURCE);
         let output = root.join("main");
         let build = build(&root, &input, &output, "exe");
         assert!(
@@ -102,7 +109,7 @@ fn hosted_cli_backends_share_float_constants_and_comparisons() {
     let source = "verb main() -> Int { erg temperature: f32 = 21.5; erg pressure: f64 = 1013.25; return case temperature < 22.0f32 && pressure > 1000.0 { true => 42, _ => 1, }; }\n";
     for backend in BACKENDS {
         let root = fixture_root("float-hosted", backend);
-        let input = write_fixture(&root, backend, None, source);
+        let input = write_fixture(&root, backend, None, None, source);
         let manifest = root.join("Actus.toml");
         let contents = fs::read_to_string(&manifest).expect("read float parity manifest");
         fs::write(
@@ -129,7 +136,7 @@ fn freestanding_cli_backends_preserve_symbols_and_zero_float_evidence() {
     let mut undefined = Vec::new();
     for backend in BACKENDS {
         let root = fixture_root("freestanding", backend);
-        let input = write_fixture(&root, backend, Some("x86_64-unknown-uefi"), SOURCE);
+        let input = write_fixture(&root, backend, None, Some("freestanding"), SOURCE);
         let output = root.join("main.o");
         let build = build(&root, &input, &output, "obj");
         assert!(
@@ -165,7 +172,7 @@ fn freestanding_cli_backends_share_large_aggregate_failure_class() {
     let source = "struct Cell { erg value: u8, } verb boot() -> Int { erg cells: Array[Cell, 131072] = Array[Cell, 131072](); return cells[0].value as Int; }\n";
     for backend in BACKENDS {
         let root = fixture_root("failure", backend);
-        let input = write_fixture(&root, backend, Some("thumbv7em-none-eabihf"), source);
+        let input = write_fixture(&root, backend, Some("thumbv7em-none-eabihf"), None, source);
         let output = root.join("main.o");
         let build = build(&root, &input, &output, "obj");
         assert!(!build.status.success(), "{backend} must reject implicit allocation");
@@ -188,7 +195,7 @@ fn freestanding_cli_backends_reject_float_at_shared_target_boundary() {
     let source = "verb boot() -> Int { erg sample: f32 = 1.5f32; return case sample > 1.0f32 { true => 0, _ => 1, }; }\n";
     for backend in BACKENDS {
         let root = fixture_root("float-freestanding", backend);
-        let input = write_fixture(&root, backend, Some("x86_64-unknown-uefi"), source);
+        let input = write_fixture(&root, backend, None, Some("freestanding"), source);
         let output = root.join("main.o");
         let build = build(&root, &input, &output, "obj");
         assert!(!build.status.success(), "{backend} must reject freestanding float");

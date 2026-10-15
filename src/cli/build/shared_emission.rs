@@ -169,6 +169,7 @@ fn lower_unit_backend_module(
         (index == 0).then_some(context.symbol),
         Some(context.bindings),
         context.configuration.target(),
+        context.configuration.entry_contract(),
         performance_context,
     )
     .map_err(|error| {
