@@ -65,12 +65,11 @@ fn referenced_undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
         for (_, relocation) in section.relocations() {
             let RelocationTarget::Symbol(index) = relocation.target() else { continue };
             let symbol = file.symbol_by_index(index).expect("relocation symbol should exist");
-            if symbol.is_undefined() {
-                if let Ok(name) = symbol.name() {
-                    if name.starts_with("actus_") {
-                        symbols.insert(name.to_owned());
-                    }
-                }
+            if symbol.is_undefined()
+                && let Ok(name) = symbol.name()
+                && name.starts_with("actus_")
+            {
+                symbols.insert(name.to_owned());
             }
         }
     }

@@ -181,13 +181,16 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let block = &normalized;
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
-            if matches!(
-                statement,
-                Stmt::OwnerDecl { initializer: Expr::Try { .. }, .. }
-                    | Stmt::Assignment { value: Expr::Try { .. }, .. }
-                    | Stmt::Return { value: Some(Expr::Try { .. }), .. }
-                    | Stmt::Expression { expression: Expr::Try { .. }, .. }
-            ) {
+            if is_case_condition(statement) {
+                return self.lower_case_condition_statement(
+                    id,
+                    block,
+                    index,
+                    statement,
+                    fallthrough,
+                );
+            }
+            if is_try_statement(statement) {
                 return self.lower_try_statement(
                     id,
                     block,
@@ -342,6 +345,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<(), BackendContractError> {
         match target {
             Place::Binding { name, .. } => {
+                if matches!(value, Expr::StructLit { .. }) {
+                    return self.provider.assign_aggregate_owner(name, value, span, instructions);
+                }
                 let value = self.provider.lower_expression(value, instructions)?;
                 self.provider.assign_owner(name, value, span)
             }
@@ -406,4 +412,18 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             self.provider.lower_integer_binary(operation, current, value, span, instructions)?;
         self.provider.assign_owner(name, result, span)
     }
+}
+
+fn is_case_condition(statement: &Stmt) -> bool {
+    matches!(statement, Stmt::If { condition: Expr::Case { .. }, .. })
+}
+
+fn is_try_statement(statement: &Stmt) -> bool {
+    matches!(
+        statement,
+        Stmt::OwnerDecl { initializer: Expr::Try { .. }, .. }
+            | Stmt::Assignment { value: Expr::Try { .. }, .. }
+            | Stmt::Return { value: Some(Expr::Try { .. }), .. }
+            | Stmt::Expression { expression: Expr::Try { .. }, .. }
+    )
 }

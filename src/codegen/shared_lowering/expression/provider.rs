@@ -189,6 +189,30 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         ))
     }
 
+    fn assign_aggregate_owner(
+        &mut self,
+        name: &str,
+        value: &Expr,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        let Expr::StructLit { fields, .. } = value else {
+            return Err(unsupported(span, "aggregate assignment requires a struct literal"));
+        };
+        let object = Expr::Identifier { name: name.to_owned(), span };
+        for field in fields {
+            aggregate::lower_field_assignment(
+                self,
+                &object,
+                &field.name,
+                &field.value,
+                field.span,
+                instructions,
+            )?;
+        }
+        Ok(())
+    }
+
     fn lower_integer_binary(
         &mut self,
         operation: BackendIntegerBinaryOp,

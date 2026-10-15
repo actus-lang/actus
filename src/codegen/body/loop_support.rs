@@ -64,12 +64,15 @@ fn collect_statement_assignment_names(statement: &Stmt, names: &mut Vec<String>)
     }
 }
 
-fn collect_expression_assignment_names(expression: &Expr, names: &mut Vec<String>) {
+pub(super) fn collect_expression_assignment_names(expression: &Expr, names: &mut Vec<String>) {
     match expression {
         Expr::Case { branches, .. } => {
             for branch in branches {
-                if let CaseBody::Block(block) = &branch.body {
-                    collect_assignment_names(block, names);
+                match &branch.body {
+                    CaseBody::Block(block) => collect_assignment_names(block, names),
+                    CaseBody::Expression(expression) => {
+                        collect_expression_assignment_names(expression, names)
+                    }
                 }
             }
         }

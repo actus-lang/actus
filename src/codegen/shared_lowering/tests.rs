@@ -259,11 +259,11 @@ fn lowers_partial_aggregate_cleanup_with_remaining_field_descriptor() {
         .iter()
         .flat_map(|function| function.blocks.iter().flat_map(|block| block.instructions.iter()))
         .find_map(|instruction| match instruction {
-            BackendInstruction::Cleanup { action, operand: Some(operand), .. }
-                if matches!(action, BackendCleanupAction::DropBindingFields { .. }) =>
-            {
-                Some(operand)
-            }
+            BackendInstruction::Cleanup {
+                action: BackendCleanupAction::DropBindingFields { .. },
+                operand: Some(operand),
+                ..
+            } => Some(operand),
             _ => None,
         })
         .expect("remaining aggregate field should have a neutral cleanup descriptor");

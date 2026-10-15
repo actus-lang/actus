@@ -34,9 +34,31 @@ pub(super) fn define_function(
     )?;
     let mut function_context = FunctionBuilderContext::new();
     lower_function_body(module, function, declarations, &mut context, &mut function_context)?;
-    module
-        .define_function(declaration.id, &mut context)
-        .map_err(|error| BackendEmitError(format!("Cranelift verifier failed: {error:?}")))?;
+    module.define_function(declaration.id, &mut context).map_err(|error| {
+        let calls = function
+            .blocks
+            .iter()
+            .flat_map(|block| block.instructions.iter())
+            .filter_map(|instruction| match instruction {
+                BackendInstruction::Call { callee, arguments, .. } => {
+                    let declaration = declarations.get(callee.as_str());
+                    Some(format!(
+                        "{} args={} declared={} return_slot={}",
+                        callee.as_str(),
+                        arguments.len(),
+                        declaration.map_or(0, |value| value.parameter_fragments.len()),
+                        declaration.is_some_and(|value| value.return_slot.is_some()),
+                    ))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        BackendEmitError(format!(
+            "Cranelift verifier failed for native function `{}`: {error:?}; calls: {calls}",
+            function.symbol.as_str(),
+        ))
+    })?;
     module.clear_context(&mut context);
     Ok(())
 }

@@ -134,6 +134,16 @@ pub trait BackendExpressionProvider {
         Err(unsupported(span, "assignment"))
     }
 
+    fn assign_aggregate_owner(
+        &mut self,
+        _name: &str,
+        _value: &Expr,
+        span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Err(unsupported(span, "aggregate assignment"))
+    }
+
     fn assign_field(
         &mut self,
         _object: &Expr,

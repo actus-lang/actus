@@ -10,6 +10,17 @@ use crate::codegen::{BackendContractError, BackendInstruction, BackendValueId};
 use super::super::SharedExpressionProvider;
 use super::super::support::{expression_span, unsupported};
 
+type ArrayElementLocationParts = (
+    BackendValueId,
+    BackendValueId,
+    crate::codegen::BackendLayout,
+    crate::codegen::BackendLayout,
+    TypeName,
+    crate::codegen::BackendValueType,
+    u32,
+    bool,
+);
+
 pub(super) fn parameter_nominal_types(
     verb: &crate::ast::VerbDecl,
     layouts: &dyn crate::codegen::BackendLayoutProvider,
@@ -44,19 +55,7 @@ pub(super) fn lower_array_element_location(
     index: &Expr,
     span: crate::lexer::SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
-) -> Result<
-    (
-        BackendValueId,
-        BackendValueId,
-        crate::codegen::BackendLayout,
-        crate::codegen::BackendLayout,
-        TypeName,
-        crate::codegen::BackendValueType,
-        u32,
-        bool,
-    ),
-    BackendContractError,
-> {
+) -> Result<ArrayElementLocationParts, BackendContractError> {
     let location =
         arrays::lower_array_element_location(provider, collection, index, span, instructions)?;
     Ok((

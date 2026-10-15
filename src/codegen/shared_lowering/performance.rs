@@ -1,6 +1,3 @@
-// Performance lowering receives the complete neutral backend context.
-#![allow(clippy::too_many_arguments)]
-
 use std::collections::BTreeMap;
 
 use crate::ast::{ExternalVerbDecl, TypeName};
@@ -8,20 +5,31 @@ use crate::ast::{PerformDecl, VerbDecl};
 
 use super::super::{
     BackendBlockId, BackendCleanupPlan, BackendContractError, BackendFunction, BackendInstruction,
-    BackendLayoutProvider, BackendPassingMode, BackendSignature, BackendSymbolBindings,
-    BackendValueType, SymbolIdentity,
+    BackendLayoutProvider, BackendSignature, BackendSymbolBindings, BackendValueType,
+    SymbolIdentity,
 };
 use super::expression::SharedExpressionProvider;
 use super::{SharedDeclarations, lower_shared_verb};
 
-pub(super) fn performance_dispatch_maps(
-    performances: &[(&PerformDecl, &VerbDecl)],
-    signatures: &[BackendSignature],
-) -> (
+type PerformanceDispatchMaps = (
     BTreeMap<(String, String), SymbolIdentity>,
     BTreeMap<(String, String), Option<BackendValueType>>,
     BTreeMap<(String, String), Option<TypeName>>,
-) {
+);
+
+struct PerformanceLoweringContext<'a, 'program, L: BackendLayoutProvider + ?Sized> {
+    namespace: &'a str,
+    layouts: &'a L,
+    declarations: &'a SharedDeclarations<'program>,
+    cleanup_plans: &'a [BackendCleanupPlan],
+    external_symbols: &'a BTreeMap<String, SymbolIdentity>,
+    bindings: Option<&'a BackendSymbolBindings>,
+}
+
+pub(super) fn performance_dispatch_maps(
+    performances: &[(&PerformDecl, &VerbDecl)],
+    signatures: &[BackendSignature],
+) -> PerformanceDispatchMaps {
     let symbols = performances
         .iter()
         .zip(signatures)
@@ -87,6 +95,14 @@ pub(super) fn lower_shared_functions(
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<Vec<BackendFunction>, BackendContractError> {
+    let context = PerformanceLoweringContext {
+        namespace,
+        layouts,
+        declarations,
+        cleanup_plans,
+        external_symbols,
+        bindings,
+    };
     let mut functions =
         Vec::with_capacity(declarations.verbs.len() + declarations.performances.len());
     for verb in &declarations.verbs {
@@ -112,69 +128,46 @@ pub(super) fn lower_shared_functions(
         declarations.performances.iter().zip(&declarations.performance_signatures)
     {
         functions.push(lower_shared_performance(
-            namespace,
+            &context,
             perform,
             method,
             signature.symbol.clone(),
-            layouts,
-            cleanup_plans,
-            &declarations.return_types,
-            &declarations.return_nominal_types,
-            &declarations.return_payload_types,
-            &declarations.performance_symbols,
-            &declarations.performance_return_types,
-            &declarations.performance_return_nominal_types,
-            &declarations.parameter_modes,
-            &declarations.parameter_types,
-            external_symbols,
-            bindings,
         )?);
     }
     Ok(functions)
 }
 
-fn lower_shared_performance(
-    namespace: &str,
+fn lower_shared_performance<L: BackendLayoutProvider>(
+    context: &PerformanceLoweringContext<'_, '_, L>,
     _perform: &PerformDecl,
     method: &VerbDecl,
     symbol: SymbolIdentity,
-    layouts: &impl BackendLayoutProvider,
-    cleanup_plans: &[BackendCleanupPlan],
-    return_types: &BTreeMap<String, Option<BackendValueType>>,
-    return_nominal_types: &BTreeMap<String, Option<crate::ast::TypeName>>,
-    return_payload_types: &BTreeMap<String, [Option<BackendValueType>; 2]>,
-    performance_symbols: &BTreeMap<(String, String), SymbolIdentity>,
-    performance_return_types: &BTreeMap<(String, String), Option<BackendValueType>>,
-    performance_return_nominal_types: &BTreeMap<(String, String), Option<crate::ast::TypeName>>,
-    parameter_modes: &BTreeMap<String, Vec<BackendPassingMode>>,
-    parameter_types: &BTreeMap<String, Vec<BackendValueType>>,
-    external_symbols: &BTreeMap<String, SymbolIdentity>,
-    bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendFunction, BackendContractError> {
     let mut provider = SharedExpressionProvider::new(
-        namespace,
+        context.namespace,
         method,
-        layouts,
-        return_types,
-        return_nominal_types,
-        return_payload_types,
-        parameter_modes,
-        parameter_types,
-        performance_symbols,
-        performance_return_types,
-        performance_return_nominal_types,
-        external_symbols,
-        bindings,
-        cleanup_plans,
+        context.layouts,
+        &context.declarations.return_types,
+        &context.declarations.return_nominal_types,
+        &context.declarations.return_payload_types,
+        &context.declarations.parameter_modes,
+        &context.declarations.parameter_types,
+        &context.declarations.performance_symbols,
+        &context.declarations.performance_return_types,
+        &context.declarations.performance_return_nominal_types,
+        context.external_symbols,
+        context.bindings,
+        context.cleanup_plans,
     );
     let mut function = super::lower_verb_with_expressions_as(
         symbol,
         method,
-        layouts,
+        context.layouts,
         &mut provider,
         BackendBlockId(0),
     )?;
-    function.cleanup = cleanup_plans
+    function.cleanup = context
+        .cleanup_plans
         .iter()
         .filter(|plan| plan.span.start >= method.span.start && plan.span.end <= method.span.end)
         .cloned()

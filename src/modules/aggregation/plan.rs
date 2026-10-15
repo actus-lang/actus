@@ -279,16 +279,29 @@ pub(super) fn qualify_import_path(importer: &str, imported: &str) -> String {
 }
 
 fn append_public_declarations(target: &mut Vec<TopLevelDecl>, unit: &ModuleUnit) {
-    target.extend(
-        unit.implementation()
-            .declarations
-            .iter()
-            .filter(|declaration| {
-                let Some((kind, name)) = export_identity(declaration) else { return false };
-                unit.exports().contains(kind, &name)
-            })
-            .map(caller_declaration),
-    );
+    for declaration in unit.implementation().declarations.iter().filter(|declaration| {
+        let Some((kind, name)) = export_identity(declaration) else { return false };
+        unit.exports().contains(kind, &name)
+    }) {
+        let imported = caller_declaration(declaration);
+        if !has_compatible_external_declaration(target, &imported) {
+            target.push(imported);
+        }
+    }
+}
+
+fn has_compatible_external_declaration(
+    declarations: &[TopLevelDecl],
+    candidate: &TopLevelDecl,
+) -> bool {
+    let Some((candidate_kind, candidate_name)) = export_identity(candidate) else { return false };
+    let Some(candidate_contract) = external_contract(candidate) else { return false };
+    declarations.iter().any(|declaration| {
+        let Some((kind, name)) = export_identity(declaration) else { return false };
+        kind == candidate_kind
+            && name == candidate_name
+            && external_contract(declaration).as_ref() == Some(&candidate_contract)
+    })
 }
 
 fn caller_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {

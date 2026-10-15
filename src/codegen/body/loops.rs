@@ -328,7 +328,7 @@ pub(super) struct LoopValues {
     exit_carried: Vec<super::super::BackendValueId>,
 }
 
-pub(super) struct CarriedBinding {
+pub(crate) struct CarriedBinding {
     pub(super) name: String,
     pub(super) value: super::super::BackendValueId,
     pub(super) ty: BackendValueType,

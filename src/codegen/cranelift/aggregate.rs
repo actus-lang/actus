@@ -167,7 +167,14 @@ fn prepare_call_arguments(
     BackendEmitError,
 > {
     let address = if declaration.niche_pointer_return {
-        function_return_slot
+        if let Some(address) = function_return_slot {
+            Some(address)
+        } else if let Some(layout) = declaration.return_slot {
+            let slot = create_return_slot(builder, layout)?;
+            Some(builder.ins().stack_addr(module.isa().pointer_type(), slot, 0))
+        } else {
+            None
+        }
     } else if let Some(layout) = declaration.return_slot {
         let slot = create_return_slot(builder, layout)?;
         Some(builder.ins().stack_addr(module.isa().pointer_type(), slot, 0))

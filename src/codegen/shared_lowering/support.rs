@@ -24,6 +24,7 @@ pub(super) fn scalar_integer_type(type_name: &TypeName) -> Option<(bool, u8)> {
         "u16" => Some((false, 16)),
         "u32" => Some((false, 32)),
         "u64" => Some((false, 64)),
+        "Usize" => Some((false, 64)),
         _ => None,
     }
 }

@@ -337,8 +337,7 @@ pub(super) fn lower_integer_unary(
         BackendIntegerUnaryOp::LogicalNot => {
             let value_type = builder.func.dfg.value_type(operand);
             let zero = builder.ins().iconst(value_type, 0);
-            let condition = builder.ins().icmp(IntCC::Equal, operand, zero);
-            condition
+            builder.ins().icmp(IntCC::Equal, operand, zero)
         }
         BackendIntegerUnaryOp::BitwiseNot => builder.ins().bnot(operand),
     };

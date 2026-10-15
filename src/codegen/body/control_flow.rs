@@ -1,8 +1,9 @@
 // Structured control-flow lowering for the body backend.
 
 use super::case_value::CaseOwnerInput;
+use super::loop_support::collect_assignment_names;
 use super::{BackendBlock, BackendBlockId, BackendContractError, BackendInstruction, BodyLowering};
-use crate::ast::{Block, Expr, Stmt};
+use crate::ast::{Block, CaseBody, Expr, Stmt};
 
 struct CaseExpressionStatementInput<'a> {
     id: BackendBlockId,
@@ -15,6 +16,30 @@ struct CaseExpressionStatementInput<'a> {
 }
 
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
+    pub(super) fn lower_case_condition_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        statement: &Stmt,
+        fallthrough: Option<BackendBlockId>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let Stmt::If { condition, span, .. } = statement else { unreachable!() };
+        let name = format!("__case_condition_{}", id.0);
+        let mut statements = block.statements.clone();
+        statements[index] = Stmt::OwnerDecl {
+            role: crate::ast::Role::Erg,
+            name: name.clone(),
+            ty: None,
+            initializer: condition.clone(),
+            span: *span,
+        };
+        if let Stmt::If { condition, .. } = &mut statements[index + 1] {
+            *condition = Expr::Identifier { name, span: *span };
+        }
+        self.lower_block_in_scope(id, &Block { statements, span: block.span }, fallthrough)
+    }
+
     pub(super) fn lower_structured_statement(
         &mut self,
         id: BackendBlockId,
@@ -182,14 +207,58 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             mut instructions,
         } = input;
         let continuation_id = self.allocate_block();
-        let case_block =
-            self.lower_case_statement(id, expression, span, continuation_id, &mut instructions)?;
+        let carried = self.case_carried_bindings(expression);
+        let (case_block, continuation_parameters) = if carried.is_empty() {
+            (
+                self.lower_case_statement(
+                    id,
+                    expression,
+                    span,
+                    continuation_id,
+                    &mut instructions,
+                )?,
+                Vec::new(),
+            )
+        } else {
+            self.lower_case_statement_with_carried(
+                id,
+                expression,
+                span,
+                continuation_id,
+                &carried,
+                instructions,
+            )?
+        };
         let continuation =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
-        let continuation_block =
+        let mut continuation_block =
             self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
+        continuation_block.parameters = continuation_parameters;
         self.blocks.push(continuation_block);
         Ok(BackendBlock { parameters: Vec::new(), id, instructions: case_block.instructions })
+    }
+
+    fn case_carried_bindings(&self, expression: &Expr) -> Vec<super::loops::CarriedBinding> {
+        let Expr::Case { branches, .. } = expression else { return Vec::new() };
+        let mut names = Vec::new();
+        for branch in branches {
+            if let CaseBody::Block(block) = &branch.body {
+                collect_assignment_names(block, &mut names);
+            }
+        }
+        names.sort();
+        names.dedup();
+        names
+            .into_iter()
+            .filter_map(|name| {
+                let value = self.provider.binding_value(&name)?;
+                let ty = self.provider.value_type(value)?;
+                if matches!(ty, super::super::BackendValueType::Aggregate { .. }) {
+                    return None;
+                }
+                Some(super::loops::CarriedBinding { name, value, ty })
+            })
+            .collect()
     }
 
     fn lower_nested_block_statement(

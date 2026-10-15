@@ -7,7 +7,13 @@ use crate::ast::{Block, CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Stmt,
 use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
 
-type CaseBranchBlocks = (BackendBlockId, Option<BackendBlockId>, BackendBlockId);
+mod carried;
+mod context;
+
+use context::{
+    BoundCaseInput, CaseBodyInput, CaseBranchBlocks, CaseBranchInput, CaseBranchesInput,
+    GuardedCaseInput,
+};
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_case_return(
@@ -48,33 +54,35 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let Expr::Case { mode, subject, branches, .. } = expression else {
             return Err(unsupported(span, "enum case expression expected"));
         };
-        lower_case_branches(self, id, subject, branches, *mode, span, fallthrough, instructions)
+        lower_case_branches(
+            self,
+            id,
+            CaseBranchesInput { subject, branches, mode: *mode, span, fallthrough, instructions },
+        )
     }
 }
 
 fn lower_case_branches<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
     id: BackendBlockId,
-    subject: &Expr,
-    branches: &[crate::ast::CaseBranch],
-    mode: CaseMode,
-    span: SourceSpan,
-    fallthrough: Option<BackendBlockId>,
-    mut instructions: Vec<BackendInstruction>,
+    input: CaseBranchesInput<'_>,
 ) -> Result<BackendBlock, BackendContractError> {
+    let CaseBranchesInput { subject, branches, mode, span, fallthrough, mut instructions } = input;
     let mut current_id = id;
     let mut entry_instructions = None;
     for (index, branch) in branches.iter().enumerate() {
         let (is_last, branch_blocks) = lowering.prepare_case_branch(index, branches.len())?;
         let (following_id, else_block) = lower_case_branch(
             lowering,
-            subject,
-            branch,
-            is_last,
-            branch_blocks,
-            mode,
-            span,
-            fallthrough,
+            CaseBranchInput {
+                subject,
+                branch,
+                is_last,
+                blocks: branch_blocks,
+                mode,
+                span,
+                fallthrough,
+            },
             &mut instructions,
         )?;
         if let Some(following_id) = following_id {
@@ -105,15 +113,18 @@ fn lower_case_branches<P: BackendExpressionProvider>(
 
 fn lower_case_branch<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
-    subject: &Expr,
-    branch: &crate::ast::CaseBranch,
-    is_last: bool,
-    (matched_id, following_id, else_block): CaseBranchBlocks,
-    mode: CaseMode,
-    span: SourceSpan,
-    fallthrough: Option<BackendBlockId>,
+    input: CaseBranchInput<'_>,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(Option<BackendBlockId>, BackendBlockId), BackendContractError> {
+    let CaseBranchInput {
+        subject,
+        branch,
+        is_last,
+        blocks: (matched_id, following_id, else_block),
+        mode,
+        span,
+        fallthrough,
+    } = input;
     let (subject_value, matched) =
         lower_case_condition(lowering, subject, branch, is_last, instructions)?;
     instructions.push(BackendInstruction::Branch {
@@ -125,15 +136,15 @@ fn lower_case_branch<P: BackendExpressionProvider>(
         span: branch.span,
     });
     let loop_bindings = lowering.snapshot_loop_bindings();
-    lowering.insert_case_branch_body(
-        matched_id,
+    lowering.insert_case_branch_body(CaseBodyInput {
+        id: matched_id,
         branch,
         span,
-        subject_value,
+        subject: subject_value,
         mode,
         fallthrough,
-        following_id.unwrap_or(else_block),
-    )?;
+        guard_failure: following_id.unwrap_or(else_block),
+    })?;
     lowering.restore_loop_bindings(loop_bindings);
     Ok((following_id, else_block))
 }
@@ -177,25 +188,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn insert_case_branch_body(
         &mut self,
-        id: BackendBlockId,
-        branch: &crate::ast::CaseBranch,
-        span: SourceSpan,
-        subject: BackendValueId,
-        mode: CaseMode,
-        fallthrough: Option<BackendBlockId>,
-        guard_failure: BackendBlockId,
+        input: CaseBodyInput<'_>,
     ) -> Result<(), BackendContractError> {
         let branch_block_start = self.blocks.len();
-        let body = lower_case_branch_body(
-            self,
-            id,
-            branch,
-            span,
-            subject,
-            mode,
-            fallthrough,
-            guard_failure,
-        )?;
+        let body = lower_case_branch_body(self, input)?;
         self.blocks.insert(branch_block_start, body);
         Ok(())
     }
@@ -220,14 +216,9 @@ fn finish_case_blocks<P: BackendExpressionProvider>(
 }
 fn lower_case_branch_body<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
-    id: BackendBlockId,
-    branch: &crate::ast::CaseBranch,
-    span: SourceSpan,
-    subject: BackendValueId,
-    mode: CaseMode,
-    fallthrough: Option<BackendBlockId>,
-    guard_failure: BackendBlockId,
+    input: CaseBodyInput<'_>,
 ) -> Result<BackendBlock, BackendContractError> {
+    let CaseBodyInput { id, branch, span, subject, mode, fallthrough, guard_failure } = input;
     lowering.provider.enter_scope(branch.span);
     let mut body_prefix = match bind_case_payload(lowering, branch, subject, mode) {
         Ok(instructions) => instructions,
@@ -240,13 +231,15 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
     let nested_block_start = lowering.blocks.len();
     let branch_result = lower_bound_case_branch(
         lowering,
-        id,
-        branch,
-        span,
-        fallthrough,
-        guard_failure,
-        &mut body_prefix,
-        nested_block_start,
+        BoundCaseInput {
+            lowering: &mut body_prefix,
+            id,
+            branch,
+            span,
+            fallthrough,
+            guard_failure,
+            nested_block_start,
+        },
     );
     match branch_result {
         Ok(mut body) => {
@@ -291,24 +284,29 @@ fn bind_case_payload<P: BackendExpressionProvider>(
 
 fn lower_bound_case_branch<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
-    id: BackendBlockId,
-    branch: &crate::ast::CaseBranch,
-    span: SourceSpan,
-    fallthrough: Option<BackendBlockId>,
-    guard_failure: BackendBlockId,
-    body_prefix: &mut Vec<BackendInstruction>,
-    nested_block_start: usize,
+    input: BoundCaseInput<'_>,
 ) -> Result<BackendBlock, BackendContractError> {
+    let BoundCaseInput {
+        lowering: body_prefix,
+        id,
+        branch,
+        span,
+        fallthrough,
+        guard_failure,
+        nested_block_start,
+    } = input;
     if branch.guard.is_some() {
         return lower_guarded_case_branch(
             lowering,
-            id,
-            branch,
-            span,
-            fallthrough,
-            guard_failure,
-            std::mem::take(body_prefix),
-            nested_block_start,
+            GuardedCaseInput {
+                id,
+                branch,
+                span,
+                fallthrough,
+                guard_failure,
+                guard_instructions: std::mem::take(body_prefix),
+                nested_block_start,
+            },
         );
     }
     case_return_block(lowering, id, branch, span, fallthrough)
@@ -316,14 +314,17 @@ fn lower_bound_case_branch<P: BackendExpressionProvider>(
 
 fn lower_guarded_case_branch<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
-    id: BackendBlockId,
-    branch: &crate::ast::CaseBranch,
-    span: SourceSpan,
-    fallthrough: Option<BackendBlockId>,
-    guard_failure: BackendBlockId,
-    mut guard_instructions: Vec<BackendInstruction>,
-    nested_block_start: usize,
+    input: GuardedCaseInput<'_>,
 ) -> Result<BackendBlock, BackendContractError> {
+    let GuardedCaseInput {
+        id,
+        branch,
+        span,
+        fallthrough,
+        guard_failure,
+        mut guard_instructions,
+        nested_block_start,
+    } = input;
     let body_id = lowering.allocate_block();
     let guard_failure_id = lowering.allocate_block();
     let condition = lowering.provider.lower_expression(

@@ -39,6 +39,19 @@ struct DeclarationInputs<'program> {
     context_performance_signatures: Vec<BackendSignature>,
 }
 
+type ReturnMetadata = (
+    BTreeMap<String, Option<BackendValueType>>,
+    BTreeMap<String, Option<TypeName>>,
+    BTreeMap<String, [Option<BackendValueType>; 2]>,
+);
+
+type PerformanceMetadata = (
+    BTreeMap<(String, String), SymbolIdentity>,
+    BTreeMap<(String, String), Option<BackendValueType>>,
+    BTreeMap<(String, String), Option<TypeName>>,
+    Vec<BackendExternal>,
+);
+
 impl<'program> SharedDeclarations<'program> {
     pub(crate) fn new(
         namespace: &str,
@@ -123,11 +136,7 @@ fn collect_declaration_inputs<'program>(
 fn build_return_metadata(
     inputs: &DeclarationInputs<'_>,
     layouts: &impl BackendLayoutProvider,
-) -> (
-    BTreeMap<String, Option<BackendValueType>>,
-    BTreeMap<String, Option<TypeName>>,
-    BTreeMap<String, [Option<BackendValueType>; 2]>,
-) {
+) -> ReturnMetadata {
     let mut return_types = shared_return_types(
         &inputs.verbs,
         &inputs.externals,
@@ -169,15 +178,7 @@ fn build_return_metadata(
 
 fn build_performance_metadata(
     inputs: &DeclarationInputs<'_>,
-) -> Result<
-    (
-        BTreeMap<(String, String), SymbolIdentity>,
-        BTreeMap<(String, String), Option<BackendValueType>>,
-        BTreeMap<(String, String), Option<TypeName>>,
-        Vec<BackendExternal>,
-    ),
-    BackendContractError,
-> {
+) -> Result<PerformanceMetadata, BackendContractError> {
     let (mut symbols, mut return_types, mut nominal_types) = performance::performance_dispatch_maps(
         &inputs.performances,
         &inputs.performance_signatures,

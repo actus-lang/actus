@@ -29,6 +29,38 @@ struct TryOwnerContext<'a> {
     payload_type: BackendValueType,
 }
 
+struct TryExpressionContext<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    expression: &'a Expr,
+    span: crate::lexer::SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    instructions: Vec<BackendInstruction>,
+}
+
+struct TryTargetContext<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    expression: &'a Expr,
+    span: crate::lexer::SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    instructions: Vec<BackendInstruction>,
+    target: TryTarget<'a>,
+}
+
+struct TryBranchesContext {
+    ok_block: BackendBlockId,
+    error_block: BackendBlockId,
+    merge_block: BackendBlockId,
+    source: super::BackendValueId,
+    span: crate::lexer::SourceSpan,
+    payload_value: super::BackendValueId,
+    payload_type: BackendValueType,
+    ok_instructions: Vec<BackendInstruction>,
+}
+
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_try_statement(
         &mut self,
@@ -60,15 +92,15 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 self.lower_try_return_statement(id, block.span, expression, *span, instructions)
             }
             Stmt::Expression { expression: Expr::Try { expression, span }, .. } => self
-                .lower_try_expression_statement(
+                .lower_try_expression_statement(TryExpressionContext {
                     id,
                     block,
                     index,
                     expression,
-                    *span,
+                    span: *span,
                     fallthrough,
                     instructions,
-                ),
+                }),
             _ => unreachable!(),
         }
     }
@@ -106,14 +138,17 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn lower_try_expression_statement(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        expression: &Expr,
-        span: crate::lexer::SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        mut instructions: Vec<BackendInstruction>,
+        context: TryExpressionContext<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let TryExpressionContext {
+            id,
+            block,
+            index,
+            expression,
+            span,
+            fallthrough,
+            mut instructions,
+        } = context;
         let source = self.provider.lower_expression(expression, &mut instructions)?;
         let condition = self.provider.lower_enum_variant_condition_value(
             source,
@@ -229,29 +264,32 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         else {
             return Err(unsupported(crate::lexer::SourceSpan::new(0, 0), "try owner expected"));
         };
-        self.lower_try_target(
+        self.lower_try_target(TryTargetContext {
             id,
             block,
             index,
             expression,
-            *span,
+            span: *span,
             fallthrough,
             instructions,
-            TryTarget::Owner { name, declared_type: ty.as_deref() },
-        )
+            target: TryTarget::Owner { name, declared_type: ty.as_deref() },
+        })
     }
 
     fn lower_try_target(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        expression: &Expr,
-        span: crate::lexer::SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        mut instructions: Vec<BackendInstruction>,
-        target: TryTarget<'_>,
+        context: TryTargetContext<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let TryTargetContext {
+            id,
+            block,
+            index,
+            expression,
+            span,
+            fallthrough,
+            mut instructions,
+            target,
+        } = context;
         let source = self.provider.lower_expression(expression, &mut instructions)?;
         let condition = self.provider.lower_enum_variant_condition_value(
             source,
@@ -287,16 +325,16 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         &mut self,
         mut context: TryOwnerContext<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
-        self.push_try_branches(
-            context.ok_block,
-            context.error_block,
-            context.merge_block,
-            context.source,
-            context.span,
-            context.payload_value,
-            context.payload_type,
-            &mut context.ok_instructions,
-        );
+        self.push_try_branches(TryBranchesContext {
+            ok_block: context.ok_block,
+            error_block: context.error_block,
+            merge_block: context.merge_block,
+            source: context.source,
+            span: context.span,
+            payload_value: context.payload_value,
+            payload_type: context.payload_type,
+            ok_instructions: context.ok_instructions,
+        });
         let cleanup_start = self.blocks.len().saturating_sub(2);
         append_try_condition_branch(
             &mut context.instructions,
@@ -347,17 +385,17 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(instructions)
     }
 
-    fn push_try_branches(
-        &mut self,
-        ok_block: BackendBlockId,
-        error_block: BackendBlockId,
-        merge_block: BackendBlockId,
-        source: super::BackendValueId,
-        span: crate::lexer::SourceSpan,
-        payload_value: super::BackendValueId,
-        payload_type: BackendValueType,
-        ok_instructions: &mut Vec<BackendInstruction>,
-    ) {
+    fn push_try_branches(&mut self, context: TryBranchesContext) {
+        let TryBranchesContext {
+            ok_block,
+            error_block,
+            merge_block,
+            source,
+            span,
+            payload_value,
+            payload_type,
+            mut ok_instructions,
+        } = context;
         ok_instructions.push(BackendInstruction::Jump {
             target: merge_block,
             arguments: vec![BackendEdgeArgument { value: payload_value, ty: payload_type, span }],
@@ -366,7 +404,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: ok_block,
-            instructions: std::mem::take(ok_instructions),
+            instructions: ok_instructions,
         });
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
