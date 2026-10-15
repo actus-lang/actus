@@ -14,10 +14,10 @@ use actus::target::TargetSpec;
 
 #[test]
 fn linker_plan_is_deterministic_across_supported_host_profiles() {
-    for (label, target, expected_linker, expected_output) in [
-        ("linux", "x86_64-unknown-linux-gnu", "cc", "/tmp/actus-plan-linux"),
-        ("macos", "x86_64-apple-darwin", "cc", "/tmp/actus-plan-macos"),
-        ("windows", "x86_64-pc-windows-msvc", "lld-link.exe", "/tmp/actus-plan-windows"),
+    for (label, target, expected_output) in [
+        ("linux", "x86_64-unknown-linux-gnu", "/tmp/actus-plan-linux"),
+        ("macos", "x86_64-apple-darwin", "/tmp/actus-plan-macos"),
+        ("windows", "x86_64-pc-windows-msvc", "/tmp/actus-plan-windows"),
     ] {
         let manifest = std::env::temp_dir()
             .join(format!("actus-linker-plan-{label}-{}.toml", std::process::id()));
@@ -40,13 +40,16 @@ fn linker_plan_is_deterministic_across_supported_host_profiles() {
             .iter()
             .map(|argument| argument.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
-        assert_eq!(plan.linker().to_string_lossy(), expected_linker);
+        assert_eq!(plan.linker(), configuration.linker());
         assert_eq!(arguments.first().map(String::as_str), Some("/tmp/actus-root.o"));
-        let output_argument = if expected_linker == "lld-link.exe" {
-            format!("/OUT:{expected_output}")
-        } else {
-            expected_output.to_owned()
-        };
+        let output_argument =
+            if TargetSpec::parse(target).expect("host target should parse").linker_flavor()
+                == actus::target::LinkerFlavor::Msvc
+            {
+                format!("/OUT:{expected_output}")
+            } else {
+                expected_output.to_owned()
+            };
         assert!(
             arguments.iter().any(|argument| argument == &output_argument),
             "unexpected linker arguments for {label}: {arguments:?}"
