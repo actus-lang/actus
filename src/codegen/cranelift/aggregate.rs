@@ -1,6 +1,4 @@
 // Aggregate emission returns the native value maps needed by later lowering.
-#![allow(clippy::type_complexity)]
-
 use std::collections::BTreeMap;
 
 use cranelift_codegen::ir::{Block, InstBuilder, Type};
@@ -24,6 +22,13 @@ pub(super) struct Declaration {
     pub(super) niche_pointer_return: bool,
     pub(super) runtime_result_layout: Option<crate::codegen::BackendLayout>,
 }
+
+type NativeValue = cranelift_codegen::ir::Value;
+type InitializedValues = (
+    Option<NativeValue>,
+    BTreeMap<BackendValueId, NativeValue>,
+    BTreeMap<BackendValueId, Vec<NativeValue>>,
+);
 
 pub(super) fn declaration(
     module: &ObjectModule,
@@ -135,59 +140,87 @@ pub(super) fn lower_call(
         values,
         aggregate_values,
     )?;
-    let (return_slot, native_arguments) = if declaration.niche_pointer_return
-        && let Some(address) = function_return_slot
-    {
-        let mut arguments = Vec::with_capacity(native_arguments.len() + 1);
-        arguments.push(address);
-        arguments.extend(native_arguments);
-        (Some(address), arguments)
-    } else if let Some(layout) = declaration.return_slot {
-        let slot = create_return_slot(builder, layout)?;
-        let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
-        (Some(address), {
-            let mut arguments = Vec::with_capacity(native_arguments.len() + 1);
-            arguments.push(address);
-            arguments.extend(native_arguments);
-            arguments
-        })
-    } else {
-        (None, native_arguments)
-    };
+    let (return_slot, native_arguments) = prepare_call_arguments(
+        module,
+        builder,
+        native_arguments,
+        declaration,
+        function_return_slot,
+    )?;
     let call = builder.ins().call(reference, &native_arguments);
     if declaration.runtime_pointer_return {
-        let result = result.ok_or_else(|| {
-            BackendEmitError("Cranelift runtime-pointer call requires a result value".to_owned())
-        })?;
-        let raw = builder.inst_results(call).first().copied().ok_or_else(|| {
-            BackendEmitError("Cranelift runtime result is unavailable".to_owned())
-        })?;
-        if declaration.niche_pointer_return {
-            values.insert(result, raw);
-            return Ok(());
-        }
-        let layout = declaration.runtime_result_layout.ok_or_else(|| {
-            BackendEmitError("Cranelift runtime-pointer result layout is unavailable".to_owned())
-        })?;
-        let slot = create_return_slot(builder, layout)?;
-        let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
-        let alignment = u8::try_from(layout.alignment).map_err(|_| {
-            BackendEmitError("Cranelift runtime result alignment exceeds u8".to_owned())
-        })?;
-        builder.emit_small_memory_copy(
-            module.isa().frontend_config(),
-            address,
-            raw,
-            u64::from(layout.size),
-            alignment,
-            alignment,
-            false,
-            cranelift_codegen::ir::MemFlagsData::new(),
-        );
-        values.insert(result, address);
+        record_runtime_pointer_result(module, builder, call, *result, declaration, values)?;
         return Ok(());
     }
     record_call_results(builder, call, result, return_slot, declaration, values, aggregate_values)?;
+    Ok(())
+}
+
+fn prepare_call_arguments(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    native_arguments: Vec<cranelift_codegen::ir::Value>,
+    declaration: &Declaration,
+    function_return_slot: Option<cranelift_codegen::ir::Value>,
+) -> Result<
+    (Option<cranelift_codegen::ir::Value>, Vec<cranelift_codegen::ir::Value>),
+    BackendEmitError,
+> {
+    let address = if declaration.niche_pointer_return {
+        function_return_slot
+    } else if let Some(layout) = declaration.return_slot {
+        let slot = create_return_slot(builder, layout)?;
+        Some(builder.ins().stack_addr(module.isa().pointer_type(), slot, 0))
+    } else {
+        None
+    };
+    let Some(address) = address else {
+        return Ok((None, native_arguments));
+    };
+    let mut arguments = Vec::with_capacity(native_arguments.len() + 1);
+    arguments.push(address);
+    arguments.extend(native_arguments);
+    Ok((Some(address), arguments))
+}
+
+fn record_runtime_pointer_result(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    call: cranelift_codegen::ir::Inst,
+    result: Option<BackendValueId>,
+    declaration: &Declaration,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let result = result.ok_or_else(|| {
+        BackendEmitError("Cranelift runtime-pointer call requires a result value".to_owned())
+    })?;
+    let raw =
+        builder.inst_results(call).first().copied().ok_or_else(|| {
+            BackendEmitError("Cranelift runtime result is unavailable".to_owned())
+        })?;
+    if declaration.niche_pointer_return {
+        values.insert(result, raw);
+        return Ok(());
+    }
+    let layout = declaration.runtime_result_layout.ok_or_else(|| {
+        BackendEmitError("Cranelift runtime-pointer result layout is unavailable".to_owned())
+    })?;
+    let slot = create_return_slot(builder, layout)?;
+    let address = builder.ins().stack_addr(module.isa().pointer_type(), slot, 0);
+    let alignment = u8::try_from(layout.alignment).map_err(|_| {
+        BackendEmitError("Cranelift runtime result alignment exceeds u8".to_owned())
+    })?;
+    builder.emit_small_memory_copy(
+        module.isa().frontend_config(),
+        address,
+        raw,
+        u64::from(layout.size),
+        alignment,
+        alignment,
+        false,
+        cranelift_codegen::ir::MemFlagsData::new(),
+    );
+    values.insert(result, address);
     Ok(())
 }
 
@@ -351,14 +384,7 @@ pub(super) fn initialize_values(
     builder: &mut FunctionBuilder<'_>,
     entry: Block,
     function: &BackendFunction,
-) -> Result<
-    (
-        Option<cranelift_codegen::ir::Value>,
-        BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
-        BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
-    ),
-    BackendEmitError,
-> {
+) -> Result<InitializedValues, BackendEmitError> {
     builder.append_block_params_for_function_params(entry);
     let block_params = builder.block_params(entry).to_vec();
     let return_slot = matches!(

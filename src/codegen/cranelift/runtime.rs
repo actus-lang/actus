@@ -114,6 +114,13 @@ fn runtime_metadata(
     append_spec: &crate::ast::IntrinsicSpec,
     print_spec: &crate::ast::IntrinsicSpec,
 ) -> HashMap<String, FunctionMeta> {
+    let mut functions = runtime_memory_metadata(ids);
+    functions.extend(runtime_serialization_metadata(ids));
+    functions.extend(runtime_intrinsic_metadata(ids, append_spec, print_spec));
+    functions
+}
+
+fn runtime_memory_metadata(ids: &RuntimeFunctionIds) -> HashMap<String, FunctionMeta> {
     HashMap::from([
         (
             format!("__{BUFFER_ALLOCATE_SYMBOL}"),
@@ -141,10 +148,11 @@ fn runtime_metadata(
             AGGREGATE_DROP_SYMBOL.to_owned(),
             named_meta(ids.aggregate_drop, &["pointer", "size", "alignment"], NativeType::Int),
         ),
-        (
-            append_spec.name.to_owned(),
-            intrinsic_meta(ids.append, append_spec.parameters, NativeType::Int),
-        ),
+    ])
+}
+
+fn runtime_serialization_metadata(ids: &RuntimeFunctionIds) -> HashMap<String, FunctionMeta> {
+    HashMap::from([
         ("crc32".to_owned(), named_meta(ids.crc32, &["buffer", "start", "end"], SERIALIZATION_I64)),
         (
             "crc32_matches".to_owned(),
@@ -157,6 +165,19 @@ fn runtime_metadata(
         (
             "validate_fixed_frame".to_owned(),
             named_meta(ids.validate_fixed_frame, VALIDATE_FIXED_FRAME_PARAMS, SERIALIZATION_I64),
+        ),
+    ])
+}
+
+fn runtime_intrinsic_metadata(
+    ids: &RuntimeFunctionIds,
+    append_spec: &crate::ast::IntrinsicSpec,
+    print_spec: &crate::ast::IntrinsicSpec,
+) -> HashMap<String, FunctionMeta> {
+    HashMap::from([
+        (
+            append_spec.name.to_owned(),
+            intrinsic_meta(ids.append, append_spec.parameters, NativeType::Int),
         ),
         (
             print_spec.name.to_owned(),

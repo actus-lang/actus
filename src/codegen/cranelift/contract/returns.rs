@@ -22,45 +22,7 @@ pub(super) fn lower_return(
     };
     if let crate::codegen::BackendReturnMode::ReturnSlot { layout } = function.return_value.passing
     {
-        let value_id = value.ok_or_else(|| {
-            BackendEmitError("Cranelift return-slot instruction has no value".to_owned())
-        })?;
-        let source = values.get(&value_id).copied().ok_or_else(|| {
-            BackendEmitError(format!("Cranelift return-slot value {} is unavailable", value_id.0))
-        })?;
-        let destination = return_slot
-            .ok_or_else(|| BackendEmitError("Cranelift return slot is unavailable".to_owned()))?;
-        if builder.func.dfg.value_type(source) != module.isa().pointer_type() {
-            return Err(BackendEmitError(format!(
-                "Cranelift return-slot value in `{}` must be an aggregate pointer",
-                function.symbol.as_str()
-            )));
-        }
-        if matches!(
-            function.return_value.ty,
-            crate::codegen::BackendValueType::NichePointerOption { .. }
-        ) {
-            if source != destination {
-                builder.ins().store(MemFlagsData::new(), source, destination, 0);
-            }
-            builder.ins().return_(&[]);
-            return Ok(());
-        }
-        let alignment = u8::try_from(layout.alignment).map_err(|_| {
-            BackendEmitError("Cranelift return-slot alignment exceeds u8".to_owned())
-        })?;
-        builder.emit_small_memory_copy(
-            module.isa().frontend_config(),
-            destination,
-            source,
-            u64::from(layout.size),
-            alignment,
-            alignment,
-            false,
-            MemFlagsData::new(),
-        );
-        builder.ins().return_(&[]);
-        return Ok(());
+        return lower_return_slot(module, builder, *value, function, return_slot, layout, values);
     }
     if let Some(value_id) = value
         && matches!(
@@ -68,14 +30,7 @@ pub(super) fn lower_return(
             crate::codegen::BackendReturnMode::DirectAggregate { .. }
         )
     {
-        let fragments = aggregate_values.get(value_id).ok_or_else(|| {
-            BackendEmitError(format!(
-                "Cranelift aggregate return value {} is unavailable",
-                value_id.0
-            ))
-        })?;
-        builder.ins().return_(fragments);
-        return Ok(());
+        return lower_direct_aggregate_return(builder, *value_id, aggregate_values);
     }
     if function.hosted_entry_return && value.is_none() {
         let result = builder.ins().iconst(cranelift_codegen::ir::types::I32, 0);
@@ -93,6 +48,67 @@ pub(super) fn lower_return(
         Some(value) => builder.ins().return_(&[value]),
         None => builder.ins().return_(&[]),
     };
+    Ok(())
+}
+
+fn lower_return_slot(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    value: Option<BackendValueId>,
+    function: &BackendFunction,
+    return_slot: Option<cranelift_codegen::ir::Value>,
+    layout: crate::codegen::BackendLayout,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let value_id = value.ok_or_else(|| {
+        BackendEmitError("Cranelift return-slot instruction has no value".to_owned())
+    })?;
+    let source = values.get(&value_id).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift return-slot value {} is unavailable", value_id.0))
+    })?;
+    let destination = return_slot
+        .ok_or_else(|| BackendEmitError("Cranelift return slot is unavailable".to_owned()))?;
+    if builder.func.dfg.value_type(source) != module.isa().pointer_type() {
+        return Err(BackendEmitError(format!(
+            "Cranelift return-slot value in `{}` must be an aggregate pointer",
+            function.symbol.as_str()
+        )));
+    }
+    if matches!(
+        function.return_value.ty,
+        crate::codegen::BackendValueType::NichePointerOption { .. }
+    ) {
+        if source != destination {
+            builder.ins().store(MemFlagsData::new(), source, destination, 0);
+        }
+        builder.ins().return_(&[]);
+        return Ok(());
+    }
+    let alignment = u8::try_from(layout.alignment)
+        .map_err(|_| BackendEmitError("Cranelift return-slot alignment exceeds u8".to_owned()))?;
+    builder.emit_small_memory_copy(
+        module.isa().frontend_config(),
+        destination,
+        source,
+        u64::from(layout.size),
+        alignment,
+        alignment,
+        false,
+        MemFlagsData::new(),
+    );
+    builder.ins().return_(&[]);
+    Ok(())
+}
+
+fn lower_direct_aggregate_return(
+    builder: &mut FunctionBuilder<'_>,
+    value: BackendValueId,
+    aggregate_values: &BTreeMap<BackendValueId, Vec<cranelift_codegen::ir::Value>>,
+) -> Result<(), BackendEmitError> {
+    let fragments = aggregate_values.get(&value).ok_or_else(|| {
+        BackendEmitError(format!("Cranelift aggregate return value {} is unavailable", value.0))
+    })?;
+    builder.ins().return_(fragments);
     Ok(())
 }
 

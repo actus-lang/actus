@@ -53,26 +53,7 @@ fn lower_construct(
         return Err(BackendEmitError("Cranelift enum constructor instruction expected".to_owned()));
     };
     if layout.niche_pointer {
-        let value = match payload {
-            Some(payload) => values.get(payload).copied().ok_or_else(|| {
-                BackendEmitError(format!(
-                    "Cranelift niche Option payload {} is unavailable",
-                    payload.0
-                ))
-            })?,
-            None => builder.ins().iconst(module.isa().pointer_type(), 0),
-        };
-        let _ = discriminant;
-        let _ = payload_type;
-        let _ = return_slot;
-        values.insert(
-            match instruction {
-                BackendInstruction::EnumConstruct { result, .. } => *result,
-                _ => unreachable!(),
-            },
-            value,
-        );
-        return Ok(());
+        return lower_niche_construct(module, builder, instruction, values);
     }
     let alignment = u8::try_from(layout.layout.alignment)
         .map_err(|_| BackendEmitError("Cranelift enum alignment exceeds u8".to_owned()))?;
@@ -99,6 +80,25 @@ fn lower_construct(
     if let BackendInstruction::EnumConstruct { result, .. } = instruction {
         values.insert(*result, slot);
     }
+    Ok(())
+}
+
+fn lower_niche_construct(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::EnumConstruct { result, payload, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift enum constructor instruction expected".to_owned()));
+    };
+    let value = match payload {
+        Some(payload) => values.get(payload).copied().ok_or_else(|| {
+            BackendEmitError(format!("Cranelift niche Option payload {} is unavailable", payload.0))
+        })?,
+        None => builder.ins().iconst(module.isa().pointer_type(), 0),
+    };
+    values.insert(*result, value);
     Ok(())
 }
 

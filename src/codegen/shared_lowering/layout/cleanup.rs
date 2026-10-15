@@ -4,77 +4,21 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
         type_name: Option<&TypeName>,
         builtin: Option<BuiltinType>,
     ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
-        if let Some(type_name) = type_name
-            && type_name.name == "Result"
-            && let Some(payload) = type_name.arguments.first()
-            && payload.name == "Region"
-            && let (Some(enum_layout), Some(payload_layout)) = (
-                self.enum_layout_for(type_name),
-                self.layout_for(payload),
-            )
-        {
-            return Ok(Some(self.cleanup_descriptor(
-                BackendCleanupBridge::RegionDrop,
-                enum_layout.layout,
-                Some(BackendCleanupField {
-                    offset: enum_layout.payload_offset,
-                    size: payload_layout.size,
-                    alignment: payload_layout.alignment,
-                }),
-            )));
+        if let Some(descriptor) = self.resolve_region_result(type_name) {
+            return Ok(Some(descriptor));
         }
-        if let Some(type_name) = type_name
-            && !matches!(type_name.name.as_str(), "Buffer" | "Region")
-            && self
-                .type_layout(type_name, &mut Vec::new())
-                .is_some_and(|layout| layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
-        {
-            let layout = self
-                .type_layout(type_name, &mut Vec::new())
-                .ok_or(BackendContractError::InvalidCleanupOperand)?;
-            return Ok(Some(self.cleanup_descriptor(
-                BackendCleanupBridge::AggregateDrop {
-                    size: layout.size,
-                    alignment: layout.alignment,
-                },
-                layout,
-                None,
-            )));
+        if let Some(descriptor) = self.resolve_large_aggregate(type_name)? {
+            return Ok(Some(descriptor));
         }
         if builtin == Some(BuiltinType::Buffer)
             || type_name.is_some_and(|name| name.name == "Buffer")
         {
-            return Ok(Some(self.cleanup_descriptor(
-                BackendCleanupBridge::BufferDrop,
-                self.pointer_layout(),
-                None,
-            )));
+            return Ok(Some(self.resource_cleanup(BackendCleanupBridge::BufferDrop)));
         }
         if type_name.is_some_and(|name| name.name == "Region") {
-            return Ok(Some(self.cleanup_descriptor(
-                BackendCleanupBridge::RegionDrop,
-                self.pointer_layout(),
-                None,
-            )));
+            return Ok(Some(self.resource_cleanup(BackendCleanupBridge::RegionDrop)));
         }
-        if let Some(type_name) = type_name
-            && let Some(symbol) = self.drop_symbols.get(&type_name.canonical_key())
-        {
-            let Some(layout) = self.type_layout(type_name, &mut Vec::new()) else {
-                return Ok(None);
-            };
-            return Ok(Some(BackendCleanupResolvedDescriptor {
-                descriptor: BackendCleanupBridgeDescriptor {
-                    bridge: BackendCleanupBridge::PerformanceDrop,
-                    argument: BackendCleanupArgument::Address,
-                    result: BackendCleanupResult::Ignored,
-                },
-                layout,
-                field: None,
-                performance_symbol: Some(symbol.clone()),
-            }));
-        }
-        Ok(None)
+        Ok(self.resolve_performance_drop(type_name))
     }
 
     fn resolve_field(
@@ -184,5 +128,71 @@ impl ProgramLayouts<'_> {
             || self
                 .type_layout(type_name, &mut Vec::new())
                 .is_some_and(|layout| layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
+    }
+
+    fn resolve_region_result(&self, type_name: Option<&TypeName>) -> Option<BackendCleanupResolvedDescriptor> {
+        let type_name = type_name?;
+        let payload = type_name.arguments.first()?;
+        if type_name.name != "Result" || payload.name != "Region" {
+            return None;
+        }
+        let enum_layout = self.enum_layout_for(type_name)?;
+        let payload_layout = self.layout_for(payload)?;
+        Some(self.cleanup_descriptor(
+            BackendCleanupBridge::RegionDrop,
+            enum_layout.layout,
+            Some(BackendCleanupField {
+                offset: enum_layout.payload_offset,
+                size: payload_layout.size,
+                alignment: payload_layout.alignment,
+            }),
+        ))
+    }
+
+    fn resolve_large_aggregate(
+        &self,
+        type_name: Option<&TypeName>,
+    ) -> Result<Option<BackendCleanupResolvedDescriptor>, BackendContractError> {
+        let Some(type_name) = type_name else { return Ok(None) };
+        if matches!(type_name.name.as_str(), "Buffer" | "Region") {
+            return Ok(None);
+        }
+        let Some(layout) = self.type_layout(type_name, &mut Vec::new()) else {
+            return Ok(None);
+        };
+        if layout.size < crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+            return Ok(None);
+        }
+        Ok(Some(self.cleanup_descriptor(
+            BackendCleanupBridge::AggregateDrop {
+                size: layout.size,
+                alignment: layout.alignment,
+            },
+            layout,
+            None,
+        )))
+    }
+
+    fn resource_cleanup(&self, bridge: BackendCleanupBridge) -> BackendCleanupResolvedDescriptor {
+        self.cleanup_descriptor(bridge, self.pointer_layout(), None)
+    }
+
+    fn resolve_performance_drop(
+        &self,
+        type_name: Option<&TypeName>,
+    ) -> Option<BackendCleanupResolvedDescriptor> {
+        let type_name = type_name?;
+        let symbol = self.drop_symbols.get(&type_name.canonical_key())?;
+        let layout = self.type_layout(type_name, &mut Vec::new())?;
+        Some(BackendCleanupResolvedDescriptor {
+            descriptor: BackendCleanupBridgeDescriptor {
+                bridge: BackendCleanupBridge::PerformanceDrop,
+                argument: BackendCleanupArgument::Address,
+                result: BackendCleanupResult::Ignored,
+            },
+            layout,
+            field: None,
+            performance_symbol: Some(symbol.clone()),
+        })
     }
 }

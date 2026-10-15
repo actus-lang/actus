@@ -5,7 +5,7 @@ use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 
 use super::super::calls::CallLoweringContext;
-use super::super::cleanup::emit_return_cleanup;
+use super::super::cleanup::{CleanupContext, emit_return_cleanup};
 use super::super::layout::LayoutRegistry;
 use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
@@ -133,16 +133,14 @@ fn emit_try_error_return(
     span: SourceSpan,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<(), BackendEmitError> {
-    emit_return_cleanup(
+    let mut cleanup = CleanupContext::new(
         function,
-        context.cleanup_schedule,
-        span,
         context.locals,
         context.local_types,
         context.functions,
         context.layouts,
-        None,
-    )?;
+    );
+    emit_return_cleanup(&mut cleanup, context.cleanup_schedule, span, None)?;
     function.ins().return_(&[source]);
     Ok(())
 }

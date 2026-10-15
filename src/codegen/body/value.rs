@@ -22,6 +22,22 @@ struct IfOwnerInput<'a> {
     else_value: BackendValueId,
 }
 
+struct IfOwnerReturnInput<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    name: &'a str,
+    declared_type: Option<&'a str>,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    merge_id: BackendBlockId,
+    instructions: Vec<BackendInstruction>,
+    then_block: BackendBlock,
+    then_value: BackendValueId,
+    else_id: BackendBlockId,
+    else_branch: &'a Block,
+}
+
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_if_owner_statement(
         &mut self,
@@ -42,46 +58,27 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let merge_id = self.allocate_block();
         let then_id = self.allocate_block();
         let else_id = self.allocate_block();
-        instructions.push(BackendInstruction::Branch {
-            condition,
-            then_block: then_id,
-            else_block: else_id,
-            then_arguments: Vec::new(),
-            else_arguments: Vec::new(),
-            span: *span,
-        });
-        let (mut then_block, then_value) =
-            self.lower_if_value_branch(then_id, then_branch, *span)?;
+        append_if_owner_branch(&mut instructions, condition, then_id, else_id, *span);
+        let (then_block, then_value) = self.lower_if_value_branch(then_id, then_branch, *span)?;
         let Some(IfBranch::Block(else_branch)) = else_branch else {
             return Err(unsupported(*span, "value-producing if requires a block else branch"));
         };
         if matches!(else_branch.statements.last(), Some(Stmt::Return { .. })) {
-            let else_block = self.return_branch(else_id, else_branch, *span)?;
-            let result_type = self
-                .provider
-                .value_type(then_value)
-                .ok_or_else(|| unsupported(*span, "if branch result type is unavailable"))?;
-            let result = self.provider.allocate_value(result_type);
-            let mut merge_instructions = Vec::new();
-            self.provider.bind_owner(
+            return self.finish_if_owner_return(IfOwnerReturnInput {
+                id,
+                block,
+                index,
                 name,
-                result,
-                ty.as_deref(),
-                *span,
-                &mut merge_instructions,
-            )?;
-            let continuation =
-                Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
-            let mut continuation_block =
-                self.lower_block_in_scope(merge_id, &continuation, fallthrough)?;
-            continuation_block.parameters =
-                vec![BackendBlockParameter { value: result, ty: result_type, span: *span }];
-            continuation_block.instructions.splice(0..0, merge_instructions);
-            append_if_owner_jump(&mut then_block, merge_id, then_value, result_type, *span);
-            self.blocks.push(continuation_block);
-            self.blocks.push(then_block);
-            self.blocks.push(else_block);
-            return Ok(BackendBlock { parameters: Vec::new(), id, instructions });
+                declared_type: ty.as_deref(),
+                span: *span,
+                fallthrough,
+                merge_id,
+                instructions,
+                then_block,
+                then_value,
+                else_id,
+                else_branch,
+            });
         }
         let (else_block, else_value) = self.lower_if_value_branch(else_id, else_branch, *span)?;
         self.finish_if_owner(IfOwnerInput {
@@ -99,6 +96,47 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             else_block,
             else_value,
         })
+    }
+
+    fn finish_if_owner_return(
+        &mut self,
+        input: IfOwnerReturnInput<'_>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let IfOwnerReturnInput {
+            id,
+            block,
+            index,
+            name,
+            declared_type,
+            span,
+            fallthrough,
+            merge_id,
+            instructions,
+            mut then_block,
+            then_value,
+            else_id,
+            else_branch,
+        } = input;
+        let else_block = self.return_branch(else_id, else_branch, span)?;
+        let result_type = self
+            .provider
+            .value_type(then_value)
+            .ok_or_else(|| unsupported(span, "if branch result type is unavailable"))?;
+        let result = self.provider.allocate_value(result_type);
+        let mut merge_instructions = Vec::new();
+        self.provider.bind_owner(name, result, declared_type, span, &mut merge_instructions)?;
+        let continuation =
+            Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
+        let mut continuation_block =
+            self.lower_block_in_scope(merge_id, &continuation, fallthrough)?;
+        continuation_block.parameters =
+            vec![BackendBlockParameter { value: result, ty: result_type, span }];
+        continuation_block.instructions.splice(0..0, merge_instructions);
+        append_if_owner_jump(&mut then_block, merge_id, then_value, result_type, span);
+        self.blocks.push(continuation_block);
+        self.blocks.push(then_block);
+        self.blocks.push(else_block);
+        Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
     fn finish_if_owner(
@@ -237,6 +275,23 @@ fn append_if_owner_jump(
     block.instructions.push(BackendInstruction::Jump {
         target: merge_id,
         arguments: vec![BackendEdgeArgument { value, ty: value_type, span }],
+        span,
+    });
+}
+
+fn append_if_owner_branch(
+    instructions: &mut Vec<BackendInstruction>,
+    condition: BackendValueId,
+    then_block: BackendBlockId,
+    else_block: BackendBlockId,
+    span: SourceSpan,
+) {
+    instructions.push(BackendInstruction::Branch {
+        condition,
+        then_block,
+        else_block,
+        then_arguments: Vec::new(),
+        else_arguments: Vec::new(),
         span,
     });
 }

@@ -43,63 +43,102 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         expression: &Expr,
         span: SourceSpan,
         fallthrough: Option<BackendBlockId>,
-        mut instructions: Vec<BackendInstruction>,
+        instructions: Vec<BackendInstruction>,
     ) -> Result<BackendBlock, BackendContractError> {
         let Expr::Case { mode, subject, branches, .. } = expression else {
             return Err(unsupported(span, "enum case expression expected"));
         };
-        let mut current_id = id;
-        let mut entry_instructions = None;
-        for (index, branch) in branches.iter().enumerate() {
-            let (is_last, (matched_id, following_id, else_block)) =
-                self.prepare_case_branch(index, branches.len())?;
-            let (subject_value, matched) =
-                lower_case_condition(self, subject, branch, is_last, &mut instructions)?;
-            instructions.push(BackendInstruction::Branch {
-                condition: matched,
-                then_block: matched_id,
-                else_block,
-                then_arguments: Vec::new(),
-                else_arguments: Vec::new(),
-                span: branch.span,
-            });
-            let loop_bindings = self.snapshot_loop_bindings();
-            self.insert_case_branch_body(
-                matched_id,
-                branch,
-                span,
-                subject_value,
-                *mode,
-                fallthrough,
-                following_id.unwrap_or(else_block),
-            )?;
-            self.restore_loop_bindings(loop_bindings);
-            if let Some(following_id) = following_id {
-                if entry_instructions.is_none() {
-                    entry_instructions = Some(std::mem::take(&mut instructions));
-                } else {
-                    self.blocks.push(BackendBlock {
-                        parameters: Vec::new(),
-                        id: current_id,
-                        instructions,
-                    });
-                    instructions = Vec::new();
-                }
-                current_id = following_id;
-            } else {
-                return self.finish_case_branch(
-                    id,
-                    current_id,
-                    else_block,
-                    span,
-                    instructions,
-                    entry_instructions,
-                );
-            }
-        }
-        Err(unsupported(span, "empty enum case"))
+        lower_case_branches(self, id, subject, branches, *mode, span, fallthrough, instructions)
     }
+}
 
+fn lower_case_branches<P: BackendExpressionProvider>(
+    lowering: &mut BodyLowering<'_, P>,
+    id: BackendBlockId,
+    subject: &Expr,
+    branches: &[crate::ast::CaseBranch],
+    mode: CaseMode,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    mut instructions: Vec<BackendInstruction>,
+) -> Result<BackendBlock, BackendContractError> {
+    let mut current_id = id;
+    let mut entry_instructions = None;
+    for (index, branch) in branches.iter().enumerate() {
+        let (is_last, branch_blocks) = lowering.prepare_case_branch(index, branches.len())?;
+        let (following_id, else_block) = lower_case_branch(
+            lowering,
+            subject,
+            branch,
+            is_last,
+            branch_blocks,
+            mode,
+            span,
+            fallthrough,
+            &mut instructions,
+        )?;
+        if let Some(following_id) = following_id {
+            if entry_instructions.is_none() {
+                entry_instructions = Some(std::mem::take(&mut instructions));
+            } else {
+                lowering.blocks.push(BackendBlock {
+                    parameters: Vec::new(),
+                    id: current_id,
+                    instructions,
+                });
+                instructions = Vec::new();
+            }
+            current_id = following_id;
+        } else {
+            return lowering.finish_case_branch(
+                id,
+                current_id,
+                else_block,
+                span,
+                instructions,
+                entry_instructions,
+            );
+        }
+    }
+    Err(unsupported(span, "empty enum case"))
+}
+
+fn lower_case_branch<P: BackendExpressionProvider>(
+    lowering: &mut BodyLowering<'_, P>,
+    subject: &Expr,
+    branch: &crate::ast::CaseBranch,
+    is_last: bool,
+    (matched_id, following_id, else_block): CaseBranchBlocks,
+    mode: CaseMode,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(Option<BackendBlockId>, BackendBlockId), BackendContractError> {
+    let (subject_value, matched) =
+        lower_case_condition(lowering, subject, branch, is_last, instructions)?;
+    instructions.push(BackendInstruction::Branch {
+        condition: matched,
+        then_block: matched_id,
+        else_block,
+        then_arguments: Vec::new(),
+        else_arguments: Vec::new(),
+        span: branch.span,
+    });
+    let loop_bindings = lowering.snapshot_loop_bindings();
+    lowering.insert_case_branch_body(
+        matched_id,
+        branch,
+        span,
+        subject_value,
+        mode,
+        fallthrough,
+        following_id.unwrap_or(else_block),
+    )?;
+    lowering.restore_loop_bindings(loop_bindings);
+    Ok((following_id, else_block))
+}
+
+impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     fn prepare_case_branch(
         &mut self,
         index: usize,
@@ -190,61 +229,25 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
     guard_failure: BackendBlockId,
 ) -> Result<BackendBlock, BackendContractError> {
     lowering.provider.enter_scope(branch.span);
-    let mut body_prefix = Vec::new();
-    let binding_result = if matches!(branch.pattern, Pattern::Variant { .. }) {
-        lowering.provider.bind_enum_variant_payload(
-            subject,
-            branch_variant(branch),
-            branch_payload(branch),
-            mode,
-            branch.span,
-            &mut body_prefix,
-        )
-    } else {
-        Ok(())
+    let mut body_prefix = match bind_case_payload(lowering, branch, subject, mode) {
+        Ok(instructions) => instructions,
+        Err(error) => {
+            let mut discarded = Vec::new();
+            let _ = lowering.provider.exit_scope(branch.span, &mut discarded);
+            return Err(error);
+        }
     };
     let nested_block_start = lowering.blocks.len();
-    let branch_result = match binding_result {
-        Ok(()) => {
-            if let Some(guard) = &branch.guard {
-                let body_id = lowering.allocate_block();
-                let guard_failure_id = lowering.allocate_block();
-                let mut guard_instructions = std::mem::take(&mut body_prefix);
-                let condition =
-                    lowering.provider.lower_expression(guard, &mut guard_instructions)?;
-                guard_instructions.push(BackendInstruction::Branch {
-                    condition,
-                    then_block: body_id,
-                    else_block: guard_failure_id,
-                    then_arguments: Vec::new(),
-                    else_arguments: Vec::new(),
-                    span: branch.span,
-                });
-                let body = case_return_block(lowering, body_id, branch, span, fallthrough)?;
-                lowering.blocks.push(BackendBlock {
-                    parameters: Vec::new(),
-                    id: guard_failure_id,
-                    instructions: vec![BackendInstruction::Jump {
-                        target: guard_failure,
-                        arguments: Vec::new(),
-                        span: branch.span,
-                    }],
-                });
-                lowering.provider.distribute_scope_cleanup(
-                    branch.span,
-                    &mut lowering.blocks,
-                    nested_block_start,
-                )?;
-                let mut body = body;
-                lowering.provider.exit_scope(branch.span, &mut body.instructions)?;
-                lowering.blocks.push(body);
-                Ok(BackendBlock { parameters: Vec::new(), id, instructions: guard_instructions })
-            } else {
-                case_return_block(lowering, id, branch, span, fallthrough)
-            }
-        }
-        Err(error) => Err(error),
-    };
+    let branch_result = lower_bound_case_branch(
+        lowering,
+        id,
+        branch,
+        span,
+        fallthrough,
+        guard_failure,
+        &mut body_prefix,
+        nested_block_start,
+    );
     match branch_result {
         Ok(mut body) => {
             if branch.guard.is_none() {
@@ -264,6 +267,95 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
             Err(error)
         }
     }
+}
+
+fn bind_case_payload<P: BackendExpressionProvider>(
+    lowering: &mut BodyLowering<'_, P>,
+    branch: &crate::ast::CaseBranch,
+    subject: BackendValueId,
+    mode: CaseMode,
+) -> Result<Vec<BackendInstruction>, BackendContractError> {
+    let mut instructions = Vec::new();
+    if matches!(branch.pattern, Pattern::Variant { .. }) {
+        lowering.provider.bind_enum_variant_payload(
+            subject,
+            branch_variant(branch),
+            branch_payload(branch),
+            mode,
+            branch.span,
+            &mut instructions,
+        )?;
+    }
+    Ok(instructions)
+}
+
+fn lower_bound_case_branch<P: BackendExpressionProvider>(
+    lowering: &mut BodyLowering<'_, P>,
+    id: BackendBlockId,
+    branch: &crate::ast::CaseBranch,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    guard_failure: BackendBlockId,
+    body_prefix: &mut Vec<BackendInstruction>,
+    nested_block_start: usize,
+) -> Result<BackendBlock, BackendContractError> {
+    if branch.guard.is_some() {
+        return lower_guarded_case_branch(
+            lowering,
+            id,
+            branch,
+            span,
+            fallthrough,
+            guard_failure,
+            std::mem::take(body_prefix),
+            nested_block_start,
+        );
+    }
+    case_return_block(lowering, id, branch, span, fallthrough)
+}
+
+fn lower_guarded_case_branch<P: BackendExpressionProvider>(
+    lowering: &mut BodyLowering<'_, P>,
+    id: BackendBlockId,
+    branch: &crate::ast::CaseBranch,
+    span: SourceSpan,
+    fallthrough: Option<BackendBlockId>,
+    guard_failure: BackendBlockId,
+    mut guard_instructions: Vec<BackendInstruction>,
+    nested_block_start: usize,
+) -> Result<BackendBlock, BackendContractError> {
+    let body_id = lowering.allocate_block();
+    let guard_failure_id = lowering.allocate_block();
+    let condition = lowering.provider.lower_expression(
+        branch.guard.as_ref().expect("guarded case branch"),
+        &mut guard_instructions,
+    )?;
+    guard_instructions.push(BackendInstruction::Branch {
+        condition,
+        then_block: body_id,
+        else_block: guard_failure_id,
+        then_arguments: Vec::new(),
+        else_arguments: Vec::new(),
+        span: branch.span,
+    });
+    let mut body = case_return_block(lowering, body_id, branch, span, fallthrough)?;
+    lowering.blocks.push(BackendBlock {
+        parameters: Vec::new(),
+        id: guard_failure_id,
+        instructions: vec![BackendInstruction::Jump {
+            target: guard_failure,
+            arguments: Vec::new(),
+            span: branch.span,
+        }],
+    });
+    lowering.provider.distribute_scope_cleanup(
+        branch.span,
+        &mut lowering.blocks,
+        nested_block_start,
+    )?;
+    lowering.provider.exit_scope(branch.span, &mut body.instructions)?;
+    lowering.blocks.push(body);
+    Ok(BackendBlock { parameters: Vec::new(), id, instructions: guard_instructions })
 }
 pub(super) fn lower_case_condition<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,

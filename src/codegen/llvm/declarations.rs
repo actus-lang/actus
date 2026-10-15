@@ -146,86 +146,69 @@ fn cleanup_signature(
     pointer_width: u8,
 ) -> (&'static str, Vec<BackendParameter>, BackendReturn) {
     match bridge {
-        BackendCleanupBridge::BufferDrop => (
-            crate::runtime::BUFFER_DROP_SYMBOL,
-            vec![BackendParameter {
-                name: "handle".to_owned(),
-                role: crate::ast::Role::Erg,
-                ty: BackendValueType::Pointer,
-                passing: BackendPassingMode::Direct,
-            }],
-            BackendReturn {
-                role: None,
-                ty: BackendValueType::Unit,
-                passing: BackendReturnMode::Direct,
-            },
-        ),
-        BackendCleanupBridge::RegionDrop => (
+        BackendCleanupBridge::BufferDrop => {
+            cleanup_pointer_signature(crate::runtime::BUFFER_DROP_SYMBOL, "handle", unit_return())
+        }
+        BackendCleanupBridge::RegionDrop => cleanup_pointer_signature(
             crate::runtime::REGION_DROP_SYMBOL,
-            vec![BackendParameter {
-                name: "region".to_owned(),
-                role: crate::ast::Role::Erg,
-                ty: BackendValueType::Pointer,
-                passing: BackendPassingMode::Direct,
-            }],
+            "region",
             BackendReturn {
                 role: None,
                 ty: BackendValueType::Integer { signed: true, width: 32 },
                 passing: BackendReturnMode::Direct,
             },
         ),
-        BackendCleanupBridge::EnumDrop { .. } => (
-            crate::runtime::ENUM_DROP_SYMBOL,
-            vec![
-                BackendParameter {
-                    name: "pointer".to_owned(),
-                    role: crate::ast::Role::Erg,
-                    ty: BackendValueType::Pointer,
-                    passing: BackendPassingMode::Direct,
-                },
-                BackendParameter {
-                    name: "size".to_owned(),
-                    role: crate::ast::Role::Erg,
-                    ty: BackendValueType::Integer { signed: false, width: pointer_width },
-                    passing: BackendPassingMode::Direct,
-                },
-            ],
-            BackendReturn {
-                role: None,
-                ty: BackendValueType::Unit,
-                passing: BackendReturnMode::Direct,
-            },
-        ),
-        BackendCleanupBridge::AggregateDrop { .. } => (
-            crate::runtime::AGGREGATE_DROP_SYMBOL,
-            vec![
-                BackendParameter {
-                    name: "pointer".to_owned(),
-                    role: crate::ast::Role::Erg,
-                    ty: BackendValueType::Pointer,
-                    passing: BackendPassingMode::Direct,
-                },
-                BackendParameter {
-                    name: "size".to_owned(),
-                    role: crate::ast::Role::Erg,
-                    ty: BackendValueType::Integer { signed: false, width: pointer_width },
-                    passing: BackendPassingMode::Direct,
-                },
-                BackendParameter {
-                    name: "alignment".to_owned(),
-                    role: crate::ast::Role::Erg,
-                    ty: BackendValueType::Integer { signed: false, width: pointer_width },
-                    passing: BackendPassingMode::Direct,
-                },
-            ],
-            BackendReturn {
-                role: None,
-                ty: BackendValueType::Unit,
-                passing: BackendReturnMode::Direct,
-            },
-        ),
+        BackendCleanupBridge::EnumDrop { .. } => {
+            cleanup_drop_signature(crate::runtime::ENUM_DROP_SYMBOL, pointer_width, false)
+        }
+        BackendCleanupBridge::AggregateDrop { .. } => {
+            cleanup_drop_signature(crate::runtime::AGGREGATE_DROP_SYMBOL, pointer_width, true)
+        }
         BackendCleanupBridge::PerformanceDrop => performance_cleanup_signature(),
     }
+}
+
+fn cleanup_pointer_signature(
+    symbol: &'static str,
+    parameter_name: &'static str,
+    return_value: BackendReturn,
+) -> (&'static str, Vec<BackendParameter>, BackendReturn) {
+    (symbol, vec![pointer_parameter(parameter_name)], return_value)
+}
+
+fn cleanup_drop_signature(
+    symbol: &'static str,
+    pointer_width: u8,
+    includes_alignment: bool,
+) -> (&'static str, Vec<BackendParameter>, BackendReturn) {
+    let mut parameters =
+        vec![pointer_parameter("pointer"), integer_parameter("size", pointer_width)];
+    if includes_alignment {
+        parameters.push(integer_parameter("alignment", pointer_width));
+    }
+    (symbol, parameters, unit_return())
+}
+
+fn pointer_parameter(name: &str) -> BackendParameter {
+    BackendParameter {
+        name: name.to_owned(),
+        role: crate::ast::Role::Erg,
+        ty: BackendValueType::Pointer,
+        passing: BackendPassingMode::Direct,
+    }
+}
+
+fn integer_parameter(name: &str, width: u8) -> BackendParameter {
+    BackendParameter {
+        name: name.to_owned(),
+        role: crate::ast::Role::Erg,
+        ty: BackendValueType::Integer { signed: false, width },
+        passing: BackendPassingMode::Direct,
+    }
+}
+
+fn unit_return() -> BackendReturn {
+    BackendReturn { role: None, ty: BackendValueType::Unit, passing: BackendReturnMode::Direct }
 }
 
 fn performance_cleanup_signature() -> (&'static str, Vec<BackendParameter>, BackendReturn) {

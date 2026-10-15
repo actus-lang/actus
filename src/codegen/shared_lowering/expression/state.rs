@@ -83,64 +83,12 @@ pub(super) fn coerce_owner_value(
     if matches!(source_type, BackendValueType::Float { .. })
         && matches!(target_type, BackendValueType::Float { .. })
     {
-        if let Some(BackendInstruction::FloatConstant { ty, bits, .. }) = instructions
-            .iter_mut()
-            .rev()
-            .find(|instruction| matches!(instruction, BackendInstruction::FloatConstant { result, .. } if *result == value))
-        {
-            if let BackendValueType::Float { width: 32 } = target_type {
-                *ty = target_type;
-                *bits = u64::from((f64::from_bits(*bits) as f32).to_bits());
-                provider.remember_value(value, target_type);
-                return Ok(value);
-            }
-            if let BackendValueType::Float { width: 64 } = target_type {
-                *ty = target_type;
-                *bits = f64::from_bits(*bits).to_bits();
-                provider.remember_value(value, target_type);
-                return Ok(value);
-            }
-        }
-        return Err(unsupported(
-            span,
-            format!(
-                "non-literal floating-point width conversion from {:?} to {:?} is not supported by the shared contract",
-                source_type, target_type
-            ),
-        ));
+        return coerce_float_literal(provider, value, source_type, target_type, span, instructions);
     }
-    if let (
-        BackendValueType::Integer { signed: source_signed, .. },
-        BackendValueType::Integer { signed: target_signed, width: target_width },
-    ) = (source_type, target_type)
-        && let Some(BackendInstruction::Constant { ty, value: literal, .. }) = instructions
-            .iter_mut()
-            .rev()
-            .find(|instruction| matches!(instruction, BackendInstruction::Constant { result, .. } if *result == value))
+    if let Some(converted) =
+        coerce_integer_literal(provider, value, source_type, target_type, instructions)
     {
-        let fits = if target_signed {
-            i64::try_from(*literal).is_ok_and(|literal| {
-                let minimum = if target_width == 64 {
-                    i64::MIN
-                } else {
-                    -(1i64 << (target_width - 1))
-                };
-                let maximum = if target_width == 64 {
-                    i64::MAX
-                } else {
-                    (1i64 << (target_width - 1)) - 1
-                };
-                (minimum..=maximum).contains(&literal)
-            })
-        } else {
-            (!source_signed || *literal <= i64::MAX as u64)
-                && integer_value_fits(*literal, false, target_width)
-        };
-        if fits {
-            *ty = target_type;
-            provider.remember_value(value, target_type);
-            return Ok(value);
-        }
+        return Ok(converted);
     }
     let converted = provider.allocate();
     provider.remember_value(converted, target_type);
@@ -152,6 +100,81 @@ pub(super) fn coerce_owner_value(
         span,
     });
     Ok(converted)
+}
+
+fn coerce_float_literal(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: BackendValueId,
+    source_type: BackendValueType,
+    target_type: BackendValueType,
+    span: crate::lexer::SourceSpan,
+    instructions: &mut [BackendInstruction],
+) -> Result<BackendValueId, BackendContractError> {
+    if let Some(BackendInstruction::FloatConstant { ty, bits, .. }) = instructions
+        .iter_mut()
+        .rev()
+        .find(|instruction| matches!(instruction, BackendInstruction::FloatConstant { result, .. } if *result == value))
+    {
+        if let BackendValueType::Float { width: 32 } = target_type {
+            *ty = target_type;
+            *bits = u64::from((f64::from_bits(*bits) as f32).to_bits());
+            provider.remember_value(value, target_type);
+            return Ok(value);
+        }
+        if let BackendValueType::Float { width: 64 } = target_type {
+            *ty = target_type;
+            *bits = f64::from_bits(*bits).to_bits();
+            provider.remember_value(value, target_type);
+            return Ok(value);
+        }
+    }
+    Err(unsupported(
+        span,
+        format!(
+            "non-literal floating-point width conversion from {:?} to {:?} is not supported by the shared contract",
+            source_type, target_type
+        ),
+    ))
+}
+
+fn coerce_integer_literal(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: BackendValueId,
+    source_type: BackendValueType,
+    target_type: BackendValueType,
+    instructions: &mut [BackendInstruction],
+) -> Option<BackendValueId> {
+    let (
+        BackendValueType::Integer { signed: source_signed, .. },
+        BackendValueType::Integer { signed: target_signed, width: target_width },
+    ) = (source_type, target_type)
+    else {
+        return None;
+    };
+    let Some(BackendInstruction::Constant { ty, value: literal, .. }) = instructions
+        .iter_mut()
+        .rev()
+        .find(|instruction| matches!(instruction, BackendInstruction::Constant { result, .. } if *result == value))
+    else {
+        return None;
+    };
+    let fits = if target_signed {
+        i64::try_from(*literal).is_ok_and(|literal| {
+            let minimum = if target_width == 64 { i64::MIN } else { -(1i64 << (target_width - 1)) };
+            let maximum =
+                if target_width == 64 { i64::MAX } else { (1i64 << (target_width - 1)) - 1 };
+            (minimum..=maximum).contains(&literal)
+        })
+    } else {
+        (!source_signed || *literal <= i64::MAX as u64)
+            && integer_value_fits(*literal, false, target_width)
+    };
+    if !fits {
+        return None;
+    }
+    *ty = target_type;
+    provider.remember_value(value, target_type);
+    Some(value)
 }
 
 pub(super) fn coerce_value_to_type(

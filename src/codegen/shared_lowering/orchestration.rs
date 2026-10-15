@@ -134,54 +134,7 @@ fn reject_floating_point_on_freestanding(
     if target.entry_contract() == EntryContract::Hosted {
         return Ok(());
     }
-    let type_name_is_float = |type_name: &TypeName| {
-        matches!(
-            crate::ast::primitive_type(&type_name.name),
-            Some(crate::ast::PrimitiveType::Float { .. })
-        )
-    };
-    let mut float_span =
-        semantic.literal_facts.iter().find(|fact| fact.kind == "float").map(|fact| fact.span);
-    if float_span.is_none() {
-        for declaration in &program.declarations {
-            let candidate = match declaration {
-                TopLevelDecl::Verb(verb) => verb
-                    .params
-                    .iter()
-                    .map(|parameter| &parameter.ty)
-                    .chain(verb.return_type.iter().map(|return_type| &return_type.ty))
-                    .find(|type_name| type_name_is_float(type_name)),
-                TopLevelDecl::ExternalVerb(verb) => verb
-                    .params
-                    .iter()
-                    .map(|parameter| &parameter.ty)
-                    .chain(verb.return_type.iter().map(|return_type| &return_type.ty))
-                    .find(|type_name| type_name_is_float(type_name)),
-                TopLevelDecl::Struct(definition) => definition
-                    .fields
-                    .iter()
-                    .map(|field| &field.ty)
-                    .find(|type_name| type_name_is_float(type_name)),
-                TopLevelDecl::Enum(definition) => {
-                    definition.variants.iter().find_map(|variant| match &variant.payload {
-                        crate::ast::EnumPayload::Tuple(types) => {
-                            types.iter().find(|ty| type_name_is_float(ty))
-                        }
-                        crate::ast::EnumPayload::Struct(fields) => {
-                            fields.iter().map(|field| &field.ty).find(|ty| type_name_is_float(ty))
-                        }
-                        crate::ast::EnumPayload::Unit => None,
-                    })
-                }
-                _ => None,
-            };
-            if let Some(type_name) = candidate {
-                float_span = Some(type_name.span);
-                break;
-            }
-        }
-    }
-    let Some(span) = float_span else { return Ok(()) };
+    let Some(span) = find_floating_point_span(program, semantic) else { return Ok(()) };
     Err(BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
         "floating-point lowering",
         span,
@@ -191,6 +144,53 @@ fn reject_floating_point_on_freestanding(
         },
         "floating-point values are forbidden by the freestanding target profile; use an integer or fixed-point representation",
     )))
+}
+
+fn find_floating_point_span(
+    program: &Program,
+    semantic: &crate::semantic::SemanticModel,
+) -> Option<crate::lexer::SourceSpan> {
+    let is_float = |type_name: &TypeName| {
+        matches!(
+            crate::ast::primitive_type(&type_name.name),
+            Some(crate::ast::PrimitiveType::Float { .. })
+        )
+    };
+    if let Some(fact) = semantic.literal_facts.iter().find(|fact| fact.kind == "float") {
+        return Some(fact.span);
+    }
+    program.declarations.iter().find_map(|declaration| {
+        let type_name = match declaration {
+            TopLevelDecl::Verb(verb) => verb
+                .params
+                .iter()
+                .map(|parameter| &parameter.ty)
+                .chain(verb.return_type.iter().map(|return_type| &return_type.ty))
+                .find(|type_name| is_float(type_name)),
+            TopLevelDecl::ExternalVerb(verb) => verb
+                .params
+                .iter()
+                .map(|parameter| &parameter.ty)
+                .chain(verb.return_type.iter().map(|return_type| &return_type.ty))
+                .find(|type_name| is_float(type_name)),
+            TopLevelDecl::Struct(definition) => definition
+                .fields
+                .iter()
+                .map(|field| &field.ty)
+                .find(|type_name| is_float(type_name)),
+            TopLevelDecl::Enum(definition) => {
+                definition.variants.iter().find_map(|variant| match &variant.payload {
+                    crate::ast::EnumPayload::Tuple(types) => types.iter().find(|ty| is_float(ty)),
+                    crate::ast::EnumPayload::Struct(fields) => {
+                        fields.iter().map(|field| &field.ty).find(|ty| is_float(ty))
+                    }
+                    crate::ast::EnumPayload::Unit => None,
+                })
+            }
+            _ => None,
+        };
+        type_name.map(|type_name| type_name.span)
+    })
 }
 
 fn reject_implicit_large_aggregate_allocation(

@@ -85,71 +85,103 @@ pub(super) fn lower_shared_modules(
     generic_instances: &[crate::semantic::GenericInstance],
     backend: &str,
 ) -> Result<Vec<LoweredSharedModule>, BackendEmitError> {
-    object_plan
+    let context =
+        SharedLoweringContext { symbol, configuration, bindings, generic_instances, backend };
+    let mut modules = object_plan
         .units()
         .iter()
         .enumerate()
-        .map(|(index, unit)| {
-            let targeted = crate::codegen::normalize_program(
-                &crate::semantic::filter_program_for_target(unit.program(), configuration.target()),
-            );
-            let program = crate::codegen::specialize_program(&targeted, generic_instances)?;
-            let entry_symbol = (index == 0).then_some(symbol);
-            let performance_context = (index != 0).then(|| {
-                (
-                    object_plan.units()[0].namespace().symbol_prefix(),
-                    object_plan.units()[0].program(),
-                )
-            });
-            let module = crate::codegen::lower_program_to_backend_module_for_target_with_context(
-                unit.namespace().symbol_prefix(),
-                &program,
-                entry_symbol,
-                Some(bindings),
-                configuration.target(),
-                performance_context,
-            )
-            .map_err(|error| {
-                let error = error
-                    .with_backend_context(backend, configuration.target().triple().to_string());
-                let location = if index == 0 {
-                    "root semantic lowering".to_owned()
-                } else {
-                    format!("module `{}` semantic lowering", unit.namespace().module_path())
-                };
-                BackendEmitError(format!("{backend} {location} failed: {error}"))
-            })?;
-            Ok(LoweredSharedModule {
-                namespace: unit.namespace().symbol_prefix().to_owned(),
-                object_name: if index == 0 {
-                    "root".to_owned()
-                } else {
-                    unit.namespace().symbol_prefix().to_owned()
-                },
-                program,
-                module,
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map(|mut modules| {
-            let required_symbols = modules
-                .iter()
-                .skip(1)
-                .flat_map(|lowered| lowered.module.functions.iter())
-                .flat_map(|function| function.blocks.iter())
-                .flat_map(|block| block.instructions.iter())
-                .filter_map(|instruction| match instruction {
-                    crate::codegen::BackendInstruction::Call { callee, .. }
-                        if callee.kind() == crate::codegen::SymbolKind::Performance =>
-                    {
-                        Some(callee.as_str().to_owned())
-                    }
-                    _ => None,
-                })
-                .collect();
-            if let Some(root) = modules.first_mut() {
-                retain_reachable_root_functions(&mut root.module, symbol, &required_symbols);
+        .map(|(index, _)| lower_unit_module(object_plan, index, &context))
+        .collect::<Result<Vec<_>, _>>()?;
+    let required_symbols = required_performance_symbols(&modules);
+    if let Some(root) = modules.first_mut() {
+        retain_reachable_root_functions(&mut root.module, symbol, &required_symbols);
+    }
+    Ok(modules)
+}
+
+struct SharedLoweringContext<'a> {
+    symbol: &'a str,
+    configuration: &'a CompilerConfiguration,
+    bindings: &'a BackendSymbolBindings,
+    generic_instances: &'a [crate::semantic::GenericInstance],
+    backend: &'a str,
+}
+
+fn lower_unit_module(
+    object_plan: &ModuleObjectPlan,
+    index: usize,
+    context: &SharedLoweringContext<'_>,
+) -> Result<LoweredSharedModule, BackendEmitError> {
+    let unit = &object_plan.units()[index];
+    let targeted = crate::codegen::normalize_program(&crate::semantic::filter_program_for_target(
+        unit.program(),
+        context.configuration.target(),
+    ));
+    let program = crate::codegen::specialize_program(&targeted, context.generic_instances)?;
+    let performance_context = (index != 0).then(|| {
+        (object_plan.units()[0].namespace().symbol_prefix(), object_plan.units()[0].program())
+    });
+    let module =
+        lower_unit_backend_module(object_plan, index, &program, performance_context, context)?;
+    Ok(LoweredSharedModule {
+        namespace: unit.namespace().symbol_prefix().to_owned(),
+        object_name: unit_object_name(unit, index),
+        program,
+        module,
+    })
+}
+
+fn lower_unit_backend_module(
+    object_plan: &ModuleObjectPlan,
+    index: usize,
+    program: &crate::ast::Program,
+    performance_context: Option<(&str, &crate::ast::Program)>,
+    context: &SharedLoweringContext<'_>,
+) -> Result<crate::codegen::BackendModule, BackendEmitError> {
+    let unit = &object_plan.units()[index];
+    crate::codegen::lower_program_to_backend_module_for_target_with_context(
+        unit.namespace().symbol_prefix(),
+        program,
+        (index == 0).then_some(context.symbol),
+        Some(context.bindings),
+        context.configuration.target(),
+        performance_context,
+    )
+    .map_err(|error| {
+        let error = error.with_backend_context(
+            context.backend,
+            context.configuration.target().triple().to_string(),
+        );
+        let location = if index == 0 {
+            "root semantic lowering".to_owned()
+        } else {
+            format!("module `{}` semantic lowering", unit.namespace().module_path())
+        };
+        BackendEmitError(format!("{} {} failed: {error}", context.backend, location))
+    })
+}
+
+fn unit_object_name(unit: &crate::modules::ModuleObjectUnit, index: usize) -> String {
+    if index == 0 { "root".to_owned() } else { unit.namespace().symbol_prefix().to_owned() }
+}
+
+fn required_performance_symbols(
+    modules: &[LoweredSharedModule],
+) -> std::collections::BTreeSet<String> {
+    modules
+        .iter()
+        .skip(1)
+        .flat_map(|lowered| lowered.module.functions.iter())
+        .flat_map(|function| function.blocks.iter())
+        .flat_map(|block| block.instructions.iter())
+        .filter_map(|instruction| match instruction {
+            crate::codegen::BackendInstruction::Call { callee, .. }
+                if callee.kind() == crate::codegen::SymbolKind::Performance =>
+            {
+                Some(callee.as_str().to_owned())
             }
-            modules
+            _ => None,
         })
+        .collect()
 }

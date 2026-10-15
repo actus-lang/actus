@@ -24,6 +24,10 @@ fn validate_instruction(
     if let Some(result) = validate_control_flow(instruction, blocks, block_ids) {
         return result;
     }
+    validate_instruction_kind(instruction)
+}
+
+fn validate_instruction_kind(instruction: &BackendInstruction) -> Result<(), BackendContractError> {
     match instruction {
         BackendInstruction::Constant { ty, .. }
             if !matches!(

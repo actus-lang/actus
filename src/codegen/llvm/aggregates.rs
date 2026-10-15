@@ -6,7 +6,7 @@ use llvm_sys::core::{
     LLVMBuildStore, LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt, LLVMGetIntTypeWidth,
     LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment, LLVMTypeOf,
 };
-use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
 
@@ -22,33 +22,55 @@ pub(super) fn emit_aggregate_construct(
     };
     let aggregate_type =
         super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
-    let address = if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
-        let declaration =
-            declarations.get(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL).ok_or_else(|| {
-                BackendEmitError("large aggregate allocator is unavailable".to_owned())
-            })?;
-        let size =
-            unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
-        let alignment = unsafe {
-            LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.alignment), 0)
-        };
-        let mut arguments = [size, alignment];
-        unsafe {
-            llvm_sys::core::LLVMBuildCall2(
-                builder,
-                declaration.function_type,
-                declaration.value,
-                arguments.as_mut_ptr(),
-                2,
-                c"aggregate.allocate".as_ptr().cast(),
-            )
-        }
-    } else {
-        unsafe { LLVMBuildAlloca(builder, aggregate_type, c"aggregate.construct".as_ptr().cast()) }
-    };
+    let address =
+        allocate_aggregate_storage(context, builder, *layout, aggregate_type, declarations)?;
     if address.is_null() {
         return Err(BackendEmitError("LLVM failed to allocate aggregate value".to_owned()));
     }
+    initialize_aggregate_storage(context, builder, address, *layout, fields, values)?;
+    values.insert(*result, address);
+    Ok(false)
+}
+
+fn allocate_aggregate_storage(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    layout: crate::codegen::BackendLayout,
+    aggregate_type: LLVMTypeRef,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+) -> Result<LLVMValueRef, BackendEmitError> {
+    if layout.size < crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+        return Ok(unsafe {
+            LLVMBuildAlloca(builder, aggregate_type, c"aggregate.construct".as_ptr().cast())
+        });
+    }
+    let declaration = declarations
+        .get(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL)
+        .ok_or_else(|| BackendEmitError("large aggregate allocator is unavailable".to_owned()))?;
+    let size = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+    let alignment =
+        unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.alignment), 0) };
+    let mut arguments = [size, alignment];
+    Ok(unsafe {
+        llvm_sys::core::LLVMBuildCall2(
+            builder,
+            declaration.function_type,
+            declaration.value,
+            arguments.as_mut_ptr(),
+            2,
+            c"aggregate.allocate".as_ptr().cast(),
+        )
+    })
+}
+
+fn initialize_aggregate_storage(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    address: LLVMValueRef,
+    layout: crate::codegen::BackendLayout,
+    fields: &[crate::codegen::BackendAggregateField],
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
     unsafe { LLVMSetAlignment(address, layout.alignment) };
     let zero = unsafe { LLVMConstInt(LLVMInt8TypeInContext(context), 0, 0) };
     let size = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
@@ -56,41 +78,51 @@ pub(super) fn emit_aggregate_construct(
         return Err(BackendEmitError("LLVM failed to zero-initialize aggregate value".to_owned()));
     }
     for field in fields {
-        let value = values.get(&field.value).copied().ok_or_else(|| {
-            BackendEmitError(format!("LLVM aggregate field value {} is unavailable", field.value.0))
-        })?;
-        let destination = field_address(context, builder, address, field.offset)?;
-        if matches!(
-            field.ty,
-            BackendValueType::Aggregate { .. }
-                | BackendValueType::Enum { .. }
-                | BackendValueType::Region { .. }
-        ) {
-            let size = unsafe {
-                LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(field.layout.size), 0)
-            };
-            let copy = unsafe {
-                LLVMBuildMemMove(
-                    builder,
-                    destination,
-                    field.layout.alignment,
-                    value,
-                    field.layout.alignment,
-                    size,
-                )
-            };
-            if copy.is_null() {
-                return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
-            }
-        } else {
-            let value = coerce_scalar_value(context, builder, value, field.ty)?;
-            if unsafe { LLVMBuildStore(builder, value, destination) }.is_null() {
-                return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
-            }
+        initialize_aggregate_field(context, builder, address, field, values)?;
+    }
+    Ok(())
+}
+
+fn initialize_aggregate_field(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    address: LLVMValueRef,
+    field: &crate::codegen::BackendAggregateField,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
+    let value = values.get(&field.value).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM aggregate field value {} is unavailable", field.value.0))
+    })?;
+    let destination = field_address(context, builder, address, field.offset)?;
+    if matches!(
+        field.ty,
+        BackendValueType::Aggregate { .. }
+            | BackendValueType::Enum { .. }
+            | BackendValueType::Region { .. }
+    ) {
+        let size = unsafe {
+            LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(field.layout.size), 0)
+        };
+        let copy = unsafe {
+            LLVMBuildMemMove(
+                builder,
+                destination,
+                field.layout.alignment,
+                value,
+                field.layout.alignment,
+                size,
+            )
+        };
+        if copy.is_null() {
+            return Err(BackendEmitError("LLVM failed to copy aggregate field".to_owned()));
+        }
+    } else {
+        let value = coerce_scalar_value(context, builder, value, field.ty)?;
+        if unsafe { LLVMBuildStore(builder, value, destination) }.is_null() {
+            return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
         }
     }
-    values.insert(*result, address);
-    Ok(false)
+    Ok(())
 }
 
 pub(super) fn emit_aggregate_instruction(

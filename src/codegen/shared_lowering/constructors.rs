@@ -275,6 +275,28 @@ pub(super) fn lower_named_unit_enum(
             instructions,
         );
     }
+    lower_named_enum_constructor(
+        provider,
+        type_name,
+        discriminant,
+        is_unit,
+        layout,
+        arguments,
+        span,
+        instructions,
+    )
+}
+
+fn lower_named_enum_constructor(
+    provider: &mut SharedExpressionProvider<'_>,
+    type_name: &TypeName,
+    discriminant: u32,
+    is_unit: bool,
+    layout: BackendEnumLayout,
+    arguments: &[crate::ast::Argument],
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
     let payload = if is_unit {
         if !arguments.is_empty() {
             return Err(unsupported(span, "named enum unit variants cannot carry a payload"));

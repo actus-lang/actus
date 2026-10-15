@@ -38,46 +38,53 @@ pub(super) fn emit_return(
         }
         None => Err(BackendEmitError("non-unit LLVM function requires a return value".to_owned())),
         Some(value_id) => {
-            let value = values.get(&value_id).copied().ok_or_else(|| {
-                BackendEmitError(format!("LLVM return value {} is unavailable", value_id.0))
-            })?;
-            if declaration.return_slot {
-                let slot = unsafe { llvm_sys::core::LLVMGetParam(declaration.value, 0) };
-                if declaration.borrowed_view_return {
-                    return emit_borrowed_view_return(context, builder, declaration, slot, value);
-                }
-                let size = declaration.runtime_return_size.ok_or_else(|| {
-                    BackendEmitError("LLVM return slot has no known storage size".to_owned())
-                })?;
-                let alignment = declaration.return_alignment.ok_or_else(|| {
-                    BackendEmitError("LLVM return slot has no known alignment".to_owned())
-                })?;
-                let source = return_slot_source(context, builder, declaration, value, function)?;
-                let copied = unsafe {
-                    LLVMBuildMemMove(
-                        builder,
-                        slot,
-                        alignment,
-                        source,
-                        alignment,
-                        LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(size), 0),
-                    )
-                };
-                if copied.is_null() {
-                    return Err(BackendEmitError("LLVM failed to copy return slot".to_owned()));
-                }
-                if declaration.borrowed_view_return {
-                    unsafe { LLVMBuildRet(builder, slot) };
-                } else {
-                    unsafe { LLVMBuildRetVoid(builder) };
-                }
-            } else {
-                let value = direct_return_value(context, builder, function, declaration, value)?;
-                unsafe { LLVMBuildRet(builder, value) };
-            }
-            Ok(())
+            emit_present_return(context, builder, function, declaration, value_id, values)
         }
     }
+}
+
+fn emit_present_return(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    function: &BackendFunction,
+    declaration: FunctionDeclaration,
+    value_id: BackendValueId,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
+    let value = values.get(&value_id).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM return value {} is unavailable", value_id.0))
+    })?;
+    if !declaration.return_slot {
+        let value = direct_return_value(context, builder, function, declaration, value)?;
+        unsafe { LLVMBuildRet(builder, value) };
+        return Ok(());
+    }
+    let slot = unsafe { llvm_sys::core::LLVMGetParam(declaration.value, 0) };
+    if declaration.borrowed_view_return {
+        return emit_borrowed_view_return(context, builder, declaration, slot, value);
+    }
+    let size = declaration
+        .runtime_return_size
+        .ok_or_else(|| BackendEmitError("LLVM return slot has no known storage size".to_owned()))?;
+    let alignment = declaration
+        .return_alignment
+        .ok_or_else(|| BackendEmitError("LLVM return slot has no known alignment".to_owned()))?;
+    let source = return_slot_source(context, builder, declaration, value, function)?;
+    let copied = unsafe {
+        LLVMBuildMemMove(
+            builder,
+            slot,
+            alignment,
+            source,
+            alignment,
+            LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(size), 0),
+        )
+    };
+    if copied.is_null() {
+        return Err(BackendEmitError("LLVM failed to copy return slot".to_owned()));
+    }
+    unsafe { LLVMBuildRetVoid(builder) };
+    Ok(())
 }
 
 fn emit_borrowed_view_return(

@@ -28,6 +28,17 @@ pub(crate) struct SharedDeclarations<'program> {
     pub(crate) performance_externals: Vec<BackendExternal>,
 }
 
+struct DeclarationInputs<'program> {
+    verbs: Vec<&'program VerbDecl>,
+    externals: Vec<&'program ExternalVerbDecl>,
+    performances: Vec<(&'program PerformDecl, &'program VerbDecl)>,
+    signatures: Vec<BackendSignature>,
+    performance_signatures: Vec<BackendSignature>,
+    external_signatures: Vec<BackendSignature>,
+    context_performances: Vec<(&'program PerformDecl, &'program VerbDecl)>,
+    context_performance_signatures: Vec<BackendSignature>,
+}
+
 impl<'program> SharedDeclarations<'program> {
     pub(crate) fn new(
         namespace: &str,
@@ -35,129 +46,22 @@ impl<'program> SharedDeclarations<'program> {
         layouts: &impl BackendLayoutProvider,
         performance_context: Option<(&str, &'program Program)>,
     ) -> Result<Self, BackendContractError> {
-        let (verbs, externals) = scalar_declarations(program)?;
-        let performances = scalar_performances(program);
-        let signatures = verbs
-            .iter()
-            .map(|verb| lower_verb_signature(namespace, verb, layouts))
-            .collect::<Result<Vec<_>, _>>()?;
-        let performance_signatures = performances
-            .iter()
-            .map(|(perform, method)| {
-                lower_performance_signature(namespace, perform, method, layouts)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let context_performances = performance_context
-            .map(|(_, context)| scalar_performances(context))
-            .unwrap_or_default();
-        let context_performance_signatures = performance_context
-            .map(|(context_namespace, _)| {
-                context_performances
-                    .iter()
-                    .map(|(perform, method)| {
-                        lower_performance_signature(context_namespace, perform, method, layouts)
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .transpose()?
-            .unwrap_or_default();
-        let external_signatures = externals
-            .iter()
-            .map(|external| lower_external_signature(external, layouts))
-            .collect::<Result<Vec<_>, _>>()?;
-        let mut return_types = shared_return_types(
-            &verbs,
-            &externals,
-            &signatures,
-            &external_signatures,
-            &performances,
-            &performance_signatures,
-        );
-        for ((_, method), signature) in
-            context_performances.iter().zip(&context_performance_signatures)
-        {
-            return_types.insert(
-                method.name.clone(),
-                (signature.return_value.ty != BackendValueType::Unit)
-                    .then_some(signature.return_value.ty),
-            );
-        }
-        let mut return_payload_types =
-            shared_return_payload_types(&verbs, &externals, layouts, &performances);
-        return_payload_types
-            .extend(shared_return_payload_types_for_performances(&context_performances, layouts));
-        let mut return_nominal_types =
-            performance::shared_return_nominal_types(&verbs, &externals, &performances);
-        return_nominal_types.extend(context_performances.iter().map(|(_, method)| {
-            (
-                method.name.clone(),
-                method.return_type.as_ref().map(|return_type| return_type.ty.clone()),
-            )
-        }));
+        let inputs = collect_declaration_inputs(namespace, program, layouts, performance_context)?;
+        let (return_types, return_nominal_types, return_payload_types) =
+            build_return_metadata(&inputs, layouts);
         let (
-            mut performance_symbols,
-            mut performance_return_types,
-            mut performance_return_nominal_types,
-        ) = performance::performance_dispatch_maps(&performances, &performance_signatures);
-        let (context_symbols, context_return_types, context_return_nominal_types) =
-            performance::performance_dispatch_maps(
-                &context_performances,
-                &context_performance_signatures,
-            );
-        performance_symbols.extend(context_symbols);
-        performance_return_types.extend(context_return_types);
-        performance_return_nominal_types.extend(context_return_nominal_types);
-        let performance_externals = context_performances
-            .iter()
-            .zip(context_performance_signatures.iter())
-            .map(|((_, _), signature)| performance_external(signature))
-            .collect::<Result<Vec<_>, _>>()?;
-        let parameter_modes = verbs
-            .iter()
-            .zip(&signatures)
-            .map(|(verb, signature)| {
-                (
-                    verb.name.clone(),
-                    signature
-                        .parameters
-                        .iter()
-                        .map(|parameter| parameter.passing.clone())
-                        .collect(),
-                )
-            })
-            .chain(externals.iter().zip(&external_signatures).map(|(external, signature)| {
-                (
-                    external.name.clone(),
-                    signature
-                        .parameters
-                        .iter()
-                        .map(|parameter| parameter.passing.clone())
-                        .collect(),
-                )
-            }))
-            .collect();
-        let parameter_types = verbs
-            .iter()
-            .zip(&signatures)
-            .map(|(verb, signature)| {
-                (
-                    verb.name.clone(),
-                    signature.parameters.iter().map(|parameter| parameter.ty).collect(),
-                )
-            })
-            .chain(externals.iter().zip(&external_signatures).map(|(external, signature)| {
-                (
-                    external.name.clone(),
-                    signature.parameters.iter().map(|parameter| parameter.ty).collect(),
-                )
-            }))
-            .collect();
+            performance_symbols,
+            performance_return_types,
+            performance_return_nominal_types,
+            performance_externals,
+        ) = build_performance_metadata(&inputs)?;
+        let (parameter_modes, parameter_types) = build_parameter_metadata(&inputs);
         Ok(Self {
-            verbs,
-            externals,
-            performances,
-            performance_signatures,
-            external_signatures,
+            verbs: inputs.verbs,
+            externals: inputs.externals,
+            performances: inputs.performances,
+            performance_signatures: inputs.performance_signatures,
+            external_signatures: inputs.external_signatures,
             return_types,
             return_nominal_types,
             return_payload_types,
@@ -169,6 +73,174 @@ impl<'program> SharedDeclarations<'program> {
             performance_externals,
         })
     }
+}
+
+fn collect_declaration_inputs<'program>(
+    namespace: &str,
+    program: &'program Program,
+    layouts: &impl BackendLayoutProvider,
+    performance_context: Option<(&str, &'program Program)>,
+) -> Result<DeclarationInputs<'program>, BackendContractError> {
+    let (verbs, externals) = scalar_declarations(program)?;
+    let performances = scalar_performances(program);
+    let performance_signatures = performances
+        .iter()
+        .map(|(perform, method)| lower_performance_signature(namespace, perform, method, layouts))
+        .collect::<Result<Vec<_>, _>>()?;
+    let signatures = verbs
+        .iter()
+        .map(|verb| lower_verb_signature(namespace, verb, layouts))
+        .collect::<Result<Vec<_>, _>>()?;
+    let external_signatures = externals
+        .iter()
+        .map(|external| lower_external_signature(external, layouts))
+        .collect::<Result<Vec<_>, _>>()?;
+    let context_performances =
+        performance_context.map(|(_, context)| scalar_performances(context)).unwrap_or_default();
+    let context_performance_signatures = performance_context
+        .map(|(context_namespace, _)| {
+            context_performances
+                .iter()
+                .map(|(perform, method)| {
+                    lower_performance_signature(context_namespace, perform, method, layouts)
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+    Ok(DeclarationInputs {
+        verbs,
+        externals,
+        performances,
+        signatures,
+        performance_signatures,
+        external_signatures,
+        context_performances,
+        context_performance_signatures,
+    })
+}
+
+fn build_return_metadata(
+    inputs: &DeclarationInputs<'_>,
+    layouts: &impl BackendLayoutProvider,
+) -> (
+    BTreeMap<String, Option<BackendValueType>>,
+    BTreeMap<String, Option<TypeName>>,
+    BTreeMap<String, [Option<BackendValueType>; 2]>,
+) {
+    let mut return_types = shared_return_types(
+        &inputs.verbs,
+        &inputs.externals,
+        &inputs.signatures,
+        &inputs.external_signatures,
+        &inputs.performances,
+        &inputs.performance_signatures,
+    );
+    let mut return_nominal_types = performance::shared_return_nominal_types(
+        &inputs.verbs,
+        &inputs.externals,
+        &inputs.performances,
+    );
+    let mut return_payload_types = shared_return_payload_types(
+        &inputs.verbs,
+        &inputs.externals,
+        layouts,
+        &inputs.performances,
+    );
+    for ((_, method), signature) in
+        inputs.context_performances.iter().zip(&inputs.context_performance_signatures)
+    {
+        return_types.insert(
+            method.name.clone(),
+            (signature.return_value.ty != BackendValueType::Unit)
+                .then_some(signature.return_value.ty),
+        );
+        return_nominal_types.insert(
+            method.name.clone(),
+            method.return_type.as_ref().map(|return_type| return_type.ty.clone()),
+        );
+    }
+    return_payload_types.extend(shared_return_payload_types_for_performances(
+        &inputs.context_performances,
+        layouts,
+    ));
+    (return_types, return_nominal_types, return_payload_types)
+}
+
+fn build_performance_metadata(
+    inputs: &DeclarationInputs<'_>,
+) -> Result<
+    (
+        BTreeMap<(String, String), SymbolIdentity>,
+        BTreeMap<(String, String), Option<BackendValueType>>,
+        BTreeMap<(String, String), Option<TypeName>>,
+        Vec<BackendExternal>,
+    ),
+    BackendContractError,
+> {
+    let (mut symbols, mut return_types, mut nominal_types) = performance::performance_dispatch_maps(
+        &inputs.performances,
+        &inputs.performance_signatures,
+    );
+    let (context_symbols, context_return_types, context_nominal_types) =
+        performance::performance_dispatch_maps(
+            &inputs.context_performances,
+            &inputs.context_performance_signatures,
+        );
+    symbols.extend(context_symbols);
+    return_types.extend(context_return_types);
+    nominal_types.extend(context_nominal_types);
+    let externals = inputs
+        .context_performance_signatures
+        .iter()
+        .map(performance_external)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok((symbols, return_types, nominal_types, externals))
+}
+
+fn build_parameter_metadata(
+    inputs: &DeclarationInputs<'_>,
+) -> (BTreeMap<String, Vec<BackendPassingMode>>, BTreeMap<String, Vec<BackendValueType>>) {
+    let parameter_modes = inputs
+        .verbs
+        .iter()
+        .zip(&inputs.signatures)
+        .map(|(verb, signature)| {
+            (
+                verb.name.clone(),
+                signature.parameters.iter().map(|parameter| parameter.passing.clone()).collect(),
+            )
+        })
+        .chain(inputs.externals.iter().zip(&inputs.external_signatures).map(
+            |(external, signature)| {
+                (
+                    external.name.clone(),
+                    signature
+                        .parameters
+                        .iter()
+                        .map(|parameter| parameter.passing.clone())
+                        .collect(),
+                )
+            },
+        ))
+        .collect();
+    let parameter_types = inputs
+        .verbs
+        .iter()
+        .zip(&inputs.signatures)
+        .map(|(verb, signature)| {
+            (verb.name.clone(), signature.parameters.iter().map(|parameter| parameter.ty).collect())
+        })
+        .chain(inputs.externals.iter().zip(&inputs.external_signatures).map(
+            |(external, signature)| {
+                (
+                    external.name.clone(),
+                    signature.parameters.iter().map(|parameter| parameter.ty).collect(),
+                )
+            },
+        ))
+        .collect();
+    (parameter_modes, parameter_types)
 }
 
 pub(crate) fn build_backend_externals(

@@ -62,27 +62,42 @@ pub(crate) fn lower_shared_verb(
         prologue.append(&mut entry.instructions);
         entry.instructions = prologue;
     }
-    let writebacks = provider.scalar_loan_writebacks();
-    if !writebacks.is_empty() {
-        for block in &mut function.blocks {
-            let Some(index) = block.instructions.iter().position(|instruction| {
-                matches!(
-                    instruction,
-                    super::BackendInstruction::Return { .. }
-                        | super::BackendInstruction::Fail { .. }
-                )
-            }) else {
-                continue;
-            };
-            block.instructions.splice(index..index, writebacks.clone());
-        }
-    }
+    insert_scalar_loan_writebacks(&mut function, provider.scalar_loan_writebacks());
+    assign_cleanup_and_performance(&mut function, verb, cleanup_plans, &provider);
+    function.validate()?;
+    Ok(function)
+}
+
+fn assign_cleanup_and_performance(
+    function: &mut super::BackendFunction,
+    verb: &VerbDecl,
+    cleanup_plans: &[super::BackendCleanupPlan],
+    provider: &SharedExpressionProvider<'_>,
+) {
     function.cleanup = cleanup_plans
         .iter()
         .filter(|plan| plan.span.start >= verb.span.start && plan.span.end <= verb.span.end)
         .cloned()
         .collect();
-    performance::append_parameter_cleanup(&mut function, &provider);
-    function.validate()?;
-    Ok(function)
+    performance::append_parameter_cleanup(function, provider);
+}
+
+fn insert_scalar_loan_writebacks(
+    function: &mut super::BackendFunction,
+    writebacks: Vec<super::BackendInstruction>,
+) {
+    if writebacks.is_empty() {
+        return;
+    }
+    for block in &mut function.blocks {
+        let Some(index) = block.instructions.iter().position(|instruction| {
+            matches!(
+                instruction,
+                super::BackendInstruction::Return { .. } | super::BackendInstruction::Fail { .. }
+            )
+        }) else {
+            continue;
+        };
+        block.instructions.splice(index..index, writebacks.clone());
+    }
 }

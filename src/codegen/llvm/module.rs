@@ -71,6 +71,33 @@ fn declare_module_functions(
     pointer_width: u8,
 ) -> Result<BTreeMap<String, FunctionDeclaration>, BackendEmitError> {
     let mut declarations = BTreeMap::new();
+    declare_external_functions(context, module, backend_module, &mut declarations)?;
+    let bridges = cleanup_bridges(backend_module);
+    declare_cleanup_functions(
+        context,
+        module,
+        backend_module,
+        &bridges,
+        pointer_width,
+        &mut declarations,
+    )?;
+    declare_aggregate_allocator_if_needed(
+        context,
+        module,
+        backend_module,
+        pointer_width,
+        &mut declarations,
+    )?;
+    declare_backend_functions(context, module, backend_module, &mut declarations)?;
+    Ok(declarations)
+}
+
+fn declare_external_functions(
+    context: LLVMContextRef,
+    module: LLVMModuleRef,
+    backend_module: &BackendModule,
+    declarations: &mut BTreeMap<String, FunctionDeclaration>,
+) -> Result<(), BackendEmitError> {
     for external in &backend_module.externals {
         let declaration = declare_function(
             context,
@@ -83,7 +110,17 @@ fn declare_module_functions(
         )?;
         declarations.insert(external.symbol.as_str().to_owned(), declaration);
     }
-    let bridges = cleanup_bridges(backend_module);
+    Ok(())
+}
+
+fn declare_cleanup_functions(
+    context: LLVMContextRef,
+    module: LLVMModuleRef,
+    backend_module: &BackendModule,
+    bridges: &[BackendCleanupBridge],
+    pointer_width: u8,
+    declarations: &mut BTreeMap<String, FunctionDeclaration>,
+) -> Result<(), BackendEmitError> {
     if (backend_module.externals.iter().any(|external| external.runtime_pointer_return)
         || bridges.iter().any(|bridge| matches!(bridge, BackendCleanupBridge::RegionDrop)))
         && !declarations.contains_key(crate::runtime::ENUM_DROP_SYMBOL)
@@ -97,51 +134,75 @@ fn declare_module_functions(
         declarations.insert(crate::runtime::ENUM_DROP_SYMBOL.to_owned(), declaration);
     }
     for bridge in bridges {
-        let symbol = cleanup_bridge_symbol(bridge);
+        let symbol = cleanup_bridge_symbol(*bridge);
         if declarations.contains_key(symbol) {
             continue;
         }
-        let declaration = declare_cleanup_bridge(context, module, bridge, pointer_width)?;
+        let declaration = declare_cleanup_bridge(context, module, *bridge, pointer_width)?;
         declarations.insert(symbol.to_owned(), declaration);
     }
-    if backend_module.functions.iter().any(|function| {
+    Ok(())
+}
+
+fn declare_aggregate_allocator_if_needed(
+    context: LLVMContextRef,
+    module: LLVMModuleRef,
+    backend_module: &BackendModule,
+    pointer_width: u8,
+    declarations: &mut BTreeMap<String, FunctionDeclaration>,
+) -> Result<(), BackendEmitError> {
+    if !has_large_aggregate(backend_module) {
+        return Ok(());
+    }
+    let parameters = vec![
+        crate::codegen::BackendParameter {
+            name: "size".to_owned(),
+            role: crate::ast::Role::Erg,
+            ty: BackendValueType::Integer { signed: false, width: pointer_width },
+            passing: crate::codegen::BackendPassingMode::Direct,
+        },
+        crate::codegen::BackendParameter {
+            name: "alignment".to_owned(),
+            role: crate::ast::Role::Erg,
+            ty: BackendValueType::Integer { signed: false, width: pointer_width },
+            passing: crate::codegen::BackendPassingMode::Direct,
+        },
+    ];
+    let return_value = crate::codegen::BackendReturn {
+        role: None,
+        ty: BackendValueType::Pointer,
+        passing: crate::codegen::BackendReturnMode::Direct,
+    };
+    let declaration = declare_function(
+        context,
+        module,
+        crate::runtime::AGGREGATE_ALLOCATE_SYMBOL,
+        &parameters,
+        &return_value,
+        false,
+        false,
+    )?;
+    declarations.insert(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL.to_owned(), declaration);
+    Ok(())
+}
+
+fn has_large_aggregate(backend_module: &BackendModule) -> bool {
+    backend_module.functions.iter().any(|function| {
         function.blocks.iter().any(|block| {
             block.instructions.iter().any(|instruction| {
                 matches!(instruction, BackendInstruction::AggregateConstruct { layout, .. }
                 if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
             })
         })
-    }) {
-        let parameters = vec![
-            crate::codegen::BackendParameter {
-                name: "size".to_owned(),
-                role: crate::ast::Role::Erg,
-                ty: BackendValueType::Integer { signed: false, width: pointer_width },
-                passing: crate::codegen::BackendPassingMode::Direct,
-            },
-            crate::codegen::BackendParameter {
-                name: "alignment".to_owned(),
-                role: crate::ast::Role::Erg,
-                ty: BackendValueType::Integer { signed: false, width: pointer_width },
-                passing: crate::codegen::BackendPassingMode::Direct,
-            },
-        ];
-        let return_value = crate::codegen::BackendReturn {
-            role: None,
-            ty: BackendValueType::Pointer,
-            passing: crate::codegen::BackendReturnMode::Direct,
-        };
-        let declaration = declare_function(
-            context,
-            module,
-            crate::runtime::AGGREGATE_ALLOCATE_SYMBOL,
-            &parameters,
-            &return_value,
-            false,
-            false,
-        )?;
-        declarations.insert(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL.to_owned(), declaration);
-    }
+    })
+}
+
+fn declare_backend_functions(
+    context: LLVMContextRef,
+    module: LLVMModuleRef,
+    backend_module: &BackendModule,
+    declarations: &mut BTreeMap<String, FunctionDeclaration>,
+) -> Result<(), BackendEmitError> {
     for function in &backend_module.functions {
         let declaration = declare_function(
             context,
@@ -154,7 +215,7 @@ fn declare_module_functions(
         )?;
         declarations.insert(function.symbol.as_str().to_owned(), declaration);
     }
-    Ok(declarations)
+    Ok(())
 }
 
 fn cleanup_bridges(module: &BackendModule) -> Vec<BackendCleanupBridge> {

@@ -11,6 +11,24 @@ enum TryTarget<'a> {
     Owner { name: &'a str, declared_type: Option<&'a str> },
 }
 
+struct TryOwnerContext<'a> {
+    id: BackendBlockId,
+    block: &'a Block,
+    index: usize,
+    target: TryTarget<'a>,
+    fallthrough: Option<BackendBlockId>,
+    instructions: Vec<BackendInstruction>,
+    span: crate::lexer::SourceSpan,
+    source: super::BackendValueId,
+    condition: super::BackendValueId,
+    ok_block: BackendBlockId,
+    error_block: BackendBlockId,
+    merge_block: BackendBlockId,
+    ok_instructions: Vec<BackendInstruction>,
+    payload_value: super::BackendValueId,
+    payload_type: BackendValueType,
+}
+
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_try_statement(
         &mut self,
@@ -30,43 +48,14 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 fallthrough,
                 instructions,
             ),
-            Stmt::Assignment { target, value, span } => {
-                let Expr::Try { .. } = value else { unreachable!() };
-                let previous = match target {
-                    Place::Binding { name, .. } => self.provider.binding_value(name),
-                    _ => None,
-                };
-                let name = format!("__try_assignment_{}_{}", span.start, span.end);
-                let mut statements = block.statements.clone();
-                statements[index] = Stmt::OwnerDecl {
-                    role: Role::Erg,
-                    name: name.clone(),
-                    ty: None,
-                    initializer: value.clone(),
-                    span: *span,
-                };
-                statements.insert(
-                    index + 1,
-                    Stmt::Assignment {
-                        target: target.clone(),
-                        value: Expr::Identifier { name, span: *span },
-                        span: *span,
-                    },
-                );
-                let synthetic = Block { statements, span: block.span };
-                let result = self.lower_try_owner_statement(
-                    id,
-                    &synthetic,
-                    index,
-                    &synthetic.statements[index],
-                    fallthrough,
-                    instructions,
-                );
-                if let (Place::Binding { name, .. }, Some(previous)) = (target, previous) {
-                    self.provider.set_binding_value(name, previous);
-                }
-                result
-            }
+            Stmt::Assignment { .. } => self.lower_try_assignment_statement(
+                id,
+                block,
+                index,
+                statement,
+                fallthrough,
+                instructions,
+            ),
             Stmt::Return { value: Some(Expr::Try { expression, span }), .. } => {
                 self.lower_try_return_statement(id, block.span, expression, *span, instructions)
             }
@@ -82,6 +71,37 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 ),
             _ => unreachable!(),
         }
+    }
+
+    fn lower_try_assignment_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        statement: &Stmt,
+        fallthrough: Option<BackendBlockId>,
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let Stmt::Assignment { target, value: value @ Expr::Try { .. }, span } = statement else {
+            unreachable!();
+        };
+        let previous = match target {
+            Place::Binding { name, .. } => self.provider.binding_value(name),
+            _ => None,
+        };
+        let synthetic = synthetic_try_assignment_block(block, index, target, value, *span);
+        let result = self.lower_try_owner_statement(
+            id,
+            &synthetic,
+            index,
+            &synthetic.statements[index],
+            fallthrough,
+            instructions,
+        );
+        if let (Place::Binding { name, .. }, Some(previous)) = (target, previous) {
+            self.provider.set_binding_value(name, previous);
+        }
+        result
     }
 
     fn lower_try_expression_statement(
@@ -242,9 +262,9 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let ok_block = self.allocate_block();
         let error_block = self.allocate_block();
         let merge_block = self.allocate_block();
-        let (mut ok_instructions, payload_value, payload_type) =
+        let (ok_instructions, payload_value, payload_type) =
             self.lower_try_payload(source, span)?;
-        self.finish_try_owner(
+        self.finish_try_owner(TryOwnerContext {
             id,
             block,
             index,
@@ -257,73 +277,74 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             ok_block,
             error_block,
             merge_block,
-            &mut ok_instructions,
+            ok_instructions,
             payload_value,
             payload_type,
-        )
+        })
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn finish_try_owner(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        target: TryTarget<'_>,
-        fallthrough: Option<BackendBlockId>,
-        mut instructions: Vec<BackendInstruction>,
-        span: crate::lexer::SourceSpan,
-        source: super::BackendValueId,
-        condition: super::BackendValueId,
-        ok_block: BackendBlockId,
-        error_block: BackendBlockId,
-        merge_block: BackendBlockId,
-        ok_instructions: &mut Vec<BackendInstruction>,
-        payload_value: super::BackendValueId,
-        payload_type: BackendValueType,
+        mut context: TryOwnerContext<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
         self.push_try_branches(
-            ok_block,
-            error_block,
-            merge_block,
-            source,
-            span,
-            payload_value,
-            payload_type,
-            ok_instructions,
+            context.ok_block,
+            context.error_block,
+            context.merge_block,
+            context.source,
+            context.span,
+            context.payload_value,
+            context.payload_type,
+            &mut context.ok_instructions,
         );
         let cleanup_start = self.blocks.len().saturating_sub(2);
-        instructions.push(BackendInstruction::Branch {
-            condition,
-            then_block: ok_block,
-            else_block: error_block,
-            then_arguments: Vec::new(),
-            else_arguments: Vec::new(),
-            span,
-        });
-        let result = self.provider.allocate_value(payload_type);
-        let mut binding_instructions = Vec::new();
-        match target {
-            TryTarget::Owner { name, declared_type } => {
-                self.provider.bind_owner(
-                    name,
-                    result,
-                    declared_type,
-                    span,
-                    &mut binding_instructions,
-                )?;
-            }
-        }
-        let continuation =
-            Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
+        append_try_condition_branch(
+            &mut context.instructions,
+            context.condition,
+            context.ok_block,
+            context.error_block,
+            context.span,
+        );
+        let result = self.provider.allocate_value(context.payload_type);
+        let binding_instructions = self.bind_try_owner(context.target, result, context.span)?;
+        let continuation = Block {
+            statements: context.block.statements[context.index + 1..].to_vec(),
+            span: context.block.span,
+        };
         let mut continuation_block =
-            self.lower_block_in_scope(merge_block, &continuation, fallthrough)?;
-        continuation_block.parameters =
-            vec![BackendBlockParameter { value: result, ty: payload_type, span }];
+            self.lower_block_in_scope(context.merge_block, &continuation, context.fallthrough)?;
+        continuation_block.parameters = vec![BackendBlockParameter {
+            value: result,
+            ty: context.payload_type,
+            span: context.span,
+        }];
         continuation_block.instructions.splice(0..0, binding_instructions);
         self.blocks.push(continuation_block);
-        self.provider.distribute_scope_cleanup(block.span, &mut self.blocks, cleanup_start)?;
-        Ok(BackendBlock { parameters: Vec::new(), id, instructions })
+        self.provider.distribute_scope_cleanup(
+            context.block.span,
+            &mut self.blocks,
+            cleanup_start,
+        )?;
+        Ok(BackendBlock {
+            parameters: Vec::new(),
+            id: context.id,
+            instructions: context.instructions,
+        })
+    }
+
+    fn bind_try_owner(
+        &mut self,
+        target: TryTarget<'_>,
+        result: super::BackendValueId,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<Vec<BackendInstruction>, BackendContractError> {
+        let mut instructions = Vec::new();
+        match target {
+            TryTarget::Owner { name, declared_type } => {
+                self.provider.bind_owner(name, result, declared_type, span, &mut instructions)?
+            }
+        }
+        Ok(instructions)
     }
 
     fn push_try_branches(
@@ -385,4 +406,44 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.provider.exit_scope_without_cleanup()?;
         Ok((instructions, value, ty))
     }
+}
+
+fn append_try_condition_branch(
+    instructions: &mut Vec<BackendInstruction>,
+    condition: super::BackendValueId,
+    ok_block: BackendBlockId,
+    error_block: BackendBlockId,
+    span: crate::lexer::SourceSpan,
+) {
+    instructions.push(BackendInstruction::Branch {
+        condition,
+        then_block: ok_block,
+        else_block: error_block,
+        then_arguments: Vec::new(),
+        else_arguments: Vec::new(),
+        span,
+    });
+}
+
+fn synthetic_try_assignment_block(
+    block: &Block,
+    index: usize,
+    target: &Place,
+    value: &Expr,
+    span: crate::lexer::SourceSpan,
+) -> Block {
+    let name = format!("__try_assignment_{}_{}", span.start, span.end);
+    let mut statements = block.statements.clone();
+    statements[index] = Stmt::OwnerDecl {
+        role: Role::Erg,
+        name: name.clone(),
+        ty: None,
+        initializer: value.clone(),
+        span,
+    };
+    statements.insert(
+        index + 1,
+        Stmt::Assignment { target: target.clone(), value: Expr::Identifier { name, span }, span },
+    );
+    Block { statements, span: block.span }
 }

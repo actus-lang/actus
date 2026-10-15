@@ -18,7 +18,6 @@ use super::super::layout::LayoutRegistry;
 use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 
-#[allow(dead_code)]
 pub(crate) struct LayoutCleanupProvider<'a> {
     pub(crate) layouts: &'a LayoutRegistry,
 }
@@ -108,6 +107,17 @@ pub(super) fn declare_cleanup_bridges(
     backend_module: &BackendModule,
     declarations: &mut BTreeMap<String, Declaration>,
 ) -> Result<(), BackendEmitError> {
+    let bridges = collect_cleanup_bridges(backend_module);
+    if needs_aggregate_allocator(backend_module) {
+        declare_aggregate_allocator(module, declarations)?;
+    }
+    for bridge in bridges {
+        declare_cleanup_bridge(module, bridge, declarations)?;
+    }
+    Ok(())
+}
+
+fn collect_cleanup_bridges(backend_module: &BackendModule) -> Vec<BackendCleanupBridge> {
     let mut bridges = Vec::new();
     for function in &backend_module.functions {
         for block in &function.blocks {
@@ -130,88 +140,113 @@ pub(super) fn declare_cleanup_bridges(
         }
     }
 
-    let needs_aggregate_allocator = backend_module.functions.iter().any(|function| {
+    bridges
+}
+
+fn needs_aggregate_allocator(backend_module: &BackendModule) -> bool {
+    backend_module.functions.iter().any(|function| {
         function.blocks.iter().any(|block| {
             block.instructions.iter().any(|instruction| {
                 matches!(instruction, BackendInstruction::AggregateConstruct { layout, .. }
                     if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
             })
         })
-    });
-    if needs_aggregate_allocator {
-        let pointer_type = module.isa().pointer_type();
-        let mut signature = module.make_signature();
-        signature.params.push(AbiParam::new(pointer_type));
-        signature.params.push(AbiParam::new(pointer_type));
-        signature.returns.push(AbiParam::new(pointer_type));
-        let id = module
-            .declare_function(
-                crate::runtime::AGGREGATE_ALLOCATE_SYMBOL,
-                Linkage::Import,
-                &signature,
-            )
-            .map_err(|error| BackendEmitError(error.to_string()))?;
-        declarations.insert(
-            crate::runtime::AGGREGATE_ALLOCATE_SYMBOL.to_owned(),
-            Declaration {
-                id,
-                parameter_fragments: vec![1, 1],
-                parameter_types: vec![Vec::new(), Vec::new()],
-                return_fragments: 1,
-                return_slot: None,
-                runtime_pointer_return: false,
-                niche_pointer_return: false,
-                runtime_result_layout: None,
-            },
-        );
-    }
+    })
+}
 
-    for bridge in bridges {
-        if matches!(bridge, BackendCleanupBridge::PerformanceDrop) {
-            continue;
-        }
-        let symbol = bridge_symbol(bridge);
-        if declarations.contains_key(symbol) {
-            continue;
-        }
-        let pointer_type = module.isa().pointer_type();
-        let mut signature = module.make_signature();
-        signature.params.push(AbiParam::new(pointer_type));
-        let parameter_fragments = if matches!(bridge, BackendCleanupBridge::EnumDrop { .. }) {
+fn declare_aggregate_allocator(
+    module: &mut ObjectModule,
+    declarations: &mut BTreeMap<String, Declaration>,
+) -> Result<(), BackendEmitError> {
+    let pointer_type = module.isa().pointer_type();
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.returns.push(AbiParam::new(pointer_type));
+    let id = module
+        .declare_function(crate::runtime::AGGREGATE_ALLOCATE_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| BackendEmitError(error.to_string()))?;
+    declarations.insert(
+        crate::runtime::AGGREGATE_ALLOCATE_SYMBOL.to_owned(),
+        Declaration {
+            id,
+            parameter_fragments: vec![1, 1],
+            parameter_types: vec![Vec::new(), Vec::new()],
+            return_fragments: 1,
+            return_slot: None,
+            runtime_pointer_return: false,
+            niche_pointer_return: false,
+            runtime_result_layout: None,
+        },
+    );
+    Ok(())
+}
+
+fn declare_cleanup_bridge(
+    module: &mut ObjectModule,
+    bridge: BackendCleanupBridge,
+    declarations: &mut BTreeMap<String, Declaration>,
+) -> Result<(), BackendEmitError> {
+    if matches!(bridge, BackendCleanupBridge::PerformanceDrop) {
+        return Ok(());
+    }
+    let symbol = bridge_symbol(bridge);
+    if declarations.contains_key(symbol) {
+        return Ok(());
+    }
+    let pointer_type = module.isa().pointer_type();
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    let parameter_fragments = append_bridge_parameters(&mut signature, bridge, pointer_type);
+    let return_fragments = append_bridge_return(&mut signature, bridge);
+    let id = module
+        .declare_function(symbol, Linkage::Import, &signature)
+        .map_err(|error| BackendEmitError(error.to_string()))?;
+    declarations.insert(
+        symbol.to_owned(),
+        Declaration {
+            id,
+            parameter_types: vec![Vec::new(); parameter_fragments.len()],
+            parameter_fragments,
+            return_fragments,
+            return_slot: None,
+            runtime_pointer_return: false,
+            niche_pointer_return: false,
+            runtime_result_layout: None,
+        },
+    );
+    Ok(())
+}
+
+fn append_bridge_parameters(
+    signature: &mut cranelift_codegen::ir::Signature,
+    bridge: BackendCleanupBridge,
+    pointer_type: cranelift_codegen::ir::Type,
+) -> Vec<usize> {
+    match bridge {
+        BackendCleanupBridge::EnumDrop { .. } => {
             signature.params.push(AbiParam::new(pointer_type));
             vec![1, 1]
-        } else if matches!(bridge, BackendCleanupBridge::AggregateDrop { .. }) {
+        }
+        BackendCleanupBridge::AggregateDrop { .. } => {
             signature.params.push(AbiParam::new(pointer_type));
             signature.params.push(AbiParam::new(pointer_type));
             vec![1, 1, 1]
-        } else {
-            vec![1]
-        };
-        let return_fragments = if matches!(bridge, BackendCleanupBridge::RegionDrop) {
-            signature.returns.push(AbiParam::new(cranelift_codegen::ir::types::I32));
-            1
-        } else {
-            0
-        };
-        let id = module
-            .declare_function(symbol, Linkage::Import, &signature)
-            .map_err(|error| BackendEmitError(error.to_string()))?;
-        let parameter_count = parameter_fragments.len();
-        declarations.insert(
-            symbol.to_owned(),
-            Declaration {
-                id,
-                parameter_fragments,
-                parameter_types: vec![Vec::new(); parameter_count],
-                return_fragments,
-                return_slot: None,
-                runtime_pointer_return: false,
-                niche_pointer_return: false,
-                runtime_result_layout: None,
-            },
-        );
+        }
+        _ => vec![1],
     }
-    Ok(())
+}
+
+fn append_bridge_return(
+    signature: &mut cranelift_codegen::ir::Signature,
+    bridge: BackendCleanupBridge,
+) -> usize {
+    if matches!(bridge, BackendCleanupBridge::RegionDrop) {
+        signature.returns.push(AbiParam::new(cranelift_codegen::ir::types::I32));
+        1
+    } else {
+        0
+    }
 }
 
 pub(super) fn lower_cleanup(

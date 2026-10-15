@@ -1,7 +1,6 @@
 // The provider constructor stores all explicit neutral lowering contracts.
-#![allow(clippy::too_many_arguments)]
 
-use crate::ast::{BinaryOp, CaseMode, Expr, Role, UnaryOp, VariantPayload, VerbDecl};
+use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
@@ -20,6 +19,7 @@ mod drop;
 mod layout;
 mod literals;
 mod packed;
+mod parameter_state;
 mod state;
 use super::super::{
     BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
@@ -61,6 +61,7 @@ pub(super) fn lower_unit_call(
 ) -> Result<(), BackendContractError> {
     calls::lower_unit_call(provider, expression, instructions)
 }
+
 impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn new(
         namespace: &'a str,
@@ -81,57 +82,13 @@ impl<'a> SharedExpressionProvider<'a> {
         bindings: Option<&'a BackendSymbolBindings>,
         cleanup_plans: &'a [super::super::BackendCleanupPlan],
     ) -> Self {
-        let mut parameter_bindings = verb
-            .params
-            .iter()
-            .enumerate()
-            .map(|(index, parameter)| (parameter.name.clone(), BackendValueId(index as u32)))
-            .collect::<BTreeMap<_, _>>();
-        let owned_parameters = verb
-            .params
-            .iter()
-            .filter(|parameter| parameter.role == Role::Erg)
-            .map(|parameter| parameter.name.clone())
-            .collect();
-        let mut parameter_types = state::parameter_types(verb, layouts);
-        let mut nominal_types = aggregate::parameter_nominal_types(verb, layouts);
-        for (index, parameter) in verb.params.iter().enumerate() {
-            nominal_types.insert(BackendValueId(index as u32), parameter.ty.clone());
-        }
-        let enum_payload_types = state::enum_payload_types(verb, layouts);
-        let mut scalar_loan_parameters = Vec::new();
-        let mut next_value = verb.params.len() as u32;
-        for (index, parameter) in verb.params.iter().enumerate() {
-            let Some(BackendValueType::Bool | BackendValueType::Integer { .. }) =
-                parameter_types.get(&BackendValueId(index as u32)).copied()
-            else {
-                continue;
-            };
-            if !matches!(
-                crate::codegen::lower_parameter(parameter, layouts)
-                    .ok()
-                    .map(|parameter| parameter.passing),
-                Some(BackendPassingMode::ExclusiveScalarLoan { .. })
-            ) {
-                continue;
-            }
-            let address = BackendValueId(index as u32);
-            let loaded = BackendValueId(next_value);
-            next_value += 1;
-            let ty = parameter_types[&address];
-            parameter_bindings.insert(parameter.name.clone(), loaded);
-            parameter_types.insert(loaded, ty);
-            if let Some(type_name) = nominal_types.get(&address).cloned() {
-                nominal_types.insert(loaded, type_name);
-            }
-            scalar_loan_parameters.push((parameter.name.clone(), address, loaded, ty));
-        }
+        let parameter_state = parameter_state::initialize(verb, layouts);
         Self {
             namespace,
             layouts,
-            parameters: parameter_bindings,
-            scalar_loan_parameters,
-            owned_parameters,
+            parameters: parameter_state.parameters,
+            scalar_loan_parameters: parameter_state.scalar_loan_parameters,
+            owned_parameters: parameter_state.owned_parameters,
             locals: Vec::new(),
             verb_name: verb.name.clone(),
             return_types,
@@ -145,11 +102,11 @@ impl<'a> SharedExpressionProvider<'a> {
             external_symbols,
             bindings,
             cleanup_plans,
-            value_types: parameter_types,
-            nominal_types,
+            value_types: parameter_state.value_types,
+            nominal_types: parameter_state.nominal_types,
             array_big_endian: BTreeMap::new(),
-            enum_payload_types,
-            next_value,
+            enum_payload_types: parameter_state.enum_payload_types,
+            next_value: parameter_state.next_value,
             loop_depth: 0,
         }
     }

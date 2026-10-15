@@ -116,19 +116,8 @@ fn normalize_expression(expression: &Expr) -> Expr {
 }
 
 fn extract_nested_cases(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -> Expr {
-    if !root && matches!(expression, Expr::Case { .. } | Expr::If { .. }) {
-        let span = expression_span(expression);
-        let prefix =
-            if matches!(expression, Expr::Case { .. }) { "__nested_case" } else { "__nested_if" };
-        let name = format!("{prefix}_{}_{}", span.start, span.end);
-        owners.push(Stmt::OwnerDecl {
-            role: Role::Erg,
-            name: name.clone(),
-            ty: None,
-            initializer: expression.clone(),
-            span,
-        });
-        return Expr::Identifier { name, span };
+    if let Some(identifier) = extract_nested_owner(expression, owners, root) {
+        return identifier;
     }
     match expression {
         Expr::Binary { left, operator, right, span }
@@ -137,42 +126,7 @@ fn extract_nested_cases(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -
                 crate::ast::BinaryOp::LogicalAnd | crate::ast::BinaryOp::LogicalOr
             ) =>
         {
-            let left = extract_nested_cases(left, owners, false);
-            let right = extract_nested_cases(right, owners, false);
-            let (then_expression, else_expression) = match operator {
-                crate::ast::BinaryOp::LogicalAnd => {
-                    (right, Expr::BoolLiteral { value: false, span: *span })
-                }
-                crate::ast::BinaryOp::LogicalOr => {
-                    (Expr::BoolLiteral { value: true, span: *span }, right)
-                }
-                _ => unreachable!(),
-            };
-            let lowered = Expr::If {
-                condition: Box::new(left),
-                then_branch: Block {
-                    statements: vec![Stmt::Expression { expression: then_expression, span: *span }],
-                    span: *span,
-                },
-                else_branch: Some(crate::ast::IfBranch::Block(Block {
-                    statements: vec![Stmt::Expression { expression: else_expression, span: *span }],
-                    span: *span,
-                })),
-                span: *span,
-            };
-            if !root {
-                let name = format!("__nested_if_{}_{}", span.start, span.end);
-                owners.push(Stmt::OwnerDecl {
-                    role: Role::Erg,
-                    name: name.clone(),
-                    ty: None,
-                    initializer: lowered,
-                    span: *span,
-                });
-                Expr::Identifier { name, span: *span }
-            } else {
-                lowered
-            }
+            extract_logical_expression(left, *operator, right, *span, owners, root)
         }
         Expr::Binary { left, operator, right, span } => Expr::Binary {
             left: Box::new(extract_nested_cases(left, owners, false)),
@@ -192,6 +146,65 @@ fn extract_nested_cases(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -
         },
         _ => expression.clone(),
     }
+}
+
+fn extract_nested_owner(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -> Option<Expr> {
+    if root || !matches!(expression, Expr::Case { .. } | Expr::If { .. }) {
+        return None;
+    }
+    let span = expression_span(expression);
+    let prefix =
+        if matches!(expression, Expr::Case { .. }) { "__nested_case" } else { "__nested_if" };
+    let name = format!("{prefix}_{}_{}", span.start, span.end);
+    owners.push(Stmt::OwnerDecl {
+        role: Role::Erg,
+        name: name.clone(),
+        ty: None,
+        initializer: expression.clone(),
+        span,
+    });
+    Some(Expr::Identifier { name, span })
+}
+
+fn extract_logical_expression(
+    left: &Expr,
+    operator: crate::ast::BinaryOp,
+    right: &Expr,
+    span: SourceSpan,
+    owners: &mut Vec<Stmt>,
+    root: bool,
+) -> Expr {
+    let left = extract_nested_cases(left, owners, false);
+    let right = extract_nested_cases(right, owners, false);
+    let (then_expression, else_expression) = match operator {
+        crate::ast::BinaryOp::LogicalAnd => (right, Expr::BoolLiteral { value: false, span }),
+        crate::ast::BinaryOp::LogicalOr => (Expr::BoolLiteral { value: true, span }, right),
+        _ => unreachable!(),
+    };
+    let lowered = Expr::If {
+        condition: Box::new(left),
+        then_branch: Block {
+            statements: vec![Stmt::Expression { expression: then_expression, span }],
+            span,
+        },
+        else_branch: Some(crate::ast::IfBranch::Block(Block {
+            statements: vec![Stmt::Expression { expression: else_expression, span }],
+            span,
+        })),
+        span,
+    };
+    if root {
+        return lowered;
+    }
+    let name = format!("__nested_if_{}_{}", span.start, span.end);
+    owners.push(Stmt::OwnerDecl {
+        role: Role::Erg,
+        name: name.clone(),
+        ty: None,
+        initializer: lowered,
+        span,
+    });
+    Expr::Identifier { name, span }
 }
 
 fn expression_span(expression: &Expr) -> SourceSpan {

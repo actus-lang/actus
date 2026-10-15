@@ -4,7 +4,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Stmt;
 
-use super::super::cleanup::emit_scope_cleanup;
+use super::super::cleanup::{CleanupContext, emit_scope_cleanup};
 use super::super::literals::StringDataValues;
 use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
@@ -159,15 +159,8 @@ fn finish_case_block(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
     if matches!(flow, Flow::Fallthrough) {
-        emit_scope_cleanup(
-            function,
-            cleanup_schedule,
-            cleanup_span,
-            locals,
-            types,
-            functions,
-            layouts,
-        )?;
+        let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
+        emit_scope_cleanup(&mut cleanup, cleanup_schedule, cleanup_span)?;
     }
     Ok(flow)
 }

@@ -6,7 +6,7 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, Stmt};
 use crate::semantic::LoopExitKind;
 
-use super::super::cleanup::emit_loop_cleanup;
+use super::super::cleanup::{CleanupContext, emit_loop_cleanup, emit_return_cleanup};
 use super::super::expressions::lower_expression;
 use super::super::literals::StringDataValues;
 use super::super::native::{BackendEmitError, FunctionRef};
@@ -94,16 +94,8 @@ fn lower_void_return(
     cleanup_schedule: &LoweredCleanupSchedule,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
-    super::super::cleanup::emit_return_cleanup(
-        function,
-        cleanup_schedule,
-        span,
-        locals,
-        types,
-        functions,
-        layouts,
-        None,
-    )?;
+    let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
+    emit_return_cleanup(&mut cleanup, cleanup_schedule, span, None)?;
     Ok(Flow::VoidReturn)
 }
 
@@ -226,16 +218,8 @@ fn lower_loop_control(
     continue_loop: bool,
 ) -> Result<Flow, BackendEmitError> {
     let exit_kind = if continue_loop { LoopExitKind::Continue } else { LoopExitKind::Break };
-    emit_loop_cleanup(
-        function,
-        cleanup_schedule,
-        span,
-        exit_kind,
-        locals,
-        types,
-        functions,
-        layouts,
-    )?;
+    let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
+    emit_loop_cleanup(&mut cleanup, cleanup_schedule, span, exit_kind)?;
     super::loops::emit_loop_jump(function, targets, locals, continue_loop)
 }
 

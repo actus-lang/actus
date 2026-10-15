@@ -4,7 +4,7 @@ use super::super::super::BackendEmitError;
 use super::super::super::{BackendCleanupBridge, BackendCleanupOperand};
 use super::super::declarations::FunctionDeclaration;
 use llvm_sys::core::{LLVMBuildCall2, LLVMConstInt};
-use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
+use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 
@@ -28,30 +28,7 @@ pub(super) fn emit_runtime_bridge(
     })?;
     let value = address::cleanup_argument(context, builder, operand.clone(), value)?;
     let mut arguments = vec![value];
-    if let BackendCleanupBridge::EnumDrop { size } = operand.bridge {
-        let integer_type = match pointer_width {
-            32 => unsafe { llvm_sys::core::LLVMInt32TypeInContext(context) },
-            64 => unsafe { llvm_sys::core::LLVMInt64TypeInContext(context) },
-            width => {
-                return Err(BackendEmitError(format!(
-                    "LLVM cleanup bridge does not support pointer width {width}"
-                )));
-            }
-        };
-        arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(size), 0) });
-    } else if let BackendCleanupBridge::AggregateDrop { size, alignment } = operand.bridge {
-        let integer_type = match pointer_width {
-            32 => unsafe { llvm_sys::core::LLVMInt32TypeInContext(context) },
-            64 => unsafe { llvm_sys::core::LLVMInt64TypeInContext(context) },
-            width => {
-                return Err(BackendEmitError(format!(
-                    "LLVM cleanup bridge does not support pointer width {width}"
-                )));
-            }
-        };
-        arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(size), 0) });
-        arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(alignment), 0) });
-    }
+    append_bridge_arguments(context, pointer_width, operand.bridge, &mut arguments)?;
     let name = CString::new(if declaration.returns_void { "" } else { "cleanup_call" })
         .map_err(|_| BackendEmitError("LLVM cleanup call name contains NUL".to_owned()))?;
     let call = unsafe {
@@ -68,6 +45,41 @@ pub(super) fn emit_runtime_bridge(
         return Err(BackendEmitError("LLVM failed to build cleanup bridge call".to_owned()));
     }
     Ok(false)
+}
+
+fn append_bridge_arguments(
+    context: LLVMContextRef,
+    pointer_width: u8,
+    bridge: BackendCleanupBridge,
+    arguments: &mut Vec<LLVMValueRef>,
+) -> Result<(), BackendEmitError> {
+    let (size, alignment) = match bridge {
+        BackendCleanupBridge::EnumDrop { size } => (Some(size), None),
+        BackendCleanupBridge::AggregateDrop { size, alignment } => (Some(size), Some(alignment)),
+        _ => (None, None),
+    };
+    let Some(size) = size else {
+        return Ok(());
+    };
+    let integer_type = pointer_integer_type(context, pointer_width)?;
+    arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(size), 0) });
+    if let Some(alignment) = alignment {
+        arguments.push(unsafe { LLVMConstInt(integer_type, u64::from(alignment), 0) });
+    }
+    Ok(())
+}
+
+fn pointer_integer_type(
+    context: LLVMContextRef,
+    pointer_width: u8,
+) -> Result<LLVMTypeRef, BackendEmitError> {
+    match pointer_width {
+        32 => Ok(unsafe { llvm_sys::core::LLVMInt32TypeInContext(context) }),
+        64 => Ok(unsafe { llvm_sys::core::LLVMInt64TypeInContext(context) }),
+        width => Err(BackendEmitError(format!(
+            "LLVM cleanup bridge does not support pointer width {width}"
+        ))),
+    }
 }
 
 fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {

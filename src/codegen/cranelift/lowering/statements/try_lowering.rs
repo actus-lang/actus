@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, condcodes::IntCC, types};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::cleanup::emit_return_cleanup;
+use super::super::super::cleanup::{CleanupContext, emit_return_cleanup};
 use super::super::super::expressions::{coerce_to_ir_type, lower_float_as};
 use super::super::super::expressions::{initializer_type, lower_expression};
 use super::super::super::literals::StringDataValues;
@@ -50,16 +50,8 @@ pub(super) fn lower_return(
         string_data,
         layouts,
     )?;
-    emit_return_cleanup(
-        function,
-        cleanup_schedule,
-        span,
-        locals,
-        types,
-        functions,
-        layouts,
-        Some(expression),
-    )?;
+    let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
+    emit_return_cleanup(&mut cleanup, cleanup_schedule, span, Some(expression))?;
     Ok(Flow::Return(value, None))
 }
 
@@ -126,7 +118,8 @@ fn lower_try_return(
         .ok_or_else(|| BackendEmitError("Result enum has no Ok variant".to_owned()))?;
     let result = allocate_enum(function, layout.size, functions, layouts)?;
     let return_value = emit_try_return_branches(function, source, result, layout, ok, layouts)?;
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts, None)?;
+    let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
+    emit_return_cleanup(&mut cleanup, cleanup_schedule, span, None)?;
     Ok(Flow::Return(return_value, Some(NativeType::Enum(enum_id))))
 }
 
@@ -268,7 +261,8 @@ fn emit_try_statement_branches(
     let continuation = function.create_block();
     function.ins().brif(is_ok, ok_block, &[], err_block, &[]);
     function.switch_to_block(err_block);
-    emit_return_cleanup(function, cleanup_schedule, span, locals, types, functions, layouts, None)?;
+    let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
+    emit_return_cleanup(&mut cleanup, cleanup_schedule, span, None)?;
     function.ins().return_(&[source]);
     function.seal_block(err_block);
     function.switch_to_block(ok_block);
