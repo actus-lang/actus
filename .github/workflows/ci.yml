@@ -84,6 +84,43 @@ jobs:
           if (-not (Test-Path (Join-Path $bin 'llvm-config.exe'))) {
             throw "LLVM development archive does not contain llvm-config.exe"
           }
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if ($vcpkgRoot) {
+            $vcpkgPath = Join-Path $vcpkgRoot 'vcpkg.exe'
+          } else {
+            $vcpkg = Get-Command vcpkg.exe -ErrorAction SilentlyContinue
+            if (-not $vcpkg) {
+              throw 'vcpkg is required to provide LLVM static-link dependencies'
+            }
+            $vcpkgPath = $vcpkg.Source
+            $vcpkgRoot = Split-Path $vcpkgPath -Parent
+          }
+          if (-not (Test-Path $vcpkgPath)) {
+            throw "vcpkg executable was not found: $vcpkgPath"
+          }
+          & $vcpkgPath install zlib:x64-windows-static zstd:x64-windows-static libxml2:x64-windows-static --clean-after-build
+          if ($LASTEXITCODE -ne 0) {
+            throw "vcpkg dependency installation failed with exit code $LASTEXITCODE"
+          }
+          $vcpkgLib = Join-Path $vcpkgRoot 'installed\x64-windows-static\lib'
+          if (-not (Test-Path $vcpkgLib)) {
+            throw "vcpkg static library directory was not found: $vcpkgLib"
+          }
+          $llvmDependencyLib = Join-Path $env:RUNNER_TEMP 'llvm-static-dependencies'
+          New-Item -ItemType Directory -Force $llvmDependencyLib | Out-Null
+          function Copy-StaticLibrary([string[]] $Names, [string] $Destination) {
+            $library = Get-ChildItem -Path $vcpkgLib -Filter '*.lib' |
+              Where-Object { $Names -contains $_.BaseName } |
+              Select-Object -First 1
+            if (-not $library) {
+              throw "Required static library was not found in ${vcpkgLib}: $($Names -join ', ')"
+            }
+            Copy-Item $library.FullName (Join-Path $llvmDependencyLib $Destination) -Force
+          }
+          Copy-StaticLibrary @('zlib', 'zlibstatic', 'zs') 'zs.lib'
+          Copy-StaticLibrary @('zstd_static', 'zstd') 'zstd_static.lib'
+          Copy-StaticLibrary @('libxml2s', 'libxml2', 'xml2s') 'xml2s.lib'
+          "LIB=$llvmDependencyLib;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $realConfig = Join-Path $bin 'llvm-config-real.exe'
           Move-Item (Join-Path $bin 'llvm-config.exe') $realConfig
           $wrapper = Join-Path $bin 'llvm-config.exe'
@@ -108,8 +145,7 @@ jobs:
                 var stderr = process.StandardError.ReadToEnd();
                 process.WaitForExit();
                 if (Array.IndexOf(args, "--system-libs") >= 0 && Array.IndexOf(args, "--link-static") >= 0) {
-                  // The official Windows archive does not ship the optional zlib/XML2/Zstd import libraries.
-                  stdout = Regex.Replace(stdout, @"(?i)(?:[A-Za-z]:[/\\][^\s]*[/\\])?(?:lib)?(?:zs?|zstd_static|xml2s?)\.lib", "");
+                  // Normalize build-machine paths while retaining every required static dependency.
                   stdout = Regex.Replace(stdout, @"(?i)[A-Za-z]:[/\\][^\s]*[/\\][^/\\\s]+\.lib", match => Path.GetFileName(match.Value));
                 }
                 Console.Write(stdout);
