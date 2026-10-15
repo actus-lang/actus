@@ -110,16 +110,9 @@ pub(super) fn lower_shared_modules(
         retain_reachable_root_functions(&mut root.module, symbol, &required_symbols);
     }
     let root_calls = modules.first().map(|root| called_symbols(&root.module)).unwrap_or_default();
-    for module in modules.iter_mut().skip(1) {
-        let roots = module
-            .module
-            .functions
-            .iter()
-            .map(|function| function.symbol.as_str())
-            .filter(|function| root_calls.contains(*function))
-            .map(str::to_owned)
-            .collect();
-        retain_reachable_functions(&mut module.module, &roots);
+    let reachable_modules = reachable_module_symbols(&modules, &root_calls);
+    for (module, reachable) in modules.iter_mut().skip(1).zip(reachable_modules.into_iter()) {
+        module.module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
     }
     Ok(modules)
 }
@@ -215,6 +208,56 @@ fn called_symbols(module: &crate::codegen::BackendModule) -> std::collections::B
         .functions
         .iter()
         .flat_map(|function| function.blocks.iter())
+        .flat_map(|block| block.instructions.iter())
+        .filter_map(|instruction| match instruction {
+            crate::codegen::BackendInstruction::Call { callee, .. } => {
+                Some(callee.as_str().to_owned())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn reachable_module_symbols(
+    modules: &[LoweredSharedModule],
+    roots: &std::collections::BTreeSet<String>,
+) -> Vec<std::collections::BTreeSet<String>> {
+    let calls = modules
+        .iter()
+        .flat_map(|module| module.module.functions.iter())
+        .map(|function| (function.symbol.as_str().to_owned(), called_symbols_in_function(function)))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut reachable = std::collections::BTreeSet::new();
+    let mut pending = roots.iter().cloned().collect::<std::collections::VecDeque<_>>();
+    while let Some(symbol) = pending.pop_front() {
+        if !reachable.insert(symbol.clone()) {
+            continue;
+        }
+        if let Some(callees) = calls.get(&symbol) {
+            pending.extend(callees.iter().cloned());
+        }
+    }
+    modules
+        .iter()
+        .skip(1)
+        .map(|module| {
+            module
+                .module
+                .functions
+                .iter()
+                .map(|function| function.symbol.as_str().to_owned())
+                .filter(|symbol| reachable.contains(symbol))
+                .collect()
+        })
+        .collect()
+}
+
+fn called_symbols_in_function(
+    function: &crate::codegen::BackendFunction,
+) -> std::collections::BTreeSet<String> {
+    function
+        .blocks
+        .iter()
         .flat_map(|block| block.instructions.iter())
         .filter_map(|instruction| match instruction {
             crate::codegen::BackendInstruction::Call { callee, .. } => {
