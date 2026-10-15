@@ -55,6 +55,10 @@ jobs:
           if (-not $linker.StartsWith($vcLinkDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
             throw "MSVC linker was not selected: $linker"
           }
+          # The LLVM archive and its vcpkg dependencies are built with the
+          # static MSVC CRT (/MT). Keep Rust test binaries on the same CRT so
+          # the in-process LLVM C API does not cross CRT allocator boundaries.
+          "RUSTFLAGS=-C target-feature=+crt-static" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Set up LLVM 23 (Unix)
         if: runner.os != 'Windows'
