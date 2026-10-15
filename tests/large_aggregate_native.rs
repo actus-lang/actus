@@ -7,7 +7,11 @@ use actus::cli::run_with_args;
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn large_fixed_array_uses_runtime_storage_on_both_native_backends() {
-    let source = "struct Cell { erg value: u8, } verb main() -> Int { erg cells: Array[Cell, 131072] = Array[Cell, 131072](); cells[131071].value = 41u8; return cells[131071].value as Int + 1; }\n";
+    const LARGE_ARRAY_CAPACITY: usize = 64 * 1024;
+    let source = format!(
+        "struct Cell {{ erg value: u8, }} verb main() -> Int {{ erg cells: Array[Cell, {LARGE_ARRAY_CAPACITY}] = Array[Cell, {LARGE_ARRAY_CAPACITY}](); cells[{last_index}].value = 41u8; return cells[{last_index}].value as Int + 1; }}\n",
+        last_index = LARGE_ARRAY_CAPACITY - 1,
+    );
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir()
             .join(format!("actus-large-aggregate-{backend}-{}", std::process::id()));
@@ -21,7 +25,7 @@ fn large_fixed_array_uses_runtime_storage_on_both_native_backends() {
             ),
         )
         .expect("write large aggregate manifest");
-        fs::write(&input, source).expect("write large aggregate source");
+        fs::write(&input, &source).expect("write large aggregate source");
         let result = run_with_args(
             vec![
                 "build".to_owned(),

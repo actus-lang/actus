@@ -3,6 +3,7 @@
 use actus::ast::Role;
 #[cfg(feature = "cranelift")]
 use actus::codegen::cranelift::emit_contract_module_object;
+#[cfg(target_os = "linux")]
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{emit_module, emit_object};
 use actus::codegen::{
@@ -13,6 +14,7 @@ use actus::codegen::{
     BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity, SymbolKind,
     lower_scalar_program,
 };
+#[cfg(target_os = "linux")]
 use actus::configuration::CompilerConfiguration;
 #[cfg(feature = "cranelift")]
 use actus::configuration::NativeBackendConfiguration;
@@ -20,7 +22,7 @@ use actus::lexer::scan;
 use actus::parser::parse;
 use object::{Object, ObjectSection, ObjectSymbol};
 
-#[cfg(feature = "cranelift")]
+#[cfg(all(feature = "cranelift", target_os = "linux"))]
 use actus::codegen::BackendCleanupResolvedDescriptor;
 
 #[cfg(target_os = "linux")]

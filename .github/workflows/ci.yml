@@ -60,7 +60,7 @@ jobs:
       - name: Set up LLVM 23
         uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
         with:
-          llvm-version: 23
+          llvm-version: ${{ runner.os == 'Windows' && '23.1.1' || '23' }}
 
       - name: Export LLVM build environment (Unix)
         if: runner.os != 'Windows'
@@ -157,6 +157,18 @@ jobs:
         with:
           llvm-version: 23
 
+      - name: Install ARM32 native link tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+
+      - name: Verify native link tools
+        shell: bash
+        run: |
+          command -v clang
+          command -v rust-lld
+          command -v ld.lld
+
       - name: Export LLVM build environment
         shell: bash
         run: |
@@ -206,6 +218,9 @@ jobs:
         run: |
           llvm-config --version
           test "$(llvm-config --version | cut -d. -f1)" = "23"
+          command -v clang
+          command -v rust-lld
+          command -v ld.lld
           arm-none-eabi-gcc --version
           arm-none-eabi-objdump --version
 

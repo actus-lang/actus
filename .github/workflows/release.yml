@@ -34,7 +34,7 @@ jobs:
       - name: Set up LLVM 23
         uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
         with:
-          llvm-version: 23
+          llvm-version: ${{ runner.os == 'Windows' && '23.1.1' || '23' }}
 
       - name: Export LLVM build environment (Unix)
         if: runner.os != 'Windows'
