@@ -4,9 +4,11 @@
 use std::collections::BTreeMap;
 mod aggregate;
 mod arena;
+mod arrays;
 mod cleanup;
 mod dispatch;
 mod enums;
+mod packed;
 mod returns;
 use super::aggregate::{
     Declaration, declaration, direct_aggregate_types, initialize_values, runtime_declaration,
