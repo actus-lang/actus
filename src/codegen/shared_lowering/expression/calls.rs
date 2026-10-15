@@ -211,8 +211,16 @@ fn lower_arguments(
                 None,
             ),
             crate::ast::Expr::Index { target, index, .. } => {
-                let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
-                    lower_array_element_location(provider, target, index, span, instructions)?;
+                let (
+                    base,
+                    index,
+                    aggregate_layout,
+                    element_layout,
+                    _,
+                    element_type,
+                    capacity,
+                    big_endian,
+                ) = lower_array_element_location(provider, target, index, span, instructions)?;
                 let value = provider.allocate();
                 provider.remember_value(value, element_type);
                 instructions.push(BackendInstruction::ArrayElementLoad {
@@ -223,6 +231,7 @@ fn lower_arguments(
                     element_layout,
                     element_type,
                     capacity,
+                    big_endian,
                     span,
                 });
                 (
@@ -339,6 +348,7 @@ fn append_scalar_loan_writebacks(
                 element_type: place.element_type,
                 value,
                 capacity: place.capacity,
+                big_endian: false,
                 span,
             });
         } else if let Some(name) = name {

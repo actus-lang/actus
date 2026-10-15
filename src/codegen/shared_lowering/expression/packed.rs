@@ -14,14 +14,7 @@ use crate::lexer::SourceSpan;
 pub(super) fn field_type(
     metadata: &super::super::super::BackendPackedFieldLayout,
 ) -> Option<BackendValueType> {
-    let primitive = crate::ast::primitive_type(&metadata.ty.name)?;
-    let crate::ast::PrimitiveType::Integer { signed, width } = primitive else { return None };
-    let width = match width {
-        1..=32 => 32,
-        33..=64 => 64,
-        _ => return None,
-    };
-    Some(BackendValueType::Integer { signed, width })
+    Some(metadata.scalar_ty)
 }
 
 pub(super) fn lower_field_access(

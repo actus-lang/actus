@@ -188,6 +188,7 @@ pub(super) fn lower_array_element_load(
         index,
         element_layout,
         element_type,
+        big_endian,
         ..
     } = instruction
     else {
@@ -210,7 +211,11 @@ pub(super) fn lower_array_element_load(
     }
     let value_type = super::scalar_type(module, *element_type)?
         .ok_or_else(|| BackendEmitError("Cranelift array element must be scalar".to_owned()))?;
-    values.insert(*result, builder.ins().load(value_type, MemFlagsData::new(), address, 0));
+    let mut value = builder.ins().load(value_type, MemFlagsData::new(), address, 0);
+    if *big_endian && value_type.bits() > 8 {
+        value = builder.ins().bswap(value);
+    }
+    values.insert(*result, value);
     Ok(())
 }
 
@@ -226,6 +231,7 @@ pub(super) fn lower_array_element_store(
         element_layout,
         element_type,
         value,
+        big_endian,
         ..
     } = instruction
     else {
@@ -237,7 +243,7 @@ pub(super) fn lower_array_element_store(
     let index = values.get(index).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift array index {} is unavailable", index.0))
     })?;
-    let value = values.get(value).copied().ok_or_else(|| {
+    let mut value = values.get(value).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift array value {} is unavailable", value.0))
     })?;
     let pointer_type = module.isa().pointer_type();
@@ -270,6 +276,9 @@ pub(super) fn lower_array_element_store(
         .ok_or_else(|| BackendEmitError("Cranelift array element must be scalar".to_owned()))?;
     if builder.func.dfg.value_type(value) != value_type {
         return Err(BackendEmitError("Cranelift array element store type mismatch".to_owned()));
+    }
+    if *big_endian && value_type.bits() > 8 {
+        value = builder.ins().bswap(value);
     }
     builder.ins().store(MemFlagsData::new(), value, address, 0);
     Ok(())

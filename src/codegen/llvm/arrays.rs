@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
-    LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMul, LLVMBuildStore, LLVMBuildZExt,
-    LLVMConstInt, LLVMInt8TypeInContext, LLVMInt64TypeInContext,
+    LLVMBuildAnd, LLVMBuildGEP2, LLVMBuildLShr, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMul,
+    LLVMBuildOr, LLVMBuildShl, LLVMBuildStore, LLVMBuildZExt, LLVMConstInt, LLVMInt8TypeInContext,
+    LLVMInt64TypeInContext,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
@@ -20,6 +21,7 @@ pub(super) fn emit_array_element_load(
         index,
         element_layout,
         element_type,
+        big_endian,
         ..
     } = instruction
     else {
@@ -50,6 +52,12 @@ pub(super) fn emit_array_element_load(
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to load array element".to_owned()));
     }
+    let value = match (big_endian, element_type) {
+        (true, BackendValueType::Integer { width, .. }) if *width > 8 => {
+            byte_swap(context, builder, value, *width)
+        }
+        _ => value,
+    };
     values.insert(*result, value);
     Ok(false)
 }
@@ -66,6 +74,7 @@ pub(super) fn emit_array_element_store(
         element_layout,
         element_type,
         value,
+        big_endian,
         ..
     } = instruction
     else {
@@ -84,8 +93,51 @@ pub(super) fn emit_array_element_store(
         .copied()
         .ok_or_else(|| BackendEmitError(format!("LLVM array value {} is unavailable", value.0)))?;
     let address = array_element_address(context, builder, base, index, *element_layout)?;
+    let value = match (big_endian, element_type) {
+        (true, BackendValueType::Integer { width, .. }) if *width > 8 => {
+            byte_swap(context, builder, value, *width)
+        }
+        _ => value,
+    };
     store_array_element_value(context, builder, address, *element_layout, *element_type, value)?;
     Ok(false)
+}
+
+fn byte_swap(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    value: LLVMValueRef,
+    width: u8,
+) -> LLVMValueRef {
+    let ty = unsafe { llvm_sys::core::LLVMTypeOf(value) };
+    let bytes = u32::from(width / 8);
+    let byte_mask = unsafe { LLVMConstInt(ty, 0xff, 0) };
+    let mut result = unsafe { LLVMConstInt(ty, 0, 0) };
+    for source in 0..bytes {
+        let source_shift = unsafe { LLVMConstInt(ty, u64::from(source * 8), 0) };
+        let shifted = if source == 0 {
+            value
+        } else {
+            unsafe {
+                LLVMBuildLShr(builder, value, source_shift, c"array.bswap.read".as_ptr().cast())
+            }
+        };
+        let byte = unsafe {
+            LLVMBuildAnd(builder, shifted, byte_mask, c"array.bswap.mask".as_ptr().cast())
+        };
+        let destination = bytes - source - 1;
+        let destination_shift = unsafe { LLVMConstInt(ty, u64::from(destination * 8), 0) };
+        let placed = if destination == 0 {
+            byte
+        } else {
+            unsafe {
+                LLVMBuildShl(builder, byte, destination_shift, c"array.bswap.write".as_ptr().cast())
+            }
+        };
+        result = unsafe { LLVMBuildOr(builder, result, placed, c"array.bswap.or".as_ptr().cast()) };
+    }
+    let _ = context;
+    result
 }
 
 fn store_array_element_value(

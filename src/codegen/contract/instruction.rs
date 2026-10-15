@@ -263,6 +263,7 @@ pub enum BackendInstruction {
         element_layout: super::BackendLayout,
         element_type: BackendValueType,
         capacity: u32,
+        big_endian: bool,
         span: SourceSpan,
     },
     ArrayElementStore {
@@ -273,6 +274,7 @@ pub enum BackendInstruction {
         element_type: BackendValueType,
         value: super::BackendValueId,
         capacity: u32,
+        big_endian: bool,
         span: SourceSpan,
     },
 }

@@ -86,8 +86,16 @@ pub(super) fn lower_array_element(
         );
     }
     let index = provider.lower_expression(index, instructions)?;
-    let (base, index, aggregate_layout, element_layout, element_type_name, element_type, capacity) =
-        lower_array_element_location_from_values(provider, base, index, span, instructions)?;
+    let (
+        base,
+        index,
+        aggregate_layout,
+        element_layout,
+        element_type_name,
+        element_type,
+        capacity,
+        big_endian,
+    ) = lower_array_element_location_from_values(provider, base, index, span, instructions)?;
     let result = provider.allocate();
     provider.remember_value(result, element_type);
     provider.remember_nominal_type(result, element_type_name);
@@ -99,6 +107,7 @@ pub(super) fn lower_array_element(
         element_layout,
         element_type,
         capacity,
+        big_endian,
         span,
     });
     Ok(result)
@@ -124,7 +133,7 @@ pub(super) fn lower_array_element_assignment(
         );
     }
     let lowered_index = provider.lower_expression(index, instructions)?;
-    let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
+    let (base, index, aggregate_layout, element_layout, _, element_type, capacity, big_endian) =
         lower_array_element_location_from_values(
             provider,
             base_value,
@@ -151,6 +160,7 @@ pub(super) fn lower_array_element_assignment(
         element_type,
         value,
         capacity,
+        big_endian,
         span,
     });
     Ok(())
@@ -197,6 +207,7 @@ pub(super) fn lower_array_element_location(
         TypeName,
         BackendValueType,
         u32,
+        bool,
     ),
     BackendContractError,
 > {
@@ -220,6 +231,7 @@ fn lower_array_element_location_from_values(
         TypeName,
         BackendValueType,
         u32,
+        bool,
     ),
     BackendContractError,
 > {
@@ -249,7 +261,16 @@ fn lower_array_element_location_from_values(
         reason: "fixed-array index is outside the declared capacity".to_owned(),
         span,
     });
-    Ok((base, index, aggregate_layout, element_layout, element_type_name, element_type, capacity))
+    Ok((
+        base,
+        index,
+        aggregate_layout,
+        element_layout,
+        element_type_name,
+        element_type,
+        capacity,
+        provider.array_is_big_endian(base),
+    ))
 }
 
 fn array_metadata(
@@ -336,7 +357,11 @@ pub(super) fn lower_field_access_expression(
         .layouts
         .layout_for(&type_name)
         .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?;
-    if provider.layouts.packed_field_for(&type_name, field).is_some() {
+    if provider
+        .layouts
+        .packed_field_for(&type_name, field)
+        .is_some_and(|metadata| metadata.ty.name != "Array")
+    {
         return packed::lower_field_access(
             provider,
             base,
@@ -363,6 +388,9 @@ pub(super) fn lower_field_access_expression(
     provider.remember_value(result, ty);
     if provider.layouts.layout_for(&metadata.ty).is_some() {
         provider.remember_nominal_type(result, metadata.ty.clone());
+        if let Some(packed) = provider.layouts.packed_field_for(&type_name, field) {
+            provider.remember_array_endianness(result, packed.big_endian);
+        }
     }
     instructions.push(BackendInstruction::AggregateFieldLoad {
         result,
@@ -414,7 +442,11 @@ pub(super) fn lower_field_assignment(
         .nominal_type(base)
         .cloned()
         .ok_or_else(|| unsupported(span, "aggregate field assignment has no nominal type"))?;
-    if provider.layouts.packed_field_for(&type_name, field).is_some() {
+    if provider
+        .layouts
+        .packed_field_for(&type_name, field)
+        .is_some_and(|metadata| metadata.ty.name != "Array")
+    {
         return packed::lower_field_assignment(
             provider,
             base,

@@ -65,6 +65,7 @@ pub struct BackendPackedFieldLayout {
     pub bit_offset: u16,
     pub width: u8,
     pub big_endian: bool,
+    pub scalar_ty: BackendValueType,
     pub ty: TypeName,
 }
 

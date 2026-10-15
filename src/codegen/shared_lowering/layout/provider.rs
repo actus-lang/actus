@@ -119,24 +119,39 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             crate::ast::PrimitiveType::Integer { width, .. } => width,
             _ => return None,
         };
+        let scalar_ty = super::support::backend_value_type(self, primitive)?;
         let storage = self.type_layout(pack.storage.type_name(), &mut Vec::new())?;
         Some(super::super::BackendPackedFieldLayout {
             storage,
             bit_offset: field.offset,
             width,
             big_endian: matches!(pack.endianness, crate::ast::LayoutEndianness::Big),
+            scalar_ty,
             ty: field.ty.clone(),
         })
     }
 
     fn field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
         if let Some(pack) = self.packs.get(type_name.name.as_str()) {
-            if field_name != "storage" {
+            if field_name == "storage" {
+                let storage = pack.storage.type_name().clone();
+                let layout = self.type_layout(&storage, &mut Vec::new())?;
+                return Some(BackendFieldLayout { offset: 0, layout, ty: storage, indirect: false });
+            }
+            let field = pack.fields.iter().find(|field| field.name == field_name)?;
+            if field.ty.name != "Array" || field.ty.arguments.len() != 2 {
                 return None;
             }
-            let storage = pack.storage.type_name().clone();
-            let layout = self.type_layout(&storage, &mut Vec::new())?;
-            return Some(BackendFieldLayout { offset: 0, layout, ty: storage, indirect: false });
+            if !field.offset.is_multiple_of(8) {
+                return None;
+            }
+            let layout = self.type_layout(&field.ty, &mut Vec::new())?;
+            return Some(BackendFieldLayout {
+                offset: u32::from(field.offset / 8),
+                layout,
+                ty: field.ty.clone(),
+                indirect: false,
+            });
         }
         let definition = self.structs.get(type_name.name.as_str())?;
         let substitution = (!definition.generic_parameters.is_empty())

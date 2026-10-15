@@ -15,7 +15,11 @@ pub(super) fn lower_field_compound_assignment(
         .layouts
         .layout_for(&type_name)
         .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?;
-    if provider.layouts.packed_field_for(&type_name, field).is_some() {
+    if provider
+        .layouts
+        .packed_field_for(&type_name, field)
+        .is_some_and(|metadata| metadata.ty.name != "Array")
+    {
         return packed::lower_field_compound_assignment(
             provider, base, &type_name, field, operator, value, aggregate_layout, span,
             instructions,

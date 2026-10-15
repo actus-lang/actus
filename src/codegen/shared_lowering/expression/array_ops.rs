@@ -29,7 +29,7 @@ pub(super) fn lower_array_element_compound_assignment(
             instructions,
         );
     }
-    let (base, index, aggregate_layout, element_layout, _, element_type, capacity) =
+    let (base, index, aggregate_layout, element_layout, _, element_type, capacity, big_endian) =
         lower_array_element_location(provider, collection, index, span, instructions)?;
     lower_lowered_array_element_compound_assignment(
         provider,
@@ -39,6 +39,7 @@ pub(super) fn lower_array_element_compound_assignment(
         element_layout,
         element_type,
         capacity,
+        big_endian,
         operator,
         value,
         span,
@@ -84,6 +85,7 @@ fn lower_lowered_array_element_compound_assignment(
     element_layout: super::super::super::BackendLayout,
     element_type: super::super::super::BackendValueType,
     capacity: u32,
+    big_endian: bool,
     operator: CompoundAssignmentOp,
     value: &Expr,
     span: SourceSpan,
@@ -99,6 +101,7 @@ fn lower_lowered_array_element_compound_assignment(
         element_layout,
         element_type,
         capacity,
+        big_endian,
         span,
     });
     let value = provider.lower_expression(value, instructions)?;
@@ -127,6 +130,7 @@ fn lower_lowered_array_element_compound_assignment(
         element_type,
         value: result,
         capacity,
+        big_endian,
         span,
     });
     Ok(())

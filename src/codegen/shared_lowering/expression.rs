@@ -47,6 +47,7 @@ pub(super) struct SharedExpressionProvider<'a> {
     cleanup_plans: &'a [super::super::BackendCleanupPlan],
     value_types: BTreeMap<BackendValueId, BackendValueType>,
     nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
+    array_big_endian: BTreeMap<BackendValueId, bool>,
     enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
     next_value: u32,
     loop_depth: usize,
@@ -139,6 +140,7 @@ impl<'a> SharedExpressionProvider<'a> {
             cleanup_plans,
             value_types: parameter_types,
             nominal_types,
+            array_big_endian: BTreeMap::new(),
             enum_payload_types,
             next_value,
             loop_depth: 0,
@@ -229,6 +231,12 @@ impl<'a> SharedExpressionProvider<'a> {
         type_name: crate::ast::TypeName,
     ) {
         self.nominal_types.insert(value, type_name);
+    }
+    pub(super) fn remember_array_endianness(&mut self, value: BackendValueId, big_endian: bool) {
+        self.array_big_endian.insert(value, big_endian);
+    }
+    pub(super) fn array_is_big_endian(&self, value: BackendValueId) -> bool {
+        self.array_big_endian.get(&value).copied().unwrap_or(false)
     }
     pub(super) fn remember_enum_payload(
         &mut self,
