@@ -68,6 +68,22 @@ fn resolves_public_child_declarations_through_the_parent_facade() {
 }
 
 #[test]
+fn accepts_equality_for_a_unit_enum_reexported_through_a_facade() {
+    let fixture = Fixture::new();
+    fixture.write("teaching/teaching.act", "open contract;");
+    fixture.write(
+        "teaching/contract.act",
+        "open enum TeachingMode { Direct, Replay, } open verb accepts(erg mode: TeachingMode) -> Bool { return mode == TeachingMode.Direct; }",
+    );
+    let program = parse_source(
+        "import teaching; verb main() -> Bool { erg mode = TeachingMode.Direct; return accepts(mode: erg mode); }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("re-exported unit enum equality should be accepted");
+}
+
+#[test]
 fn resolves_a_configuration_facade_with_compile_time_siblings() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open values;");
