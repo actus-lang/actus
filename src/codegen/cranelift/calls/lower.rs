@@ -34,6 +34,7 @@ pub(crate) fn lower_call(
         function,
         arguments,
         &target.parameter_names,
+        &target.parameter_types,
         &target.dynamic_params,
         &target.dynamic_roles,
         &target.ins_params,

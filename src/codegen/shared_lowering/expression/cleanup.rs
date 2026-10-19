@@ -9,10 +9,16 @@ pub(crate) fn descriptor_applies(
     value: BackendValueId,
     descriptor: &super::super::super::BackendCleanupResolvedDescriptor,
 ) -> bool {
-    if !matches!(
-        descriptor.descriptor.bridge,
-        super::super::super::BackendCleanupBridge::AggregateDrop { .. }
-    ) {
+    let bridge = descriptor.descriptor.bridge;
+    if matches!(bridge, super::super::super::BackendCleanupBridge::BufferDrop) {
+        return provider.value_type(value) == Some(super::super::super::BackendValueType::Pointer)
+            && provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Buffer");
+    }
+    if matches!(bridge, super::super::super::BackendCleanupBridge::RegionDrop) {
+        return provider.value_type(value) == Some(super::super::super::BackendValueType::Pointer)
+            && provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Region");
+    }
+    if !matches!(bridge, super::super::super::BackendCleanupBridge::AggregateDrop { .. }) {
         return true;
     }
     let actual = match provider.value_type(value) {

@@ -169,6 +169,7 @@ pub(super) fn function_metadata(
                 FunctionMeta {
                     id: meta.id,
                     parameter_names: meta.parameter_names.clone(),
+                    parameter_types: meta.parameter_types.clone(),
                     return_type: meta.return_type,
                     dynamic_params: meta.dynamic_params.clone(),
                     dynamic_roles: meta.dynamic_roles.clone(),

@@ -7,6 +7,7 @@ use crate::ast::{Argument, Expr};
 
 use super::super::expressions::lower_expression;
 use super::super::native::BackendEmitError;
+use super::super::types::NativeType;
 use super::context::CallLoweringContext;
 
 struct CallArgumentModes<'a> {
@@ -19,6 +20,7 @@ pub(super) fn lower_call_arguments(
     function: &mut FunctionBuilder<'_>,
     arguments: &[Argument],
     parameter_names: &[String],
+    parameter_types: &[NativeType],
     dynamic_params: &[bool],
     dynamic_roles: &[Option<String>],
     ins_params: &[bool],
@@ -28,7 +30,15 @@ pub(super) fn lower_call_arguments(
     let modes = CallArgumentModes { dynamic_params, dynamic_roles, ins_params };
     let mut values = Vec::new();
     for (index, argument) in ordered.iter().enumerate() {
-        lower_one_call_argument(function, argument, index, &modes, context, &mut values)?;
+        lower_one_call_argument(
+            function,
+            argument,
+            index,
+            parameter_types.get(index).copied(),
+            &modes,
+            context,
+            &mut values,
+        )?;
     }
     Ok(values)
 }
@@ -37,6 +47,7 @@ fn lower_one_call_argument(
     function: &mut FunctionBuilder<'_>,
     argument: &Expr,
     index: usize,
+    expected_type: Option<NativeType>,
     modes: &CallArgumentModes<'_>,
     context: &CallLoweringContext<'_, '_>,
     values: &mut Vec<Value>,
@@ -55,7 +66,7 @@ fn lower_one_call_argument(
             context.layouts,
         )?
     };
-    values.push(value);
+    values.push(coerce_call_argument(function, value, expected_type, context)?);
     append_dynamic_argument(
         function,
         argument,
@@ -65,6 +76,37 @@ fn lower_one_call_argument(
         context,
         values,
     )
+}
+
+fn coerce_call_argument(
+    function: &mut FunctionBuilder<'_>,
+    value: Value,
+    expected_type: Option<NativeType>,
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<Value, BackendEmitError> {
+    let Some(expected_type) = expected_type else { return Ok(value) };
+    let actual_ir_type = function.func.dfg.value_type(value);
+    let expected_ir_type = expected_type.ir_type(context.layouts.pointer_type)?;
+    if actual_ir_type == expected_ir_type {
+        return Ok(value);
+    }
+    if !matches!(expected_type, NativeType::Int | NativeType::Integer { .. }) {
+        return Err(BackendEmitError(format!(
+            "call argument type mismatch: expected {expected_ir_type}, got {actual_ir_type}"
+        )));
+    }
+    if actual_ir_type.bytes() < expected_ir_type.bytes() {
+        return Ok(match expected_type {
+            NativeType::Integer { signed: true, .. } | NativeType::Int => {
+                function.ins().sextend(expected_ir_type, value)
+            }
+            NativeType::Integer { signed: false, .. } => {
+                function.ins().uextend(expected_ir_type, value)
+            }
+            _ => unreachable!(),
+        });
+    }
+    Ok(function.ins().ireduce(expected_ir_type, value))
 }
 
 fn lower_indirect_ins_argument(
