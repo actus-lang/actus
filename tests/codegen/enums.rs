@@ -35,6 +35,16 @@ fn lowers_enum_case_discriminant_switch_to_native_code() {
 }
 
 #[test]
+fn lowers_unit_enum_equality_to_native_code() {
+    let source = "enum State { Ready, Busy, } verb main(erg left: State, erg right: State) -> Bool { return left != right; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("enum equality program should parse");
+    let object = emit_program_object(&program, "main").expect("enum equality should emit");
+    object::File::parse(object.as_slice()).expect("enum equality should emit a native object");
+}
+
+#[test]
 fn lowers_hex_integer_case_patterns_without_defaulting_to_zero() {
     let source = "verb main(erg value: Int) -> Int { return case value { 0x10 => 1, _ => 0, }; }";
     let (tokens, errors) = scan(source);

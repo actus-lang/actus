@@ -19,6 +19,26 @@ fn registers_enums_and_validates_unit_and_payload_construction() {
 }
 
 #[test]
+fn accepts_equality_for_values_of_the_same_unit_enum() {
+    analyze_source(
+        "enum State { Ready, Busy, } verb same(erg left: State, erg right: State) -> Bool { return left == right; }",
+    )
+    .expect("unit enum equality should be accepted");
+}
+
+#[test]
+fn rejects_equality_for_enum_values_with_payloads() {
+    let error = analyze_source(
+        "enum State { Ready(Int), Busy, } verb same(erg left: State, erg right: State) -> Bool { return left == right; }",
+    )
+    .expect_err("payload enum equality must remain unsupported");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::TypeMismatch { callee, .. } if callee == "equality operator"
+    ));
+}
+
+#[test]
 fn rejects_invalid_enum_variants_and_payload_arguments() {
     let unknown_variant =
         analyze_source("enum Color { Red, } verb main() { erg color: Color = Color.Blue; }")

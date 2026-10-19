@@ -22,6 +22,7 @@ Enums and exhaustive pattern matching are required before self-hosting work and 
 - [x] Validate positional and named payload arguments.
 - [x] Emit stable E10xx diagnostics for invalid variant construction.
 - [x] Add positive and negative semantic tests for enum validation.
+- [x] Support equality and inequality for same-typed unit enums in both native backends.
 
 ## Tagged Union Layout
 

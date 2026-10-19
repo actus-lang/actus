@@ -1,5 +1,6 @@
 use crate::ast::{
-    BinaryOp, CaseBody, Expr, IfBranch, PrimitiveType, Stmt, TypeName, UnaryOp, primitive_type,
+    BinaryOp, CaseBody, EnumPayload, Expr, IfBranch, PrimitiveType, Stmt, TypeName, UnaryOp,
+    primitive_type,
 };
 use crate::lexer::SourceSpan;
 
@@ -262,6 +263,7 @@ impl Analyzer {
             relational_types_match(&left_type, &right_type)
         } else if matches!(operator, BinaryOp::Equals | BinaryOp::NotEquals) {
             equality_types_match(&left_type, &right_type)
+                || self.enum_equality_types_match(&left_type, &right_type)
         } else if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
             left_type == "Bool" && right_type == "Bool"
         } else if matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) {
@@ -281,6 +283,16 @@ impl Analyzer {
                 found: right_type,
             },
             span: expression_span(right),
+        })
+    }
+
+    fn enum_equality_types_match(&self, left: &str, right: &str) -> bool {
+        if left != right {
+            return false;
+        }
+        let base_name = left.split('[').next().unwrap_or(left);
+        self.enum_types.get(base_name).is_some_and(|definition| {
+            definition.variants.iter().all(|variant| matches!(variant.payload, EnumPayload::Unit))
         })
     }
 
