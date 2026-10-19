@@ -13,6 +13,7 @@ pub use super::super::symbols::BackendSymbolBindings;
 pub(crate) struct FunctionMeta {
     pub(crate) id: FuncId,
     pub(crate) parameter_names: Vec<String>,
+    pub(crate) parameter_types: Vec<NativeType>,
     pub(crate) return_type: NativeType,
     pub(crate) dynamic_params: Vec<bool>,
     pub(crate) dynamic_roles: Vec<Option<String>>,
@@ -22,6 +23,7 @@ pub(crate) struct FunctionMeta {
 pub(crate) struct FunctionRef {
     pub(crate) reference: FuncRef,
     pub(crate) parameter_names: Vec<String>,
+    pub(crate) parameter_types: Vec<NativeType>,
     pub(crate) return_type: NativeType,
     pub(crate) dynamic_params: Vec<bool>,
     pub(crate) dynamic_roles: Vec<Option<String>>,

@@ -9,7 +9,7 @@ use crate::lexer::SourceSpan;
 use super::super::layout::LayoutRegistry;
 use super::super::native::{BackendEmitError, FunctionRef};
 use super::super::types::NativeType;
-use super::arguments::lower_call_arguments;
+use super::arguments::{CallArgumentModes, lower_call_arguments};
 use super::context::CallLoweringContext;
 use super::returns::allocate_return_address;
 
@@ -30,13 +30,17 @@ pub(crate) fn lower_call(
         _ => {}
     }
     let target = call_target(context.functions, callee_name)?;
+    let argument_modes = CallArgumentModes {
+        parameter_types: &target.parameter_types,
+        dynamic_params: &target.dynamic_params,
+        dynamic_roles: &target.dynamic_roles,
+        ins_params: &target.ins_params,
+    };
     let mut values = lower_call_arguments(
         function,
         arguments,
         &target.parameter_names,
-        &target.dynamic_params,
-        &target.dynamic_roles,
-        &target.ins_params,
+        &argument_modes,
         context,
     )?;
     let target = resolve_call_target(function, callee_name, arguments, target, &values, context)?;

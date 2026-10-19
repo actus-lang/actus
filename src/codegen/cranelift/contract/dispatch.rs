@@ -42,6 +42,7 @@ pub(super) fn lower_instruction(
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. }
         | BackendInstruction::IntegerCompare { .. }
+        | BackendInstruction::ScalarSelect { .. }
         | BackendInstruction::FloatCompare { .. }
         | BackendInstruction::IntegerUnary { .. }
         | BackendInstruction::MemoryCopy { .. }
@@ -167,6 +168,9 @@ fn lower_scalar(
         }
         BackendInstruction::IntegerCompare { .. } => {
             super::lower_integer_compare(builder, instruction, values)
+        }
+        BackendInstruction::ScalarSelect { .. } => {
+            super::lower_scalar_select(builder, instruction, values)
         }
         BackendInstruction::FloatCompare { .. } => {
             super::super::float_ops::lower_float_compare(builder, instruction, values)

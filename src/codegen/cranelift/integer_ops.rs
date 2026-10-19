@@ -305,6 +305,29 @@ pub(super) fn lower_integer_compare(
     Ok(())
 }
 
+pub(super) fn lower_scalar_select(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::ScalarSelect { result, condition, then_value, else_value, .. } =
+        instruction
+    else {
+        return Err(BackendEmitError("Cranelift scalar select expected".to_owned()));
+    };
+    let condition = values.get(condition).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift select condition {} is unavailable", condition.0))
+    })?;
+    let then_value = values.get(then_value).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift select then value {} is unavailable", then_value.0))
+    })?;
+    let else_value = values.get(else_value).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift select else value {} is unavailable", else_value.0))
+    })?;
+    values.insert(*result, builder.ins().select(condition, then_value, else_value));
+    Ok(())
+}
+
 fn coerce_integer_width(
     builder: &mut FunctionBuilder<'_>,
     value: cranelift_codegen::ir::Value,

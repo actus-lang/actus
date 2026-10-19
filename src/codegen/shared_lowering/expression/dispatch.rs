@@ -54,6 +54,7 @@ pub(super) fn lower_expression(
         Expr::If { condition, .. } if matches!(condition.as_ref(), Expr::BoolLiteral { .. }) => {
             lower_constant_if(provider, expression, instructions)
         }
+        Expr::If { .. } => lower_scalar_if(provider, expression, instructions),
         Expr::Call { .. } => super::calls::lower_call(provider, expression, instructions),
         Expr::MethodCall { .. } => provider.lower_method_call(expression, instructions),
         Expr::StructLit { .. } | Expr::FieldAccess { .. } | Expr::Index { .. } => {
@@ -65,6 +66,57 @@ pub(super) fn lower_expression(
             "expression is outside the scalar shared lowering contract",
         )),
     }
+}
+
+fn lower_scalar_if(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let Expr::If { condition, then_branch, else_branch, span } = expression else {
+        unreachable!("scalar-if lowering received a non-if expression")
+    };
+    let Some(crate::ast::Stmt::Expression { expression: then_expression, .. }) =
+        then_branch.statements.last()
+    else {
+        return Err(unsupported(*span, "scalar if branch requires a tail expression"));
+    };
+    let Some(crate::ast::IfBranch::Block(else_block)) = else_branch else {
+        return Err(unsupported(*span, "scalar if requires an else block"));
+    };
+    let Some(crate::ast::Stmt::Expression { expression: else_expression, .. }) =
+        else_block.statements.last()
+    else {
+        return Err(unsupported(*span, "scalar if branch requires a tail expression"));
+    };
+    if then_branch.statements.len() != 1 || else_block.statements.len() != 1 {
+        return Err(unsupported(*span, "scalar if branches must be pure tail expressions"));
+    }
+    let condition = provider.lower_expression(condition, instructions)?;
+    if provider.value_type(condition) != Some(BackendValueType::Bool) {
+        return Err(unsupported(*span, "scalar if condition must be Bool"));
+    }
+    let then_value = provider.lower_expression(then_expression, instructions)?;
+    let else_value = provider.lower_expression(else_expression, instructions)?;
+    let Some(result_type) = provider.value_type(then_value) else {
+        return Err(unsupported(*span, "scalar if then value type is unavailable"));
+    };
+    if provider.value_type(else_value) != Some(result_type)
+        || !matches!(result_type, BackendValueType::Bool | BackendValueType::Integer { .. })
+    {
+        return Err(unsupported(*span, "scalar if branches must have the same scalar type"));
+    }
+    let result = provider.allocate();
+    provider.remember_value(result, result_type);
+    instructions.push(BackendInstruction::ScalarSelect {
+        result,
+        condition,
+        then_value,
+        else_value,
+        ty: result_type,
+        span: *span,
+    });
+    Ok(result)
 }
 
 fn lower_integer_literal(

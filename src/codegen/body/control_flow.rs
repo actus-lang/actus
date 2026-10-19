@@ -49,6 +49,38 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         fallthrough: Option<BackendBlockId>,
         instructions: Vec<BackendInstruction>,
     ) -> Result<Option<BackendBlock>, BackendContractError> {
+        if let Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } = statement {
+            return self
+                .lower_case_return_case(CaseExpressionStatementInput {
+                    id,
+                    block,
+                    index,
+                    expression,
+                    span: *span,
+                    fallthrough,
+                    instructions,
+                })
+                .map(Some);
+        }
+        self.lower_nonreturn_structured_statement(
+            id,
+            block,
+            index,
+            statement,
+            fallthrough,
+            instructions,
+        )
+    }
+
+    fn lower_nonreturn_structured_statement(
+        &mut self,
+        id: BackendBlockId,
+        block: &Block,
+        index: usize,
+        statement: &Stmt,
+        fallthrough: Option<BackendBlockId>,
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<Option<BackendBlock>, BackendContractError> {
         match statement {
             Stmt::Loop(nested) => self
                 .lower_loop_statement(id, block, index, nested, fallthrough, instructions)
@@ -62,9 +94,6 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             Stmt::If { .. } => self
                 .lower_if_statement(id, block, index, statement, fallthrough, instructions)
                 .map(Some),
-            Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } => {
-                self.lower_case_return(id, expression, *span, instructions).map(Some)
-            }
             Stmt::OwnerDecl { initializer: Expr::If { .. }, .. } => self
                 .lower_if_owner_statement(id, block, index, statement, fallthrough, instructions)
                 .map(Some),
@@ -97,6 +126,33 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                 .map(Some),
             _ => Ok(None),
         }
+    }
+
+    fn lower_case_return_case(
+        &mut self,
+        input: CaseExpressionStatementInput<'_>,
+    ) -> Result<BackendBlock, BackendContractError> {
+        let CaseExpressionStatementInput {
+            id,
+            block,
+            index,
+            expression,
+            span,
+            fallthrough,
+            instructions,
+        } = input;
+        if case_requires_continuation(expression) {
+            return self.lower_case_expression_statement(CaseExpressionStatementInput {
+                id,
+                block,
+                index,
+                expression,
+                span,
+                fallthrough,
+                instructions,
+            });
+        }
+        self.lower_case_return(id, expression, span, instructions)
     }
 
     fn lower_if_statement(
@@ -285,4 +341,20 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         self.provider.distribute_scope_cleanup(block.span, &mut self.blocks, continuation_start)?;
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
+}
+
+fn case_requires_continuation(expression: &Expr) -> bool {
+    let Expr::Case { branches, .. } = expression else { return false };
+    branches.iter().any(|branch| {
+        let crate::ast::CaseBody::Block(block) = &branch.body else { return false };
+        !block.statements.last().is_some_and(|statement| {
+            matches!(
+                statement,
+                Stmt::Expression { .. }
+                    | Stmt::Return { .. }
+                    | Stmt::Break { .. }
+                    | Stmt::Continue { .. }
+            )
+        })
+    })
 }

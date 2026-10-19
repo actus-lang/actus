@@ -257,6 +257,7 @@ fn named_meta(
     FunctionMeta {
         id,
         parameter_names: parameters.iter().map(|name| (*name).to_owned()).collect(),
+        parameter_types: Vec::new(),
         return_type,
         dynamic_params: vec![false; parameters.len()],
         dynamic_roles: vec![None; parameters.len()],

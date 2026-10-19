@@ -88,6 +88,14 @@ pub enum BackendInstruction {
         signed: bool,
         span: SourceSpan,
     },
+    ScalarSelect {
+        result: super::BackendValueId,
+        condition: super::BackendValueId,
+        then_value: super::BackendValueId,
+        else_value: super::BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+    },
     FloatCompare {
         result: super::BackendValueId,
         operation: BackendIntegerCompareOp,

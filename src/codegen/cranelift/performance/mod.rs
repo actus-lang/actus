@@ -176,6 +176,18 @@ fn declare_performance_function(
             .iter()
             .map(|parameter| parameter.name.clone())
             .collect(),
+        parameter_types: definition
+            .method
+            .params
+            .iter()
+            .map(|parameter| {
+                if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
+                    Ok(NativeType::FatPointer)
+                } else {
+                    NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?,
         return_type,
         dynamic_params: dynamic_parameters(definition),
         dynamic_roles: dynamic_roles(definition),

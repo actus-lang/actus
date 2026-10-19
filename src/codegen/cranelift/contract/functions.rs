@@ -163,6 +163,7 @@ fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId
         | BackendInstruction::IntegerCast { result, .. }
         | BackendInstruction::FloatCast { result, .. }
         | BackendInstruction::IntegerCompare { result, .. }
+        | BackendInstruction::ScalarSelect { result, .. }
         | BackendInstruction::FloatCompare { result, .. }
         | BackendInstruction::IntegerUnary { result, .. }
         | BackendInstruction::Call { result: Some(result), .. }
@@ -187,6 +188,9 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         BackendInstruction::IntegerBinary { left, right, .. }
         | BackendInstruction::IntegerCompare { left, right, .. }
         | BackendInstruction::FloatCompare { left, right, .. } => vec![*left, *right],
+        BackendInstruction::ScalarSelect { condition, then_value, else_value, .. } => {
+            vec![*condition, *then_value, *else_value]
+        }
         BackendInstruction::IntegerCast { source, .. }
         | BackendInstruction::FloatCast { source, .. }
         | BackendInstruction::IntegerUnary { operand: source, .. }
