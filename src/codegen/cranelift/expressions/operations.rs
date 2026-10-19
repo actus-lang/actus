@@ -1,5 +1,5 @@
 use cranelift_codegen::ir::{
-    InstBuilder, TrapCode,
+    InstBuilder, MemFlagsData, TrapCode,
     condcodes::{FloatCC, IntCC},
     types,
 };
@@ -74,6 +74,17 @@ fn lower_comparison(
     let right = lower_expression_with_context(function, right_expression, context)?;
     let left_type =
         initializer_type(left_expression, context.local_types, context.functions, context.layouts)?;
+    let right_type = initializer_type(
+        right_expression,
+        context.local_types,
+        context.functions,
+        context.layouts,
+    )?;
+    if let (NativeType::Enum(left_id), NativeType::Enum(right_id)) = (left_type, right_type)
+        && left_id == right_id
+    {
+        return lower_enum_comparison(function, left, right, operator, left_id, context);
+    }
     let condition = match left_type {
         NativeType::Float { .. } => function.ins().fcmp(float_condition(operator)?, left, right),
         NativeType::Int | NativeType::Integer { .. } => {
@@ -96,6 +107,44 @@ fn lower_comparison(
         other => return Err(BackendEmitError(format!("cannot compare native type {other:?}"))),
     };
     Ok(normalize_bool(function, condition))
+}
+
+fn lower_enum_comparison(
+    function: &mut FunctionBuilder<'_>,
+    left: cranelift_codegen::ir::Value,
+    right: cranelift_codegen::ir::Value,
+    operator: &BinaryOp,
+    enum_id: usize,
+    context: &CallLoweringContext<'_, '_>,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
+    let layout = context
+        .layouts
+        .enum_layout(enum_id)
+        .ok_or_else(|| BackendEmitError("enum comparison layout is unavailable".to_owned()))?;
+    let (left, right) = if layout.niche_pointer {
+        (left, right)
+    } else {
+        let left = function.ins().load(
+            types::I32,
+            MemFlagsData::new(),
+            left,
+            layout.discriminant_offset as i32,
+        );
+        let right = function.ins().load(
+            types::I32,
+            MemFlagsData::new(),
+            right,
+            layout.discriminant_offset as i32,
+        );
+        (left, right)
+    };
+    let condition = match operator {
+        BinaryOp::Equals => IntCC::Equal,
+        BinaryOp::NotEquals => IntCC::NotEqual,
+        _ => return Err(BackendEmitError("enum ordering comparison is unsupported".to_owned())),
+    };
+    let comparison = function.ins().icmp(condition, left, right);
+    Ok(normalize_bool(function, comparison))
 }
 
 fn normalize_bool(

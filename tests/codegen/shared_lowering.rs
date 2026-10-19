@@ -641,6 +641,25 @@ fn lowers_scalar_integer_comparison_into_neutral_ir() {
 }
 
 #[test]
+fn lowers_unit_enum_equality_through_discriminants() {
+    let source = "enum State { Ready, Busy, } verb main() -> Bool { erg left: State = State.Ready; erg right: State = State.Busy; return left == right; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "lexer errors: {errors:?}");
+    let program = parse(tokens).expect("enum equality fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("enum equality should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::IntegerCompare { operation: BackendIntegerCompareOp::Equals, .. }
+    )));
+}
+
+#[test]
 fn lowers_scalar_integer_unary_into_neutral_ir() {
     let source = "verb main() -> Int { return -7; }";
     let (tokens, errors) = scan(source);

@@ -27,6 +27,18 @@ fn symbol_name_matches(format: BinaryFormat, actual: &str, expected: &str) -> bo
         || (format == BinaryFormat::MachO && actual.strip_prefix('_') == Some(expected))
 }
 
+#[test]
+fn llvm_emits_unit_enum_equality() {
+    let source = "enum State { Ready, Busy, } verb main(erg left: State, erg right: State) -> Bool { return left == right; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "enum equality fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("enum equality fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("enum equality should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume enum equality");
+    assert!(llvm_ir.contains("icmp eq"));
+}
+
 fn has_symbol<'data>(object: &object::File<'data>, expected: &str) -> bool {
     object
         .symbols()

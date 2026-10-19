@@ -38,6 +38,11 @@ case status {
 Patterns must be exhaustive unless the language form explicitly permits a
 validated wildcard. Duplicate and unreachable patterns are rejected.
 
+Unit-only enums support `==` and `!=` when both operands have the same enum
+type. The comparison uses the enum discriminant and is lowered consistently by
+the Cranelift and LLVM backends. Enums with payloads do not support whole-value
+equality; compare their selected payloads explicitly after pattern matching.
+
 ## Payload ownership
 
 A payload binding follows the subject's ownership contract. A `dat` subject may
