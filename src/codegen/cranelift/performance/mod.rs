@@ -180,7 +180,13 @@ fn declare_performance_function(
             .method
             .params
             .iter()
-            .map(|parameter| NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts))
+            .map(|parameter| {
+                if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
+                    Ok(NativeType::FatPointer)
+                } else {
+                    NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
+                }
+            })
             .collect::<Result<Vec<_>, _>>()?,
         return_type,
         dynamic_params: dynamic_parameters(definition),

@@ -30,11 +30,15 @@ pub(super) fn lower_call_arguments(
     let modes = CallArgumentModes { dynamic_params, dynamic_roles, ins_params };
     let mut values = Vec::new();
     for (index, argument) in ordered.iter().enumerate() {
+        let expected_type = parameter_types
+            .get(index)
+            .copied()
+            .filter(|_| !dynamic_params.get(index).copied().unwrap_or(false));
         lower_one_call_argument(
             function,
             argument,
             index,
-            parameter_types.get(index).copied(),
+            expected_type,
             &modes,
             context,
             &mut values,

@@ -115,7 +115,13 @@ fn function_meta(
         parameter_names: params.iter().map(|param| param.name.clone()).collect(),
         parameter_types: params
             .iter()
-            .map(|parameter| NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts))
+            .map(|parameter| {
+                if parameter.dispatch == DispatchMode::Dynamic {
+                    Ok(NativeType::FatPointer)
+                } else {
+                    NativeType::from_type_name_with_layout(Some(&parameter.ty), layouts)
+                }
+            })
             .collect::<Result<Vec<_>, _>>()?,
         return_type,
         dynamic_params: params

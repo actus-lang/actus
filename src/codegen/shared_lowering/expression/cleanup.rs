@@ -11,12 +11,25 @@ pub(crate) fn descriptor_applies(
 ) -> bool {
     let bridge = descriptor.descriptor.bridge;
     if matches!(bridge, super::super::super::BackendCleanupBridge::BufferDrop) {
+        if descriptor.field.is_some() {
+            return true;
+        }
         return provider.value_type(value) == Some(super::super::super::BackendValueType::Pointer)
             && provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Buffer");
     }
     if matches!(bridge, super::super::super::BackendCleanupBridge::RegionDrop) {
-        return provider.value_type(value) == Some(super::super::super::BackendValueType::Pointer)
-            && provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Region");
+        if descriptor.field.is_some() {
+            return true;
+        }
+        return match provider.value_type(value) {
+            Some(super::super::super::BackendValueType::Region { .. }) => {
+                provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Region")
+            }
+            Some(super::super::super::BackendValueType::Pointer) => {
+                provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Region")
+            }
+            _ => false,
+        };
     }
     if !matches!(bridge, super::super::super::BackendCleanupBridge::AggregateDrop { .. }) {
         return true;
