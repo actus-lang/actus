@@ -51,15 +51,15 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<Option<BackendBlock>, BackendContractError> {
         if let Stmt::Return { value: Some(expression @ Expr::Case { .. }), span } = statement {
             return self
-                .lower_case_return_case(
+                .lower_case_return_case(CaseExpressionStatementInput {
                     id,
                     block,
                     index,
                     expression,
-                    *span,
+                    span: *span,
                     fallthrough,
                     instructions,
-                )
+                })
                 .map(Some);
         }
         self.lower_nonreturn_structured_statement(
@@ -130,14 +130,17 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn lower_case_return_case(
         &mut self,
-        id: BackendBlockId,
-        block: &Block,
-        index: usize,
-        expression: &Expr,
-        span: crate::lexer::SourceSpan,
-        fallthrough: Option<BackendBlockId>,
-        instructions: Vec<BackendInstruction>,
+        input: CaseExpressionStatementInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let CaseExpressionStatementInput {
+            id,
+            block,
+            index,
+            expression,
+            span,
+            fallthrough,
+            instructions,
+        } = input;
         if case_requires_continuation(expression) {
             return self.lower_case_expression_statement(CaseExpressionStatementInput {
                 id,

@@ -10,36 +10,34 @@ use super::super::native::BackendEmitError;
 use super::super::types::NativeType;
 use super::context::CallLoweringContext;
 
-struct CallArgumentModes<'a> {
-    dynamic_params: &'a [bool],
-    dynamic_roles: &'a [Option<String>],
-    ins_params: &'a [bool],
+pub(super) struct CallArgumentModes<'a> {
+    pub(super) parameter_types: &'a [NativeType],
+    pub(super) dynamic_params: &'a [bool],
+    pub(super) dynamic_roles: &'a [Option<String>],
+    pub(super) ins_params: &'a [bool],
 }
 
 pub(super) fn lower_call_arguments(
     function: &mut FunctionBuilder<'_>,
     arguments: &[Argument],
     parameter_names: &[String],
-    parameter_types: &[NativeType],
-    dynamic_params: &[bool],
-    dynamic_roles: &[Option<String>],
-    ins_params: &[bool],
+    modes: &CallArgumentModes<'_>,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Vec<Value>, BackendEmitError> {
     let ordered = order_arguments(arguments, parameter_names)?;
-    let modes = CallArgumentModes { dynamic_params, dynamic_roles, ins_params };
     let mut values = Vec::new();
     for (index, argument) in ordered.iter().enumerate() {
-        let expected_type = parameter_types
+        let expected_type = modes
+            .parameter_types
             .get(index)
             .copied()
-            .filter(|_| !dynamic_params.get(index).copied().unwrap_or(false));
+            .filter(|_| !modes.dynamic_params.get(index).copied().unwrap_or(false));
         lower_one_call_argument(
             function,
             argument,
             index,
             expected_type,
-            &modes,
+            modes,
             context,
             &mut values,
         )?;
