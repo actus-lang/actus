@@ -47,7 +47,7 @@ impl Analyzer {
         let (Expr::Call { span, .. } | Expr::MethodCall { span, .. }) = expression else {
             return None;
         };
-        self.inferred_expression_types.get(&(span.start, span.end)).cloned()
+        self.inferred_expression_types.get(&self.expression_cache_key(*span)).cloned()
     }
 
     fn identifier_type_name(&self, name: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {

@@ -105,7 +105,7 @@ impl Analyzer {
         self.validate_fixed_size_type(&type_name, &mut Vec::new())?;
         self.validate_type_reference(&type_name)?;
         self.inferred_expression_types.insert(
-            (span.start, span.end),
+            self.expression_cache_key(span),
             TypeName { name: "u64".to_owned(), arguments: Vec::new(), reference_role: None, span },
         );
         Ok(true)
@@ -139,7 +139,7 @@ impl Analyzer {
         self.validate_fixed_size_type(&type_name, &mut Vec::new())?;
         self.validate_type_reference(&type_name)?;
         self.inferred_expression_types.insert(
-            (span.start, span.end),
+            self.expression_cache_key(span),
             TypeName { name: "u64".to_owned(), arguments: Vec::new(), reference_role: None, span },
         );
         Ok(true)
@@ -289,7 +289,7 @@ impl Analyzer {
         }
         if let Some(name) = type_name {
             self.inferred_expression_types.insert(
-                (span.start, span.end),
+                self.expression_cache_key(span),
                 TypeName { name, arguments: Vec::new(), reference_role: None, span },
             );
         }

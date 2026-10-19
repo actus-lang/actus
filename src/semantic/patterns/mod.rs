@@ -102,7 +102,7 @@ impl Analyzer {
         if let Some(result_type) = result_type
             && let Some(type_name) = super::calls::parse_type_name_key(&result_type, case_span)
         {
-            self.case_result_types.insert((case_span.start, case_span.end), type_name);
+            self.case_result_types.insert(self.expression_cache_key(case_span), type_name);
         }
         Ok(branch_results)
     }

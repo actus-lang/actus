@@ -84,6 +84,27 @@ fn accepts_equality_for_a_unit_enum_reexported_through_a_facade() {
 }
 
 #[test]
+fn keeps_inferred_types_scoped_across_imported_declarations() {
+    let fixture = Fixture::new();
+    fixture.write("layout/layout.act", "open fixed;");
+    fixture.write(
+        "layout/fixed.act",
+        "open struct FixedHeaderLayout { value: Int, } open verb read_fixed_header_layout() -> FixedHeaderLayout { return FixedHeaderLayout { value: 1, }; }",
+    );
+    fixture.write("aux/aux.act", "open forwarding;");
+    fixture.write(
+        "aux/forwarding.act",
+        "open enum AuxLinkError { Capacity, } open verb allocate_aux_record(erg value: Int) -> Option[Int] { return Option[Int].Some(value); } open verb acquire_aux_record(erg value: Int) -> Result[Int, AuxLinkError] { erg allocated = allocate_aux_record(value: erg value); erg selected: Int = case dat allocated { Option.None => 0, Option.Some(item) => item, }; erg layout = read_fixed_header_layout(); return Result[Int, AuxLinkError].Ok(selected + layout.value); }",
+    );
+    let program = parse_source(
+        "import layout; import aux; verb main() -> Int { erg input: Int = 1; erg result = acquire_aux_record(value: erg input); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("inferred types from imported declarations should not collide");
+}
+
+#[test]
 fn resolves_a_configuration_facade_with_compile_time_siblings() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open values;");

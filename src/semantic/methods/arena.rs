@@ -50,8 +50,8 @@ impl Analyzer {
                 span: expression_span(argument),
             });
         };
-        self.inferred_expression_types.insert((span.start, span.end), type_name);
-        self.expression_arena_provenance.insert((span.start, span.end), arena_id);
+        self.inferred_expression_types.insert(self.expression_cache_key(span), type_name);
+        self.expression_arena_provenance.insert(self.expression_cache_key(span), arena_id);
         Ok(())
     }
 
@@ -69,7 +69,7 @@ impl Analyzer {
                 .collect(),
             Expr::MethodCall { span, .. } | Expr::Call { span, .. } => self
                 .expression_arena_provenance
-                .get(&(span.start, span.end))
+                .get(&self.expression_cache_key(*span))
                 .copied()
                 .into_iter()
                 .collect(),

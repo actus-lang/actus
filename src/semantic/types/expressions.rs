@@ -81,12 +81,12 @@ impl Analyzer {
             Some(IntrinsicKind::SizeOf | IntrinsicKind::AlignOf) => Some(BuiltinType::Int),
             Some(IntrinsicKind::Copy) => self
                 .inferred_expression_types
-                .get(&(span.start, span.end))
+                .get(&self.expression_cache_key(span))
                 .and_then(|type_name| lookup_builtin_type(&type_name.name)),
             Some(IntrinsicKind::Drop) => None,
             None => self
                 .inferred_expression_types
-                .get(&(span.start, span.end))
+                .get(&self.expression_cache_key(span))
                 .and_then(|type_name| lookup_builtin_type(&type_name.name))
                 .or_else(|| {
                     self.signatures.get(callee).and_then(|signature| signature.return_type)
@@ -100,7 +100,7 @@ impl Analyzer {
         span: crate::lexer::SourceSpan,
     ) -> Option<BuiltinType> {
         self.inferred_expression_types
-            .get(&(span.start, span.end))
+            .get(&self.expression_cache_key(span))
             .and_then(|type_name| lookup_builtin_type(&type_name.name))
             .or_else(|| self.signatures.get(method).and_then(|signature| signature.return_type))
     }
@@ -157,29 +157,8 @@ impl Analyzer {
         if let Some(type_name) = self.binary_type_name(expression) {
             return Some(type_name);
         }
-        if let Expr::Call { callee, span, .. } = expression {
-            if let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end)) {
-                return Some(super::super::analyzer::canonical_type_name(type_name));
-            }
-            if let Some(type_name) = self
-                .signatures
-                .get(callee)
-                .and_then(|signature| signature.return_type_name.as_ref())
-            {
-                return Some(super::super::analyzer::canonical_type_name(type_name));
-            }
-        }
-        if let Expr::MethodCall { method, span, .. } = expression {
-            if let Some(type_name) = self.inferred_expression_types.get(&(span.start, span.end)) {
-                return Some(super::super::analyzer::canonical_type_name(type_name));
-            }
-            if let Some(type_name) = self
-                .signatures
-                .get(method)
-                .and_then(|signature| signature.return_type_name.as_ref())
-            {
-                return Some(super::super::analyzer::canonical_type_name(type_name));
-            }
+        if let Some(type_name) = self.call_type_name(expression) {
+            return Some(type_name);
         }
         if let Expr::Cast { target, .. } = expression {
             return Some(super::super::analyzer::canonical_type_name(target));
@@ -199,6 +178,20 @@ impl Analyzer {
             })
             .or_else(|| self.expression_enum_type_application(expression))
             .or_else(|| self.expression_enum_type(expression))
+    }
+
+    fn call_type_name(&self, expression: &Expr) -> Option<String> {
+        let (name, span) = match expression {
+            Expr::Call { callee, span, .. } => (callee, span),
+            Expr::MethodCall { method, span, .. } => (method, span),
+            _ => return None,
+        };
+        self.inferred_expression_types
+            .get(&self.expression_cache_key(*span))
+            .or_else(|| {
+                self.signatures.get(name).and_then(|signature| signature.return_type_name.as_ref())
+            })
+            .map(super::super::analyzer::canonical_type_name)
     }
 
     fn literal_type_name(&self, expression: &Expr) -> Option<String> {
@@ -275,7 +268,7 @@ impl Analyzer {
 
     fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {
         let Expr::Case { branches, span, .. } = expression else { return None };
-        if let Some(type_name) = self.case_result_types.get(&(span.start, span.end)) {
+        if let Some(type_name) = self.case_result_types.get(&self.expression_cache_key(*span)) {
             return Some(super::super::analyzer::canonical_type_name(type_name));
         }
         branches.iter().find_map(|branch| match &branch.body {
