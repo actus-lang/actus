@@ -13,6 +13,7 @@ mod scalar;
 
 use super::integer_ops::{
     lower_integer_binary, lower_integer_cast, lower_integer_compare, lower_integer_unary,
+    lower_scalar_select,
 };
 use super::native::BackendEmitError;
 use super::object::create_module;

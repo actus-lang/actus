@@ -233,6 +233,44 @@ fn both_native_backends_share_logical_case_predicates() {
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_share_scalar_if_and_empty_case_continuation() {
+    let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(7); } verb main() -> Int { erg result = produce(); return case dat result { Result.Err(_) => { return 1; }, Result.Ok(_) => {}, }; return if 7 == 7 { 0 } else { 1 }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-scalar-if-case-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create scalar if case directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"scalar-if-case-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write scalar if case manifest");
+        fs::write(&input, source).expect("write scalar if case source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build scalar if case fixture");
+        let status =
+            std::process::Command::new(&output).status().expect("run scalar if case fixture");
+        assert_eq!(status.code(), Some(0), "backend {backend} scalar if case result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn llvm_backend_builds_and_runs_a_shared_fixed_array_element_compound_store() {

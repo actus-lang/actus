@@ -50,6 +50,7 @@ pub(super) fn emit_scalar_instruction(
         BackendInstruction::IntegerCompare { .. } => {
             emit_integer_compare(builder, instruction, values)
         }
+        BackendInstruction::ScalarSelect { .. } => emit_scalar_select(builder, instruction, values),
         BackendInstruction::FloatCompare { .. } => emit_float_compare(builder, instruction, values),
         BackendInstruction::IntegerUnary { .. } => emit_integer_unary(builder, instruction, values),
         BackendInstruction::EnumDiscriminant { .. } => {
@@ -69,6 +70,41 @@ pub(super) fn emit_scalar_instruction(
         _ => return None,
     };
     Some(result)
+}
+
+fn emit_scalar_select(
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::ScalarSelect { result, condition, then_value, else_value, .. } =
+        instruction
+    else {
+        return Err(BackendEmitError("LLVM scalar select expected".to_owned()));
+    };
+    let condition = values.get(condition).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM select condition {} is unavailable", condition.0))
+    })?;
+    let then_value = values.get(then_value).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM select then value {} is unavailable", then_value.0))
+    })?;
+    let else_value = values.get(else_value).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM select else value {} is unavailable", else_value.0))
+    })?;
+    let value = unsafe {
+        llvm_sys::core::LLVMBuildSelect(
+            builder,
+            condition,
+            then_value,
+            else_value,
+            c"actus.select".as_ptr(),
+        )
+    };
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit scalar select".to_owned()));
+    }
+    values.insert(*result, value);
+    Ok(false)
 }
 
 fn emit_guard(
