@@ -89,17 +89,17 @@ fn statement_guarantees_return(statement: &Stmt) -> bool {
 }
 
 fn loop_guarantees_return(block: &Block) -> bool {
-    block_guarantees_return(block) && !contains_loop_exit(block)
+    !contains_loop_break(block)
 }
 
-fn contains_loop_exit(block: &Block) -> bool {
+fn contains_loop_break(block: &Block) -> bool {
     block.statements.iter().any(|statement| match statement {
-        Stmt::Break { .. } | Stmt::Continue { .. } => true,
-        Stmt::Block(nested) => contains_loop_exit(nested),
+        Stmt::Break { .. } => true,
+        Stmt::Block(nested) => contains_loop_break(nested),
         Stmt::If { then_branch, else_branch, .. } => {
-            contains_loop_exit(then_branch)
+            contains_loop_break(then_branch)
                 || else_branch.as_ref().is_some_and(|branch| match branch {
-                    crate::ast::IfBranch::Block(block) => contains_loop_exit(block),
+                    crate::ast::IfBranch::Block(block) => contains_loop_break(block),
                     crate::ast::IfBranch::ElseIf(_) => false,
                 })
         }
