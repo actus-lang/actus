@@ -58,8 +58,8 @@ Use `print` for the language's `String` value and `printb` for raw bytes. A
 | Verb | Contract |
 | --- | --- |
 | `eprint_int(erg value: Int) -> Result[Int, IoError]` | Writes an integer to stderr. |
-| `eprint(abs text: Buffer) -> Result[Int, IoError]` | Compatibility wrapper for borrowed stderr bytes. |
-| `eprintln(abs text: Buffer) -> Result[Int, IoError]` | Writes bytes, newline, and flushes stderr. |
+| `eprint(abs buffer: Buffer) -> Result[Int, IoError]` | Compatibility wrapper for borrowed stderr bytes. |
+| `eprintln(abs buffer: Buffer) -> Result[Int, IoError]` | Writes bytes, newline, and flushes stderr. |
 
 ## Static stream contracts
 

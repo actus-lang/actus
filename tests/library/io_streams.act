@@ -173,8 +173,8 @@ verb emit_standard_output(abs text: Buffer) -> Int {
 verb emit_error_output(abs text: Buffer) -> Int {
     erg value = 0;
     erg integer = eprint_int(value: value);
-    erg printed = eprint(text: abs text);
-    erg line = eprintln(text: abs text);
+    erg printed = eprint(buffer: abs text);
+    erg line = eprintln(buffer: abs text);
     case dat integer {
         Result.Ok(_) => { },
         Result.Err(_) => { return 1; },

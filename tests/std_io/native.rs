@@ -92,7 +92,7 @@ fn std_io_native_bridge_prints_borrowed_buffer_text() {
         "text",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 72); append(text, 105); printb(text: abs text); printlnb(text: abs text); eprint(text: abs text); eprintln(text: abs text); flush(); return 0; }\n",
+        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 72); append(text, 105); printb(text: abs text); printlnb(text: abs text); eprint(buffer: abs text); eprintln(buffer: abs text); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("text fixture should run");
