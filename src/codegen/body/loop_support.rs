@@ -6,6 +6,15 @@ use super::BackendContractError;
 use crate::ast::{Argument, Block, CaseBody, Expr, ForBinding, IfBranch, Place, Role, Stmt};
 use crate::lexer::SourceSpan;
 
+pub(super) fn is_loop_carried_type(ty: BackendValueType) -> bool {
+    matches!(
+        ty,
+        BackendValueType::Bool
+            | BackendValueType::Integer { .. }
+            | BackendValueType::Aggregate { .. }
+    )
+}
+
 pub(super) fn range_binding_type(
     binding: &ForBinding,
     span: SourceSpan,

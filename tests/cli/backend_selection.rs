@@ -202,6 +202,37 @@ fn both_native_backends_share_case_continue_loop_state() {
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_preserve_aggregate_loop_state() {
+    let source = "verb replace() -> Buffer { return Buffer[4]; } verb main() -> Int { erg value: Buffer = Buffer[4]; erg index: u32 = 0u32; loop { if index >= 1u32 { break; } value = replace(); index += 1u32; } return 0; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-aggregate-loop-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write aggregate-loop fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build aggregate-loop fixture");
+        let status =
+            std::process::Command::new(&output).status().expect("run aggregate-loop fixture");
+        assert_eq!(status.code(), Some(0), "backend {backend} aggregate-loop result");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_guarded_case_through_shared_lowering() {
     let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(41); } verb select_true() -> Int { erg result = produce(); return case result { Result.Ok(value) if value == 41 => 42, Result.Ok(_) => 1, Result.Err(_) => 0, }; } verb select_false() -> Int { erg result = produce(); return case result { Result.Ok(value) if value == 40 => 1, Result.Ok(_) => 42, Result.Err(_) => 0, }; } verb main() -> Int { return select_true() + select_false() - 42; }\n";
     for backend in ["cranelift", "llvm"] {

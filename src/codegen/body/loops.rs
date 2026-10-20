@@ -6,14 +6,18 @@ use super::super::{
     BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendValueType,
 };
 use super::loop_support::{
-    collect_assignment_names, collect_ins_argument_names, index_type_signed, range_binding_type,
+    collect_assignment_names, collect_ins_argument_names, index_type_signed, is_loop_carried_type,
+    range_binding_type,
 };
 use super::{BodyLowering, LoopTargets};
 use crate::ast::{Block, Expr, ForBinding, Stmt};
 use crate::lexer::SourceSpan;
 
 mod range_setup;
+mod state;
 use range_setup::{RangeBodyInput, RangeSetup};
+pub(crate) use state::CarriedBinding;
+use state::LoopValues;
 
 pub(super) struct ForArrayInput<'a> {
     id: BackendBlockId,
@@ -154,6 +158,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
         for (binding, value) in carried.iter().zip(&ids.exit_carried) {
             self.provider.set_binding_value(&binding.name, *value);
+            if let Some(type_name) = &binding.nominal_type {
+                self.provider.remember_nominal_type(*value, type_name.clone());
+            }
         }
         let mut continuation_block =
             self.lower_block_in_scope(blocks.continuation, &continuation, fallthrough)?;
@@ -220,10 +227,15 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                 let expression = Expr::Identifier { name: name.clone(), span };
                 let value = self.provider.lower_expression(&expression, &mut Vec::new()).ok()?;
                 let ty = self.provider.value_type(value)?;
-                if !matches!(ty, BackendValueType::Integer { .. } | BackendValueType::Bool) {
+                if !is_loop_carried_type(ty) {
                     return None;
                 }
-                Some(Ok(CarriedBinding { name, value, ty }))
+                Some(Ok(CarriedBinding {
+                    name,
+                    value,
+                    ty,
+                    nominal_type: self.provider.nominal_type(value),
+                }))
             })
             .collect()
     }
@@ -255,6 +267,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         self.provider.enter_loop();
         for (binding, value) in carried.iter().zip(&ids.body_carried) {
             self.provider.set_binding_value(&binding.name, *value);
+            if let Some(type_name) = &binding.nominal_type {
+                self.provider.remember_nominal_type(*value, type_name.clone());
+            }
         }
         self.provider.enter_scope(body.span);
         let mut prefix = Vec::new();
@@ -318,26 +333,6 @@ pub(super) struct LoopBlocks {
     body: BackendBlockId,
     increment: BackendBlockId,
     continuation: BackendBlockId,
-}
-
-#[derive(Clone)]
-pub(super) struct LoopValues {
-    header: super::super::BackendValueId,
-    body: super::super::BackendValueId,
-    increment: super::super::BackendValueId,
-    one: super::super::BackendValueId,
-    next: super::super::BackendValueId,
-    condition: super::super::BackendValueId,
-    header_carried: Vec<super::super::BackendValueId>,
-    body_carried: Vec<super::super::BackendValueId>,
-    increment_carried: Vec<super::super::BackendValueId>,
-    exit_carried: Vec<super::super::BackendValueId>,
-}
-
-pub(crate) struct CarriedBinding {
-    pub(super) name: String,
-    pub(super) value: super::super::BackendValueId,
-    pub(super) ty: BackendValueType,
 }
 
 pub(super) fn initial_loop_arguments(
