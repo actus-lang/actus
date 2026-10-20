@@ -56,7 +56,7 @@ impl Analyzer {
         if self.visit_scalar_copy_call(callee, arguments, span)? {
             return Ok(());
         }
-        if callee == "print" && print_uses_label(arguments) {
+        if matches!(callee, "print" | "eprint") && print_uses_label(arguments) {
             return self.visit_intrinsic_call(callee, arguments, span).map(|_| ());
         }
         if let Some(result) = self.visit_special_call(callee, arguments, span)? {
@@ -445,7 +445,13 @@ fn print_uses_label(arguments: &[Argument]) -> bool {
     arguments.iter().any(|argument| {
         matches!(
             argument.name.as_deref(),
-            Some("string") | Some("int") | Some("byte") | Some("bool") | Some("buffer")
+            Some("value")
+                | Some("format")
+                | Some("string")
+                | Some("int")
+                | Some("byte")
+                | Some("bool")
+                | Some("buffer")
         )
     })
 }

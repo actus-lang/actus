@@ -9,7 +9,10 @@ use crate::runtime::{
     AGGREGATE_ALLOCATE_SYMBOL, AGGREGATE_DROP_SYMBOL, BUFFER_ALLOCATE_SYMBOL, BUFFER_APPEND_SYMBOL,
     BUFFER_CRC32_MATCHES_SYMBOL, BUFFER_CRC32_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_LENGTH_SYMBOL,
     BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, ENUM_ALLOCATE_SYMBOL, ENUM_DROP_SYMBOL,
-    PRINT_BUFFER_STDOUT_SYMBOL, PRINT_INT_SYMBOL, PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL,
+    PRINT_BOOL_STDERR_SYMBOL, PRINT_BOOL_SYMBOL, PRINT_BUFFER_STDERR_SYMBOL,
+    PRINT_BUFFER_STDOUT_SYMBOL, PRINT_FORMAT_BOOL_STDERR_SYMBOL, PRINT_FORMAT_BOOL_SYMBOL,
+    PRINT_FORMAT_INT_STDERR_SYMBOL, PRINT_FORMAT_INT_SYMBOL, PRINT_INT_STDERR_SYMBOL,
+    PRINT_INT_SYMBOL, PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL, REGION_DROP_SYMBOL,
     WRITE_STRING_STDOUT_SYMBOL,
 };
 
@@ -43,18 +46,44 @@ pub(crate) fn declare_runtime_functions(
         crc32: declare_crc32(module, pointer_type)?,
         crc32_matches: declare_crc32_matches(module, pointer_type)?,
         validate_fixed_frame: declare_validate_fixed_frame(module, pointer_type)?,
-        print_int: declare_print_int(module)?,
-        print_string: declare_print_string(module, pointer_type)?,
+        print_int: declare_print_scalar(module, PRINT_INT_SYMBOL)?,
+        print_bool: declare_print_scalar(module, PRINT_BOOL_SYMBOL)?,
+        print_int_stderr: declare_print_scalar(module, PRINT_INT_STDERR_SYMBOL)?,
+        print_bool_stderr: declare_print_scalar(module, PRINT_BOOL_STDERR_SYMBOL)?,
+        print_string: declare_print_pointer(module, pointer_type, PRINT_STRING_SYMBOL)?,
+        print_string_stderr: declare_print_pointer(
+            module,
+            pointer_type,
+            PRINT_STRING_STDERR_SYMBOL,
+        )?,
+        print_buffer_stderr: declare_print_pointer(
+            module,
+            pointer_type,
+            PRINT_BUFFER_STDERR_SYMBOL,
+        )?,
+        print_format_int: declare_print_format(module, pointer_type, PRINT_FORMAT_INT_SYMBOL)?,
+        print_format_bool: declare_print_format(module, pointer_type, PRINT_FORMAT_BOOL_SYMBOL)?,
+        print_format_int_stderr: declare_print_format(
+            module,
+            pointer_type,
+            PRINT_FORMAT_INT_STDERR_SYMBOL,
+        )?,
+        print_format_bool_stderr: declare_print_format(
+            module,
+            pointer_type,
+            PRINT_FORMAT_BOOL_STDERR_SYMBOL,
+        )?,
         write_string: declare_write_string(module, pointer_type)?,
         enum_allocate: declare_enum_allocate(module, pointer_type)?,
         enum_drop: declare_enum_drop(module, pointer_type)?,
         aggregate_allocate: declare_aggregate_allocate(module, pointer_type)?,
         aggregate_drop: declare_aggregate_drop(module, pointer_type)?,
     };
-    declare_print_buffer(module, pointer_type)?;
+    declare_print_pointer(module, pointer_type, PRINT_BUFFER_STDOUT_SYMBOL)?;
     let append_spec = IntrinsicKind::Append.spec();
     let print_spec = IntrinsicKind::Print.spec();
-    let mut functions = runtime_metadata(&ids, &append_spec, &print_spec);
+    let eprint_spec = IntrinsicKind::Eprint.spec();
+    let mut functions = runtime_metadata(&ids, &append_spec, &print_spec, &eprint_spec);
     if has_print_definition {
         functions.remove(print_spec.name);
     }
@@ -101,7 +130,16 @@ struct RuntimeFunctionIds {
     crc32_matches: cranelift_module::FuncId,
     validate_fixed_frame: cranelift_module::FuncId,
     print_int: cranelift_module::FuncId,
+    print_bool: cranelift_module::FuncId,
+    print_int_stderr: cranelift_module::FuncId,
+    print_bool_stderr: cranelift_module::FuncId,
     print_string: cranelift_module::FuncId,
+    print_string_stderr: cranelift_module::FuncId,
+    print_buffer_stderr: cranelift_module::FuncId,
+    print_format_int: cranelift_module::FuncId,
+    print_format_bool: cranelift_module::FuncId,
+    print_format_int_stderr: cranelift_module::FuncId,
+    print_format_bool_stderr: cranelift_module::FuncId,
     write_string: cranelift_module::FuncId,
     enum_allocate: cranelift_module::FuncId,
     enum_drop: cranelift_module::FuncId,
@@ -113,10 +151,11 @@ fn runtime_metadata(
     ids: &RuntimeFunctionIds,
     append_spec: &crate::ast::IntrinsicSpec,
     print_spec: &crate::ast::IntrinsicSpec,
+    eprint_spec: &crate::ast::IntrinsicSpec,
 ) -> HashMap<String, FunctionMeta> {
     let mut functions = runtime_memory_metadata(ids);
     functions.extend(runtime_serialization_metadata(ids));
-    functions.extend(runtime_intrinsic_metadata(ids, append_spec, print_spec));
+    functions.extend(runtime_intrinsic_metadata(ids, append_spec, print_spec, eprint_spec));
     functions
 }
 
@@ -173,6 +212,7 @@ fn runtime_intrinsic_metadata(
     ids: &RuntimeFunctionIds,
     append_spec: &crate::ast::IntrinsicSpec,
     print_spec: &crate::ast::IntrinsicSpec,
+    eprint_spec: &crate::ast::IntrinsicSpec,
 ) -> HashMap<String, FunctionMeta> {
     HashMap::from([
         (
@@ -183,7 +223,44 @@ fn runtime_intrinsic_metadata(
             print_spec.name.to_owned(),
             intrinsic_meta(ids.print_int, print_spec.parameters, NativeType::Int),
         ),
+        (
+            eprint_spec.name.to_owned(),
+            intrinsic_meta(ids.print_int_stderr, eprint_spec.parameters, NativeType::Int),
+        ),
+        (PRINT_BOOL_SYMBOL.to_owned(), named_meta(ids.print_bool, &["value"], NativeType::Int)),
+        (
+            PRINT_INT_STDERR_SYMBOL.to_owned(),
+            named_meta(ids.print_int_stderr, &["value"], NativeType::Int),
+        ),
+        (
+            PRINT_BOOL_STDERR_SYMBOL.to_owned(),
+            named_meta(ids.print_bool_stderr, &["value"], NativeType::Int),
+        ),
         (PRINT_STRING_SYMBOL.to_owned(), named_meta(ids.print_string, &["text"], NativeType::Int)),
+        (
+            PRINT_STRING_STDERR_SYMBOL.to_owned(),
+            named_meta(ids.print_string_stderr, &["text"], NativeType::Int),
+        ),
+        (
+            PRINT_BUFFER_STDERR_SYMBOL.to_owned(),
+            named_meta(ids.print_buffer_stderr, &["text"], NativeType::Int),
+        ),
+        (
+            PRINT_FORMAT_INT_SYMBOL.to_owned(),
+            named_meta(ids.print_format_int, &["format", "value"], NativeType::Int),
+        ),
+        (
+            PRINT_FORMAT_BOOL_SYMBOL.to_owned(),
+            named_meta(ids.print_format_bool, &["format", "value"], NativeType::Int),
+        ),
+        (
+            PRINT_FORMAT_INT_STDERR_SYMBOL.to_owned(),
+            named_meta(ids.print_format_int_stderr, &["format", "value"], NativeType::Int),
+        ),
+        (
+            PRINT_FORMAT_BOOL_STDERR_SYMBOL.to_owned(),
+            named_meta(ids.print_format_bool_stderr, &["format", "value"], NativeType::Int),
+        ),
         (
             WRITE_STRING_STDOUT_SYMBOL.to_owned(),
             named_meta(ids.write_string, &["text"], NativeType::Int),
@@ -369,38 +446,28 @@ fn declare_validate_fixed_frame(
         .map_err(|error| BackendEmitError(error.to_string()))
 }
 
-fn declare_print_int(
+fn declare_print_scalar(
     module: &mut ObjectModule,
+    symbol: &str,
 ) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(types::I32));
     signature.returns.push(AbiParam::new(types::I32));
     module
-        .declare_function(PRINT_INT_SYMBOL, Linkage::Import, &signature)
+        .declare_function(symbol, Linkage::Import, &signature)
         .map_err(|error| BackendEmitError(error.to_string()))
 }
 
-fn declare_print_string(
+fn declare_print_pointer(
     module: &mut ObjectModule,
     pointer_type: cranelift_codegen::ir::Type,
+    symbol: &str,
 ) -> Result<cranelift_module::FuncId, BackendEmitError> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(pointer_type));
     signature.returns.push(AbiParam::new(types::I32));
     module
-        .declare_function(PRINT_STRING_SYMBOL, Linkage::Import, &signature)
-        .map_err(|error| BackendEmitError(error.to_string()))
-}
-
-fn declare_print_buffer(
-    module: &mut ObjectModule,
-    pointer_type: cranelift_codegen::ir::Type,
-) -> Result<cranelift_module::FuncId, BackendEmitError> {
-    let mut signature = module.make_signature();
-    signature.params.push(AbiParam::new(pointer_type));
-    signature.returns.push(AbiParam::new(types::I32));
-    module
-        .declare_function(PRINT_BUFFER_STDOUT_SYMBOL, Linkage::Import, &signature)
+        .declare_function(symbol, Linkage::Import, &signature)
         .map_err(|error| BackendEmitError(error.to_string()))
 }
 
@@ -413,5 +480,19 @@ fn declare_write_string(
     signature.returns.push(AbiParam::new(types::I32));
     module
         .declare_function(WRITE_STRING_STDOUT_SYMBOL, Linkage::Import, &signature)
+        .map_err(|error| BackendEmitError(error.to_string()))
+}
+
+fn declare_print_format(
+    module: &mut ObjectModule,
+    pointer_type: cranelift_codegen::ir::Type,
+    symbol: &str,
+) -> Result<cranelift_module::FuncId, BackendEmitError> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(pointer_type));
+    signature.params.push(AbiParam::new(types::I32));
+    signature.returns.push(AbiParam::new(types::I32));
+    module
+        .declare_function(symbol, Linkage::Import, &signature)
         .map_err(|error| BackendEmitError(error.to_string()))
 }

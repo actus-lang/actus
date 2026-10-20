@@ -11,6 +11,9 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<bool, SemanticError> {
+        if arguments.len() == 2 {
+            return self.validate_print_format(callee, arguments, span);
+        }
         if arguments.len() != 1 {
             return Err(SemanticError {
                 kind: SemanticErrorKind::WrongArgumentCount { callee: callee.to_owned() },
@@ -35,6 +38,40 @@ impl Analyzer {
             invalid_print_argument(callee, label.unwrap_or("value"), &argument.expression)
         })?;
         validate_print_type(callee, label, value_type, &argument.expression)
+    }
+
+    fn validate_print_format(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        let format = &arguments[0];
+        let value = &arguments[1];
+        if format.name.as_deref() != Some("format")
+            || value.name.as_deref() != Some("int") && value.name.as_deref() != Some("bool")
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: "format".to_owned(),
+                },
+                span,
+            });
+        }
+        self.visit_expression(&format.expression)?;
+        self.visit_expression(&value.expression)?;
+        if self.expression_type(&format.expression) != Some(BuiltinType::String) {
+            return Err(invalid_print_argument(callee, "format", &format.expression));
+        }
+        let value_type = self.expression_type(&value.expression).ok_or_else(|| {
+            invalid_print_argument(
+                callee,
+                value.name.as_deref().unwrap_or("value"),
+                &value.expression,
+            )
+        })?;
+        validate_print_type(callee, value.name.as_deref(), value_type, &value.expression)
     }
 }
 

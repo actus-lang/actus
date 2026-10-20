@@ -57,9 +57,27 @@ pub(super) fn lower_call(
             instructions,
         );
     }
-    if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print) {
-        return print::lower_print_call(provider, arguments, *span, instructions);
+    if matches!(lookup_call_intrinsic(callee), Some(IntrinsicKind::Print | IntrinsicKind::Eprint)) {
+        return print::lower_print_call(
+            provider,
+            callee,
+            expression_arguments(expression),
+            arguments,
+            *span,
+            instructions,
+        );
     }
+    lower_user_call(provider, callee, arguments, lowered.writebacks, *span, instructions)
+}
+
+fn lower_user_call(
+    provider: &mut SharedExpressionProvider<'_>,
+    callee: &str,
+    arguments: Vec<BackendValueId>,
+    writebacks: Vec<loan::ScalarLoanWriteback>,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
     let result_type = provider.return_types.get(callee).copied().flatten();
     let result = result_type.map(|_| provider.allocate());
     if let (Some(result), Some(result_type)) = (result, result_type) {
@@ -67,15 +85,21 @@ pub(super) fn lower_call(
         remember_return_metadata(provider, result, callee);
     }
     instructions.push(BackendInstruction::Call {
-        callee: provider.callee_for(callee, *span)?,
+        callee: provider.callee_for(callee, span)?,
         arguments,
         result,
-        span: *span,
+        span,
     });
-    loan::append_scalar_loan_writebacks(provider, lowered.writebacks, *span, instructions);
-    result.ok_or_else(|| {
-        super::super::support::unsupported(*span, "unit call cannot produce a value")
-    })
+    loan::append_scalar_loan_writebacks(provider, writebacks, span, instructions);
+    result
+        .ok_or_else(|| super::super::support::unsupported(span, "unit call cannot produce a value"))
+}
+
+fn expression_arguments(expression: &Expr) -> &[crate::ast::Argument] {
+    match expression {
+        Expr::Call { arguments, .. } => arguments,
+        _ => &[],
+    }
 }
 
 fn is_scalar_copy_intrinsic(provider: &SharedExpressionProvider<'_>, callee: &str) -> bool {

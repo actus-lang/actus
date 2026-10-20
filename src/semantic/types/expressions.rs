@@ -76,7 +76,8 @@ impl Analyzer {
                 | IntrinsicKind::Crc32
                 | IntrinsicKind::Crc32Matches
                 | IntrinsicKind::ValidateFixedFrame
-                | IntrinsicKind::Print,
+                | IntrinsicKind::Print
+                | IntrinsicKind::Eprint,
             ) => Some(BuiltinType::Int),
             Some(IntrinsicKind::SizeOf | IntrinsicKind::AlignOf) => Some(BuiltinType::Int),
             Some(IntrinsicKind::Copy) => self

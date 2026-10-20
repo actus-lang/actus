@@ -36,6 +36,13 @@ storage with sufficient capacity and retain ownership after the call.
 | `print(byte: erg value)` | Writes one `u8` value. |
 | `print(bool: erg value)` | Writes one `Bool` value. |
 | `print(buffer: abs bytes)` | Writes borrowed bytes through the unified console intrinsic. |
+| `eprint(string: abs value)` | Writes a borrowed `String` to stderr. |
+| `eprint(int: erg value)` | Writes one integer to stderr. |
+| `eprint(byte: erg value)` | Writes one byte to stderr. |
+| `eprint(bool: erg value)` | Writes `true` or `false` to stderr. |
+| `eprint(buffer: abs bytes)` | Writes borrowed bytes to stderr. |
+| `print(format: abs template, int: erg value)` | Replaces `{}` with one integer and writes the result. |
+| `print(format: abs template, bool: erg value)` | Replaces `{}` with `true` or `false` and writes the result. |
 | `println(abs text: String) -> Result[Int, IoError]` | Writes a borrowed `String` and a newline. |
 | `print_int(erg value: Int) -> Result[Int, IoError]` | Compatibility alias for integer output. |
 | `printb(abs text: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes without a newline. |
@@ -51,7 +58,7 @@ Use `print` for the language's `String` value and `printb` for raw bytes. A
 | Verb | Contract |
 | --- | --- |
 | `eprint_int(erg value: Int) -> Result[Int, IoError]` | Writes an integer to stderr. |
-| `eprint(abs text: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes to stderr. |
+| `eprint(abs text: Buffer) -> Result[Int, IoError]` | Compatibility wrapper for borrowed stderr bytes. |
 | `eprintln(abs text: Buffer) -> Result[Int, IoError]` | Writes bytes, newline, and flushes stderr. |
 
 ## Static stream contracts

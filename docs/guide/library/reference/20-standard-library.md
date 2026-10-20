@@ -48,7 +48,9 @@ The public I/O facade includes:
 - `print_int(erg value: Int)` as a compatibility alias;
 - `printb(abs text: Buffer) -> Result[Int, IoError]`;
 - `printlnb(abs text: Buffer) -> Result[Int, IoError]`;
-- `eprint_int`, `eprint`, and `eprintln` for stderr;
+- labelled `eprint(string: ...)`, `eprint(int: ...)`, `eprint(byte: ...)`,
+  `eprint(bool: ...)`, and `eprint(buffer: ...)` for stderr;
+- `eprint_int`, `eprint`, and `eprintln` remain compatibility wrappers;
 - `flush()` for stdout;
 - `Cursor` and cursor read/write/seek/flush operations;
 - buffered reader and writer types and operations;

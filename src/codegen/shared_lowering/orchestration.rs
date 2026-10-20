@@ -6,8 +6,8 @@ use super::declarations::{SharedDeclarations, build_backend_externals, scalar_ex
 use super::layout::ProgramLayouts;
 use super::performance::lower_shared_functions;
 use super::runtime::{
-    append_buffer_allocate_external, append_buffer_drop_external, append_performance_externals,
-    append_print_externals, referenced_runtime_symbols,
+    append_buffer_allocate_external, append_buffer_drop_external, append_format_externals,
+    append_performance_externals, append_print_externals, referenced_runtime_symbols,
 };
 use super::runtime_externals;
 use super::support::unsupported;
@@ -301,6 +301,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
     append_buffer_allocate_external(&mut module.externals, &runtime_symbols)?;
     runtime_externals::append_buffer_runtime_externals(&mut module.externals, &runtime_symbols)?;
     append_print_externals(&mut module.externals, &runtime_symbols)?;
+    append_format_externals(&mut module.externals, &runtime_symbols)?;
     module.validate()?;
     Ok(module)
 }

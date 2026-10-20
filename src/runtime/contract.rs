@@ -70,6 +70,7 @@ pub const BUFFER_CRC32_SYMBOL: &str = "actus_buffer_crc32";
 pub const BUFFER_CRC32_MATCHES_SYMBOL: &str = "actus_buffer_crc32_matches";
 pub const BUFFER_VALIDATE_FIXED_FRAME_SYMBOL: &str = "actus_buffer_validate_fixed_frame";
 pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
+pub const PRINT_BOOL_SYMBOL: &str = "actus_print_bool";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
 pub const WRITE_STRING_STDOUT_SYMBOL: &str = "actus_write_string_stdout";
 /// Stable runtime symbol for checked UTF-8 byte-length inspection.
@@ -87,6 +88,12 @@ pub const STRING_COPY_STATUS_CAPACITY: i32 = -2;
 /// Source string bytes were not valid UTF-8.
 pub const STRING_COPY_STATUS_INVALID_UTF8: i32 = -3;
 pub const PRINT_INT_STDERR_SYMBOL: &str = "actus_print_int_stderr";
+pub const PRINT_BOOL_STDERR_SYMBOL: &str = "actus_print_bool_stderr";
+pub const PRINT_FORMAT_INT_SYMBOL: &str = "actus_print_format_int";
+pub const PRINT_FORMAT_BOOL_SYMBOL: &str = "actus_print_format_bool";
+pub const PRINT_FORMAT_INT_STDERR_SYMBOL: &str = "actus_print_format_int_stderr";
+pub const PRINT_FORMAT_BOOL_STDERR_SYMBOL: &str = "actus_print_format_bool_stderr";
+pub const PRINT_FORMAT_MAX_BYTES: usize = 4096;
 pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
 pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";
 pub const PRINT_BUFFER_STDERR_SYMBOL: &str = "actus_print_buffer_stderr";
