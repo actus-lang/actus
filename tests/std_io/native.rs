@@ -264,6 +264,11 @@ fn std_io_native_bridge_carries_mutated_ins_scalar_through_loop() {
     run_loop_mutating_ins_scalar_fixture("cranelift");
 }
 
+#[test]
+fn std_io_native_bridge_reads_multiple_bytes_in_loop() {
+    run_loop_read_byte_fixture("cranelift");
+}
+
 #[cfg(feature = "llvm")]
 #[test]
 fn std_io_llvm_bridge_mutates_ins_scalar_after_read_byte() {
@@ -274,6 +279,12 @@ fn std_io_llvm_bridge_mutates_ins_scalar_after_read_byte() {
 #[test]
 fn std_io_llvm_bridge_carries_mutated_ins_scalar_through_loop() {
     run_loop_mutating_ins_scalar_fixture("llvm");
+}
+
+#[cfg(feature = "llvm")]
+#[test]
+fn std_io_llvm_bridge_reads_multiple_bytes_in_loop() {
+    run_loop_read_byte_fixture("llvm");
 }
 
 fn run_mutating_ins_scalar_fixture(backend: &str) {
@@ -302,6 +313,24 @@ fn run_loop_mutating_ins_scalar_fixture(backend: &str) {
     build_with_backend(&input, &output, backend);
     let execution = Command::new(&output).output().expect("loop byte-ins fixture should run");
     assert_eq!(execution.status.code(), Some(1));
+    let _ = fs::remove_dir_all(root);
+}
+
+fn run_loop_read_byte_fixture(backend: &str) {
+    let (root, input, output) = project(
+        &format!("loop-read-byte-{backend}"),
+        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
+        &["stdout.act", "stderr.act", "stdin.act", "error.act"],
+        "import io; verb main() -> Int { erg count: u32 = 0u32; for erg index: u16 in 0u16 .. 3u16 { erg next = read_byte(); case dat next { Result.Err(_) => { return count as Int; }, Result.Ok(_) => { count += 1u32; }, }; } return count as Int; }\n",
+    );
+    build_with_backend(&input, &output, backend);
+    let mut child = Command::new(&output)
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("loop read-byte fixture should run");
+    child.stdin.take().expect("stdin pipe should exist").write_all(b"ABC").unwrap();
+    let execution = child.wait_with_output().expect("wait for loop read-byte fixture");
+    assert_eq!(execution.status.code(), Some(3));
     let _ = fs::remove_dir_all(root);
 }
 

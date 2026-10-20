@@ -3,10 +3,8 @@ use super::super::{
     BackendExpressionProvider, BackendInstruction, BackendValueId, BodyLowering,
 };
 use super::context::CaseBranchInput;
-use crate::ast::{CaseBody, Expr};
+use crate::ast::Expr;
 use crate::lexer::SourceSpan;
-
-use super::super::loop_support::{collect_assignment_names, collect_expression_assignment_names};
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(crate) fn lower_case_statement_with_carried(
@@ -205,6 +203,7 @@ fn lower_carried_case_branch<P: BackendExpressionProvider>(
             mode: input.mode,
             span: input.span,
             fallthrough: Some(input.continuation_id),
+            preserve_loop_bindings: true,
         },
         instructions,
     )?;
@@ -229,20 +228,8 @@ fn lower_carried_case_branch<P: BackendExpressionProvider>(
 
 fn carried_branch_value<P: BackendExpressionProvider>(
     lowering: &BodyLowering<'_, P>,
-    branch: &crate::ast::CaseBranch,
+    _branch: &crate::ast::CaseBranch,
     binding: &super::super::loops::CarriedBinding,
 ) -> BackendValueId {
-    let mut assigned = Vec::new();
-    match &branch.body {
-        CaseBody::Block(block) => collect_assignment_names(block, &mut assigned),
-        CaseBody::Expression(expression) => {
-            collect_expression_assignment_names(expression, &mut assigned)
-        }
-    }
-    assigned
-        .iter()
-        .any(|name| name == &binding.name)
-        .then(|| lowering.provider.binding_value(&binding.name))
-        .flatten()
-        .unwrap_or(binding.value)
+    lowering.provider.binding_value(&binding.name).unwrap_or(binding.value)
 }

@@ -83,6 +83,7 @@ fn lower_case_branches<P: BackendExpressionProvider>(
                 mode,
                 span,
                 fallthrough,
+                preserve_loop_bindings: false,
             },
             &mut instructions,
         )?;
@@ -126,6 +127,7 @@ fn lower_case_branch<P: BackendExpressionProvider>(
         mode,
         span,
         fallthrough,
+        preserve_loop_bindings,
     } = input;
     let (subject_value, matched) =
         lower_case_condition(lowering, subject, branch, is_last, instructions)?;
@@ -147,7 +149,9 @@ fn lower_case_branch<P: BackendExpressionProvider>(
         fallthrough,
         guard_failure: following_id.unwrap_or(else_block),
     })?;
-    lowering.restore_loop_bindings(loop_bindings);
+    if !preserve_loop_bindings {
+        lowering.restore_loop_bindings(loop_bindings);
+    }
     Ok((following_id, else_block))
 }
 

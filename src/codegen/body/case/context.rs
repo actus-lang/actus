@@ -21,6 +21,7 @@ pub(super) struct CaseBranchInput<'a> {
     pub(super) mode: CaseMode,
     pub(super) span: SourceSpan,
     pub(super) fallthrough: Option<BackendBlockId>,
+    pub(super) preserve_loop_bindings: bool,
 }
 
 pub(super) struct CaseBodyInput<'a> {
