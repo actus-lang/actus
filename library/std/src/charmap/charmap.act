@@ -1,0 +1,12 @@
+"""
+The public `std::charmap` facade for bounded byte codecs.
+
+Charmap bytes are explicit internal representations, not ASCII and not a
+replacement for UTF-8. Callers own input and output buffers; codecs validate
+their complete input and output capacity before publishing any bytes.
+"""
+"""Re-export typed failures for bounded character-map operations."""
+open error;
+
+"""Re-export the bounded ISO `ka` Georgian UTF-8 codec."""
+open ka;

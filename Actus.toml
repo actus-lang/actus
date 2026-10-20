@@ -8,6 +8,7 @@ entry = "main"
 fs = { path = "library/std" }
 io = { path = "library/std" }
 path = { path = "library/std" }
+charmap = { path = "library/std" }
 
 [build]
 target = "host"
