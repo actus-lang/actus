@@ -5,7 +5,9 @@ use super::super::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendContractError, BackendEdgeArgument,
     BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendValueType,
 };
-use super::loop_support::{collect_assignment_names, index_type_signed, range_binding_type};
+use super::loop_support::{
+    collect_assignment_names, collect_ins_argument_names, index_type_signed, range_binding_type,
+};
 use super::{BodyLowering, LoopTargets};
 use crate::ast::{Block, Expr, ForBinding, Stmt};
 use crate::lexer::SourceSpan;
@@ -209,8 +211,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<Vec<CarriedBinding>, BackendContractError> {
         let mut names = Vec::new();
         collect_assignment_names(body, &mut names);
-        names.extend(self.provider.scalar_loan_binding_names());
-        names.extend(self.provider.scalar_binding_names());
+        collect_ins_argument_names(body, &mut names);
         names.sort();
         names.dedup();
         names
@@ -219,6 +220,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                 let expression = Expr::Identifier { name: name.clone(), span };
                 let value = self.provider.lower_expression(&expression, &mut Vec::new()).ok()?;
                 let ty = self.provider.value_type(value)?;
+                if !matches!(ty, BackendValueType::Integer { .. } | BackendValueType::Bool) {
+                    return None;
+                }
                 Some(Ok(CarriedBinding { name, value, ty }))
             })
             .collect()

@@ -77,10 +77,6 @@ pub trait BackendExpressionProvider {
         Vec::new()
     }
 
-    fn scalar_binding_names(&self) -> Vec<String> {
-        Vec::new()
-    }
-
     fn lower_array_element(
         &mut self,
         _collection: &Expr,
