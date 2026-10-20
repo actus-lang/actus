@@ -76,7 +76,7 @@ fn std_io_native_bridge_separates_stdout_and_stderr() {
         "streams",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg value = 42; print_int(value: value); eprint_int(value: value); return 0; }\n",
+        "import io; verb main() -> Int { erg value = 42; print(int: value); eprint_int(value: value); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("std io fixture should run");
@@ -115,6 +115,32 @@ fn std_io_native_bridge_prints_string_text() {
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"HelloHello\n");
     let _ = fs::remove_dir_all(root);
+}
+
+fn assert_labelled_print_output(backend: &str) {
+    let (root, input, output) = project(
+        &format!("labelled-{backend}"),
+        "open stdout;\nopen error;\n",
+        &["stdout.act", "error.act"],
+        "import io; verb main() -> Int { erg text = \"Hi\"; erg value = 42; print(string: abs text); print(int: value); return 0; }\n",
+    );
+    build_with_backend(&input, &output, backend);
+    let execution = Command::new(&output).output().expect("labelled print fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"Hi42\n");
+    assert_eq!(execution.stderr, b"");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_labelled_print_works_on_cranelift() {
+    assert_labelled_print_output("cranelift");
+}
+
+#[test]
+#[cfg(feature = "llvm")]
+fn std_io_native_labelled_print_works_on_llvm() {
+    assert_labelled_print_output("llvm");
 }
 
 #[test]

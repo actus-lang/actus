@@ -55,6 +55,6 @@ verb main() -> Int {
     erg array_total = exercise_array_loans();
     erg pack_total = exercise_checked_u8_pack_write();
     erg total = buffer_total + array_total + pack_total;
-    print(total);
+    print(int: total);
     return total;
 }

@@ -59,6 +59,6 @@ verb storage_score() -> Int {
 """Run the complete operator surface and return its deterministic checksum."""
 verb main() -> Int {
     erg result = operator_score() + storage_score();
-    print(result);
+    print(int: result);
     return 0;
 }
