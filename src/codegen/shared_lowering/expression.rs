@@ -233,7 +233,11 @@ impl SharedExpressionProvider<'_> {
         if !receiver_is_binding {
             return super::constructors::lower_method_call(self, expression, instructions);
         }
-        let receiver_value = dispatch::lower_expression(self, receiver, instructions)?;
+        let receiver_value = if let Some(address) = self.scalar_loan_parameter_address(receiver) {
+            address
+        } else {
+            dispatch::lower_expression(self, receiver, instructions)?
+        };
         let receiver_type = self
             .nominal_type(receiver_value)
             .ok_or_else(|| unsupported(*span, "performance receiver has no nominal type"))?;
@@ -298,6 +302,14 @@ impl SharedExpressionProvider<'_> {
             }
             _ => false,
         }
+    }
+
+    fn scalar_loan_parameter_address(&self, expression: &Expr) -> Option<BackendValueId> {
+        let Expr::Identifier { name, .. } = expression else { return None };
+        self.scalar_loan_parameters
+            .iter()
+            .find(|(parameter, _, _, _)| parameter == name)
+            .map(|(_, address, _, _)| *address)
     }
 
     fn method_result_type(&self, key: &(String, String), method: &str) -> Option<BackendValueType> {
