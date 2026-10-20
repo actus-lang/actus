@@ -39,6 +39,17 @@ struct TryExpressionContext<'a> {
     instructions: Vec<BackendInstruction>,
 }
 
+fn parameter_writeback_return<P: BackendExpressionProvider>(
+    provider: &P,
+    value: super::BackendValueId,
+    span: crate::lexer::SourceSpan,
+) -> Vec<BackendInstruction> {
+    let mut instructions = Vec::new();
+    provider.append_parameter_writebacks(&mut instructions);
+    instructions.push(BackendInstruction::Return { value: Some(value), span });
+    instructions
+}
+
 struct TryTargetContext<'a> {
     id: BackendBlockId,
     block: &'a Block,
@@ -171,7 +182,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: error_block,
-            instructions: vec![BackendInstruction::Return { value: Some(source), span }],
+            instructions: parameter_writeback_return(self.provider, source, span),
         });
         let continuation_block =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
@@ -226,7 +237,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             payload_type: Some(payload_type),
             span,
         });
-        ok_instructions.push(BackendInstruction::Return { value: Some(result), span });
+        ok_instructions.extend(parameter_writeback_return(self.provider, result, span));
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: ok_block,
@@ -235,7 +246,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: error_block,
-            instructions: vec![BackendInstruction::Return { value: Some(source), span }],
+            instructions: parameter_writeback_return(self.provider, source, span),
         });
         let cleanup_start = self.blocks.len().saturating_sub(2);
         self.provider.distribute_scope_cleanup(block_span, &mut self.blocks, cleanup_start)?;
@@ -409,7 +420,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: error_block,
-            instructions: vec![BackendInstruction::Return { value: Some(source), span }],
+            instructions: parameter_writeback_return(self.provider, source, span),
         });
     }
 

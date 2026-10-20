@@ -68,6 +68,7 @@ fn lower_case_branches<P: BackendExpressionProvider>(
     input: CaseBranchesInput<'_>,
 ) -> Result<BackendBlock, BackendContractError> {
     let CaseBranchesInput { subject, branches, mode, span, fallthrough, mut instructions } = input;
+    let scalar_loan_bindings = lowering.provider.snapshot_scalar_loan_bindings();
     let mut current_id = id;
     let mut entry_instructions = None;
     for (index, branch) in branches.iter().enumerate() {
@@ -82,9 +83,11 @@ fn lower_case_branches<P: BackendExpressionProvider>(
                 mode,
                 span,
                 fallthrough,
+                preserve_loop_bindings: false,
             },
             &mut instructions,
         )?;
+        lowering.provider.restore_scalar_loan_bindings(&scalar_loan_bindings);
         if let Some(following_id) = following_id {
             if entry_instructions.is_none() {
                 entry_instructions = Some(std::mem::take(&mut instructions));
@@ -124,6 +127,7 @@ fn lower_case_branch<P: BackendExpressionProvider>(
         mode,
         span,
         fallthrough,
+        preserve_loop_bindings,
     } = input;
     let (subject_value, matched) =
         lower_case_condition(lowering, subject, branch, is_last, instructions)?;
@@ -145,7 +149,9 @@ fn lower_case_branch<P: BackendExpressionProvider>(
         fallthrough,
         guard_failure: following_id.unwrap_or(else_block),
     })?;
-    lowering.restore_loop_bindings(loop_bindings);
+    if !preserve_loop_bindings {
+        lowering.restore_loop_bindings(loop_bindings);
+    }
     Ok((following_id, else_block))
 }
 

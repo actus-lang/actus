@@ -583,6 +583,14 @@ fn rejects_return_paths_broken_by_loop_exit() {
 }
 
 #[test]
+fn accepts_non_terminating_loop_with_case_iteration() {
+    analyze_source(
+        "verb main() -> Int { loop { case true { true => { continue; }, _ => { continue; }, }; } }",
+    )
+    .expect("a loop without break cannot fall through to a missing return");
+}
+
+#[test]
 fn keeps_type_and_function_namespaces_separate() {
     analyze_source(
         "verb Buffer() -> Buffer { return Buffer[1]; } verb main() -> Buffer { return Buffer(); }",

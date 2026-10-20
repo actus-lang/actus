@@ -31,6 +31,10 @@ fn project(name: &str, facade: &str, files: &[&str], source: &str) -> (PathBuf, 
 }
 
 fn build(input: &Path, output: &Path) {
+    build_with_backend(input, output, "cranelift");
+}
+
+fn build_with_backend(input: &Path, output: &Path, backend: &str) {
     assert_eq!(
         run_with_args(
             vec![
@@ -38,6 +42,8 @@ fn build(input: &Path, output: &Path) {
                 input.display().to_string(),
                 "--emit".to_owned(),
                 "exe".to_owned(),
+                "--backend".to_owned(),
+                backend.to_owned(),
                 "-o".to_owned(),
                 output.display().to_string(),
             ]
@@ -245,6 +251,86 @@ fn std_io_native_bridge_reports_eof_from_read_byte() {
     build(&input, &output);
     let execution = Command::new(&output).output().expect("byte fixture should run");
     assert_eq!(execution.status.code(), Some(42));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_bridge_mutates_ins_scalar_after_read_byte() {
+    run_mutating_ins_scalar_fixture("cranelift");
+}
+
+#[test]
+fn std_io_native_bridge_carries_mutated_ins_scalar_through_loop() {
+    run_loop_mutating_ins_scalar_fixture("cranelift");
+}
+
+#[test]
+fn std_io_native_bridge_reads_multiple_bytes_in_loop() {
+    run_loop_read_byte_fixture("cranelift");
+}
+
+#[cfg(feature = "llvm")]
+#[test]
+fn std_io_llvm_bridge_mutates_ins_scalar_after_read_byte() {
+    run_mutating_ins_scalar_fixture("llvm");
+}
+
+#[cfg(feature = "llvm")]
+#[test]
+fn std_io_llvm_bridge_carries_mutated_ins_scalar_through_loop() {
+    run_loop_mutating_ins_scalar_fixture("llvm");
+}
+
+#[cfg(feature = "llvm")]
+#[test]
+fn std_io_llvm_bridge_reads_multiple_bytes_in_loop() {
+    run_loop_read_byte_fixture("llvm");
+}
+
+fn run_mutating_ins_scalar_fixture(backend: &str) {
+    let (root, input, output) = project(
+        &format!("byte-ins-{backend}"),
+        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
+        &["stdout.act", "stderr.act", "stdin.act", "error.act"],
+        "import io; verb read_one(ins total: u32) -> Result[Int, IoError] { erg next = read_byte(); return case dat next { Result.Err(error) => Result[Int, IoError].Err(error), Result.Ok(value) => { total += 1u32; return Result[Int, IoError].Ok(value); }, }; } verb main() -> Int { erg total: u32 = 0u32; erg result = read_one(total: ins total); drop(result); return total as Int; }\n",
+    );
+    build_with_backend(&input, &output, backend);
+    let mut child =
+        Command::new(&output).stdin(Stdio::piped()).spawn().expect("byte-ins fixture should run");
+    child.stdin.take().expect("stdin pipe should exist").write_all(b"x").unwrap();
+    let execution = child.wait_with_output().expect("wait for byte-ins fixture");
+    assert_eq!(execution.status.code(), Some(1));
+    let _ = fs::remove_dir_all(root);
+}
+
+fn run_loop_mutating_ins_scalar_fixture(backend: &str) {
+    let (root, input, output) = project(
+        &format!("loop-byte-ins-{backend}"),
+        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
+        &["stdout.act", "stderr.act", "stdin.act", "error.act"],
+        "import io; verb bump(ins total: u32) -> Result[Int, IoError] { total += 1u32; return Result[Int, IoError].Ok(0); } verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 1u32 { bump(total: ins total); } return total as Int; }\n",
+    );
+    build_with_backend(&input, &output, backend);
+    let execution = Command::new(&output).output().expect("loop byte-ins fixture should run");
+    assert_eq!(execution.status.code(), Some(1));
+    let _ = fs::remove_dir_all(root);
+}
+
+fn run_loop_read_byte_fixture(backend: &str) {
+    let (root, input, output) = project(
+        &format!("loop-read-byte-{backend}"),
+        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
+        &["stdout.act", "stderr.act", "stdin.act", "error.act"],
+        "import io; verb main() -> Int { erg count: u32 = 0u32; for erg index: u16 in 0u16 .. 3u16 { erg next = read_byte(); case dat next { Result.Err(_) => { return count as Int; }, Result.Ok(_) => { count += 1u32; }, }; } return count as Int; }\n",
+    );
+    build_with_backend(&input, &output, backend);
+    let mut child = Command::new(&output)
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("loop read-byte fixture should run");
+    child.stdin.take().expect("stdin pipe should exist").write_all(b"ABC").unwrap();
+    let execution = child.wait_with_output().expect("wait for loop read-byte fixture");
+    assert_eq!(execution.status.code(), Some(3));
     let _ = fs::remove_dir_all(root);
 }
 

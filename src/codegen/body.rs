@@ -234,7 +234,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     }
 
     fn finish_block(
-        &self,
+        &mut self,
         id: BackendBlockId,
         span: SourceSpan,
         fallthrough: Option<BackendBlockId>,
@@ -245,6 +245,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         {
             instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
         } else if !terminates(instructions.last()) && self.implicit_unit_return {
+            self.provider.append_parameter_writebacks(&mut instructions);
             instructions.push(BackendInstruction::Return { value: None, span });
         }
         BackendBlock { parameters: Vec::new(), id, instructions }
@@ -268,14 +269,17 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             }
             Stmt::Return { value, span } => {
                 let Some(expression) = value else {
+                    self.provider.append_parameter_writebacks(instructions);
                     instructions.push(BackendInstruction::Return { value: None, span: *span });
                     return Ok(());
                 };
                 if let Some(failure) = self.provider.failure_for(expression)? {
+                    self.provider.append_parameter_writebacks(instructions);
                     instructions.push(BackendInstruction::Fail { failure, span: *span });
                 } else {
                     let value = self.provider.lower_expression(expression, instructions)?;
                     let value = self.provider.coerce_return_value(value, *span, instructions)?;
+                    self.provider.append_parameter_writebacks(instructions);
                     instructions
                         .push(BackendInstruction::Return { value: Some(value), span: *span });
                 }

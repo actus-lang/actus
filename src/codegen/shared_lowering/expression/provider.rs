@@ -73,6 +73,26 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn binding_value(&self, name: &str) -> Option<BackendValueId> {
         self.binding_value(name)
     }
+
+    fn append_parameter_writebacks(&self, instructions: &mut Vec<BackendInstruction>) {
+        instructions.extend(self.scalar_loan_writebacks());
+    }
+    fn snapshot_scalar_loan_bindings(&self) -> Vec<(String, BackendValueId)> {
+        self.scalar_loan_parameters
+            .iter()
+            .filter_map(|(name, _, _, _)| {
+                self.binding_value(name).map(|value| (name.clone(), value))
+            })
+            .collect()
+    }
+    fn restore_scalar_loan_bindings(&mut self, bindings: &[(String, BackendValueId)]) {
+        for (name, value) in bindings {
+            state::set_binding_value(self, name, *value);
+        }
+    }
+    fn scalar_loan_binding_names(&self) -> Vec<String> {
+        self.scalar_loan_parameters.iter().map(|(name, _, _, _)| name.clone()).collect()
+    }
     fn enter_scope(&mut self, _span: SourceSpan) {
         self.locals.push(BTreeMap::new());
     }

@@ -309,7 +309,12 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             .filter_map(|name| {
                 let value = self.provider.binding_value(&name)?;
                 let ty = self.provider.value_type(value)?;
-                Some(super::loops::CarriedBinding { name, value, ty })
+                Some(super::loops::CarriedBinding {
+                    name,
+                    value,
+                    ty,
+                    nominal_type: self.provider.nominal_type(value),
+                })
             })
             .collect()
     }

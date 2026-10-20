@@ -61,6 +61,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         })?;
         for (binding, value) in carried.iter().zip(&state.exit_values) {
             self.provider.set_binding_value(&binding.name, *value);
+            if let Some(type_name) = &binding.nominal_type {
+                self.provider.remember_nominal_type(*value, type_name.clone());
+            }
         }
         let continuation =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
@@ -152,6 +155,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         self.provider.enter_loop();
         for (binding, value) in carried.iter().zip(body_values) {
             self.provider.set_binding_value(&binding.name, *value);
+            if let Some(type_name) = &binding.nominal_type {
+                self.provider.remember_nominal_type(*value, type_name.clone());
+            }
         }
         self.provider.enter_scope(span);
         let nested_block_start = self.blocks.len();

@@ -166,6 +166,11 @@ fn lower_shared_performance<L: BackendLayoutProvider>(
         &mut provider,
         BackendBlockId(0),
     )?;
+    if let Some(entry) = function.blocks.first_mut() {
+        let mut prologue = provider.scalar_loan_prologue();
+        prologue.append(&mut entry.instructions);
+        entry.instructions = prologue;
+    }
     function.cleanup = context
         .cleanup_plans
         .iter()
