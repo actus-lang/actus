@@ -209,6 +209,8 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
     ) -> Result<Vec<CarriedBinding>, BackendContractError> {
         let mut names = Vec::new();
         collect_assignment_names(body, &mut names);
+        names.extend(self.provider.scalar_loan_binding_names());
+        names.extend(self.provider.scalar_binding_names());
         names.sort();
         names.dedup();
         names

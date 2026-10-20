@@ -67,6 +67,20 @@ pub trait BackendExpressionProvider {
 
     fn append_parameter_writebacks(&self, _instructions: &mut Vec<BackendInstruction>) {}
 
+    fn snapshot_scalar_loan_bindings(&self) -> Vec<(String, BackendValueId)> {
+        Vec::new()
+    }
+
+    fn restore_scalar_loan_bindings(&mut self, _bindings: &[(String, BackendValueId)]) {}
+
+    fn scalar_loan_binding_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn scalar_binding_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     fn lower_array_element(
         &mut self,
         _collection: &Expr,

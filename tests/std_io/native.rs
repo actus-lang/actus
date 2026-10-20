@@ -259,10 +259,21 @@ fn std_io_native_bridge_mutates_ins_scalar_after_read_byte() {
     run_mutating_ins_scalar_fixture("cranelift");
 }
 
+#[test]
+fn std_io_native_bridge_carries_mutated_ins_scalar_through_loop() {
+    run_loop_mutating_ins_scalar_fixture("cranelift");
+}
+
 #[cfg(feature = "llvm")]
 #[test]
 fn std_io_llvm_bridge_mutates_ins_scalar_after_read_byte() {
     run_mutating_ins_scalar_fixture("llvm");
+}
+
+#[cfg(feature = "llvm")]
+#[test]
+fn std_io_llvm_bridge_carries_mutated_ins_scalar_through_loop() {
+    run_loop_mutating_ins_scalar_fixture("llvm");
 }
 
 fn run_mutating_ins_scalar_fixture(backend: &str) {
@@ -277,6 +288,19 @@ fn run_mutating_ins_scalar_fixture(backend: &str) {
         Command::new(&output).stdin(Stdio::piped()).spawn().expect("byte-ins fixture should run");
     child.stdin.take().expect("stdin pipe should exist").write_all(b"x").unwrap();
     let execution = child.wait_with_output().expect("wait for byte-ins fixture");
+    assert_eq!(execution.status.code(), Some(1));
+    let _ = fs::remove_dir_all(root);
+}
+
+fn run_loop_mutating_ins_scalar_fixture(backend: &str) {
+    let (root, input, output) = project(
+        &format!("loop-byte-ins-{backend}"),
+        "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
+        &["stdout.act", "stderr.act", "stdin.act", "error.act"],
+        "import io; verb bump(ins total: u32) -> Result[Int, IoError] { total += 1u32; return Result[Int, IoError].Ok(0); } verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 1u32 { bump(total: ins total); } return total as Int; }\n",
+    );
+    build_with_backend(&input, &output, backend);
+    let execution = Command::new(&output).output().expect("loop byte-ins fixture should run");
     assert_eq!(execution.status.code(), Some(1));
     let _ = fs::remove_dir_all(root);
 }
