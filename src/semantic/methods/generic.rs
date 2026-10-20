@@ -43,7 +43,8 @@ impl Analyzer {
         };
         self.visit_call_with_signature(method, arguments, span, &signature)?;
         if let Some(return_type) = &signature.return_type_name {
-            self.inferred_expression_types.insert((span.start, span.end), return_type.clone());
+            self.inferred_expression_types
+                .insert(self.expression_cache_key(span), return_type.clone());
         }
         Ok(())
     }

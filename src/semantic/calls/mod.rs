@@ -139,7 +139,7 @@ impl Analyzer {
                     span,
                 })));
             }
-            self.inferred_expression_types.insert((span.start, span.end), type_name);
+            self.inferred_expression_types.insert(self.expression_cache_key(span), type_name);
             return Ok(Some(Ok(())));
         }
         if let Some(type_name) = array_constructor_type(callee, span) {
@@ -150,7 +150,7 @@ impl Analyzer {
                     span,
                 })));
             }
-            self.inferred_expression_types.insert((span.start, span.end), type_name);
+            self.inferred_expression_types.insert(self.expression_cache_key(span), type_name);
             return Ok(Some(Ok(())));
         }
         if matches!(callee, "Ok" | "Err") && !self.signatures.contains_key(callee) {
@@ -190,7 +190,7 @@ impl Analyzer {
         }
         let payload_type = &result_type.arguments[usize::from(constructor == "Err")];
         self.validate_result_payload(constructor, &arguments[0], payload_type)?;
-        self.inferred_expression_types.insert((span.start, span.end), result_type);
+        self.inferred_expression_types.insert(self.expression_cache_key(span), result_type);
         Ok(())
     }
 
@@ -246,7 +246,8 @@ impl Analyzer {
         }
         self.execute_exclusive_loans(callee, &resolved_arguments, &parameter_indices, signature)?;
         if let Some(return_type) = &signature.return_type_name {
-            self.inferred_expression_types.insert((span.start, span.end), return_type.clone());
+            self.inferred_expression_types
+                .insert(self.expression_cache_key(span), return_type.clone());
         }
         Ok(())
     }

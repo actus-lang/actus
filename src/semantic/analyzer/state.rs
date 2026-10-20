@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{BuiltinType, EnumDef, ReturnAccess, RoleDecl, StructDef};
+use crate::lexer::SourceSpan;
 
 use super::super::model::{Origin, SemanticModel};
 
@@ -11,6 +12,8 @@ pub(crate) struct ScopeFrame {
     pub(crate) declaration_indices: Vec<usize>,
     pub(crate) payload_cleanup: Vec<(usize, String, String, String)>,
 }
+
+pub(crate) type ExpressionCacheKey = (usize, usize, usize);
 
 #[derive(Default)]
 pub(crate) struct Analyzer {
@@ -50,15 +53,23 @@ pub(crate) struct Analyzer {
     pub(crate) binding_scope_depth: HashMap<usize, usize>,
     pub(crate) arena_scope_depth: HashMap<usize, usize>,
     pub(crate) field_arena_provenance: HashMap<(usize, String), usize>,
-    pub(crate) expression_arena_provenance: HashMap<(usize, usize), usize>,
+    pub(crate) expression_arena_provenance: HashMap<ExpressionCacheKey, usize>,
     pub(crate) next_arena_id: usize,
     pub(crate) generic_scopes: Vec<HashSet<String>>,
     pub(crate) const_generic_scopes: Vec<HashSet<String>>,
     pub(crate) generic_bounds: HashMap<String, Vec<String>>,
     pub(crate) generic_instances: super::super::generic_cache::GenericInstanceCache,
     pub(crate) current_generic_owner: Option<String>,
+    pub(crate) current_expression_scope: usize,
+    pub(crate) next_expression_scope: usize,
     pub(crate) expected_expression_type: Option<crate::ast::TypeName>,
-    pub(crate) inferred_expression_types: HashMap<(usize, usize), crate::ast::TypeName>,
-    pub(crate) case_result_types: HashMap<(usize, usize), crate::ast::TypeName>,
+    pub(crate) inferred_expression_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
+    pub(crate) case_result_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) type_registry: super::super::types::TypeRegistry,
+}
+
+impl Analyzer {
+    pub(crate) fn expression_cache_key(&self, span: SourceSpan) -> ExpressionCacheKey {
+        (self.current_expression_scope, span.start, span.end)
+    }
 }

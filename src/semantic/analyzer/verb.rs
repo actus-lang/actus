@@ -6,6 +6,8 @@ use super::validation::block_guarantees_return;
 
 impl Analyzer {
     pub(super) fn analyze_verb_body(&mut self, verb: &VerbDecl) -> Result<(), SemanticError> {
+        self.next_expression_scope += 1;
+        self.current_expression_scope = self.next_expression_scope;
         self.configure_return_state(verb);
         self.initialize_origin_parameter_map(&verb.params);
         self.enter_scope(verb.body.span);
