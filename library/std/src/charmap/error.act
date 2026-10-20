@@ -1,0 +1,17 @@
+"""
+Typed failures for bounded character-map codecs.
+
+The error domain distinguishes malformed UTF-8, unsupported mapped bytes,
+invalid storage metadata, and output capacity failure without exposing runtime
+status values or allowing silent replacement.
+"""
+open enum CharmapError {
+    """The input buffer metadata cannot be represented or validated."""
+    InvalidStorage,
+    """The input ends in or contains an unsupported UTF-8 sequence."""
+    InvalidUtf8,
+    """The input contains a valid byte outside this codec's alphabet."""
+    UnmappedByte,
+    """The output buffer cannot hold the complete converted result."""
+    InsufficientCapacity,
+}

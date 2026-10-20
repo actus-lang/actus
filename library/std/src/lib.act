@@ -12,3 +12,6 @@ open region;
 
 """Re-export target-neutral bounded binary wire framing contracts."""
 open wire;
+
+"""Re-export bounded internal byte codecs with explicit UTF-8 boundaries."""
+open charmap;

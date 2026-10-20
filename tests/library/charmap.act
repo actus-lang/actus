@@ -1,0 +1,112 @@
+import charmap;
+
+verb ka_sample_utf8() -> Buffer {
+    erg input = Buffer[8];
+    input[0] = 65u8;
+    input[1] = 225u8;
+    input[2] = 131u8;
+    input[3] = 144u8;
+    input[4] = 32u8;
+    input[5] = 225u8;
+    input[6] = 131u8;
+    input[7] = 176u8;
+    return input;
+}
+
+meta test
+verb ka_encode_maps_letters_and_preserves_ascii() -> Int {
+    erg input = ka_sample_utf8();
+    erg output = Buffer[4];
+    erg result = ka_encode(input: abs input, output: ins output);
+    case dat result {
+        Result.Err(_) => {
+            return 1;
+        },
+        Result.Ok(length) => {
+            if length != 4u32 {
+                return 2;
+            }
+            if output[0] != 65u8 {
+                return 3;
+            }
+            if output[1] != 128u8 {
+                return 4;
+            }
+            if output[2] != 32u8 {
+                return 5;
+            }
+            if output[3] != 160u8 {
+                return 6;
+            }
+        },
+    };
+    return 0;
+}
+
+meta test
+verb ka_decode_round_trips_mapped_bytes() -> Int {
+    erg input = Buffer[3];
+    input[0] = 65u8;
+    input[1] = 128u8;
+    input[2] = 160u8;
+    erg output = Buffer[7];
+    erg result = ka_decode(input: abs input, output: ins output);
+    case dat result {
+        Result.Err(_) => {
+            return 1;
+        },
+        Result.Ok(length) => {
+            if length != 7u32 {
+                return 2;
+            }
+            if output[0] != 65u8 || output[1] != 225u8 || output[2] != 131u8 || output[3] != 144u8 {
+                return 3;
+            }
+            if output[4] != 225u8 || output[5] != 131u8 || output[6] != 176u8 {
+                return 4;
+            }
+        },
+    };
+    return 0;
+}
+
+meta test
+verb ka_rejects_invalid_input_without_writing() -> Int {
+    erg input = Buffer[1];
+    input[0] = 225u8;
+    erg output = Buffer[1];
+    output[0] = 77u8;
+    erg result = ka_encode(input: abs input, output: ins output);
+    case dat result {
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(error) => case dat error {
+            CharmapError.InvalidUtf8 => {
+                if output[0] != 77u8 {
+                    return 2;
+                }
+                return 0;
+            },
+            _ => {
+                return 3;
+            },
+        },
+    };
+    return 4;
+}
+
+meta test
+verb ka_rejects_insufficient_capacity() -> Int {
+    erg input = Buffer[1];
+    input[0] = 128u8;
+    erg output = Buffer[2];
+    erg result = ka_decode(input: abs input, output: ins output);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(error) => case dat error {
+            CharmapError.InsufficientCapacity => 0,
+            _ => 2,
+        },
+    };
+}

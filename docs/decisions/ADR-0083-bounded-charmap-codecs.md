@@ -15,15 +15,16 @@ allocation, or be confused with ASCII or Unicode.
 
 Add a hosted `std::charmap` module with explicit bounded codecs.
 
-The first codec is `std::charmap::georgian`. It maps the 33 modern Georgian
-letters to a reserved one-byte range and preserves ASCII bytes unchanged.
+The first codec is `std::charmap::ka`, using the ISO 639-1 language code for
+Georgian. It maps the 33 modern Georgian letters to a reserved one-byte range
+and preserves ASCII bytes unchanged.
 The representation is an internal codec, not ASCII and not a replacement for
 UTF-8. Callers must explicitly request encoding or decoding.
 
 The public boundary is caller-owned and buffer-backed:
 
-- encoding consumes a UTF-8 source buffer and writes one-byte mapped output;
-- decoding consumes mapped bytes and writes UTF-8 output;
+- encoding borrows a UTF-8 source buffer and writes one-byte mapped output;
+- decoding borrows mapped bytes and writes UTF-8 output;
 - capacity exhaustion, malformed UTF-8, unmapped bytes, invalid storage, and
   unavailable providers are typed failures;
 - failed operations must not publish a partial output result;

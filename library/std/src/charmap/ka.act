@@ -1,0 +1,199 @@
+"""
+Bounded ISO `ka` modern Georgian UTF-8 to one-byte codec.
+
+Modern Georgian letters occupy the contiguous UTF-8 range `E1 83 90` through
+`E1 83 B0`. They map to internal bytes `128` through `160`. ASCII bytes are
+copied unchanged. All other non-ASCII input is rejected as unmapped; this
+codec does not normalize, transliterate, or silently replace text.
+"""
+open const KA_FIRST_UTF8_TAIL: u8 = 144u8;
+
+
+open const KA_LAST_UTF8_TAIL: u8 = 176u8;
+
+
+open const KA_FIRST_BYTE: u8 = 128u8;
+
+
+open const KA_LAST_BYTE: u8 = 160u8;
+
+
+open const KA_UTF8_PREFIX: u8 = 225u8;
+
+
+open const KA_UTF8_SECOND: u8 = 131u8;
+
+
+verb ka_encoded_length(abs input: Buffer) -> Result[u32, CharmapError] {
+    erg input_length: Int = buffer_length(buffer: abs input);
+    if input_length < 0 {
+        return Result[u32, CharmapError].Err(CharmapError.InvalidStorage);
+    }
+    erg georgian_units = ka_count_georgian_units(input: abs input);
+    case dat georgian_units {
+        Result.Err(error) => {
+            return Result[u32, CharmapError].Err(error);
+        },
+        Result.Ok(count) => {
+            return Result[u32, CharmapError].Ok((input_length as u32) - (count * 2u32));
+        },
+    };
+    return Result[u32, CharmapError].Err(CharmapError.InvalidStorage);
+}
+
+verb ka_count_georgian_units(abs input: Buffer) -> Result[u32, CharmapError] {
+    erg input_length: u32 = buffer_length(buffer: abs input) as u32;
+    erg count: u32 = 0u32;
+    erg index: u32 = 0u32;
+    loop {
+        if index >= input_length {
+            break;
+        }
+        erg byte: u8 = input[index];
+        if byte < 128u8 {
+            index += 1u32;
+            continue;
+        }
+        if byte != KA_UTF8_PREFIX || index + 2u32 >= input_length {
+            return Result[u32, CharmapError].Err(CharmapError.InvalidUtf8);
+        }
+        if input[index + 1u32] != KA_UTF8_SECOND {
+            return Result[u32, CharmapError].Err(CharmapError.UnmappedByte);
+        }
+        erg tail: u8 = input[index + 2u32];
+        if tail < KA_FIRST_UTF8_TAIL || tail > KA_LAST_UTF8_TAIL {
+            return Result[u32, CharmapError].Err(CharmapError.UnmappedByte);
+        }
+        count += 1u32;
+        index += 3u32;
+    }
+    return Result[u32, CharmapError].Ok(count);
+}
+
+verb ka_decoded_length(abs input: Buffer) -> Result[u32, CharmapError] {
+    erg input_length: Int = buffer_length(buffer: abs input);
+    if input_length < 0 {
+        return Result[u32, CharmapError].Err(CharmapError.InvalidStorage);
+    }
+    erg required: u32 = 0u32;
+    erg index: u32 = 0u32;
+    loop {
+        if index >= (input_length as u32) {
+            break;
+        }
+        erg byte: u8 = input[index];
+        if byte < 128u8 {
+            required += 1u32;
+        } else if byte >= KA_FIRST_BYTE && byte <= KA_LAST_BYTE {
+            required += 3u32;
+        } else {
+            return Result[u32, CharmapError].Err(CharmapError.UnmappedByte);
+        }
+        index += 1u32;
+    }
+    return Result[u32, CharmapError].Ok(required);
+}
+
+"""
+Encode supported modern Georgian UTF-8 into bounded internal bytes.
+
+The source is borrowed through `abs` and the destination is mutated through
+`ins`. A complete validation and length pass runs before any destination byte
+is written. ASCII is preserved; modern Georgian letters map to `128..160`.
+Returns `Err(InvalidUtf8)` or `Err(UnmappedByte)` for unsupported input,
+`Err(InvalidStorage)` for invalid metadata, and
+`Err(InsufficientCapacity)` before writing when output storage is too small.
+"""
+open verb ka_encode(abs input: Buffer, ins output: Buffer) -> Result[u32, CharmapError] {
+    erg length = ka_encoded_length(input: abs input);
+    case dat length {
+        Result.Err(error) => {
+            return Result[u32, CharmapError].Err(error);
+        },
+        Result.Ok(required) => {
+            if buffer_length(buffer: abs output) < (required as Int) {
+                return Result[u32, CharmapError].Err(CharmapError.InsufficientCapacity);
+            }
+            return ka_encode_body(
+                input: abs input,
+                output: ins output,
+                required: erg required
+            );
+        },
+    };
+    return Result[u32, CharmapError].Err(CharmapError.InvalidStorage);
+}
+
+"""
+Decode bounded internal Georgian bytes into standard UTF-8.
+
+The source is borrowed through `abs` and the destination is mutated through
+`ins`. The complete input and required UTF-8 length are validated before any
+destination byte is written. ASCII is preserved and `128..160` expands to
+the modern Georgian UTF-8 range. Returns `Err(UnmappedByte)` for bytes outside
+the codec, `Err(InvalidStorage)` for invalid metadata, and
+`Err(InsufficientCapacity)` before writing when output storage is too small.
+"""
+open verb ka_decode(abs input: Buffer, ins output: Buffer) -> Result[u32, CharmapError] {
+    erg length = ka_decoded_length(input: abs input);
+    case dat length {
+        Result.Err(error) => {
+            return Result[u32, CharmapError].Err(error);
+        },
+        Result.Ok(required) => {
+            if buffer_length(buffer: abs output) < (required as Int) {
+                return Result[u32, CharmapError].Err(CharmapError.InsufficientCapacity);
+            }
+            return ka_decode_body(
+                input: abs input,
+                output: ins output,
+                required: erg required
+            );
+        },
+    };
+    return Result[u32, CharmapError].Err(CharmapError.InvalidStorage);
+}
+
+verb ka_encode_body(abs input: Buffer, ins output: Buffer, erg required: u32) -> Result[u32, CharmapError] {
+    erg input_length: u32 = buffer_length(buffer: abs input) as u32;
+    erg input_index: u32 = 0u32;
+    erg output_index: u32 = 0u32;
+    loop {
+        if input_index >= input_length {
+            break;
+        }
+        erg byte: u8 = input[input_index];
+        if byte < 128u8 {
+            output[output_index] = byte;
+            input_index += 1u32;
+        } else {
+            output[output_index] = KA_FIRST_BYTE + (input[input_index + 2u32] - KA_FIRST_UTF8_TAIL);
+            input_index += 3u32;
+        }
+        output_index += 1u32;
+    }
+    return Result[u32, CharmapError].Ok(required);
+}
+
+verb ka_decode_body(abs input: Buffer, ins output: Buffer, erg required: u32) -> Result[u32, CharmapError] {
+    erg input_length: u32 = buffer_length(buffer: abs input) as u32;
+    erg input_index: u32 = 0u32;
+    erg output_index: u32 = 0u32;
+    loop {
+        if input_index >= input_length {
+            break;
+        }
+        erg byte: u8 = input[input_index];
+        if byte < 128u8 {
+            output[output_index] = byte;
+            output_index += 1u32;
+        } else {
+            output[output_index] = KA_UTF8_PREFIX;
+            output[output_index + 1u32] = KA_UTF8_SECOND;
+            output[output_index + 2u32] = KA_FIRST_UTF8_TAIL + (byte - KA_FIRST_BYTE);
+            output_index += 3u32;
+        }
+        input_index += 1u32;
+    }
+    return Result[u32, CharmapError].Ok(required);
+}
