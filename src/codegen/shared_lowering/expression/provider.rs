@@ -73,6 +73,10 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn binding_value(&self, name: &str) -> Option<BackendValueId> {
         self.binding_value(name)
     }
+
+    fn append_parameter_writebacks(&self, instructions: &mut Vec<BackendInstruction>) {
+        instructions.extend(self.scalar_loan_writebacks());
+    }
     fn enter_scope(&mut self, _span: SourceSpan) {
         self.locals.push(BTreeMap::new());
     }

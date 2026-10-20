@@ -65,6 +65,8 @@ pub trait BackendExpressionProvider {
         None
     }
 
+    fn append_parameter_writebacks(&self, _instructions: &mut Vec<BackendInstruction>) {}
+
     fn lower_array_element(
         &mut self,
         _collection: &Expr,
