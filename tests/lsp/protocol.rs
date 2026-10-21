@@ -96,6 +96,23 @@ fn lsp_signature_help_exposes_generics_and_result_contract() {
 }
 
 #[test]
+fn lsp_signature_help_exposes_labelled_print_api() {
+    let uri = "file:///tmp/actus-lsp-print-signature.act";
+    let source = "import io; verb main() -> Int { print(string: \"ready\"); return 0; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/signatureHelp","params":{"textDocument":{"uri":uri},"position":position_after(source, "print(string")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("print(string: String)"), "stdout: {stdout}");
+    assert!(stdout.contains("print(int: Int)"), "stdout: {stdout}");
+    assert!(!stdout.contains("print(abs text: Buffer)"), "stdout: {stdout}");
+}
+
+#[test]
 fn lsp_signature_help_rejects_stale_document_versions() {
     let uri = "file:///tmp/actus-lsp-signature-stale.act";
     let source = "verb add(abs value: Int) -> Int { return value; }\nverb main() -> Int { return add(value: 1); }\n";

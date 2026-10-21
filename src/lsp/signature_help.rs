@@ -53,11 +53,11 @@ fn signature_help(params: &Value, store: &DocumentStore, target: &TargetSpec) ->
     let Some((callee, active_parameter)) = call_context(&document.text, &position) else {
         return Value::Null;
     };
-    let Some(signature) = find_signature(&document.text, &callee, target) else {
+    let Some(signatures) = find_signatures(&document.text, &callee, target) else {
         return Value::Null;
     };
     json!({
-        "signatures": [signature],
+        "signatures": signatures,
         "activeSignature": 0,
         "activeParameter": active_parameter,
     })
@@ -100,53 +100,77 @@ fn active_parameter(tokens: &[Token], offset: usize) -> u32 {
     commas
 }
 
-fn find_signature(source: &str, name: &str, target: &TargetSpec) -> Option<Value> {
-    if let Some(signature) = intrinsic_signature(name) {
-        return Some(signature);
+fn find_signatures(source: &str, name: &str, target: &TargetSpec) -> Option<Vec<Value>> {
+    if let Some(signatures) = intrinsic_signatures(name) {
+        return Some(signatures);
     }
     let program = crate::semantic::filter_program_for_target(&parse(scan(source).0).ok()?, target);
     program.declarations.iter().find_map(|declaration| match declaration {
-        TopLevelDecl::Verb(verb) if verb.name == name => Some(callable_signature(
+        TopLevelDecl::Verb(verb) if verb.name == name => Some(vec![callable_signature(
             &verb.name,
             &verb.generic_parameters,
             &verb.params,
             verb.return_type.as_ref(),
             contract_documentation(verb.doc.as_deref(), verb.contract.as_ref()).as_deref(),
-        )),
-        TopLevelDecl::ExternalVerb(verb) if verb.name == name => Some(callable_signature(
+        )]),
+        TopLevelDecl::ExternalVerb(verb) if verb.name == name => Some(vec![callable_signature(
             &verb.name,
             &verb.generic_parameters,
             &verb.params,
             verb.return_type.as_ref(),
             contract_documentation(verb.doc.as_deref(), verb.contract.as_ref()).as_deref(),
-        )),
+        )]),
         _ => None,
     })
 }
 
-fn intrinsic_signature(name: &str) -> Option<Value> {
-    let (label, documentation, parameters) = match name {
-        "print" | "println" => (
-            format!("{name}(abs text: Buffer) -> Result[Int, IoError]"),
-            "Writes exactly the live Buffer length.",
-            vec![("abs text".to_owned(), "Buffer".to_owned())],
-        ),
-        "append" => (
-            "append(ins buffer: Buffer, abs byte: u8) -> Void".to_owned(),
+fn intrinsic_signatures(name: &str) -> Option<Vec<Value>> {
+    match name {
+        "print" | "println" | "eprint" | "eprintln" => Some(labelled_print_signatures(name)),
+        "append" => Some(vec![signature_value(
+            "append(ins buffer: Buffer, abs byte: u8) -> Void",
             "Appends one byte in place.",
-            vec![
+            &[
                 ("ins buffer".to_owned(), "Buffer".to_owned()),
                 ("abs byte".to_owned(), "u8".to_owned()),
             ],
-        ),
-        "copy" => (
-            "copy(abs value: scalar) -> scalar".to_owned(),
+        )]),
+        "copy" => Some(vec![signature_value(
+            "copy(abs value: scalar) -> scalar",
             "Explicitly reuses an eligible integer or boolean scalar.",
-            vec![("abs value".to_owned(), "scalar".to_owned())],
-        ),
-        _ => return None,
-    };
-    Some(signature_value(&label, documentation, &parameters))
+            &[("abs value".to_owned(), "scalar".to_owned())],
+        )]),
+        _ => None,
+    }
+}
+
+fn labelled_print_signatures(name: &str) -> Vec<Value> {
+    let output = "Result[Int, IoError]";
+    let mut signatures = Vec::new();
+    for (label, ty) in [
+        ("string", "String"),
+        ("int", "Int"),
+        ("byte", "u8"),
+        ("bool", "Bool"),
+        ("buffer", "Buffer"),
+    ] {
+        signatures.push(signature_value(
+            &format!("{name}({label}: {ty}) -> {output}"),
+            "Writes one typed value through the standard output channel.",
+            &[(format!("{label}: {ty}"), ty.to_owned())],
+        ));
+    }
+    for (label, ty) in [("int", "Int"), ("bool", "Bool")] {
+        signatures.push(signature_value(
+            &format!("{name}(format: String, {label}: {ty}) -> {output}"),
+            "Writes one formatted integer or boolean value.",
+            &[
+                ("format: String".to_owned(), "String".to_owned()),
+                (format!("{label}: {ty}"), ty.to_owned()),
+            ],
+        ));
+    }
+    signatures
 }
 
 fn callable_signature(
