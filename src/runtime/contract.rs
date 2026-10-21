@@ -20,8 +20,27 @@ pub const ABI_STATUS_END_OF_STREAM: i32 = -2;
 /// Failed opaque-handle C-ABI result.
 pub const ABI_HANDLE_FAILURE: i64 = -1;
 
+/// Maximum number of hosted process arguments exposed through std::process.
+pub const PROCESS_MAX_ARGUMENTS: usize = 64;
+/// Maximum UTF-8 byte length of one hosted process argument.
+pub const PROCESS_MAX_ARGUMENT_BYTES: usize = 4096;
+/// Process argument provider is unavailable or could not be read.
+pub const PROCESS_STATUS_UNAVAILABLE: i32 = -1;
+/// Requested process argument index is invalid.
+pub const PROCESS_STATUS_INVALID_INDEX: i32 = -3;
+/// A process argument is not valid UTF-8.
+pub const PROCESS_STATUS_INVALID_ENCODING: i32 = -4;
+/// The process supplied more arguments than the bounded API permits.
+pub const PROCESS_STATUS_TOO_MANY_ARGUMENTS: i32 = -5;
+/// The caller-owned destination cannot hold the argument.
+pub const PROCESS_STATUS_BUFFER_TOO_SMALL: i32 = -6;
+/// One process argument exceeds the bounded byte limit.
+pub const PROCESS_STATUS_ARGUMENT_TOO_LARGE: i32 = -7;
+
 /// Stable runtime symbol names used by native lowering.
 pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
+pub const PROCESS_ARG_COUNT_SYMBOL: &str = "actus_process_arg_count";
+pub const PROCESS_ARG_SYMBOL: &str = "actus_process_arg";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
 /// Stable runtime symbol used by compiler-generated Region cleanup.
 pub const REGION_DROP_SYMBOL: &str = "actus_region_drop";

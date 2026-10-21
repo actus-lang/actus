@@ -1,0 +1,104 @@
+"""
+Private native bridges for the hosted process argument provider. Application
+code must use the typed public verbs below; these declarations expose no raw
+pointers or host-specific string representation through the std facade.
+"""
+unsafe extern "C" verb actus_process_arg_count() -> Int;
+
+"""Copy one host argument into an existing caller buffer using a bounded native status contract."""
+unsafe extern "C" verb actus_process_arg(ins buffer: Buffer, erg index: Int) -> Int;
+
+"""
+Maximum number of process arguments accepted by this API. The count includes
+`argv[0]`, which is normally the executable path, so at most 63 additional
+user-supplied arguments are available when the limit is reached.
+"""
+open const PROCESS_MAX_ARGUMENTS: Int = 64;
+
+
+"""
+Maximum UTF-8 byte length accepted for one argument. This is a byte limit, not
+a character limit; a multi-byte UTF-8 character consumes multiple bytes.
+"""
+open const PROCESS_MAX_ARGUMENT_BYTES: Int = 4096;
+
+
+"""
+Stateful bounded cursor over one validated snapshot of the host argument
+vector. The cursor owns only scalar counters and a validity flag; it does not
+own the host argument strings or the caller's destination buffer.
+"""
+open struct Arguments {
+    """Owned `erg` zero-based index of the next value; `argv[0]` starts at index zero."""
+    erg next_index: Int,
+    """Owned `erg` total count in the snapshot, including the executable path."""
+    erg count: Int,
+    """Owned `erg` state marker; invalid state causes a typed error and preserves the destination."""
+    erg valid: Bool,
+}
+
+"""
+Create a bounded cursor over the host argument vector without exposing native
+process storage. The snapshot includes `argv[0]` and preserves the host's
+argument order. `Ok(Arguments)` starts at index zero; `Err` reports an
+unavailable provider, invalid UTF-8, too many arguments, or an argument that
+exceeds `PROCESS_MAX_ARGUMENT_BYTES`. No caller buffer is read or changed.
+"""
+open verb arguments() -> Result[Arguments, ProcessError] {
+    erg count = actus_process_arg_count();
+    if count == -1 {
+        return Result[Arguments, ProcessError].Err(ProcessError.Unavailable);
+    }
+    if count == -4 {
+        return Result[Arguments, ProcessError].Err(ProcessError.InvalidEncoding);
+    }
+    if count == -5 {
+        return Result[Arguments, ProcessError].Err(ProcessError.TooManyArguments);
+    }
+    if count == -7 {
+        return Result[Arguments, ProcessError].Err(ProcessError.ArgumentTooLarge);
+    }
+    return Result[Arguments, ProcessError].Ok(Arguments {next_index: 0, count: count, valid: true});
+}
+
+"""
+Return the validated number of arguments, including `argv[0]`. The `abs`
+cursor is read-only: this verb does not advance it, access host storage, or
+mutate any caller-owned value. The returned count is always bounded by
+`PROCESS_MAX_ARGUMENTS` for a successful cursor.
+"""
+open verb count(abs arguments: Arguments) -> Int {
+    return arguments.count;
+}
+
+"""
+Copy the next argument through two `ins` loans. `arguments` advances only after
+a successful copy, while `buffer` is overwritten from offset zero and its
+logical length becomes the copied byte count. The result is
+`Ok(Some(byte_count))` for a value, including an empty value, or `Ok(None)` at
+the end of the cursor. `Err` reports unavailable host state, invalid index or
+encoding, too many arguments, an oversized argument, or insufficient buffer
+capacity. Failed reads leave the caller buffer and cursor unchanged. The
+implementation retains no pointer to either `ins` value.
+"""
+open verb next_arg(ins arguments: Arguments, ins buffer: Buffer) -> Result[Option[Int], ProcessError] {
+    if !arguments.valid {
+        return Result[Option[Int], ProcessError].Err(ProcessError.InvalidIndex);
+    }
+    if arguments.next_index >= arguments.count {
+        return Result[Option[Int], ProcessError].Ok(Option[Int].None);
+    }
+    erg status = actus_process_arg(buffer: ins buffer, index: erg arguments.next_index);
+    return case status {
+        -1 => Result[Option[Int], ProcessError].Err(ProcessError.Unavailable),
+        -3 => Result[Option[Int], ProcessError].Err(ProcessError.InvalidIndex),
+        -4 => Result[Option[Int], ProcessError].Err(ProcessError.InvalidEncoding),
+        -5 => Result[Option[Int], ProcessError].Err(ProcessError.TooManyArguments),
+        -6 => Result[Option[Int], ProcessError].Err(ProcessError.BufferTooSmall),
+        -7 => Result[Option[Int], ProcessError].Err(ProcessError.ArgumentTooLarge),
+        _ => {
+            arguments.next_index += 1;
+            return Result[Option[Int], ProcessError].Ok(Option[Int].Some(status));
+        },
+    };
+}

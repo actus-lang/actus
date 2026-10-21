@@ -39,6 +39,11 @@ path = "src/charmap"
 targets = ["hosted"]
 
 [[runtime.modules]]
+name = "process"
+path = "src/process"
+targets = ["hosted"]
+
+[[runtime.modules]]
 name = "region"
 path = "src/region"
 targets = ["hosted", "freestanding"]
