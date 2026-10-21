@@ -272,6 +272,9 @@ impl Analyzer {
         if let Some(type_name) = self.case_result_types.get(&self.expression_cache_key(*span)) {
             return Some(super::super::analyzer::canonical_type_name(type_name));
         }
+        if let Some(expected) = self.expected_expression_type.as_ref() {
+            return Some(super::super::analyzer::canonical_type_name(expected));
+        }
         branches.iter().find_map(|branch| match &branch.body {
             CaseBody::Expression(expression) => self.expression_type_name(expression),
             CaseBody::Block(block) => block.statements.iter().rev().find_map(|statement| {

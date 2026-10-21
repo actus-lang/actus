@@ -366,7 +366,13 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         self.visit_expression(subject)?;
-        self.validate_case_patterns(mode, subject, branches, span)
+        let result = self.validate_case_patterns(mode, subject, branches, span);
+        if result.is_ok()
+            && let Some(expected) = self.expected_expression_type.as_ref()
+        {
+            self.case_result_types.insert(self.expression_cache_key(span), expected.clone());
+        }
+        result
     }
 
     fn validate_try_expression(
