@@ -72,7 +72,12 @@ fn store_aggregate_field(
         ))
     })?;
     let destination = builder.ins().iadd_imm_s(address, i64::from(field.offset));
-    if matches!(field.ty, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. }) {
+    if matches!(
+        field.ty,
+        BackendValueType::Aggregate { .. }
+            | BackendValueType::Region { .. }
+            | BackendValueType::Enum { .. }
+    ) {
         let alignment = u8::try_from(field.layout.alignment).map_err(|_| {
             BackendEmitError("Cranelift aggregate field alignment exceeds u8".to_owned())
         })?;
@@ -165,7 +170,10 @@ pub(super) fn lower_aggregate_field_store(
     })?;
     let offset = i32::try_from(*offset)
         .map_err(|_| BackendEmitError("Cranelift aggregate field offset exceeds i32".to_owned()))?;
-    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
+    if let BackendValueType::Aggregate { layout }
+    | BackendValueType::Region { layout }
+    | BackendValueType::Enum { layout: crate::codegen::BackendEnumLayout { layout, .. } } = ty
+    {
         let destination = builder.ins().iadd_imm_s(base, i64::from(offset));
         let alignment = u8::try_from(layout.alignment).map_err(|_| {
             BackendEmitError("Cranelift aggregate field alignment exceeds u8".to_owned())

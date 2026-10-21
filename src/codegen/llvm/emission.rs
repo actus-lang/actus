@@ -18,9 +18,19 @@ pub fn emit_object(
     target: &TargetSpec,
     output: &Path,
 ) -> Result<(), BackendEmitError> {
+    emit_object_with_configuration(module, target, output, true)
+}
+
+/// Emits a validated backend-neutral module using the requested relocation model.
+pub fn emit_object_with_configuration(
+    module: &BackendModule,
+    target: &TargetSpec,
+    output: &Path,
+    position_independent: bool,
+) -> Result<(), BackendEmitError> {
     let (_context, owned_module) = lower_module(module, target.pointer_width.bits())?;
     verify_module(owned_module.raw)?;
-    super::object::emit_object(owned_module.raw, target, output)?;
+    super::object::emit_object(owned_module.raw, target, output, position_independent)?;
     Ok(())
 }
 
@@ -29,7 +39,16 @@ pub fn emit_object_bytes(
     module: &BackendModule,
     target: &TargetSpec,
 ) -> Result<Vec<u8>, BackendEmitError> {
+    emit_object_bytes_with_configuration(module, target, true)
+}
+
+/// Emits a validated backend-neutral object buffer using the requested relocation model.
+pub fn emit_object_bytes_with_configuration(
+    module: &BackendModule,
+    target: &TargetSpec,
+    position_independent: bool,
+) -> Result<Vec<u8>, BackendEmitError> {
     let (_context, owned_module) = lower_module(module, target.pointer_width.bits())?;
     verify_module(owned_module.raw)?;
-    super::object::emit_object_bytes(owned_module.raw, target)
+    super::object::emit_object_bytes(owned_module.raw, target, position_independent)
 }

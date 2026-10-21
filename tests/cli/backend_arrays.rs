@@ -34,6 +34,44 @@ fn cranelift_backend_builds_and_runs_scalar_aggregate_field_access() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_and_run_non_niche_enum_aggregate_field_access() {
+    let source = "struct Config { choice: Option[Int], } verb main() -> Int { erg config: Config = Config { choice: Option[Int].Some(41), }; return case config.choice { Option.Some(value) => value, Option.None => 0, }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-non-niche-enum-field-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create non-niche enum field directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"non-niche-enum-field-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write non-niche enum field manifest");
+        fs::write(&input, source).expect("write non-niche enum field source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build enum aggregate field");
+        let status =
+            std::process::Command::new(&output).status().expect("run non-niche enum field fixture");
+        assert_eq!(status.code(), Some(41), "backend {backend} enum aggregate result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[test]
 fn cranelift_backend_builds_and_runs_scalar_aggregate_field_assignment() {
     let root = std::env::temp_dir()

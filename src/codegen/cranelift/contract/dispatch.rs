@@ -49,7 +49,7 @@ pub(super) fn lower_instruction(
         | BackendInstruction::ScalarLoanLoad { .. }
         | BackendInstruction::ScalarLoanStore { .. }
         | BackendInstruction::ScalarLoanMaterialize { .. } => {
-            lower_scalar(module, builder, instruction, state.values)
+            lower_scalar(module, builder, instruction, state.function, state.values)
         }
         _ => lower_non_scalar(module, builder, instruction, state),
     }
@@ -139,6 +139,7 @@ fn lower_scalar(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
+    function: &BackendFunction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
@@ -149,7 +150,7 @@ fn lower_scalar(
             super::scalar::lower_float_constant(builder, instruction, values)
         }
         BackendInstruction::StringLiteral { result, value, .. } => {
-            lower_string_literal(module, builder, *result, value, values)
+            lower_string_literal(module, builder, function, *result, value, values)
         }
         BackendInstruction::IntegerBinary { .. } => {
             super::lower_integer_binary(builder, instruction, values)
@@ -193,14 +194,15 @@ fn lower_scalar(
 fn lower_string_literal(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
+    function: &BackendFunction,
     result: BackendValueId,
     value: &str,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
-    // Keep the neutral path's local data symbols in the established encoded
-    // form used by the native emitter. The result id is deterministic within
-    // a lowered module, so repeated builds retain stable object names.
-    let symbol = format!("actus__data_string_5f{}", result.0);
+    // Value ids are local to a function. Include the function symbol so data
+    // declarations remain unique when several contract functions share one
+    // native object module.
+    let symbol = format!("actus__data_string_5f{}_5f{}", result.0, function.symbol.as_str());
     let data_id = module
         .declare_data(&symbol, Linkage::Local, false, false)
         .map_err(|error| BackendEmitError(error.to_string()))?;

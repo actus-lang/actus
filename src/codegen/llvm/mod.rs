@@ -25,4 +25,7 @@ mod scalar_loan;
 mod values;
 mod verification;
 
-pub use emission::{emit_module, emit_object, emit_object_bytes};
+pub use emission::{
+    emit_module, emit_object, emit_object_bytes, emit_object_bytes_with_configuration,
+    emit_object_with_configuration,
+};

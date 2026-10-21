@@ -24,7 +24,14 @@ pub(super) fn emit_objects_llvm(
     )?;
     modules
         .into_iter()
-        .map(|lowered| llvm_object(&lowered.object_name, &lowered.module, configuration.target()))
+        .map(|lowered| {
+            llvm_object(
+                &lowered.object_name,
+                &lowered.module,
+                configuration.target(),
+                configuration.native_backend().position_independent(),
+            )
+        })
         .collect()
 }
 
@@ -32,8 +39,13 @@ fn llvm_object(
     name: &str,
     module: &crate::codegen::BackendModule,
     target: &crate::target::TargetSpec,
+    position_independent: bool,
 ) -> Result<EmittedObject, BackendEmitError> {
-    let bytes = crate::codegen::llvm::emit_object_bytes(module, target)?;
+    let bytes = crate::codegen::llvm::emit_object_bytes_with_configuration(
+        module,
+        target,
+        position_independent,
+    )?;
     let symbols =
         module.functions.iter().map(|function| function.symbol.as_str().to_owned()).collect();
     Ok(EmittedObject { name: name.to_owned(), bytes, symbols })

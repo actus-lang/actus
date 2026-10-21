@@ -7,7 +7,9 @@ use super::super::{
 use super::branches::block_value;
 use super::declarations::FunctionDeclaration;
 use super::instruction::{InstructionContext, emit_instruction};
-use llvm_sys::core::{LLVMBuildRetVoid, LLVMGetParam, LLVMPositionBuilderAtEnd};
+use llvm_sys::core::{
+    LLVMBuildRetVoid, LLVMBuildUnreachable, LLVMGetParam, LLVMPositionBuilderAtEnd,
+};
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
 pub(super) type BlockParameters = BTreeMap<BackendBlockId, Vec<(BackendValueId, LLVMValueRef)>>;
@@ -50,6 +52,13 @@ pub(super) fn emit_blocks(
             )?;
         }
         if !terminated {
+            if block.id != function.entry
+                && block.instructions.is_empty()
+                && !function_has_predecessor(function, block.id)
+            {
+                unsafe { LLVMBuildUnreachable(builder) };
+                continue;
+            }
             if matches!(function.return_value.ty, BackendValueType::Unit) {
                 unsafe { LLVMBuildRetVoid(builder) };
             } else {
@@ -62,6 +71,18 @@ pub(super) fn emit_blocks(
         }
     }
     Ok(())
+}
+
+fn function_has_predecessor(function: &BackendFunction, target: BackendBlockId) -> bool {
+    function.blocks.iter().any(|block| {
+        block.instructions.iter().any(|instruction| match instruction {
+            BackendInstruction::Branch { then_block, else_block, .. } => {
+                *then_block == target || *else_block == target
+            }
+            BackendInstruction::Jump { target: jump_target, .. } => *jump_target == target,
+            _ => false,
+        })
+    })
 }
 
 fn ordered_blocks(function: &BackendFunction) -> Vec<&super::super::BackendBlock> {

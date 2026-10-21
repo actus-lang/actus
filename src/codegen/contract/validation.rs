@@ -316,12 +316,8 @@ fn validate_aggregate_field_load(
 ) -> Result<(), BackendContractError> {
     aggregate_layout.validate()?;
     field_layout.validate()?;
-    let unsupported_type = matches!(
-        ty,
-        super::BackendValueType::Unit
-            | super::BackendValueType::Float { .. }
-            | super::BackendValueType::Enum { .. }
-    );
+    let unsupported_type =
+        matches!(ty, super::BackendValueType::Unit | super::BackendValueType::Float { .. });
     if unsupported_type
         || !offset.is_multiple_of(field_layout.alignment)
         || offset > aggregate_layout.size
@@ -340,12 +336,8 @@ fn validate_aggregate_field_store(
 ) -> Result<(), BackendContractError> {
     aggregate_layout.validate()?;
     field_layout.validate()?;
-    let unsupported_type = matches!(
-        ty,
-        super::BackendValueType::Unit
-            | super::BackendValueType::Float { .. }
-            | super::BackendValueType::Enum { .. }
-    );
+    let unsupported_type =
+        matches!(ty, super::BackendValueType::Unit | super::BackendValueType::Float { .. });
     if unsupported_type
         || !offset.is_multiple_of(field_layout.alignment)
         || offset > aggregate_layout.size

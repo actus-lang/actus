@@ -19,6 +19,7 @@ pub(super) fn emit_object(
     module: llvm_sys::prelude::LLVMModuleRef,
     target: &TargetSpec,
     output: &Path,
+    position_independent: bool,
 ) -> Result<(), BackendEmitError> {
     initialize_targets()?;
     let triple = CString::new(target.triple().to_string())
@@ -28,7 +29,7 @@ pub(super) fn emit_object(
         .ok_or_else(|| BackendEmitError("LLVM object path is not valid UTF-8".to_owned()))?;
     let output = CString::new(output)
         .map_err(|_| BackendEmitError("LLVM object path contains NUL".to_owned()))?;
-    let machine = TargetMachine::new(triple.as_c_str())?;
+    let machine = TargetMachine::new(triple.as_c_str(), position_independent)?;
     let data_layout = unsafe { LLVMCreateTargetDataLayout(machine.raw) };
     if data_layout.is_null() {
         return Err(BackendEmitError("LLVM failed to create target data layout".to_owned()));
@@ -55,11 +56,12 @@ pub(super) fn emit_object(
 pub(super) fn emit_object_bytes(
     module: llvm_sys::prelude::LLVMModuleRef,
     target: &TargetSpec,
+    position_independent: bool,
 ) -> Result<Vec<u8>, BackendEmitError> {
     initialize_targets()?;
     let triple = CString::new(target.triple().to_string())
         .map_err(|_| BackendEmitError("LLVM target triple contains NUL".to_owned()))?;
-    let machine = TargetMachine::new(triple.as_c_str())?;
+    let machine = TargetMachine::new(triple.as_c_str(), position_independent)?;
     let data_layout = unsafe { LLVMCreateTargetDataLayout(machine.raw) };
     if data_layout.is_null() {
         return Err(BackendEmitError("LLVM failed to create target data layout".to_owned()));
@@ -113,7 +115,7 @@ struct TargetMachine {
 }
 
 impl TargetMachine {
-    fn new(triple: &std::ffi::CStr) -> Result<Self, BackendEmitError> {
+    fn new(triple: &std::ffi::CStr, position_independent: bool) -> Result<Self, BackendEmitError> {
         let mut target = ptr::null_mut();
         let mut error = ptr::null_mut();
         let failed =
@@ -133,7 +135,11 @@ impl TargetMachine {
                 cpu.as_ptr(),
                 features.as_ptr(),
                 LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
-                LLVMRelocMode::LLVMRelocStatic,
+                if position_independent {
+                    LLVMRelocMode::LLVMRelocPIC
+                } else {
+                    LLVMRelocMode::LLVMRelocStatic
+                },
                 LLVMCodeModel::LLVMCodeModelDefault,
             )
         };
