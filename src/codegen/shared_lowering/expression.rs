@@ -13,6 +13,7 @@ mod calls;
 mod case;
 mod cast;
 mod cleanup;
+mod compare;
 pub(crate) use cleanup::descriptor_applies;
 mod dispatch;
 mod drop;
@@ -32,6 +33,7 @@ pub(crate) struct SharedExpressionProvider<'a> {
     layouts: &'a dyn super::super::BackendLayoutProvider,
     parameters: BTreeMap<String, BackendValueId>,
     scalar_loan_parameters: Vec<(String, BackendValueId, BackendValueId, BackendValueType)>,
+    aggregate_loan_parameters: BTreeMap<String, (BackendValueId, super::super::BackendLayout)>,
     owned_parameters: std::collections::BTreeSet<String>,
     locals: Vec<BTreeMap<String, BackendValueId>>,
     verb_name: String,
@@ -89,6 +91,7 @@ impl<'a> SharedExpressionProvider<'a> {
             layouts,
             parameters: parameter_state.parameters,
             scalar_loan_parameters: parameter_state.scalar_loan_parameters,
+            aggregate_loan_parameters: parameter_state.aggregate_loan_parameters,
             owned_parameters: parameter_state.owned_parameters,
             locals: Vec::new(),
             verb_name: verb.name.clone(),
@@ -122,6 +125,42 @@ impl<'a> SharedExpressionProvider<'a> {
     }
     pub(super) fn parameter_is_owned(&self, name: &str) -> bool {
         self.owned_parameters.contains(name)
+    }
+    pub(super) fn aggregate_loan_parameter(
+        &self,
+        name: &str,
+    ) -> Option<(BackendValueId, super::super::BackendLayout)> {
+        self.aggregate_loan_parameters.get(name).copied()
+    }
+    pub(super) fn materialize_aggregate_assignment(
+        &mut self,
+        value: BackendValueId,
+        span: crate::lexer::SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, super::super::BackendContractError> {
+        if !self.is_aggregate_place(value) {
+            return Ok(value);
+        }
+        let BackendValueType::Aggregate { layout } = self.value_type(value).ok_or_else(|| {
+            super::support::unsupported(span, "aggregate assignment value has no layout")
+        })?
+        else {
+            return Err(super::support::unsupported(
+                span,
+                "aggregate assignment value has an invalid type",
+            ));
+        };
+        let copy = self.allocate_value(BackendValueType::Aggregate { layout });
+        if let Some(type_name) = self.nominal_type(value).cloned() {
+            self.remember_nominal_type(copy, type_name);
+        }
+        instructions.push(BackendInstruction::AggregateCopy {
+            result: copy,
+            source: value,
+            layout,
+            span,
+        });
+        Ok(copy)
     }
     pub(super) fn scalar_loan_prologue(&self) -> Vec<BackendInstruction> {
         self.scalar_loan_parameters
@@ -427,61 +466,5 @@ impl SharedExpressionProvider<'_> {
             }
         };
         self.lower_integer_binary(operation, left, right, *span, instructions)
-    }
-
-    fn lower_compare(
-        &mut self,
-        left: BackendValueId,
-        right: BackendValueId,
-        operator: BinaryOp,
-        span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<BackendValueId, BackendContractError> {
-        let operation = match operator {
-            BinaryOp::LessThan => BackendIntegerCompareOp::LessThan,
-            BinaryOp::LessEquals => BackendIntegerCompareOp::LessEquals,
-            BinaryOp::GreaterThan => BackendIntegerCompareOp::GreaterThan,
-            BinaryOp::GreaterEquals => BackendIntegerCompareOp::GreaterEquals,
-            BinaryOp::Equals => BackendIntegerCompareOp::Equals,
-            BinaryOp::NotEquals => BackendIntegerCompareOp::NotEquals,
-            _ => return Err(unsupported(span, "comparison operator expected")),
-        };
-        let left_type = self
-            .value_type(left)
-            .ok_or_else(|| unsupported(span, "left comparison operand type is unavailable"))?;
-        let right_type = self
-            .value_type(right)
-            .ok_or_else(|| unsupported(span, "right comparison operand type is unavailable"))?;
-        if let (
-            BackendValueType::Float { width: left_width },
-            BackendValueType::Float { width: right_width },
-        ) = (left_type, right_type)
-        {
-            if left_width != right_width {
-                return Err(unsupported(span, "floating-point comparison widths must match"));
-            }
-            let result = self.allocate();
-            self.remember_value(result, BackendValueType::Bool);
-            instructions.push(BackendInstruction::FloatCompare {
-                result,
-                operation,
-                left,
-                right,
-                ty: left_type,
-                span,
-            });
-            return Ok(result);
-        }
-        let result = self.allocate();
-        self.remember_value(result, BackendValueType::Bool);
-        instructions.push(BackendInstruction::IntegerCompare {
-            result,
-            operation,
-            left,
-            right,
-            signed: matches!(left_type, BackendValueType::Integer { signed: true, .. }),
-            span,
-        });
-        Ok(result)
     }
 }
