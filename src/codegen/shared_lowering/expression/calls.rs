@@ -57,7 +57,7 @@ pub(super) fn lower_call(
             instructions,
         );
     }
-    if matches!(lookup_call_intrinsic(callee), Some(IntrinsicKind::Print | IntrinsicKind::Eprint)) {
+    if is_print_intrinsic_call(provider, callee, expression_arguments(expression)) {
         return print::lower_print_call(
             provider,
             callee,
@@ -68,6 +68,21 @@ pub(super) fn lower_call(
         );
     }
     lower_user_call(provider, callee, arguments, lowered.writebacks, *span, instructions)
+}
+
+fn is_print_intrinsic_call(
+    provider: &SharedExpressionProvider<'_>,
+    callee: &str,
+    arguments: &[crate::ast::Argument],
+) -> bool {
+    if !matches!(lookup_call_intrinsic(callee), Some(IntrinsicKind::Print | IntrinsicKind::Eprint))
+    {
+        return false;
+    }
+    !(callee == "eprint"
+        && arguments.len() == 1
+        && arguments[0].name.as_deref() == Some("buffer")
+        && provider.return_types.contains_key(callee))
 }
 
 fn lower_user_call(

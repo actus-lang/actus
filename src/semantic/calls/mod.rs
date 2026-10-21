@@ -56,7 +56,10 @@ impl Analyzer {
         if self.visit_scalar_copy_call(callee, arguments, span)? {
             return Ok(());
         }
-        if matches!(callee, "print" | "eprint") && print_uses_label(arguments) {
+        if matches!(callee, "print" | "eprint")
+            && print_uses_label(arguments)
+            && !signatures::has_matching_named_signature(self.signatures.get(callee), arguments)
+        {
             return self.visit_intrinsic_call(callee, arguments, span).map(|_| ());
         }
         if let Some(result) = self.visit_special_call(callee, arguments, span)? {
