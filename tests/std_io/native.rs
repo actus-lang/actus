@@ -76,13 +76,13 @@ fn std_io_native_bridge_separates_stdout_and_stderr() {
         "streams",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg value = 42; print_int(value: value); eprint_int(value: value); return 0; }\n",
+        "import io; verb main() -> Int { erg value = 42; erg flag = true; print(int: value); eprint(int: value); eprint(bool: flag); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("std io fixture should run");
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"42\n");
-    assert_eq!(execution.stderr, b"42\n");
+    assert_eq!(execution.stderr, b"42\ntrue\n");
     let _ = fs::remove_dir_all(root);
 }
 
@@ -92,7 +92,7 @@ fn std_io_native_bridge_prints_borrowed_buffer_text() {
         "text",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 72); append(text, 105); printb(text: abs text); printlnb(text: abs text); eprint(text: abs text); eprintln(text: abs text); flush(); return 0; }\n",
+        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 72); append(text, 105); printb(text: abs text); printlnb(text: abs text); eprint(buffer: abs text); eprintln(buffer: abs text); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("text fixture should run");
@@ -115,6 +115,32 @@ fn std_io_native_bridge_prints_string_text() {
     assert_eq!(execution.status.code(), Some(0));
     assert_eq!(execution.stdout, b"HelloHello\n");
     let _ = fs::remove_dir_all(root);
+}
+
+fn assert_labelled_print_output(backend: &str) {
+    let (root, input, output) = project(
+        &format!("labelled-{backend}"),
+        "open stdout;\nopen error;\n",
+        &["stdout.act", "error.act"],
+        "import io; verb main() -> Int { erg text = \"Hi\"; erg value = 42; erg flag = true; print(string: abs text); print(int: value); print(bool: flag); print(format: \"score={}\", int: value); print(format: \"ok={}\", bool: flag); return 0; }\n",
+    );
+    build_with_backend(&input, &output, backend);
+    let execution = Command::new(&output).output().expect("labelled print fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"Hi42\ntrue\nscore=42\nok=true\n");
+    assert_eq!(execution.stderr, b"");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn std_io_native_labelled_print_works_on_cranelift() {
+    assert_labelled_print_output("cranelift");
+}
+
+#[test]
+#[cfg(feature = "llvm")]
+fn std_io_native_labelled_print_works_on_llvm() {
+    assert_labelled_print_output("llvm");
 }
 
 #[test]

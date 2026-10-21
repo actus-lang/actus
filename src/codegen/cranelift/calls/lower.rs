@@ -36,13 +36,31 @@ pub(crate) fn lower_call(
         dynamic_roles: &target.dynamic_roles,
         ins_params: &target.ins_params,
     };
-    let mut values = lower_call_arguments(
-        function,
-        arguments,
-        &target.parameter_names,
-        &argument_modes,
-        context,
-    )?;
+    let mut values = if is_formatted_output(callee, arguments) {
+        arguments
+            .iter()
+            .map(|argument| {
+                super::super::expressions::lower_expression(
+                    function,
+                    &argument.expression,
+                    context.locals,
+                    context.local_types,
+                    context.functions,
+                    context.cleanup_schedule,
+                    context.string_data,
+                    context.layouts,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?
+    } else {
+        lower_call_arguments(
+            function,
+            arguments,
+            &target.parameter_names,
+            &argument_modes,
+            context,
+        )?
+    };
     let target = resolve_call_target(function, callee_name, arguments, target, &values, context)?;
     normalize_call_arguments(function, callee_name, &mut values)?;
     let result_address = allocate_return_address(function, target.return_type, context.layouts)?;
@@ -121,6 +139,20 @@ fn resolve_call_target<'a>(
     values: &[Value],
     context: &'a CallLoweringContext<'a, '_>,
 ) -> Result<&'a FunctionRef, BackendEmitError> {
+    if is_formatted_output(callee, arguments) {
+        let stderr = lookup_call_intrinsic(callee) == Some(IntrinsicKind::Eprint);
+        let bool_value =
+            arguments.get(1).and_then(|argument| argument.name.as_deref()) == Some("bool");
+        let symbol = match (stderr, bool_value) {
+            (false, false) => "actus_print_format_int",
+            (false, true) => "actus_print_format_bool",
+            (true, false) => "actus_print_format_int_stderr",
+            (true, true) => "actus_print_format_bool_stderr",
+        };
+        return context.functions.get(symbol).ok_or_else(|| {
+            BackendEmitError(format!("native runtime function `{symbol}` is unavailable"))
+        });
+    }
     if lookup_call_intrinsic(callee) == Some(IntrinsicKind::Print)
         && target.parameter_names == ["value"]
         && values.first().is_some_and(|value| function.func.dfg.value_type(*value) == types::I64)
@@ -134,17 +166,25 @@ fn resolve_call_target<'a>(
             )
             .ok()
         });
-        let symbol = if argument_type == Some(NativeType::Buffer) {
-            "actus_print_buffer_stdout"
-        } else {
-            "actus_print_string"
-        };
+        let symbol =
+            if arguments.first().and_then(|argument| argument.name.as_deref()) == Some("bool") {
+                "actus_print_bool"
+            } else if argument_type == Some(NativeType::Buffer) {
+                "actus_print_buffer_stdout"
+            } else {
+                "actus_print_string"
+            };
         context.functions.get(symbol).ok_or_else(|| {
             BackendEmitError(format!("native runtime function `{symbol}` is unavailable"))
         })
     } else {
         Ok(target)
     }
+}
+
+fn is_formatted_output(callee: &str, arguments: &[Argument]) -> bool {
+    matches!(lookup_call_intrinsic(callee), Some(IntrinsicKind::Print | IntrinsicKind::Eprint))
+        && arguments.first().and_then(|argument| argument.name.as_deref()) == Some("format")
 }
 
 fn normalize_call_arguments(

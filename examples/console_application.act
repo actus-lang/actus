@@ -11,7 +11,7 @@ verb main() -> Int {
     return case dat result {
         Result.Ok(_) => {
             printlnb(text: abs input);
-            eprintln(text: abs input);
+            eprintln(buffer: abs input);
             flush();
             return 0;
         },
@@ -20,7 +20,7 @@ verb main() -> Int {
                 erg message = Buffer[0];
                 append(message, 69);
                 append(message, 79);
-                eprintln(text: abs message);
+                eprintln(buffer: abs message);
                 return 2;
             },
             IoError.Failed => {

@@ -1,6 +1,9 @@
 """Re-export console and stream I/O contracts."""
 open io;
 
+"""Re-export bounded hosted process arguments."""
+open process;
+
 """Re-export raw, platform-aware path representation."""
 open path;
 

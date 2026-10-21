@@ -37,8 +37,8 @@ operations:
 ```act
 open verb print(abs text: Buffer) -> Result[Int, IoError];
 open verb println(abs text: Buffer) -> Result[Int, IoError];
-open verb eprint(abs text: Buffer) -> Result[Int, IoError];
-open verb eprintln(abs text: Buffer) -> Result[Int, IoError];
+open verb eprint(abs buffer: Buffer) -> Result[Int, IoError];
+open verb eprintln(abs buffer: Buffer) -> Result[Int, IoError];
 open verb flush() -> Result[Int, IoError];
 ```
 

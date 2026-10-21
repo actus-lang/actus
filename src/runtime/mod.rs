@@ -7,6 +7,7 @@ mod contract;
 mod fs;
 mod input;
 mod path;
+mod process;
 mod region;
 mod region_bridge;
 #[cfg(test)]
@@ -31,7 +32,9 @@ pub use capabilities::{
     RegionCapabilityTable,
 };
 pub use console::{
-    actus_flush_stderr, actus_flush_stdout, actus_print_buffer_stderr, actus_print_buffer_stdout,
+    actus_flush_stderr, actus_flush_stdout, actus_print_bool, actus_print_bool_stderr,
+    actus_print_buffer_stderr, actus_print_buffer_stdout, actus_print_format_bool,
+    actus_print_format_bool_stderr, actus_print_format_int, actus_print_format_int_stderr,
     actus_print_int, actus_print_int_stderr, actus_print_line_buffer_stderr,
     actus_print_line_buffer_stdout, actus_print_string, actus_print_string_stderr,
     actus_string_byte_at, actus_string_copy_to_buffer, actus_string_length,
@@ -44,10 +47,16 @@ pub use contract::{
     BUFFER_CRC32_SYMBOL, BUFFER_DROP_SYMBOL, BUFFER_LENGTH_SYMBOL, BUFFER_RESERVE_SYMBOL,
     BUFFER_VALIDATE_FIXED_FRAME_SYMBOL, BUFFERED_WRITE_STDOUT_SYMBOL, ENUM_ALLOCATE_SYMBOL,
     ENUM_DROP_SYMBOL, FLUSH_BUFFERED_STDOUT_SYMBOL, FLUSH_STDERR_SYMBOL, FLUSH_STDOUT_SYMBOL,
-    MONOTONIC_NANOS_SYMBOL, PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL,
-    PRINT_INT_STDERR_SYMBOL, PRINT_INT_SYMBOL, PRINT_LINE_BUFFER_STDERR_SYMBOL,
-    PRINT_LINE_BUFFER_STDOUT_SYMBOL, PRINT_STRING_STDERR_SYMBOL, PRINT_STRING_SYMBOL,
-    READ_BYTE_SYMBOL, READ_STDIN_LINE_SYMBOL, REGION_CANCEL_SYMBOL, REGION_CLOSE_SYMBOL,
+    MONOTONIC_NANOS_SYMBOL, PRINT_BOOL_STDERR_SYMBOL, PRINT_BOOL_SYMBOL,
+    PRINT_BUFFER_STDERR_SYMBOL, PRINT_BUFFER_STDOUT_SYMBOL, PRINT_FORMAT_BOOL_STDERR_SYMBOL,
+    PRINT_FORMAT_BOOL_SYMBOL, PRINT_FORMAT_INT_STDERR_SYMBOL, PRINT_FORMAT_INT_SYMBOL,
+    PRINT_FORMAT_MAX_BYTES, PRINT_INT_STDERR_SYMBOL, PRINT_INT_SYMBOL,
+    PRINT_LINE_BUFFER_STDERR_SYMBOL, PRINT_LINE_BUFFER_STDOUT_SYMBOL, PRINT_STRING_STDERR_SYMBOL,
+    PRINT_STRING_SYMBOL, PROCESS_ARG_COUNT_SYMBOL, PROCESS_ARG_SYMBOL, PROCESS_MAX_ARGUMENT_BYTES,
+    PROCESS_MAX_ARGUMENTS, PROCESS_STATUS_ARGUMENT_TOO_LARGE, PROCESS_STATUS_BUFFER_TOO_SMALL,
+    PROCESS_STATUS_INVALID_ENCODING, PROCESS_STATUS_INVALID_INDEX,
+    PROCESS_STATUS_TOO_MANY_ARGUMENTS, PROCESS_STATUS_UNAVAILABLE, READ_BYTE_SYMBOL,
+    READ_STDIN_LINE_SYMBOL, REGION_CANCEL_SYMBOL, REGION_CLOSE_SYMBOL,
     REGION_DESCRIPTOR_ABI_VERSION, REGION_DIRTY_SYMBOL, REGION_DROP_SYMBOL,
     REGION_GENERATION_SYMBOL, REGION_LOGICAL_LENGTH_SYMBOL, REGION_MAX_BULK_BYTES,
     REGION_OPEN_SYMBOL, REGION_PIN_SYMBOL, REGION_PINNED_SYMBOL, REGION_PROVIDER_QUEUE_CAPACITY,
@@ -85,6 +94,7 @@ pub use path::{
     actus_windows_root_kind, components, extension, file_name, file_stem, posix_is_separator,
     posix_root, validate_posix, validate_windows, windows_is_separator, windows_root,
 };
+pub use process::{actus_process_arg, actus_process_arg_count};
 pub use region::{
     InMemoryRegion, MutableRegionView, RegionAddressProfile, RegionDescriptor, RegionError,
     RegionGeneration, RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,

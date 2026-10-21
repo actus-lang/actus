@@ -6,6 +6,12 @@ fn reports_success_after_printing_an_integer() {
 }
 
 #[test]
+fn reports_success_after_printing_a_boolean() {
+    assert_eq!(actus::runtime::actus_print_bool(1), 0);
+    assert_eq!(actus::runtime::actus_print_bool(0), 0);
+}
+
+#[test]
 fn returns_printed_string_length() {
     let text = std::ffi::CString::new("Actus").expect("test string should be valid");
     let length = unsafe { actus::runtime::actus_print_string(text.as_ptr().cast()) };

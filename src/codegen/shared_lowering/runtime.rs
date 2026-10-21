@@ -11,9 +11,20 @@ pub(crate) fn append_print_externals(
 ) -> Result<(), BackendContractError> {
     for (symbol, ty) in [
         (crate::runtime::PRINT_INT_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
+        (crate::runtime::PRINT_BOOL_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
+        (
+            crate::runtime::PRINT_INT_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: true, width: 32 },
+        ),
+        (
+            crate::runtime::PRINT_BOOL_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: true, width: 32 },
+        ),
         (crate::runtime::PRINT_STRING_SYMBOL, BackendValueType::Pointer),
+        (crate::runtime::PRINT_STRING_STDERR_SYMBOL, BackendValueType::Pointer),
         (crate::runtime::WRITE_STRING_STDOUT_SYMBOL, BackendValueType::Pointer),
         (crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL, BackendValueType::Pointer),
+        (crate::runtime::PRINT_BUFFER_STDERR_SYMBOL, BackendValueType::Pointer),
     ] {
         if !required_symbols.contains(symbol) {
             continue;
@@ -35,6 +46,50 @@ pub(crate) fn append_print_externals(
                 role: None,
                 ty: BackendValueType::Integer { signed: true, width: 32 },
                 passing: super::BackendReturnMode::Direct,
+            },
+            runtime_pointer_return: false,
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn append_format_externals(
+    externals: &mut Vec<BackendExternal>,
+    required_symbols: &std::collections::BTreeSet<String>,
+) -> Result<(), BackendContractError> {
+    for symbol in [
+        crate::runtime::PRINT_FORMAT_INT_SYMBOL,
+        crate::runtime::PRINT_FORMAT_BOOL_SYMBOL,
+        crate::runtime::PRINT_FORMAT_INT_STDERR_SYMBOL,
+        crate::runtime::PRINT_FORMAT_BOOL_STDERR_SYMBOL,
+    ] {
+        if !required_symbols.contains(symbol)
+            || externals.iter().any(|external| external.symbol.as_str() == symbol)
+        {
+            continue;
+        }
+        externals.push(BackendExternal {
+            symbol: SymbolIdentity::external_raw(symbol).map_err(|error| {
+                unsupported(crate::lexer::SourceSpan::new(0, 0), error.to_string())
+            })?,
+            parameters: vec![
+                BackendParameter {
+                    name: "format".to_owned(),
+                    role: crate::ast::Role::Abs,
+                    ty: BackendValueType::Pointer,
+                    passing: BackendPassingMode::Direct,
+                },
+                BackendParameter {
+                    name: "value".to_owned(),
+                    role: crate::ast::Role::Erg,
+                    ty: BackendValueType::Integer { signed: true, width: 32 },
+                    passing: BackendPassingMode::Direct,
+                },
+            ],
+            return_value: BackendReturn {
+                role: None,
+                ty: BackendValueType::Integer { signed: true, width: 32 },
+                passing: BackendReturnMode::Direct,
             },
             runtime_pointer_return: false,
         });

@@ -1,8 +1,8 @@
 use std::io::Write;
 
 use super::contract::{
-    STRING_COPY_STATUS_CAPACITY, STRING_COPY_STATUS_INVALID_UTF8, STRING_STATUS_INVALID_UTF8,
-    STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS,
+    PRINT_FORMAT_MAX_BYTES, STRING_COPY_STATUS_CAPACITY, STRING_COPY_STATUS_INVALID_UTF8,
+    STRING_STATUS_INVALID_UTF8, STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS,
 };
 use super::stream::write_buffer;
 use super::types::{ActusBuffer, BufferHandle};
@@ -15,6 +15,77 @@ pub extern "C" fn actus_print_int(value: i32) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_print_int_stderr(value: i32) -> i32 {
     if writeln!(std::io::stderr(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_bool(value: i32) -> i32 {
+    let text = if value == 0 { "false" } else { "true" };
+    if writeln!(std::io::stdout(), "{text}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_bool_stderr(value: i32) -> i32 {
+    let text = if value == 0 { "false" } else { "true" };
+    if writeln!(std::io::stderr(), "{text}").is_ok() { 0 } else { -1 }
+}
+
+unsafe fn print_format_value(format: *const u8, value: &str, stderr: bool) -> i32 {
+    if format.is_null() {
+        return -1;
+    }
+    let template = unsafe { std::ffi::CStr::from_ptr(format.cast()) }.to_string_lossy();
+    if template.len() > PRINT_FORMAT_MAX_BYTES || template.matches("{}").count() != 1 {
+        return -1;
+    }
+    let rendered = template.replace("{}", value);
+    let result = if stderr {
+        writeln!(std::io::stderr(), "{rendered}")
+    } else {
+        writeln!(std::io::stdout(), "{rendered}")
+    };
+    if result.is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one integer into a bounded one-placeholder format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_int(format: *const u8, value: i32) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), false) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one boolean into a bounded one-placeholder format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_bool(format: *const u8, value: i32) -> i32 {
+    let text = if value == 0 { "false" } else { "true" };
+    unsafe { print_format_value(format, text, false) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one integer into a bounded stderr format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_int_stderr(format: *const u8, value: i32) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), true) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one boolean into a bounded stderr format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_bool_stderr(format: *const u8, value: i32) -> i32 {
+    let text = if value == 0 { "false" } else { "true" };
+    unsafe { print_format_value(format, text, true) }
 }
 
 /// Prints a null-terminated UTF-8 string followed by a newline.

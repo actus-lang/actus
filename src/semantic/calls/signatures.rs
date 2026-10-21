@@ -1,6 +1,6 @@
 use crate::ast::{
-    BuiltinType, DispatchMode, ExternalVerbDecl, GenericParam, ReturnAccess, Role, VerbDecl,
-    lookup_builtin_type,
+    Argument, BuiltinType, DispatchMode, ExternalVerbDecl, GenericParam, ReturnAccess, Role,
+    VerbDecl, lookup_builtin_type,
 };
 
 use super::super::analyzer::canonical_type_name;
@@ -14,6 +14,19 @@ pub(crate) struct VerbSignature {
     pub(crate) return_access: Option<ReturnAccess>,
     pub(crate) generic_parameters: Vec<GenericParam>,
     pub(crate) external: bool,
+}
+
+pub(super) fn has_matching_named_signature(
+    signature: Option<&VerbSignature>,
+    arguments: &[Argument],
+) -> bool {
+    let Some(signature) = signature else { return false };
+    arguments.len() == signature.params.len()
+        && arguments.iter().all(|argument| {
+            argument.name.as_ref().is_some_and(|name| {
+                signature.params.iter().any(|(parameter, _, _)| parameter == name)
+            })
+        })
 }
 
 impl VerbDecl {

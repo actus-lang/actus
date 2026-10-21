@@ -47,8 +47,10 @@ fn widen_value(
     value: LLVMValueRef,
     ty: BackendValueType,
 ) -> Result<LLVMValueRef, BackendEmitError> {
-    let BackendValueType::Integer { signed, width } = ty else {
-        return Err(BackendEmitError("LLVM cast source must be an integer".to_owned()));
+    let (signed, width) = match ty {
+        BackendValueType::Integer { signed, width } => (signed, width),
+        BackendValueType::Bool => (false, 1),
+        _ => return Err(BackendEmitError("LLVM cast source must be an integer".to_owned())),
     };
     if width == 64 {
         return Ok(value);
@@ -72,11 +74,12 @@ fn validity(
     source: BackendValueType,
     target: BackendValueType,
 ) -> Result<LLVMValueRef, BackendEmitError> {
-    let (
-        BackendValueType::Integer { signed: source_signed, .. },
-        BackendValueType::Integer { signed: target_signed, width: target_width },
-    ) = (source, target)
-    else {
+    let source_signed = match source {
+        BackendValueType::Bool => false,
+        BackendValueType::Integer { signed, .. } => signed,
+        _ => return Err(BackendEmitError("LLVM cast types are invalid".to_owned())),
+    };
+    let BackendValueType::Integer { signed: target_signed, width: target_width } = target else {
         return Err(BackendEmitError("LLVM cast types are invalid".to_owned()));
     };
     let zero = unsafe { LLVMConstInt(i64_type(context), 0, 0) };

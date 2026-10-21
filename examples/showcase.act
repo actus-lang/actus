@@ -31,6 +31,6 @@ verb main() -> Int {
     }
     rand();
     erg consumed = consume(packet: buffer);
-    print(value: value + consumed);
+    print(int: value + consumed);
     return value + consumed;
 }

@@ -199,6 +199,32 @@ fn validates_print_arguments() {
 }
 
 #[test]
+fn accepts_labelled_print_intrinsic_for_strings_and_integers() {
+    analyze_source(
+        "verb main() { erg bytes = Buffer[1]; print(string: \"text\"); print(int: 42); print(byte: 7u8); print(bool: true); print(buffer: abs bytes); }",
+    )
+        .expect("labelled output should be valid");
+}
+
+#[test]
+fn accepts_typed_stderr_and_bounded_format_output() {
+    analyze_source(
+        "verb main() { erg text = \"value={}\"; erg number = 42; eprint(string: abs text); eprint(int: number); eprint(bool: true); print(format: abs text, int: number); print(format: \"ready={}\", bool: true); }",
+    )
+    .expect("typed stderr and bounded format output should be valid");
+}
+
+#[test]
+fn rejects_labelled_print_intrinsic_with_a_mismatched_type() {
+    let error = analyze_source("verb main() { print(int: \"text\"); }")
+        .expect_err("integer label must reject string values");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::InvalidIntrinsicArgument { parameter, .. } if parameter == "int"
+    ));
+}
+
+#[test]
 fn validates_typed_constants_and_resolves_constant_references() {
     analyze_source("const FRAME_HEADER: u16 = 12u16; verb main() -> u16 { return FRAME_HEADER; }")
         .expect("typed constant reference should be valid");

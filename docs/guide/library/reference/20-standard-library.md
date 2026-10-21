@@ -42,20 +42,26 @@ The public I/O facade includes:
 - `write(abs buffer: Buffer) -> Result[Int, IoError]`;
 - `read_line(ins buffer: Buffer) -> Result[Int, IoError]`;
 - `read_byte() -> Result[Int, IoError]`;
-- `print(abs text: String) -> Result[Int, IoError]`;
+- `print(string: abs value)`, `print(int: erg value)`, `print(byte: erg value)`,
+  `print(bool: erg value)`, and `print(buffer: abs value)` for labelled output;
 - `println(abs text: String) -> Result[Int, IoError]`;
-- `print_int(erg value: Int) -> Result[Int, IoError]`;
+- `print_int(erg value: Int)` as a compatibility alias;
 - `printb(abs text: Buffer) -> Result[Int, IoError]`;
 - `printlnb(abs text: Buffer) -> Result[Int, IoError]`;
-- `eprint_int`, `eprint`, and `eprintln` for stderr;
+- labelled `eprint(string: ...)`, `eprint(int: ...)`, `eprint(byte: ...)`,
+  `eprint(bool: ...)`, and `eprint(buffer: ...)` for stderr;
+- `eprint_int`, `eprint`, and `eprintln` remain compatibility wrappers;
 - `flush()` for stdout;
 - `Cursor` and cursor read/write/seek/flush operations;
 - buffered reader and writer types and operations;
 - `copy` for reader-to-writer transfer.
 
-Use `print` for `String`, `printb` for binary `Buffer`, and typed result
-handling for failures. Do not pass a `String` to `printb` or a `Buffer` to
-`print` without an explicit, documented conversion boundary.
+Use labelled `print(string: ...)`, `print(int: ...)`, `print(byte: ...)`,
+`print(bool: ...)`, or `print(buffer: ...)` for
+the unified console intrinsic. `printb` remains a compatibility wrapper for
+binary `Buffer` output, and typed result handling remains available through
+the explicit std wrappers. Do not pass a `String` to `printb` or a `Buffer` to
+`print(string: ...)`.
 
 `Result.Ok(count)` is the number of bytes processed, not merely a boolean
 success flag. EOF is a typed result condition where the API defines it.

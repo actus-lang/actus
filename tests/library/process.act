@@ -1,0 +1,49 @@
+import process;
+
+meta test
+verb process_arguments_are_bounded_and_ordered() -> Int {
+    erg created = arguments();
+    return case dat created {
+        Result.Err(_) => 1,
+        Result.Ok(state) => {
+            if count(arguments: abs state) < 1 {
+                return 2;
+            }
+            erg buffer = Buffer[4096];
+            erg first = next_arg(arguments: ins state, buffer: ins buffer);
+            return case dat first {
+                Result.Err(_) => 3,
+                Result.Ok(value) => {
+                    erg length: Option[Int] = value;
+                    return case dat length {
+                        Option.Some(byte_count) => if byte_count >= 0 {
+                            0;
+                        } else {
+                            4;
+                        },
+                        Option.None => 5,
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb process_arguments_reject_small_destination() -> Int {
+    erg created = arguments();
+    return case dat created {
+        Result.Err(_) => 0,
+        Result.Ok(state) => {
+            erg buffer = Buffer[0];
+            erg result = next_arg(arguments: ins state, buffer: ins buffer);
+            return case dat result {
+                Result.Err(error) => case dat error {
+                    ProcessError.BufferTooSmall => 0,
+                    _ => 1,
+                },
+                Result.Ok(_) => 1,
+            };
+        },
+    };
+}

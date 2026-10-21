@@ -1,0 +1,28 @@
+"""
+Hosted command-line argument access for Actus applications.
+
+This module is available only when the selected target has a hosted process
+environment. It exposes a bounded cursor instead of changing `main()` or
+exposing native pointers. The first value produced by `next_arg` is the host
+executable path (`argv[0]`); user-supplied values follow in their original
+order. Use `count` to inspect the total before reading values.
+
+Typical use:
+
+    erg created = arguments();
+    case dat created {
+        Result.Ok(state) => {
+            erg total = count(arguments: abs state);
+            erg storage = Buffer[4096];
+            erg next = next_arg(arguments: ins state, buffer: ins storage);
+        },
+        Result.Err(error) => { },
+    };
+
+Every read writes from buffer offset zero. The caller owns the `Buffer` and
+must provide enough capacity; the API never grows or retains that buffer.
+"""
+open error;
+
+"""Re-export the bounded process argument cursor and reader operations."""
+open arguments;

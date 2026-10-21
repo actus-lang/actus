@@ -13,9 +13,9 @@ verb main() -> Int {
     erg bound: u32 = index + 1u32;
     erg signed_offset: i32 = -1i32;
     if bound > index {
-        print((values[index] as Int) + (signed_offset as Int) + (branch as Int));
+        print(int: (values[index] as Int) + (signed_offset as Int) + (branch as Int));
     } else {
-        print(0);
+        print(int: 0);
     }
     return 0;
 }

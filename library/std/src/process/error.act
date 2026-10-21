@@ -1,0 +1,19 @@
+"""
+Typed failures for the hosted `std::process` argument boundary. These errors
+are deterministic bounded outcomes; callers should handle them before using
+the returned cursor or destination-buffer contents.
+"""
+open enum ProcessError {
+    """The hosted process provider could not be read or the native boundary rejected the request."""
+    Unavailable,
+    """The host supplied an argument whose bytes cannot be represented as UTF-8."""
+    InvalidEncoding,
+    """The host supplied more than `PROCESS_MAX_ARGUMENTS` values, including `argv[0]`."""
+    TooManyArguments,
+    """The cursor or native index is invalid; no destination-buffer mutation is promised."""
+    InvalidIndex,
+    """The caller-owned destination capacity is smaller than the argument's UTF-8 byte length."""
+    BufferTooSmall,
+    """One host argument exceeds `PROCESS_MAX_ARGUMENT_BYTES` UTF-8 bytes."""
+    ArgumentTooLarge,
+}

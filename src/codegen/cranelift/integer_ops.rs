@@ -98,8 +98,10 @@ fn widen_integer(
     value: cranelift_codegen::ir::Value,
     ty: BackendValueType,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
-    let BackendValueType::Integer { signed, .. } = ty else {
-        return Err(BackendEmitError("integer cast source must be an integer".to_owned()));
+    let signed = match ty {
+        BackendValueType::Integer { signed, .. } => signed,
+        BackendValueType::Bool => false,
+        _ => return Err(BackendEmitError("integer cast source must be an integer".to_owned())),
     };
     Ok(if builder.func.dfg.value_type(value) == types::I64 {
         value
@@ -116,11 +118,12 @@ fn cast_validity(
     source: BackendValueType,
     target: BackendValueType,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
-    let (
-        BackendValueType::Integer { signed: source_signed, .. },
-        BackendValueType::Integer { signed: target_signed, width: target_width },
-    ) = (source, target)
-    else {
+    let source_signed = match source {
+        BackendValueType::Bool => false,
+        BackendValueType::Integer { signed, .. } => signed,
+        _ => return Err(BackendEmitError("integer cast types are invalid".to_owned())),
+    };
+    let BackendValueType::Integer { signed: target_signed, width: target_width } = target else {
         return Err(BackendEmitError("integer cast types are invalid".to_owned()));
     };
     let zero = builder.ins().iconst(types::I64, 0);

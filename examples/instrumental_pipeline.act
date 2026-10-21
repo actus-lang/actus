@@ -15,6 +15,6 @@ verb main() -> Int {
     enrich(target: ins buffer);
     """The caller still owns the same buffer after both loans complete."""
     append(buffer, 0);
-    print(42);
+    print(int: 42);
     return 42;
 }

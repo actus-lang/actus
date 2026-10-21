@@ -7,6 +7,7 @@ pub enum IntrinsicKind {
     ValidateFixedFrame,
     Copy,
     Print,
+    Eprint,
     Drop,
     SizeOf,
     AlignOf,
@@ -62,11 +63,8 @@ impl IntrinsicKind {
                 parameters: &["value"],
                 status: RegistryStatus::Active,
             },
-            Self::Print => IntrinsicSpec {
-                name: "print",
-                parameters: &["value"],
-                status: RegistryStatus::Active,
-            },
+            Self::Print => output_spec("print"),
+            Self::Eprint => output_spec("eprint"),
             Self::Drop => IntrinsicSpec {
                 name: "drop",
                 parameters: &["binding"],
@@ -76,6 +74,10 @@ impl IntrinsicKind {
             Self::AlignOf => layout_spec("align_of"),
         }
     }
+}
+
+const fn output_spec(name: &'static str) -> IntrinsicSpec {
+    IntrinsicSpec { name, parameters: &["value"], status: RegistryStatus::Active }
 }
 
 const fn layout_spec(name: &'static str) -> IntrinsicSpec {
@@ -91,6 +93,7 @@ pub fn lookup_intrinsic(name: &str) -> Option<IntrinsicKind> {
         "validate_fixed_frame" => Some(IntrinsicKind::ValidateFixedFrame),
         "copy" => Some(IntrinsicKind::Copy),
         "print" => Some(IntrinsicKind::Print),
+        "eprint" => Some(IntrinsicKind::Eprint),
         "drop" => Some(IntrinsicKind::Drop),
         "size_of" => Some(IntrinsicKind::SizeOf),
         "align_of" => Some(IntrinsicKind::AlignOf),
@@ -109,6 +112,7 @@ pub fn lookup_call_intrinsic(name: &str) -> Option<IntrinsicKind> {
             | IntrinsicKind::ValidateFixedFrame
             | IntrinsicKind::Copy
             | IntrinsicKind::Print
+            | IntrinsicKind::Eprint
             | IntrinsicKind::SizeOf
             | IntrinsicKind::AlignOf,
         ) => lookup_intrinsic(base_name),

@@ -14,7 +14,8 @@ pub(super) fn is_reserved_name(name: &str) -> bool {
     // already yields to a locally registered signature, so the name must remain
     // available to module-scoped declarations without weakening the intrinsic
     // fallback for scalar reuse.
-    name == "allocate" || (lookup_intrinsic(name).is_some() && !matches!(name, "print" | "copy"))
+    name == "allocate"
+        || (lookup_intrinsic(name).is_some() && !matches!(name, "print" | "eprint" | "copy"))
 }
 
 impl Analyzer {
@@ -71,6 +72,7 @@ impl Analyzer {
             IntrinsicKind::ValidateFixedFrame => self.validate_fixed_frame(arguments, callee, span),
             IntrinsicKind::Copy => self.validate_copy(arguments, callee, span),
             IntrinsicKind::Print => self.validate_print(callee, arguments, span),
+            IntrinsicKind::Eprint => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
             IntrinsicKind::SizeOf => self.validate_size_of(callee, arguments, span),
             IntrinsicKind::AlignOf => self.validate_align_of(callee, arguments, span),
@@ -317,35 +319,6 @@ impl Analyzer {
             },
             span: expression_span(expression),
         })
-    }
-
-    fn validate_print(
-        &mut self,
-        callee: &str,
-        arguments: &[Argument],
-        span: SourceSpan,
-    ) -> Result<bool, SemanticError> {
-        let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
-        let argument = arguments[0];
-        self.visit_expression(&argument.expression)?;
-        let value_type =
-            self.expression_type(&argument.expression).ok_or_else(|| SemanticError {
-                kind: SemanticErrorKind::InvalidIntrinsicArgument {
-                    callee: callee.to_owned(),
-                    parameter: IntrinsicKind::Print.spec().parameters[0].to_owned(),
-                },
-                span: expression_span(&argument.expression),
-            })?;
-        if !matches!(value_type, crate::ast::BuiltinType::Int | crate::ast::BuiltinType::String) {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::InvalidIntrinsicArgument {
-                    callee: callee.to_owned(),
-                    parameter: IntrinsicKind::Print.spec().parameters[0].to_owned(),
-                },
-                span: expression_span(&argument.expression),
-            });
-        }
-        Ok(true)
     }
 
     fn bind_intrinsic_arguments<'a>(

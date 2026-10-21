@@ -23,6 +23,7 @@ mod packs;
 mod pattern_moves;
 mod pattern_support;
 mod patterns;
+mod print_validation;
 mod roles;
 mod scopes;
 mod serialization;
