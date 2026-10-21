@@ -74,6 +74,7 @@ fn infallible_verbs() -> BTreeSet<&'static str> {
         "buffered_reader",
         "buffered_writer",
         "cursor",
+        "count",
         "drop",
         "monotonic_nanos",
         "now",
