@@ -302,7 +302,7 @@ fn lsp_exposes_adr44_operators_and_length_aware_buffer_hover() {
     ];
     let stdout = run_lsp(messages.to_vec());
     assert!(stdout.contains("relational operator -> Bool"), "stdout: {stdout}");
-    assert!(stdout.contains("Writes exactly the Buffer live length"), "stdout: {stdout}");
+    assert!(stdout.contains("Writes one typed value to standard output"), "stdout: {stdout}");
     assert!(stdout.contains("\"label\":\"&&\""), "stdout: {stdout}");
     assert!(stdout.contains("\"label\":\"%\""), "stdout: {stdout}");
     assert!(stdout.contains("\"operator\""), "stdout: {stdout}");

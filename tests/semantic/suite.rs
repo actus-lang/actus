@@ -155,6 +155,14 @@ fn validates_case_branch_result_types_and_divergence() {
 }
 
 #[test]
+fn preserves_path_payload_state_across_dat_result_case_branches() {
+    analyze_source(
+        "enum Failure { Missing, } struct Config { erg brain_path: Buffer, } verb consume_path(dat path: Buffer) { drop(path); } verb inspect_case(erg result: Result[Config, Failure]) -> Int { return case dat result { Result.Ok(command) => { consume_path(path: dat command.brain_path); return 0; }, Result.Err(_) => 1, }; }",
+    )
+    .expect("a moved aggregate field must not corrupt the enclosing case join state");
+}
+
+#[test]
 fn rejects_invalid_nested_call_contracts() {
     let invalid_role = analyze_source(
         "verb update(ins slot: Int) { } verb main() { erg value = 0; if true { update(slot: abs value); } }",
