@@ -65,7 +65,11 @@ pub(crate) fn lower_case_block<'source>(
 ) -> Result<CaseBlockState<'source>, BackendEmitError> {
     let mut branch_locals = locals.clone();
     let mut branch_types = types.clone();
-    let (prefix, tail) = case_block_parts(block, value_producing);
+    let synthetic_tail = value_case_if_tail(block, value_producing);
+    let (prefix, tail) = match synthetic_tail.as_ref() {
+        Some(expression) => (&block.statements[..block.statements.len() - 1], Some(expression)),
+        None => case_block_parts(block, value_producing),
+    };
     let flow = super::statements::lower_statements(
         function,
         prefix,
@@ -100,6 +104,26 @@ pub(crate) fn lower_case_block<'source>(
         layouts,
     )?;
     Ok((flow, branch_locals, branch_types, tail_value))
+}
+
+fn value_case_if_tail(
+    block: &crate::ast::Block,
+    value_producing: bool,
+) -> Option<crate::ast::Expr> {
+    if !value_producing {
+        return None;
+    }
+    let Some(crate::ast::Stmt::If { condition, then_branch, else_branch, span }) =
+        block.statements.last()
+    else {
+        return None;
+    };
+    Some(crate::ast::Expr::If {
+        condition: Box::new(condition.clone()),
+        then_branch: then_branch.clone(),
+        else_branch: else_branch.clone(),
+        span: *span,
+    })
 }
 
 fn case_block_parts(
