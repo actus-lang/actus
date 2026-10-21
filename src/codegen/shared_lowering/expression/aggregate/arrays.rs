@@ -31,6 +31,9 @@ pub(super) fn lower_array_element(
     let result = provider.allocate();
     provider.remember_value(result, location.element_type);
     provider.remember_nominal_type(result, location.element_type_name);
+    if matches!(location.element_type, BackendValueType::Aggregate { .. }) {
+        provider.remember_aggregate_place(result);
+    }
     instructions.push(BackendInstruction::ArrayElementLoad {
         result,
         base: location.base,

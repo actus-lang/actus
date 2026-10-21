@@ -171,6 +171,27 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         let value = state::coerce_owner_value(self, value, declared_type, span, instructions)?;
+        let value = if self.is_aggregate_place(value) {
+            let BackendValueType::Aggregate { layout } = self
+                .value_type(value)
+                .ok_or_else(|| unsupported(span, "aggregate owner value has no layout"))?
+            else {
+                return Err(unsupported(span, "aggregate owner value has an invalid type"));
+            };
+            let copy = self.allocate_value(BackendValueType::Aggregate { layout });
+            if let Some(type_name) = self.nominal_type(value).cloned() {
+                self.remember_nominal_type(copy, type_name);
+            }
+            instructions.push(BackendInstruction::AggregateCopy {
+                result: copy,
+                source: value,
+                layout,
+                span,
+            });
+            copy
+        } else {
+            value
+        };
         if let Some(declared_type) =
             declared_type.and_then(|name| crate::semantic::parse_type_name_key(name, span))
             && self.layouts.layout_for(&declared_type).is_some()

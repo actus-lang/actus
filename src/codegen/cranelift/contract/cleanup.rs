@@ -148,6 +148,7 @@ fn needs_aggregate_allocator(backend_module: &BackendModule) -> bool {
         function.blocks.iter().any(|block| {
             block.instructions.iter().any(|instruction| {
                 matches!(instruction, BackendInstruction::AggregateConstruct { layout, .. }
+                    | BackendInstruction::AggregateCopy { layout, .. }
                     if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
             })
         })

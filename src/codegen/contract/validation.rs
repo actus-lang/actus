@@ -72,6 +72,7 @@ fn validate_instruction_kind(instruction: &BackendInstruction) -> Result<(), Bac
             validate_arena_instruction(instruction)
         }
         BackendInstruction::AggregateConstruct { .. }
+        | BackendInstruction::AggregateCopy { .. }
         | BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. }
         | BackendInstruction::ArrayElementLoad { .. } => {
@@ -188,6 +189,13 @@ fn validate_aggregate_instruction(
     match instruction {
         BackendInstruction::AggregateConstruct { layout, fields, .. } => {
             validate_aggregate_construct(*layout, fields)
+        }
+        BackendInstruction::AggregateCopy { layout, .. } => {
+            if layout.size == 0 || layout.alignment == 0 || !layout.alignment.is_power_of_two() {
+                Err(BackendContractError::InvalidAggregateInstruction)
+            } else {
+                Ok(())
+            }
         }
         BackendInstruction::AggregateFieldLoad {
             aggregate_layout,

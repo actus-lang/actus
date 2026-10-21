@@ -764,6 +764,47 @@ fn both_native_backends_build_and_run_a_shared_aggregate_array_element_replaceme
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_build_and_run_large_aggregate_array_element_self_copy() {
+    let source = "struct Cell { erg storage: Array[u8, 64], } struct Fabric { erg columns: Array[Cell, 1024], } struct Brain { erg fabrics: Array[Fabric, 2], } verb main() -> Int { erg brain: Brain = Brain { fabrics: Array[Fabric, 2](), }; erg local_fabric: Fabric = brain.fabrics[0u32]; brain.fabrics[0u32] = local_fabric; return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-{backend}-large-aggregate-array-self-copy-{}",
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create large aggregate self-copy fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"large-aggregate-array-self-copy-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write large aggregate self-copy manifest");
+        fs::write(&input, source).expect("write large aggregate self-copy source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build large aggregate self-copy");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run large aggregate self-copy fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} large aggregate self-copy");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_build_and_run_a_shared_nested_aggregate_array_element_store() {
     let source = "struct Point { x: u32, } struct Line { start: Point, } verb main() -> Int { erg values: Array[Line, 2] = Array[Line, 2](); values[1u32] = Line { start: Point { x: 41u32, }, }; return values[1u32].start.x as Int + 1; }\n";
     for backend in ["cranelift", "llvm"] {

@@ -46,6 +46,9 @@ pub(super) fn lower_field_access_expression(
     let result = provider.allocate();
     provider.remember_value(result, ty);
     remember_field_metadata(provider, result, &metadata.ty, &type_name, field);
+    if matches!(ty, BackendValueType::Aggregate { .. }) {
+        provider.remember_aggregate_place(result);
+    }
     instructions.push(BackendInstruction::AggregateFieldLoad {
         result,
         base,

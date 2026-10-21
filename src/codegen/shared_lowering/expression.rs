@@ -49,6 +49,7 @@ pub(crate) struct SharedExpressionProvider<'a> {
     value_types: BTreeMap<BackendValueId, BackendValueType>,
     nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
     array_big_endian: BTreeMap<BackendValueId, bool>,
+    aggregate_places: std::collections::BTreeSet<BackendValueId>,
     enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
     next_value: u32,
     loop_depth: usize,
@@ -105,6 +106,7 @@ impl<'a> SharedExpressionProvider<'a> {
             value_types: parameter_state.value_types,
             nominal_types: parameter_state.nominal_types,
             array_big_endian: BTreeMap::new(),
+            aggregate_places: std::collections::BTreeSet::new(),
             enum_payload_types: parameter_state.enum_payload_types,
             next_value: parameter_state.next_value,
             loop_depth: 0,
@@ -201,6 +203,12 @@ impl<'a> SharedExpressionProvider<'a> {
     }
     pub(super) fn array_is_big_endian(&self, value: BackendValueId) -> bool {
         self.array_big_endian.get(&value).copied().unwrap_or(false)
+    }
+    pub(super) fn remember_aggregate_place(&mut self, value: BackendValueId) {
+        self.aggregate_places.insert(value);
+    }
+    pub(super) fn is_aggregate_place(&self, value: BackendValueId) -> bool {
+        self.aggregate_places.contains(&value)
     }
     pub(super) fn remember_enum_payload(
         &mut self,

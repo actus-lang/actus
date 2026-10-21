@@ -29,6 +29,36 @@ pub(super) fn lower_aggregate_construct(
     Ok(())
 }
 
+pub(super) fn lower_aggregate_copy(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, Declaration>,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::AggregateCopy { result, source, layout, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift aggregate copy expected".to_owned()));
+    };
+    let source = values.get(source).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift aggregate copy source {} is unavailable", source.0))
+    })?;
+    let destination = allocate_aggregate(module, builder, *layout, declarations)?;
+    let alignment = u8::try_from(layout.alignment)
+        .map_err(|_| BackendEmitError("Cranelift aggregate alignment exceeds u8".to_owned()))?;
+    builder.emit_small_memory_copy(
+        module.isa().frontend_config(),
+        destination,
+        source,
+        u64::from(layout.size),
+        alignment,
+        alignment,
+        false,
+        MemFlagsData::new(),
+    );
+    values.insert(*result, destination);
+    Ok(())
+}
+
 fn allocate_aggregate(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
@@ -229,6 +259,9 @@ pub(super) fn lower_aggregate_instruction(
     match instruction {
         BackendInstruction::AggregateConstruct { .. } => {
             lower_aggregate_construct(module, builder, instruction, declarations, values)
+        }
+        BackendInstruction::AggregateCopy { .. } => {
+            lower_aggregate_copy(module, builder, instruction, declarations, values)
         }
         BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. } => {

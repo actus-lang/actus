@@ -174,6 +174,7 @@ fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId
         | BackendInstruction::ArenaConstruct { result, .. }
         | BackendInstruction::ArenaPlace { result, .. }
         | BackendInstruction::AggregateConstruct { result, .. }
+        | BackendInstruction::AggregateCopy { result, .. }
         | BackendInstruction::AggregateFieldLoad { result, .. }
         | BackendInstruction::PackedFieldLoad { result, .. }
         | BackendInstruction::ArrayElementLoad { result, .. }
@@ -221,6 +222,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         BackendInstruction::AggregateConstruct { fields, .. } => {
             fields.iter().map(|field| field.value).collect()
         }
+        BackendInstruction::AggregateCopy { source, .. } => vec![*source],
         BackendInstruction::AggregateFieldLoad { base, .. }
         | BackendInstruction::PackedFieldLoad { base, .. }
         | BackendInstruction::ArrayElementLoad { base, .. } => vec![*base],
