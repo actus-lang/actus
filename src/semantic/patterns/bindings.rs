@@ -157,6 +157,9 @@ impl Analyzer {
         }
         if self.enum_types.contains_key(&parsed_type.name) {
             self.binding_enum_types.insert(index, parsed_type.name.clone());
+            if !parsed_type.arguments.is_empty() {
+                self.binding_enum_type_applications.insert(index, parsed_type);
+            }
         }
         Ok(())
     }
