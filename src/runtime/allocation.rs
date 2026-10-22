@@ -133,6 +133,49 @@ pub unsafe extern "C" fn actus_buffer_drop(handle: BufferHandle) {
     }
 }
 
+/// Replaces the destination buffer with the source buffer and leaves the source
+/// in an empty moved-from state. The existing destination allocation is
+/// released before the source allocation is transferred.
+///
+/// # Safety
+///
+/// Both handles must be distinct live buffers returned by
+/// [`actus_buffer_allocate`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_buffer_move(
+    destination_handle: BufferHandle,
+    source_handle: BufferHandle,
+) {
+    if destination_handle.is_null()
+        || source_handle.is_null()
+        || destination_handle == source_handle
+    {
+        return;
+    }
+    let destination = unsafe { &mut *destination_handle };
+    let source = unsafe { &mut *source_handle };
+    if destination.length > destination.capacity
+        || source.length > source.capacity
+        || (destination.length > 0 && destination.data.is_null())
+        || (source.length > 0 && source.data.is_null())
+    {
+        return;
+    }
+    let old_data = (!destination.data.is_null()).then(|| unsafe {
+        Vec::from_raw_parts(destination.data, destination.length, destination.capacity)
+    });
+    let moved_data = if source.data.is_null() {
+        Vec::new()
+    } else {
+        unsafe { Vec::from_raw_parts(source.data, source.length, source.capacity) }
+    };
+    drop(old_data);
+    restore_buffer(destination, moved_data);
+    source.data = std::ptr::null_mut();
+    source.length = 0;
+    source.capacity = 0;
+}
+
 /// Appends one byte to a live buffer.
 ///
 /// # Safety

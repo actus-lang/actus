@@ -1,5 +1,3 @@
-// The provider constructor stores all explicit neutral lowering contracts.
-
 use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
@@ -63,6 +61,38 @@ pub(super) fn lower_unit_call(
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
     calls::lower_unit_call(provider, expression, instructions)
+}
+
+pub(super) fn assign_aggregate_loan(
+    provider: &mut SharedExpressionProvider<'_>,
+    destination: BackendValueId,
+    value: BackendValueId,
+    layout: super::super::BackendLayout,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    let destination_is_buffer =
+        provider.nominal_type(destination).is_some_and(|type_name| type_name.name == "Buffer");
+    let source_is_buffer =
+        provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Buffer");
+    if destination_is_buffer && source_is_buffer {
+        instructions.push(BackendInstruction::Call {
+            callee: SymbolIdentity::external_raw(crate::runtime::BUFFER_MOVE_SYMBOL)
+                .map_err(|error| unsupported(span, error.to_string()))?,
+            arguments: vec![destination, value],
+            result: None,
+            span,
+        });
+    } else {
+        instructions.push(BackendInstruction::MemoryCopy {
+            destination,
+            source: value,
+            size: layout.size,
+            alignment: layout.alignment,
+            span,
+        });
+    }
+    Ok(())
 }
 
 impl<'a> SharedExpressionProvider<'a> {

@@ -72,6 +72,83 @@ fn both_native_backends_build_and_run_non_niche_enum_aggregate_field_access() {
     }
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_preserve_aggregate_enum_payload_assignment_to_exclusive_loan() {
+    let source = "verb copy_payload(ins destination: Buffer, dat selected: Option[Buffer]) -> Int { return case dat selected { Option.Some(value) => { destination = value; return destination[0] as Int; }, Option.None => 1, }; } verb main() -> Int { erg source: Buffer = Buffer[0]; append(source, 42u8); erg selected = Option[Buffer].Some(dat source); erg destination: Buffer = Buffer[0]; return copy_payload(destination: ins destination, selected: dat selected); }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-enum-loan-assignment-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create enum loan assignment fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"enum-loan-assignment-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write enum loan assignment fixture manifest");
+        fs::write(&input, source).expect("write enum loan assignment fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build enum loan assignment");
+        let status =
+            std::process::Command::new(&output).status().expect("run enum loan assignment fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} enum loan assignment result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_preserve_direct_buffer_assignment_to_exclusive_loan() {
+    let source = "verb copy_payload(ins destination: Buffer, dat source: Buffer) -> Int { destination = source; return destination[0] as Int; } verb main() -> Int { erg source: Buffer = Buffer[0]; append(source, 42u8); erg destination: Buffer = Buffer[0]; return copy_payload(destination: ins destination, source: dat source); }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-direct-loan-assignment-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create direct loan assignment fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"direct-loan-assignment-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write direct loan assignment manifest");
+        fs::write(&input, source).expect("write direct loan assignment source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build direct loan assignment");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run direct loan assignment fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} direct loan result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[test]
 fn cranelift_backend_builds_and_runs_scalar_aggregate_field_assignment() {
     let root = std::env::temp_dir()

@@ -228,17 +228,18 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
+        let value = self.materialize_aggregate_assignment(value, span, instructions)?;
         if let Some((destination, layout)) = self.aggregate_loan_parameter(name) {
-            instructions.push(BackendInstruction::MemoryCopy {
+            assign_aggregate_loan(
+                self,
                 destination,
-                source: value,
-                size: layout.size,
-                alignment: layout.alignment,
+                value,
+                layout,
                 span,
-            });
+                instructions,
+            )?;
             return Ok(());
         }
-        let value = self.materialize_aggregate_assignment(value, span, instructions)?;
         if let Some(previous) = self.binding_value(name).filter(|previous| *previous != value) {
             cleanup::emit_replacement_cleanup(self, name, previous, span, instructions);
         }

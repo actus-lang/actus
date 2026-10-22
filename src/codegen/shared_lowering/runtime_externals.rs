@@ -11,6 +11,7 @@ pub(super) fn append_buffer_runtime_externals(
 ) -> Result<(), BackendContractError> {
     let start = externals.len();
     append_buffer_append(externals)?;
+    append_buffer_move(externals)?;
     append_buffer_length(externals)?;
     append_buffer_byte_at(externals)?;
     append_buffer_byte_set(externals)?;
@@ -23,6 +24,15 @@ pub(super) fn append_buffer_runtime_externals(
         .collect::<Vec<_>>();
     externals.extend(candidates);
     Ok(())
+}
+
+fn append_buffer_move(externals: &mut Vec<BackendExternal>) -> Result<(), BackendContractError> {
+    append_runtime_external(
+        externals,
+        crate::runtime::BUFFER_MOVE_SYMBOL,
+        vec![buffer_param("destination"), buffer_param("source")],
+        BackendValueType::Unit,
+    )
 }
 
 fn append_buffer_append(externals: &mut Vec<BackendExternal>) -> Result<(), BackendContractError> {

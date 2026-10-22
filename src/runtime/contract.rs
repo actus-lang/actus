@@ -42,6 +42,8 @@ pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
 pub const PROCESS_ARG_COUNT_SYMBOL: &str = "actus_process_arg_count";
 pub const PROCESS_ARG_SYMBOL: &str = "actus_process_arg";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
+/// Stable runtime symbol for ownership-preserving replacement of one Buffer handle.
+pub const BUFFER_MOVE_SYMBOL: &str = "actus_buffer_move";
 /// Stable runtime symbol used by compiler-generated Region cleanup.
 pub const REGION_DROP_SYMBOL: &str = "actus_region_drop";
 /// Stable runtime symbol for opening a bounded logical region.
