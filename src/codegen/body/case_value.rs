@@ -13,6 +13,9 @@ use crate::lexer::SourceSpan;
 use super::loop_support::collect_assignment_names;
 use super::loops::CarriedBinding;
 
+#[path = "case_value/owner_flow.rs"]
+mod owner_flow;
+
 struct CaseBranchValue {
     block: BackendBlockId,
     value: BackendValueId,
@@ -44,6 +47,46 @@ pub(super) struct CaseOwnerInput<'a> {
     pub(super) instructions: Vec<BackendInstruction>,
 }
 
+struct CaseOwnerContinuationInput<'a> {
+    name: &'a str,
+    declared_type: Option<&'a str>,
+    block: &'a Block,
+    index: usize,
+    fallthrough: Option<BackendBlockId>,
+    merge_id: BackendBlockId,
+    result_type: BackendValueType,
+    carried: &'a [CarriedBinding],
+    span: SourceSpan,
+}
+
+struct CaseOwnerBranchesInput<'a> {
+    id: BackendBlockId,
+    mode: crate::ast::CaseMode,
+    subject: &'a Expr,
+    branches: &'a [crate::ast::CaseBranch],
+    span: SourceSpan,
+    carried: &'a [CarriedBinding],
+    initial_values: &'a BTreeMap<String, BackendValueId>,
+    instructions: Vec<BackendInstruction>,
+}
+
+struct CaseOwnerBranchInput<'a> {
+    subject: &'a Expr,
+    branch: &'a crate::ast::CaseBranch,
+    index: usize,
+    branch_count: usize,
+    mode: crate::ast::CaseMode,
+    span: SourceSpan,
+    instructions: &'a mut Vec<BackendInstruction>,
+}
+
+type CaseOwnerBranchResult = (
+    BackendBlock,
+    Option<(BackendBlockId, BackendValueId)>,
+    Option<BackendBlockId>,
+    BackendBlockId,
+);
+
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     pub(super) fn lower_case_owner(
         &mut self,
@@ -64,38 +107,36 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             return Err(unsupported(span, "enum case value expected"));
         };
         let carried = self.collect_case_carried_bindings(branches);
-        let initial_values = carried
-            .iter()
-            .map(|binding| (binding.name.clone(), binding.value))
-            .collect::<BTreeMap<_, _>>();
+        let initial_values = self.case_owner_initial_values(&carried);
         let CaseOwnerBranches {
             merge_id,
             branch_values,
             current_id,
             entry_instructions,
             mut instructions,
-        } = self.lower_case_owner_branches(
+        } = self.lower_case_owner_branches(CaseOwnerBranchesInput {
             id,
-            *mode,
+            mode: *mode,
             subject,
             branches,
             span,
-            &carried,
-            &initial_values,
+            carried: &carried,
+            initial_values: &initial_values,
             instructions,
-        )?;
+        })?;
         let result_type = self.case_result_type(&branch_values, span)?;
-        let continuation_block = self.lower_case_owner_continuation(
-            name,
-            declared_type,
-            block,
-            index,
-            fallthrough,
-            merge_id,
-            result_type,
-            &carried,
-            span,
-        )?;
+        let continuation_block =
+            self.lower_case_owner_continuation(CaseOwnerContinuationInput {
+                name,
+                declared_type,
+                block,
+                index,
+                fallthrough,
+                merge_id,
+                result_type,
+                carried: &carried,
+                span,
+            })?;
         self.blocks.push(continuation_block);
         self.attach_case_value_branches(branch_values, merge_id, result_type, &carried, span)?;
         if let Some(entry_instructions) = entry_instructions {
@@ -105,31 +146,21 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
-    fn case_result_type(
-        &self,
-        branch_values: &[CaseBranchValue],
-        span: SourceSpan,
-    ) -> Result<BackendValueType, BackendContractError> {
-        let Some(first_value) = branch_values.first().map(|branch| branch.value) else {
-            return Err(unsupported(span, "empty enum case"));
-        };
-        self.provider
-            .value_type(first_value)
-            .ok_or_else(|| unsupported(span, "case result type is unavailable"))
-    }
-
     fn lower_case_owner_continuation(
         &mut self,
-        name: &str,
-        declared_type: Option<&str>,
-        block: &Block,
-        index: usize,
-        fallthrough: Option<BackendBlockId>,
-        merge_id: BackendBlockId,
-        result_type: BackendValueType,
-        carried: &[CarriedBinding],
-        span: SourceSpan,
+        input: CaseOwnerContinuationInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
+        let CaseOwnerContinuationInput {
+            name,
+            declared_type,
+            block,
+            index,
+            fallthrough,
+            merge_id,
+            result_type,
+            carried,
+            span,
+        } = input;
         let result = self.provider.allocate_value(result_type);
         let carried_values = carried
             .iter()
@@ -206,15 +237,18 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn lower_case_owner_branches(
         &mut self,
-        id: BackendBlockId,
-        mode: crate::ast::CaseMode,
-        subject: &Expr,
-        branches: &[crate::ast::CaseBranch],
-        span: SourceSpan,
-        carried: &[CarriedBinding],
-        initial_values: &BTreeMap<String, BackendValueId>,
-        mut instructions: Vec<BackendInstruction>,
+        input: CaseOwnerBranchesInput<'_>,
     ) -> Result<CaseOwnerBranches, BackendContractError> {
+        let CaseOwnerBranchesInput {
+            id,
+            mode,
+            subject,
+            branches,
+            span,
+            carried,
+            initial_values,
+            mut instructions,
+        } = input;
         let merge_id = self.allocate_block();
         let mut branch_values = Vec::new();
         let mut current_id = id;
@@ -223,15 +257,16 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             for (name, value) in initial_values {
                 self.provider.set_binding_value(name, *value);
             }
-            let (matched, branch_value, following_id, else_id) = self.lower_case_owner_branch(
-                subject,
-                branch,
-                index,
-                branches.len(),
-                mode,
-                span,
-                &mut instructions,
-            )?;
+            let (matched, branch_value, following_id, else_id) =
+                self.lower_case_owner_branch(CaseOwnerBranchInput {
+                    subject,
+                    branch,
+                    index,
+                    branch_count: branches.len(),
+                    mode,
+                    span,
+                    instructions: &mut instructions,
+                })?;
             if let Some((value_block, value)) = branch_value {
                 let carried_values = carried
                     .iter()
@@ -262,22 +297,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn lower_case_owner_branch(
         &mut self,
-        subject: &Expr,
-        branch: &crate::ast::CaseBranch,
-        index: usize,
-        branch_count: usize,
-        mode: crate::ast::CaseMode,
-        span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<
-        (
-            BackendBlock,
-            Option<(BackendBlockId, BackendValueId)>,
-            Option<BackendBlockId>,
-            BackendBlockId,
-        ),
-        BackendContractError,
-    > {
+        input: CaseOwnerBranchInput<'_>,
+    ) -> Result<CaseOwnerBranchResult, BackendContractError> {
+        let CaseOwnerBranchInput { subject, branch, index, branch_count, mode, span, instructions } =
+            input;
         let matched_id = self.allocate_block();
         let is_last = index + 1 == branch_count;
         let following_id = (!is_last).then(|| self.allocate_block());
@@ -295,38 +318,6 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let (matched, branch_value) =
             self.lower_case_value_branch(matched_id, branch, mode, subject_value, span)?;
         Ok((matched, branch_value, following_id, else_id))
-    }
-
-    fn advance_case_owner_branch(
-        &mut self,
-        following_id: Option<BackendBlockId>,
-        current_id: &mut BackendBlockId,
-        entry_instructions: &mut Option<Vec<BackendInstruction>>,
-        instructions: &mut Vec<BackendInstruction>,
-        else_id: BackendBlockId,
-        span: SourceSpan,
-    ) {
-        if let Some(following_id) = following_id {
-            if entry_instructions.is_none() {
-                *entry_instructions = Some(std::mem::take(instructions));
-            } else {
-                self.blocks.push(BackendBlock {
-                    parameters: Vec::new(),
-                    id: *current_id,
-                    instructions: std::mem::take(instructions),
-                });
-            }
-            *current_id = following_id;
-        } else {
-            self.blocks.push(BackendBlock {
-                parameters: Vec::new(),
-                id: else_id,
-                instructions: vec![BackendInstruction::Trap {
-                    reason: "non-exhaustive enum case".to_owned(),
-                    span,
-                }],
-            });
-        }
     }
 
     fn lower_case_value_branch(
@@ -423,16 +414,16 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         };
         let empty_carried: [CarriedBinding; 0] = [];
         let empty_initial_values: BTreeMap<String, BackendValueId> = BTreeMap::new();
-        let lowered = self.lower_case_owner_branches(
+        let lowered = self.lower_case_owner_branches(CaseOwnerBranchesInput {
             id,
-            *mode,
+            mode: *mode,
             subject,
             branches,
             span,
-            &empty_carried,
-            &empty_initial_values,
+            carried: &empty_carried,
+            initial_values: &empty_initial_values,
             instructions,
-        )?;
+        })?;
         let Some(first_value) = lowered.branch_values.first().map(|branch| branch.value) else {
             return Err(unsupported(span, "empty nested enum case"));
         };
