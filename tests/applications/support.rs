@@ -20,6 +20,7 @@ pub(crate) fn copy_standard_library(root: &Path) {
         "io/cursor.act",
         "io/copy.act",
         "fs/fs.act",
+        "fs/directory.act",
         "fs/file.act",
         "fs/metadata.act",
         "fs/operations.act",
