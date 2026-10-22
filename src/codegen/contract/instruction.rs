@@ -223,6 +223,12 @@ pub enum BackendInstruction {
         fields: Vec<BackendAggregateField>,
         span: SourceSpan,
     },
+    AggregateCopy {
+        result: super::BackendValueId,
+        source: super::BackendValueId,
+        layout: super::BackendLayout,
+        span: SourceSpan,
+    },
     AggregateFieldLoad {
         result: super::BackendValueId,
         base: super::BackendValueId,

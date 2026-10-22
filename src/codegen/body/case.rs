@@ -3,13 +3,16 @@ use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendExpressionProvider,
     BackendInstruction, BackendValueId, BodyLowering,
 };
-use crate::ast::{Block, CaseBody, CaseMode, Expr, LiteralPattern, Pattern, Stmt, VariantPayload};
+use crate::ast::{CaseMode, Expr, LiteralPattern, Pattern, VariantPayload};
 use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
 
 mod carried;
+#[path = "case_return.rs"]
+mod case_return;
 mod context;
 
+use case_return::case_return_block;
 use context::{
     BoundCaseInput, CaseBodyInput, CaseBranchBlocks, CaseBranchInput, CaseBranchesInput,
     GuardedCaseInput,
@@ -446,6 +449,7 @@ fn integer_suffix(signed: bool, width: u8) -> &'static str {
         _ => "i32",
     }
 }
+
 fn branch_variant(branch: &crate::ast::CaseBranch) -> &str {
     match &branch.pattern {
         Pattern::Variant { variant, .. } => variant,
@@ -457,36 +461,5 @@ fn branch_payload(branch: &crate::ast::CaseBranch) -> Option<&VariantPayload> {
     match &branch.pattern {
         Pattern::Variant { payload, .. } => Some(payload),
         Pattern::Wildcard { .. } | Pattern::Literal { .. } => None,
-    }
-}
-
-fn case_return_block<P: BackendExpressionProvider>(
-    lowering: &mut BodyLowering<'_, P>,
-    id: BackendBlockId,
-    branch: &crate::ast::CaseBranch,
-    span: SourceSpan,
-    fallthrough: Option<BackendBlockId>,
-) -> Result<BackendBlock, BackendContractError> {
-    match &branch.body {
-        CaseBody::Expression(expression) => {
-            let statement = if fallthrough.is_some() {
-                Stmt::Expression { expression: *expression.clone(), span }
-            } else {
-                Stmt::Return { value: Some(*expression.clone()), span }
-            };
-            let block = Block { statements: vec![statement], span: branch.span };
-            lowering.lower_block(id, &block, fallthrough)
-        }
-        CaseBody::Block(block) => {
-            if fallthrough.is_none()
-                && let Some(Stmt::Expression { expression, span }) = block.statements.last()
-            {
-                let mut statements = block.statements[..block.statements.len() - 1].to_vec();
-                statements.push(Stmt::Return { value: Some(expression.clone()), span: *span });
-                let block = Block { statements, span: block.span };
-                return lowering.lower_block(id, &block, fallthrough);
-            }
-            lowering.lower_block(id, block, fallthrough)
-        }
     }
 }

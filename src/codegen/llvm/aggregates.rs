@@ -32,6 +32,38 @@ pub(super) fn emit_aggregate_construct(
     Ok(false)
 }
 
+pub(super) fn emit_aggregate_copy(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, FunctionDeclaration>,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::AggregateCopy { result, source, layout, .. } = instruction else {
+        return Err(BackendEmitError("LLVM aggregate copy expected".to_owned()));
+    };
+    let source = values.get(source).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM aggregate copy source {} is unavailable", source.0))
+    })?;
+    let aggregate_type =
+        super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
+    let destination =
+        allocate_aggregate_storage(context, builder, *layout, aggregate_type, declarations)?;
+    if destination.is_null() {
+        return Err(BackendEmitError("LLVM failed to allocate aggregate copy".to_owned()));
+    }
+    let size = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+    if unsafe {
+        LLVMBuildMemMove(builder, destination, layout.alignment, source, layout.alignment, size)
+    }
+    .is_null()
+    {
+        return Err(BackendEmitError("LLVM failed to copy aggregate value".to_owned()));
+    }
+    values.insert(*result, destination);
+    Ok(false)
+}
+
 fn allocate_aggregate_storage(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
@@ -143,6 +175,9 @@ pub(super) fn emit_aggregate_instruction(
         }
         BackendInstruction::AggregateConstruct { .. } => {
             emit_aggregate_construct(context, builder, instruction, declarations, values)
+        }
+        BackendInstruction::AggregateCopy { .. } => {
+            emit_aggregate_copy(context, builder, instruction, declarations, values)
         }
         BackendInstruction::AggregateFieldLoad { .. } => {
             emit_aggregate_field_load(context, builder, instruction, values)

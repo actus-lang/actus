@@ -10,6 +10,8 @@ pub(super) struct ProviderParameterState {
     pub(super) parameters: BTreeMap<String, BackendValueId>,
     pub(super) scalar_loan_parameters:
         Vec<(String, BackendValueId, BackendValueId, BackendValueType)>,
+    pub(super) aggregate_loan_parameters:
+        BTreeMap<String, (BackendValueId, crate::codegen::BackendLayout)>,
     pub(super) owned_parameters: BTreeSet<String>,
     pub(super) value_types: BTreeMap<BackendValueId, BackendValueType>,
     pub(super) nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
@@ -40,8 +42,10 @@ pub(super) fn initialize(
     }
     let enum_payload_types = state::enum_payload_types(verb, layouts);
     let mut scalar_loan_parameters = Vec::new();
+    let mut aggregate_loan_parameters = BTreeMap::new();
     let mut next_value = verb.params.len() as u32;
     for (index, parameter) in verb.params.iter().enumerate() {
+        register_aggregate_loan(parameter, index, layouts, &mut aggregate_loan_parameters);
         let Some(BackendValueType::Bool | BackendValueType::Integer { .. }) =
             value_types.get(&BackendValueId(index as u32)).copied()
         else {
@@ -63,11 +67,29 @@ pub(super) fn initialize(
     ProviderParameterState {
         parameters,
         scalar_loan_parameters,
+        aggregate_loan_parameters,
         owned_parameters,
         value_types,
         nominal_types,
         enum_payload_types,
         next_value,
+    }
+}
+
+fn register_aggregate_loan(
+    parameter: &crate::ast::Param,
+    index: usize,
+    layouts: &impl super::super::super::BackendLayoutProvider,
+    aggregate_loan_parameters: &mut BTreeMap<
+        String,
+        (BackendValueId, crate::codegen::BackendLayout),
+    >,
+) {
+    if let Some(crate::codegen::BackendPassingMode::ExclusiveLoan { layout }) =
+        crate::codegen::lower_parameter(parameter, layouts).ok().map(|parameter| parameter.passing)
+    {
+        aggregate_loan_parameters
+            .insert(parameter.name.clone(), (BackendValueId(index as u32), layout));
     }
 }
 

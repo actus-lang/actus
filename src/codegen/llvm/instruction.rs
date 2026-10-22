@@ -171,6 +171,7 @@ fn is_aggregate_instruction(instruction: &BackendInstruction) -> bool {
     matches!(
         instruction,
         BackendInstruction::AggregateConstruct { .. }
+            | BackendInstruction::AggregateCopy { .. }
             | BackendInstruction::AggregateFieldLoad { .. }
             | BackendInstruction::PackedFieldLoad { .. }
             | BackendInstruction::PackedFieldStore { .. }

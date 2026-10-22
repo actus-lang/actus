@@ -77,6 +77,20 @@ fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
 
 #[cfg(feature = "cranelift")]
 #[test]
+fn cranelift_names_contract_string_data_per_function() {
+    let source = "verb first() -> String { return \"shared\"; } verb second() -> String { return \"shared\"; } verb main() -> Int { return 42; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "contract string fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("contract string fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("contract string fixture should lower through the shared contract");
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+        .expect("Cranelift should keep contract string data symbols unique");
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
 fn both_backends_consume_shared_fixed_array_iteration() {
     let source = "verb inspect(abs values: Array[u32, 4]) -> Int { erg total: u32 = 0u32; for erg index: u32 in values { total += values[index]; } return total as Int; }";
     let (tokens, errors) = scan(source);

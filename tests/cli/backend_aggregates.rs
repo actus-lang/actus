@@ -164,6 +164,207 @@ fn cranelift_backend_builds_and_runs_a_shared_fixed_array_element_compound_store
 
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
+fn cranelift_backend_lowers_case_branch_with_trailing_if_value() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-case-if-tail-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "enum Failure { Bad, } verb check(abs value: Int) -> Bool { erg result: Result[Int, Failure] = Result[Int, Failure].Ok(1); return case dat result { Result.Err(_) => false, Result.Ok(_) => { if value == 0 { false; } else { erg selected: Bool = true; selected; } }, }; } verb main() -> Int { erg value = 1; if check(value: abs value) { return 0; } return 1; }\n",
+    )
+    .expect("write Cranelift case-if tail fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "cranelift",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is valid UTF-8"),
+            input.to_str().expect("input path is valid UTF-8"),
+        ])
+        .status()
+        .expect("build Cranelift case-if tail fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run Cranelift case-if tail fixture");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_lowers_case_branch_with_trailing_if_value() {
+    let root =
+        std::env::temp_dir().join(format!("actus-cli-llvm-case-if-tail-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "enum Failure { Bad, } verb check(abs value: Int) -> Bool { erg result: Result[Int, Failure] = Result[Int, Failure].Ok(1); return case dat result { Result.Err(_) => false, Result.Ok(_) => { if value == 0 { false; } else { erg selected: Bool = true; selected; } }, }; } verb main() -> Int { erg value = 1; if check(value: abs value) { return 0; } return 1; }\n",
+    )
+    .expect("write LLVM case-if tail fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is valid UTF-8"),
+            input.to_str().expect("input path is valid UTF-8"),
+        ])
+        .status()
+        .expect("build LLVM case-if tail fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run LLVM case-if tail fixture");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_merges_case_branch_assignment_before_call() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-case-assignment-call-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "enum Failure { Bad, } verb consume(abs value: u32) -> Int { return value as Int; } verb check() -> Int { erg target: u32 = 0u32; erg result: Result[u32, Failure] = Result[u32, Failure].Ok(1031u32); erg status: Int = case dat result { Result.Err(_) => 1, Result.Ok(index) => { target = index; 0; }, }; return consume(value: abs target) + status; } verb main() -> Int { if check() == 1031 { return 0; } return 1; }\n",
+    )
+    .expect("write Cranelift case-assignment call fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "cranelift",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is valid UTF-8"),
+            input.to_str().expect("input path is valid UTF-8"),
+        ])
+        .status()
+        .expect("build Cranelift case-assignment call fixture");
+    assert!(status.success());
+    let status =
+        Command::new(&output).status().expect("run Cranelift case-assignment call fixture");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_merges_case_branch_assignment_before_call() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-llvm-case-assignment-call-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "enum Failure { Bad, } verb consume(abs value: u32) -> Int { return value as Int; } verb check() -> Int { erg target: u32 = 0u32; erg result: Result[u32, Failure] = Result[u32, Failure].Ok(1031u32); erg status: Int = case dat result { Result.Err(_) => 1, Result.Ok(index) => { target = index; 0; }, }; return consume(value: abs target) + status; } verb main() -> Int { if check() == 1031 { return 0; } return 1; }\n",
+    )
+    .expect("write LLVM case-assignment call fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is valid UTF-8"),
+            input.to_str().expect("input path is valid UTF-8"),
+        ])
+        .status()
+        .expect("build LLVM case-assignment call fixture");
+    assert!(status.success());
+    let status = Command::new(&output).status().expect("run LLVM case-assignment call fixture");
+    assert_eq!(status.code(), Some(0));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
+fn cranelift_backend_copies_aggregate_case_payload_into_existing_owner() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-cranelift-aggregate-case-assignment-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Location { erg global_index: u32, } enum Failure { Invalid, } verb assign(ins location: Location) { erg result = Result[Location, Failure].Ok(Location { global_index: 41u32, }); case dat result { Result.Err(_) => { location.global_index = 0u32; }, Result.Ok(value) => { location = value; }, }; } verb main() -> Int { erg location: Location = Location { global_index: 0u32, }; assign(location: ins location); return location.global_index as Int; }\n",
+    )
+    .expect("write Cranelift aggregate case assignment fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "cranelift",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is valid UTF-8"),
+            input.to_str().expect("input path is valid UTF-8"),
+        ])
+        .status()
+        .expect("build Cranelift aggregate case assignment fixture");
+    assert!(status.success());
+    let status =
+        Command::new(&output).status().expect("run Cranelift aggregate case assignment fixture");
+    assert_eq!(status.code(), Some(41));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "llvm"))]
+#[test]
+fn llvm_backend_copies_aggregate_case_payload_into_existing_owner() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-llvm-aggregate-case-assignment-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "struct Location { erg global_index: u32, } enum Failure { Invalid, } verb assign(ins location: Location) { erg result = Result[Location, Failure].Ok(Location { global_index: 41u32, }); case dat result { Result.Err(_) => { location.global_index = 0u32; }, Result.Ok(value) => { location = value; }, }; } verb main() -> Int { erg location: Location = Location { global_index: 0u32, }; assign(location: ins location); return location.global_index as Int; }\n",
+    )
+    .expect("write LLVM aggregate case assignment fixture");
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            "--strict",
+            "--backend",
+            "llvm",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path is valid UTF-8"),
+            input.to_str().expect("input path is valid UTF-8"),
+        ])
+        .status()
+        .expect("build LLVM aggregate case assignment fixture");
+    assert!(status.success());
+    let status =
+        Command::new(&output).status().expect("run LLVM aggregate case assignment fixture");
+    assert_eq!(status.code(), Some(41));
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(all(unix, feature = "cranelift"))]
+#[test]
 fn cranelift_backend_coerces_case_branch_values_to_the_merge_type() {
     let root =
         std::env::temp_dir().join(format!("actus-cli-cranelift-case-{}", std::process::id()));

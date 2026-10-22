@@ -29,6 +29,36 @@ pub(super) fn lower_aggregate_construct(
     Ok(())
 }
 
+pub(super) fn lower_aggregate_copy(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    declarations: &BTreeMap<String, Declaration>,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::AggregateCopy { result, source, layout, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift aggregate copy expected".to_owned()));
+    };
+    let source = values.get(source).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift aggregate copy source {} is unavailable", source.0))
+    })?;
+    let destination = allocate_aggregate(module, builder, *layout, declarations)?;
+    let alignment = u8::try_from(layout.alignment)
+        .map_err(|_| BackendEmitError("Cranelift aggregate alignment exceeds u8".to_owned()))?;
+    builder.emit_small_memory_copy(
+        module.isa().frontend_config(),
+        destination,
+        source,
+        u64::from(layout.size),
+        alignment,
+        alignment,
+        false,
+        MemFlagsData::new(),
+    );
+    values.insert(*result, destination);
+    Ok(())
+}
+
 fn allocate_aggregate(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
@@ -72,7 +102,12 @@ fn store_aggregate_field(
         ))
     })?;
     let destination = builder.ins().iadd_imm_s(address, i64::from(field.offset));
-    if matches!(field.ty, BackendValueType::Aggregate { .. } | BackendValueType::Region { .. }) {
+    if matches!(
+        field.ty,
+        BackendValueType::Aggregate { .. }
+            | BackendValueType::Region { .. }
+            | BackendValueType::Enum { .. }
+    ) {
         let alignment = u8::try_from(field.layout.alignment).map_err(|_| {
             BackendEmitError("Cranelift aggregate field alignment exceeds u8".to_owned())
         })?;
@@ -165,7 +200,10 @@ pub(super) fn lower_aggregate_field_store(
     })?;
     let offset = i32::try_from(*offset)
         .map_err(|_| BackendEmitError("Cranelift aggregate field offset exceeds i32".to_owned()))?;
-    if let BackendValueType::Aggregate { layout } | BackendValueType::Region { layout } = ty {
+    if let BackendValueType::Aggregate { layout }
+    | BackendValueType::Region { layout }
+    | BackendValueType::Enum { layout: crate::codegen::BackendEnumLayout { layout, .. } } = ty
+    {
         let destination = builder.ins().iadd_imm_s(base, i64::from(offset));
         let alignment = u8::try_from(layout.alignment).map_err(|_| {
             BackendEmitError("Cranelift aggregate field alignment exceeds u8".to_owned())
@@ -221,6 +259,9 @@ pub(super) fn lower_aggregate_instruction(
     match instruction {
         BackendInstruction::AggregateConstruct { .. } => {
             lower_aggregate_construct(module, builder, instruction, declarations, values)
+        }
+        BackendInstruction::AggregateCopy { .. } => {
+            lower_aggregate_copy(module, builder, instruction, declarations, values)
         }
         BackendInstruction::AggregateFieldLoad { .. }
         | BackendInstruction::AggregateFieldStore { .. } => {

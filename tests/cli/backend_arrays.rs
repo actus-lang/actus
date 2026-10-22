@@ -34,6 +34,44 @@ fn cranelift_backend_builds_and_runs_scalar_aggregate_field_access() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_and_run_non_niche_enum_aggregate_field_access() {
+    let source = "struct Config { choice: Option[Int], } verb main() -> Int { erg config: Config = Config { choice: Option[Int].Some(41), }; return case config.choice { Option.Some(value) => value, Option.None => 0, }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-non-niche-enum-field-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create non-niche enum field directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"non-niche-enum-field-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write non-niche enum field manifest");
+        fs::write(&input, source).expect("write non-niche enum field source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build enum aggregate field");
+        let status =
+            std::process::Command::new(&output).status().expect("run non-niche enum field fixture");
+        assert_eq!(status.code(), Some(41), "backend {backend} enum aggregate result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
 #[test]
 fn cranelift_backend_builds_and_runs_scalar_aggregate_field_assignment() {
     let root = std::env::temp_dir()
@@ -720,6 +758,211 @@ fn both_native_backends_build_and_run_a_shared_aggregate_array_element_replaceme
             .status()
             .expect("run aggregate replacement fixture");
         assert_eq!(status.code(), Some(42), "backend {backend} should copy the aggregate element");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_write_through_a_dynamic_nested_aggregate_index() {
+    let source = "struct Record { targets: Array[u32, 2], } struct State { records: Array[Record, 2], } verb initialize(ins record: Record) { record.targets[0u32] = 41u32; } verb main() -> Int { erg state: State = State { records: Array[Record, 2](), }; erg index: u32 = 1u32; initialize(record: ins state.records[index]); return state.records[index].targets[0u32] as Int + 1; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-{backend}-dynamic-nested-aggregate-index-{}",
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create dynamic nested aggregate fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"dynamic-nested-aggregate-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write dynamic nested aggregate manifest");
+        fs::write(&input, source).expect("write dynamic nested aggregate source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build dynamic nested aggregate");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run dynamic nested aggregate fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} dynamic nested aggregate result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_initialize_and_mutate_a_three_level_dynamic_aggregate() {
+    let source = "struct Record { targets: Array[u32, 2], } struct Table { records: Array[Record, 2], active_count: u32, } struct State { table: Table, } struct Brain { auxiliary: Array[State, 2], } verb initialize(ins state: State) { state.table.records[0u32].targets[0u32] = 4294967295u32; state.table.active_count = 0u32; } verb link(ins state: State) { state.table.records[0u32].targets[0u32] = 0u32; state.table.active_count += 1u32; } verb main() -> Int { erg brain: Brain = Brain { auxiliary: Array[State, 2](), }; erg index: u32 = 0u32; initialize(state: ins brain.auxiliary[index]); index = 1u32; initialize(state: ins brain.auxiliary[index]); link(state: ins brain.auxiliary[index]); return if brain.auxiliary[0u32].table.records[0u32].targets[0u32] == 4294967295u32 { if brain.auxiliary[1u32].table.records[0u32].targets[0u32] == 0u32 { 42 } else { 43 } } else { 44 }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-{backend}-three-level-dynamic-aggregate-{}",
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create three-level dynamic aggregate fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"three-level-dynamic-aggregate-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write three-level dynamic aggregate manifest");
+        fs::write(&input, source).expect("write three-level dynamic aggregate source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build three-level dynamic aggregate");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run three-level dynamic aggregate fixture");
+        assert_eq!(
+            status.code(),
+            Some(42),
+            "backend {backend} three-level dynamic aggregate result"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_write_through_large_dynamic_nested_aggregate_state() {
+    let source = "struct Record { targets: Array[u32, 8], used_count: u8, reserved: Array[u8, 3], free_list_link: u32, } struct Table { source_to_record: Array[u16, 1024], records: Array[Record, 8], free_list_head: u32, active_count: u32, } struct State { table: Table, } struct Brain { auxiliary: Array[State, 2], } verb initialize(ins state: State) { for erg source: u32 in 0u32 .. 1024u32 { state.table.source_to_record[source] = 65535u16; } for erg record: u32 in 0u32 .. 8u32 { for erg target: u32 in 0u32 .. 8u32 { state.table.records[record].targets[target] = 4294967295u32; } } state.table.free_list_head = 0u32; state.table.active_count = 0u32; } verb link(ins state: State, erg source: u32) -> Int { state.table.source_to_record[source] = 0u16; state.table.records[0u32].targets[0u32] = source; state.table.active_count += 1u32; return state.table.active_count as Int; } verb main() -> Int { erg brain: Brain = Brain { auxiliary: Array[State, 2](), }; erg index: u32 = 0u32; initialize(state: ins brain.auxiliary[index]); index = 1u32; initialize(state: ins brain.auxiliary[index]); erg source_index: u32 = 1023u32; erg link_status: Int = link(state: ins brain.auxiliary[index], source: erg source_index); return if brain.auxiliary[1u32].table.source_to_record[1023u32] == 0u16 { if brain.auxiliary[1u32].table.records[0u32].targets[0u32] == 1023u32 { link_status + 41 } else { 43 } } else { 44 }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-large-dynamic-nested-state-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create large dynamic nested state fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"large-dynamic-nested-state-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write large dynamic nested state manifest");
+        fs::write(&input, source).expect("write large dynamic nested state source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build large dynamic nested state");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run large dynamic nested state fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} large dynamic nested state result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_round_trip_a_large_nested_aggregate_snapshot() {
+    let source = "struct Record { targets: Array[u32, 8], used_count: u8, reserved: Array[u8, 3], free_list_link: u32, } struct Table { source_to_record: Array[u16, 1024], records: Array[Record, 8], free_list_head: u32, active_count: u32, } struct State { table: Table, } struct Snapshot { table: Table, checksum: u64, } struct Brain { prefix: Array[u8, 524288], auxiliary: Array[State, 2], } verb initialize(ins state: State) { for erg source: u32 in 0u32 .. 1024u32 { state.table.source_to_record[source] = 65535u16; } for erg record: u32 in 0u32 .. 8u32 { for erg target: u32 in 0u32 .. 8u32 { state.table.records[record].targets[target] = 4294967295u32; } } state.table.free_list_head = 0u32; state.table.active_count = 0u32; } verb checksum(abs table: Table) -> u64 { return table.records[0u32].targets[0u32] as u64 + table.active_count as u64; } verb capture(ins snapshot: Snapshot, abs state: State) { for erg source: u32 in 0u32 .. 1024u32 { snapshot.table.source_to_record[source] = state.table.source_to_record[source]; } for erg record: u32 in 0u32 .. 8u32 { for erg target: u32 in 0u32 .. 8u32 { snapshot.table.records[record].targets[target] = state.table.records[record].targets[target]; } snapshot.table.records[record].used_count = state.table.records[record].used_count; snapshot.table.records[record].reserved[0u32] = state.table.records[record].reserved[0u32]; snapshot.table.records[record].reserved[1u32] = state.table.records[record].reserved[1u32]; snapshot.table.records[record].reserved[2u32] = state.table.records[record].reserved[2u32]; snapshot.table.records[record].free_list_link = state.table.records[record].free_list_link; } snapshot.table.free_list_head = state.table.free_list_head; snapshot.table.active_count = state.table.active_count; snapshot.checksum = checksum(table: abs state.table); } verb restore(ins state: State, abs snapshot: Snapshot) -> Bool { if snapshot.checksum != 1025u64 { return false; } for erg source: u32 in 0u32 .. 1024u32 { state.table.source_to_record[source] = snapshot.table.source_to_record[source]; } for erg record: u32 in 0u32 .. 8u32 { for erg target: u32 in 0u32 .. 8u32 { state.table.records[record].targets[target] = snapshot.table.records[record].targets[target]; } state.table.records[record].used_count = snapshot.table.records[record].used_count; state.table.records[record].reserved[0u32] = snapshot.table.records[record].reserved[0u32]; state.table.records[record].reserved[1u32] = snapshot.table.records[record].reserved[1u32]; state.table.records[record].reserved[2u32] = snapshot.table.records[record].reserved[2u32]; state.table.records[record].free_list_link = snapshot.table.records[record].free_list_link; } state.table.free_list_head = snapshot.table.free_list_head; state.table.active_count = snapshot.table.active_count; return true; } verb main() -> Int { erg brain: Brain = Brain { prefix: Array[u8, 524288](), auxiliary: Array[State, 2](), }; erg index: u32 = 0u32; initialize(state: ins brain.auxiliary[index]); brain.auxiliary[index].table.source_to_record[0u32] = 0u16; brain.auxiliary[index].table.records[0u32].targets[0u32] = 1024u32; brain.auxiliary[index].table.active_count = 1u32; erg snapshot: Snapshot = Snapshot { table: Table { source_to_record: Array[u16, 1024](), records: Array[Record, 8](), free_list_head: 0u32, active_count: 0u32, }, checksum: 0u64, }; capture(snapshot: ins snapshot, state: abs brain.auxiliary[index]); erg recovered: State = State { table: Table { source_to_record: Array[u16, 1024](), records: Array[Record, 8](), free_list_head: 0u32, active_count: 0u32, }, }; initialize(state: ins recovered); if !restore(state: ins recovered, snapshot: abs snapshot) { return 45; } return if recovered.table.records[0u32].targets[0u32] == 1024u32 { if recovered.table.source_to_record[0u32] == 0u16 { 42 } else { 43 } } else { 44 }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-{backend}-large-nested-snapshot-{}", std::process::id()));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create large nested snapshot fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"large-nested-snapshot-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write large nested snapshot manifest");
+        fs::write(&input, source).expect("write large nested snapshot source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build large nested snapshot");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run large nested snapshot fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} large nested snapshot result");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn both_native_backends_build_and_run_large_aggregate_array_element_self_copy() {
+    let source = "struct Cell { erg storage: Array[u8, 64], } struct Fabric { erg columns: Array[Cell, 1024], } struct Brain { erg fabrics: Array[Fabric, 2], } verb main() -> Int { erg brain: Brain = Brain { fabrics: Array[Fabric, 2](), }; erg local_fabric: Fabric = brain.fabrics[0u32]; brain.fabrics[0u32] = local_fabric; return 42; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir().join(format!(
+            "actus-cli-{backend}-large-aggregate-array-self-copy-{}",
+            std::process::id()
+        ));
+        let input = root.join("main.act");
+        let output = root.join("main.bin");
+        fs::create_dir_all(&root).expect("create large aggregate self-copy fixture directory");
+        fs::write(
+            root.join("Actus.toml"),
+            format!(
+                "[package]\nname = \"large-aggregate-array-self-copy-{backend}\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"{backend}\"\n"
+            ),
+        )
+        .expect("write large aggregate self-copy manifest");
+        fs::write(&input, source).expect("write large aggregate self-copy source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build large aggregate self-copy");
+        let status = std::process::Command::new(&output)
+            .status()
+            .expect("run large aggregate self-copy fixture");
+        assert_eq!(status.code(), Some(42), "backend {backend} large aggregate self-copy");
         let _ = fs::remove_dir_all(root);
     }
 }

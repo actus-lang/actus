@@ -356,6 +356,7 @@ fn case_requires_continuation(expression: &Expr) -> bool {
             matches!(
                 statement,
                 Stmt::Expression { .. }
+                    | Stmt::If { .. }
                     | Stmt::Return { .. }
                     | Stmt::Break { .. }
                     | Stmt::Continue { .. }

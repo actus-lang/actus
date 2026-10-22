@@ -228,12 +228,12 @@ fn operator_documentation(operator: &str) -> &'static str {
 fn intrinsic_info(name: &str) -> Option<SymbolInfo> {
     let (signature, documentation) = match name {
         "print" => (
-            "print(abs text: Buffer) -> Result[Int, IoError]",
-            "Writes exactly the Buffer live length, including embedded zero bytes; no null terminator is required.",
+            "print(string: String | int: Int | byte: u8 | bool: Bool | buffer: Buffer) -> Result[Int, IoError]",
+            "Writes one typed value to standard output; formatted integer and boolean forms are also supported.",
         ),
         "println" => (
-            "println(abs text: Buffer) -> Result[Int, IoError]",
-            "Writes the Buffer live length and a line ending; output is length-aware and binary-safe.",
+            "println(string: String | int: Int | byte: u8 | bool: Bool | buffer: Buffer) -> Result[Int, IoError]",
+            "Writes one typed value and a line ending; formatted integer and boolean forms are also supported.",
         ),
         "copy" => (
             "copy(abs value: scalar) -> scalar",
