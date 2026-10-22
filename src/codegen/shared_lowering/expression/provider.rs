@@ -60,6 +60,22 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         self.remember_nominal_type(value, type_name);
     }
 
+    fn copy_value_metadata(&mut self, source: BackendValueId, target: BackendValueId) {
+        if let Some(type_name) = self.nominal_type(source).cloned() {
+            self.remember_nominal_type(target, type_name);
+        }
+        let payloads = self
+            .enum_payload_types
+            .iter()
+            .filter_map(|((value, discriminant), ty)| {
+                (*value == source).then_some((*discriminant, *ty))
+            })
+            .collect::<Vec<_>>();
+        for (discriminant, ty) in payloads {
+            self.remember_enum_payload(target, discriminant, ty);
+        }
+    }
+
     fn allocate_value(&mut self, ty: BackendValueType) -> BackendValueId {
         let value = self.allocate();
         self.remember_value(value, ty);

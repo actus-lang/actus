@@ -123,6 +123,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             .value_type(then_value)
             .ok_or_else(|| unsupported(span, "if branch result type is unavailable"))?;
         let result = self.provider.allocate_value(result_type);
+        self.provider.copy_value_metadata(then_value, result);
         let mut merge_instructions = Vec::new();
         self.provider.bind_owner(name, result, declared_type, span, &mut merge_instructions)?;
         let continuation =
@@ -166,6 +167,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             return Err(unsupported(span, "if branches have different value types"));
         }
         let result = self.provider.allocate_value(result_type);
+        self.provider.copy_value_metadata(then_value, result);
         let mut merge_instructions = Vec::new();
         self.provider.bind_owner(name, result, declared_type, span, &mut merge_instructions)?;
         let continuation =
