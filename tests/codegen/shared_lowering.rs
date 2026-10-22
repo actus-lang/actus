@@ -72,6 +72,26 @@ fn lowers_unit_result_constructor_with_shared_payload_layout() {
 }
 
 #[test]
+fn lowers_unit_return_case_calls_without_a_value_result() {
+    let source = "verb consume() { return; } verb dispatch(erg flag: Bool) { return case flag { true => { consume(); }, _ => { }, }; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "unit case fixture should lex: {errors:?}");
+    let program = actus::parser::parse(tokens).expect("unit case fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, None)
+        .expect("unit return case should lower through the neutral contract");
+    let dispatch = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("dispatch"))
+        .expect("dispatch function should be present");
+    assert!(
+        dispatch.blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(instruction, BackendInstruction::Call { result: None, .. })
+        )
+    );
+}
+
+#[test]
 fn lowers_string_literal_to_a_pointer_instruction() {
     let source = "verb main() -> Int { erg text = \"Actus print works\"; print(text); return 0; }";
     let (tokens, errors) = actus::lexer::scan(source);
