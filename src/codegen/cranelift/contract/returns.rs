@@ -74,15 +74,10 @@ fn lower_return_slot(
             function.symbol.as_str()
         )));
     }
-    if matches!(
-        function.return_value.ty,
-        crate::codegen::BackendValueType::NichePointerOption { .. }
-    ) {
-        if source != destination {
-            builder.ins().store(MemFlagsData::new(), source, destination, 0);
-        }
-        builder.ins().return_(&[]);
-        return Ok(());
+    if let crate::codegen::BackendValueType::NichePointerOption { payload_layout, .. } =
+        function.return_value.ty
+    {
+        return lower_niche_return_slot(module, builder, source, destination, payload_layout);
     }
     let alignment = u8::try_from(layout.alignment)
         .map_err(|_| BackendEmitError("Cranelift return-slot alignment exceeds u8".to_owned()))?;
@@ -97,6 +92,54 @@ fn lower_return_slot(
         MemFlagsData::new(),
     );
     builder.ins().return_(&[]);
+    Ok(())
+}
+
+fn lower_niche_return_slot(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    source: cranelift_codegen::ir::Value,
+    destination: cranelift_codegen::ir::Value,
+    payload_layout: Option<crate::codegen::BackendLayout>,
+) -> Result<(), BackendEmitError> {
+    if let Some(payload_layout) = payload_layout {
+        return lower_borrowed_view_return(module, builder, source, destination, payload_layout);
+    }
+    if source != destination {
+        builder.ins().store(MemFlagsData::new(), source, destination, 0);
+    }
+    builder.ins().return_(&[]);
+    Ok(())
+}
+
+fn lower_borrowed_view_return(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    source: cranelift_codegen::ir::Value,
+    destination: cranelift_codegen::ir::Value,
+    payload_layout: crate::codegen::BackendLayout,
+) -> Result<(), BackendEmitError> {
+    let null_block = builder.create_block();
+    let some_block = builder.create_block();
+    let null = builder.ins().iconst(module.isa().pointer_type(), 0);
+    let is_null = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::Equal, source, null);
+    builder.ins().brif(is_null, null_block, &[], some_block, &[]);
+    builder.switch_to_block(null_block);
+    builder.ins().return_(&[null]);
+    builder.switch_to_block(some_block);
+    let alignment = u8::try_from(payload_layout.alignment)
+        .map_err(|_| BackendEmitError("Cranelift borrowed view alignment exceeds u8".to_owned()))?;
+    builder.emit_small_memory_copy(
+        module.isa().frontend_config(),
+        destination,
+        source,
+        u64::from(payload_layout.size),
+        alignment,
+        alignment,
+        false,
+        MemFlagsData::new(),
+    );
+    builder.ins().return_(&[destination]);
     Ok(())
 }
 

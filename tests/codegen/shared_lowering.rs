@@ -299,6 +299,30 @@ fn lowers_scalar_aggregate_field_access_into_neutral_load() {
 }
 
 #[test]
+fn lowers_borrowed_nested_aggregate_field_access_into_pointer_loads() {
+    let source = "struct Path { platform: Int, } struct Component { abs source: Path, } verb main(abs component: Component) -> Int { return component.source.platform; }";
+    let (tokens, errors) = actus::lexer::scan(source);
+    assert!(errors.is_empty(), "borrowed nested aggregate fixture should lex: {errors:?}");
+    let program =
+        actus::parser::parse(tokens).expect("borrowed nested aggregate fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("borrowed nested aggregate access should lower through the neutral contract");
+    let instructions = module.functions[0]
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .collect::<Vec<_>>();
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        BackendInstruction::AggregateFieldLoad {
+            offset: 0,
+            ty: actus::codegen::BackendValueType::Pointer,
+            ..
+        }
+    )));
+}
+
+#[test]
 fn preserves_nominal_type_for_aggregate_array_element_field_access() {
     let source = "struct Point { x: Int, y: Int, } verb main() -> Int { erg points: Array[Point, 2] = Array[Point, 2](); points[1] = Point { x: 19, y: 23, }; return points[1].x + points[1].y; }";
     let (tokens, errors) = actus::lexer::scan(source);

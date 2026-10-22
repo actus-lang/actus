@@ -86,6 +86,12 @@ pub(super) fn signature(
         }
         crate::codegen::BackendReturnMode::ReturnSlot { layout } => {
             if matches!(return_value.ty, BackendValueType::NichePointerOption { .. }) {
+                if matches!(
+                    return_value.ty,
+                    BackendValueType::NichePointerOption { payload_layout: Some(_), .. }
+                ) {
+                    signature.returns.push(AbiParam::new(module.isa().pointer_type()));
+                }
                 signature.params.insert(0, AbiParam::new(module.isa().pointer_type()));
                 return Ok(signature);
             }

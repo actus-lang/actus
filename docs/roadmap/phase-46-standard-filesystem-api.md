@@ -51,6 +51,12 @@ filesystem dependency.
       platform rules.
 - [ ] Add explicit path operations for `join`, `parent`, `file_name`,
       `extension`, `file_stem`, `components`, and `normalize`.
+- [ ] Guarantee that every non-owning `PathComponent` view preserves a valid
+      source reference and that reads through `source.storage`, `offset`, and
+      `length` observe the original platform representation without exposing
+      backend-specific pointer details.
+- [ ] Add regression coverage for component-source byte/code-unit reads,
+      including extension and file-name views on POSIX and Windows paths.
 - [ ] Add a separate canonicalization operation that resolves filesystem
       identity and reports missing components instead of changing lexical
       paths implicitly.
@@ -227,6 +233,9 @@ filesystem dependency.
       backends.
 - [ ] Add standalone Cranelift and LLVM build/run tests for directory opening,
       iteration, EOF, close, file filtering, and publication.
+- [ ] Verify `PathComponent` source-view layout and field access equivalently
+      on Cranelift and LLVM; reject the change if either backend returns a
+      valid range with an invalid source view.
 - [ ] Add negative tests proving unsupported target capabilities fail
       deterministically on both backends.
 - [ ] Verify no filesystem operation introduces floating-point state or an
