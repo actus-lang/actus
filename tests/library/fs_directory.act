@@ -11,7 +11,7 @@ verb current_directory() -> Result[Path, PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
     append(raw, 0u8);
-    return path_from_posix(storage: dat raw);
+    return path_from_ascii(storage: dat raw);
 }
 
 verb close_directory_entry(ins directory: Directory, dat value: Option[Path]) -> Int {
