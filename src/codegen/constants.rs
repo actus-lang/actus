@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    BinaryOp, Block, CaseBody, Expr, IfBranch, Place, Program, Stmt, TopLevelDecl, TypeName,
-    UnaryOp,
+    BinaryOp, Block, CaseBody, EnumPayload, Expr, IfBranch, PackStorage, Place, Program, Stmt,
+    TopLevelDecl, TypeName, UnaryOp,
 };
 
 /// Inlines validated constant values before native lowering.
@@ -22,6 +22,7 @@ pub(super) fn inline_constants(program: &mut Program) {
         })
         .collect::<HashMap<_, _>>();
     for declaration in &mut program.declarations {
+        inline_declaration_types(declaration, &constants);
         match declaration {
             TopLevelDecl::Pack(pack) => {
                 for field in &mut pack.fields {
@@ -41,6 +42,89 @@ pub(super) fn inline_constants(program: &mut Program) {
                 }
             }
             _ => {}
+        }
+    }
+}
+
+fn inline_declaration_types(declaration: &mut TopLevelDecl, constants: &HashMap<String, Expr>) {
+    match declaration {
+        TopLevelDecl::Struct(definition) => {
+            for field in &mut definition.fields {
+                inline_type_name(&mut field.ty, constants);
+            }
+        }
+        TopLevelDecl::Enum(definition) => {
+            for variant in &mut definition.variants {
+                match &mut variant.payload {
+                    EnumPayload::Tuple(types) => {
+                        for type_name in types {
+                            inline_type_name(type_name, constants);
+                        }
+                    }
+                    EnumPayload::Struct(fields) => {
+                        for field in fields {
+                            inline_type_name(&mut field.ty, constants);
+                        }
+                    }
+                    EnumPayload::Unit => {}
+                }
+            }
+        }
+        TopLevelDecl::Pack(pack) => inline_pack_storage(&mut pack.storage, constants),
+        TopLevelDecl::Verb(verb) => inline_callable_types(verb, constants),
+        TopLevelDecl::Perform(perform) => {
+            inline_type_name(&mut perform.target, constants);
+            for method in &mut perform.methods {
+                inline_callable_types(method, constants);
+            }
+        }
+        TopLevelDecl::Role(role) => {
+            for method in &mut role.methods {
+                inline_params_and_return(&mut method.params, &mut method.return_type, constants);
+            }
+        }
+        TopLevelDecl::ExternalVerb(verb) => {
+            inline_params_and_return(&mut verb.params, &mut verb.return_type, constants);
+        }
+        TopLevelDecl::Constant(constant) => inline_type_name(&mut constant.ty, constants),
+        TopLevelDecl::Serialize(_) | TopLevelDecl::OpenSibling(_) | TopLevelDecl::Import(_) => {}
+    }
+}
+
+fn inline_callable_types(verb: &mut crate::ast::VerbDecl, constants: &HashMap<String, Expr>) {
+    inline_params_and_return(&mut verb.params, &mut verb.return_type, constants);
+    for parameter in &mut verb.generic_parameters {
+        if let crate::ast::GenericParamKind::Const { domain } = &mut parameter.kind {
+            inline_type_name(domain, constants);
+        }
+        if let Some(bound) = &mut parameter.bound {
+            inline_type_name(bound, constants);
+        }
+        for bound in &mut parameter.bounds {
+            inline_type_name(bound, constants);
+        }
+    }
+}
+
+fn inline_params_and_return(
+    params: &mut [crate::ast::Param],
+    return_type: &mut Option<crate::ast::ReturnType>,
+    constants: &HashMap<String, Expr>,
+) {
+    for parameter in params {
+        inline_type_name(&mut parameter.ty, constants);
+    }
+    if let Some(return_type) = return_type {
+        inline_type_name(&mut return_type.ty, constants);
+    }
+}
+
+fn inline_pack_storage(storage: &mut PackStorage, constants: &HashMap<String, Expr>) {
+    match storage {
+        PackStorage::Scalar(type_name) => inline_type_name(type_name, constants),
+        PackStorage::ByteArray { type_name, element, .. } => {
+            inline_type_name(type_name, constants);
+            inline_type_name(element, constants);
         }
     }
 }
