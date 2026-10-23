@@ -101,7 +101,10 @@ impl Analyzer {
         Ok(())
     }
 
-    fn resolve_type_reference(&self, type_name: &TypeName) -> Result<ResolvedType, SemanticError> {
+    pub(crate) fn resolve_type_reference(
+        &self,
+        type_name: &TypeName,
+    ) -> Result<ResolvedType, SemanticError> {
         let name = type_name.name.as_str();
         if name == "Arena" {
             return self.resolve_arena_type(type_name);
@@ -158,10 +161,26 @@ impl Analyzer {
         let capacity = &type_name.arguments[1];
         let parsed_capacity = capacity.name.parse::<u32>().ok();
         let const_parameter = self.is_const_generic_parameter(&capacity.name);
+        let named_const_capacity = if parsed_capacity.is_none() && !const_parameter {
+            self.constants
+                .get(&capacity.name)
+                .filter(|ty| canonical_type_name(ty) == "Usize")
+                .and_then(|_| {
+                    super::packs::evaluate_constant_name(
+                        &capacity.name,
+                        &self.constant_initializers,
+                        &mut Vec::new(),
+                    )
+                })
+                .and_then(|value| u32::try_from(value).ok())
+        } else {
+            None
+        };
         if capacity.reference_role.is_some()
             || !capacity.arguments.is_empty()
-            || (!const_parameter && parsed_capacity.is_none())
+            || (!const_parameter && parsed_capacity.is_none() && named_const_capacity.is_none())
             || parsed_capacity == Some(0)
+            || named_const_capacity == Some(0)
         {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidArrayCapacity { capacity: capacity.name.clone() },
@@ -169,9 +188,12 @@ impl Analyzer {
             });
         }
         let resolved_element = self.resolve_type_reference(element)?;
+        let resolved_capacity = named_const_capacity
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| capacity.name.clone());
         Ok(ResolvedType::Applied {
             name: "Array".to_owned(),
-            arguments: vec![resolved_element, ResolvedType::Concrete(capacity.name.clone())],
+            arguments: vec![resolved_element, ResolvedType::Concrete(resolved_capacity)],
         })
     }
 

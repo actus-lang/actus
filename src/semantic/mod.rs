@@ -1,5 +1,6 @@
 mod analyzer;
 mod argument_shapes;
+mod array_capacity;
 mod borrowing;
 mod call_arguments;
 mod calls;

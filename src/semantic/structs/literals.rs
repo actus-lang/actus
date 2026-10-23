@@ -74,7 +74,8 @@ impl Analyzer {
             });
         };
         self.visit_expression(&initializer.value)?;
-        let expected = substitution.apply(&field.ty);
+        let mut expected = substitution.apply(&field.ty);
+        self.normalize_array_capacities(&mut expected)?;
         self.validate_field_value_type(
             name,
             &field,

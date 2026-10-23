@@ -149,14 +149,16 @@ impl Analyzer {
             return Ok(Some(Ok(())));
         }
         if let Some(type_name) = array_constructor_type(callee, span) {
-            self.validate_type_reference(&type_name)?;
+            let mut normalized_type_name = type_name;
+            self.normalize_array_capacities(&mut normalized_type_name)?;
             if !arguments.is_empty() {
                 return Ok(Some(Err(SemanticError {
                     kind: SemanticErrorKind::WrongArgumentCount { callee: callee.to_owned() },
                     span,
                 })));
             }
-            self.inferred_expression_types.insert(self.expression_cache_key(span), type_name);
+            self.inferred_expression_types
+                .insert(self.expression_cache_key(span), normalized_type_name);
             return Ok(Some(Ok(())));
         }
         if matches!(callee, "Ok" | "Err") && !self.signatures.contains_key(callee) {

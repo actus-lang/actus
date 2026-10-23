@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    BinaryOp, Block, CaseBody, Expr, IfBranch, Place, Program, Stmt, TopLevelDecl, UnaryOp,
+    BinaryOp, Block, CaseBody, EnumPayload, Expr, IfBranch, PackStorage, Place, Program, Stmt,
+    TopLevelDecl, TypeName, UnaryOp,
 };
 
 /// Inlines validated constant values before native lowering.
@@ -21,6 +22,7 @@ pub(super) fn inline_constants(program: &mut Program) {
         })
         .collect::<HashMap<_, _>>();
     for declaration in &mut program.declarations {
+        inline_declaration_types(declaration, &constants);
         match declaration {
             TopLevelDecl::Pack(pack) => {
                 for field in &mut pack.fields {
@@ -40,6 +42,89 @@ pub(super) fn inline_constants(program: &mut Program) {
                 }
             }
             _ => {}
+        }
+    }
+}
+
+fn inline_declaration_types(declaration: &mut TopLevelDecl, constants: &HashMap<String, Expr>) {
+    match declaration {
+        TopLevelDecl::Struct(definition) => {
+            for field in &mut definition.fields {
+                inline_type_name(&mut field.ty, constants);
+            }
+        }
+        TopLevelDecl::Enum(definition) => {
+            for variant in &mut definition.variants {
+                match &mut variant.payload {
+                    EnumPayload::Tuple(types) => {
+                        for type_name in types {
+                            inline_type_name(type_name, constants);
+                        }
+                    }
+                    EnumPayload::Struct(fields) => {
+                        for field in fields {
+                            inline_type_name(&mut field.ty, constants);
+                        }
+                    }
+                    EnumPayload::Unit => {}
+                }
+            }
+        }
+        TopLevelDecl::Pack(pack) => inline_pack_storage(&mut pack.storage, constants),
+        TopLevelDecl::Verb(verb) => inline_callable_types(verb, constants),
+        TopLevelDecl::Perform(perform) => {
+            inline_type_name(&mut perform.target, constants);
+            for method in &mut perform.methods {
+                inline_callable_types(method, constants);
+            }
+        }
+        TopLevelDecl::Role(role) => {
+            for method in &mut role.methods {
+                inline_params_and_return(&mut method.params, &mut method.return_type, constants);
+            }
+        }
+        TopLevelDecl::ExternalVerb(verb) => {
+            inline_params_and_return(&mut verb.params, &mut verb.return_type, constants);
+        }
+        TopLevelDecl::Constant(constant) => inline_type_name(&mut constant.ty, constants),
+        TopLevelDecl::Serialize(_) | TopLevelDecl::OpenSibling(_) | TopLevelDecl::Import(_) => {}
+    }
+}
+
+fn inline_callable_types(verb: &mut crate::ast::VerbDecl, constants: &HashMap<String, Expr>) {
+    inline_params_and_return(&mut verb.params, &mut verb.return_type, constants);
+    for parameter in &mut verb.generic_parameters {
+        if let crate::ast::GenericParamKind::Const { domain } = &mut parameter.kind {
+            inline_type_name(domain, constants);
+        }
+        if let Some(bound) = &mut parameter.bound {
+            inline_type_name(bound, constants);
+        }
+        for bound in &mut parameter.bounds {
+            inline_type_name(bound, constants);
+        }
+    }
+}
+
+fn inline_params_and_return(
+    params: &mut [crate::ast::Param],
+    return_type: &mut Option<crate::ast::ReturnType>,
+    constants: &HashMap<String, Expr>,
+) {
+    for parameter in params {
+        inline_type_name(&mut parameter.ty, constants);
+    }
+    if let Some(return_type) = return_type {
+        inline_type_name(&mut return_type.ty, constants);
+    }
+}
+
+fn inline_pack_storage(storage: &mut PackStorage, constants: &HashMap<String, Expr>) {
+    match storage {
+        PackStorage::Scalar(type_name) => inline_type_name(type_name, constants),
+        PackStorage::ByteArray { type_name, element, .. } => {
+            inline_type_name(type_name, constants);
+            inline_type_name(element, constants);
         }
     }
 }
@@ -70,6 +155,7 @@ fn evaluate_constant_expression(
         Expr::Grouping { expression, .. } => {
             evaluate_constant_expression(expression, constants, path)
         }
+        Expr::Cast { expression, .. } => evaluate_constant_expression(expression, constants, path),
         Expr::Unary { operator, expression, .. } => {
             let value = evaluate_constant_expression(expression, constants, path)?;
             match operator {
@@ -159,44 +245,38 @@ fn inline_expression(expression: &mut Expr, constants: &HashMap<String, Expr>) {
         inline_expression(expression, constants);
         return;
     }
+    inline_expression_node(expression, constants);
+}
+
+fn inline_expression_node(expression: &mut Expr, constants: &HashMap<String, Expr>) {
     match expression {
-        Expr::Grouping { expression, .. }
-        | Expr::Unary { expression, .. }
-        | Expr::Cast { expression, .. }
-        | Expr::Borrow { expression, .. }
-        | Expr::Try { expression, .. } => inline_expression(expression, constants),
+        Expr::Grouping { expression, .. } | Expr::Unary { expression, .. } => {
+            inline_expression(expression, constants)
+        }
+        Expr::Cast { expression, target, .. } => {
+            inline_type_name(target, constants);
+            inline_expression(expression, constants);
+        }
+        Expr::Borrow { expression, .. } | Expr::Try { expression, .. } => {
+            inline_expression(expression, constants)
+        }
         Expr::Binary { left, right, .. } => {
             inline_expression(left, constants);
             inline_expression(right, constants);
         }
-        Expr::Call { arguments, .. } | Expr::MethodCall { arguments, .. } => {
-            for argument in arguments {
-                inline_expression(&mut argument.expression, constants);
-            }
+        Expr::Call { callee, arguments, span } => inline_call(callee, arguments, *span, constants),
+        Expr::MethodCall { receiver, arguments, .. } => {
+            inline_method_call(receiver, arguments, constants);
         }
-        Expr::StructLit { fields, .. } => {
-            for field in fields {
-                inline_expression(&mut field.value, constants);
-            }
+        Expr::StructLit { type_arguments, fields, .. } => {
+            inline_struct_literal(type_arguments, fields, constants);
         }
-        Expr::FieldAccess { object, .. } | Expr::Index { target: object, .. } => {
+        Expr::FieldAccess { object, .. } => inline_expression(object, constants),
+        Expr::Index { target: object, index, .. } => {
             inline_expression(object, constants);
-            if let Expr::Index { index, .. } = expression {
-                inline_expression(index, constants);
-            }
+            inline_expression(index, constants);
         }
-        Expr::Case { subject, branches, .. } => {
-            inline_expression(subject, constants);
-            for branch in branches {
-                if let Some(guard) = &mut branch.guard {
-                    inline_expression(guard, constants);
-                }
-                match &mut branch.body {
-                    CaseBody::Expression(value) => inline_expression(value, constants),
-                    CaseBody::Block(block) => inline_block(block, constants),
-                }
-            }
-        }
+        Expr::Case { subject, branches, .. } => inline_case(subject, branches, constants),
         Expr::If { condition, then_branch, else_branch, .. } => {
             inline_conditional(condition, then_branch, else_branch.as_mut(), constants);
         }
@@ -206,6 +286,87 @@ fn inline_expression(expression: &mut Expr, constants: &HashMap<String, Expr>) {
         | Expr::FloatLiteral { .. }
         | Expr::StringLiteral { .. }
         | Expr::Identifier { .. } => {}
+    }
+}
+
+fn inline_call(
+    callee: &mut String,
+    arguments: &mut [crate::ast::Argument],
+    span: crate::lexer::SourceSpan,
+    constants: &HashMap<String, Expr>,
+) {
+    inline_array_callee(callee, span, constants);
+    for argument in arguments {
+        inline_expression(&mut argument.expression, constants);
+    }
+}
+
+fn inline_method_call(
+    receiver: &mut Box<Expr>,
+    arguments: &mut [crate::ast::Argument],
+    constants: &HashMap<String, Expr>,
+) {
+    inline_expression(receiver, constants);
+    for argument in arguments {
+        inline_expression(&mut argument.expression, constants);
+    }
+}
+
+fn inline_struct_literal(
+    type_arguments: &mut [TypeName],
+    fields: &mut [crate::ast::StructFieldInit],
+    constants: &HashMap<String, Expr>,
+) {
+    for type_argument in type_arguments {
+        inline_type_name(type_argument, constants);
+    }
+    for field in fields {
+        inline_expression(&mut field.value, constants);
+    }
+}
+
+fn inline_case(
+    subject: &mut Box<Expr>,
+    branches: &mut [crate::ast::CaseBranch],
+    constants: &HashMap<String, Expr>,
+) {
+    inline_expression(subject, constants);
+    for branch in branches {
+        if let Some(guard) = &mut branch.guard {
+            inline_expression(guard, constants);
+        }
+        match &mut branch.body {
+            CaseBody::Expression(value) => inline_expression(value, constants),
+            CaseBody::Block(block) => inline_block(block, constants),
+        }
+    }
+}
+
+fn inline_array_callee(
+    callee: &mut String,
+    span: crate::lexer::SourceSpan,
+    constants: &HashMap<String, Expr>,
+) {
+    if !callee.starts_with("Array[") {
+        return;
+    }
+    let Some(mut type_name) = crate::semantic::parse_type_name_key(callee, span) else {
+        return;
+    };
+    inline_type_name(&mut type_name, constants);
+    *callee = type_name.canonical_key();
+}
+
+fn inline_type_name(type_name: &mut TypeName, constants: &HashMap<String, Expr>) {
+    for argument in &mut type_name.arguments {
+        inline_type_name(argument, constants);
+    }
+    if type_name.name != "Array" || type_name.arguments.len() != 2 {
+        return;
+    }
+    let capacity = &mut type_name.arguments[1];
+    if let Some(value) = evaluate_constant_name(&capacity.name, constants, &mut Vec::new()) {
+        capacity.name = value.to_string();
     }
 }
 

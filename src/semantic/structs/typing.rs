@@ -91,7 +91,9 @@ impl Analyzer {
         let definition = self.struct_types.get(&type_name.name)?;
         let field = definition.fields.iter().find(|candidate| candidate.name == field)?;
         if type_name.arguments.is_empty() {
-            return Some(field.ty.clone());
+            let mut field_type = field.ty.clone();
+            self.normalize_array_capacities(&mut field_type).ok()?;
+            return Some(field_type);
         }
         TypeSubstitution::for_type(
             &definition.name,
@@ -100,6 +102,10 @@ impl Analyzer {
             type_name.span,
         )
         .ok()
-        .map(|substitution| substitution.apply(&field.ty))
+        .and_then(|substitution| {
+            let mut field_type = substitution.apply(&field.ty);
+            self.normalize_array_capacities(&mut field_type).ok()?;
+            Some(field_type)
+        })
     }
 }
