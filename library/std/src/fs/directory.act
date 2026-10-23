@@ -91,22 +91,33 @@ open verb next_dir_entry(ins directory: Directory) -> Result[Option[Path], IoErr
             Err(IoError.InvalidInput);
         },
         0 => {
+            return directory_entry_from_storage(storage: dat storage, status: status);
+        },
+        1 => {
+            return directory_entry_from_storage(storage: dat storage, status: status);
+        },
+        _ => {
+            drop(storage);
+            Err(IoError.Failed);
+        },
+    };
+}
+
+verb directory_entry_from_storage(dat storage: Buffer, erg status: Int) -> Result[Option[Path], IoError] {
+    return case status {
+        0 => {
             erg result = path_from_posix(storage: dat storage);
             return case dat result {
                 Result.Err(_) => Err(IoError.InvalidData),
                 Result.Ok(value) => Ok(Option[Path].Some(dat value)),
             };
         },
-        1 => {
+        _ => {
             erg result = path_from_windows_utf16(storage: dat storage);
             return case dat result {
                 Result.Err(_) => Err(IoError.InvalidData),
                 Result.Ok(value) => Ok(Option[Path].Some(dat value)),
             };
-        },
-        _ => {
-            drop(storage);
-            Err(IoError.Failed);
         },
     };
 }
