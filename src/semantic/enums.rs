@@ -57,7 +57,8 @@ impl Analyzer {
         }
         match expression {
             Expr::Call { callee, .. } => self.signatures.get(callee).and_then(|signature| {
-                (signature.return_type_name.as_ref()?.name == "Result").then(|| "Result".to_owned())
+                let return_type = signature.return_type_name.as_ref()?;
+                self.enum_types.contains_key(&return_type.name).then(|| return_type.name.clone())
             }),
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => {
                 self.enum_receiver_name(object).map(str::to_owned)
@@ -124,9 +125,8 @@ impl Analyzer {
         let receiver = match expression {
             Expr::Call { callee, .. } => {
                 return self.signatures.get(callee).and_then(|signature| {
-                    (signature.return_type_name.as_ref()?.name == "Result")
-                        .then(|| signature.return_type_name.clone())
-                        .flatten()
+                    let return_type = signature.return_type_name.as_ref()?;
+                    self.enum_types.contains_key(&return_type.name).then(|| return_type.clone())
                 });
             }
             Expr::Case { branches, .. } => {

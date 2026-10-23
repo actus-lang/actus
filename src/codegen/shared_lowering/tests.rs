@@ -149,6 +149,26 @@ fn lowers_plain_result_case_into_neutral_branches() {
     }));
 }
 
+#[test]
+fn lowers_unit_return_case_calls_as_discarded_calls() {
+    let source = "verb consume() { return; } verb dispatch(erg flag: Bool) { return case flag { true => { consume(); }, _ => { }, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unit case fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("unit case fixture should parse");
+    let module = super::super::lower_program_to_backend_module("actus_root", &program, None, None)
+        .expect("unit return case should lower through the neutral contract");
+    let dispatch = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("dispatch"))
+        .expect("dispatch function should be present");
+    assert!(
+        dispatch.blocks.iter().flat_map(|block| block.instructions.iter()).any(
+            |instruction| matches!(instruction, BackendInstruction::Call { result: None, .. })
+        )
+    );
+}
+
 struct RegionLayouts;
 
 impl BackendLayoutProvider for RegionLayouts {

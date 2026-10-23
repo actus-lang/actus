@@ -2,9 +2,11 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use actus::codegen::cranelift::emit_program_object;
 use actus::lexer::scan;
 use actus::modules::{
-    ModuleError, ModuleResolver, analyze_with_imports, load_module_unit, parse_module,
+    ModuleError, ModuleResolver, analyze_with_imports, build_compilation_plan, load_module_unit,
+    parse_module,
 };
 use actus::parser::parse;
 
@@ -81,6 +83,46 @@ fn accepts_equality_for_a_unit_enum_reexported_through_a_facade() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("re-exported unit enum equality should be accepted");
+}
+
+#[test]
+fn lowers_generic_option_return_through_a_facade() {
+    let fixture = Fixture::new();
+    fixture.write("dataset/dataset.act", "open manifest;");
+    fixture.write("dataset/validation.act", "open enum DatasetError { Invalid, }");
+    fixture.write(
+        "dataset/manifest.act",
+        "open validation; open verb read() -> Option[DatasetError] { return Option[DatasetError].Some(DatasetError.Invalid); }",
+    );
+    let program = parse_source(
+        "import dataset; verb main() -> Int { erg header = read(); return case dat header { Option.Some(_) => 0, Option.None => 1, }; }",
+    );
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("facade plan should build");
+    let object = emit_program_object(&plan.implementation(), "main")
+        .expect("generic Option return through a facade should emit");
+    object::File::parse(object.as_slice()).expect("facade Option object should parse");
+}
+
+#[test]
+fn lowers_nested_generic_option_payload_through_a_facade() {
+    let fixture = Fixture::new();
+    fixture.write("dataset/dataset.act", "open manifest;");
+    fixture.write("dataset/validation.act", "open enum DatasetError { Invalid, }");
+    fixture.write(
+        "dataset/manifest.act",
+        "open validation; open verb read_nested() -> Result[Option[DatasetError], DatasetError] { return Result[Option[DatasetError], DatasetError].Ok(Option[DatasetError].Some(DatasetError.Invalid)); }",
+    );
+    let program = parse_source(
+        "import dataset; verb main() -> Int { erg result = read_nested(); return case dat result { Result.Ok(option) => case dat option { Option.Some(_) => 0, Option.None => 1, }, Result.Err(_) => 2, }; }",
+    );
+
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("nested facade plan should build");
+    let object = emit_program_object(&plan.implementation(), "main")
+        .expect("nested generic Option payload should emit");
+    object::File::parse(object.as_slice()).expect("nested facade Option object should parse");
 }
 
 #[test]

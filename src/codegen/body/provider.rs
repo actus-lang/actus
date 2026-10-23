@@ -55,6 +55,8 @@ pub trait BackendExpressionProvider {
 
     fn remember_nominal_type(&mut self, _value: BackendValueId, _type_name: crate::ast::TypeName) {}
 
+    fn copy_value_metadata(&mut self, _source: BackendValueId, _target: BackendValueId) {}
+
     fn allocate_value(&mut self, _ty: BackendValueType) -> BackendValueId {
         BackendValueId(u32::MAX)
     }

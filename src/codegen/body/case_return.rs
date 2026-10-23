@@ -13,7 +13,7 @@ pub(super) fn case_return_block<P: BackendExpressionProvider>(
 ) -> Result<BackendBlock, BackendContractError> {
     match &branch.body {
         CaseBody::Expression(expression) => {
-            let statement = if fallthrough.is_some() {
+            let statement = if fallthrough.is_some() || lowering.returns_unit() {
                 Stmt::Expression { expression: *expression.clone(), span }
             } else {
                 Stmt::Return { value: Some(*expression.clone()), span }
@@ -22,7 +22,7 @@ pub(super) fn case_return_block<P: BackendExpressionProvider>(
             lowering.lower_block(id, &block, fallthrough)
         }
         CaseBody::Block(block) => {
-            if fallthrough.is_none() {
+            if fallthrough.is_none() && !lowering.returns_unit() {
                 let value = match block.statements.last() {
                     Some(Stmt::Expression { expression, span }) => {
                         Some((expression.clone(), *span))

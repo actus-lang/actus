@@ -177,6 +177,7 @@ fn declare_aggregate_allocator(
             return_slot: None,
             runtime_pointer_return: false,
             niche_pointer_return: false,
+            borrowed_view_return: false,
             runtime_result_layout: None,
         },
     );
@@ -213,6 +214,7 @@ fn declare_cleanup_bridge(
             return_slot: None,
             runtime_pointer_return: false,
             niche_pointer_return: false,
+            borrowed_view_return: false,
             runtime_result_layout: None,
         },
     );

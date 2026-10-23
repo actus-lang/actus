@@ -129,6 +129,10 @@ impl<P: BackendBodyProvider> BackendExpressionProvider for LegacyExpressionProvi
 }
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
+    pub(super) fn returns_unit(&self) -> bool {
+        self.implicit_unit_return
+    }
+
     fn snapshot_loop_bindings(&self) -> Vec<(String, BackendValueId)> {
         self.loop_targets
             .last()

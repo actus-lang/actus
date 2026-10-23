@@ -110,6 +110,7 @@ fn copy_std_library(root: &Path) {
         ("io/cursor.act", library_file("io/cursor.act")),
         ("io/copy.act", library_file("io/copy.act")),
         ("fs/fs.act", library_file("fs/fs.act")),
+        ("fs/directory.act", library_file("fs/directory.act")),
         ("fs/file.act", library_file("fs/file.act")),
         ("fs/metadata.act", library_file("fs/metadata.act")),
         ("fs/operations.act", library_file("fs/operations.act")),

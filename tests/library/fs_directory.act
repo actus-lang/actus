@@ -1,0 +1,78 @@
+"""Minimal hosted directory enumeration contract tests."""
+import fs;
+
+import path;
+
+open fs;
+
+open path;
+
+verb current_directory() -> Result[Path, PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path_from_ascii(storage: dat raw);
+}
+
+verb close_directory_entry(ins directory: Directory, dat value: Option[Path]) -> Int {
+    erg entry_code = case dat value {
+        Option.None => 5,
+        Option.Some(name) => case name.length {
+            0 => 6,
+            _ => 0,
+        },
+    };
+    erg closed = close_dir(directory: ins directory);
+    return case dat closed {
+        Result.Err(_) => 4,
+        Result.Ok(_) => entry_code,
+    };
+}
+
+meta test
+verb directory_iteration_returns_entry_and_closes() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    erg entry = next_dir_entry(directory: ins directory);
+                    return case dat entry {
+                        Result.Err(_) => 3,
+                        Result.Ok(value) => close_directory_entry(directory: ins directory, value: dat value),
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb missing_directory_path() -> Result[Path, PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 47u8);
+    append(raw, 120u8);
+    append(raw, 121u8);
+    append(raw, 0u8);
+    return path_from_posix(storage: dat raw);
+}
+
+meta test
+verb directory_iteration_rejects_missing_directory() -> Int {
+    erg path = missing_directory_path();
+    return case dat path {
+        Result.Err(_) => 1,
+        Result.Ok(value) => {
+            erg opened = read_dir(path: abs value);
+            return case dat opened {
+                Result.Err(_) => 0,
+                Result.Ok(directory) => {
+                    close_dir(directory: ins directory);
+                    2;
+                },
+            };
+        },
+    };
+}

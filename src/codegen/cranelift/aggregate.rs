@@ -20,6 +20,7 @@ pub(super) struct Declaration {
     pub(super) return_slot: Option<crate::codegen::BackendLayout>,
     pub(super) runtime_pointer_return: bool,
     pub(super) niche_pointer_return: bool,
+    pub(super) borrowed_view_return: bool,
     pub(super) runtime_result_layout: Option<crate::codegen::BackendLayout>,
 }
 
@@ -59,6 +60,10 @@ pub(super) fn declaration(
         niche_pointer_return: matches!(
             return_value.ty,
             BackendValueType::NichePointerOption { .. }
+        ),
+        borrowed_view_return: matches!(
+            return_value.ty,
+            BackendValueType::NichePointerOption { payload_layout: Some(_), .. }
         ),
         runtime_result_layout: None,
     })
@@ -110,9 +115,13 @@ fn return_fragment_count(
         crate::codegen::BackendReturnMode::Direct => {
             Ok(usize::from(!matches!(return_value.ty, BackendValueType::Unit)))
         }
-        crate::codegen::BackendReturnMode::ReturnSlot { .. } => {
-            Ok(usize::from(runtime_pointer_return))
-        }
+        crate::codegen::BackendReturnMode::ReturnSlot { .. } => Ok(usize::from(
+            runtime_pointer_return
+                || matches!(
+                    return_value.ty,
+                    BackendValueType::NichePointerOption { payload_layout: Some(_), .. }
+                ),
+        )),
     }
 }
 
@@ -329,6 +338,13 @@ fn record_call_results(
         }
         return Ok(());
     };
+    if declaration.borrowed_view_return {
+        let value = builder.inst_results(call).first().copied().ok_or_else(|| {
+            BackendEmitError("Cranelift borrowed view call result is unavailable".to_owned())
+        })?;
+        values.insert(*result, value);
+        return Ok(());
+    }
     if let Some(return_slot) = return_slot {
         values.insert(*result, return_slot);
         return Ok(());

@@ -1,0 +1,52 @@
+import path;
+
+verb source_path() -> Path {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 46u8);
+    append(raw, 103u8);
+    append(raw, 122u8);
+    append(raw, 0u8);
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {storage: Buffer[1], platform: PathPlatform.Posix, length: 0, capacity: 1, terminated: 1},
+    };
+}
+
+verb verify_source_component(abs path: Path) -> Int {
+    erg found = extension(self: abs path);
+    return case dat found {
+        Option.None => 1,
+        Option.Some(component) => {
+            if component.source.platform != PathPlatform.Posix {
+                return 10;
+            }
+            if component.source.length != 4 {
+                return 14;
+            }
+            if component.source.capacity != 8 {
+                return 15;
+            }
+            if component.length != 2 {
+                return 11;
+            }
+            if component.source.storage[component.offset as Usize] != 103u8 {
+                return 12;
+            }
+            if component.source.storage[(component.offset + 1) as Usize] != 122u8 {
+                return 13;
+            }
+            0;
+        },
+    };
+}
+
+meta test
+verb path_component_source_view_preserves_bytes() -> Int {
+    erg path = source_path();
+    if path.platform != PathPlatform.Posix {
+        return 20;
+    }
+    return verify_source_component(path: abs path);
+}

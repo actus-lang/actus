@@ -171,6 +171,37 @@ fn both_native_backends_build_standalone_case_statement_through_shared_lowering(
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
+fn both_native_backends_preserve_enum_metadata_through_value_case_merge() {
+    let source = "enum Failure { Bad, } verb main() -> Int { erg original = Result[Int, Failure].Ok(41); erg selected = case dat original { Result.Ok(value) => Result[Int, Failure].Ok(value), Result.Err(error) => Result[Int, Failure].Err(error), }; return case dat selected { Result.Ok(value) => value, Result.Err(_) => 0, }; }\n";
+    for backend in ["cranelift", "llvm"] {
+        let root = std::env::temp_dir()
+            .join(format!("actus-cli-case-merge-metadata-{backend}-{}", std::process::id()));
+        let input = root.with_extension("act");
+        let output = root.with_extension("bin");
+        fs::write(&input, source).expect("write enum case merge fixture source");
+        let result = run_with_args(
+            vec![
+                "build".to_owned(),
+                input.display().to_string(),
+                "--strict".to_owned(),
+                "--emit".to_owned(),
+                "exe".to_owned(),
+                "-o".to_owned(),
+                output.display().to_string(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(result, 0, "backend {backend} should build enum case merge");
+        let status =
+            std::process::Command::new(&output).status().expect("run enum case merge fixture");
+        assert_eq!(status.code(), Some(41), "backend {backend} should preserve enum metadata");
+        let _ = fs::remove_file(input);
+        let _ = fs::remove_file(output);
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
 fn both_native_backends_share_case_continue_loop_state() {
     let source = "verb main() -> Int { erg flag = 1; loop { case flag { 1 => { flag += 1; continue; }, _ => { break; }, }; } return flag; }\n";
     for backend in ["cranelift", "llvm"] {

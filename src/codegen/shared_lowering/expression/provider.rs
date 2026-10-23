@@ -60,6 +60,22 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         self.remember_nominal_type(value, type_name);
     }
 
+    fn copy_value_metadata(&mut self, source: BackendValueId, target: BackendValueId) {
+        if let Some(type_name) = self.nominal_type(source).cloned() {
+            self.remember_nominal_type(target, type_name);
+        }
+        let payloads = self
+            .enum_payload_types
+            .iter()
+            .filter_map(|((value, discriminant), ty)| {
+                (*value == source).then_some((*discriminant, *ty))
+            })
+            .collect::<Vec<_>>();
+        for (discriminant, ty) in payloads {
+            self.remember_enum_payload(target, discriminant, ty);
+        }
+    }
+
     fn allocate_value(&mut self, ty: BackendValueType) -> BackendValueId {
         let value = self.allocate();
         self.remember_value(value, ty);
@@ -212,17 +228,18 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
+        let value = self.materialize_aggregate_assignment(value, span, instructions)?;
         if let Some((destination, layout)) = self.aggregate_loan_parameter(name) {
-            instructions.push(BackendInstruction::MemoryCopy {
+            assign_aggregate_loan(
+                self,
                 destination,
-                source: value,
-                size: layout.size,
-                alignment: layout.alignment,
+                value,
+                layout,
                 span,
-            });
+                instructions,
+            )?;
             return Ok(());
         }
-        let value = self.materialize_aggregate_assignment(value, span, instructions)?;
         if let Some(previous) = self.binding_value(name).filter(|previous| *previous != value) {
             cleanup::emit_replacement_cleanup(self, name, previous, span, instructions);
         }

@@ -55,6 +55,7 @@ struct CaseOwnerContinuationInput<'a> {
     fallthrough: Option<BackendBlockId>,
     merge_id: BackendBlockId,
     result_type: BackendValueType,
+    metadata_source: Option<BackendValueId>,
     carried: &'a [CarriedBinding],
     span: SourceSpan,
 }
@@ -134,6 +135,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 fallthrough,
                 merge_id,
                 result_type,
+                metadata_source: branch_values.first().map(|branch| branch.value),
                 carried: &carried,
                 span,
             })?;
@@ -158,10 +160,14 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             fallthrough,
             merge_id,
             result_type,
+            metadata_source,
             carried,
             span,
         } = input;
         let result = self.provider.allocate_value(result_type);
+        if let Some(source) = metadata_source {
+            self.provider.copy_value_metadata(source, result);
+        }
         let carried_values = carried
             .iter()
             .map(|binding| self.provider.allocate_value(binding.ty))
@@ -432,6 +438,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             .value_type(first_value)
             .ok_or_else(|| unsupported(span, "nested case result type is unavailable"))?;
         let result = self.provider.allocate_value(result_type);
+        self.provider.copy_value_metadata(first_value, result);
         self.blocks.push(BackendBlock {
             parameters: vec![BackendBlockParameter { value: result, ty: result_type, span }],
             id: lowered.merge_id,
