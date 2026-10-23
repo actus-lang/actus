@@ -116,6 +116,26 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
 }
 
 #[test]
+fn hosted_cli_backends_accept_named_array_capacity_constants() {
+    let source = "const CAPACITY: Usize = 8u64 as Usize; verb main() -> Int { erg values: Array[u8, CAPACITY] = Array[u8, CAPACITY](); values[0] = 41u8; return values[0] as Int + 1; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("named-array-capacity", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} named array capacity build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status =
+            Command::new(&output).status().expect("run named array capacity parity fixture");
+        assert_eq!(status.code(), Some(42), "{backend} named array capacity result");
+        fs::remove_dir_all(root).expect("remove named array capacity fixture");
+    }
+}
+
+#[test]
 fn hosted_cli_backends_share_float_constants_and_comparisons() {
     let source = "verb main() -> Int { erg temperature: f32 = 21.5; erg pressure: f64 = 1013.25; return case temperature < 22.0f32 && pressure > 1000.0 { true => 42, _ => 1, }; }\n";
     for backend in BACKENDS {

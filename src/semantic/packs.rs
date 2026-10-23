@@ -107,7 +107,7 @@ fn resolve_pack_offsets(
     Ok(())
 }
 
-fn evaluate_constant_name(
+pub(super) fn evaluate_constant_name(
     name: &str,
     constants: &HashMap<String, Expr>,
     path: &mut Vec<String>,
@@ -133,6 +133,7 @@ fn evaluate_constant_expression(
         Expr::Grouping { expression, .. } => {
             evaluate_constant_expression(expression, constants, path)
         }
+        Expr::Cast { expression, .. } => evaluate_constant_expression(expression, constants, path),
         Expr::Unary { operator, expression, .. } => {
             let value = evaluate_constant_expression(expression, constants, path)?;
             match operator {

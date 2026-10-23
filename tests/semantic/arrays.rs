@@ -140,6 +140,14 @@ fn rejects_non_const_generic_array_capacity() {
 }
 
 #[test]
+fn accepts_named_usize_constant_array_capacity() {
+    analyze_source(
+        "const CAPACITY: Usize = 4u64 as Usize; struct Storage { values: Array[Int, CAPACITY], } verb main() { }",
+    )
+    .expect("named Usize constants should resolve as array capacities");
+}
+
+#[test]
 fn rejects_constant_array_index_out_of_bounds() {
     let error = analyze_source("verb main(abs values: Array[Int, 4]) { print(values[4]); }")
         .expect_err("a constant index at capacity must be rejected");

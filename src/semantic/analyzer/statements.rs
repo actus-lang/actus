@@ -232,8 +232,11 @@ impl Analyzer {
         initializer: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let declared_type_name =
+        let mut declared_type_name =
             declared_type.and_then(|name| super::super::calls::parse_type_name_key(name, span));
+        if let Some(type_name) = &mut declared_type_name {
+            self.normalize_array_capacities(type_name)?;
+        }
         self.validate_owner_initializer(initializer, declared_type_name.as_ref())?;
         let binding_type =
             self.resolve_binding_type(declared_type_name.as_ref(), initializer, span)?;
