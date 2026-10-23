@@ -56,6 +56,10 @@ pub unsafe extern "C" fn actus_directory_next(handle: i32, storage: BufferHandle
 }
 
 /// Closes one directory token and releases its host iterator.
+///
+/// # Safety
+/// `handle` must be a directory token returned by `actus_directory_open` or a
+/// non-negative token whose lifetime is independently controlled by the host.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_directory_close(handle: i32) -> i32 {
     if handle < 0 {
