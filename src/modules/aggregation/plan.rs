@@ -375,6 +375,9 @@ fn append_public_declarations(
 ) {
     for declaration in &unit.implementation().declarations {
         let Some((kind, name)) = export_identity(declaration) else { continue };
+        if kind == "perform" {
+            continue;
+        }
         if !unit.exports().contains(kind, &name) {
             continue;
         }

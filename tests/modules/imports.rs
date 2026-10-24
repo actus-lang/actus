@@ -71,6 +71,20 @@ fn records_imported_namespace_and_resolves_qualified_call() {
 }
 
 #[test]
+fn keeps_imported_performance_bodies_in_their_module_scope() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write(
+        "shared/api.act",
+        "open struct File { value: Int, } open role Writer { verb write(abs self: File) -> Int; } open verb helper(abs value: Int) -> Int { return value; } open perform Writer for File { verb write(abs self: File) -> Int { return helper(value: abs self.value); } }",
+    );
+    let program = parse_source("import shared; verb main() -> Int { return 0; }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("an imported performance body should resolve its module-local helper");
+}
+
+#[test]
 fn rejects_unqualified_call_through_a_closed_import() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open api;");
