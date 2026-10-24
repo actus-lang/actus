@@ -57,8 +57,8 @@ The source-limit validator measures code-bearing lines. Blank lines, Rust-style
 comments are ignored after the code on their line has been counted. Actus
 triple-quoted `""" ... """` documentation blocks remain counted because they
 are language constructs. `E1850` is reported when a file exceeds the preferred
-300 code-line size or `E1853` when a function exceeds the preferred 30
+300 code-line size or `E1853` when a function exceeds the preferred 50
 code-line size.
 `E1851` and `E1854` are strict split-required failures at 400 file lines and
-40 function lines. `E1852` and `E1855` reject files above 500 lines and
-functions above 60 lines respectively.
+60 function lines. `E1852` and `E1855` reject files above 500 lines and
+functions above 80 lines respectively.

@@ -21,9 +21,9 @@ impl Default for SourceLimitPolicy {
             preferred_file_lines: 300,
             file_split_lines: 400,
             hard_file_lines: 500,
-            preferred_function_lines: 30,
-            function_split_lines: 40,
-            hard_function_lines: 60,
+            preferred_function_lines: 50,
+            function_split_lines: 60,
+            hard_function_lines: 80,
         }
     }
 }

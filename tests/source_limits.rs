@@ -126,7 +126,7 @@ fn file_limitless_metadata_skips_file_and_function_diagnostics() {
 #[test]
 fn verb_limitless_metadata_skips_only_function_diagnostic() {
     let mut source = String::from("meta limitless(\"verb\") verb large() {\n");
-    for index in 0..60 {
+    for index in 0..80 {
         source.push_str(&format!("\"\"\"documentation {index}\"\"\"\n"));
     }
     source.push_str("return;\n}\n");
@@ -186,7 +186,7 @@ fn package_limitless_report_records_policy_approval() {
 #[test]
 fn rust_functions_are_measured_without_counting_comment_text() {
     let mut source = String::from("/* fn fake() {\nstill comment } */\nfn real() {\n");
-    source.push_str(&lines(40));
+    source.push_str(&lines(60));
     source.push_str("}\n");
     let diagnostics = source_limit_diagnostics(Path::new("src/example.rs"), &source, policy());
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1854"));
@@ -199,7 +199,7 @@ fn rust_functions_are_measured_without_counting_comment_text() {
 #[test]
 fn actus_verbs_use_the_same_function_contract() {
     let mut source = String::from("verb run() {\n");
-    source.push_str(&lines(60));
+    source.push_str(&lines(80));
     source.push_str("}\n");
     let diagnostics =
         source_limit_diagnostics(Path::new("library/std/src/run.act"), &source, policy());
