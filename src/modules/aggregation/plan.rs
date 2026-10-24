@@ -9,7 +9,7 @@ use super::super::resolver::ModuleResolver;
 use super::object_plan::{ModuleObjectPlan, build_object_plan};
 use super::types::ModuleError;
 use super::unit::ModuleUnit;
-use super::validation::{export_identity, validate_import_bindings};
+use super::validation::{declaration_import_binding, export_identity, validate_import_bindings};
 use super::visibility::validate_import_visibility;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,13 +45,9 @@ impl ModuleCompilationPlan {
 
     pub fn implementation(&self) -> Program {
         let mut declarations = self.local.declarations.clone();
-        declarations.extend(
-            self.caller
-                .declarations
-                .iter()
-                .filter(|declaration| matches!(declaration, TopLevelDecl::Import(_)))
-                .cloned(),
-        );
+        let mut import_bindings =
+            declarations.iter().filter_map(declaration_import_binding).collect::<HashSet<_>>();
+        append_unique_imports(&mut declarations, &mut import_bindings, &self.caller.declarations);
         declarations.extend(
             self.caller
                 .declarations
@@ -66,6 +62,11 @@ impl ModuleCompilationPlan {
                 .cloned(),
         );
         for unit in &self.units {
+            append_unique_imports(
+                &mut declarations,
+                &mut import_bindings,
+                &unit.implementation().declarations,
+            );
             declarations.extend(
                 unit.implementation()
                     .declarations
@@ -73,13 +74,26 @@ impl ModuleCompilationPlan {
                     .filter(|declaration| {
                         !matches!(
                             declaration,
-                            TopLevelDecl::Import(_) | TopLevelDecl::OpenSibling(_)
+                            TopLevelDecl::OpenSibling(_) | TopLevelDecl::Import(_)
                         )
                     })
                     .cloned(),
             );
         }
         Program { file_metadata: Vec::new(), declarations }
+    }
+}
+
+fn append_unique_imports(
+    declarations: &mut Vec<TopLevelDecl>,
+    bindings: &mut HashSet<String>,
+    source: &[TopLevelDecl],
+) {
+    for declaration in source {
+        let Some(binding) = declaration_import_binding(declaration) else { continue };
+        if bindings.insert(binding) {
+            declarations.push(declaration.clone());
+        }
     }
 }
 
@@ -117,7 +131,12 @@ fn build_compilation_plan_with_overlays_and_scope_check(
     let mut units = Vec::new();
     let mut imported_paths = HashSet::new();
     let mut appended_symbols = HashSet::new();
-    if validate_root_import_bindings {
+    if validate_root_import_bindings
+        && !program
+            .declarations
+            .iter()
+            .any(|declaration| matches!(declaration, TopLevelDecl::OpenSibling(_)))
+    {
         validate_import_bindings(program)?;
     }
     collect_root_imports(
@@ -332,6 +351,7 @@ fn collect_unit(
         for declaration in &unit.implementation().declarations {
             let TopLevelDecl::Import(import) = declaration else { continue };
             let import_path = qualify_import_path(module_path, &import.path);
+            let imported_namespace = import_namespace(import);
             collect_unit(
                 &import_path,
                 unit.implementation(),
@@ -341,7 +361,7 @@ fn collect_unit(
                 units,
                 caller_declarations,
                 appended_symbols,
-                namespace,
+                imported_namespace.as_deref(),
             )?;
         }
     }
@@ -385,7 +405,9 @@ fn append_public_declarations(
             .unwrap_or_else(|| import.path.clone());
         let key = (module_path.to_owned(), format!("import:{binding}"), String::new());
         if appended_symbols.insert(key) {
-            target.push(declaration.clone());
+            let mut imported = import.clone();
+            imported.path = qualify_import_path(module_path, &import.path);
+            target.push(TopLevelDecl::Import(imported));
         }
     }
     for declaration in &unit.implementation().declarations {

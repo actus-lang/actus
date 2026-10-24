@@ -14,12 +14,13 @@ impl Analyzer {
         let Pattern::Variant { enum_name, variant, payload, span } = pattern else {
             return Ok(());
         };
+        let enum_name = self.imported_member_name(enum_name).unwrap_or(enum_name);
         let definition = self.enum_types[enum_name].clone();
         let substitution = self.enum_substitution_for_binding(binding_index, &definition)?;
         let Some(candidate) = definition.variants.iter().find(|item| item.name == *variant) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownEnumVariant {
-                    enum_name: enum_name.clone(),
+                    enum_name: enum_name.to_owned(),
                     variant: variant.clone(),
                 },
                 span: *span,

@@ -5,7 +5,14 @@ use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 fn receiver_name<'a>(analyzer: &Analyzer, expression: &'a Expr) -> Option<&'a str> {
-    let Expr::Identifier { name, .. } = expression else { return None };
+    let name = match expression {
+        Expr::Identifier { name, .. } => name,
+        Expr::Index { target, .. } => {
+            let Expr::Identifier { name, .. } = target.as_ref() else { return None };
+            name
+        }
+        _ => return None,
+    };
     let base_name = name.split('[').next().unwrap_or(name);
     let base_name = analyzer.imported_member_name(base_name).unwrap_or(base_name);
     analyzer.enum_types.contains_key(base_name).then_some(base_name)
@@ -52,14 +59,15 @@ impl Analyzer {
 
     pub(super) fn expression_enum_type(&self, expression: &Expr) -> Option<String> {
         if let Some(type_name) = self.resolved_type_name(expression)
-            && self.enum_types.contains_key(&type_name.name)
+            && self.enum_types.contains_key(&self.normalize_imported_type_name(&type_name).name)
         {
-            return Some(type_name.name);
+            return Some(self.normalize_imported_type_name(&type_name).name);
         }
         match expression {
             Expr::Call { callee, .. } => self.signatures.get(callee).and_then(|signature| {
                 let return_type = signature.return_type_name.as_ref()?;
-                self.enum_types.contains_key(&return_type.name).then(|| return_type.name.clone())
+                let return_type = self.normalize_imported_type_name(return_type);
+                self.enum_types.contains_key(&return_type.name).then(|| return_type.name)
             }),
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => {
                 self.enum_receiver_name(object).map(str::to_owned)
@@ -120,15 +128,16 @@ impl Analyzer {
 
     pub(super) fn enum_type_application(&self, expression: &Expr) -> Option<crate::ast::TypeName> {
         if let Some(type_name) = self.resolved_type_name(expression)
-            && self.enum_types.contains_key(&type_name.name)
+            && self.enum_types.contains_key(&self.normalize_imported_type_name(&type_name).name)
         {
-            return Some(type_name);
+            return Some(self.normalize_imported_type_name(&type_name));
         }
         let receiver = match expression {
             Expr::Call { callee, .. } => {
                 return self.signatures.get(callee).and_then(|signature| {
                     let return_type = signature.return_type_name.as_ref()?;
-                    self.enum_types.contains_key(&return_type.name).then(|| return_type.clone())
+                    let return_type = self.normalize_imported_type_name(return_type);
+                    self.enum_types.contains_key(&return_type.name).then_some(return_type)
                 });
             }
             Expr::Case { branches, .. } => {
@@ -145,6 +154,7 @@ impl Analyzer {
             _ => return None,
         };
         super::enum_constructors::generic_receiver_type(receiver)
+            .map(|type_name| self.normalize_imported_type_name(&type_name))
             .filter(|type_name| self.enum_types.contains_key(&type_name.name))
     }
 }

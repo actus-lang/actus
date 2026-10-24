@@ -146,9 +146,12 @@ impl Analyzer {
         argument: &Argument,
     ) -> Result<(), SemanticError> {
         self.visit_expression(&argument.expression)?;
-        let found =
-            self.expression_type_name(&argument.expression).unwrap_or_else(|| "unknown".to_owned());
-        let expected_name = support::canonical_type_name(expected);
+        let found = self
+            .expression_type_name(&argument.expression)
+            .map(|name| self.normalize_imported_type_key(&name))
+            .unwrap_or_else(|| "unknown".to_owned());
+        let expected_name =
+            self.normalize_imported_type_key(&support::canonical_type_name(expected));
         if found == expected_name || found == support::strip_reference_role(&expected_name) {
             if self.enum_payload_owns_value(expected) {
                 self.initialize_owner(&argument.expression, support::argument_span(argument))?;

@@ -23,6 +23,11 @@ pub(super) fn validate_import_bindings(program: &Program) -> Result<(), ModuleEr
     Ok(())
 }
 
+pub(super) fn declaration_import_binding(declaration: &TopLevelDecl) -> Option<String> {
+    let TopLevelDecl::Import(import) = declaration else { return None };
+    Some(import_binding(import))
+}
+
 fn import_binding(import: &ImportDecl) -> String {
     import
         .alias

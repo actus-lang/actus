@@ -101,12 +101,14 @@ fn implementation_declarations(
         .implementation()
         .declarations
         .iter()
-        .filter(|declaration| {
-            !matches!(declaration, TopLevelDecl::Import(_) | TopLevelDecl::OpenSibling(_))
-        })
+        .filter(|declaration| !matches!(declaration, TopLevelDecl::OpenSibling(_)))
         .cloned()
         .collect::<Vec<_>>();
-    let mut declarations = Vec::new();
+    let mut declarations = local_declarations
+        .iter()
+        .filter(|declaration| matches!(declaration, TopLevelDecl::Import(_)))
+        .cloned()
+        .collect::<Vec<_>>();
     let mut imported_paths = HashSet::new();
     let mut declaration_identities = HashSet::new();
     append_imported_declarations(
@@ -116,7 +118,11 @@ fn implementation_declarations(
         &mut declaration_identities,
         &mut declarations,
     );
-    declarations.extend(local_declarations);
+    declarations.extend(
+        local_declarations
+            .into_iter()
+            .filter(|declaration| !matches!(declaration, TopLevelDecl::Import(_))),
+    );
     for declaration in &declarations {
         if let Some(identity) = type_declaration_identity(declaration) {
             declaration_identities.insert(identity);
@@ -244,6 +250,23 @@ fn append_imported_declarations(
             continue;
         }
         for declaration in &dependency.implementation().declarations {
+            let TopLevelDecl::Import(import) = declaration else { continue };
+            if import.is_open {
+                continue;
+            }
+            let mut imported = import.clone();
+            imported.path =
+                super::plan::qualify_import_path(dependency.identity().module_path(), &import.path);
+            let already_present = declarations.iter().any(|declaration| {
+                let TopLevelDecl::Import(existing) = declaration else { return false };
+                import_binding(existing) == import_binding(&imported)
+                    && existing.is_open == imported.is_open
+            });
+            if !already_present {
+                declarations.push(TopLevelDecl::Import(imported));
+            }
+        }
+        for declaration in &dependency.implementation().declarations {
             let Some(exported) = exported_dependency_declaration(dependency, declaration) else {
                 continue;
             };
@@ -261,6 +284,14 @@ fn append_imported_declarations(
             declarations,
         );
     }
+}
+
+fn import_binding(import: &crate::ast::ImportDecl) -> String {
+    import
+        .alias
+        .clone()
+        .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+        .unwrap_or_else(|| import.path.clone())
 }
 
 fn exported_dependency_declaration(

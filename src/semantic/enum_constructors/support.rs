@@ -107,8 +107,20 @@ pub(super) fn enum_substitution(
 }
 
 pub(super) fn receiver_type_name(receiver: &Expr) -> Option<TypeName> {
-    let Expr::Identifier { name, span } = receiver else { return None };
-    parse_type_name_key(name, *span)
+    match receiver {
+        Expr::Identifier { name, span } => parse_type_name_key(name, *span),
+        Expr::Index { target, index, span } => {
+            let Expr::Identifier { name, .. } = target.as_ref() else { return None };
+            let Expr::Identifier { name: argument, .. } = index.as_ref() else { return None };
+            Some(TypeName {
+                name: name.clone(),
+                arguments: vec![parse_type_name_key(argument, *span)?],
+                reference_role: None,
+                span: *span,
+            })
+        }
+        _ => None,
+    }
 }
 
 fn parse_type_name_key(key: &str, span: SourceSpan) -> Option<TypeName> {

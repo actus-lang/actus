@@ -47,6 +47,28 @@ impl Analyzer {
             if self.signatures.contains_key(callee) {
                 return Ok(callee.to_owned());
             }
+            if let Some((_, member)) = callee.rsplit_once("::")
+                && let Some(module) = self.imported_namespaces.get(namespace)
+                && let Some(module_name) = module.rsplit("::").next()
+            {
+                let qualified = format!("{module_name}::{member}");
+                if self.signatures.contains_key(&qualified) {
+                    return Ok(qualified);
+                }
+            }
+            if let Some((_, member)) = callee.rsplit_once("::") {
+                let matches = self
+                    .signatures
+                    .keys()
+                    .filter(|name| {
+                        name.as_str() == member || name.as_str().ends_with(&format!("::{member}"))
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if matches.len() == 1 {
+                    return Ok(matches[0].clone());
+                }
+            }
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownVerb { name: callee.to_owned() },
                 span,

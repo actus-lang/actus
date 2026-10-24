@@ -1,7 +1,7 @@
 use actus::ast::{
-    EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PackStorage, PrimitiveType,
-    ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl, VerbContractSectionKind,
-    primitive_type,
+    EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PackStorage, Pattern,
+    PrimitiveType, ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl,
+    VerbContractSectionKind, primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -558,6 +558,23 @@ fn parses_unit_tuple_and_named_enum_variants() {
     assert!(
         matches!(&definition.variants[2].payload, EnumPayload::Struct(fields) if fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>() == ["text", "code"])
     );
+}
+
+#[test]
+fn parses_qualified_enum_case_patterns() {
+    let program = parse_source(
+        "enum Color { Red, Blue, } verb main(erg color: Color) -> Int { return case dat color { colors::Color.Red => 1, colors::Color.Blue => 0, }; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[1] else { panic!("expected verb") };
+    let Stmt::Return { value: Some(Expr::Case { branches, .. }), .. } = &verb.body.statements[0]
+    else {
+        panic!("expected case return")
+    };
+    assert!(matches!(
+        &branches[0].pattern,
+        Pattern::Variant { enum_name, variant, .. }
+            if enum_name == "colors::Color" && variant == "Red"
+    ));
 }
 
 #[test]

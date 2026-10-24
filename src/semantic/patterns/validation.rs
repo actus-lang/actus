@@ -126,6 +126,7 @@ impl Analyzer {
                 self.validate_literal_pattern(value, subject_type, *span)
             }
             Pattern::Variant { enum_name, variant, payload, span } => {
+                let enum_name = self.imported_member_name(enum_name).unwrap_or(enum_name);
                 if self.expression_enum_type(subject).as_deref() != Some(enum_name) {
                     return Err(pattern_type_mismatch(subject_type, enum_name, *span));
                 }
@@ -134,7 +135,7 @@ impl Analyzer {
                 else {
                     return Err(SemanticError {
                         kind: SemanticErrorKind::UnknownEnumVariant {
-                            enum_name: enum_name.clone(),
+                            enum_name: enum_name.to_owned(),
                             variant: variant.clone(),
                         },
                         span: *span,

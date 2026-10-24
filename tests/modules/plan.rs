@@ -218,7 +218,7 @@ fn object_metadata_lists_only_facade_exported_verbs() {
 }
 
 #[test]
-fn imported_object_program_excludes_module_directives() {
+fn imported_object_program_preserves_imports_but_excludes_facade_directives() {
     let fixture = Fixture::new();
     fixture.write("math/math.act", "open ops;");
     fixture.write("math/ops.act", "open verb add() -> Int { return 1; }");
@@ -229,10 +229,11 @@ fn imported_object_program_excludes_module_directives() {
     let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
     let objects = plan.object_plan().unwrap();
     let object = objects.units()[1].program();
-    assert!(object.declarations.iter().all(|declaration| {
-        !matches!(declaration, actus::ast::TopLevelDecl::Import(_))
-            && !matches!(declaration, actus::ast::TopLevelDecl::OpenSibling(_))
-    }));
+    assert!(
+        object.declarations.iter().all(|declaration| {
+            !matches!(declaration, actus::ast::TopLevelDecl::OpenSibling(_))
+        })
+    );
 }
 
 #[test]

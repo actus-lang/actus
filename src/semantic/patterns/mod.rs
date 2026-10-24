@@ -78,7 +78,9 @@ impl Analyzer {
                 self.validate_case_guard(guard, branch.span)?;
             }
             self.visit_case_body(&branch.body)?;
-            if let Some(candidate) = super::analyzer::case_branch_type(self, &branch.body) {
+            if let Some(candidate) = super::analyzer::case_branch_type(self, &branch.body)
+                .map(|candidate| self.normalize_imported_type_key(&candidate))
+            {
                 if let Some(expected) = &result_type
                     && expected != &candidate
                 {

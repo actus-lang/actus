@@ -99,7 +99,10 @@ impl Parser {
                 value: LiteralPattern::Bool(matches!(token.kind, TokenKind::True)),
                 span: token.span,
             }),
-            TokenKind::Identifier(enum_name) => self.parse_variant_pattern(enum_name, token.span),
+            TokenKind::Identifier(enum_name) => {
+                let enum_name = self.parse_qualified_identifier(enum_name)?;
+                self.parse_variant_pattern(enum_name, token.span)
+            }
             found => Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {

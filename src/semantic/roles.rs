@@ -112,7 +112,8 @@ impl Analyzer {
         if perform.role_name == "Drop" {
             return self.validate_drop_performance(perform);
         }
-        let Some(role) = self.role_types.get(&perform.role_name).cloned() else {
+        let role_name = self.imported_member_name(&perform.role_name).unwrap_or(&perform.role_name);
+        let Some(role) = self.role_types.get(role_name).cloned() else {
             return Err(role_error(
                 SemanticErrorKind::UnknownRole { name: perform.role_name.clone() },
                 perform.span,
@@ -120,7 +121,7 @@ impl Analyzer {
         };
         self.validate_type_reference(&perform.target)?;
         self.validate_performance_methods(&role, perform)?;
-        self.register_performance_methods(perform);
+        self.register_performance_methods(perform, role_name);
         Ok(())
     }
 
@@ -143,7 +144,7 @@ impl Analyzer {
                     perform.span,
                 ));
             };
-            if !method_matches(required, implementation, &perform.target) {
+            if !self.method_matches(required, implementation, &perform.target) {
                 return Err(role_error(
                     SemanticErrorKind::RoleMethodMismatch {
                         role: perform.role_name.clone(),
@@ -175,14 +176,14 @@ impl Analyzer {
         Ok(())
     }
 
-    fn register_performance_methods(&mut self, perform: &PerformDecl) {
+    fn register_performance_methods(&mut self, perform: &PerformDecl, role_name: &str) {
         let target_key = canonical_type_name(&perform.target);
-        self.performances.insert((perform.role_name.clone(), target_key.clone()));
+        self.performances.insert((role_name.to_owned(), target_key.clone()));
         for method in &perform.methods {
             self.performance_methods
                 .insert((target_key.clone(), method.name.clone()), method.signature());
             self.performance_roles
-                .insert((target_key.clone(), method.name.clone()), perform.role_name.clone());
+                .insert((target_key.clone(), method.name.clone()), role_name.to_owned());
         }
     }
 
@@ -217,31 +218,47 @@ impl Analyzer {
         self.performance_roles.insert((target_key, "drop".to_owned()), "Drop".to_owned());
         Ok(())
     }
-}
 
-fn method_matches(
-    required: &RoleMethod,
-    implementation: &crate::ast::VerbDecl,
-    target: &TypeName,
-) -> bool {
-    required.name == implementation.name
-        && required.params.len() == implementation.params.len()
-        && required.params.iter().zip(&implementation.params).enumerate().all(
-            |(index, (left, right))| {
-                left.role == right.role
-                    && left.dispatch == right.dispatch
-                    && left.name == right.name
-                    && (index == 0 || type_names_match(&left.ty, &right.ty))
-            },
-        )
-        && required.return_type.as_ref().zip(implementation.return_type.as_ref()).map_or(
-            required.return_type.is_none() && implementation.return_type.is_none(),
-            |(left, right)| left.access == right.access && type_names_match(&left.ty, &right.ty),
-        )
-        && implementation.params.first().is_some_and(|parameter| {
-            parameter.name == "self"
-                && (is_self_type(&required.params[0].ty) || type_names_match(&parameter.ty, target))
-        })
+    fn method_matches(
+        &self,
+        required: &RoleMethod,
+        implementation: &crate::ast::VerbDecl,
+        target: &TypeName,
+    ) -> bool {
+        required.name == implementation.name
+            && required.params.len() == implementation.params.len()
+            && required.params.iter().zip(&implementation.params).enumerate().all(
+                |(index, (left, right))| {
+                    left.role == right.role
+                        && left.dispatch == right.dispatch
+                        && left.name == right.name
+                        && (index == 0 || self.imported_type_names_match(&left.ty, &right.ty))
+                },
+            )
+            && required.return_type.as_ref().zip(implementation.return_type.as_ref()).map_or(
+                required.return_type.is_none() && implementation.return_type.is_none(),
+                |(left, right)| {
+                    left.access == right.access
+                        && self.imported_type_names_match(&left.ty, &right.ty)
+                },
+            )
+            && implementation.params.first().is_some_and(|parameter| {
+                parameter.name == "self"
+                    && (is_self_type(&required.params[0].ty)
+                        || self.imported_type_names_match(&parameter.ty, target))
+            })
+    }
+
+    fn imported_type_names_match(&self, left: &TypeName, right: &TypeName) -> bool {
+        self.imported_member_name(&left.name).unwrap_or(&left.name)
+            == self.imported_member_name(&right.name).unwrap_or(&right.name)
+            && left.arguments.len() == right.arguments.len()
+            && left
+                .arguments
+                .iter()
+                .zip(&right.arguments)
+                .all(|(left, right)| self.imported_type_names_match(left, right))
+    }
 }
 
 fn is_self_type(type_name: &TypeName) -> bool {

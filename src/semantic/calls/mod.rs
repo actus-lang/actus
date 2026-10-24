@@ -210,14 +210,18 @@ impl Analyzer {
         payload_type: &crate::ast::TypeName,
     ) -> Result<(), SemanticError> {
         self.visit_expression_with_expected(&argument.expression, Some(payload_type))?;
-        let found =
-            self.expression_type_name(&argument.expression).unwrap_or_else(|| "unknown".to_owned());
-        if found != super::analyzer::canonical_type_name(payload_type) {
+        let found = self
+            .expression_type_name(&argument.expression)
+            .map(|name| self.normalize_imported_type_key(&name))
+            .unwrap_or_else(|| "unknown".to_owned());
+        let expected =
+            self.normalize_imported_type_key(&super::analyzer::canonical_type_name(payload_type));
+        if found != expected {
             return Err(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     callee: constructor.to_owned(),
                     parameter: "payload".to_owned(),
-                    expected: super::analyzer::canonical_type_name(payload_type),
+                    expected,
                     found,
                 },
                 span: argument_span(argument),

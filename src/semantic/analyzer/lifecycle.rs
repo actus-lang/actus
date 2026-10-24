@@ -25,10 +25,40 @@ impl Analyzer {
     }
 
     pub(crate) fn normalize_imported_type_key(&self, name: &str) -> String {
-        name.split_once("::")
-            .filter(|(namespace, _)| self.imported_namespaces.contains_key(*namespace))
-            .map(|(_, member)| member.to_owned())
-            .unwrap_or_else(|| name.to_owned())
+        let (prefix, name) = ["abs ", "ins ", "erg ", "dat "]
+            .iter()
+            .find_map(|prefix| name.strip_prefix(prefix).map(|rest| (*prefix, rest)))
+            .unwrap_or(("", name));
+        let normalized = if let Some(open) = name.find('[') {
+            let base = self.normalize_imported_type_key(&name[..open]);
+            let inner = &name[open + 1..name.len().saturating_sub(1)];
+            let mut arguments = Vec::new();
+            let mut start = 0usize;
+            let mut depth = 0usize;
+            for (index, character) in inner.char_indices() {
+                match character {
+                    '[' => depth += 1,
+                    ']' => depth = depth.saturating_sub(1),
+                    ',' if depth == 0 => {
+                        arguments
+                            .push(self.normalize_imported_type_key(inner[start..index].trim()));
+                        start = index + 1;
+                    }
+                    _ => {}
+                }
+            }
+            if !inner.trim().is_empty() {
+                arguments.push(self.normalize_imported_type_key(inner[start..].trim()));
+            }
+            format!("{base}[{}]", arguments.join(","))
+        } else {
+            name.split_once("::")
+                .filter(|(namespace, _)| self.imported_namespaces.contains_key(*namespace))
+                .map(|(_, member)| member.to_owned())
+                .or_else(|| name.rsplit_once("::").map(|(_, member)| member.to_owned()))
+                .unwrap_or_else(|| name.to_owned())
+        };
+        format!("{prefix}{normalized}")
     }
 
     pub(super) fn new() -> Self {

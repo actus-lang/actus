@@ -97,7 +97,10 @@ impl Parser {
         self.parse_identifier_suffix(name, type_arguments, span)
     }
 
-    fn parse_qualified_identifier(&mut self, mut name: String) -> Result<String, ParseError> {
+    pub(super) fn parse_qualified_identifier(
+        &mut self,
+        mut name: String,
+    ) -> Result<String, ParseError> {
         while self.match_simple(TokenKind::ColonColon) {
             let segment = identifier_text(&self.take_identifier("qualified name segment")?.kind);
             name.push_str("::");
