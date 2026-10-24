@@ -192,26 +192,49 @@ and schedules from current time. The timer is borrowed through `ins`, returns
 `Err(TimeError.Overflow)` for an unrepresentable periodic deadline. No policy
 allocates or performs callbacks.
 """
-open verb timer_poll_at(ins timer: Timer, abs instant: Instant) -> Result[TimerPoll, TimeError] {
+verb timer_poll_lifecycle(ins timer: Timer) -> Result[Int, TimeError] {
     erg state = timer.state;
     case state {
         0 => {
-            return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
+            return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
         },
         3 => {
-            return Result[TimerPoll, TimeError].Ok(TimerPoll.Canceled);
+            return Result[Int, TimeError].Ok(2);
         },
         4 => {
-            return Result[TimerPoll, TimeError].Ok(TimerPoll.Completed);
+            return Result[Int, TimeError].Ok(3);
         },
         2 => {
             timer.state = 4u8;
+            return Result[Int, TimeError].Ok(3);
+        },
+        1 => {
+            return Result[Int, TimeError].Ok(0);
+        },
+        _ => {
+            return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+        },
+    };
+    return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+}
+
+"""
+Poll an owned timer against a deterministic instant.
+
+The `ins timer` loan mutates only bounded lifecycle fields and is restored to
+the caller. `Ok` reports the timer event; `Err(TimeError)` reports invalid
+state or deadline overflow. The operation performs no allocation or I/O.
+"""
+open verb timer_poll_at(ins timer: Timer, abs instant: Instant) -> Result[TimerPoll, TimeError] {
+    erg lifecycle = timer_poll_lifecycle(timer: ins timer)?;
+    case lifecycle {
+        2 => {
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Canceled);
+        },
+        3 => {
             return Result[TimerPoll, TimeError].Ok(TimerPoll.Completed);
         },
-        1 => {},
-        _ => {
-            return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
-        },
+        _ => {},
     };
     if instant.ticks < timer.deadline_ticks {
         return Result[TimerPoll, TimeError].Ok(TimerPoll.Pending);
@@ -225,9 +248,7 @@ open verb timer_poll_at(ins timer: Timer, abs instant: Instant) -> Result[TimerP
         1 => {
             return timer_poll_periodic(timer: ins timer, instant: abs instant);
         },
-        _ => {
-            return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
-        },
+        _ => Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState),
     };
     return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
 }

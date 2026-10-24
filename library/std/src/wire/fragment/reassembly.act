@@ -147,6 +147,40 @@ The fragment is borrowed and the reassembly state is exclusively loaned. The
 operation performs no allocation or I/O and rejects stale, duplicate,
 overlapping, malformed, out-of-range, and exhausted input.
 """
+verb wire_reassembly_validate_fragment(
+    abs reassembly: WireReassembly,
+    abs fragment: Buffer
+) -> Result[WireFragmentHeader, WireError] {
+    erg fragment_length: u32 = buffer_length(buffer: abs fragment) as u32;
+    if fragment_length < WIRE_FRAGMENT_HEADER_BYTES {
+        return Result[WireFragmentHeader, WireError].Err(WireError.Truncated);
+    }
+    erg decoded = wire_fragment_decode(input: abs fragment);
+    case dat decoded {
+        Result.Err(error) => {
+            return Result[WireFragmentHeader, WireError].Err(error);
+        },
+        Result.Ok(_) => {},
+    };
+    erg header: WireFragmentHeader = wire_fragment_read_header(input: abs fragment);
+    erg payload_length: u32 = fragment_length - WIRE_FRAGMENT_HEADER_BYTES;
+    erg identity = wire_reassembly_check_identity(reassembly: abs reassembly, header: abs header)?;
+    erg slot = wire_reassembly_check_slot(
+        reassembly: abs reassembly,
+        header: abs header,
+        payload_length: erg payload_length
+    )?;
+    return Result[WireFragmentHeader, WireError].Ok(header);
+}
+
+"""
+Accept one fragment, copy it into active storage, and report completion.
+
+The fragment is borrowed through `abs`; reassembly state is mutated through
+`ins` and remains caller-owned. `Ok(1)` marks completion, `Ok(0)` means more
+fragments are required, and `Err(WireError)` reports malformed, duplicate,
+stale, overlapping, or exhausted input. No allocation or I/O occurs.
+"""
 open verb wire_reassembly_accept(
     ins reassembly: WireReassembly,
     abs fragment: Buffer
@@ -155,36 +189,11 @@ open verb wire_reassembly_accept(
         return Result[Int, WireError].Err(WireError.ReassemblyState);
     }
     erg fragment_length: u32 = buffer_length(buffer: abs fragment) as u32;
-    if fragment_length < WIRE_FRAGMENT_HEADER_BYTES {
-        return Result[Int, WireError].Err(WireError.Truncated);
-    }
-    erg decoded = wire_fragment_decode(input: abs fragment);
-    case dat decoded {
-        Result.Err(error) => {
-            return Result[Int, WireError].Err(error);
-        },
-        Result.Ok(_) => {},
-    };
-    erg header: WireFragmentHeader = wire_fragment_read_header(input: abs fragment);
     erg payload_length: u32 = fragment_length - WIRE_FRAGMENT_HEADER_BYTES;
-    erg identity = wire_reassembly_check_identity(reassembly: abs reassembly, header: abs header);
-    case dat identity {
-        Result.Err(error) => {
-            return Result[Int, WireError].Err(error);
-        },
-        Result.Ok(_) => {},
-    };
-    erg slot = wire_reassembly_check_slot(
+    erg header = wire_reassembly_validate_fragment(
         reassembly: abs reassembly,
-        header: abs header,
-        payload_length: erg payload_length
-    );
-    case dat slot {
-        Result.Err(error) => {
-            return Result[Int, WireError].Err(error);
-        },
-        Result.Ok(_) => {},
-    };
+        fragment: abs fragment
+    )?;
     wire_reassembly_copy_fragment(
         reassembly: ins reassembly,
         fragment: abs fragment,

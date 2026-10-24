@@ -306,12 +306,9 @@ open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> 
                     return case dat expected_result {
                         Result.Err(error) => Result[Int, io::IoError].Err(error),
                         Result.Ok(expected) => {
-                            case count - expected {
-                                0 => {},
-                                _ => {
-                                    return Result[Int, io::IoError].Err(io::IoError.Failed);
-                                },
-                            };
+                            if count != expected {
+                                return Result[Int, io::IoError].Err(io::IoError.Failed);
+                            }
                             erg flushed = file.flush();
                             return case dat flushed {
                                 Result.Ok(_) => Result[Int, io::IoError].Ok(count),
