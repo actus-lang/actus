@@ -12,8 +12,13 @@ impl Analyzer {
         &self,
         type_name: &crate::ast::TypeName,
     ) -> crate::ast::TypeName {
+        let normalized_name = self
+            .imported_member_name(&type_name.name)
+            .map(str::to_owned)
+            .or_else(|| type_name.name.rsplit_once("::").map(|(_, member)| member.to_owned()))
+            .unwrap_or_else(|| type_name.name.clone());
         crate::ast::TypeName {
-            name: self.imported_member_name(&type_name.name).unwrap_or(&type_name.name).to_owned(),
+            name: normalized_name,
             arguments: type_name
                 .arguments
                 .iter()

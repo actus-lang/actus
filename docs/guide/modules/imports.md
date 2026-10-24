@@ -100,6 +100,25 @@ This facade syntax is not an external consumer import and remains valid for
 every public re-export. External qualified lookup always uses the imported
 namespace and never depends on ambient facade state.
 
+Within a nested module tree, an implementation consumer must use the complete
+canonical import path when it depends on a sibling module. Do not use a
+standalone `open sibling;` as a consumer import. Keep that form only in the
+canonical parent facade when the sibling is intentionally re-exported:
+
+```actus
+import parent::child;
+
+child::validate(...);
+```
+
+If two sibling paths have the same final segment, alias both namespace
+bindings explicitly:
+
+```actus
+import parent::child as local_child;
+import other::child as other_child;
+```
+
 ## Binding and resolution rules
 
 - Every path segment is resolved through the corresponding canonical facade.
@@ -111,25 +130,26 @@ namespace and never depends on ambient facade state.
 - Qualified lookup is deterministic and independent of declaration order in the
   consuming file.
 
-When migrating an external consumer, change:
+When migrating a consumer, change:
 
 ```actus
 open config;
 MAX_SPEED;
 ```
 
-to:
+to a canonical namespace import:
 
 ```actus
-import { open config };
-MAX_SPEED;
+import parent::child;
+child::MAX_SPEED;
 ```
 
-Or, when unqualified access is not required:
+If a consumer intentionally needs selected unqualified declarations, use the
+explicit grouped form only at that boundary:
 
 ```actus
-import config;
-config::MAX_SPEED;
+import { open parent::child };
+MAX_SPEED;
 ```
 
 If an import fails, check the module directory, canonical facade filename,

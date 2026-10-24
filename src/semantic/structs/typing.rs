@@ -86,6 +86,7 @@ impl Analyzer {
         type_name: &TypeName,
         field: &str,
     ) -> Option<TypeName> {
+        let type_name = self.normalize_imported_type_name(type_name);
         if field == "storage"
             && let Some(pack) = self.pack_types.get(&type_name.name)
         {

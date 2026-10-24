@@ -174,22 +174,25 @@ resolved, lowered identically by Cranelift and LLVM, supported by formatter and
 LSP tooling, and covered by compatibility and visibility evidence. No `open`
 removal is implied until a separate migration decision is accepted.
 
-## Follow-up: consumer migration to canonical qualified paths
+## Follow-up: canonical consumers inside nested module trees
 
-The compiler capability is complete, but application consumers still require
-an explicit migration pass. This work is separate from compiler implementation:
+The compiler capability is complete, but Actus module trees still need an
+explicit consumer migration pass. Sibling implementation modules under one
+canonical parent must be able to refer to one another through complete module
+paths, without relying on ambiguous ambient openings. This follow-up is part
+of the Actus module and facade contract, separate from compiler implementation.
 
-- [x] Migrate `src/ie/persistence/logical/core.act` to one unified import
-      block with `ie::persistence::cache` and `ie::persistence::manifest`.
-- [ ] Replace the remaining ambiguous consumer openings with complete
-      canonical imports such as `import ie::persistence::manifest;` and
-      `import ie::persistence::cache;`.
-- [ ] Use `manifest::...` and `cache::...` at call sites so ownership remains
-      visible without repeating the full path.
-- [ ] Add explicit aliases when different imports share a final segment, such
-      as `ie::persistence::cache as persistence_cache` and
-      `other::cache as other_cache`.
-- [ ] Add a consumer regression fixture for nested paths, qualified types, and
-      same-final-segment aliases.
-- [ ] Record compiler revision, formatter output, and strict-check evidence
-      before marking this follow-up complete.
+- [ ] Replace consumer-side ambiguous `open` entries with canonical imports
+      such as `import parent::child;` where qualified ownership is required.
+- [ ] Use `child::...` at call sites so the owning nested module remains
+      visible.
+- [ ] Keep `open sibling;` only where it is an intentional canonical-facade
+      re-export; remove it from ordinary nested consumers.
+- [ ] Add explicit aliases when nested imports share a final segment, such as
+      `import parent::child as local_child;` and
+      `import other::child as other_child;`.
+- [ ] Add a regression fixture proving nested sibling imports, qualified
+      types, and same-final-segment aliases across one canonical parent.
+- [ ] Record compiler revision, formatter output, strict checks, and the
+      resulting facade/module-visibility evidence before marking this
+      follow-up complete.

@@ -105,36 +105,36 @@ impl Analyzer {
         &self,
         type_name: &TypeName,
     ) -> Result<ResolvedType, SemanticError> {
-        let name = self.imported_member_name(&type_name.name).unwrap_or(&type_name.name);
+        let normalized_type_name = self.normalize_imported_type_name(type_name);
+        let name = normalized_type_name.name.as_str();
         if name == "Arena" {
-            return self.resolve_arena_type(type_name);
+            return self.resolve_arena_type(&normalized_type_name);
         }
         if name == "Array" {
-            return self.resolve_array_type(type_name);
+            return self.resolve_array_type(&normalized_type_name);
         }
         if name == "Region" {
-            return self.resolve_region_type(type_name);
+            return self.resolve_region_type(&normalized_type_name);
         }
-        if let Some(generic) = self.resolve_generic_parameter(type_name)? {
+        if let Some(generic) = self.resolve_generic_parameter(&normalized_type_name)? {
             return Ok(generic);
         }
-        let normalized = TypeName {
-            name: name.to_owned(),
-            arguments: type_name.arguments.clone(),
-            reference_role: type_name.reference_role.clone(),
-            span: type_name.span,
-        };
-        self.validate_named_type(&normalized)?;
+        self.validate_named_type(&normalized_type_name)?;
 
-        if type_name.arguments.is_empty() {
+        if normalized_type_name.arguments.is_empty() {
             return Ok(ResolvedType::Concrete(name.to_owned()));
         }
         let parameters = self.named_type_parameters(name);
         if let Some(parameters) = &parameters {
-            TypeSubstitution::for_type(name, parameters, &type_name.arguments, type_name.span)?;
-            self.validate_type_arguments(parameters, &type_name.arguments)?;
+            TypeSubstitution::for_type(
+                name,
+                parameters,
+                &normalized_type_name.arguments,
+                normalized_type_name.span,
+            )?;
+            self.validate_type_arguments(parameters, &normalized_type_name.arguments)?;
         }
-        let arguments = type_name
+        let arguments = normalized_type_name
             .arguments
             .iter()
             .enumerate()
