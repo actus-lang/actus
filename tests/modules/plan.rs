@@ -150,6 +150,21 @@ fn deduplicates_compatible_external_symbols_across_modules() {
 }
 
 #[test]
+fn deduplicates_identical_declarations_across_nested_module_scopes() {
+    let fixture = Fixture::new();
+    fixture.write("left/left.act", "open api;");
+    fixture.write("left/api.act", "open enum SharedError { Missing, }");
+    fixture.write("right/right.act", "open api;");
+    fixture.write("right/api.act", "open enum SharedError { Missing, }");
+    let (tokens, errors) = scan("import left; import right; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect("identical declarations should be shared across module scopes");
+}
+
+#[test]
 fn rejects_incompatible_external_symbols_across_modules() {
     let fixture = Fixture::new();
     fixture.write("left/left.act", "open bridge;");

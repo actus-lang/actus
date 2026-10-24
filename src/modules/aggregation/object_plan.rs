@@ -110,7 +110,11 @@ fn implementation_declarations(
         .cloned()
         .collect::<Vec<_>>();
     let mut imported_paths = HashSet::new();
-    let mut declaration_identities = HashSet::new();
+    let mut declaration_identities = local_declarations
+        .iter()
+        .filter_map(export_identity)
+        .map(|(kind, name)| (kind.to_owned(), name))
+        .collect::<HashSet<_>>();
     append_imported_declarations(
         module,
         compilation,

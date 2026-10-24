@@ -176,6 +176,34 @@ fn accepts_equality_for_a_unit_enum_reexported_through_a_facade() {
 }
 
 #[test]
+fn deduplicates_identical_type_reexports_through_nested_open_facades() {
+    let fixture = Fixture::new();
+    fixture.write("ie/ie.act", "open resident;");
+    fixture.write(
+        "ie/resident.act",
+        "open enum ResidentError { Missing, } open verb status() -> ResidentError { return ResidentError.Missing; }",
+    );
+    fixture.write("runner/runner.act", "open startup; open teaching;");
+    fixture.write(
+        "runner/startup.act",
+        "import { open ie }; open verb startup() -> ResidentError { return status(); }",
+    );
+    fixture.write(
+        "runner/teaching.act",
+        "import { open ie }; open verb teaching() -> ResidentError { return status(); }",
+    );
+
+    let program = parse_source("import { open runner }; verb main() -> Int { return 0; }");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("identical facade re-exports should be deduplicated");
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("deduplicated facade re-exports should remain semantically valid");
+    assert!(plan.caller().declarations.iter().filter(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::Enum(definition) if definition.name == "ResidentError")
+    }).count() == 1);
+}
+
+#[test]
 fn lowers_generic_option_return_through_a_facade() {
     let fixture = Fixture::new();
     fixture.write("dataset/dataset.act", "open manifest;");

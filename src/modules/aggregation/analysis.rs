@@ -28,7 +28,7 @@ pub fn analyze_module_with_overlays(
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<SemanticModel, ModuleError> {
     let program = parse_module_with_overlays(resolver, module_path, overlays)?;
-    let program = resolve_module_imports_with_overlays(&program, resolver, overlays)?;
+    let program = resolve_module_imports_with_overlays(&program, resolver, overlays, module_path)?;
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
@@ -39,7 +39,7 @@ pub fn analyze_module_with_overlays_for_target(
     target: &crate::target::TargetSpec,
 ) -> Result<SemanticModel, ModuleError> {
     let program = parse_module_with_overlays(resolver, module_path, overlays)?;
-    let program = resolve_module_imports_with_overlays(&program, resolver, overlays)?;
+    let program = resolve_module_imports_with_overlays(&program, resolver, overlays, module_path)?;
     let program = filter_program_for_target(&program, target);
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
@@ -87,8 +87,12 @@ fn analyze_imported_units(
     for unit in plan.units() {
         let program =
             parse_module_with_overlays(resolver, unit.identity().module_path(), overlays)?;
-        let module_plan =
-            build_module_compilation_plan_with_overlays(&program, resolver, overlays)?;
+        let module_plan = build_module_compilation_plan_with_overlays(
+            unit.identity().module_path(),
+            &program,
+            resolver,
+            overlays,
+        )?;
         let expanded = module_scope_program(module_plan.caller());
         analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     }
@@ -132,6 +136,9 @@ fn resolve_module_imports_with_overlays(
     program: &Program,
     resolver: &ModuleResolver,
     overlays: &HashMap<PathBuf, String>,
+    module_path: &str,
 ) -> Result<Program, ModuleError> {
-    Ok(build_module_compilation_plan_with_overlays(program, resolver, overlays)?.caller().clone())
+    Ok(build_module_compilation_plan_with_overlays(module_path, program, resolver, overlays)?
+        .caller()
+        .clone())
 }

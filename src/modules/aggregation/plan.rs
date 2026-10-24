@@ -1,11 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{
-    DispatchMode, ExternalVerbDecl, ForeignAbi, GenericParamKind, Program, ReturnAccess, Role,
-    TopLevelDecl,
-};
+use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 
 use super::super::resolver::ModuleResolver;
+use super::collision::{ExternalContract, external_contract};
 use super::object_plan::{ModuleObjectPlan, build_object_plan};
 use super::types::ModuleError;
 use super::unit::ModuleUnit;
@@ -109,18 +107,26 @@ pub fn build_compilation_plan_with_overlays(
     resolver: &ModuleResolver,
     overlays: &HashMap<std::path::PathBuf, String>,
 ) -> Result<ModuleCompilationPlan, ModuleError> {
-    build_compilation_plan_with_overlays_and_scope_check(program, resolver, overlays, true)
+    build_compilation_plan_with_overlays_and_scope_check(None, program, resolver, overlays, true)
 }
 
 pub(super) fn build_module_compilation_plan_with_overlays(
+    module_path: &str,
     program: &Program,
     resolver: &ModuleResolver,
     overlays: &HashMap<std::path::PathBuf, String>,
 ) -> Result<ModuleCompilationPlan, ModuleError> {
-    build_compilation_plan_with_overlays_and_scope_check(program, resolver, overlays, false)
+    build_compilation_plan_with_overlays_and_scope_check(
+        Some(module_path),
+        program,
+        resolver,
+        overlays,
+        false,
+    )
 }
 
 fn build_compilation_plan_with_overlays_and_scope_check(
+    importer_module_path: Option<&str>,
     program: &Program,
     resolver: &ModuleResolver,
     overlays: &HashMap<std::path::PathBuf, String>,
@@ -141,6 +147,7 @@ fn build_compilation_plan_with_overlays_and_scope_check(
     }
     collect_root_imports(
         program,
+        importer_module_path,
         resolver,
         overlays,
         &mut imported_paths,
@@ -165,6 +172,7 @@ fn build_compilation_plan_with_overlays_and_scope_check(
 
 fn collect_root_imports(
     program: &Program,
+    importer_module_path: Option<&str>,
     resolver: &ModuleResolver,
     overlays: &HashMap<std::path::PathBuf, String>,
     imported_paths: &mut HashSet<String>,
@@ -181,8 +189,11 @@ fn collect_root_imports(
         };
         caller_declarations.push(declaration.clone());
         let namespace = import_namespace(import);
+        let import_path = importer_module_path
+            .map(|module_path| qualify_import_path(module_path, &import.path))
+            .unwrap_or_else(|| import.path.clone());
         collect_unit(
-            &import.path,
+            &import_path,
             program,
             resolver,
             overlays,
@@ -233,10 +244,14 @@ fn record_symbols(
         let record = SymbolRecord {
             module: module.to_owned(),
             external_contract: external_contract(declaration),
+            declaration: declaration.clone(),
         };
         if let Some(first) = symbols.get(&key)
             && first.module != module
         {
+            if first.declaration == *declaration {
+                continue;
+            }
             if first.external_contract.is_some()
                 && first.external_contract == record.external_contract
             {
@@ -261,76 +276,7 @@ fn record_symbols(
 struct SymbolRecord {
     module: String,
     external_contract: Option<ExternalContract>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ExternalContract {
-    abi: ForeignAbi,
-    unsafe_boundary: bool,
-    generic_parameters: Vec<String>,
-    parameters: Vec<String>,
-    return_type: Option<String>,
-}
-
-fn external_contract(declaration: &TopLevelDecl) -> Option<ExternalContract> {
-    let TopLevelDecl::ExternalVerb(verb) = declaration else { return None };
-    Some(ExternalContract {
-        abi: verb.abi,
-        unsafe_boundary: verb.unsafe_boundary,
-        generic_parameters: verb.generic_parameters.iter().map(generic_parameter_key).collect(),
-        parameters: verb.params.iter().map(parameter_key).collect(),
-        return_type: verb.return_type.as_ref().map(|return_type| {
-            format!("{}:{}", return_access_key(return_type.access), return_type.ty.canonical_key())
-        }),
-    })
-}
-
-fn generic_parameter_key(parameter: &crate::ast::GenericParam) -> String {
-    let kind = match &parameter.kind {
-        GenericParamKind::Type => "type".to_owned(),
-        GenericParamKind::Const { domain } => format!("const:{}", domain.canonical_key()),
-    };
-    let bound =
-        parameter.bound.as_ref().map(crate::ast::TypeName::canonical_key).unwrap_or_default();
-    let bounds = parameter
-        .bounds
-        .iter()
-        .map(crate::ast::TypeName::canonical_key)
-        .collect::<Vec<_>>()
-        .join(",");
-    format!("{kind}:{bound}:{bounds}")
-}
-
-fn parameter_key(parameter: &crate::ast::Param) -> String {
-    format!(
-        "{}:{}:{}",
-        role_key(&parameter.role),
-        dispatch_key(parameter.dispatch),
-        parameter.ty.canonical_key()
-    )
-}
-
-fn role_key(role: &Role) -> &'static str {
-    match role {
-        Role::Erg => "erg",
-        Role::Abs => "abs",
-        Role::Dat => "dat",
-        Role::Ins => "ins",
-    }
-}
-
-fn dispatch_key(dispatch: DispatchMode) -> &'static str {
-    match dispatch {
-        DispatchMode::Static => "static",
-        DispatchMode::Dynamic => "dynamic",
-    }
-}
-
-fn return_access_key(access: ReturnAccess) -> &'static str {
-    match access {
-        ReturnAccess::Owned => "owned",
-        ReturnAccess::Abs => "abs",
-    }
+    declaration: TopLevelDecl,
 }
 
 fn collect_unit(
@@ -429,10 +375,23 @@ fn append_public_declarations(
             namespace,
             Some(unit.identity().namespace().symbol_prefix()),
         );
-        if !has_compatible_external_declaration(target, &imported) {
+        if !has_compatible_external_declaration(target, &imported)
+            && !has_identical_imported_declaration(target, &imported)
+        {
             target.push(imported);
         }
     }
+}
+
+fn has_identical_imported_declaration(
+    declarations: &[TopLevelDecl],
+    candidate: &TopLevelDecl,
+) -> bool {
+    let Some(candidate_identity) = export_identity(candidate) else { return false };
+    declarations.iter().any(|declaration| {
+        export_identity(declaration).as_ref() == Some(&candidate_identity)
+            && declaration == candidate
+    })
 }
 
 fn has_compatible_external_declaration(

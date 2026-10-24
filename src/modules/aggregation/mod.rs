@@ -1,4 +1,5 @@
 mod analysis;
+mod collision;
 mod exports;
 mod identity;
 mod object_plan;
