@@ -1,4 +1,4 @@
-import charmap;
+import { open charmap };
 
 verb ka_sample_utf8() -> Buffer {
     erg input = Buffer[8];

@@ -1,4 +1,4 @@
-import path;
+import { open path };
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);

@@ -1,4 +1,4 @@
-import process;
+import { open process };
 
 meta test
 verb process_arguments_are_bounded_and_ordered() -> Int {

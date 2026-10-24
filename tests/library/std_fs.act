@@ -1,6 +1,4 @@
-import io;
-import fs;
-import path;
+import { open io, open fs, open path };
 
 verb empty_path() -> Path {
     erg raw = Buffer[0];

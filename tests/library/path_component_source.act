@@ -1,4 +1,4 @@
-import path;
+import { open path };
 
 verb source_path() -> Path {
     erg raw: Buffer = Buffer[0];

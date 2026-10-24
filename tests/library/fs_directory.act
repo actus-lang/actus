@@ -1,11 +1,5 @@
 """Minimal hosted directory enumeration contract tests."""
-import fs;
-
-import path;
-
-open fs;
-
-open path;
+import { open fs, open path };
 
 verb current_directory() -> Result[Path, PathError] {
     erg raw: Buffer = Buffer[0];

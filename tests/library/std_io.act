@@ -1,4 +1,4 @@
-import io;
+import { open io };
 
 meta test
 verb cursor_reads_owned_bytes_through_reader() -> Int {
