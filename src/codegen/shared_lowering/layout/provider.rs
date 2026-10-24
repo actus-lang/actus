@@ -165,6 +165,8 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     }
 
     fn field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
+        let normalized = self.normalize_type_name(type_name);
+        let type_name = &normalized;
         if let Some(pack) = self.packs.get(type_name.name.as_str()) {
             if field_name == "storage" {
                 let storage = pack.storage.type_name().clone();
