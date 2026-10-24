@@ -384,6 +384,25 @@ impl Formatter<'_> {
         }
         self.output.push(';');
     }
+
+    pub(super) fn import_group(&mut self, declarations: &[crate::ast::TopLevelDecl]) {
+        self.output.push_str("import {\n");
+        for declaration in declarations {
+            let crate::ast::TopLevelDecl::Import(import) = declaration else { continue };
+            self.output.push_str("    ");
+            if import.is_open {
+                self.output.push_str("open ");
+            }
+            self.output.push_str(&import.path);
+            if let Some(alias) = &import.alias {
+                self.output.push_str(" as ");
+                self.output.push_str(alias);
+            }
+            self.output.push_str(",\n");
+        }
+        self.output.push('}');
+        self.output.push(';');
+    }
 }
 
 fn contract_section_name(kind: crate::ast::VerbContractSectionKind) -> &'static str {

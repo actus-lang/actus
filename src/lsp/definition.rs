@@ -25,7 +25,7 @@ pub fn find_definition(
 ) -> Option<DefinitionLocation> {
     let tokens = scan(source).0;
     let offset = LineIndex::new(source).byte_offset(source, position)?;
-    let name = identifier_at(&tokens, offset)?;
+    let (qualified_name, name) = qualified_identifier_at(source, &tokens, offset)?;
     let program = parse(tokens).ok()?;
     let current_path = file_uri_to_path(uri)?;
     if let Some(span) = local_definition(source, &program, &name, offset) {
@@ -36,7 +36,7 @@ pub fn find_definition(
             super::hover::contract_documentation_for_name(&program, &name),
         ));
     }
-    imported_definition(&current_path, &program, &name, overlays)
+    imported_definition(&current_path, &program, &qualified_name, overlays)
 }
 
 fn local_definition(
@@ -216,9 +216,12 @@ fn collect_block_definitions(
 fn imported_definition(
     current_path: &Path,
     program: &Program,
-    name: &str,
+    qualified_name: &str,
     overlays: &HashMap<PathBuf, String>,
 ) -> Option<DefinitionLocation> {
+    let (namespace, name) = qualified_name
+        .rsplit_once("::")
+        .map_or((None, qualified_name), |(namespace, name)| (Some(namespace), name));
     let configuration = CompilerConfiguration::from_input_path_read_only(current_path).ok()?;
     let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
@@ -228,6 +231,14 @@ fn imported_definition(
     );
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
+        let binding = import.alias.as_deref().or_else(|| import.path.rsplit("::").next());
+        if let Some(namespace) = namespace {
+            if binding != Some(namespace) {
+                continue;
+            }
+        } else if !import.is_open {
+            continue;
+        }
         let exports =
             crate::modules::exports_module_with_overlays(&resolver, &import.path, overlays).ok()?;
         if !exports.symbols.iter().any(|symbol| symbol.name == name) {
@@ -286,6 +297,28 @@ fn identifier_at(tokens: &[Token], offset: usize) -> Option<String> {
         }
         None
     })
+}
+
+fn qualified_identifier_at(
+    source: &str,
+    tokens: &[Token],
+    offset: usize,
+) -> Option<(String, String)> {
+    let name = identifier_at(tokens, offset)?;
+    let token_index = tokens.iter().position(|token| {
+        token.span.start <= offset
+            && offset <= token.span.end
+            && matches!(&token.kind, TokenKind::Identifier(value) if value == &name)
+    })?;
+    let mut start = token_index;
+    while start >= 2
+        && matches!(tokens[start - 1].kind, TokenKind::ColonColon)
+        && matches!(tokens[start - 2].kind, TokenKind::Identifier(_))
+    {
+        start -= 2;
+    }
+    let path = &source[tokens[start].span.start..tokens[token_index].span.end];
+    Some((path.to_owned(), name))
 }
 
 fn identifier_span(source: &str, span: SourceSpan, name: &str) -> Option<SourceSpan> {

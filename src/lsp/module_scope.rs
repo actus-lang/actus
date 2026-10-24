@@ -15,6 +15,7 @@ pub(super) fn imported_public_symbols(
     uri: &str,
     program: &Program,
     overlays: &HashMap<PathBuf, String>,
+    namespace: Option<&str>,
 ) -> Vec<String> {
     let Some(path) = file_uri_to_path(uri) else { return Vec::new() };
     let Ok(configuration) = CompilerConfiguration::from_input_path_read_only(&path) else {
@@ -30,11 +31,21 @@ pub(super) fn imported_public_symbols(
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::Import(import) => Some(import.path.as_str()),
+            TopLevelDecl::Import(import) => Some(import),
             _ => None,
         })
-        .filter_map(|module| exports_module_with_overlays(&resolver, module, overlays).ok())
-        .flat_map(|exports| exports.symbols.into_iter().map(|symbol| symbol.name))
+        .filter_map(|import| {
+            let binding = import.alias.as_deref().or_else(|| import.path.rsplit("::").next())?;
+            if namespace.is_some_and(|value| value != binding) {
+                return None;
+            }
+            let exports = exports_module_with_overlays(&resolver, &import.path, overlays).ok()?;
+            let qualified = !import.is_open && namespace.is_none();
+            Some(exports.symbols.into_iter().map(move |symbol| {
+                if qualified { format!("{binding}::{}", symbol.name) } else { symbol.name }
+            }))
+        })
+        .flatten()
         .collect()
 }
 

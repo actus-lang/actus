@@ -91,13 +91,17 @@ remains green.
 
 ### Gate 47.4 — Formatter, LSP, and diagnostics
 
-- [ ] Format qualified paths deterministically without converting them to
+- [x] Format qualified paths deterministically without converting them to
       `open` declarations.
-- [ ] Add LSP completion, go-to-definition, hover, and diagnostic spans for
+- [x] Add LSP completion, go-to-definition, hover, and diagnostic spans for
       imported namespaces.
-- [ ] Preserve qualified paths through parse-format-parse round trips.
+- [x] Preserve qualified paths through parse-format-parse round trips.
 - [ ] Add tests for unresolved modules, missing declarations, aliases, and
       private-child diagnostics in editor output.
+
+Evidence: formatter regression coverage keeps qualified import paths stable and
+keeps `open` imports inside a legal import block. LSP regression coverage
+resolves completion members and go-to-definition through an imported namespace.
 
 ### Gate 47.5 — Standard-library migration inventory
 

@@ -215,6 +215,21 @@ fn formats_const_generic_declarations_without_changing_meaning() {
 }
 
 #[test]
+fn preserves_qualified_import_paths_and_uses_idempotently() {
+    let source = concat!(
+        "import { driver::{i2c, uart}, telemetry::uart as telem_uart, open sensors::imu };\n",
+        "verb main() -> Int { return 0; }\n",
+    );
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("telemetry::uart as telem_uart"));
+    assert!(formatted.contains("import driver::i2c;"));
+    assert!(formatted.contains("driver::i2c"));
+    assert!(formatted.contains("open sensors::imu"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_array_backed_packs_idempotently_with_layout_metadata() {
     let source = "pack Frame { erg storage: Array[u8, 4]; layout big; fields { erg marker: u8 at 0; abs tail: u8 at 24 = 0; } }";
     let formatted = format_source(source);

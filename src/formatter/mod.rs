@@ -46,13 +46,29 @@ impl Formatter<'_> {
                 self.output.push_str("meta limitless(\"file\")\n");
             }
         }
-        for (index, declaration) in program.declarations.iter().enumerate() {
+        let mut index = 0;
+        while index < program.declarations.len() {
+            let declaration = &program.declarations[index];
             if index > 0 || !program.file_metadata.is_empty() {
                 self.output.push('\n');
                 self.output.push('\n');
             }
             self.emit_comments_before(declaration_span(declaration).start);
-            self.top_level(declaration);
+            if let TopLevelDecl::Import(import) = declaration
+                && import.is_open
+            {
+                let end = program.declarations[index..]
+                    .iter()
+                    .take_while(|candidate| {
+                        matches!(candidate, TopLevelDecl::Import(value) if value.is_open)
+                    })
+                    .count();
+                self.import_group(&program.declarations[index..index + end]);
+                index += end;
+            } else {
+                self.top_level(declaration);
+                index += 1;
+            }
         }
     }
 
