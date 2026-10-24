@@ -10,19 +10,14 @@ impl Analyzer {
         if self.constants.contains_key(name) {
             return true;
         }
-        let Some((namespace, member)) = name.rsplit_once("::") else { return false };
-        self.imported_namespaces.contains_key(namespace) && self.constants.contains_key(member)
+        self.imported_member_name(name).is_some_and(|member| self.constants.contains_key(member))
     }
 
     pub(crate) fn constant_type(&self, name: &str) -> Option<&crate::ast::TypeName> {
         if let Some(ty) = self.constants.get(name) {
             return Some(ty);
         }
-        let (namespace, member) = name.rsplit_once("::")?;
-        self.imported_namespaces
-            .contains_key(namespace)
-            .then(|| self.constants.get(member))
-            .flatten()
+        self.imported_member_name(name).and_then(|member| self.constants.get(member))
     }
 
     pub(super) fn register_constants(&mut self, program: &Program) -> Result<(), SemanticError> {

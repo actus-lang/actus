@@ -338,6 +338,7 @@ impl Analyzer {
         fields: &[crate::ast::StructFieldInit],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        let name = self.imported_member_name(name).unwrap_or(name);
         if self.pack_types.contains_key(name) {
             self.validate_pack_literal(name, fields, span)
         } else {

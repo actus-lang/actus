@@ -105,7 +105,7 @@ impl Analyzer {
         &self,
         type_name: &TypeName,
     ) -> Result<ResolvedType, SemanticError> {
-        let name = type_name.name.as_str();
+        let name = self.imported_member_name(&type_name.name).unwrap_or(&type_name.name);
         if name == "Arena" {
             return self.resolve_arena_type(type_name);
         }
@@ -118,7 +118,13 @@ impl Analyzer {
         if let Some(generic) = self.resolve_generic_parameter(type_name)? {
             return Ok(generic);
         }
-        self.validate_named_type(type_name)?;
+        let normalized = TypeName {
+            name: name.to_owned(),
+            arguments: type_name.arguments.clone(),
+            reference_role: type_name.reference_role.clone(),
+            span: type_name.span,
+        };
+        self.validate_named_type(&normalized)?;
 
         if type_name.arguments.is_empty() {
             return Ok(ResolvedType::Concrete(name.to_owned()));

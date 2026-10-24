@@ -3,6 +3,27 @@ use super::Analyzer;
 use crate::ast::Program;
 
 impl Analyzer {
+    pub(crate) fn imported_member_name<'a>(&self, name: &'a str) -> Option<&'a str> {
+        let (namespace, member) = name.split_once("::")?;
+        self.imported_namespaces.contains_key(namespace).then_some(member)
+    }
+
+    pub(crate) fn normalize_imported_type_name(
+        &self,
+        type_name: &crate::ast::TypeName,
+    ) -> crate::ast::TypeName {
+        crate::ast::TypeName {
+            name: self.imported_member_name(&type_name.name).unwrap_or(&type_name.name).to_owned(),
+            arguments: type_name
+                .arguments
+                .iter()
+                .map(|argument| self.normalize_imported_type_name(argument))
+                .collect(),
+            reference_role: type_name.reference_role.clone(),
+            span: type_name.span,
+        }
+    }
+
     pub(super) fn new() -> Self {
         Self::default()
     }

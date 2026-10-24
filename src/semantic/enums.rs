@@ -7,6 +7,7 @@ use super::errors::{SemanticError, SemanticErrorKind};
 fn receiver_name<'a>(analyzer: &Analyzer, expression: &'a Expr) -> Option<&'a str> {
     let Expr::Identifier { name, .. } = expression else { return None };
     let base_name = name.split('[').next().unwrap_or(name);
+    let base_name = analyzer.imported_member_name(base_name).unwrap_or(base_name);
     analyzer.enum_types.contains_key(base_name).then_some(base_name)
 }
 
@@ -90,11 +91,12 @@ impl Analyzer {
         type_name: &TypeName,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if !self.enum_types.contains_key(&type_name.name) {
+        let enum_name = self.imported_member_name(&type_name.name).unwrap_or(&type_name.name);
+        if !self.enum_types.contains_key(enum_name) {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.binding_enum_types.insert(index, type_name.name.clone());
+        self.binding_enum_types.insert(index, enum_name.to_owned());
         if !type_name.arguments.is_empty() {
             self.binding_enum_type_applications.insert(index, type_name.clone());
         }

@@ -266,6 +266,19 @@ fn resolves_qualified_configuration_constant_semantically() {
 }
 
 #[test]
+fn resolves_qualified_enum_type_and_variant_semantically() {
+    let fixture = Fixture::new();
+    fixture.write("colors/colors.act", "open values;");
+    fixture.write("colors/values.act", "open enum Color { Red, Blue, }");
+    let program = parse_source(
+        "import colors; verb main() -> Int { erg color: colors::Color = colors::Color.Red; return 0; }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified enum types and variants should resolve semantically");
+}
+
+#[test]
 fn rejects_imports_inside_nested_configuration_sources() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open policy;");

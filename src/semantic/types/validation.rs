@@ -43,6 +43,8 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let Some(expected_type) = declared_type else { return Ok(()) };
+        let normalized_type = self.normalize_imported_type_name(expected_type);
+        let expected_type = &normalized_type;
         let expected_name = crate::semantic::analyzer::canonical_type_name(expected_type);
         if self.struct_types.contains_key(&expected_type.name)
             || self.pack_types.contains_key(&expected_type.name)
