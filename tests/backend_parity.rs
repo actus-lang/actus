@@ -160,6 +160,32 @@ fn hosted_cli_backends_lower_qualified_imports_identically() {
 }
 
 #[test]
+fn hosted_cli_backends_lower_qualified_enum_values_identically() {
+    let source = "import colors; verb main() -> Int { erg color: colors::Color = colors::Color.Red; return colors::score(value: erg color); }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-enum", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/colors")).expect("create colors module directory");
+        fs::write(root.join("src/colors/colors.act"), "open api;\n").expect("write colors facade");
+        fs::write(
+            root.join("src/colors/api.act"),
+            "open enum Color { Red, Blue, } open verb score(erg value: Color) -> Int { return case dat value { Color.Red => 42, Color.Blue => 1, }; }\n",
+        )
+        .expect("write colors API");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified enum build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified enum fixture");
+        assert_eq!(status.code(), Some(42), "{backend} qualified enum result");
+        fs::remove_dir_all(root).expect("remove qualified enum fixture");
+    }
+}
+
+#[test]
 fn hosted_cli_backends_share_float_constants_and_comparisons() {
     let source = "verb main() -> Int { erg temperature: f32 = 21.5; erg pressure: f64 = 1013.25; return case temperature < 22.0f32 && pressure > 1000.0 { true => 42, _ => 1, }; }\n";
     for backend in BACKENDS {

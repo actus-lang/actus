@@ -63,11 +63,17 @@ import facade
 
 ### Gate 47.2 — Shared semantic lookup
 
-- [ ] Add an imported module namespace binding without ambient name injection.
-- [ ] Resolve qualified declarations through canonical facades only.
-- [ ] Preserve ownership roles and generic/type arguments after qualification.
-- [ ] Reject direct implementation-child access and ambiguous aliases.
-- [ ] Add visibility, collision, alias, nested-facade, and package-boundary tests.
+- [x] Add an imported module namespace binding without ambient name injection.
+- [x] Resolve qualified declarations through canonical facades only.
+- [x] Preserve ownership roles and generic/type arguments after qualification.
+- [x] Reject direct implementation-child access and ambiguous aliases.
+- [x] Add visibility, collision, alias, nested-facade, and package-boundary tests.
+
+Evidence: module resolution and semantic tests pass 83/83. Qualified verbs,
+aliases, constants, enum types/variants, generic calls, explicit `open`
+imports, private-child rejection, and import-collision diagnostics are covered.
+Cranelift/LLVM lowering parity passes 8/8 for the qualified constant and enum
+fixtures.
 
 ### Gate 47.3 — Backend-neutral lowering parity
 
