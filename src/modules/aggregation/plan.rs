@@ -45,6 +45,26 @@ impl ModuleCompilationPlan {
 
     pub fn implementation(&self) -> Program {
         let mut declarations = self.local.declarations.clone();
+        declarations.extend(
+            self.caller
+                .declarations
+                .iter()
+                .filter(|declaration| matches!(declaration, TopLevelDecl::Import(_)))
+                .cloned(),
+        );
+        declarations.extend(
+            self.caller
+                .declarations
+                .iter()
+                .filter(|declaration| {
+                    matches!(
+                        declaration,
+                        TopLevelDecl::ExternalVerb(verb)
+                            if verb.module_import && verb.name.contains("::")
+                    )
+                })
+                .cloned(),
+        );
         for unit in &self.units {
             declarations.extend(
                 unit.implementation()
@@ -79,42 +99,16 @@ pub fn build_compilation_plan_with_overlays(
     let mut local_declarations = Vec::new();
     let mut units = Vec::new();
     let mut imported_paths = HashSet::new();
-    let mut import_bindings: HashMap<String, crate::lexer::SourceSpan> = HashMap::new();
-    for declaration in &program.declarations {
-        let TopLevelDecl::Import(import) = declaration else { continue };
-        let binding = import
-            .alias
-            .clone()
-            .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
-            .unwrap_or_else(|| import.path.clone());
-        if let Some(first) = import_bindings.insert(binding.clone(), import.span) {
-            return Err(ModuleError::ImportBindingCollision {
-                binding,
-                first,
-                second: import.span,
-            });
-        }
-    }
-    for declaration in &program.declarations {
-        let TopLevelDecl::Import(import) = declaration else {
-            local_declarations.push(declaration.clone());
-            caller_declarations.push(declaration.clone());
-            continue;
-        };
-        caller_declarations.push(declaration.clone());
-        if !imported_paths.insert(import.path.clone()) {
-            continue;
-        }
-        collect_unit(
-            &import.path,
-            program,
-            resolver,
-            overlays,
-            &mut imported_paths,
-            &mut units,
-            &mut caller_declarations,
-        )?;
-    }
+    validate_import_bindings(program)?;
+    collect_root_imports(
+        program,
+        resolver,
+        overlays,
+        &mut imported_paths,
+        &mut units,
+        &mut local_declarations,
+        &mut caller_declarations,
+    )?;
     validate_symbol_collisions(&local_declarations, &units)?;
     Ok(ModuleCompilationPlan {
         local: Program {
@@ -126,6 +120,70 @@ pub fn build_compilation_plan_with_overlays(
             declarations: caller_declarations,
         },
         units,
+    })
+}
+
+fn validate_import_bindings(program: &Program) -> Result<(), ModuleError> {
+    let mut bindings = HashMap::new();
+    for declaration in &program.declarations {
+        let TopLevelDecl::Import(import) = declaration else { continue };
+        let binding = import
+            .alias
+            .clone()
+            .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+            .unwrap_or_else(|| import.path.clone());
+        if let Some(first) = bindings.insert(binding.clone(), import.span) {
+            return Err(ModuleError::ImportBindingCollision {
+                binding,
+                first,
+                second: import.span,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn collect_root_imports(
+    program: &Program,
+    resolver: &ModuleResolver,
+    overlays: &HashMap<std::path::PathBuf, String>,
+    imported_paths: &mut HashSet<String>,
+    units: &mut Vec<ModuleUnit>,
+    local_declarations: &mut Vec<TopLevelDecl>,
+    caller_declarations: &mut Vec<TopLevelDecl>,
+) -> Result<(), ModuleError> {
+    for declaration in &program.declarations {
+        let TopLevelDecl::Import(import) = declaration else {
+            local_declarations.push(declaration.clone());
+            caller_declarations.push(declaration.clone());
+            continue;
+        };
+        caller_declarations.push(declaration.clone());
+        if !imported_paths.insert(import.path.clone()) {
+            continue;
+        }
+        let namespace = import_namespace(import);
+        collect_unit(
+            &import.path,
+            program,
+            resolver,
+            overlays,
+            imported_paths,
+            units,
+            caller_declarations,
+            namespace.as_deref(),
+        )?;
+    }
+    Ok(())
+}
+
+fn import_namespace(import: &crate::ast::ImportDecl) -> Option<String> {
+    (!import.is_open).then(|| {
+        import
+            .alias
+            .clone()
+            .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+            .unwrap_or_else(|| import.path.clone())
     })
 }
 
@@ -264,6 +322,7 @@ fn collect_unit(
     imported_paths: &mut HashSet<String>,
     units: &mut Vec<ModuleUnit>,
     caller_declarations: &mut Vec<TopLevelDecl>,
+    namespace: Option<&str>,
 ) -> Result<(), ModuleError> {
     let unit = super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
     validate_import_visibility(importer, module_path, &unit)?;
@@ -279,10 +338,11 @@ fn collect_unit(
                 imported_paths,
                 units,
                 caller_declarations,
+                namespace,
             )?;
         }
     }
-    append_public_declarations(caller_declarations, &unit);
+    append_public_declarations(caller_declarations, &unit, namespace);
     units.push(unit);
     Ok(())
 }
@@ -295,12 +355,16 @@ pub(super) fn qualify_import_path(importer: &str, imported: &str) -> String {
     }
 }
 
-fn append_public_declarations(target: &mut Vec<TopLevelDecl>, unit: &ModuleUnit) {
+fn append_public_declarations(
+    target: &mut Vec<TopLevelDecl>,
+    unit: &ModuleUnit,
+    namespace: Option<&str>,
+) {
     for declaration in unit.implementation().declarations.iter().filter(|declaration| {
         let Some((kind, name)) = export_identity(declaration) else { return false };
         unit.exports().contains(kind, &name)
     }) {
-        let imported = caller_declaration(declaration);
+        let imported = caller_declaration(declaration, namespace);
         if !has_compatible_external_declaration(target, &imported) {
             target.push(imported);
         }
@@ -321,7 +385,7 @@ fn has_compatible_external_declaration(
     })
 }
 
-fn caller_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
+fn caller_declaration(declaration: &TopLevelDecl, namespace: Option<&str>) -> TopLevelDecl {
     match declaration {
         TopLevelDecl::Verb(verb) => TopLevelDecl::ExternalVerb(ExternalVerbDecl {
             is_open: verb.is_open,
@@ -331,13 +395,28 @@ fn caller_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
             module_import: true,
             abi: ForeignAbi::C,
             metadata: verb.metadata.clone(),
-            name: verb.name.clone(),
-            native_symbol: None,
+            name: qualified_name(namespace, &verb.name),
+            native_symbol: namespace.map(|_| verb.name.clone()),
             generic_parameters: verb.generic_parameters.clone(),
             params: verb.params.clone(),
             return_type: verb.return_type.clone(),
             span: verb.span,
         }),
+        TopLevelDecl::ExternalVerb(verb) => {
+            let mut imported = verb.clone();
+            imported.unsafe_boundary = false;
+            imported.module_import = true;
+            if let Some(namespace) = namespace {
+                imported.native_symbol =
+                    Some(imported.native_symbol.clone().unwrap_or_else(|| imported.name.clone()));
+                imported.name = qualified_name(Some(namespace), &imported.name);
+            }
+            TopLevelDecl::ExternalVerb(imported)
+        }
         _ => declaration.clone(),
     }
+}
+
+fn qualified_name(namespace: Option<&str>, name: &str) -> String {
+    namespace.map_or_else(|| name.to_owned(), |namespace| format!("{namespace}::{name}"))
 }

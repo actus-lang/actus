@@ -12,7 +12,7 @@ fn write_fixture(root: &Path) {
     .unwrap();
     fs::write(
         root.join("src/main.act"),
-        "import zeta; import alpha; verb main() -> Int { return aye() + zed(); }\n",
+        "import zeta; import alpha; verb main() -> Int { return alpha::aye() + zeta::zed(); }\n",
     )
     .unwrap();
     fs::write(root.join("src/alpha/alpha.act"), "open api;\n").unwrap();

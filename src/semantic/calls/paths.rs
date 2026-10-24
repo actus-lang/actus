@@ -40,11 +40,17 @@ impl Analyzer {
         callee: &str,
         span: SourceSpan,
     ) -> Result<String, SemanticError> {
-        let Some((namespace, member)) = callee.rsplit_once("::") else {
+        let Some((namespace, _member)) = callee.rsplit_once("::") else {
             return Ok(callee.to_owned());
         };
         if self.imported_namespaces.contains_key(namespace) {
-            return Ok(member.to_owned());
+            if self.signatures.contains_key(callee) {
+                return Ok(callee.to_owned());
+            }
+            return Err(SemanticError {
+                kind: SemanticErrorKind::UnknownVerb { name: callee.to_owned() },
+                span,
+            });
         }
         Err(SemanticError {
             kind: SemanticErrorKind::UnknownVerb { name: callee.to_owned() },

@@ -69,6 +69,22 @@ fn records_imported_namespace_and_resolves_qualified_call() {
 }
 
 #[test]
+fn rejects_unqualified_call_through_a_closed_import() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source("import shared; verb main() -> Int { return read(); }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("closed imports must not inject unqualified declarations");
+    assert!(matches!(
+        error,
+        ModuleError::Semantic(ref semantic)
+            if matches!(semantic.kind, actus::semantic::SemanticErrorKind::UnknownVerb { ref name } if name == "read")
+    ));
+}
+
+#[test]
 fn resolves_qualified_call_through_a_namespace_alias() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open api;");
@@ -102,7 +118,7 @@ fn resolves_public_child_declarations_through_the_parent_facade() {
     fixture.write("aie/aie.act", "open runtime;");
     fixture.write("aie/runtime/runtime.act", "open api;");
     fixture.write("aie/runtime/api.act", "open verb start() -> Int { return 7; }");
-    let program = parse_source("import aie; verb main() -> Int { return start(); }");
+    let program = parse_source("import { open aie }; verb main() -> Int { return start(); }");
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("child exports should be visible through the parent facade");
@@ -117,7 +133,7 @@ fn accepts_equality_for_a_unit_enum_reexported_through_a_facade() {
         "open enum TeachingMode { Direct, Replay, } open verb accepts(erg mode: TeachingMode) -> Bool { return mode == TeachingMode.Direct; }",
     );
     let program = parse_source(
-        "import teaching; verb main() -> Bool { erg mode = TeachingMode.Direct; return accepts(mode: erg mode); }",
+        "import { open teaching }; verb main() -> Bool { erg mode = TeachingMode.Direct; return accepts(mode: erg mode); }",
     );
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
@@ -154,7 +170,7 @@ fn lowers_nested_generic_option_payload_through_a_facade() {
         "open validation; open verb read_nested() -> Result[Option[DatasetError], DatasetError] { return Result[Option[DatasetError], DatasetError].Ok(Option[DatasetError].Some(DatasetError.Invalid)); }",
     );
     let program = parse_source(
-        "import dataset; verb main() -> Int { erg result = read_nested(); return case dat result { Result.Ok(option) => case dat option { Option.Some(_) => 0, Option.None => 1, }, Result.Err(_) => 2, }; }",
+        "import dataset; verb main() -> Int { erg result = dataset::read_nested(); return case dat result { Result.Ok(option) => case dat option { Option.Some(_) => 0, Option.None => 1, }, Result.Err(_) => 2, }; }",
     );
 
     let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
@@ -178,7 +194,7 @@ fn keeps_inferred_types_scoped_across_imported_declarations() {
         "open enum AuxLinkError { Capacity, } open verb allocate_aux_record(erg value: Int) -> Option[Int] { return Option[Int].Some(value); } open verb acquire_aux_record(erg value: Int) -> Result[Int, AuxLinkError] { erg allocated = allocate_aux_record(value: erg value); erg selected: Int = case dat allocated { Option.None => 0, Option.Some(item) => item, }; erg layout = read_fixed_header_layout(); return Result[Int, AuxLinkError].Ok(selected + layout.value); }",
     );
     let program = parse_source(
-        "import layout; import aux; verb main() -> Int { erg input: Int = 1; erg result = acquire_aux_record(value: erg input); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }",
+        "import { open layout, open aux }; verb main() -> Int { erg input: Int = 1; erg result = acquire_aux_record(value: erg input); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }",
     );
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
@@ -275,7 +291,7 @@ fn resolves_generic_nested_calls_through_parent_facade() {
         "open struct Packet[T] { item: T, } open verb inner[T](erg value: T) -> Packet[T] { return Packet[T] { item: value, }; } open verb outer[T](erg value: T) -> Packet[T] { return inner(value: erg value); }",
     );
     let program = parse_source(
-        "import device; verb main() -> Int { erg value = 41; erg packet = outer(value: erg value); return packet.item + 1; }",
+        "import device; verb main() -> Int { erg value = 41; erg packet = device::outer(value: erg value); return packet.item + 1; }",
     );
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))

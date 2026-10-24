@@ -95,13 +95,13 @@ fn nested_sibling_facade_preserves_transitive_public_verbs_in_object_plan() {
         "open runtime; open verb resident_step() -> u32 { return allocate_column_index(); }",
     );
     let (tokens, errors) =
-        scan("import aie; verb main() -> Int { return allocate_column_index() as Int; }");
+        scan("import aie; verb main() -> Int { return aie::allocate_column_index() as Int; }");
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
 
     let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
     assert!(plan.caller().declarations.iter().any(|declaration| {
-        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "allocate_column_index")
+        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "aie::allocate_column_index")
     }));
     let object_plan = plan.object_plan().unwrap();
     assert!(

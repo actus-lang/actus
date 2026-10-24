@@ -30,13 +30,24 @@ impl Analyzer {
 
     fn register_import_namespaces(&mut self, program: &Program) {
         for declaration in &program.declarations {
-            let crate::ast::TopLevelDecl::Import(import) = declaration else { continue };
-            let binding = import
-                .alias
-                .clone()
-                .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
-                .unwrap_or_else(|| import.path.clone());
-            self.imported_namespaces.insert(binding, import.path.clone());
+            match declaration {
+                crate::ast::TopLevelDecl::Import(import) if !import.is_open => {
+                    let binding = import
+                        .alias
+                        .clone()
+                        .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+                        .unwrap_or_else(|| import.path.clone());
+                    self.imported_namespaces.insert(binding, import.path.clone());
+                }
+                crate::ast::TopLevelDecl::ExternalVerb(verb) if verb.module_import => {
+                    if let Some((namespace, _)) = verb.name.rsplit_once("::") {
+                        self.imported_namespaces
+                            .entry(namespace.to_owned())
+                            .or_insert_with(|| namespace.to_owned());
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
