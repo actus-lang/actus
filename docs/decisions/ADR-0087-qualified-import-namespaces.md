@@ -68,6 +68,29 @@ The exact token spelling and AST representation must be shared by semantic
 analysis, formatter, language server, diagnostics, Cranelift lowering, and
 LLVM lowering. No backend may implement a separate qualified-name rule.
 
+### Binding and package-resolution rules
+
+- A plain import binds the final module segment as its local namespace. For
+  example, `import driver::i2c;` is referenced as `i2c::...`.
+- `as` replaces only that local namespace binding. It is never a declaration
+  rename and cannot rename a verb, type, constant, enum variant, or field.
+- Grouped imports are normalized to independent namespace bindings, so every
+  member of `driver::{i2c, uart}` is checked for its own local binding and
+  source span.
+- A nested path is resolved one module segment at a time through canonical
+  facades. A child is externally importable only when its own canonical facade
+  exists and the path does not bypass an existing parent facade.
+- A package-root alias selects a configured dependency root; it does not
+  permit filesystem paths, arbitrary directory traversal, or direct access to
+  a dependency's implementation files. Runtime `std::...` roots retain their
+  target-compatibility checks.
+- A path that names a non-facade implementation child is rejected before
+  semantic lookup. The diagnostic identifies the parent facade that must be
+  used instead.
+- Repeating any local import binding is an error, including repeating the
+  exact same path. Different paths may not share an alias or final namespace
+  segment.
+
 ## Constraints and invariants
 
 - Canonical facade and private-child visibility rules remain unchanged.

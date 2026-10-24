@@ -55,9 +55,9 @@ import facade
       parser contract.
 - [x] Define the AST node and source-span behavior for one or more path
       components.
-- [ ] Define how aliases, nested facades, package roots, and imports that
+- [x] Define how aliases, nested facades, package roots, and imports that
       resolve to non-facade children behave.
-- [ ] Define stable diagnostics for malformed, unresolved, ambiguous, and
+- [x] Define stable diagnostics for malformed, unresolved, ambiguous, and
       private qualified paths.
 - [ ] Add parser and semantic negative tests before backend work begins.
 
