@@ -1,6 +1,6 @@
 use actus::ast::TopLevelDecl;
 use actus::lexer::scan;
-use actus::parser::parse;
+use actus::parser::{ParseErrorCode, parse};
 
 #[test]
 fn parses_extension_free_module_imports() {
@@ -92,4 +92,12 @@ fn parses_qualified_call_and_type_names() {
         panic!("expected qualified call");
     };
     assert_eq!(callee, "driver::write");
+}
+
+#[test]
+fn rejects_open_imports_outside_the_unified_import_block() {
+    let (tokens, errors) = scan("import open sensors::imu;");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = parse(tokens).expect_err("standalone open import should be rejected");
+    assert_eq!(error.code, ParseErrorCode::OpenImportRequiresBlock);
 }

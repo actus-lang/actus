@@ -29,6 +29,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::UnsupportedLimitlessScope => "E0012",
         ParseErrorCode::DuplicateMetadata => "E0013",
         ParseErrorCode::MalformedVerbContract => "E0014",
+        ParseErrorCode::OpenImportRequiresBlock => "E0015",
     }
 }
 

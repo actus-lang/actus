@@ -31,6 +31,7 @@ pub enum ParseErrorKind {
     UnsupportedLimitlessScope { name: String },
     DuplicateMetadata { name: String },
     MalformedVerbContract { reason: String },
+    OpenImportRequiresBlock,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,6 +48,7 @@ pub enum ParseErrorCode {
     UnsupportedLimitlessScope,
     DuplicateMetadata,
     MalformedVerbContract,
+    OpenImportRequiresBlock,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -192,7 +192,8 @@ impl Parser {
     fn parse_import_decl(&mut self) -> Result<Vec<TopLevelDecl>, ParseError> {
         let start = self.expect_keyword(TokenKind::Import, "`import`")?.span.start;
         let mut items = Vec::new();
-        if self.match_simple(TokenKind::LeftBrace) {
+        let is_block = self.match_simple(TokenKind::LeftBrace);
+        if is_block {
             loop {
                 items.extend(self.parse_import_items()?);
                 if self.match_simple(TokenKind::Comma) {
@@ -208,6 +209,13 @@ impl Parser {
             items = self.parse_import_items()?;
         }
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
+        if !is_block && items.iter().any(|(_, _, is_open, _, _)| *is_open) {
+            return Err(ParseError {
+                code: ParseErrorCode::OpenImportRequiresBlock,
+                kind: ParseErrorKind::OpenImportRequiresBlock,
+                span: SourceSpan::new(start, end),
+            });
+        }
         Ok(items
             .into_iter()
             .map(|(path, alias, is_open, grouped, _)| {
