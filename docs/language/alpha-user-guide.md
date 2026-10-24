@@ -181,8 +181,20 @@ become available through `control` only because `control.act` opens `runtime`.
 Sibling implementation files share the child module's internal scope, but
 private declarations do not cross the facade.
 
-Valid application code uses `import control;` and `import std::io;`. These
-forms are invalid because they bypass a parent facade or address a source file:
+Valid application code uses `import control;` and `import std::io;` as
+namespace bindings. Use qualified names such as `control::control_value()`
+and `io::print(...)`. If unqualified access is intentional, put the opening
+inside the unified import block:
+
+```act
+import {
+    open control,
+    open std::io,
+};
+```
+
+These direct child paths are invalid because they bypass a parent facade or
+address an implementation file:
 
 ```act
 import control::runtime;
@@ -208,7 +220,8 @@ src/
 ```
 
 The facade may open configuration siblings, and normal package modules consume
-its public constants with `import config;`. Configuration sources are
+its public constants with `import config;` and qualified names such as
+`config::MAX_VALUE`. Configuration sources are
 compile-time-only: they may expose typed constants and supporting type-level
 declarations, but may not import domain/runtime modules or declare verbs.
 Private constants remain private to the configuration subtree. `Actus.toml`
@@ -219,13 +232,15 @@ LSP, semantic checker, and test runner use the same facade boundary.
 ## 5. Monotonic time
 
 Hosted projects can opt into the typed `std::time` facade with
-`[build] runtime = "std"` and `import std::time;`. The facade provides
+`[build] runtime = "std"` and `import std::time;`. This binds the `time`
+namespace; use names such as `time::now()` and `time::Duration`. For
+unqualified access, write `import { open std::time };`. The facade provides
 `Instant`, `Duration`, `Deadline`, checked integer conversions and arithmetic,
 `delay`, `sleep`, and caller-owned one-shot or periodic timers. It does not
 provide wall-clock, calendar, timezone, or platform clock APIs.
 
 ```act
-import std::time;
+import { open std::time };
 
 verb main() -> Int {
     erg started: Instant = now();

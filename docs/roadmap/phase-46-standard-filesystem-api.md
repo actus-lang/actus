@@ -40,8 +40,9 @@ filesystem dependency.
 - [ ] Keep native extern declarations in a platform-specific implementation
       boundary; do not leak C or OS types into the public Actus API.
 - [ ] Add public documentation for every type, enum, constant, and verb.
-- [ ] Add module-visibility tests proving `import std::fs; open fs;` is the
-      supported path.
+- [ ] Add module-visibility tests proving `import std::fs;` with qualified
+      `fs::...` access, and `import { open std::fs };` for intentional
+      unqualified access, are the supported paths.
 - [ ] Reject direct imports of private implementation children where the
       compiler's module rules require the canonical facade.
 

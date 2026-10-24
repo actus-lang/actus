@@ -46,7 +46,9 @@ behavioral contracts.
 
 ## How to use a library
 
-1. Import the public facade, for example `import std::io;`.
+1. Import the public facade, for example `import std::io;`, and use the local
+   namespace (`io::...`). Use `import { open std::io };` only when unqualified
+   access is intentional.
 2. Read the module's ownership page before passing buffers or resources.
 3. Handle every fallible result with `case` or `?`.
 4. Use the public facade; raw runtime bridges are implementation details.

@@ -1,7 +1,9 @@
 # `std::io` API reference
 
 This page explains the public operations exported by `import std::io;`. The
-signatures below are grouped by the job they perform. Raw `unsafe extern "C"`
+plain import binds the `io` namespace; callers use `io::...` or explicitly
+write `import { open std::io };` for unqualified access. The signatures below
+are grouped by the job they perform. Raw `unsafe extern "C"`
 bridges are intentionally omitted because application code uses the typed
 Actus wrappers.
 
