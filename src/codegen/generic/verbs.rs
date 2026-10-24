@@ -146,10 +146,12 @@ fn expand_transitive_once(
         .map_err(|error| {
             BackendEmitError(format!("generic instance expansion failed: {error:?}"))
         })?;
-        for nested_template in snapshot
-            .iter()
-            .filter(|instance| instance.caller.as_deref() == Some(caller_instance.name.as_str()))
-        {
+        for nested_template in snapshot.iter().filter(|instance| {
+            instance.caller.as_deref().is_some_and(|caller| {
+                caller == caller_instance.name
+                    || caller.rsplit("::").next() == caller_instance.name.rsplit("::").next()
+            })
+        }) {
             changed |= append_specialized_nested_instance(
                 expanded,
                 caller_instance,
@@ -199,8 +201,14 @@ fn generic_parameters_for<'a>(
     name: &str,
 ) -> Option<&'a [crate::ast::GenericParam]> {
     program.declarations.iter().find_map(|declaration| match declaration {
-        TopLevelDecl::Verb(verb) if verb.name == name => Some(verb.generic_parameters.as_slice()),
-        TopLevelDecl::ExternalVerb(verb) if verb.name == name => {
+        TopLevelDecl::Verb(verb)
+            if verb.name == name || name.rsplit("::").next() == Some(verb.name.as_str()) =>
+        {
+            Some(verb.generic_parameters.as_slice())
+        }
+        TopLevelDecl::ExternalVerb(verb)
+            if verb.name == name || name.rsplit("::").next() == Some(verb.name.as_str()) =>
+        {
             Some(verb.generic_parameters.as_slice())
         }
         _ => None,
@@ -349,8 +357,9 @@ fn nested_call_bindings(
     .map_err(|error| BackendEmitError(format!("nested generic substitution failed: {error:?}")))?;
     let mut bindings = inherited.clone();
     for template in instances.iter().filter(|instance| {
-        instance.caller.as_deref() == Some(caller_name)
-            && instance.arguments.iter().any(|argument| substitution.apply(argument) != *argument)
+        instance.caller.as_deref().is_some_and(|caller| {
+            caller == caller_name || caller.rsplit("::").next() == caller_name.rsplit("::").next()
+        }) && instance.arguments.iter().any(|argument| substitution.apply(argument) != *argument)
     }) {
         let arguments = template
             .arguments
@@ -402,7 +411,7 @@ fn instance_matches_verb(instance: &GenericInstance, verb: &VerbDecl) -> bool {
 }
 
 fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl) -> bool {
-    instance.name == verb.name
+    (instance.name == verb.name || instance.name.rsplit("::").next() == Some(verb.name.as_str()))
         && instance.arguments.len() == verb.generic_parameters.len()
         && instance
             .arguments

@@ -16,12 +16,8 @@ pub(super) fn lower_method_call(
     let Expr::MethodCall { receiver, method, arguments, span } = expression else {
         return Err(unsupported(expression_span(expression), "method call expected"));
     };
-    let Expr::Identifier { name, .. } = receiver.as_ref() else {
-        return Err(unsupported(*span, "Result constructor receiver must be a type name"));
-    };
-    let result_type = crate::semantic::parse_type_name_key(name, *span)
-        .or_else(|| parse_type_name(name, *span))
-        .ok_or_else(|| {
+    let result_type =
+        parse_constructor_receiver_type(receiver.as_ref(), *span).ok_or_else(|| {
             unsupported(*span, "Result constructor receiver has an invalid type name")
         })?;
     if result_type.name == "Option" && result_type.arguments.len() == 1 {
@@ -60,6 +56,28 @@ pub(super) fn lower_method_call(
         );
     }
     lower_result_constructor(provider, &result_type, method, arguments, *span, instructions)
+}
+
+pub(super) fn parse_constructor_receiver_type(
+    expression: &Expr,
+    span: SourceSpan,
+) -> Option<TypeName> {
+    match expression {
+        Expr::Identifier { name, .. } => {
+            crate::semantic::parse_type_name_key(name, span).or_else(|| parse_type_name(name, span))
+        }
+        Expr::Index { target, index, .. } => {
+            let mut type_name = parse_constructor_receiver_type(target, span)?;
+            let Expr::Identifier { name, .. } = index.as_ref() else {
+                return None;
+            };
+            let argument = crate::semantic::parse_type_name_key(name, span)
+                .or_else(|| parse_type_name(name, span))?;
+            type_name.arguments.push(argument);
+            Some(type_name)
+        }
+        _ => None,
+    }
 }
 
 fn lower_regular_option_constructor(

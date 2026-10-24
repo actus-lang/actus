@@ -1,6 +1,7 @@
 // Shared lowering receives explicit compiler contracts from both backends.
 #![allow(clippy::too_many_arguments)]
 
+mod aggregate_assignment;
 mod constructors;
 mod declarations;
 mod expression;
