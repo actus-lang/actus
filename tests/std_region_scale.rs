@@ -25,7 +25,7 @@ fn run_case(
     fs::write(
         source_root.join("main.act"),
         format!(
-            "{declaration}import std::region; verb main() -> Int {{ erg backing: Buffer = Buffer[{resident_bytes}]; erg logical_length: u64 = {logical_length}u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[{element_type}](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened {{ Result.Err(_) => 1, Result.Ok(region) => {{ erg destination: Buffer = Buffer[{resident_bytes}]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read {{ Result.Err(_) => 2, Result.Ok(_) => 0, }}; }}, }}; }}\n"
+            "{declaration}import {{ open std::region }}; verb main() -> Int {{ erg backing: Buffer = Buffer[{resident_bytes}]; erg logical_length: u64 = {logical_length}u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[{element_type}](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened {{ Result.Err(_) => 1, Result.Ok(region) => {{ erg destination: Buffer = Buffer[{resident_bytes}]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read {{ Result.Err(_) => 2, Result.Ok(_) => 0, }}; }}, }}; }}\n"
         ),
     )
     .expect("scale fixture source should be written");

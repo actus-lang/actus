@@ -26,7 +26,7 @@ fn std_time_facade_exports_documented_monotonic_api() {
 
 #[test]
 fn hosted_program_can_import_and_call_monotonic_api() {
-    let source = "import time; verb measure() -> u64 { return monotonic_nanos(); } verb main() -> Int { erg value: u64 = measure(); return value as Int; }";
+    let source = "import { open time }; verb measure() -> u64 { return monotonic_nanos(); } verb main() -> Int { erg value: u64 = measure(); return value as Int; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "fixture should lex without errors: {errors:?}");
     let program = parse(tokens).expect("hosted time fixture should parse");

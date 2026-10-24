@@ -74,12 +74,12 @@ verb main() -> Int {
     append(raw, 120);
     append(raw, 116);
     append(raw, 0);
-    erg result = path_from_posix(storage: dat raw);
+    erg result = path::path_from_posix(storage: dat raw);
     return case dat result {
         Result.Err(_) => 1,
         Result.Ok(value) => {
             erg path: Path = value;
-            erg found = file_name(self: abs path);
+            erg found = path::file_name(self: abs path);
             return case dat found {
                 Option.Some(component) => case component.length {
                     7 => 0,

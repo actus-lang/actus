@@ -59,7 +59,7 @@ fn std_io_native_buffer_flushes_pending_bytes() {
         "buffered",
         "open stdout;\nopen error;\n",
         &["stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg storage = Buffer[0]; append(storage, 97); append(storage, 98); append(storage, 99); append(storage, 100); append(storage, 101); append(storage, 102); printb(text: abs storage); flush(); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg storage = Buffer[0]; append(storage, 97); append(storage, 98); append(storage, 99); append(storage, 100); append(storage, 101); append(storage, 102); printb(text: abs storage); flush(); return 0; }\n",
     );
     build(&input, &output);
     let child =
@@ -76,7 +76,7 @@ fn std_io_native_bridge_separates_stdout_and_stderr() {
         "streams",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg value = 42; erg flag = true; print(int: value); eprint(int: value); eprint(bool: flag); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg value = 42; erg flag = true; print(int: value); eprint(int: value); eprint(bool: flag); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("std io fixture should run");
@@ -92,7 +92,7 @@ fn std_io_native_bridge_prints_borrowed_buffer_text() {
         "text",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg text = Buffer[0]; append(text, 72); append(text, 105); printb(text: abs text); printlnb(text: abs text); eprint(buffer: abs text); eprintln(buffer: abs text); flush(); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg text = Buffer[0]; append(text, 72); append(text, 105); printb(text: abs text); printlnb(text: abs text); eprint(buffer: abs text); eprintln(buffer: abs text); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("text fixture should run");
@@ -108,7 +108,7 @@ fn std_io_native_bridge_prints_string_text() {
         "string-text",
         "open stdout;\nopen error;\n",
         &["stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg text = \"Hello\"; print(abs text); println(text: abs text); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg text = \"Hello\"; print(abs text); println(text: abs text); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("string fixture should run");
@@ -122,7 +122,7 @@ fn assert_labelled_print_output(backend: &str) {
         &format!("labelled-{backend}"),
         "open stdout;\nopen error;\n",
         &["stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg text = \"Hi\"; erg value = 42; erg flag = true; print(string: abs text); print(int: value); print(bool: flag); print(format: \"score={}\", int: value); print(format: \"ok={}\", bool: flag); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg text = \"Hi\"; erg value = 42; erg flag = true; print(string: abs text); print(int: value); print(bool: flag); print(format: \"score={}\", int: value); print(format: \"ok={}\", bool: flag); return 0; }\n",
     );
     build_with_backend(&input, &output, backend);
     let execution = Command::new(&output).output().expect("labelled print fixture should run");
@@ -149,7 +149,7 @@ fn native_string_collection_covers_case_blocks_and_else_if() {
         "string-control-flow",
         "open stdout;\nopen error;\n",
         &["stdout.act", "error.act"],
-        r#"import io;
+        r#"import { open io };
 verb main() -> Int {
     erg selected = "selected";
     case true {
@@ -195,7 +195,7 @@ fn native_string_data_is_deduplicated_and_deterministic() {
         "string-data",
         "open stdout;\nopen error;\n",
         &["stdout.act", "error.act"],
-        r#"import io;
+        r#"import { open io };
 verb main() -> Int {
     erg first = "zeta";
     erg repeated = "alpha";
@@ -251,7 +251,7 @@ fn std_io_native_bridge_reads_line_into_exclusive_buffer() {
         "stdin",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg buffer = Buffer[0]; read_line(buffer: ins buffer); printb(text: abs buffer); flush(); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg buffer = Buffer[0]; read_line(buffer: ins buffer); printb(text: abs buffer); flush(); return 0; }\n",
     );
     build(&input, &output);
     let mut child = Command::new(&output)
@@ -272,7 +272,7 @@ fn std_io_native_bridge_reports_eof_from_read_byte() {
         "byte",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb consume_byte() -> Result[Int, IoError] { read_byte()?; return Result[Int, IoError].Ok(0); } verb main() -> Int { consume_byte(); return 42; }\n",
+        "import { open io }; verb consume_byte() -> Result[Int, IoError] { read_byte()?; return Result[Int, IoError].Ok(0); } verb main() -> Int { consume_byte(); return 42; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("byte fixture should run");
@@ -318,7 +318,7 @@ fn run_mutating_ins_scalar_fixture(backend: &str) {
         &format!("byte-ins-{backend}"),
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb read_one(ins total: u32) -> Result[Int, IoError] { erg next = read_byte(); return case dat next { Result.Err(error) => Result[Int, IoError].Err(error), Result.Ok(value) => { total += 1u32; return Result[Int, IoError].Ok(value); }, }; } verb main() -> Int { erg total: u32 = 0u32; erg result = read_one(total: ins total); drop(result); return total as Int; }\n",
+        "import { open io }; verb read_one(ins total: u32) -> Result[Int, IoError] { erg next = read_byte(); return case dat next { Result.Err(error) => Result[Int, IoError].Err(error), Result.Ok(value) => { total += 1u32; return Result[Int, IoError].Ok(value); }, }; } verb main() -> Int { erg total: u32 = 0u32; erg result = read_one(total: ins total); drop(result); return total as Int; }\n",
     );
     build_with_backend(&input, &output, backend);
     let mut child =
@@ -334,7 +334,7 @@ fn run_loop_mutating_ins_scalar_fixture(backend: &str) {
         &format!("loop-byte-ins-{backend}"),
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb bump(ins total: u32) -> Result[Int, IoError] { total += 1u32; return Result[Int, IoError].Ok(0); } verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 1u32 { bump(total: ins total); } return total as Int; }\n",
+        "import { open io }; verb bump(ins total: u32) -> Result[Int, IoError] { total += 1u32; return Result[Int, IoError].Ok(0); } verb main() -> Int { erg total: u32 = 0u32; for erg index: u32 in 0u32 .. 1u32 { bump(total: ins total); } return total as Int; }\n",
     );
     build_with_backend(&input, &output, backend);
     let execution = Command::new(&output).output().expect("loop byte-ins fixture should run");
@@ -347,7 +347,7 @@ fn run_loop_read_byte_fixture(backend: &str) {
         &format!("loop-read-byte-{backend}"),
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act"],
-        "import io; verb main() -> Int { erg count: u32 = 0u32; for erg index: u16 in 0u16 .. 3u16 { erg next = read_byte(); case dat next { Result.Err(_) => { return count as Int; }, Result.Ok(_) => { count += 1u32; }, }; } return count as Int; }\n",
+        "import { open io }; verb main() -> Int { erg count: u32 = 0u32; for erg index: u16 in 0u16 .. 3u16 { erg next = read_byte(); case dat next { Result.Err(_) => { return count as Int; }, Result.Ok(_) => { count += 1u32; }, }; } return count as Int; }\n",
     );
     build_with_backend(&input, &output, backend);
     let mut child = Command::new(&output)
@@ -366,7 +366,7 @@ fn std_io_stream_result_chain_propagates_success() {
         "stream",
         "open stdout;\nopen stderr;\nopen stdin;\nopen error;\nopen read;\nopen write;\n",
         &["stdout.act", "stderr.act", "stdin.act", "error.act", "read.act", "write.act"],
-        "import io; verb stream() -> Result[Int, IoError] { erg buffer = Buffer[0]; append(buffer, 115); append(buffer, 116); append(buffer, 114); append(buffer, 101); append(buffer, 97); append(buffer, 109); write(buffer: abs buffer)?; return Result[Int, IoError].Ok(0); } verb main() -> Int { stream(); return 42; }\n",
+        "import { open io }; verb stream() -> Result[Int, IoError] { erg buffer = Buffer[0]; append(buffer, 115); append(buffer, 116); append(buffer, 114); append(buffer, 101); append(buffer, 97); append(buffer, 109); write(buffer: abs buffer)?; return Result[Int, IoError].Ok(0); } verb main() -> Int { stream(); return 42; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("stream fixture should run");
@@ -380,7 +380,7 @@ fn std_io_cursor_reader_uses_static_generic_dispatch() {
         "cursor-reader",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg payload = Buffer[0]; append(payload, 67); append(payload, 117); append(payload, 114); erg storage = Buffer[0]; erg cursor = Cursor { buffer: storage, position: 0, }; cursor_write(self: ins cursor, buffer: abs payload); erg offset = 0; seek(self: ins cursor, offset: offset); erg output = Buffer[0]; cursor_read(self: ins cursor, buffer: ins output); printb(text: abs output); flush(); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg payload = Buffer[0]; append(payload, 67); append(payload, 117); append(payload, 114); erg storage = Buffer[0]; erg cursor = Cursor { buffer: storage, position: 0, }; cursor_write(self: ins cursor, buffer: abs payload); erg offset = 0; seek(self: ins cursor, offset: offset); erg output = Buffer[0]; cursor_read(self: ins cursor, buffer: ins output); printb(text: abs output); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("cursor fixture should run");
@@ -395,7 +395,7 @@ fn std_io_native_buffered_reader_specializes_cursor() {
         "buffered-cursor",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg source_bytes = Buffer[0]; append(source_bytes, 72); append(source_bytes, 105); erg source = Cursor { buffer: source_bytes, position: 0, }; erg storage = Buffer[0]; erg reader: BufferedReader[Cursor] = BufferedReader[Cursor] { source: source, buffer: storage, }; refill(reader: ins reader); printb(text: abs reader.buffer); flush(); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg source_bytes = Buffer[0]; append(source_bytes, 72); append(source_bytes, 105); erg source = Cursor { buffer: source_bytes, position: 0, }; erg storage = Buffer[0]; erg reader: BufferedReader[Cursor] = BufferedReader[Cursor] { source: source, buffer: storage, }; refill(reader: ins reader); printb(text: abs reader.buffer); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("buffered Cursor fixture should run");
@@ -410,7 +410,7 @@ fn std_io_native_buffered_writer_specializes_cursor() {
         "buffered-writer-cursor",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg capacity = 4; reserve(buffer: ins scratch, capacity: capacity); erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); buffered_write(writer: ins writer, input: abs payload); flush_buffer(writer: ins writer); printb(text: abs writer.target.buffer); flush(); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg capacity = 4; reserve(buffer: ins scratch, capacity: capacity); erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); buffered_write(writer: ins writer, input: abs payload); flush_buffer(writer: ins writer); printb(text: abs writer.target.buffer); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution =
@@ -426,7 +426,7 @@ fn std_io_native_buffered_writer_defers_target_write_until_flush() {
         "buffered-writer-deferred",
         "open cursor;\nopen buffered;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "buffered.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb measure(ins writer: BufferedWriter[Cursor], abs payload: Buffer) -> Int { buffered_write(writer: ins writer, input: abs payload); return writer.target.position; } verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg capacity = 4; reserve(buffer: ins scratch, capacity: capacity); erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); erg before = measure(writer: ins writer, payload: abs payload); flush_buffer(writer: ins writer); return before; }\n",
+        "import { open io }; verb measure(ins writer: BufferedWriter[Cursor], abs payload: Buffer) -> Int { buffered_write(writer: ins writer, input: abs payload); return writer.target.position; } verb main() -> Int { erg storage = Buffer[0]; erg target = Cursor { buffer: storage, position: 0, }; erg scratch = Buffer[0]; erg capacity = 4; reserve(buffer: ins scratch, capacity: capacity); erg writer: BufferedWriter[Cursor] = BufferedWriter[Cursor] { target: target, buffer: scratch, }; erg payload = Buffer[0]; append(payload, 79); append(payload, 75); erg before = measure(writer: ins writer, payload: abs payload); flush_buffer(writer: ins writer); return before; }\n",
     );
     build(&input, &output);
     let execution =
@@ -441,7 +441,7 @@ fn std_io_native_copy_propagates_reader_failure() {
         "copy-reader-error",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
-        "import io; struct BrokenReader { erg marker: Int, } perform Reader for BrokenReader { verb read(ins self: BrokenReader, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg reader = BrokenReader { marker: 0, }; erg output = Buffer[0]; erg writer = Cursor { buffer: output, position: 0, }; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+        "import { open io }; struct BrokenReader { erg marker: Int, } perform Reader for BrokenReader { verb read(ins self: BrokenReader, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg reader = BrokenReader { marker: 0, }; erg output = Buffer[0]; erg writer = Cursor { buffer: output, position: 0, }; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy reader error fixture should run");
@@ -455,7 +455,7 @@ fn std_io_native_copy_propagates_writer_failure() {
         "copy-writer-error",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
-        "import io; perform Writer for Int { verb write(ins self: Int, abs buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } verb flush(ins self: Int) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg input = Buffer[0]; append(input, 65); erg reader = Cursor { buffer: input, position: 0, }; erg writer = 0; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+        "import { open io }; perform Writer for Int { verb write(ins self: Int, abs buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } verb flush(ins self: Int) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg input = Buffer[0]; append(input, 65); erg reader = Cursor { buffer: input, position: 0, }; erg writer = 0; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy writer error fixture should run");
@@ -469,7 +469,7 @@ fn std_io_native_cursor_seek_rejects_out_of_bounds_positions() {
         "cursor-seek",
         "open cursor;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg bytes = Buffer[0]; append(bytes, 88); erg cursor = Cursor { buffer: bytes, position: 0, }; erg offset = 2; erg result = seek(self: ins cursor, offset: offset); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }\n",
+        "import { open io }; verb main() -> Int { erg bytes = Buffer[0]; append(bytes, 88); erg cursor = Cursor { buffer: bytes, position: 0, }; erg offset = 2; erg result = seek(self: ins cursor, offset: offset); return case dat result { Result.Ok(_) => 1, Result.Err(_) => 0, }; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("seek fixture should run");
@@ -483,7 +483,7 @@ fn std_io_native_copy_transfers_cursor_streams_until_eof() {
         "cursor-copy",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen stdout;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "stdout.act", "error.act"],
-        "import io; verb main() -> Int { erg input = Buffer[0]; append(input, 65); append(input, 66); append(input, 67); erg source = Cursor { buffer: input, position: 0, }; erg output = Buffer[0]; erg target = Cursor { buffer: output, position: 0, }; copy_stream(reader: ins source, writer: ins target); erg offset = 0; seek(self: ins target, offset: offset); erg result = Buffer[0]; cursor_read(self: ins target, buffer: ins result); printb(text: abs result); flush(); return 0; }\n",
+        "import { open io }; verb main() -> Int { erg input = Buffer[0]; append(input, 65); append(input, 66); append(input, 67); erg source = Cursor { buffer: input, position: 0, }; erg output = Buffer[0]; erg target = Cursor { buffer: output, position: 0, }; copy_stream(reader: ins source, writer: ins target); erg offset = 0; seek(self: ins target, offset: offset); erg result = Buffer[0]; cursor_read(self: ins target, buffer: ins result); printb(text: abs result); flush(); return 0; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy fixture should run");

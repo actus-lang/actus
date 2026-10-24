@@ -14,7 +14,7 @@ fn write_region_object_fixture(root: &std::path::Path, logical_length: &str) {
     fs::write(
         source_root.join("main.act"),
         format!(
-            "import std::region; verb main() -> Int {{ erg backing: Buffer = Buffer[4]; erg logical_length: u64 = {logical_length}; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(opened); return 0; }}\n"
+            "import {{ open std::region }}; verb main() -> Int {{ erg backing: Buffer = Buffer[4]; erg logical_length: u64 = {logical_length}; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(opened); return 0; }}\n"
         ),
     )
     .expect("fixture source should be written");
@@ -72,7 +72,7 @@ fn write_freestanding_region_fixture(root: &std::path::Path, backend: &str) {
     .expect("freestanding parity manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb boot(erg backing: Buffer) -> Int { erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(_region) => { return 0; }, }; }\n",
+        "import { open std::region }; verb boot(erg backing: Buffer) -> Int { erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(_region) => { return 0; }, }; }\n",
     )
     .expect("freestanding parity source should be written");
 }
@@ -126,7 +126,7 @@ fn hosted_std_region_operations_build_and_run() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }",
+        "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }",
     )
     .expect("fixture source should be written");
 
@@ -203,7 +203,7 @@ fn hosted_std_region_inspection_and_clean_remap_run_natively() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        r#"import std::region;
+        r#"import { open std::region };
 verb check_start(abs region: Region[u32]) -> Int {
     erg result = region_window_start(region: abs region);
     return case dat result { Result.Err(_) => 1, Result.Ok(value) => if value == 0u64 { return 0; } else { return 2; }, };
@@ -279,7 +279,7 @@ fn hosted_std_region_bounded_ranges_run_natively() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        r#"import std::region;
+        r#"import { open std::region };
 verb verify_published(ins region: Region[u32]) -> Int {
     erg published = region_publish(region: ins region);
     return case dat published {
@@ -360,7 +360,7 @@ fn hosted_std_region_accepts_exact_128_kib_bulk_transfer() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[131072]; erg logical_length: u64 = 131072u64; erg window_start: u64 = 0u64; erg window_count: u64 = 131072u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[131072]; erg start: u64 = 0u64; erg count: u64 = 131072u64; erg written = region_write_range(region: ins region, start_index: erg start, element_count: erg count, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[131072]; erg read = region_read_range(region: abs region, start_index: erg start, element_count: erg count, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(value) => { if value != 131072u64 { return 5; } erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 6, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }",
+        "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[131072]; erg logical_length: u64 = 131072u64; erg window_start: u64 = 0u64; erg window_count: u64 = 131072u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[131072]; erg start: u64 = 0u64; erg count: u64 = 131072u64; erg written = region_write_range(region: ins region, start_index: erg start, element_count: erg count, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[131072]; erg read = region_read_range(region: abs region, start_index: erg start, element_count: erg count, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(value) => { if value != 131072u64 { return 5; } erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 6, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }",
     )
     .expect("fixture source should be written");
 
@@ -398,7 +398,7 @@ fn hosted_std_region_write_publish_and_read_are_visible() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[4]; erg index: u64 = 0u64; erg written = region_write(region: ins region, index: erg index, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(_) => { erg closed = region_close(region: ins region); drop(closed); return 0; }, }; }, }; }, }; }, }; }",
+        "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[4]; erg index: u64 = 0u64; erg written = region_write(region: ins region, index: erg index, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(_) => { erg closed = region_close(region: ins region); drop(closed); return 0; }, }; }, }; }, }; }, }; }",
     )
     .expect("fixture source should be written");
 
@@ -434,7 +434,7 @@ fn hosted_std_region_rejects_out_of_window_read_without_trap() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }\n",
+        "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }\n",
     )
     .expect("fixture source should be written");
 
@@ -473,7 +473,7 @@ fn hosted_std_region_pinning_blocks_remap_until_unpinned() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg pinned = region_pin(region: ins region); return case dat pinned { Result.Err(_) => 2, Result.Ok(_) => { erg state = region_pinned(region: abs region); return case dat state { Result.Err(_) => 3, Result.Ok(value) => { if value != 1 { return 4; } erg replacement: Buffer = Buffer[4]; erg remapped = region_remap(region: ins region, backing: dat replacement, window_start: erg window_start, window_count: erg window_count); return case dat remapped { Result.Ok(_) => 5, Result.Err(_) => { erg unpinned = region_unpin(region: ins region); return case dat unpinned { Result.Err(_) => 6, Result.Ok(_) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 7, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }, }; }",
+        "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg pinned = region_pin(region: ins region); return case dat pinned { Result.Err(_) => 2, Result.Ok(_) => { erg state = region_pinned(region: abs region); return case dat state { Result.Err(_) => 3, Result.Ok(value) => { if value != 1 { return 4; } erg replacement: Buffer = Buffer[4]; erg remapped = region_remap(region: ins region, backing: dat replacement, window_start: erg window_start, window_count: erg window_count); return case dat remapped { Result.Ok(_) => 5, Result.Err(_) => { erg unpinned = region_unpin(region: ins region); return case dat unpinned { Result.Err(_) => 6, Result.Ok(_) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 7, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }, }; }",
     )
     .expect("fixture source should be written");
     let build = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -511,7 +511,7 @@ fn hosted_std_region_rejects_access_after_close_without_trap() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 3, }; }, }; }, }; }\n",
+        "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 3, }; }, }; }, }; }\n",
     )
     .expect("fixture source should be written");
 
@@ -550,7 +550,7 @@ fn hosted_std_region_cleanup_handles_early_return_and_nested_transfer() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        r#"import std::region;
+        r#"import { open std::region };
 verb consume_region(dat region: Region[u32]) -> Int {
     return 0;
 }
@@ -693,7 +693,7 @@ fn freestanding_region_object_imports_only_target_provider_bridges() {
     .expect("freestanding fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        r#"import std::region;
+        r#"import { open std::region };
 verb after_write(ins region: Region[u8], ins destination: Buffer) -> Int {
     erg published = region_publish(region: ins region);
     return case dat published {
@@ -825,7 +825,7 @@ fn freestanding_region_object_scales_logical_capacity_with_bounded_output() {
         fs::write(
             source_root.join("main.act"),
             format!(
-                "import std::region;\nverb boot(erg backing: Buffer) -> Int {{\n    erg logical_length: u64 = {logical_length};\n    erg window_start: u64 = 0u64;\n    erg window_count: u64 = 1u64;\n    erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);\n    return case dat opened {{\n        Result.Err(_) => 1,\n        Result.Ok(region) => {{ drop(region); return 0; }},\n    }};\n}}\n"
+                "import {{ open std::region }};\nverb boot(erg backing: Buffer) -> Int {{\n    erg logical_length: u64 = {logical_length};\n    erg window_start: u64 = 0u64;\n    erg window_count: u64 = 1u64;\n    erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);\n    return case dat opened {{\n        Result.Err(_) => 1,\n        Result.Ok(region) => {{ drop(region); return 0; }},\n    }};\n}}\n"
             ),
         )
         .expect("freestanding scale fixture source should be written");

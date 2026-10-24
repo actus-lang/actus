@@ -66,7 +66,8 @@ verb restore(ins column: Minicolumn, abs input: Buffer) {
     }
 }
 
-verb main() -> Int {
+"""Create the initialized source column used by the readiness workload."""
+verb initialized_source() -> Minicolumn {
     erg source = Minicolumn {
         storage: Array[u8, 64](),
     };
@@ -78,13 +79,26 @@ verb main() -> Int {
     source.axon_0 = 11u32;
     source.axon_7 = 17u32;
     source.inhibitory_link = 63u32;
-    erg advanced = advance(column: ins source);
+    return source;
+}
+
+"""Snapshot and restore one column through caller-owned byte storage."""
+verb snapshot_restore(abs source: Minicolumn) -> Minicolumn {
     erg snapshot_bytes = Buffer[0];
-    erg written = snapshot(output: ins snapshot_bytes, column: abs source);
+    snapshot(output: ins snapshot_bytes, column: abs source);
     erg restored = Minicolumn {
         storage: Array[u8, 64](),
     };
     restore(column: ins restored, input: abs snapshot_bytes);
+    drop(snapshot_bytes);
+    return restored;
+}
+
+verb main() -> Int {
+    erg source = initialized_source();
+    erg advanced = advance(column: ins source);
+    erg restored = snapshot_restore(source: abs source);
+    erg written: Int = 64;
     erg complete: Bool = restored.storage[63] == 0u8;
     if restored.flags == 1u8 {
         if restored.charge == 42u8 {

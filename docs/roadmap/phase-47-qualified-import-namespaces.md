@@ -148,7 +148,7 @@ successfully and resolve the same imported module identity.
 ### Gate 47.6 — Compatibility and release evidence
 
 - [x] Prove existing `open` programs remain valid during the migration window.
-- [ ] Prove qualified and legacy forms resolve to the same declaration identity
+- [x] Prove qualified and legacy forms resolve to the same declaration identity
       where both are accepted.
 - [ ] Run formatter checks, lock validation, strict compiler checks, full tests,
       and native backend parity suites.
