@@ -8,7 +8,7 @@ use std::process::Command;
 use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol, RelocationTarget};
 
 const BACKENDS: [&str; 2] = ["cranelift", "llvm"];
-const SOURCE: &str = "import std::region; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
+const SOURCE: &str = "import { open std::region }; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
 
 fn fixture_root(name: &str, backend: &str) -> PathBuf {
     std::env::temp_dir()
@@ -132,6 +132,30 @@ fn hosted_cli_backends_accept_named_array_capacity_constants() {
             Command::new(&output).status().expect("run named array capacity parity fixture");
         assert_eq!(status.code(), Some(42), "{backend} named array capacity result");
         fs::remove_dir_all(root).expect("remove named array capacity fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_lower_qualified_imports_identically() {
+    let source = "import config; verb main() -> Int { return config::LIMIT as Int; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-imports", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/config")).expect("create config module directory");
+        fs::write(root.join("src/config/config.act"), "open values;\n")
+            .expect("write config facade");
+        fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
+            .expect("write config values");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified import build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified import fixture");
+        assert_eq!(status.code(), Some(30), "{backend} qualified import result");
+        fs::remove_dir_all(root).expect("remove qualified import fixture");
     }
 }
 

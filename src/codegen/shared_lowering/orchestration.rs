@@ -100,6 +100,13 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
 
 fn program_with_performance_context(program: &Program, context: &Program) -> Program {
     let mut declarations = program.declarations.clone();
+    declarations.extend(
+        context
+            .declarations
+            .iter()
+            .filter(|declaration| matches!(declaration, TopLevelDecl::Import(_)))
+            .cloned(),
+    );
     let mut known: BTreeSet<String> =
         declarations.iter().filter_map(context_declaration_identity).collect();
     declarations.extend(
