@@ -53,17 +53,30 @@ impl Formatter<'_> {
         self.output.push_str("role ");
         self.output.push_str(&role.name);
         self.output.push_str(" {");
+        self.indent += 1;
         for method in &role.methods {
             self.output.push('\n');
-            self.emit_comments_before(method.span.start);
+            if self.render_ast_docs && method.doc.is_some() {
+                self.skip_comments_before(method.span.start);
+            } else {
+                self.emit_comments_before(method.span.start);
+            }
             self.documentation(method.doc.as_deref());
-            self.output.push_str(" verb ");
+            self.line_indent();
+            self.output.push_str("verb ");
             self.output.push_str(&method.name);
             self.parameters(&method.params);
             self.return_type(&method.return_type);
             self.output.push(';');
         }
-        self.output.push_str(" }");
+        self.indent -= 1;
+        if role.methods.is_empty() {
+            self.output.push_str(" }");
+        } else {
+            self.output.push('\n');
+            self.line_indent();
+            self.output.push('}');
+        }
     }
 
     pub(super) fn perform_definition(&mut self, perform: &crate::ast::PerformDecl) {
@@ -76,19 +89,36 @@ impl Formatter<'_> {
         self.output.push_str(" for ");
         self.type_name(&perform.target);
         self.output.push_str(" {");
+        if perform.methods.is_empty() {
+            self.output.push_str(" }");
+            return;
+        }
+        self.indent += 1;
         for method in &perform.methods {
-            self.output.push(' ');
+            self.output.push('\n');
+            if self.render_ast_docs && method.doc.is_some() {
+                self.skip_comments_before(method.span.start);
+            } else {
+                self.emit_comments_before(method.span.start);
+            }
             self.verb(method);
         }
-        self.output.push_str(" }");
+        self.indent -= 1;
+        self.output.push('\n');
+        self.line_indent();
+        self.output.push('}');
     }
 
     pub(super) fn verb(&mut self, verb: &crate::ast::VerbDecl) {
         self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
         for metadata in &verb.metadata {
+            self.line_indent();
             self.output.push_str("meta ");
             self.output.push_str(&meta_name(metadata));
             self.output.push('\n');
+        }
+        if self.indent > 0 {
+            self.line_indent();
         }
         if verb.is_open {
             self.output.push_str("open ");
@@ -228,7 +258,11 @@ impl Formatter<'_> {
             self.output.push('\n');
             self.indent += 1;
             for field in &definition.fields {
-                self.emit_comments_before(field.span.start);
+                if self.render_ast_docs && field.doc.is_some() {
+                    self.skip_comments_before(field.span.start);
+                } else {
+                    self.emit_comments_before(field.span.start);
+                }
                 self.documentation(field.doc.as_deref());
                 self.line_indent();
                 self.output.push_str(match field.role {
@@ -261,7 +295,11 @@ impl Formatter<'_> {
             self.output.push('\n');
             self.indent += 1;
             for variant in &definition.variants {
-                self.emit_comments_before(variant.span.start);
+                if self.render_ast_docs && variant.doc.is_some() {
+                    self.skip_comments_before(variant.span.start);
+                } else {
+                    self.emit_comments_before(variant.span.start);
+                }
                 self.documentation(variant.doc.as_deref());
                 self.line_indent();
                 self.enum_variant(variant);
@@ -317,14 +355,7 @@ impl Formatter<'_> {
         self.output.push_str(" {");
         self.output.push('\n');
         self.indent += 1;
-        self.emit_comments_before(definition.storage.span().start);
-        self.documentation(definition.storage_doc.as_deref());
-        self.line_indent();
-        self.output.push_str("erg ");
-        self.output.push_str(&definition.storage_name);
-        self.output.push_str(": ");
-        self.type_name(definition.storage.type_name());
-        self.output.push_str(";\n");
+        self.pack_storage(definition);
         self.line_indent();
         self.output.push_str("layout ");
         self.output.push_str(match definition.endianness {
@@ -336,8 +367,37 @@ impl Formatter<'_> {
         self.output.push_str("fields {");
         self.output.push('\n');
         self.indent += 1;
+        self.pack_fields(definition);
+        self.indent -= 1;
+        self.line_indent();
+        self.output.push_str("}\n");
+        self.indent -= 1;
+        self.line_indent();
+        self.output.push('}');
+    }
+
+    fn pack_storage(&mut self, definition: &crate::ast::PackDecl) {
+        if self.render_ast_docs && definition.storage_doc.is_some() {
+            self.skip_comments_before(definition.storage.span().start);
+        } else {
+            self.emit_comments_before(definition.storage.span().start);
+        }
+        self.documentation(definition.storage_doc.as_deref());
+        self.line_indent();
+        self.output.push_str("erg ");
+        self.output.push_str(&definition.storage_name);
+        self.output.push_str(": ");
+        self.type_name(definition.storage.type_name());
+        self.output.push_str(";\n");
+    }
+
+    fn pack_fields(&mut self, definition: &crate::ast::PackDecl) {
         for field in &definition.fields {
-            self.emit_comments_before(field.span.start);
+            if self.render_ast_docs && field.doc.is_some() {
+                self.skip_comments_before(field.span.start);
+            } else {
+                self.emit_comments_before(field.span.start);
+            }
             self.documentation(field.doc.as_deref());
             self.line_indent();
             self.output.push_str(role_name(&field.role));
@@ -357,12 +417,6 @@ impl Formatter<'_> {
             self.output.push(';');
             self.output.push('\n');
         }
-        self.indent -= 1;
-        self.line_indent();
-        self.output.push_str("}\n");
-        self.indent -= 1;
-        self.line_indent();
-        self.output.push('}');
     }
 
     pub(super) fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {

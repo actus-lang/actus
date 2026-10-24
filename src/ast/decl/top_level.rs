@@ -72,6 +72,8 @@ pub struct RoleMethod {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PerformDecl {
     pub is_open: bool,
+    pub module_import: bool,
+    pub module_import_namespace: Option<String>,
     pub doc: Option<String>,
     pub role_name: String,
     pub target: TypeName,

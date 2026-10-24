@@ -53,6 +53,8 @@ impl Parser {
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(PerformDecl {
             is_open,
+            module_import: false,
+            module_import_namespace: None,
             doc,
             role_name,
             target,

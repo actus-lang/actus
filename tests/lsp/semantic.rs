@@ -424,6 +424,40 @@ fn lsp_resolves_standard_library_test_fixture_imports() {
 }
 
 #[test]
+fn lsp_does_not_semantically_validate_formatter_fixtures() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/formatter/valid/nested_blocks.act");
+    let uri = file_uri(&path);
+    let source = fs::read_to_string(&path).expect("read formatter fixture");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(!stdout.contains("E1069"), "stdout: {stdout}");
+}
+
+#[test]
+fn lsp_does_not_semantically_validate_parser_fixtures() {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parser/valid/case.act");
+    let uri = file_uri(&path);
+    let source = fs::read_to_string(&path).expect("read parser fixture");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(!stdout.contains("E1003"), "stdout: {stdout}");
+}
+
+#[test]
 fn lsp_uses_unsaved_sibling_overlay_for_package_diagnostics() {
     let root = temp_root();
     let module = root.join("src/math");

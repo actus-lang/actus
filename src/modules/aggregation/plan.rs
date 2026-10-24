@@ -375,9 +375,6 @@ fn append_public_declarations(
 ) {
     for declaration in &unit.implementation().declarations {
         let Some((kind, name)) = export_identity(declaration) else { continue };
-        if kind == "perform" {
-            continue;
-        }
         if !unit.exports().contains(kind, &name) {
             continue;
         }
@@ -390,7 +387,11 @@ fn append_public_declarations(
         if !appended_symbols.insert(key) {
             continue;
         }
-        let imported = caller_declaration(declaration, namespace);
+        let imported = caller_declaration(
+            declaration,
+            namespace,
+            Some(unit.identity().namespace().symbol_prefix()),
+        );
         if !has_compatible_external_declaration(target, &imported) {
             target.push(imported);
         }
@@ -411,8 +412,18 @@ fn has_compatible_external_declaration(
     })
 }
 
-fn caller_declaration(declaration: &TopLevelDecl, namespace: Option<&str>) -> TopLevelDecl {
+fn caller_declaration(
+    declaration: &TopLevelDecl,
+    namespace: Option<&str>,
+    module_symbol_namespace: Option<&str>,
+) -> TopLevelDecl {
     match declaration {
+        TopLevelDecl::Perform(perform) => {
+            let mut imported = perform.clone();
+            imported.module_import = true;
+            imported.module_import_namespace = module_symbol_namespace.map(str::to_owned);
+            TopLevelDecl::Perform(imported)
+        }
         TopLevelDecl::Verb(verb) => TopLevelDecl::ExternalVerb(ExternalVerbDecl {
             is_open: verb.is_open,
             doc: verb.doc.clone(),

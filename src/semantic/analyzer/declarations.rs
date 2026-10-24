@@ -109,6 +109,9 @@ impl Analyzer {
         }
         for declaration in &program.declarations {
             if let TopLevelDecl::Perform(perform) = declaration {
+                if perform.module_import {
+                    continue;
+                }
                 for method in &perform.methods {
                     let parameters = method.generic_parameters.clone();
                     self.with_generic_scope(&parameters, |analyzer| {

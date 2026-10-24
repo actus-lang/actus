@@ -163,15 +163,21 @@ impl Formatter<'_> {
             }
             self.output.push(']');
         }
-        self.output.push_str(" {");
-        for (index, field) in fields.iter().enumerate() {
-            if index > 0 {
-                self.output.push_str(", ");
-            }
+        if fields.is_empty() {
+            self.output.push_str(" {}");
+            return;
+        }
+        self.output.push_str(" {\n");
+        self.indent += 1;
+        for field in fields {
+            self.line_indent();
             self.output.push_str(&field.name);
             self.output.push_str(": ");
             self.expression(&field.value);
+            self.output.push_str(",\n");
         }
+        self.indent -= 1;
+        self.line_indent();
         self.output.push('}');
     }
 
