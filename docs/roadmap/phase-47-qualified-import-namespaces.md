@@ -110,10 +110,10 @@ diagnostics with qualified names and spans.
 - [x] Inventory every standard-library `open` declaration and classify it as
       migration candidate, intentional local opening, or blocked by a missing
       compiler capability.
-- [ ] Migrate selected standard-library consumers to qualified access only
+- [x] Migrate selected standard-library consumers to qualified access only
       after the shared semantic and backend gates pass.
 - [ ] Keep migration changes separate from compiler implementation changes.
-- [ ] Document remaining `open` uses and their reasons.
+- [x] Document remaining `open` uses and their reasons.
 
 Inventory evidence (2026-10-24): the standard library contains 346 `open`
 declarations. 280 are public declaration exports (`open verb`, `open struct`,
@@ -126,6 +126,14 @@ signatures expose the shared `Path`, `File`, and `IoError` API types. No
 module-level `open` was classified as a safe removal candidate; removing any
 of the inventoried declarations would either hide public API or bypass the
 canonical facade contract.
+
+Migration evidence (2026-10-24): `library/std/src/fs/options.act` now imports
+the `std::io` and `std::path` namespaces without opening them and uses
+`io::IoError` and `path_module::Path` in its public contract. The compiler
+aggregation regression test covers this facade-signature case. Remaining
+module-level `open` declarations are retained for canonical facade re-exports;
+the other filesystem consumers remain follow-up candidates until their
+qualified signatures are migrated and tested independently.
 
 ### Gate 47.6 — Compatibility and release evidence
 
