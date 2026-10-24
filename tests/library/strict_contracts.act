@@ -1,4 +1,6 @@
-import { open io };
+import {
+    open io,
+};
 
 meta test
 verb strict_positive_ownership_contract() -> Int {

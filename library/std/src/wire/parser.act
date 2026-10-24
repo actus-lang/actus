@@ -40,8 +40,16 @@ buffer. It performs no I/O, does not borrow caller state, and cannot fail
 because the storage size is fixed by the type contract.
 """
 open verb wire_parser_empty() -> WireParser {
-    return WireParser {storage: Buffer[1038], filled: 0u32, expected_length: 0u32, state: 0u8, last_consumed: 0u32, header: WireHeader {storage: Array[u8, 12](
-    )}};
+    return WireParser {
+        storage: Buffer[1038],
+        filled: 0u32,
+        expected_length: 0u32,
+        state: 0u8,
+        last_consumed: 0u32,
+        header: WireHeader {
+            storage: Array[u8, 12](),
+        },
+    };
 }
 
 """

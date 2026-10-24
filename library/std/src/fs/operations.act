@@ -11,6 +11,7 @@ Remove the regular file named by `path`.
 success, `-1` on a host failure, and never exposes a raw status to callers.
 """
 unsafe extern "C" verb actus_file_remove_path(abs path: Path) -> Int;
+
 """
 Rename `from` to `to` without copying file contents.
 
@@ -18,6 +19,7 @@ Both path arguments are non-owning `abs` views valid for this call only.
 The bridge returns zero on success or `-1` on failure.
 """
 unsafe extern "C" verb actus_file_rename_path(abs from: Path, abs to: Path) -> Int;
+
 """
 Copy the file named by `from` to `to` and return its byte count.
 
@@ -26,6 +28,7 @@ the number of copied bytes; the C ABI returns `-1` for failure, translated to
 `IoError.Failed`.
 """
 unsafe extern "C" verb actus_file_copy_path(abs from: Path, abs to: Path) -> Int;
+
 """
 Create the directory named by `path`.
 
@@ -34,6 +37,7 @@ the host rejects the operation. It does not retain the path or allocate a
 converted string; the facade maps `-1` to `IoError.Failed`.
 """
 unsafe extern "C" verb actus_file_create_dir_path(abs path: Path) -> Int;
+
 """
 Remove the empty directory named by `path`.
 
@@ -41,13 +45,18 @@ The path is borrowed for the call. The bridge returns zero on success or
 `-1` when the directory is missing, non-empty, or otherwise inaccessible.
 """
 unsafe extern "C" verb actus_file_remove_dir_path(abs path: Path) -> Int;
+
 """
 Read all bytes from `handle` into the caller-owned `ins buffer`.
 
 The runtime appends into the existing allocation and retains no pointer.
 The return value is the byte count, `-1` for failure, or `-2` for EOF.
 """
-unsafe extern "C" verb actus_file_read_all_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_file_read_all_buffer(
+    abs handle: Int,
+    ins buffer: Buffer
+) -> Int;
+
 """
 Validate the bytes in `buffer` as UTF-8 without taking ownership.
 
@@ -293,7 +302,9 @@ open verb write_and_flush(abs path: Path, abs contents: Buffer) -> Result[Int, I
                         Result.Ok(expected) => {
                             case count - expected {
                                 0 => {},
-                                _ => { return Result[Int, IoError].Err(IoError.Failed); },
+                                _ => {
+                                    return Result[Int, IoError].Err(IoError.Failed);
+                                },
                             };
                             erg flushed = file.flush();
                             return case dat flushed {

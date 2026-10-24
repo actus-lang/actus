@@ -95,7 +95,11 @@ caller-owned bounded storage. A zero period is rejected with
 `TimeError.InvalidTimerPeriod`; an invalid lifecycle state is rejected without
 changing the timer. No aggregate timer value crosses a result ABI boundary.
 """
-open verb timer_periodic(ins timer: Timer, abs period: Duration, abs policy: MissedTickPolicy) -> Result[Int, TimeError] {
+open verb timer_periodic(
+    ins timer: Timer,
+    abs period: Duration,
+    abs policy: MissedTickPolicy
+) -> Result[Int, TimeError] {
     if period.nanos == 0u64 {
         return Result[Int, TimeError].Err(TimeError.InvalidTimerPeriod);
     }
@@ -127,7 +131,11 @@ overflow returns `TimeError.Overflow` without changing the timer state.
 """
 open verb timer_arm(ins timer: Timer, abs delay: Duration) -> Result[Int, TimeError] {
     erg start: Instant = now();
-    return timer_arm_at(timer: ins timer, start: abs start, delay: abs delay);
+    return timer_arm_at(
+        timer: ins timer,
+        start: abs start,
+        delay: abs delay
+    );
 }
 
 """
@@ -140,9 +148,13 @@ domain; no wall-clock conversion is performed.
 open verb timer_arm_at(ins timer: Timer, abs start: Instant, abs delay: Duration) -> Result[Int, TimeError] {
     erg state = timer.state;
     case state {
-        3 => { return Result[Int, TimeError].Err(TimeError.InvalidTimerState); },
-        4 => { return Result[Int, TimeError].Err(TimeError.InvalidTimerState); },
-        _ => { },
+        3 => {
+            return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+        },
+        4 => {
+            return Result[Int, TimeError].Err(TimeError.InvalidTimerState);
+        },
+        _ => {},
     };
     erg deadline_result = deadline_after(start: abs start, duration: abs delay);
     case dat deadline_result {
@@ -183,15 +195,23 @@ allocates or performs callbacks.
 open verb timer_poll_at(ins timer: Timer, abs instant: Instant) -> Result[TimerPoll, TimeError] {
     erg state = timer.state;
     case state {
-        0 => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
-        3 => { return Result[TimerPoll, TimeError].Ok(TimerPoll.Canceled); },
-        4 => { return Result[TimerPoll, TimeError].Ok(TimerPoll.Completed); },
+        0 => {
+            return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
+        },
+        3 => {
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Canceled);
+        },
+        4 => {
+            return Result[TimerPoll, TimeError].Ok(TimerPoll.Completed);
+        },
         2 => {
             timer.state = 4u8;
             return Result[TimerPoll, TimeError].Ok(TimerPoll.Completed);
         },
-        1 => { },
-        _ => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
+        1 => {},
+        _ => {
+            return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
+        },
     };
     if instant.ticks < timer.deadline_ticks {
         return Result[TimerPoll, TimeError].Ok(TimerPoll.Pending);
@@ -205,7 +225,9 @@ open verb timer_poll_at(ins timer: Timer, abs instant: Instant) -> Result[TimerP
         1 => {
             return timer_poll_periodic(timer: ins timer, instant: abs instant);
         },
-        _ => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
+        _ => {
+            return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
+        },
     };
     return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
 }
@@ -275,7 +297,9 @@ verb timer_poll_periodic(ins timer: Timer, abs instant: Instant) -> Result[Timer
             timer.deadline_ticks = instant.ticks + timer.period_nanos;
             return Result[TimerPoll, TimeError].Ok(TimerPoll.Pending);
         },
-        _ => { return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState); },
+        _ => {
+            return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
+        },
     };
     return Result[TimerPoll, TimeError].Err(TimeError.InvalidTimerState);
 }

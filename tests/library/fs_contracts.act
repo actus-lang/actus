@@ -40,8 +40,10 @@ verb file_open_and_create_reject_empty_path() -> Int {
     erg opened = file_open(path: abs path);
     erg created = file_create(path: abs path);
     case dat opened {
-        Result.Ok(_) => { return 1; },
-        Result.Err(_) => { },
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
     };
     return case dat created {
         Result.Ok(_) => 1,
@@ -58,20 +60,28 @@ verb path_operations_reject_empty_paths() -> Int {
     erg created = create_dir(path: abs path);
     erg deleted = remove_dir(path: abs path);
     case dat removed {
-        Result.Ok(_) => { return 1; },
-        Result.Err(_) => { },
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
     };
     case dat renamed {
-        Result.Ok(_) => { return 1; },
-        Result.Err(_) => { },
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
     };
     case dat copied {
-        Result.Ok(_) => { return 1; },
-        Result.Err(_) => { },
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
     };
     case dat created {
-        Result.Ok(_) => { return 1; },
-        Result.Err(_) => { },
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
     };
     return case dat deleted {
         Result.Ok(_) => 1,
@@ -84,7 +94,9 @@ verb read_to_bytes_propagates_empty_path_error() -> Int {
     erg path = empty_path();
     erg bytes = read_to_bytes(path: abs path);
     return case dat bytes {
-        Result.Ok(_) => { return 1; },
+        Result.Ok(_) => {
+            return 1;
+        },
         Result.Err(_) => 0,
     };
 }
@@ -210,21 +222,31 @@ verb write_round_trip_file(abs path: Path) -> Int {
     erg written = write_file(path: abs path, contents: abs contents);
     case dat written {
         Result.Ok(count) => case count {
-            2 => { },
-            _ => { return 1; },
+            2 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg info_result = metadata(path: abs path);
     case dat info_result {
         Result.Ok(info) => case info.size {
             2 => case info.is_file {
-                1 => { },
-                _ => { return 1; },
+                1 => {},
+                _ => {
+                    return 1;
+                },
             },
-            _ => { return 1; },
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -233,12 +255,16 @@ verb verify_round_trip_reads(abs path: Path) -> Int {
     erg bytes = read_to_bytes(path: abs path);
     erg text = read_to_string(path: abs path);
     case dat bytes {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     case dat text {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -246,13 +272,17 @@ verb verify_round_trip_reads(abs path: Path) -> Int {
 verb copy_round_trip_file(abs path: Path, abs copy_path: Path) -> Int {
     erg copied = copy_file(from: abs path, to: abs copy_path);
     case dat copied {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg renamed = rename(from: abs copy_path, to: abs path);
     case dat renamed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg removed = remove_file(path: abs path);
     return case dat removed {
@@ -267,13 +297,17 @@ verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
     erg copy_path = round_trip_copy_path();
     erg written = write_round_trip_file(path: abs path);
     case written {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg read = verify_round_trip_reads(path: abs path);
     case read {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     return copy_round_trip_file(path: abs path, copy_path: abs copy_path);
 }

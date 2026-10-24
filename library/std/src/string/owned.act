@@ -15,9 +15,15 @@ open struct Utf8Buffer {
 }
 
 unsafe extern "C" verb actus_buffer_validate_utf8(abs storage: Buffer) -> Int;
+
 unsafe extern "C" verb actus_buffer_length(abs storage: Buffer) -> Int;
+
 unsafe extern "C" verb actus_buffer_byte_at(abs storage: Buffer, erg index: Int) -> Int;
-unsafe extern "C" verb actus_string_copy_to_buffer(abs text: String, ins storage: Buffer) -> Int;
+
+unsafe extern "C" verb actus_string_copy_to_buffer(
+    abs text: String,
+    ins storage: Buffer
+) -> Int;
 
 """
 Validate and take ownership of a caller-provided UTF-8 buffer.
@@ -38,7 +44,10 @@ open verb utf8_from_buffer(dat storage: Buffer) -> Result[Utf8Buffer, StringErro
         drop(storage);
         return Err(StringError.InvalidStorage);
     }
-    return Ok(Utf8Buffer {storage: storage, length: length});
+    return Ok(Utf8Buffer {
+        storage: storage,
+        length: length,
+    });
 }
 
 """
@@ -47,10 +56,7 @@ Drop rejected UTF-8 storage and preserve its typed construction error.
 Returns `Err(error)` after deterministic cleanup; no rejected buffer remains
 owned by the caller or callee.
 """
-open verb reject_utf8_storage(
-    dat storage: Buffer,
-    dat error: StringError
-) -> Result[Utf8Buffer, StringError] {
+open verb reject_utf8_storage(dat storage: Buffer, dat error: StringError) -> Result[Utf8Buffer, StringError] {
     drop(storage);
     return Err(error);
 }

@@ -24,7 +24,9 @@ Returns a typed `Instant` with no allocation and no wall-clock semantics. The
 selected runtime must provide a monotonic clock for this operation to exist.
 """
 open verb now() -> Instant {
-    return Instant {ticks: monotonic_nanos()};
+    return Instant {
+        ticks: monotonic_nanos(),
+    };
 }
 
 """

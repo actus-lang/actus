@@ -12,7 +12,6 @@ import {
 """Maximum raw storage reserved for one returned directory entry name."""
 open const DIRECTORY_ENTRY_BUFFER_BYTES: Int = 4096;
 
-
 """An owned opaque directory handle backed by one host directory resource."""
 open struct Directory {
     """Owned erg scalar token for one host directory; the owner must call `close_dir` before release."""
@@ -53,11 +52,15 @@ open verb read_dir(abs path: Path) -> Result[Directory, IoError] {
     erg failed: Bool = handle == -1;
     return case failed {
         true => {
-            erg rejected = Directory {handle: handle};
+            erg rejected = Directory {
+                handle: handle,
+            };
             drop(rejected);
             Err(IoError.Failed);
         },
-        _ => Ok(Directory {handle: handle}),
+        _ => Ok(Directory {
+            handle: handle,
+        }),
     };
 }
 

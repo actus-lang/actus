@@ -24,7 +24,9 @@ The input is transferred into the returned value; no allocation or runtime
 provider access occurs. Every `u64` nanosecond count is representable.
 """
 open verb duration_nanos(erg nanos: u64) -> Duration {
-    return Duration {nanos: nanos};
+    return Duration {
+        nanos: nanos,
+    };
 }
 
 """

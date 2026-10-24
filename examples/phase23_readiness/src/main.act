@@ -67,7 +67,9 @@ verb restore(ins column: Minicolumn, abs input: Buffer) {
 }
 
 verb main() -> Int {
-    erg source = Minicolumn {storage: Array[u8, 64]()};
+    erg source = Minicolumn {
+        storage: Array[u8, 64](),
+    };
     source.charge = 40u8;
     source.threshold = 42u8;
     source.layer_depth = 7u16;
@@ -79,7 +81,9 @@ verb main() -> Int {
     erg advanced = advance(column: ins source);
     erg snapshot_bytes = Buffer[0];
     erg written = snapshot(output: ins snapshot_bytes, column: abs source);
-    erg restored = Minicolumn {storage: Array[u8, 64]()};
+    erg restored = Minicolumn {
+        storage: Array[u8, 64](),
+    };
     restore(column: ins restored, input: abs snapshot_bytes);
     erg complete: Bool = restored.storage[63] == 0u8;
     if restored.flags == 1u8 {

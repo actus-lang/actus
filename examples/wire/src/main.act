@@ -11,7 +11,9 @@ import {
 };
 
 verb encode_frame(ins encoded: Buffer) -> Int {
-    erg header = WireHeader {storage: Array[u8, 12]()};
+    erg header = WireHeader {
+        storage: Array[u8, 12](),
+    };
     header.magic_0 = WIRE_MAGIC_0;
     header.magic_1 = WIRE_MAGIC_1;
     header.version = WIRE_VERSION;

@@ -1,5 +1,9 @@
 """Negative application fixture: a missing file must become IoError.Failed."""
-import { open path, open fs, open io };
+import {
+    open path,
+    open fs,
+    open io,
+};
 
 verb missing_path() -> Result[Path, PathError] {
     erg raw = Buffer[0];

@@ -8,6 +8,7 @@ import {
     open io,
     open path,
 };
+
 """
 An owned scalar metadata record returned by filesystem inspection.
 Its erg fields are copied facts and require no host-handle cleanup.
@@ -73,7 +74,12 @@ the host could not inspect the path. The operation performs no path-string
 conversion and does not allocate an owned path representation.
 """
 open verb metadata(abs path: Path) -> Result[Metadata, IoError] {
-    erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
+    erg output = Metadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+    };
     erg status = actus_file_metadata_path(path: abs path, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
@@ -88,11 +94,13 @@ The returned metadata owns only copied scalar facts. The file handle remains
 owned by the caller, and a failed native status becomes `Err(Failed)`.
 """
 open verb file_metadata(ins self: File) -> Result[Metadata, IoError] {
-    erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
-    erg status = actus_file_metadata_handle_buffer(
-        handle: abs self.handle,
-        output: ins output
-    );
+    erg output = Metadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+    };
+    erg status = actus_file_metadata_handle_buffer(handle: abs self.handle, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
         _ => Result[Metadata, IoError].Ok(output),

@@ -8,6 +8,8 @@ pack InvalidIndex {
 }
 
 verb invalid() {
-    erg value = InvalidIndex {storage: Array[u8, 2]()};
+    erg value = InvalidIndex {
+        storage: Array[u8, 2](),
+    };
     value.storage[2] = 1u8;
 }

@@ -7,6 +7,7 @@ caller's buffer and returns the byte count; it does not allocate a new
 Actus buffer or retain the handle.
 """
 unsafe extern "C" verb actus_read_stdin_line(ins buffer: Buffer) -> Int;
+
 """C ABI bridge that returns one input byte, or a standard negative status."""
 unsafe extern "C" verb actus_read_byte() -> Int;
 

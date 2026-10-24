@@ -15,7 +15,9 @@ verb write[N: Usize](ins storage: Storage[N]) {
 }
 
 verb main() -> Int {
-    erg storage: Storage[64] = Storage[64] {values: Array[Cell, 64]()};
+    erg storage: Storage[64] = Storage[64] {
+        values: Array[Cell, 64](),
+    };
     write[64](storage: ins storage);
     return storage.values[0u32].marker as Int + 1;
 }

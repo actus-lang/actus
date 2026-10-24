@@ -7,22 +7,11 @@ copied unchanged. All other non-ASCII input is rejected as unmapped; this
 codec does not normalize, transliterate, or silently replace text.
 """
 open const KA_FIRST_UTF8_TAIL: u8 = 144u8;
-
-
 open const KA_LAST_UTF8_TAIL: u8 = 176u8;
-
-
 open const KA_FIRST_BYTE: u8 = 128u8;
-
-
 open const KA_LAST_BYTE: u8 = 160u8;
-
-
 open const KA_UTF8_PREFIX: u8 = 225u8;
-
-
 open const KA_UTF8_SECOND: u8 = 131u8;
-
 
 verb ka_encoded_length(abs input: Buffer) -> Result[u32, CharmapError] {
     erg input_length: Int = buffer_length(buffer: abs input);

@@ -1,4 +1,6 @@
-enum Color { Red, }
+enum Color {
+    Red,
+}
 
 verb main() -> Int {
     return case value {

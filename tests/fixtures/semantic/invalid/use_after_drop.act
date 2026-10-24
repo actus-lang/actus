@@ -1,4 +1,5 @@
 unsafe extern "C" verb make() -> Buffer;
+
 unsafe extern "C" verb inspect(abs view: Buffer);
 
 verb main() {

@@ -6,7 +6,6 @@ They never transcode path data to `String`. `join` consumes its owned receiver
 and returns that same storage after the combination; the mutation verbs use an
 `ins` loan and restore the caller's owner after the call.
 """
-
 """
 Ensure `self` has storage for at least `capacity` raw units.
 
@@ -41,6 +40,7 @@ unsafe extern "C" verb actus_path_set_extension(
     ins self: Path,
     abs extension: Path
 ) -> Int;
+
 """
 Replace the final file-name component using raw platform code units.
 
@@ -48,10 +48,7 @@ Replace the final file-name component using raw platform code units.
 or a typed-negative status, performs no implicit UTF-8 transcoding, and uses
 the existing capacity without allocation. `name` is never retained.
 """
-unsafe extern "C" verb actus_path_set_file_name(
-    ins self: Path,
-    abs name: Path
-) -> Int;
+unsafe extern "C" verb actus_path_set_file_name(ins self: Path, abs name: Path) -> Int;
 
 """
 Translate a builder status while consuming `path` with `dat`. `Ok` returns the

@@ -5,11 +5,11 @@ Each iteration opens one resident byte, closes the capability through the
 public std::region API, and lets lexical cleanup release the descriptor.
 The elapsed integer nanoseconds are printed for external measurement capture.
 """
-import std::io;
-
-import std::region;
-
-import std::time;
+import {
+    open std::io,
+    open std::region,
+    open std::time,
+};
 
 verb close_once() -> Int {
     erg backing: Buffer = Buffer[1];

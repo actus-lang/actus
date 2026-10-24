@@ -1,4 +1,6 @@
-import { open path };
+import {
+    open path,
+};
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
@@ -54,20 +56,26 @@ verb mutate_joined_path(ins joined: Path, abs child: Path) -> Int {
     erg capacity = 16;
     erg reserved = reserve_path(self: ins joined, capacity: erg capacity);
     case dat reserved {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg pushed = push(self: ins joined, other: abs child);
     case dat pushed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg extension = extension_path();
     erg name = name_path();
     erg renamed = set_file_name(self: ins joined, name: abs name);
     case dat renamed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     drop(name);
     erg changed = set_extension(self: ins joined, extension: abs extension);
@@ -80,8 +88,10 @@ verb mutate_joined_path(ins joined: Path, abs child: Path) -> Int {
 verb verify_posix_separators() -> Int {
     erg slash = 47;
     case posix_is_separator(byte: erg slash) {
-        1 => { },
-        _ => { return 1; },
+        1 => {},
+        _ => {
+            return 1;
+        },
     };
     erg backslash = 92;
     return case posix_is_separator(byte: erg backslash) {
@@ -100,8 +110,10 @@ verb path_builders_and_platform_parsers() -> Int {
         Result.Ok(joined) => {
             erg mutated = mutate_joined_path(joined: ins joined, child: abs child);
             case mutated {
-                0 => { },
-                _ => { return 1; },
+                0 => {},
+                _ => {
+                    return 1;
+                },
             };
             return verify_posix_separators();
         },

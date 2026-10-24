@@ -1,4 +1,6 @@
-import { open path };
+import {
+    open path,
+};
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
@@ -67,16 +69,22 @@ verb component_predicates_respect_boundaries() -> Int {
     erg prefix = posix_usr_path();
     erg partial = posix_us_path();
     case starts_with(self: abs path, prefix: abs prefix) {
-        true => { },
-        _ => { return 1; },
+        true => {},
+        _ => {
+            return 1;
+        },
     };
     case starts_with(self: abs path, prefix: abs partial) {
-        false => { },
-        _ => { return 1; },
+        false => {},
+        _ => {
+            return 1;
+        },
     };
     case ends_with(self: abs path, suffix: abs prefix) {
-        false => { },
-        _ => { return 1; },
+        false => {},
+        _ => {
+            return 1;
+        },
     };
     return case ends_with(self: abs path, suffix: abs partial) {
         false => 0,
@@ -127,19 +135,27 @@ verb windows_drive_forms_and_mixed_separators() -> Int {
     erg relative_kind = windows_root(abs relative);
     case dat relative_kind {
         Result.Ok(kind) => case dat kind {
-            WindowsRoot.DriveRelative => { },
-            _ => { return 1; },
+            WindowsRoot.DriveRelative => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     case is_absolute(self: abs relative) {
-        false => { },
-        _ => { return 1; },
+        false => {},
+        _ => {
+            return 1;
+        },
     };
     erg mixed = mixed_separator_path();
     case is_absolute(self: abs mixed) {
-        true => { },
-        _ => { return 1; },
+        true => {},
+        _ => {
+            return 1;
+        },
     };
     erg name = file_name(self: abs mixed);
     return case dat name {
@@ -217,10 +233,14 @@ verb windows_unc_and_normalization_preserve_units() -> Int {
     erg kind = windows_root(abs unc);
     case dat kind {
         Result.Ok(root) => case dat root {
-            WindowsRoot.Unc => { },
-            _ => { return 1; },
+            WindowsRoot.Unc => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg candidate = normalized_windows_path();
     erg normalized = normalize(dat candidate);
@@ -242,10 +262,14 @@ verb invalid_utf16_and_non_utf8_posix_are_distinct() -> Int {
     append(invalid_raw, 0);
     erg invalid = path_from_windows_utf16(storage: dat invalid_raw);
     case dat invalid {
-        Result.Ok(_) => { return 1; },
+        Result.Ok(_) => {
+            return 1;
+        },
         Result.Err(error) => case dat error {
-            PathError.InvalidEncoding => { },
-            _ => { return 1; },
+            PathError.InvalidEncoding => {},
+            _ => {
+                return 1;
+            },
         },
     };
     erg raw = Buffer[0];

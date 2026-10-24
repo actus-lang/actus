@@ -8,7 +8,10 @@ The copy-specific C bridge reserves that storage without retaining the buffer.
 Only `EndOfStream` terminates the transfer successfully; all other errors
 are returned to the caller unchanged.
 """
-unsafe extern "C" verb actus_copy_buffer_reserve(ins buffer: Buffer, erg capacity: Int) -> Int;
+unsafe extern "C" verb actus_copy_buffer_reserve(
+    ins buffer: Buffer,
+    erg capacity: Int
+) -> Int;
 
 """
 Translate a writer failure into the public copy result contract.
@@ -17,7 +20,12 @@ The `dat error` payload is consumed during exhaustive mapping and is not
 retained. `Err` preserves the concrete `IoError` variant for the caller.
 """
 open verb copy_write_error(dat error: IoError) -> Result[Int, IoError] {
-    return case dat error { IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+    return case dat error {
+        IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream),
+        IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
+        IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
+        IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+    };
 }
 
 """
@@ -27,7 +35,12 @@ The `dat error` payload is consumed. `EndOfStream` returns the accumulated
 byte count as success; every other variant remains a typed failure.
 """
 open verb copy_read_error(dat error: IoError, erg total: Int) -> Result[Int, IoError] {
-    return case dat error { IoError.EndOfStream => Result[Int, IoError].Ok(total), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+    return case dat error {
+        IoError.EndOfStream => Result[Int, IoError].Ok(total),
+        IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
+        IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
+        IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+    };
 }
 
 """
@@ -39,7 +52,10 @@ verb returns `Err(IoError.Failed)` without retaining any input state.
 """
 open verb copy_written_chunk(erg total: Int, erg expected: Int, erg actual: Int) -> Result[Int, IoError] {
     erg difference = actual - expected;
-    return case difference { 0 => Result[Int, IoError].Ok(total + actual), _ => Result[Int, IoError].Err(IoError.Failed), };
+    return case difference {
+        0 => Result[Int, IoError].Ok(total + actual),
+        _ => Result[Int, IoError].Err(IoError.Failed),
+    };
 }
 
 """
@@ -48,20 +64,32 @@ The result is the exact count or a typed error; EndOfStream is handled as the
 successful termination condition and all scratch storage is cleaned up.
 """
 open verb copy_stream[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
-    erg scratch = Buffer[0]; erg capacity = 4096;
+    erg scratch = Buffer[0];
+    erg capacity = 4096;
     erg reserved = actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
-    case reserved { -1 => { return Result[Int, IoError].Err(IoError.Failed); }, _ => { }, };
+    case reserved {
+        -1 => {
+            return Result[Int, IoError].Err(IoError.Failed);
+        },
+        _ => {},
+    };
     erg total = 0;
     loop {
         erg read_result: Result[Int, IoError] = reader.read(buffer: ins scratch);
         case dat read_result {
             Result.Ok(count) => case count {
-                0 => { return Result[Int, IoError].Err(IoError.InvalidData); },
+                0 => {
+                    return Result[Int, IoError].Err(IoError.InvalidData);
+                },
                 _ => {
                     erg write_result: Result[Int, IoError] = writer.write(buffer: abs scratch);
                     case dat write_result {
                         Result.Ok(written) => {
-                            total = copy_written_chunk(total: total, expected: count, actual: written)?;
+                            total = copy_written_chunk(
+                                total: total,
+                                expected: count,
+                                actual: written
+                            )?;
                         },
                         Result.Err(error) => {
                             return copy_write_error(error: dat error);

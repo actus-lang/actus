@@ -7,6 +7,7 @@ import {
     open io,
     open path,
 };
+
 """
 An owned set of erg scalar switches consumed by an open operation.
 The record has no external resource and is returned after each builder.
@@ -161,6 +162,8 @@ open verb options_open(dat options: OpenOptions, abs path: Path) -> Result[File,
             discard_handle(handle: dat handle);
             return Err(IoError.Failed);
         },
-        _ => Ok(File { handle: handle, }),
+        _ => Ok(File {
+            handle: handle,
+        }),
     };
 }

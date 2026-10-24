@@ -13,7 +13,13 @@ verb total_score(abs self: Player) -> Int {
 }
 
 verb main() -> Int {
-    erg player = Player {position: Point {x: 3, y: 4}, score: 5};
+    erg player = Player {
+        position: Point {
+            x: 3,
+            y: 4,
+        },
+        score: 5,
+    };
     player.position.x = 8;
     abs player_view = ref player;
     erg result = player_view.total_score();

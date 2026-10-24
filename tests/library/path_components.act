@@ -1,4 +1,6 @@
-import { open path };
+import {
+    open path,
+};
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
@@ -41,16 +43,22 @@ verb component_path() -> Path {
 
 verb verify_path_predicates(abs path: Path) -> Int {
     case is_absolute(self: abs path) {
-        true => { },
-        _ => { return 1; },
+        true => {},
+        _ => {
+            return 1;
+        },
     };
     case is_relative(self: abs path) {
-        false => { },
-        _ => { return 1; },
+        false => {},
+        _ => {
+            return 1;
+        },
     };
     case has_root(self: abs path) {
-        true => { },
-        _ => { return 1; },
+        true => {},
+        _ => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -61,17 +69,25 @@ verb verify_component_lengths(abs path: Path) -> Int {
     erg extension = extension(self: abs path);
     case dat name {
         Option.Some(component) => case component.length {
-            14 => { },
-            _ => { return 1; },
+            14 => {},
+            _ => {
+                return 1;
+            },
         },
-        Option.None => { return 1; },
+        Option.None => {
+            return 1;
+        },
     };
     case dat stem {
         Option.Some(component) => case component.length {
-            11 => { },
-            _ => { return 1; },
+            11 => {},
+            _ => {
+                return 1;
+            },
         },
-        Option.None => { return 1; },
+        Option.None => {
+            return 1;
+        },
     };
     return case dat extension {
         Option.Some(component) => case component.length {
@@ -87,8 +103,10 @@ verb path_components_and_predicates() -> Int {
     erg path = component_path();
     erg predicates = verify_path_predicates(path: abs path);
     case predicates {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     return verify_component_lengths(path: abs path);
 }

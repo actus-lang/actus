@@ -7,5 +7,6 @@ limits. The facade re-exports only their documented declarations.
 """
 """Re-export the fixed metadata encoder and decoder."""
 open codec;
+
 """Re-export caller-owned bounded reassembly lifecycle operations."""
 open reassembly;

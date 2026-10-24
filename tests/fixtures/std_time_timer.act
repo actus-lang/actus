@@ -1,6 +1,8 @@
 meta limitless("file")
 
-import std::time;
+import {
+    open std::time,
+};
 
 verb poll_code(erg result: Result[TimerPoll, TimeError]) -> Int {
     return case dat result {
@@ -33,8 +35,12 @@ verb invalid_period_code(erg result: Result[Int, TimeError]) -> Int {
 }
 
 verb one_shot_check() -> Int {
-    erg start: Instant = Instant {ticks: 100u64};
-    erg zero: Duration = Duration {nanos: 10u64};
+    erg start: Instant = Instant {
+        ticks: 100u64,
+    };
+    erg zero: Duration = Duration {
+        nanos: 10u64,
+    };
     erg timer: Timer = timer_one_shot();
     erg armed = timer_arm_at(
         timer: ins timer,
@@ -48,8 +54,12 @@ verb one_shot_check() -> Int {
 }
 
 verb cancel_check() -> Int {
-    erg start: Instant = Instant {ticks: 100u64};
-    erg period: Duration = Duration {nanos: 10u64};
+    erg start: Instant = Instant {
+        ticks: 100u64,
+    };
+    erg period: Duration = Duration {
+        nanos: 10u64,
+    };
     erg timer: Timer = timer_one_shot();
     erg armed = timer_arm_at(
         timer: ins timer,
@@ -74,8 +84,12 @@ verb cancel_check() -> Int {
 }
 
 verb reuse_rejection_check() -> Int {
-    erg start: Instant = Instant {ticks: 100u64};
-    erg zero: Duration = Duration {nanos: 0u64};
+    erg start: Instant = Instant {
+        ticks: 100u64,
+    };
+    erg zero: Duration = Duration {
+        nanos: 0u64,
+    };
     erg timer: Timer = timer_one_shot();
     erg armed = timer_arm_at(
         timer: ins timer,
@@ -106,10 +120,18 @@ verb reuse_rejection_check() -> Int {
 }
 
 verb policy_check(abs policy: MissedTickPolicy, abs expected: Int) -> Int {
-    erg start: Instant = Instant {ticks: 100u64};
-    erg current: Instant = Instant {ticks: 135u64};
-    erg before: Instant = Instant {ticks: 105u64};
-    erg period: Duration = Duration {nanos: 10u64};
+    erg start: Instant = Instant {
+        ticks: 100u64,
+    };
+    erg current: Instant = Instant {
+        ticks: 135u64,
+    };
+    erg before: Instant = Instant {
+        ticks: 105u64,
+    };
+    erg period: Duration = Duration {
+        nanos: 10u64,
+    };
     erg timer: Timer = timer_one_shot();
     erg timer_result = timer_periodic(
         timer: ins timer,
@@ -144,9 +166,15 @@ verb policy_check(abs policy: MissedTickPolicy, abs expected: Int) -> Int {
 }
 
 verb catch_up_check() -> Int {
-    erg start: Instant = Instant {ticks: 100u64};
-    erg current: Instant = Instant {ticks: 135u64};
-    erg period: Duration = Duration {nanos: 10u64};
+    erg start: Instant = Instant {
+        ticks: 100u64,
+    };
+    erg current: Instant = Instant {
+        ticks: 135u64,
+    };
+    erg period: Duration = Duration {
+        nanos: 10u64,
+    };
     erg policy: MissedTickPolicy = MissedTickPolicy.CatchUp;
     erg timer: Timer = timer_one_shot();
     erg timer_result = timer_periodic(
@@ -182,7 +210,9 @@ verb catch_up_check() -> Int {
 }
 
 verb main() -> Int {
-    erg zero: Duration = Duration {nanos: 0u64};
+    erg zero: Duration = Duration {
+        nanos: 0u64,
+    };
     erg policy: MissedTickPolicy = MissedTickPolicy.Coalesce;
     erg invalid_timer: Timer = timer_one_shot();
     erg invalid = timer_periodic(

@@ -3,7 +3,9 @@ Phase 19.2 console application.
 It reads one line through std::io, echoes successful input to stdout,
 reports EOF to stderr, and returns an application-level status.
 """
-import { open io };
+import {
+    open io,
+};
 
 verb main() -> Int {
     erg input = Buffer[0];

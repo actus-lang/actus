@@ -1,4 +1,6 @@
-import { open path };
+import {
+    open path,
+};
 
 verb source_path() -> Path {
     erg raw: Buffer = Buffer[0];
@@ -10,7 +12,13 @@ verb source_path() -> Path {
     erg result = path_from_posix(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
-        Result.Err(_) => Path {storage: Buffer[1], platform: PathPlatform.Posix, length: 0, capacity: 1, terminated: 1},
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
     };
 }
 
