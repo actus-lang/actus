@@ -531,7 +531,7 @@ fn lsp_resolves_qualified_namespace_completion_and_definition() {
     let api_path = module.join("api.act");
     let main_uri = file_uri(&main_path);
     let api_uri = file_uri(&api_path);
-    let main = "import math;\nverb main() -> Int { return math::visible(); }\n";
+    let main = "import math as maths;\nverb main() -> Int { return maths::visible(); }\n";
     let api = "open verb visible() -> Int { return 7; }\n";
     fs::write(&main_path, main).expect("write main");
     fs::write(module.join("math.act"), "open api;\n").expect("write facade");
@@ -540,7 +540,7 @@ fn lsp_resolves_qualified_namespace_completion_and_definition() {
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":main_uri,"version":1,"text":main}}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":api_uri,"version":1,"text":api}}}),
-        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":main_uri},"position":{"line":1,"character":34}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":main_uri},"position":{"line":1,"character":35}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"visible")}}),
         json!({"jsonrpc":"2.0","id":4,"method":"textDocument/hover","params":{"textDocument":{"uri":main_uri},"position":position_after(main,"visible")}}),
         json!({"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}),
@@ -584,6 +584,60 @@ fn lsp_reports_missing_qualified_namespace_members_with_spans() {
     assert!(stdout.contains("E1069"), "missing qualified diagnostic: {stdout}");
     assert!(stdout.contains("math::missing"), "qualified diagnostic lost its name: {stdout}");
     assert!(stdout.contains("\"line\":1"), "qualified diagnostic lost its span: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn lsp_reports_unresolved_imported_namespace() {
+    let root = temp_root();
+    fs::create_dir_all(root.join("src")).expect("create source directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-unresolved\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    let path = root.join("src/main.act");
+    let uri = file_uri(&path);
+    let source = "import missing_namespace;\nverb main() -> Int { return 0; }\n";
+    fs::write(&path, source).expect("write main");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("E1101"), "unresolved namespace diagnostic missing: {stdout}");
+    assert!(stdout.contains("missing_namespace"), "unresolved namespace name missing: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn lsp_rejects_private_child_imports() {
+    let root = temp_root();
+    let module = root.join("src/math");
+    fs::create_dir_all(&module).expect("create module directory");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-private-child\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    let main_path = root.join("src/main.act");
+    let main_uri = file_uri(&main_path);
+    let source = "import math::api;\nverb main() -> Int { return 0; }\n";
+    fs::write(&main_path, source).expect("write main");
+    fs::write(module.join("math.act"), "open api;\n").expect("write facade");
+    fs::write(module.join("api.act"), "open verb visible() -> Int { return 7; }\n")
+        .expect("write child");
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":main_uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("E1101"), "private child diagnostic missing: {stdout}");
+    assert!(stdout.contains("math::api"), "private child path missing: {stdout}");
     let _ = fs::remove_dir_all(root);
 }
 

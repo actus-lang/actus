@@ -96,12 +96,14 @@ remains green.
 - [x] Add LSP completion, go-to-definition, hover, and diagnostic spans for
       imported namespaces.
 - [x] Preserve qualified paths through parse-format-parse round trips.
-- [ ] Add tests for unresolved modules, missing declarations, aliases, and
+- [x] Add tests for unresolved modules, missing declarations, aliases, and
       private-child diagnostics in editor output.
 
 Evidence: formatter regression coverage keeps qualified import paths stable and
 keeps `open` imports inside a legal import block. LSP regression coverage
-resolves completion members and go-to-definition through an imported namespace.
+resolves completion members, aliases, hover, and go-to-definition through an
+imported namespace, and reports unresolved, missing-member, and private-child
+diagnostics with qualified names and spans.
 
 ### Gate 47.5 — Standard-library migration inventory
 
