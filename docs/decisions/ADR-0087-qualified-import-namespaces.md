@@ -1,6 +1,6 @@
 # ADR-0087: Qualified Import Namespaces
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-24
 - Scope: Actus module resolution, name lookup, diagnostics, and tooling
 
@@ -139,3 +139,13 @@ not a requirement of this ADR.
 - Cranelift/LLVM parity tests proving identical resolved symbols and behavior.
 - A migration inventory showing which standard-library modules still use
   `open` and why.
+
+## Acceptance evidence
+
+Accepted on 2026-10-24 after compiler revision `7daf9fd7`. Formatter, lockfile,
+strict-check, full test, and native backend parity validation passed. The
+default Cranelift profile and the LLVM-enabled `--all-features` profile both
+passed, including 10/10 qualified backend-parity tests and strict zero-float
+native verification. Remaining directory-facade `open` declarations are
+intentional public re-exports; they are not external consumer imports and are
+outside this migration decision.

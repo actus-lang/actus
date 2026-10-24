@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned. This phase introduces explicit module-qualified name lookup while
+Complete. This phase introduces explicit module-qualified name lookup while
 preserving the existing `open` form during migration. It applies only to the
 Actus compiler, standard library, formatter, and language tooling; it does not
 contain application-specific Twin-e behavior.
@@ -150,10 +150,22 @@ successfully and resolve the same imported module identity.
 - [x] Prove existing `open` programs remain valid during the migration window.
 - [x] Prove qualified and legacy forms resolve to the same declaration identity
       where both are accepted.
-- [ ] Run formatter checks, lock validation, strict compiler checks, full tests,
+- [x] Run formatter checks, lock validation, strict compiler checks, full tests,
       and native backend parity suites.
-- [ ] Record compiler revision, target profiles, and known limitations.
-- [ ] Update ADR-0087 from Proposed only after all accepted evidence exists.
+- [x] Record compiler revision, target profiles, and known limitations.
+- [x] Update ADR-0087 from Proposed only after all accepted evidence exists.
+
+Release evidence (2026-10-24): compiler revision `7daf9fd7` contains the
+qualified-import implementation and release evidence. `cargo fmt --check`,
+`git diff --check`, root and project lock validation, strict source checks, and
+`cargo test --quiet` pass. `cargo test --all-features --quiet` passes with both
+Cranelift and LLVM enabled; the qualified backend-parity suite passes 10/10,
+and strict native fixtures report no floating-point instructions. The tested
+profiles are hosted x86_64 Linux debug builds with Cranelift (default) and
+LLVM (`--all-features`). Known limitations are intentional: directory-facade
+`open` re-exports remain public, external consumers must use the unified
+`import { open ... }` form, and no automatic migration or removal of facade
+exports is implied.
 
 ## Definition of done
 
