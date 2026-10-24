@@ -10,6 +10,8 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         &self,
         type_name: &TypeName,
     ) -> Option<super::super::abi::BackendEnumLayout> {
+        let normalized = self.normalize_type_name(type_name);
+        let type_name = &normalized;
         if let Some(layout) = self.niche_option_layout(type_name) {
             return Some(layout);
         }
@@ -23,6 +25,8 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     }
 
     fn enum_variant(&self, type_name: &TypeName, variant: &str) -> Option<(u32, bool)> {
+        let normalized = self.normalize_type_name(type_name);
+        let type_name = &normalized;
         if let Some(variant) = niche_option_variant(type_name, variant) {
             return Some(variant);
         }
@@ -47,6 +51,8 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         type_name: &TypeName,
         variant: &str,
     ) -> Option<super::super::BackendValueType> {
+        let normalized = self.normalize_type_name(type_name);
+        let type_name = &normalized;
         let definition = self.enums.get(type_name.name.as_str())?;
         let variant = definition.variants.iter().find(|candidate| candidate.name == variant)?;
         let substitution = (!definition.generic_parameters.is_empty())

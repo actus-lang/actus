@@ -23,6 +23,7 @@ pub(crate) struct ProgramLayouts<'program> {
     structs: BTreeMap<&'program str, &'program StructDef>,
     enums: BTreeMap<&'program str, &'program EnumDef>,
     packs: BTreeMap<&'program str, &'program PackDecl>,
+    imported_namespaces: BTreeMap<String, String>,
     drop_symbols: BTreeMap<String, SymbolIdentity>,
     pointer_bytes: u32,
 }
@@ -55,6 +56,7 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
+        let imported_namespaces = collect_imported_namespaces(program);
         let drop_symbols = program
             .declarations
             .iter()
@@ -73,7 +75,33 @@ impl<'program> ProgramLayouts<'program> {
                 _ => None,
             })
             .collect();
-        Self { structs, enums, packs, drop_symbols, pointer_bytes: usize::BITS / 8 }
+        Self {
+            structs,
+            enums,
+            packs,
+            imported_namespaces,
+            drop_symbols,
+            pointer_bytes: usize::BITS / 8,
+        }
+    }
+
+    fn normalize_type_name(&self, type_name: &TypeName) -> TypeName {
+        TypeName {
+            name: type_name
+                .name
+                .split_once("::")
+                .and_then(|(namespace, member)| {
+                    self.imported_namespaces.contains_key(namespace).then(|| member.to_owned())
+                })
+                .unwrap_or_else(|| type_name.name.clone()),
+            arguments: type_name
+                .arguments
+                .iter()
+                .map(|argument| self.normalize_type_name(argument))
+                .collect(),
+            reference_role: type_name.reference_role.clone(),
+            span: type_name.span,
+        }
     }
 
     fn type_layout(
@@ -81,6 +109,8 @@ impl<'program> ProgramLayouts<'program> {
         type_name: &TypeName,
         visiting: &mut Vec<String>,
     ) -> Option<BackendLayout> {
+        let normalized = self.normalize_type_name(type_name);
+        let type_name = &normalized;
         if is_niche_pointer_option(type_name) {
             return Some(self.pointer_layout());
         }
@@ -367,6 +397,24 @@ impl<'program> ProgramLayouts<'program> {
             performance_symbol: None,
         }
     }
+}
+
+fn collect_imported_namespaces(program: &Program) -> BTreeMap<String, String> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| {
+            let TopLevelDecl::Import(import) = declaration else { return None };
+            (!import.is_open).then(|| {
+                let binding = import
+                    .alias
+                    .clone()
+                    .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+                    .unwrap_or_else(|| import.path.clone());
+                (binding, import.path.clone())
+            })
+        })
+        .collect()
 }
 
 include!("layout/provider.rs");
