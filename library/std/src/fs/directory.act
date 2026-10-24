@@ -5,8 +5,8 @@ The iterator returns one owned entry `Path` at a time. It does not retain the
 parent path, expose a native pointer, or allocate an unbounded entry array.
 """
 import {
-    open io,
-    open path,
+    io,
+    path as path_module,
 };
 
 """Maximum raw storage reserved for one returned directory entry name."""
@@ -24,7 +24,7 @@ Open one directory for streaming enumeration.
 `path` is borrowed only for the runtime call. The returned `Directory` owns
 the host handle and does not retain the source path.
 """
-unsafe extern "C" verb actus_directory_open(abs path: Path) -> Int;
+unsafe extern "C" verb actus_directory_open(abs path: path_module::Path) -> Int;
 
 """
 Write the next entry name into caller-owned storage.
@@ -47,7 +47,7 @@ invalid, or inaccessible directory. Errors leave no live handle exposed.
 The operation performs no unbounded allocation; the caller must later use
 `close_dir` to release the returned resource.
 """
-open verb read_dir(abs path: Path) -> Result[Directory, IoError] {
+open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError] {
     erg handle = actus_directory_open(path: abs path);
     erg failed: Bool = handle == -1;
     return case failed {
@@ -56,7 +56,7 @@ open verb read_dir(abs path: Path) -> Result[Directory, IoError] {
                 handle: handle,
             };
             drop(rejected);
-            Err(IoError.Failed);
+            Err(io::IoError.Failed);
         },
         _ => Ok(Directory {
             handle: handle,
@@ -72,21 +72,21 @@ the returned entry path; the iterator itself remains bounded by one host
 handle and the fixed entry-name buffer. Errors are returned as typed
 `IoError` values and leave the directory owner available for explicit close.
 """
-open verb next_dir_entry(ins directory: Directory) -> Result[Option[Path], IoError] {
+open verb next_dir_entry(ins directory: Directory) -> Result[Option[path_module::Path], io::IoError] {
     erg storage: Buffer = Buffer[4096];
     erg status = actus_directory_next(handle: abs directory.handle, storage: ins storage);
     return case status {
         -1 => {
             drop(storage);
-            Err(IoError.Failed);
+            Err(io::IoError.Failed);
         },
         -2 => {
             drop(storage);
-            Ok(Option[Path].None);
+            Ok(Option[path_module::Path].None);
         },
         -3 => {
             drop(storage);
-            Err(IoError.InvalidInput);
+            Err(io::IoError.InvalidInput);
         },
         0 => {
             return directory_entry_from_storage(storage: dat storage, status: status);
@@ -96,25 +96,25 @@ open verb next_dir_entry(ins directory: Directory) -> Result[Option[Path], IoErr
         },
         _ => {
             drop(storage);
-            Err(IoError.Failed);
+            Err(io::IoError.Failed);
         },
     };
 }
 
-verb directory_entry_from_storage(dat storage: Buffer, erg status: Int) -> Result[Option[Path], IoError] {
+verb directory_entry_from_storage(dat storage: Buffer, erg status: Int) -> Result[Option[path_module::Path], io::IoError] {
     return case status {
         0 => {
-            erg result = path_from_posix(storage: dat storage);
+            erg result = path_module::path_from_posix(storage: dat storage);
             return case dat result {
-                Result.Err(_) => Err(IoError.InvalidData),
-                Result.Ok(value) => Ok(Option[Path].Some(dat value)),
+                Result.Err(_) => Err(io::IoError.InvalidData),
+                Result.Ok(value) => Ok(Option[path_module::Path].Some(dat value)),
             };
         },
         _ => {
-            erg result = path_from_windows_utf16(storage: dat storage);
+            erg result = path_module::path_from_windows_utf16(storage: dat storage);
             return case dat result {
-                Result.Err(_) => Err(IoError.InvalidData),
-                Result.Ok(value) => Ok(Option[Path].Some(dat value)),
+                Result.Err(_) => Err(io::IoError.InvalidData),
+                Result.Ok(value) => Ok(Option[path_module::Path].Some(dat value)),
             };
         },
     };
@@ -127,10 +127,10 @@ The input directory is borrowed through `ins`, not copied or consumed.
 Returns `Ok(0)` on successful release or `Err(IoError.Failed)` when the host
 handle is already invalid or cannot be released. No allocation is performed.
 """
-open verb close_dir(ins directory: Directory) -> Result[Int, IoError] {
+open verb close_dir(ins directory: Directory) -> Result[Int, io::IoError] {
     erg status = actus_directory_close(handle: abs directory.handle);
     return case status {
-        -1 => Err(IoError.Failed),
+        -1 => Err(io::IoError.Failed),
         _ => {
             directory.handle = -1;
             Ok(status);

@@ -1,7 +1,7 @@
 """Filesystem operations implemented behind the public `std::fs` facade."""
 import {
-    open io,
-    open path,
+    io,
+    path as path_module,
 };
 
 """
@@ -10,7 +10,7 @@ Remove the regular file named by `path`.
 `path` is borrowed read-only and is not retained. The bridge returns zero on
 success, `-1` on a host failure, and never exposes a raw status to callers.
 """
-unsafe extern "C" verb actus_file_remove_path(abs path: Path) -> Int;
+unsafe extern "C" verb actus_file_remove_path(abs path: path_module::Path) -> Int;
 
 """
 Rename `from` to `to` without copying file contents.
@@ -18,7 +18,10 @@ Rename `from` to `to` without copying file contents.
 Both path arguments are non-owning `abs` views valid for this call only.
 The bridge returns zero on success or `-1` on failure.
 """
-unsafe extern "C" verb actus_file_rename_path(abs from: Path, abs to: Path) -> Int;
+unsafe extern "C" verb actus_file_rename_path(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Int;
 
 """
 Copy the file named by `from` to `to` and return its byte count.
@@ -27,7 +30,10 @@ The two path views are borrowed and never retained. A non-negative return is
 the number of copied bytes; the C ABI returns `-1` for failure, translated to
 `IoError.Failed`.
 """
-unsafe extern "C" verb actus_file_copy_path(abs from: Path, abs to: Path) -> Int;
+unsafe extern "C" verb actus_file_copy_path(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Int;
 
 """
 Create the directory named by `path`.
@@ -36,7 +42,7 @@ The path is an `abs` view. The bridge returns zero on success or `-1` when
 the host rejects the operation. It does not retain the path or allocate a
 converted string; the facade maps `-1` to `IoError.Failed`.
 """
-unsafe extern "C" verb actus_file_create_dir_path(abs path: Path) -> Int;
+unsafe extern "C" verb actus_file_create_dir_path(abs path: path_module::Path) -> Int;
 
 """
 Remove the empty directory named by `path`.
@@ -44,7 +50,7 @@ Remove the empty directory named by `path`.
 The path is borrowed for the call. The bridge returns zero on success or
 `-1` when the directory is missing, non-empty, or otherwise inaccessible.
 """
-unsafe extern "C" verb actus_file_remove_dir_path(abs path: Path) -> Int;
+unsafe extern "C" verb actus_file_remove_dir_path(abs path: path_module::Path) -> Int;
 
 """
 Read all bytes from `handle` into the caller-owned `ins buffer`.
@@ -67,10 +73,10 @@ valid UTF-8; the C ABI returns non-zero for invalid data, mapped to
 unsafe extern "C" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int;
 
 """Translate a private runtime status into the public I/O result contract."""
-open verb fs_status(erg status: Int) -> Result[Int, IoError] {
+open verb fs_status(erg status: Int) -> Result[Int, io::IoError] {
     return case status {
-        -1 => Err(IoError.Failed),
-        -2 => Err(IoError.EndOfStream),
+        -1 => Err(io::IoError.Failed),
+        -2 => Err(io::IoError.EndOfStream),
         _ => Ok(status),
     };
 }
@@ -82,7 +88,7 @@ Remove one regular file.
 the host removed the file; `Err(IoError.Failed)` covers missing, protected,
 or otherwise rejected paths. The bridge does not retain or allocate a path.
 """
-open verb remove_file(abs path: Path) -> Result[Int, IoError] {
+open verb remove_file(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_path(path: abs path);
     return fs_status(status: erg status);
 }
@@ -94,7 +100,7 @@ Both `from` and `to` are `abs` views valid only for this call. `Ok(0)` means
 the host completed the rename; `Err(IoError.Failed)` reports any host error.
 Neither borrowed view is retained after the runtime bridge returns.
 """
-open verb rename(abs from: Path, abs to: Path) -> Result[Int, IoError] {
+open verb rename(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_rename_path(from: abs from, to: abs to);
     return fs_status(status: erg status);
 }
@@ -106,7 +112,7 @@ Copy one regular file and return the number of copied bytes.
 exact host-reported byte count; `Err(IoError.Failed)` reports a copy failure.
 The runtime consumes neither path view and performs no UTF-8 conversion.
 """
-open verb copy_file(abs from: Path, abs to: Path) -> Result[Int, IoError] {
+open verb copy_file(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_copy_path(from: abs from, to: abs to);
     return fs_status(status: erg status);
 }
@@ -118,7 +124,7 @@ Create one directory at `path`.
 directory was created; `Err(IoError.Failed)` reports an existing, invalid, or
 otherwise inaccessible target.
 """
-open verb create_dir(abs path: Path) -> Result[Int, IoError] {
+open verb create_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_create_dir_path(path: abs path);
     return fs_status(status: erg status);
 }
@@ -130,7 +136,7 @@ Remove one empty directory at `path`.
 succeeded; `Err(IoError.Failed)` covers a missing, non-empty, protected, or
 otherwise inaccessible directory.
 """
-open verb remove_dir(abs path: Path) -> Result[Int, IoError] {
+open verb remove_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_dir_path(path: abs path);
     return fs_status(status: erg status);
 }
@@ -140,18 +146,18 @@ Discard an incomplete owned read buffer with `dat` and return its typed native
 failure. The buffer is deterministically dropped before `Err(IoError.Failed)`
 is produced, so the caller receives no leaked allocation.
 """
-open verb discard_read_output(dat output: Buffer) -> Result[Buffer, IoError] {
+open verb discard_read_output(dat output: Buffer) -> Result[Buffer, io::IoError] {
     drop(output);
-    return Result[Buffer, IoError].Err(IoError.Failed);
+    return Result[Buffer, io::IoError].Err(io::IoError.Failed);
 }
 
 """Read one open file into an owned buffer, close the file, and return typed failure when reading fails."""
-open verb read_open_file(dat file: File) -> Result[Buffer, IoError] {
+open verb read_open_file(dat file: File) -> Result[Buffer, io::IoError] {
     erg output = Buffer[0];
     erg status = actus_file_read_all_buffer(handle: abs file.handle, buffer: ins output);
     return case status {
         -1 => discard_read_output(output: dat output),
-        _ => Result[Buffer, IoError].Ok(output),
+        _ => Result[Buffer, io::IoError].Ok(output),
     };
 }
 
@@ -163,7 +169,7 @@ owned result buffer to the caller; `Err(IoError.Failed)` or
 `Err(IoError.EndOfStream)` reports the runtime result after the file is
 closed. The caller owns the returned buffer and must eventually drop it.
 """
-open verb read_to_bytes(abs path: Path) -> Result[Buffer, IoError] {
+open verb read_to_bytes(abs path: path_module::Path) -> Result[Buffer, io::IoError] {
     erg opened = file_open(path: abs path);
     return case dat opened {
         Result.Ok(value) => read_open_file(file: dat value),
@@ -172,9 +178,9 @@ open verb read_to_bytes(abs path: Path) -> Result[Buffer, IoError] {
 }
 
 """Drop invalid text storage before returning the typed encoding error."""
-open verb reject_invalid_text(dat output: Buffer) -> Result[Buffer, IoError] {
+open verb reject_invalid_text(dat output: Buffer) -> Result[Buffer, io::IoError] {
     drop(output);
-    return Err(IoError.InvalidData);
+    return Err(io::IoError.InvalidData);
 }
 
 """
@@ -182,22 +188,22 @@ Validate text while consuming the temporary `dat` byte buffer. `Ok(output)`
 returns the same owned buffer; invalid data returns `Err(IoError.InvalidData)`
 after ownership cleanup remains deterministic.
 """
-open verb accept_valid_text(dat output: Buffer) -> Result[Buffer, IoError] {
+open verb accept_valid_text(dat output: Buffer) -> Result[Buffer, io::IoError] {
     return Ok(output);
 }
 
 """Rebuild a buffer-typed error result without retaining a borrowed payload."""
-open verb propagate_text_error(dat error: IoError) -> Result[Buffer, IoError] {
+open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoError] {
     return case dat error {
-        IoError.EndOfStream => Result[Buffer, IoError].Err(IoError.EndOfStream),
-        IoError.Failed => Result[Buffer, IoError].Err(IoError.Failed),
-        IoError.InvalidInput => Result[Buffer, IoError].Err(IoError.InvalidInput),
-        IoError.InvalidData => Result[Buffer, IoError].Err(IoError.InvalidData),
+        io::IoError.EndOfStream => Result[Buffer, io::IoError].Err(io::IoError.EndOfStream),
+        io::IoError.Failed => Result[Buffer, io::IoError].Err(io::IoError.Failed),
+        io::IoError.InvalidInput => Result[Buffer, io::IoError].Err(io::IoError.InvalidInput),
+        io::IoError.InvalidData => Result[Buffer, io::IoError].Err(io::IoError.InvalidData),
     };
 }
 
 """Validate and consume one owned byte buffer as text, returning bytes or typed failure."""
-open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, IoError] {
+open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, io::IoError] {
     erg valid = actus_buffer_validate_utf8(buffer: abs output);
     return case valid {
         0 => accept_valid_text(output: dat output),
@@ -206,7 +212,7 @@ open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, IoError] {
 }
 
 """Read a file, reject invalid UTF-8, and return owned bytes or a typed error."""
-open verb validate_loaded_text(dat loaded: Result[Buffer, IoError]) -> Result[Buffer, IoError] {
+open verb validate_loaded_text(dat loaded: Result[Buffer, io::IoError]) -> Result[Buffer, io::IoError] {
     return case dat loaded {
         Result.Err(error) => propagate_text_error(error: dat error),
         Result.Ok(output) => validate_text_bytes(output: dat output),
@@ -220,7 +226,7 @@ Read a file and validate its bytes as UTF-8 without accepting a path string.
 the validated bytes; `Err(IoError.Failed)` or `Err(IoError.InvalidData)` is
 returned after all temporary file and buffer ownership is cleaned up.
 """
-open verb read_to_string(abs path: Path) -> Result[Buffer, IoError] {
+open verb read_to_string(abs path: path_module::Path) -> Result[Buffer, io::IoError] {
     erg loaded = read_to_bytes(path: abs path);
     return validate_loaded_text(loaded: dat loaded);
 }
@@ -233,7 +239,7 @@ runtime calls. `Ok(count)` is the exact number of bytes written;
 `Err(IoError.Failed)` or `Err(IoError.EndOfStream)` reports failure after the
 owned `File` has been deterministically cleaned up.
 """
-open verb write_file(abs path: Path, abs contents: Buffer) -> Result[Int, IoError] {
+open verb write_file(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
     erg opened = file_create(path: abs path);
     return case dat opened {
         Result.Ok(value) => {
@@ -242,10 +248,10 @@ open verb write_file(abs path: Path, abs contents: Buffer) -> Result[Int, IoErro
         },
         Result.Err(error) => {
             return case dat error {
-                IoError.EndOfStream => Err(IoError.EndOfStream),
-                IoError.Failed => Err(IoError.Failed),
-                IoError.InvalidInput => Err(IoError.InvalidInput),
-                IoError.InvalidData => Err(IoError.InvalidData),
+                io::IoError.EndOfStream => Err(io::IoError.EndOfStream),
+                io::IoError.Failed => Err(io::IoError.Failed),
+                io::IoError.InvalidInput => Err(io::IoError.InvalidInput),
+                io::IoError.InvalidData => Err(io::IoError.InvalidData),
             };
         },
     };
@@ -261,10 +267,10 @@ and returns the typed error; cleanup is deterministic and the final destination
 is never partially written. The operation performs no hidden allocation.
 """
 open verb write_file_atomic(
-    abs path: Path,
-    dat staging: Path,
+    abs path: path_module::Path,
+    dat staging: path_module::Path,
     abs contents: Buffer
-) -> Result[Int, IoError] {
+) -> Result[Int, io::IoError] {
     erg written = write_and_flush(path: abs staging, contents: abs contents);
     return case dat written {
         Result.Err(error) => {
@@ -275,7 +281,7 @@ open verb write_file_atomic(
             return case dat published {
                 Result.Ok(_) => {
                     drop(staging);
-                    return Result[Int, IoError].Ok(count);
+                    return Result[Int, io::IoError].Ok(count);
                 },
                 Result.Err(error) => {
                     return cleanup_atomic_failure(staging: dat staging, error: dat error);
@@ -286,30 +292,30 @@ open verb write_file_atomic(
 }
 
 """Write bytes to a new file and flush the handle before returning a typed error or count; no hidden allocation occurs."""
-open verb write_and_flush(abs path: Path, abs contents: Buffer) -> Result[Int, IoError] {
+open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
     erg opened = file_create(path: abs path);
     return case dat opened {
-        Result.Err(error) => Result[Int, IoError].Err(error),
+        Result.Err(error) => Result[Int, io::IoError].Err(error),
         Result.Ok(value) => {
             erg file: File = value;
             erg written = file.write(buffer: abs contents);
             return case dat written {
-                Result.Err(error) => Result[Int, IoError].Err(error),
+                Result.Err(error) => Result[Int, io::IoError].Err(error),
                 Result.Ok(count) => {
-                    erg expected_result = buffer_size(buffer: abs contents);
+                    erg expected_result = io::buffer_size(buffer: abs contents);
                     return case dat expected_result {
-                        Result.Err(error) => Result[Int, IoError].Err(error),
+                        Result.Err(error) => Result[Int, io::IoError].Err(error),
                         Result.Ok(expected) => {
                             case count - expected {
                                 0 => {},
                                 _ => {
-                                    return Result[Int, IoError].Err(IoError.Failed);
+                                    return Result[Int, io::IoError].Err(io::IoError.Failed);
                                 },
                             };
                             erg flushed = file.flush();
                             return case dat flushed {
-                                Result.Ok(_) => Result[Int, IoError].Ok(count),
-                                Result.Err(error) => Result[Int, IoError].Err(error),
+                                Result.Ok(_) => Result[Int, io::IoError].Ok(count),
+                                Result.Err(error) => Result[Int, io::IoError].Err(error),
                             };
                         },
                     };
@@ -324,8 +330,11 @@ open verb write_and_flush(abs path: Path, abs contents: Buffer) -> Result[Int, I
 The `dat staging` owner is explicitly dropped after cleanup, so neither the
 caller nor the filesystem facade retains a failed staging path.
 """
-open verb cleanup_atomic_failure(dat staging: Path, dat error: IoError) -> Result[Int, IoError] {
+open verb cleanup_atomic_failure(
+    dat staging: path_module::Path,
+    dat error: io::IoError
+) -> Result[Int, io::IoError] {
     remove_file(path: abs staging);
     drop(staging);
-    return Result[Int, IoError].Err(error);
+    return Result[Int, io::IoError].Err(error);
 }
