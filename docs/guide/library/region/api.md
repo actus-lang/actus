@@ -4,6 +4,10 @@
 import std::region;
 ```
 
+This binds the `region` namespace. Callers use qualified names such as
+`region::region_open`; use `import { open std::region };` only when an
+unqualified consumer scope is intentional.
+
 ## `Region[T]`
 
 `Region[T]` is an owned, runtime-backed descriptor for a logical sequence of

@@ -14,6 +14,11 @@ A declaration that is not exposed remains private to the module's internal
 scope. The compiler resolves sibling discovery and facade exports
 deterministically and rejects duplicate or unknown exports.
 
+The facade form of `open` is distinct from an external import. Consumer code
+must write `import { open module };` when it wants unqualified access. A plain
+`import module;` binds the module namespace and is used with qualified names
+such as `module::verb(...)`.
+
 When a public child module is needed, expose that child through the parent
 facade. External code then uses the parent path and does not depend on the
 child's internal filesystem location.

@@ -5,9 +5,15 @@ covers owned file handles, metadata, open modes, cursor movement, one-shot
 reads and writes, directory operations, and atomic publication.
 
 ```actus
-import std::fs;
-import std::path;
+import {
+    std::fs,
+    std::path,
+};
 ```
+
+These imports bind the `fs` and `path` namespaces. Use `fs::...` and
+`path::...` for qualified access, or `import { open std::fs, open std::path }`
+when unqualified access is intentional.
 
 Filesystem calls are external side effects. They belong at an explicit
 application, persistence, or service boundary. Do not put synchronous file

@@ -3,7 +3,7 @@
 ## Measure elapsed time
 
 ```actus
-import std::time;
+import { open std::time };
 
 open verb elapsed_work() -> Result[Duration, TimeError] {
     erg before: Instant = now();

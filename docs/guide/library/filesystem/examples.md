@@ -3,7 +3,7 @@
 ## Read bytes into an owned result
 
 ```actus
-import std::fs;
+import { open std::fs };
 
 open verb load(abs path: Path) -> Result[Buffer, IoError] {
     return read_to_bytes(path: abs path);

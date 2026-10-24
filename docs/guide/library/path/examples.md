@@ -3,7 +3,7 @@
 ## Construct and inspect a POSIX path
 
 ```actus
-import std::path;
+import { open std::path };
 
 verb file_length(dat raw: Buffer) -> Result[Int, PathError] {
     erg path = path_from_posix(storage: dat raw)?;

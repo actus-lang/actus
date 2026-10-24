@@ -9,6 +9,9 @@ the caller, or silently repair malformed bytes.
 import std::string;
 ```
 
+The plain form binds the `string` namespace. Use `string::...` for qualified
+access, or `import { open std::string };` for the unqualified examples below.
+
 ## What this library provides
 
 The facade exposes two related representations:

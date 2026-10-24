@@ -131,7 +131,7 @@ prevents source traversal order from changing the data-symbol identity.
 For readable output, use the public `std::io` facade:
 
 ```act
-import std::io;
+import { open std::io };
 
 verb main() -> Void {
     erg message = "ACTUS_EVENT status=ready";
@@ -169,7 +169,7 @@ When bytes must become an owned text value, use `Utf8Buffer` instead of
 changing the `String` ABI:
 
 ```act
-import std::string;
+import { open std::string };
 
 verb make_text(dat storage: Buffer) -> Result[Utf8Buffer, StringError] {
     return utf8_from_buffer(storage: dat storage);

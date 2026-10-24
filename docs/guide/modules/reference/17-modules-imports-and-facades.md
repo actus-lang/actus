@@ -6,13 +6,43 @@ This page preserves the complete technical detail for this source section. The s
 
 ### 17.1 Importing
 
-Use extensionless canonical module paths:
+Use extensionless canonical module paths. A plain import creates a local
+namespace binding; it does not inject the facade's declarations into the
+consumer's unqualified scope:
 
 ```act
 import std::io;
 import std::fs;
 import std::path;
+
+io::println(...);
+fs::file_open(...);
+path::from_bytes(...);
 ```
+
+When unqualified access is intentional, put `open` explicitly inside the
+unified import block:
+
+```act
+import {
+    open std::io,
+    open std::fs,
+    open std::path,
+};
+```
+
+Grouped imports and aliases are also valid:
+
+```act
+import {
+    driver::{i2c, uart},
+    telemetry::uart as telem_uart,
+};
+```
+
+`driver::{i2c, uart}` creates the local namespace bindings `i2c` and `uart`.
+An `as` clause aliases a module or namespace only; it cannot rename an
+individual declaration. Repeated local bindings are rejected.
 
 The package/build configuration resolves the module package. Do not hard-code
 an absolute host path to `library/std` in application source.
@@ -157,6 +187,11 @@ force semantic-only commands to invoke code generation.
 Do not use Rust `pub`, Go `export`, or C header conventions in Actus source.
 Fields do not have a separate `pub` keyword; aggregate visibility follows the
 declared facade and type contract.
+
+This rule has two scopes. In external consumer code, `open` is only an import
+item inside `import { ... };`. In a canonical directory facade, `open sibling;`
+remains the public re-export declaration. Facade re-exports are not external
+consumer imports and remain valid for every public child or sibling export.
 
 ### 17.5 Hierarchical facades
 

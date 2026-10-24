@@ -9,6 +9,9 @@ timers.
 import std::time;
 ```
 
+The plain form binds the `time` namespace. Use `time::...` for qualified
+access, or `import { open std::time };` for the unqualified examples below.
+
 The module is about elapsed time and scheduling boundaries. It does not expose
 calendar dates, wall-clock timestamps, time zones, formatting, raw platform
 clock structures, callbacks, or hidden timer allocation.

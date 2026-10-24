@@ -3,7 +3,7 @@
 ## Encode with caller-owned storage
 
 ```actus
-import std::wire;
+import { open std::wire };
 
 open verb encode(abs header: WireHeader, abs payload: Buffer, ins output: Buffer)
     -> Result[u32, WireError] {

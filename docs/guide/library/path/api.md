@@ -8,6 +8,10 @@ runtime bridges and implementation helpers are intentionally excluded.
 import std::path;
 ```
 
+This binds the `path` namespace. Callers use qualified names such as
+`path::from_bytes`; use `import { open std::path };` only when an unqualified
+consumer scope is intentional.
+
 ## Types
 
 ```actus

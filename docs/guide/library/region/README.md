@@ -9,6 +9,9 @@ for `Array[T, N]`, a raw pointer, or a filesystem mapping.
 import std::region;
 ```
 
+The plain form binds the `region` namespace. Use `region::...` for qualified
+access, or `import { open std::region };` for the unqualified examples below.
+
 ## What the module provides
 
 - generic `Region[T]` ownership with compiler-checked element layout;

@@ -9,6 +9,9 @@ every path into a `String`.
 import std::path;
 ```
 
+The plain form binds the `path` namespace. Use `path::...` for qualified
+access, or `import { open std::path };` for the unqualified examples below.
+
 ## What this module provides
 
 - validated owned `Path` values;

@@ -6,8 +6,10 @@ Filesystem verbs receive `Path`, not arbitrary text. Construct the path with
 `std::path` first:
 
 ```actus
-import std::fs;
-import std::path;
+import {
+    open std::fs,
+    open std::path,
+};
 
 open verb load_path(dat raw: Buffer) -> Result[Buffer, IoError] {
     erg path_result = path_from_ascii(storage: dat raw);

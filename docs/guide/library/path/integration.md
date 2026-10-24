@@ -4,8 +4,10 @@
 external operations. Keep the boundary explicit:
 
 ```actus
-import std::fs;
-import std::path;
+import {
+    open std::fs,
+    open std::path,
+};
 
 open verb save(dat raw_path: Buffer, abs payload: Buffer)
     -> Result[Int, IoError] {
