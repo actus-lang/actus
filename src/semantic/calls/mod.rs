@@ -403,28 +403,6 @@ impl Analyzer {
         self.validate_explicit_owner_view(callee, argument, parameter_index, signature, role)
     }
 
-    fn validate_explicit_owner_view(
-        &self,
-        callee: &str,
-        argument: &Argument,
-        parameter_index: usize,
-        signature: &VerbSignature,
-        role: &Role,
-    ) -> Result<(), SemanticError> {
-        if *role == Role::Abs
-            && argument.role == Some(Role::Abs)
-            && self.is_readable_owner(&argument.expression)
-        {
-            return Ok(());
-        }
-        self.validate_argument_role(
-            callee,
-            &signature.params[parameter_index].0,
-            role,
-            &argument.expression,
-        )
-    }
-
     pub(super) fn performance_signature(
         &self,
         target_type: &str,

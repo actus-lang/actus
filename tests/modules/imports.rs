@@ -71,6 +71,19 @@ fn records_imported_namespace_and_resolves_qualified_call() {
 }
 
 #[test]
+fn accepts_explicit_abs_view_of_scalar_through_imported_helper() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read(abs value: u32) -> u32 { return value; }");
+    let program = parse_source(
+        "import { open shared }; verb main() -> u32 { erg value: u32 = 1u32; return read(value: abs value); }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("an imported helper should accept an explicit abs scalar view");
+}
+
+#[test]
 fn legacy_open_and_qualified_import_share_one_imported_module_identity() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open api;");
@@ -101,6 +114,40 @@ fn keeps_imported_performance_bodies_in_their_module_scope() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("an imported performance body should resolve its module-local helper");
+}
+
+#[test]
+fn preserves_abs_scalar_roles_inside_imported_module_bodies() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write(
+        "shared/api.act",
+        "open verb helper(abs value: u32) -> u32 { return value; } open verb outer() -> u32 { erg value: u32 = 1u32; return helper(value: abs value); }",
+    );
+    let program = parse_source("import shared; verb main() -> Int { return 0; }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("imported module bodies should preserve scalar abs roles");
+}
+
+#[test]
+fn preserves_abs_scalar_roles_through_nested_facades() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open codec; open generation;");
+    fixture.write("shared/codec.act", "verb append_u32(abs value: u32) -> Int { return 0; }");
+    fixture.write("shared/generation/generation.act", "open codec;");
+    fixture.write(
+        "shared/generation/codec.act",
+        "open verb split(abs value: u64) -> u32 { erg low: u32 = (value & 4294967295u64) as u32; append_u32(value: abs (low * 2u32)); return 0u32; }",
+    );
+    let program = parse_source("import shared; verb main() -> Int { return 0; }");
+
+    let resolver = ModuleResolver::new(&fixture.root);
+    analyze_with_imports(&program, &resolver)
+        .expect("nested facades should preserve scalar abs roles");
+    let plan = build_compilation_plan(&program, &resolver).expect("nested plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("nested facade object codegen should preserve scalar abs roles");
 }
 
 #[test]
