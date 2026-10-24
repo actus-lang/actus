@@ -148,6 +148,7 @@ impl Display for ModuleError {
 
 impl std::error::Error for ModuleError {}
 
+#[allow(clippy::ptr_arg)]
 fn write_read_error(
     formatter: &mut Formatter<'_>,
     path: &PathBuf,
@@ -156,6 +157,7 @@ fn write_read_error(
     write!(formatter, "cannot read module source `{}`: {message}", path.display())
 }
 
+#[allow(clippy::ptr_arg)]
 fn write_lex_error(
     formatter: &mut Formatter<'_>,
     path: &PathBuf,
@@ -164,6 +166,7 @@ fn write_lex_error(
     write!(formatter, "cannot lex module source `{}` ({count} errors)", path.display())
 }
 
+#[allow(clippy::ptr_arg)]
 fn write_parse_error(formatter: &mut Formatter<'_>, path: &PathBuf) -> std::fmt::Result {
     write!(formatter, "cannot parse module source `{}`", path.display())
 }

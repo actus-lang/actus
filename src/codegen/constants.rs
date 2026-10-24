@@ -294,6 +294,7 @@ fn inline_expression_node(expression: &mut Expr, constants: &HashMap<String, Exp
         }
         Expr::FieldAccess { object, .. } => {
             if let Expr::Identifier { name, .. } = object.as_mut()
+                && name.find('[').is_none_or(|open| name[..open].contains("::"))
                 && let Some((_, member)) = name.split_once("::")
             {
                 *name = member.to_owned();

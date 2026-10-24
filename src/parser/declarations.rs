@@ -230,6 +230,7 @@ impl Parser {
             .collect())
     }
 
+    #[allow(clippy::type_complexity)]
     fn parse_import_items(
         &mut self,
     ) -> Result<Vec<(String, Option<String>, bool, bool, SourceSpan)>, ParseError> {

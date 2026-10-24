@@ -170,6 +170,7 @@ fn build_compilation_plan_with_overlays_and_scope_check(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_root_imports(
     program: &Program,
     importer_module_path: Option<&str>,
@@ -279,6 +280,7 @@ struct SymbolRecord {
     declaration: TopLevelDecl,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_unit(
     module_path: &str,
     importer: &Program,

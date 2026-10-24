@@ -67,7 +67,7 @@ impl Analyzer {
             Expr::Call { callee, .. } => self.signatures.get(callee).and_then(|signature| {
                 let return_type = signature.return_type_name.as_ref()?;
                 let return_type = self.normalize_imported_type_name(return_type);
-                self.enum_types.contains_key(&return_type.name).then(|| return_type.name)
+                self.enum_types.contains_key(&return_type.name).then_some(return_type.name)
             }),
             Expr::FieldAccess { object, .. } | Expr::MethodCall { receiver: object, .. } => {
                 self.enum_receiver_name(object).map(str::to_owned)
