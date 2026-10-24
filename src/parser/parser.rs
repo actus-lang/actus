@@ -143,7 +143,7 @@ impl Parser {
                 declarations.push(self.parse_metadata_declaration(metadata, doc)?);
                 continue;
             }
-            declarations.push(self.parse_top_level_decl_with_doc(doc)?);
+            declarations.extend(self.parse_top_level_decl_with_doc(doc)?);
         }
 
         Ok(Program { file_metadata, declarations })

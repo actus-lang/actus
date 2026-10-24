@@ -374,7 +374,14 @@ impl Formatter<'_> {
 
     pub(super) fn import(&mut self, import: &crate::ast::ImportDecl) {
         self.output.push_str("import ");
+        if import.is_open {
+            self.output.push_str("open ");
+        }
         self.output.push_str(&import.path);
+        if let Some(alias) = &import.alias {
+            self.output.push_str(" as ");
+            self.output.push_str(alias);
+        }
         self.output.push(';');
     }
 }

@@ -45,6 +45,9 @@ pub struct OpenSiblingDecl {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImportDecl {
     pub path: String,
+    pub alias: Option<String>,
+    pub is_open: bool,
+    pub grouped: bool,
     pub span: SourceSpan,
 }
 
