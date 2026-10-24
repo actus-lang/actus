@@ -11,6 +11,28 @@ import config;
 config::MAX_VALUE;
 ```
 
+For nested application modules, keep the complete canonical path at the import
+site and use the final path segment as the local namespace:
+
+```actus
+import ie::persistence::manifest;
+import ie::persistence::cache;
+
+manifest::ManifestDescriptor;
+cache::ShardCache;
+```
+
+If two imported paths end in the same module name, assign explicit namespace
+aliases:
+
+```actus
+import ie::persistence::cache as persistence_cache;
+import other::cache as other_cache;
+
+persistence_cache::ShardCache;
+other_cache::Cache;
+```
+
 ## Import forms
 
 The compiler accepts one import item or a unified import block. A plain import

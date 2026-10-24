@@ -173,3 +173,23 @@ Phase 47 is complete only when qualified imports are parsed, semantically
 resolved, lowered identically by Cranelift and LLVM, supported by formatter and
 LSP tooling, and covered by compatibility and visibility evidence. No `open`
 removal is implied until a separate migration decision is accepted.
+
+## Follow-up: consumer migration to canonical qualified paths
+
+The compiler capability is complete, but application consumers still require
+an explicit migration pass. This work is separate from compiler implementation:
+
+- [x] Migrate `src/ie/persistence/logical/core.act` to one unified import
+      block with `ie::persistence::cache` and `ie::persistence::manifest`.
+- [ ] Replace the remaining ambiguous consumer openings with complete
+      canonical imports such as `import ie::persistence::manifest;` and
+      `import ie::persistence::cache;`.
+- [ ] Use `manifest::...` and `cache::...` at call sites so ownership remains
+      visible without repeating the full path.
+- [ ] Add explicit aliases when different imports share a final segment, such
+      as `ie::persistence::cache as persistence_cache` and
+      `other::cache as other_cache`.
+- [ ] Add a consumer regression fixture for nested paths, qualified types, and
+      same-final-segment aliases.
+- [ ] Record compiler revision, formatter output, and strict-check evidence
+      before marking this follow-up complete.

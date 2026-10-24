@@ -133,17 +133,41 @@ impl Parser {
         if matches!(next.kind, TokenKind::LeftParen | TokenKind::LeftBrace) {
             return true;
         }
-        matches!(next.kind, TokenKind::Dot) && self.tokens.get(self.cursor + 1).is_some_and(|token| {
-            matches!(&token.kind, TokenKind::Identifier(name) if name.chars().next().is_some_and(char::is_uppercase))
-                || matches!(
-                    token.kind,
-                    TokenKind::IntType { .. }
-                        | TokenKind::FloatType { .. }
-                        | TokenKind::VoidType
-                        | TokenKind::Abs
-                        | TokenKind::Ins
-                )
-        })
+        matches!(next.kind, TokenKind::Dot) && self.type_argument_starts_with_type_name()
+    }
+
+    fn type_argument_starts_with_type_name(&self) -> bool {
+        let mut index = self.cursor + 1;
+        let Some(first) = self.tokens.get(index) else { return false };
+        if !matches!(
+            first.kind,
+            TokenKind::Identifier(_)
+                | TokenKind::IntType { .. }
+                | TokenKind::FloatType { .. }
+                | TokenKind::VoidType
+                | TokenKind::Abs
+                | TokenKind::Ins
+        ) {
+            return false;
+        }
+        let mut final_identifier = match &first.kind {
+            TokenKind::Identifier(name) => Some(name.as_str()),
+            _ => None,
+        };
+        while matches!(
+            self.tokens.get(index + 1).map(|token| &token.kind),
+            Some(TokenKind::ColonColon)
+        ) {
+            let Some(segment) = self.tokens.get(index + 2) else { return false };
+            let TokenKind::Identifier(name) = &segment.kind else { return false };
+            final_identifier = Some(name.as_str());
+            index += 2;
+        }
+        match first.kind {
+            TokenKind::Identifier(_) => final_identifier
+                .is_some_and(|name| name.chars().next().is_some_and(char::is_uppercase)),
+            _ => true,
+        }
     }
 
     fn parse_buffer_literal(

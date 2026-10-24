@@ -95,6 +95,31 @@ fn parses_qualified_call_and_type_names() {
 }
 
 #[test]
+fn parses_qualified_type_names_inside_generic_arguments() {
+    let source =
+        "verb main() -> Result[manifest::ManifestDescriptor, LogicalBrainError] { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    parse(tokens).expect("qualified generic type names should parse");
+}
+
+#[test]
+fn parses_imported_qualified_type_names_inside_generic_arguments() {
+    let source = "import { open config, ie::persistence::manifest, ie::persistence::cache, }; verb main() -> Result[manifest::ManifestDescriptor, LogicalBrainError] { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    parse(tokens).expect("imported qualified generic type names should parse");
+}
+
+#[test]
+fn parses_qualified_type_names_in_generic_result_constructors() {
+    let source = "verb main() -> Int { return Result[manifest::ManifestDescriptor, LogicalBrainError].Err(0); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    parse(tokens).expect("qualified generic result constructors should parse");
+}
+
+#[test]
 fn rejects_open_imports_outside_the_unified_import_block() {
     let (tokens, errors) = scan("import open sensors::imu;");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");

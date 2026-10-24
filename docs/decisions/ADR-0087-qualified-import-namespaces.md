@@ -68,6 +68,31 @@ The exact token spelling and AST representation must be shared by semantic
 analysis, formatter, language server, diagnostics, Cranelift lowering, and
 LLVM lowering. No backend may implement a separate qualified-name rule.
 
+### Canonical nested-path convention
+
+Consumers must keep the complete canonical module path in the import and use
+the final path segment as the local namespace:
+
+```actus
+import ie::persistence::manifest;
+import ie::persistence::cache;
+
+manifest::ManifestDescriptor;
+cache::ShardCache;
+```
+
+The full path documents ownership while the short local namespace keeps use
+sites readable. If two imports share a final segment, they must use explicit
+namespace aliases:
+
+```actus
+import ie::persistence::cache as persistence_cache;
+import other::cache as other_cache;
+```
+
+Every segment still resolves through its canonical parent facade; this
+convention does not make implementation children directly importable.
+
 ### Binding and package-resolution rules
 
 - A plain import binds the final module segment as its local namespace. For
@@ -87,6 +112,8 @@ LLVM lowering. No backend may implement a separate qualified-name rule.
 - A path that names a non-facade implementation child is rejected before
   semantic lookup. The diagnostic identifies the parent facade that must be
   used instead.
+- The complete canonical path remains visible in source; the final segment is
+  the local namespace unless an explicit alias is needed for a collision.
 - Repeating any local import binding is an error, including repeating the
   exact same path. Different paths may not share an alias or final namespace
   segment.
@@ -139,6 +166,8 @@ not a requirement of this ADR.
 - Cranelift/LLVM parity tests proving identical resolved symbols and behavior.
 - A migration inventory showing which standard-library modules still use
   `open` and why.
+- A consumer fixture using nested canonical paths and a same-final-segment
+  alias collision.
 
 ## Acceptance evidence
 
