@@ -52,15 +52,16 @@ impl Analyzer {
         expected: &str,
         expression: &Expr,
     ) -> Result<(), SemanticError> {
+        let normalized_expected = self.normalize_imported_type_key(expected);
         let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
-        if argument_type_matches(expected, &found, expression) {
+        if argument_type_matches(&normalized_expected, &found, expression) {
             return Ok(());
         }
         Err(SemanticError {
             kind: SemanticErrorKind::TypeMismatch {
                 callee: callee.to_owned(),
                 parameter: parameter.to_owned(),
-                expected: expected.to_owned(),
+                expected: normalized_expected,
                 found,
             },
             span: expression_span(expression),
