@@ -264,7 +264,7 @@ impl Analyzer {
 
     fn constant_type_name(&self, expression: &Expr) -> Option<String> {
         let Expr::Identifier { name, .. } = expression else { return None };
-        self.constants.get(name).map(super::super::analyzer::canonical_type_name)
+        self.constant_type(name).map(super::super::analyzer::canonical_type_name)
     }
 
     fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {

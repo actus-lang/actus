@@ -254,6 +254,18 @@ fn accepts_transitive_public_configuration_constants_semantically() {
 }
 
 #[test]
+fn resolves_qualified_configuration_constant_semantically() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    fixture.write("config/values.act", "open const LIMIT: u8 = 30u8;");
+    let program =
+        parse_source("import config; verb main() -> Int { return config::LIMIT as Int; }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified configuration constants should resolve semantically");
+}
+
+#[test]
 fn rejects_imports_inside_nested_configuration_sources() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open policy;");

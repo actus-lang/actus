@@ -216,7 +216,7 @@ impl Analyzer {
     }
 
     fn visit_identifier(&self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
-        if self.constants.contains_key(name) || self.is_const_generic_parameter(name) {
+        if self.is_constant_name(name) || self.is_const_generic_parameter(name) {
             return Ok(());
         }
         let index = self.binding(name, span)?;
