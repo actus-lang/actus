@@ -81,6 +81,7 @@ impl Parser {
         name: String,
         span: SourceSpan,
     ) -> Result<Expr, ParseError> {
+        let name = self.parse_qualified_identifier(name)?;
         if let Some(buffer) = self.parse_buffer_literal(&name, span)? {
             return Ok(buffer);
         }
@@ -94,6 +95,16 @@ impl Parser {
             return Ok(call);
         }
         self.parse_identifier_suffix(name, type_arguments, span)
+    }
+
+    fn parse_qualified_identifier(&mut self, mut name: String) -> Result<String, ParseError> {
+        while self.match_simple(TokenKind::Colon) {
+            self.expect_simple(TokenKind::Colon, "`:`")?;
+            let segment = identifier_text(&self.take_identifier("qualified name segment")?.kind);
+            name.push_str("::");
+            name.push_str(&segment);
+        }
+        Ok(name)
     }
 
     fn should_parse_type_arguments(&self) -> bool {

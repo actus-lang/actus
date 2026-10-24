@@ -75,3 +75,21 @@ fn keeps_facade_open_as_a_distinct_top_level_declaration() {
     let program = parse(tokens).expect("facade re-export should parse");
     assert!(matches!(program.declarations[0], TopLevelDecl::OpenSibling(_)));
 }
+
+#[test]
+fn parses_qualified_call_and_type_names() {
+    let source = "verb main() -> telemetry::Packet { return driver::write(value: 1); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("qualified names should parse");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else {
+        panic!("expected verb");
+    };
+    assert_eq!(verb.return_type.as_ref().unwrap().ty.name, "telemetry::Packet");
+    let actus::ast::Stmt::Return { value: Some(actus::ast::Expr::Call { callee, .. }), .. } =
+        &verb.body.statements[0]
+    else {
+        panic!("expected qualified call");
+    };
+    assert_eq!(callee, "driver::write");
+}

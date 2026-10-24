@@ -62,7 +62,7 @@ impl Parser {
         let reference_role =
             if allow_reference_role { self.parse_type_reference_role()? } else { None };
         let token = self.advance_required("type name")?;
-        let name = type_name_text(&token.kind).ok_or_else(|| ParseError {
+        let mut name = type_name_text(&token.kind).ok_or_else(|| ParseError {
             code: ParseErrorCode::UnexpectedToken,
             kind: ParseErrorKind::UnexpectedToken {
                 expected: "type name".to_owned(),
@@ -70,6 +70,12 @@ impl Parser {
             },
             span: token.span,
         })?;
+        while self.match_simple(TokenKind::Colon) {
+            self.expect_simple(TokenKind::Colon, "`:`")?;
+            let segment = self.take_identifier("qualified type name segment")?;
+            name.push_str("::");
+            name.push_str(&identifier_text(&segment.kind));
+        }
         let arguments = if self.match_simple(TokenKind::LeftBracket) {
             self.parse_type_arguments()?
         } else {
