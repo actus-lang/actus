@@ -186,6 +186,56 @@ fn hosted_cli_backends_lower_qualified_enum_values_identically() {
 }
 
 #[test]
+fn hosted_cli_backends_lower_qualified_aggregate_constructors_identically() {
+    let source = "import shapes; verb main() -> Int { erg packet: shapes::Packet = shapes::Packet { value: 42, }; return packet.value; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-aggregate", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/shapes")).expect("create shapes module directory");
+        fs::write(root.join("src/shapes/shapes.act"), "open api;\n").expect("write shapes facade");
+        fs::write(root.join("src/shapes/api.act"), "open struct Packet { value: Int, }\n")
+            .expect("write shapes API");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified aggregate build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified aggregate fixture");
+        assert_eq!(status.code(), Some(42), "{backend} qualified aggregate result");
+        fs::remove_dir_all(root).expect("remove qualified aggregate fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_lower_qualified_generic_calls_identically() {
+    let source = "import generic; verb main() -> Int { erg value: Int = 41; return generic::identity[Int](value: erg value); }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-generic", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/generic")).expect("create generic module directory");
+        fs::write(root.join("src/generic/generic.act"), "open api;\n")
+            .expect("write generic facade");
+        fs::write(
+            root.join("src/generic/api.act"),
+            "open verb identity[T](erg value: T) -> T { return value; }\n",
+        )
+        .expect("write generic API");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified generic build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified generic fixture");
+        assert_eq!(status.code(), Some(41), "{backend} qualified generic result");
+        fs::remove_dir_all(root).expect("remove qualified generic fixture");
+    }
+}
+
+#[test]
 fn hosted_cli_backends_share_float_constants_and_comparisons() {
     let source = "verb main() -> Int { erg temperature: f32 = 21.5; erg pressure: f64 = 1013.25; return case temperature < 22.0f32 && pressure > 1000.0 { true => 42, _ => 1, }; }\n";
     for backend in BACKENDS {

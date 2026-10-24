@@ -213,8 +213,16 @@ fn module_bindings(
                 name.clone(),
                 identity.as_str().to_owned(),
             ));
-            for instance in generic_instances.iter().filter(|instance| instance.name == *name) {
-                let specialized_name = crate::codegen::specialized_generic_name(instance);
+            for instance in generic_instances
+                .iter()
+                .filter(|instance| instance.name.rsplit("::").next() == Some(name.as_str()))
+            {
+                let specialized_full = crate::codegen::specialized_generic_name(instance);
+                let specialized_name = specialized_full
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or(specialized_full.as_str())
+                    .to_owned();
                 let specialized_identity = crate::codegen::SymbolIdentity::new(
                     unit.namespace().symbol_prefix(),
                     crate::codegen::SymbolKind::Verb,

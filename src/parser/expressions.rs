@@ -192,7 +192,11 @@ impl Parser {
             let qualified_name = format_type_application(&name, &type_arguments);
             return Ok(Expr::Identifier { name: qualified_name, span });
         }
-        let is_type_name = name.chars().next().is_some_and(char::is_uppercase);
+        let is_type_name = name
+            .rsplit("::")
+            .next()
+            .and_then(|segment| segment.chars().next())
+            .is_some_and(char::is_uppercase);
         if !self.case_subject
             && (is_type_name || !type_arguments.is_empty())
             && self.looks_like_struct_literal()

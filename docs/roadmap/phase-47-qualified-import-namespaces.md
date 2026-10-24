@@ -77,12 +77,17 @@ fixtures.
 
 ### Gate 47.3 — Backend-neutral lowering parity
 
-- [ ] Carry the resolved declaration identity through shared lowering.
-- [ ] Verify qualified constants, verbs, generic calls, enum variants, and
+- [x] Carry the resolved declaration identity through shared lowering.
+- [x] Verify qualified constants, verbs, generic calls, enum variants, and
       aggregate constructors through the shared lowering boundary.
-- [ ] Add Cranelift/LLVM parity tests for accepted and rejected programs.
-- [ ] Confirm no backend-specific qualified-name lookup or fallback exists.
-- [ ] Retain zero-float native verification for affected executable fixtures.
+- [x] Add Cranelift/LLVM parity tests for accepted and rejected programs.
+- [x] Confirm no backend-specific qualified-name lookup or fallback exists.
+- [x] Retain zero-float native verification for affected executable fixtures.
+
+Evidence: the shared lowering suite passes qualified constant, verb, generic,
+enum, and aggregate fixtures on both Cranelift and LLVM (10/10 parity tests).
+The strict LLVM build passes and the existing freestanding zero-float evidence
+remains green.
 
 ### Gate 47.4 — Formatter, LSP, and diagnostics
 

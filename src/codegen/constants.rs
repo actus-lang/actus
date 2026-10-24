@@ -289,8 +289,8 @@ fn inline_expression_node(expression: &mut Expr, constants: &HashMap<String, Exp
         Expr::MethodCall { receiver, arguments, .. } => {
             inline_method_call(receiver, arguments, constants);
         }
-        Expr::StructLit { type_arguments, fields, .. } => {
-            inline_struct_literal(type_arguments, fields, constants);
+        Expr::StructLit { name, type_arguments, fields, .. } => {
+            inline_struct_literal(name, type_arguments, fields, constants);
         }
         Expr::FieldAccess { object, .. } => {
             if let Expr::Identifier { name, .. } = object.as_mut()
@@ -341,10 +341,14 @@ fn inline_method_call(
 }
 
 fn inline_struct_literal(
+    name: &mut String,
     type_arguments: &mut [TypeName],
     fields: &mut [crate::ast::StructFieldInit],
     constants: &HashMap<String, Expr>,
 ) {
+    if let Some((_, member)) = name.split_once("::") {
+        *name = member.to_owned();
+    }
     for type_argument in type_arguments {
         inline_type_name(type_argument, constants);
     }
@@ -386,6 +390,9 @@ fn inline_array_callee(
 }
 
 fn inline_type_name(type_name: &mut TypeName, constants: &HashMap<String, Expr>) {
+    if let Some((_, member)) = type_name.name.split_once("::") {
+        type_name.name = member.to_owned();
+    }
     for argument in &mut type_name.arguments {
         inline_type_name(argument, constants);
     }
