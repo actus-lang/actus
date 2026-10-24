@@ -71,6 +71,25 @@ fn records_imported_namespace_and_resolves_qualified_call() {
 }
 
 #[test]
+fn legacy_open_and_qualified_import_share_one_imported_module_identity() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let legacy = parse_source("import { open shared }; verb main() -> Int { return read(); }");
+    let qualified = parse_source("import shared; verb main() -> Int { return shared::read(); }");
+
+    let legacy_plan = build_compilation_plan(&legacy, &ModuleResolver::new(&fixture.root))
+        .expect("legacy open program should remain valid");
+    let qualified_plan = build_compilation_plan(&qualified, &ModuleResolver::new(&fixture.root))
+        .expect("qualified program should remain valid");
+    let imported_modules = |plan: &actus::modules::ModuleCompilationPlan| {
+        plan.units().iter().map(|unit| unit.identity().module_path().to_owned()).collect::<Vec<_>>()
+    };
+
+    assert_eq!(imported_modules(&legacy_plan), imported_modules(&qualified_plan));
+}
+
+#[test]
 fn keeps_imported_performance_bodies_in_their_module_scope() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open api;");

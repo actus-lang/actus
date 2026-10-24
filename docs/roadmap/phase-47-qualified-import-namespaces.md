@@ -140,9 +140,14 @@ backend lowering, standard-library migration, and roadmap documentation were
 committed as separate thematic commits. No standard-library migration is
 mixed into the compiler implementation commit.
 
+Compatibility evidence (2026-10-24):
+`legacy_open_and_qualified_import_share_one_imported_module_identity` verifies
+that a legacy `open` consumer and a qualified `import` consumer both analyze
+successfully and resolve the same imported module identity.
+
 ### Gate 47.6 — Compatibility and release evidence
 
-- [ ] Prove existing `open` programs remain valid during the migration window.
+- [x] Prove existing `open` programs remain valid during the migration window.
 - [ ] Prove qualified and legacy forms resolve to the same declaration identity
       where both are accepted.
 - [ ] Run formatter checks, lock validation, strict compiler checks, full tests,
