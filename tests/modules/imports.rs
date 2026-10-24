@@ -329,6 +329,10 @@ fn resolves_generic_nested_calls_through_parent_facade() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("generic nested calls should resolve through the parent facade");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified generic plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("qualified generic call should lower");
 }
 
 #[test]
