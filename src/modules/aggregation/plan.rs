@@ -374,6 +374,21 @@ fn append_public_declarations(
     appended_symbols: &mut HashSet<(String, String, String)>,
 ) {
     for declaration in &unit.implementation().declarations {
+        let TopLevelDecl::Import(import) = declaration else { continue };
+        if import.is_open {
+            continue;
+        }
+        let binding = import
+            .alias
+            .clone()
+            .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+            .unwrap_or_else(|| import.path.clone());
+        let key = (module_path.to_owned(), format!("import:{binding}"), String::new());
+        if appended_symbols.insert(key) {
+            target.push(declaration.clone());
+        }
+    }
+    for declaration in &unit.implementation().declarations {
         let Some((kind, name)) = export_identity(declaration) else { continue };
         if !unit.exports().contains(kind, &name) {
             continue;

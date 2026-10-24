@@ -4,8 +4,8 @@ Each field is a scalar switch. The configuration is consumed by `options_open`
 so the host runtime receives one complete, immutable open request.
 """
 import {
-    open io,
-    open path,
+    io,
+    path as path_module,
 };
 
 """
@@ -147,7 +147,7 @@ Consume `dat options` and inspect an `abs path` without copying or allocating
 path text. `Ok(File)` transfers ownership of the opened handle; `Err` reports
 the typed `IoError` and all consumed resources are cleaned up.
 """
-open verb options_open(dat options: OpenOptions, abs path: Path) -> Result[File, IoError] {
+open verb options_open(dat options: OpenOptions, abs path: path_module::Path) -> Result[File, io::IoError] {
     erg handle = actus_file_open_options_path(
         path: abs path,
         read: abs options.read,
@@ -160,7 +160,7 @@ open verb options_open(dat options: OpenOptions, abs path: Path) -> Result[File,
     return case handle {
         -1 => {
             discard_handle(handle: dat handle);
-            return Err(IoError.Failed);
+            return Err(io::IoError.Failed);
         },
         _ => Ok(File {
             handle: handle,

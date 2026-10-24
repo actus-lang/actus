@@ -361,6 +361,30 @@ fn resolves_qualified_std_path_types_from_the_project_configuration() {
 }
 
 #[test]
+fn resolves_qualified_types_in_a_standard_facade_signature() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/std_fs.act");
+    let source = fs::read_to_string(&path).expect("read std fs fixture");
+    let (tokens, errors) = scan(&source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("std fs fixture should parse");
+    let configuration = CompilerConfiguration::from_input_path_read_only(&path)
+        .expect("project configuration should load");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    );
+
+    analyze_with_imports_for_target(
+        &program,
+        &resolver,
+        &actus::target::TargetSpec::host().expect("host target"),
+    )
+    .expect("standard facade signatures should resolve qualified aliased types");
+}
+
+#[test]
 fn rejects_imports_inside_nested_configuration_sources() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open policy;");
