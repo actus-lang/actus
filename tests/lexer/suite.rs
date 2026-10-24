@@ -37,6 +37,16 @@ fn scans_keywords_and_punctuation() {
 }
 
 #[test]
+fn scans_double_colon_as_one_qualified_path_token() {
+    let (tokens, errors) = scan("driver::i2c name: Type");
+    assert!(errors.is_empty());
+    assert_eq!(tokens[0].kind, TokenKind::Identifier("driver".to_owned()));
+    assert_eq!(tokens[1].kind, TokenKind::ColonColon);
+    assert_eq!(tokens[2].kind, TokenKind::Identifier("i2c".to_owned()));
+    assert_eq!(tokens[4].kind, TokenKind::Colon);
+}
+
+#[test]
 fn scans_the_instrumental_role_keyword() {
     let (tokens, errors) = scan("verb update(ins buffer: Buffer) { }");
 

@@ -240,8 +240,7 @@ impl Parser {
             self.peek().map_or(0, |token| token.span.start)
         };
         let mut segments = vec![identifier_text(&self.take_identifier("module name")?.kind)];
-        while self.match_simple(TokenKind::Colon) {
-            self.expect_simple(TokenKind::Colon, "`:`")?;
+        while self.match_simple(TokenKind::ColonColon) {
             if self.match_simple(TokenKind::LeftBrace) {
                 let mut items = Vec::new();
                 loop {

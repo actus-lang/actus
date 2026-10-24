@@ -74,6 +74,7 @@ pub enum TokenKind {
     LeftBracket,
     RightBracket,
     Colon,
+    ColonColon,
     Comma,
     Semicolon,
     Equals,

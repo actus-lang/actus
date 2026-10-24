@@ -98,8 +98,7 @@ impl Parser {
     }
 
     fn parse_qualified_identifier(&mut self, mut name: String) -> Result<String, ParseError> {
-        while self.match_simple(TokenKind::Colon) {
-            self.expect_simple(TokenKind::Colon, "`:`")?;
+        while self.match_simple(TokenKind::ColonColon) {
             let segment = identifier_text(&self.take_identifier("qualified name segment")?.kind);
             name.push_str("::");
             name.push_str(&segment);

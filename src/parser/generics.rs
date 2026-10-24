@@ -70,8 +70,7 @@ impl Parser {
             },
             span: token.span,
         })?;
-        while self.match_simple(TokenKind::Colon) {
-            self.expect_simple(TokenKind::Colon, "`:`")?;
+        while self.match_simple(TokenKind::ColonColon) {
             let segment = self.take_identifier("qualified type name segment")?;
             name.push_str("::");
             name.push_str(&identifier_text(&segment.kind));

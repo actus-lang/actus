@@ -93,6 +93,7 @@ impl<'source> Scanner<'source> {
             ')' => TokenKind::RightParen,
             '[' => TokenKind::LeftBracket,
             ']' => TokenKind::RightBracket,
+            ':' if self.match_character(':') => TokenKind::ColonColon,
             ':' => TokenKind::Colon,
             ',' => TokenKind::Comma,
             ';' => TokenKind::Semicolon,
