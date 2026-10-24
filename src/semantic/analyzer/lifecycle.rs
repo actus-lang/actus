@@ -11,6 +11,7 @@ impl Analyzer {
         mut self,
         program: &Program,
     ) -> Result<super::super::model::SemanticModel, SemanticError> {
+        self.register_import_namespaces(program);
         self.register_enums(program)?;
         self.register_roles(program)?;
         self.register_constants(program)?;
@@ -25,6 +26,18 @@ impl Analyzer {
         self.validate_method_declarations(program)?;
         self.analyze_verbs(program)?;
         Ok(self.finalize_model())
+    }
+
+    fn register_import_namespaces(&mut self, program: &Program) {
+        for declaration in &program.declarations {
+            let crate::ast::TopLevelDecl::Import(import) = declaration else { continue };
+            let binding = import
+                .alias
+                .clone()
+                .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+                .unwrap_or_else(|| import.path.clone());
+            self.imported_namespaces.insert(binding, import.path.clone());
+        }
     }
 
     fn finalize_model(mut self) -> super::super::model::SemanticModel {

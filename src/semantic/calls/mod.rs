@@ -66,10 +66,11 @@ impl Analyzer {
             return result;
         }
         let explicit_type_application = parse_generic_call_arguments(callee, span);
-        let lookup_name = explicit_type_application
+        let parsed_lookup_name = explicit_type_application
             .as_ref()
             .map_or(callee, |type_name| type_name.name.as_str())
             .to_owned();
+        let lookup_name = self.qualified_call_lookup_name(&parsed_lookup_name, span)?;
         let Some(mut signature) = self.signatures.get(&lookup_name).cloned() else {
             for argument in arguments {
                 self.visit_expression(&argument.expression)?;

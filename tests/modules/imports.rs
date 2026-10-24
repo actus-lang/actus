@@ -58,6 +58,45 @@ fn resolves_only_facade_exports_into_the_importing_unit() {
 }
 
 #[test]
+fn records_imported_namespace_and_resolves_qualified_call() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source("import shared; verb main() -> Int { return shared::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified call should resolve through the imported namespace");
+}
+
+#[test]
+fn resolves_qualified_call_through_a_namespace_alias() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program =
+        parse_source("import shared as telem; verb main() -> Int { return telem::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified alias should resolve through the imported namespace");
+}
+
+#[test]
+fn rejects_qualified_call_through_an_unimported_namespace() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source("import shared; verb main() -> Int { return missing::read(); }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("unknown namespace must be rejected");
+    assert!(matches!(
+        error,
+        ModuleError::Semantic(ref semantic)
+            if matches!(semantic.kind, actus::semantic::SemanticErrorKind::UnknownVerb { ref name } if name == "missing::read")
+    ));
+}
+
+#[test]
 fn resolves_public_child_declarations_through_the_parent_facade() {
     let fixture = Fixture::new();
     fixture.write("aie/aie.act", "open runtime;");

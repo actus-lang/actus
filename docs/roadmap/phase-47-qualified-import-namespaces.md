@@ -59,7 +59,7 @@ import facade
       resolve to non-facade children behave.
 - [x] Define stable diagnostics for malformed, unresolved, ambiguous, and
       private qualified paths.
-- [ ] Add parser and semantic negative tests before backend work begins.
+- [x] Add parser and semantic negative tests before backend work begins.
 
 ### Gate 47.2 — Shared semantic lookup
 

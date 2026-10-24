@@ -25,6 +25,7 @@ pub(crate) struct Analyzer {
     pub(crate) active_borrow_ids: HashSet<usize>,
     pub(crate) signatures: HashMap<String, super::super::calls::VerbSignature>,
     pub(crate) local_signatures: HashSet<String>,
+    pub(crate) imported_namespaces: HashMap<String, String>,
     pub(crate) constants: HashMap<String, crate::ast::TypeName>,
     pub(crate) constant_initializers: HashMap<String, crate::ast::Expr>,
     pub(crate) loop_boundaries: Vec<usize>,

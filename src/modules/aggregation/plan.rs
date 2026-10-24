@@ -101,6 +101,7 @@ pub fn build_compilation_plan_with_overlays(
             caller_declarations.push(declaration.clone());
             continue;
         };
+        caller_declarations.push(declaration.clone());
         if !imported_paths.insert(import.path.clone()) {
             continue;
         }
