@@ -51,9 +51,9 @@ import facade
 
 ### Gate 47.1 — Grammar and module-resolution contract
 
-- [ ] Record the qualified-path grammar and reserved-token decision in the
+- [x] Record the qualified-path grammar and reserved-token decision in the
       parser contract.
-- [ ] Define the AST node and source-span behavior for one or more path
+- [x] Define the AST node and source-span behavior for one or more path
       components.
 - [ ] Define how aliases, nested facades, package roots, and imports that
       resolve to non-facade children behave.

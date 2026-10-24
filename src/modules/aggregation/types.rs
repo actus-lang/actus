@@ -49,6 +49,11 @@ pub enum ModuleError {
         first_module: String,
         second_module: String,
     },
+    ImportBindingCollision {
+        binding: String,
+        first: SourceSpan,
+        second: SourceSpan,
+    },
     DuplicateObjectOwner {
         module_path: String,
     },
@@ -106,18 +111,9 @@ impl Display for ModuleError {
                 "configuration module `{module}` cannot contain runtime declaration `{kind}` in `{}`",
                 path.display()
             ),
-            Self::Read { path, message } => {
-                write!(formatter, "cannot read module source `{}`: {message}", path.display())
-            }
-            Self::Lex { path, errors } => write!(
-                formatter,
-                "cannot lex module source `{}` ({} errors)",
-                path.display(),
-                errors.len()
-            ),
-            Self::Parse { path, .. } => {
-                write!(formatter, "cannot parse module source `{}`", path.display())
-            }
+            Self::Read { path, message } => write_read_error(formatter, path, message),
+            Self::Lex { path, errors } => write_lex_error(formatter, path, errors.len()),
+            Self::Parse { path, .. } => write_parse_error(formatter, path),
             Self::DuplicateDeclaration(diagnostic) => write!(
                 formatter,
                 "duplicate {} declaration `{}` in `{}` and `{}`",
@@ -130,6 +126,9 @@ impl Display for ModuleError {
                 formatter,
                 "native symbol `{symbol}` would collide between modules `{first_module}` and `{second_module}`"
             ),
+            Self::ImportBindingCollision { binding, .. } => {
+                write_import_binding_error(formatter, binding)
+            }
             Self::DuplicateObjectOwner { module_path } => {
                 write!(formatter, "duplicate object ownership for module `{module_path}`")
             }
@@ -148,3 +147,27 @@ impl Display for ModuleError {
 }
 
 impl std::error::Error for ModuleError {}
+
+fn write_read_error(
+    formatter: &mut Formatter<'_>,
+    path: &PathBuf,
+    message: &str,
+) -> std::fmt::Result {
+    write!(formatter, "cannot read module source `{}`: {message}", path.display())
+}
+
+fn write_lex_error(
+    formatter: &mut Formatter<'_>,
+    path: &PathBuf,
+    count: usize,
+) -> std::fmt::Result {
+    write!(formatter, "cannot lex module source `{}` ({count} errors)", path.display())
+}
+
+fn write_parse_error(formatter: &mut Formatter<'_>, path: &PathBuf) -> std::fmt::Result {
+    write!(formatter, "cannot parse module source `{}`", path.display())
+}
+
+fn write_import_binding_error(formatter: &mut Formatter<'_>, binding: &str) -> std::fmt::Result {
+    write!(formatter, "import binding `{binding}` is declared more than once")
+}

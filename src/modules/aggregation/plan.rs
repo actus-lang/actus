@@ -79,6 +79,22 @@ pub fn build_compilation_plan_with_overlays(
     let mut local_declarations = Vec::new();
     let mut units = Vec::new();
     let mut imported_paths = HashSet::new();
+    let mut import_bindings: HashMap<String, crate::lexer::SourceSpan> = HashMap::new();
+    for declaration in &program.declarations {
+        let TopLevelDecl::Import(import) = declaration else { continue };
+        let binding = import
+            .alias
+            .clone()
+            .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+            .unwrap_or_else(|| import.path.clone());
+        if let Some(first) = import_bindings.insert(binding.clone(), import.span) {
+            return Err(ModuleError::ImportBindingCollision {
+                binding,
+                first,
+                second: import.span,
+            });
+        }
+    }
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else {
             local_declarations.push(declaration.clone());

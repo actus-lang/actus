@@ -52,7 +52,7 @@ fn compilation_plan_separates_public_caller_and_internal_module_units() {
 }
 
 #[test]
-fn compilation_plan_deduplicates_repeated_module_imports() {
+fn compilation_plan_rejects_repeated_module_imports() {
     let fixture = Fixture::new();
     fixture.write("math/math.act", "open ops;");
     fixture.write("math/ops.act", "open verb add() -> Int { return 1; }");
@@ -60,24 +60,27 @@ fn compilation_plan_deduplicates_repeated_module_imports() {
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
 
-    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
-    assert_eq!(plan.units().len(), 1);
-    assert_eq!(
-        plan.caller()
-            .declarations
-            .iter()
-            .filter(|declaration| {
-                matches!(
-                    declaration,
-                    actus::ast::TopLevelDecl::Verb(verb) if verb.name == "add"
-                ) || matches!(
-                    declaration,
-                    actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "add"
-                )
-            })
-            .count(),
-        1
+    let error = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect_err("repeated imports must be rejected");
+    assert!(
+        matches!(error, ModuleError::ImportBindingCollision { ref binding, .. } if binding == "math")
     );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1115");
+}
+
+#[test]
+fn rejects_duplicate_local_import_bindings_before_module_resolution() {
+    let (tokens, errors) =
+        scan("import left as device; import right as device; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+    let error = build_compilation_plan(&program, &ModuleResolver::new(std::path::Path::new(".")))
+        .expect_err("duplicate aliases must be rejected before resolving modules");
+    assert!(matches!(
+        error,
+        ModuleError::ImportBindingCollision { ref binding, .. } if binding == "device"
+    ));
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1115");
 }
 
 #[test]

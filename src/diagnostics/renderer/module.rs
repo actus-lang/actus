@@ -49,6 +49,11 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         ModuleError::SymbolCollision { .. } => {
             module_error("E1110", error.to_string(), SourceSpan::new(0, 0))
         }
+        ModuleError::ImportBindingCollision { first, second, .. } => {
+            module_error("E1115", error.to_string(), *second).with_related_location(
+                DiagnosticRelatedLocation::new(None, *first, "first import binding is here"),
+            )
+        }
         ModuleError::DuplicateObjectOwner { .. } => {
             module_error("E1111", error.to_string(), SourceSpan::new(0, 0))
         }

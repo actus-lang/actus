@@ -366,7 +366,7 @@ fn accepts_public_types_nested_in_exported_result_signatures() {
 }
 
 #[test]
-fn resolves_repeated_imports_once() {
+fn rejects_repeated_imports_with_a_stable_module_diagnostic() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open types;");
     fixture.write("shared/types.act", "open struct Token { byte: Int, }");
@@ -374,8 +374,12 @@ fn resolves_repeated_imports_once() {
         "import shared; import shared; verb main() -> Int { erg token = Token { byte: 7, }; return token.byte; }",
     );
 
-    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
-        .expect("repeated imports must not duplicate exported declarations");
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("repeated imports must be rejected");
+    assert!(
+        matches!(error, ModuleError::ImportBindingCollision { ref binding, .. } if binding == "shared")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1115");
 }
 
 #[test]
