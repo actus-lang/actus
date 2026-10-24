@@ -218,13 +218,13 @@ impl Parser {
         }
         Ok(items
             .into_iter()
-            .map(|(path, alias, is_open, grouped, _)| {
+            .map(|(path, alias, is_open, grouped, span)| {
                 TopLevelDecl::Import(crate::ast::ImportDecl {
                     path,
                     alias,
                     is_open,
                     grouped,
-                    span: SourceSpan::new(start, end),
+                    span: if is_block { span } else { SourceSpan::new(start, end) },
                 })
             })
             .collect())
@@ -232,7 +232,7 @@ impl Parser {
 
     fn parse_import_items(
         &mut self,
-    ) -> Result<Vec<(String, Option<String>, bool, bool, usize)>, ParseError> {
+    ) -> Result<Vec<(String, Option<String>, bool, bool, SourceSpan)>, ParseError> {
         let is_open = self.match_simple(TokenKind::Open);
         let item_start = if is_open {
             self.previous().span.start
@@ -248,7 +248,14 @@ impl Parser {
                     let mut path = segments.clone();
                     path.push(identifier_text(&self.take_identifier("imported name")?.kind));
                     let alias = self.parse_import_alias()?;
-                    items.push((path.join("::"), alias, is_open, true, item_start));
+                    let item_end = self.previous().span.end;
+                    items.push((
+                        path.join("::"),
+                        alias,
+                        is_open,
+                        true,
+                        SourceSpan::new(item_start, item_end),
+                    ));
                     if self.match_simple(TokenKind::Comma) {
                         if self.check_simple(&TokenKind::RightBrace) {
                             break;
@@ -263,7 +270,14 @@ impl Parser {
             segments.push(identifier_text(&self.take_identifier("module name")?.kind));
         }
         let alias = self.parse_import_alias()?;
-        Ok(vec![(segments.join("::"), alias, is_open, false, item_start)])
+        let item_end = self.previous().span.end;
+        Ok(vec![(
+            segments.join("::"),
+            alias,
+            is_open,
+            false,
+            SourceSpan::new(item_start, item_end),
+        )])
     }
 
     fn parse_import_alias(&mut self) -> Result<Option<String>, ParseError> {
