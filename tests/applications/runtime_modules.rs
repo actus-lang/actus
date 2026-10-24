@@ -5,7 +5,7 @@ use std::process::Command;
 
 #[test]
 fn nested_runtime_facade_qualifies_sibling_imports() {
-    let source = "import feature; verb main() -> Int { return runtime_probe(); }\n";
+    let source = "import { open feature }; verb main() -> Int { return runtime_probe(); }\n";
     let (root, input, output) = project("nested-runtime-sibling-import", source);
     fs::write(
         root.join("Actus.toml"),
@@ -17,7 +17,7 @@ fn nested_runtime_facade_qualifies_sibling_imports() {
         .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        "import std::fs; open verb runtime_probe() -> Int { return 0; }\n",
+        "import { open std::fs }; open verb runtime_probe() -> Int { return 0; }\n",
     )
     .expect("write runtime import fixture");
     build(&root, &input, &output);
@@ -28,7 +28,7 @@ fn nested_runtime_facade_qualifies_sibling_imports() {
 
 #[test]
 fn generic_nested_module_lowers_facade_constant_without_native_binding() {
-    let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
+    let source = "import { open feature }; verb main() -> Int { return inspect[2]() as Int; }\n";
     let (root, input, output) = project("generic-constant-facade", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -40,7 +40,7 @@ fn generic_nested_module_lowers_facade_constant_without_native_binding() {
         .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        "import config; open verb inspect[N: Usize]() -> u16 { return BUFFER_STRIDE + (N as u16); }\n",
+        "import { open config }; open verb inspect[N: Usize]() -> u16 { return BUFFER_STRIDE + (N as u16); }\n",
     )
     .expect("write generic feature implementation");
 
@@ -52,7 +52,7 @@ fn generic_nested_module_lowers_facade_constant_without_native_binding() {
 
 #[test]
 fn native_lowering_inlines_facade_constant_in_else_if_branch() {
-    let source = "import feature; verb main() -> Int { erg input: u8 = 17u8; return inspect(value: erg input); }\n";
+    let source = "import { open feature }; verb main() -> Int { erg input: u8 = 17u8; return inspect(value: erg input); }\n";
     let (root, input, output) = project("constant-else-if-lowering", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -86,7 +86,7 @@ open verb inspect(erg value: u8) -> Int {
 
 #[test]
 fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
-    let source = "import std::region; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
+    let source = "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
     let (root, input, output) = project("generic-region-object", source);
     fs::write(
         root.join("Actus.toml"),
@@ -111,7 +111,7 @@ fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
 
 #[test]
 fn generic_region_lowers_an_imported_packed_element_type() {
-    let source = "import feature; import std::region; verb main() -> Int { erg backing: Buffer = Buffer[64]; erg logical_length: u64 = 1048576u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[64]; erg index: u64 = 0u64; erg read_result = region_read(region: abs region, index: erg index, destination: ins destination); region_close(region: ins region); return case dat read_result { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
+    let source = "import { open feature, open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[64]; erg logical_length: u64 = 1048576u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[64]; erg index: u64 = 0u64; erg read_result = region_read(region: abs region, index: erg index, destination: ins destination); region_close(region: ins region); return case dat read_result { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
     let (root, input, output) = project("generic-region-imported-pack", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
     fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
@@ -135,8 +135,7 @@ fn generic_region_lowers_an_imported_packed_element_type() {
 
 #[test]
 fn generic_region_lowers_all_packed_element_operations() {
-    let source = r#"import feature;
-import std::region;
+    let source = r#"import { open feature, open std::region };
 
 verb write_publish_cancel(ins region: Region[Minicolumn]) -> Int {
     erg source: Buffer = Buffer[64];
@@ -219,7 +218,7 @@ verb main() -> Int {
 
 #[test]
 fn nested_facade_lowers_pack_backed_const_generic_parameters() {
-    let source = "import feature; verb main() -> Int { return inspect[256]() as Int; }\n";
+    let source = "import { open feature }; verb main() -> Int { return inspect[256]() as Int; }\n";
     let (root, input, output) = project("pack-backed-generic-facade", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
     fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
@@ -238,7 +237,7 @@ fn nested_facade_lowers_pack_backed_const_generic_parameters() {
 
 #[test]
 fn generic_region_covers_array_struct_and_aggregate_return_abi() {
-    let source = r#"import std::region;
+    let source = r#"import { open std::region };
 
 struct Pair {
     erg left: u32,
@@ -355,7 +354,7 @@ verb main() -> Int {
 
 #[test]
 fn generic_facade_constant_survives_scalar_predicate_and_aggregate_specialization() {
-    let source = "import feature; verb main() -> Int { return inspect[2]() as Int; }\n";
+    let source = "import { open feature }; verb main() -> Int { return inspect[2]() as Int; }\n";
     let (root, input, output) = project("generic-constant-uses", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -393,7 +392,7 @@ open verb inspect[N: Usize]() -> u16 {
 
 #[test]
 fn facade_constant_objects_are_deterministic_and_symbol_free() {
-    let source = "import feature; verb main() -> Int { return stride() as Int; }\n";
+    let source = "import { open feature }; verb main() -> Int { return stride() as Int; }\n";
     let (root, input, output) = project("constant-symbol-integrity", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -405,7 +404,7 @@ fn facade_constant_objects_are_deterministic_and_symbol_free() {
         .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        "import config; open verb stride() -> u16 { return BUFFER_STRIDE; }\n",
+        "import { open config }; open verb stride() -> u16 { return BUFFER_STRIDE; }\n",
     )
     .expect("write feature implementation");
 

@@ -5,7 +5,7 @@ use std::process::Command;
 
 #[test]
 fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
-    let source = "import output; verb main() -> Int { return emit(); }\n";
+    let source = "import { open output }; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("module-runtime-bridge", source);
     fs::create_dir_all(root.join("src/output")).expect("create output module directory");
     fs::write(root.join("src/output/output.act"), "open api;\n").expect("write output facade");
@@ -25,7 +25,7 @@ fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
 #[cfg(unix)]
 #[test]
 fn unresolved_external_bridge_fails_during_multi_object_link() {
-    let source = "import missing; verb main() -> Int { return invoke(); }\n";
+    let source = "import { open missing }; verb main() -> Int { return invoke(); }\n";
     let (root, input, output) = project("unresolved-bridge", source);
     fs::create_dir_all(root.join("src/missing")).expect("create missing module directory");
     fs::write(root.join("src/missing/missing.act"), "open api;\n").expect("write missing facade");
@@ -54,7 +54,7 @@ fn unresolved_external_bridge_fails_during_multi_object_link() {
 
 #[test]
 fn freestanding_multi_object_build_keeps_configured_entry_and_module_symbols() {
-    let source = "import math; verb boot() -> Int { return add(); }\n";
+    let source = "import { open math }; verb boot() -> Int { return add(); }\n";
     let (root, input, output) = project("freestanding-objects", source);
     fs::write(
         root.join("Actus.toml"),
@@ -95,7 +95,7 @@ fn freestanding_multi_object_build_keeps_configured_entry_and_module_symbols() {
 
 #[test]
 fn object_build_emits_one_root_and_one_imported_module_object() {
-    let source = "import math; verb main() -> Int { return add(); }\n";
+    let source = "import { open math }; verb main() -> Int { return add(); }\n";
     let (root, input, output) = project("module-objects", source);
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
@@ -119,7 +119,7 @@ fn object_build_emits_one_root_and_one_imported_module_object() {
 
 #[test]
 fn module_application_rejects_private_bridge_before_codegen() {
-    let source = "import runtime; verb main() -> Int { return private_bridge(); }\n";
+    let source = "import { open runtime }; verb main() -> Int { return private_bridge(); }\n";
     let (root, input, _output) = project("private-bridge", source);
     fs::create_dir_all(root.join("src/runtime")).expect("create runtime module directory");
     fs::write(root.join("src/runtime/runtime.act"), "open api;\n").expect("write runtime facade");

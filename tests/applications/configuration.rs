@@ -4,7 +4,7 @@ use std::fs;
 use std::process::Command;
 #[test]
 fn package_configuration_module_emits_without_an_anchor_verb() {
-    let source = "import config; verb main() -> Int { return LIMIT as Int; }\n";
+    let source = "import { open config }; verb main() -> Int { return LIMIT as Int; }\n";
     let (root, input, output) = project("const-only-config", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -42,7 +42,7 @@ fn package_configuration_module_emits_without_an_anchor_verb() {
 
 #[test]
 fn package_configuration_supports_all_compile_time_consumers() {
-    let source = "import config; struct Settings { erg threshold: u8, } struct Storage[N: Usize] { erg values: Array[u8, N], } verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = LIMIT; erg settings = Settings { threshold: values[0], }; erg storage: Storage[2] = Storage[2] { values: Array[u8, 2](), }; storage.values[0] = settings.threshold; erg result = storage.values[0] as Int; if ENABLED == true { return result; } return 2; }\n";
+    let source = "import { open config }; struct Settings { erg threshold: u8, } struct Storage[N: Usize] { erg values: Array[u8, N], } verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = LIMIT; erg settings = Settings { threshold: values[0], }; erg storage: Storage[2] = Storage[2] { values: Array[u8, 2](), }; storage.values[0] = settings.threshold; erg result = storage.values[0] as Int; if ENABLED == true { return result; } return 2; }\n";
     let (root, input, output) = project("config-acceptance", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -61,7 +61,7 @@ fn package_configuration_supports_all_compile_time_consumers() {
 
 #[test]
 fn imported_module_can_lower_a_configuration_constant() {
-    let source = "import worker; verb main() -> Int { return read_magic(); }\n";
+    let source = "import { open worker }; verb main() -> Int { return read_magic(); }\n";
     let (root, input, output) = project("config-imported-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -72,7 +72,7 @@ fn imported_module_can_lower_a_configuration_constant() {
     fs::write(root.join("src/worker/worker.act"), "open api;\n").expect("write worker facade");
     fs::write(
         root.join("src/worker/api.act"),
-        "import config; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
+        "import { open config }; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
     )
     .expect("write worker implementation");
 
@@ -84,7 +84,7 @@ fn imported_module_can_lower_a_configuration_constant() {
 
 #[test]
 fn nested_imported_module_can_lower_a_configuration_constant() {
-    let source = "import aie; verb main() -> Int { return read_magic(); }\n";
+    let source = "import { open aie }; verb main() -> Int { return read_magic(); }\n";
     let (root, input, output) = project("config-nested-imported-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -97,7 +97,7 @@ fn nested_imported_module_can_lower_a_configuration_constant() {
         .expect("write persistence facade");
     fs::write(
         root.join("src/aie/persistence/serialization.act"),
-        "import config; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
+        "import { open config }; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
     )
     .expect("write serialization implementation");
 
@@ -109,7 +109,7 @@ fn nested_imported_module_can_lower_a_configuration_constant() {
 
 #[test]
 fn canonical_parent_facade_exposes_nested_configuration_constant() {
-    let source = "import feature; verb main() -> Int { return stride() as Int; }\n";
+    let source = "import { open feature }; verb main() -> Int { return stride() as Int; }\n";
     let (root, input, output) = project("canonical-constant-facade", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -121,7 +121,7 @@ fn canonical_parent_facade_exposes_nested_configuration_constant() {
         .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        "import config; open verb stride() -> u16 { return BUFFER_STRIDE; }\n",
+        "import { open config }; open verb stride() -> u16 { return BUFFER_STRIDE; }\n",
     )
     .expect("write feature implementation");
 
@@ -133,7 +133,7 @@ fn canonical_parent_facade_exposes_nested_configuration_constant() {
 
 #[test]
 fn nested_facade_constant_has_object_and_executable_parity() {
-    let source = "import feature; verb main() -> Int { return inspect() as Int; }\n";
+    let source = "import { open feature }; verb main() -> Int { return inspect() as Int; }\n";
     let (root, input, output) = project("constant-native-parity", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -145,7 +145,7 @@ fn nested_facade_constant_has_object_and_executable_parity() {
         .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        r#"import config;
+        r#"import { open config };
 
 open struct Settings {
     erg stride: u16,

@@ -43,7 +43,7 @@ fn negative_application_proves_missing_file_is_typed() {
 
 #[test]
 fn module_application_executes_public_wrapper_with_private_implementation() {
-    let source = "import math; verb main() -> Int { return add(); }\n";
+    let source = "import { open math }; verb main() -> Int { return add(); }\n";
     let (root, input, output) = project("module-wrapper", source);
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");

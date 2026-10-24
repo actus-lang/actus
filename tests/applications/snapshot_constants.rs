@@ -3,7 +3,7 @@ use std::fs;
 
 #[test]
 fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
-    let source = "import aie; verb main() -> Int { return snapshot_is_valid(); }\n";
+    let source = "import { open aie }; verb main() -> Int { return snapshot_is_valid(); }\n";
     let (root, input, output) = project("config-snapshot-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -16,7 +16,7 @@ fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
         .expect("write persistence facade");
     fs::write(
         root.join("src/aie/persistence/serialization.act"),
-        r#"import config;
+        r#"import { open config };
 
 open struct Snapshot {
     erg magic: u32,
@@ -43,7 +43,7 @@ open verb snapshot_is_valid() -> Int {
 
 #[test]
 fn nested_facade_constants_lower_inside_indexed_snapshot_loops() {
-    let source = "import feature; verb main() -> Int { return emit(); }\n";
+    let source = "import { open feature }; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("constant-indexed-loop", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(root.join("src/config/config.act"), "open values;\n")
@@ -58,7 +58,7 @@ fn nested_facade_constants_lower_inside_indexed_snapshot_loops() {
         .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        r#"import config;
+        r#"import { open config };
 
 open verb emit() -> Int {
     erg bytes: Array[u8, 24] = Array[u8, 24]();
