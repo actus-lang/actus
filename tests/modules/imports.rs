@@ -263,6 +263,10 @@ fn resolves_qualified_configuration_constant_semantically() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("qualified configuration constants should resolve semantically");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified configuration constant plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("qualified configuration constant should lower");
 }
 
 #[test]
@@ -276,6 +280,10 @@ fn resolves_qualified_enum_type_and_variant_semantically() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("qualified enum types and variants should resolve semantically");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified enum plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("qualified enum type and variant should lower");
 }
 
 #[test]

@@ -11,7 +11,7 @@ use crate::ast::{
 /// codegen preparation makes that contract explicit while leaving semantic
 /// validation in the semantic phase.
 pub(super) fn inline_constants(program: &mut Program) {
-    let constants = program
+    let mut constants = program
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
@@ -21,6 +21,27 @@ pub(super) fn inline_constants(program: &mut Program) {
             _ => None,
         })
         .collect::<HashMap<_, _>>();
+    let namespaces = program
+        .declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            TopLevelDecl::Import(import) if !import.is_open => Some(
+                import
+                    .alias
+                    .clone()
+                    .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+                    .unwrap_or_else(|| import.path.clone()),
+            ),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    for namespace in namespaces {
+        for (name, initializer) in constants.clone() {
+            if !name.contains("::") {
+                constants.insert(format!("{namespace}::{name}"), initializer);
+            }
+        }
+    }
     for declaration in &mut program.declarations {
         inline_declaration_types(declaration, &constants);
         match declaration {
@@ -271,7 +292,14 @@ fn inline_expression_node(expression: &mut Expr, constants: &HashMap<String, Exp
         Expr::StructLit { type_arguments, fields, .. } => {
             inline_struct_literal(type_arguments, fields, constants);
         }
-        Expr::FieldAccess { object, .. } => inline_expression(object, constants),
+        Expr::FieldAccess { object, .. } => {
+            if let Expr::Identifier { name, .. } = object.as_mut()
+                && let Some((_, member)) = name.split_once("::")
+            {
+                *name = member.to_owned();
+            }
+            inline_expression(object, constants);
+        }
         Expr::Index { target: object, index, .. } => {
             inline_expression(object, constants);
             inline_expression(index, constants);
