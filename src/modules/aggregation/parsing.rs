@@ -9,7 +9,8 @@ use crate::parser::parse;
 use super::super::resolver::ModuleResolver;
 use super::types::ModuleError;
 use super::validation::{
-    check_declaration_name, validate_configuration_source, validate_open_siblings,
+    check_declaration_name, validate_configuration_source, validate_import_bindings,
+    validate_open_siblings,
 };
 
 pub fn parse_module(resolver: &ModuleResolver, module_path: &str) -> Result<Program, ModuleError> {
@@ -75,6 +76,7 @@ where
             path: source_path.clone(),
             error: Box::new(error),
         })?;
+        validate_import_bindings(&program)?;
         validate_configuration_source(module_path, &source_path, &program)?;
         if source_index == 0 {
             validate_open_siblings(module_path, facade, siblings, children, &program)?;

@@ -5,9 +5,10 @@ This example is intentionally independent of any application engine. It
 captures an instant, constructs and converts a duration, checks a deadline,
 and observes a typed overflow failure.
 """
-import std::io;
-
-import std::time;
+import {
+    open std::io,
+    open std::time,
+};
 
 verb unwrap_duration(erg candidate: Result[Duration, TimeError]) -> Duration {
     return case dat candidate {

@@ -1,4 +1,6 @@
-import control;
+import {
+    open control,
+};
 
 meta test
 verb parent_facade_exposes_public_api() -> Int {

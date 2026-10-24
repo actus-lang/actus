@@ -4,15 +4,10 @@ Streaming directory access through one owned host directory handle.
 The iterator returns one owned entry `Path` at a time. It does not retain the
 parent path, expose a native pointer, or allocate an unbounded entry array.
 """
-import io;
-
-import path;
-
-"""Re-export the standard I/O error type used by directory operations."""
-open io;
-
-"""Re-export the standard path type used by directory operations."""
-open path;
+import {
+    open io,
+    open path,
+};
 
 """Maximum raw storage reserved for one returned directory entry name."""
 open const DIRECTORY_ENTRY_BUFFER_BYTES: Int = 4096;

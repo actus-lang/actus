@@ -569,7 +569,7 @@ fn lsp_reports_missing_qualified_namespace_members_with_spans() {
     .expect("write manifest");
     let main_path = root.join("src/main.act");
     let main_uri = file_uri(&main_path);
-    let main = "import math;\nverb main() -> Int { return math::missing(); }\n";
+    let main = "import { open math };\nverb main() -> Int { return math::missing(); }\n";
     fs::write(&main_path, main).expect("write main");
     fs::write(module.join("math.act"), "open api;\n").expect("write facade");
     fs::write(module.join("api.act"), "open verb visible() -> Int { return 7; }\n")

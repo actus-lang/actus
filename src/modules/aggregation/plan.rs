@@ -9,7 +9,7 @@ use super::super::resolver::ModuleResolver;
 use super::object_plan::{ModuleObjectPlan, build_object_plan};
 use super::types::ModuleError;
 use super::unit::ModuleUnit;
-use super::validation::export_identity;
+use super::validation::{export_identity, validate_import_bindings};
 use super::visibility::validate_import_visibility;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -95,11 +95,31 @@ pub fn build_compilation_plan_with_overlays(
     resolver: &ModuleResolver,
     overlays: &HashMap<std::path::PathBuf, String>,
 ) -> Result<ModuleCompilationPlan, ModuleError> {
+    build_compilation_plan_with_overlays_and_scope_check(program, resolver, overlays, true)
+}
+
+pub(super) fn build_module_compilation_plan_with_overlays(
+    program: &Program,
+    resolver: &ModuleResolver,
+    overlays: &HashMap<std::path::PathBuf, String>,
+) -> Result<ModuleCompilationPlan, ModuleError> {
+    build_compilation_plan_with_overlays_and_scope_check(program, resolver, overlays, false)
+}
+
+fn build_compilation_plan_with_overlays_and_scope_check(
+    program: &Program,
+    resolver: &ModuleResolver,
+    overlays: &HashMap<std::path::PathBuf, String>,
+    validate_root_import_bindings: bool,
+) -> Result<ModuleCompilationPlan, ModuleError> {
     let mut caller_declarations = Vec::new();
     let mut local_declarations = Vec::new();
     let mut units = Vec::new();
     let mut imported_paths = HashSet::new();
-    validate_import_bindings(program)?;
+    let mut appended_symbols = HashSet::new();
+    if validate_root_import_bindings {
+        validate_import_bindings(program)?;
+    }
     collect_root_imports(
         program,
         resolver,
@@ -108,6 +128,7 @@ pub fn build_compilation_plan_with_overlays(
         &mut units,
         &mut local_declarations,
         &mut caller_declarations,
+        &mut appended_symbols,
     )?;
     validate_symbol_collisions(&local_declarations, &units)?;
     Ok(ModuleCompilationPlan {
@@ -123,26 +144,6 @@ pub fn build_compilation_plan_with_overlays(
     })
 }
 
-fn validate_import_bindings(program: &Program) -> Result<(), ModuleError> {
-    let mut bindings = HashMap::new();
-    for declaration in &program.declarations {
-        let TopLevelDecl::Import(import) = declaration else { continue };
-        let binding = import
-            .alias
-            .clone()
-            .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
-            .unwrap_or_else(|| import.path.clone());
-        if let Some(first) = bindings.insert(binding.clone(), import.span) {
-            return Err(ModuleError::ImportBindingCollision {
-                binding,
-                first,
-                second: import.span,
-            });
-        }
-    }
-    Ok(())
-}
-
 fn collect_root_imports(
     program: &Program,
     resolver: &ModuleResolver,
@@ -151,6 +152,7 @@ fn collect_root_imports(
     units: &mut Vec<ModuleUnit>,
     local_declarations: &mut Vec<TopLevelDecl>,
     caller_declarations: &mut Vec<TopLevelDecl>,
+    appended_symbols: &mut HashSet<(String, String, String)>,
 ) -> Result<(), ModuleError> {
     for declaration in &program.declarations {
         let TopLevelDecl::Import(import) = declaration else {
@@ -159,9 +161,6 @@ fn collect_root_imports(
             continue;
         };
         caller_declarations.push(declaration.clone());
-        if !imported_paths.insert(import.path.clone()) {
-            continue;
-        }
         let namespace = import_namespace(import);
         collect_unit(
             &import.path,
@@ -171,6 +170,7 @@ fn collect_root_imports(
             imported_paths,
             units,
             caller_declarations,
+            appended_symbols,
             namespace.as_deref(),
         )?;
     }
@@ -322,14 +322,16 @@ fn collect_unit(
     imported_paths: &mut HashSet<String>,
     units: &mut Vec<ModuleUnit>,
     caller_declarations: &mut Vec<TopLevelDecl>,
+    appended_symbols: &mut HashSet<(String, String, String)>,
     namespace: Option<&str>,
 ) -> Result<(), ModuleError> {
     let unit = super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
     validate_import_visibility(importer, module_path, &unit)?;
-    for declaration in &unit.implementation().declarations {
-        let TopLevelDecl::Import(import) = declaration else { continue };
-        let import_path = qualify_import_path(module_path, &import.path);
-        if imported_paths.insert(import_path.clone()) {
+    let first_load = imported_paths.insert(module_path.to_owned());
+    if first_load {
+        for declaration in &unit.implementation().declarations {
+            let TopLevelDecl::Import(import) = declaration else { continue };
+            let import_path = qualify_import_path(module_path, &import.path);
             collect_unit(
                 &import_path,
                 unit.implementation(),
@@ -338,12 +340,21 @@ fn collect_unit(
                 imported_paths,
                 units,
                 caller_declarations,
+                appended_symbols,
                 namespace,
             )?;
         }
     }
-    append_public_declarations(caller_declarations, &unit, namespace);
-    units.push(unit);
+    append_public_declarations(
+        caller_declarations,
+        &unit,
+        module_path,
+        namespace,
+        appended_symbols,
+    );
+    if first_load {
+        units.push(unit);
+    }
     Ok(())
 }
 
@@ -358,12 +369,24 @@ pub(super) fn qualify_import_path(importer: &str, imported: &str) -> String {
 fn append_public_declarations(
     target: &mut Vec<TopLevelDecl>,
     unit: &ModuleUnit,
+    module_path: &str,
     namespace: Option<&str>,
+    appended_symbols: &mut HashSet<(String, String, String)>,
 ) {
-    for declaration in unit.implementation().declarations.iter().filter(|declaration| {
-        let Some((kind, name)) = export_identity(declaration) else { return false };
-        unit.exports().contains(kind, &name)
-    }) {
+    for declaration in &unit.implementation().declarations {
+        let Some((kind, name)) = export_identity(declaration) else { continue };
+        if !unit.exports().contains(kind, &name) {
+            continue;
+        }
+        let symbol_namespace = (kind == "verb").then(|| namespace.unwrap_or_default().to_owned());
+        let key = (
+            module_path.to_owned(),
+            format!("{kind}:{name}"),
+            symbol_namespace.unwrap_or_default(),
+        );
+        if !appended_symbols.insert(key) {
+            continue;
+        }
         let imported = caller_declaration(declaration, namespace);
         if !has_compatible_external_declaration(target, &imported) {
             target.push(imported);

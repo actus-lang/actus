@@ -5,9 +5,10 @@ The executable encodes and decodes one bounded frame, admits its sequence in
 the replay window, then feeds the same frame to the incremental parser in two
 chunks. It uses only caller-owned buffers and prints observable success lines.
 """
-import std::io;
-
-import std::wire;
+import {
+    open std::io,
+    open std::wire,
+};
 
 verb encode_frame(ins encoded: Buffer) -> Int {
     erg header = WireHeader {storage: Array[u8, 12]()};

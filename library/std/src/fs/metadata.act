@@ -4,8 +4,10 @@
 the value can cross the runtime boundary in a deterministic C-compatible
 layout.
 """
-import io;
-import path;
+import {
+    open io,
+    open path,
+};
 """
 An owned scalar metadata record returned by filesystem inspection.
 Its erg fields are copied facts and require no host-handle cleanup.

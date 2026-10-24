@@ -24,6 +24,13 @@ impl Analyzer {
         }
     }
 
+    pub(crate) fn normalize_imported_type_key(&self, name: &str) -> String {
+        name.split_once("::")
+            .filter(|(namespace, _)| self.imported_namespaces.contains_key(*namespace))
+            .map(|(_, member)| member.to_owned())
+            .unwrap_or_else(|| name.to_owned())
+    }
+
     pub(super) fn new() -> Self {
         Self::default()
     }

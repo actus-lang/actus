@@ -1,4 +1,4 @@
-import aie;
+import { open aie };
 
 verb main() -> Int {
     erg small: Storage[4] = Storage[4] { values: Array[u32, 4]() };

@@ -1,4 +1,6 @@
-import control;
+import {
+    open control,
+};
 
 verb main() -> Int {
     return control_value();

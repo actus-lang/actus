@@ -1,5 +1,5 @@
 """Generic external-consumer fixture for the public text boundary."""
-import std::string;
+import { open std::string };
 
 verb inspect_text(dat storage: Buffer) -> Int {
     erg owned = utf8_from_buffer(storage: dat storage);

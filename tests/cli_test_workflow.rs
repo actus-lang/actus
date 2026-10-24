@@ -79,7 +79,7 @@ fn test_links_imported_module_objects_for_meta_tests() {
     let root = create_test_project(
         "runner-module",
         "module.act",
-        "import math; meta test\nverb smoke() -> Int { return add(); }\n",
+        "import { open math }; meta test\nverb smoke() -> Int { return add(); }\n",
     );
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
@@ -100,7 +100,7 @@ fn test_treats_configuration_as_a_package_module() {
     let root = create_test_project(
         "runner-config",
         "config_test.act",
-        "import config; meta test\nverb reads_config() -> Int { return LIMIT as Int - 30; }\n",
+        "import { open config }; meta test\nverb reads_config() -> Int { return LIMIT as Int - 30; }\n",
     );
     fs::create_dir_all(root.join("src/config")).expect("create config directory");
     fs::write(root.join("src/config/config.act"), "open values;\n").expect("write config facade");
@@ -178,7 +178,7 @@ fn test_native_runner_keeps_transitive_sibling_facade_dependencies() {
     let root = create_test_project(
         "runner-transitive-sibling-facade",
         "transitive.act",
-        "import aie; meta test\nverb smoke() -> Int { return allocate_column_index() as Int - 1; }\n",
+        "import { open aie }; meta test\nverb smoke() -> Int { return allocate_column_index() as Int - 1; }\n",
     );
     fs::create_dir_all(root.join("src/aie/runtime")).expect("create runtime directory");
     fs::write(root.join("src/aie/aie.act"), "open runtime; open resident;\n")
@@ -210,7 +210,7 @@ fn file_limitless_metadata_does_not_change_nested_native_dependency_roots() {
     let root = create_test_project(
         "runner-limitless-roots",
         "nested.act",
-        "meta limitless(\"file\")\nimport aie;\nmeta test\nverb forwards_through_nested_facade() -> Int { return step() - 42; }\n",
+        "meta limitless(\"file\")\nimport { open aie };\nmeta test\nverb forwards_through_nested_facade() -> Int { return step() - 42; }\n",
     );
     let forwarding = root.join("src/aie/runtime");
     fs::create_dir_all(&forwarding).expect("create nested runtime directory");
@@ -236,7 +236,7 @@ fn test_specializes_nested_generic_facade_dependencies() {
     let root = create_test_project(
         "runner-generic-closure",
         "nested_generic.act",
-        "import aie;\nmeta test\nverb nested_generic() -> Int {\n    erg storage: Storage[4] = Storage[4] { values: Array[u32, 4]() };\n    return outer(storage: ins storage) as Int - 4;\n}\n",
+        "import { open aie };\nmeta test\nverb nested_generic() -> Int {\n    erg storage: Storage[4] = Storage[4] { values: Array[u32, 4]() };\n    return outer(storage: ins storage) as Int - 4;\n}\n",
     );
     let api = root.join("src/aie/runtime");
     fs::create_dir_all(&api).expect("create nested generic module");

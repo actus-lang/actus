@@ -6,32 +6,32 @@ name = "charmap"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "25445cf9bc5f48ad"
 
 [[package]]
 name = "fs"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "25445cf9bc5f48ad"
 
 [[package]]
 name = "io"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "25445cf9bc5f48ad"
 
 [[package]]
 name = "path"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "25445cf9bc5f48ad"
 
 [[package]]
 name = "process"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "25445cf9bc5f48ad"

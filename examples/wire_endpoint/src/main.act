@@ -4,9 +4,10 @@ Optional hosted endpoint demonstration.
 The address is represented as caller-owned bytes. Parsing returns bounded
 offset metadata; it does not create a String or open a transport.
 """
-import std::io;
-
-import std::wire;
+import {
+    open std::io,
+    open std::wire,
+};
 
 verb address_bytes() -> Buffer {
     erg address = Buffer[25];

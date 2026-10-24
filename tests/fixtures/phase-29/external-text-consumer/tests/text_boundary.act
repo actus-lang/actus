@@ -1,4 +1,4 @@
-import std::string;
+import { open std::string };
 
 meta test
 verb public_text_boundary_test() -> Int {

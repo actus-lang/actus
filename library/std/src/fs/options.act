@@ -3,8 +3,10 @@
 Each field is a scalar switch. The configuration is consumed by `options_open`
 so the host runtime receives one complete, immutable open request.
 """
-import io;
-import path;
+import {
+    open io,
+    open path,
+};
 """
 An owned set of erg scalar switches consumed by an open operation.
 The record has no external resource and is returned after each builder.

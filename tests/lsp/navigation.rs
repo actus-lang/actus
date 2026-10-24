@@ -96,7 +96,7 @@ fn lsp_navigation_reports_ambiguous_module_roots() {
     .expect("write module directory facade");
     let main_path = source_root.join("main.act");
     let main_uri = file_uri(&main_path);
-    let source = "import math;\nverb main() -> Int { return file_root(); }\n";
+    let source = "import { open math };\nverb main() -> Int { return file_root(); }\n";
     fs::write(&main_path, source).expect("write main");
     let messages = [
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),

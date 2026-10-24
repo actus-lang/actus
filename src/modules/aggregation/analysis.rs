@@ -6,7 +6,7 @@ use crate::semantic::{SemanticModel, analyze, filter_program_for_target};
 
 use super::super::resolver::ModuleResolver;
 use super::parsing::parse_module_with_overlays;
-use super::plan::build_compilation_plan;
+use super::plan::{build_compilation_plan, build_module_compilation_plan_with_overlays};
 use super::types::ModuleError;
 use super::unit::{ModuleUnit, load_module_unit};
 
@@ -28,7 +28,7 @@ pub fn analyze_module_with_overlays(
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<SemanticModel, ModuleError> {
     let program = parse_module_with_overlays(resolver, module_path, overlays)?;
-    let program = resolve_imports(&program, resolver)?;
+    let program = resolve_module_imports_with_overlays(&program, resolver, overlays)?;
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
@@ -39,7 +39,7 @@ pub fn analyze_module_with_overlays_for_target(
     target: &crate::target::TargetSpec,
 ) -> Result<SemanticModel, ModuleError> {
     let program = parse_module_with_overlays(resolver, module_path, overlays)?;
-    let program = resolve_imports(&program, resolver)?;
+    let program = resolve_module_imports_with_overlays(&program, resolver, overlays)?;
     let program = filter_program_for_target(&program, target);
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
@@ -88,4 +88,12 @@ fn resolve_imports_with_overlays(
     Ok(super::plan::build_compilation_plan_with_overlays(program, resolver, overlays)?
         .caller()
         .clone())
+}
+
+fn resolve_module_imports_with_overlays(
+    program: &Program,
+    resolver: &ModuleResolver,
+    overlays: &HashMap<PathBuf, String>,
+) -> Result<Program, ModuleError> {
+    Ok(build_module_compilation_plan_with_overlays(program, resolver, overlays)?.caller().clone())
 }

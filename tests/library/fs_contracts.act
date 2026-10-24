@@ -1,4 +1,8 @@
-import { open io, open fs, open path };
+import {
+    open io,
+    open fs,
+    open path,
+};
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_ascii(storage: dat raw);

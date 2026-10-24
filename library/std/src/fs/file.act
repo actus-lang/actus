@@ -5,8 +5,10 @@ The handle is an opaque runtime token. File construction returns a typed
 Result, and the Drop performance closes the underlying operating-system
 resource exactly once when ownership leaves scope.
 """
-import io;
-import path;
+import {
+    open io,
+    open path,
+};
 """
 An owned opaque file handle backed by one host operating-system resource.
 The erg handle is closed by its Drop performance and never stores a Path.

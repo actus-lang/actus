@@ -1,4 +1,4 @@
-import calc;
+import { open calc };
 
 verb main() -> Int {
     erg left = 40;

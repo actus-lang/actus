@@ -1,4 +1,4 @@
-import aie;
+import { open aie };
 
 meta test
 verb nested_generic_test() -> Int {

@@ -84,7 +84,7 @@ fn lsp_keeps_a_malformed_nested_child_overlay_live() {
     let child_path = child.join("api.act");
     let main_uri = file_uri(&main_path);
     let child_uri = file_uri(&child_path);
-    let main = "import device;\nverb main() -> Int { return visible(); }\n";
+    let main = "import { open device };\nverb main() -> Int { return visible(); }\n";
     let valid_child = "open verb visible() -> Int { return 42; }\n";
     let malformed_child = "open verb visible() -> Int { return\n";
     fs::write(&main_path, main).expect("write main");
@@ -129,7 +129,7 @@ fn lsp_removes_closed_overlay_and_falls_back_to_disk_module() {
     let api_path = module.join("api.act");
     let main_uri = file_uri(&main_path);
     let api_uri = file_uri(&api_path);
-    let main = "import math;\nverb main() -> Int { return disk_only(); }\n";
+    let main = "import { open math };\nverb main() -> Int { return disk_only(); }\n";
     let disk_api = "open verb disk_only() -> Int { return 3; }\n";
     let overlay_api = "open verb unsaved_only() -> Int { return 4; }\n";
     fs::write(&main_path, main).expect("write main");
@@ -167,7 +167,7 @@ fn lsp_reindexes_facade_dependency_and_renamed_sibling_changes() {
     let facade_uri = file_uri(&module.join("math.act"));
     let api_uri = file_uri(&api_path);
     let renamed_uri = file_uri(&renamed_path);
-    let main = "import math;\nverb main() -> Int { return renamed_symbol(); }\n";
+    let main = "import { open math };\nverb main() -> Int { return renamed_symbol(); }\n";
     let facade = "open api;\n";
     let api = "open verb old_symbol() -> Int { return 1; }\n";
     let renamed = "open verb renamed_symbol() -> Int { return 2; }\n";
@@ -209,7 +209,7 @@ fn lsp_rename_updates_open_facade_export_and_imported_reference() {
     let main_path = root.join("src/main.act");
     let facade = "open api;\n";
     let api = "open verb add(erg left: Int, erg right: Int) -> Int { return left + right; }\n";
-    let main = "import math;\nverb main() -> Int { return add(left: 40, right: 2); }\n";
+    let main = "import { open math };\nverb main() -> Int { return add(left: 40, right: 2); }\n";
     fs::write(&facade_path, facade).expect("write facade");
     fs::write(&api_path, api).expect("write api");
     fs::write(&main_path, main).expect("write main");

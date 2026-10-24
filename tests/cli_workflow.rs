@@ -262,7 +262,7 @@ fn native_build_propagates_nested_generic_instances_through_an_imported_module()
         "[package]\nname = \"nested-generic-module\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "import aie; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n")
+    fs::write(root.join("src/main.act"), "import { open aie }; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n")
         .expect("write root source");
     fs::write(module.join("aie.act"), "open engine;\n").expect("write module facade");
     fs::write(
@@ -296,7 +296,7 @@ fn native_build_propagates_nested_generics_through_a_child_facade() {
     .expect("write manifest");
     fs::write(
         root.join("src/main.act"),
-        "import aie; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n",
+        "import { open aie }; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n",
     )
     .expect("write root source");
     fs::write(root.join("src/aie/aie.act"), "open runtime;\n").expect("write parent facade");
@@ -333,7 +333,7 @@ fn native_build_specializes_root_generic_calls_through_nested_facades() {
     .expect("write manifest");
     fs::write(
         root.join("src/main.act"),
-        "import device; verb wrapper[N: Usize](ins value: Storage[N]) -> u32 { return forward(value: ins value); } verb main() -> Int { erg value: Storage[4] = Storage[4] { values: Array[u32, 4]() }; return wrapper(value: ins value) as Int; }\n",
+        "import { open device }; verb wrapper[N: Usize](ins value: Storage[N]) -> u32 { return forward(value: ins value); } verb main() -> Int { erg value: Storage[4] = Storage[4] { values: Array[u32, 4]() }; return wrapper(value: ins value) as Int; }\n",
     )
     .expect("write root source");
     fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
@@ -452,7 +452,7 @@ fn native_build_links_multiple_child_facades_once() {
     .expect("write manifest");
     fs::write(
         root.join("src/main.act"),
-        "import device; verb main() -> Int { return runtime_value() + layout_value(); }\n",
+        "import { open device }; verb main() -> Int { return runtime_value() + layout_value(); }\n",
     )
     .expect("write root source");
     fs::write(root.join("src/device/device.act"), "open runtime; open layout;\n")

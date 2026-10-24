@@ -1,12 +1,14 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::codegen::cranelift::emit_program_object;
+use actus::configuration::CompilerConfiguration;
 use actus::lexer::scan;
 use actus::modules::{
-    ModuleError, ModuleResolver, analyze_with_imports, build_compilation_plan, load_module_unit,
-    parse_module,
+    ModuleError, ModuleResolver, analyze_module_with_overlays, analyze_with_imports,
+    analyze_with_imports_for_target, build_compilation_plan, load_module_unit, parse_module,
 };
 use actus::parser::parse;
 
@@ -287,6 +289,64 @@ fn resolves_qualified_enum_type_and_variant_semantically() {
 }
 
 #[test]
+fn resolves_qualified_struct_type_semantically() {
+    let fixture = Fixture::new();
+    fixture.write("paths/paths.act", "open values;");
+    fixture.write("paths/values.act", "open struct Path { value: Int, }");
+    let program = parse_source(
+        "import paths; verb main() -> paths::Path { return paths::Path { value: 1, }; }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified struct types should resolve semantically");
+}
+
+#[test]
+fn resolves_qualified_struct_type_from_a_dependency_alias() {
+    let fixture = Fixture::new();
+    fixture.write("path/path.act", "open types;");
+    fixture.write("path/types.act", "open struct Path { value: Int, }");
+    let mut dependencies = BTreeMap::new();
+    dependencies.insert("path".to_owned(), fixture.root.clone());
+    let resolver = ModuleResolver::with_dependencies(fixture.root.join("app"), &dependencies);
+    let program =
+        parse_source("import path; verb main() -> path::Path { return path::Path { value: 1, }; }");
+
+    analyze_with_imports(&program, &resolver)
+        .expect("qualified struct types should resolve through dependency aliases");
+    analyze_with_imports_for_target(
+        &program,
+        &resolver,
+        &actus::target::TargetSpec::host().expect("host target"),
+    )
+    .expect("target-aware qualified struct types should resolve through dependency aliases");
+}
+
+#[test]
+fn resolves_qualified_std_path_types_from_the_project_configuration() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/path_components.act");
+    let source = fs::read_to_string(&path).expect("read path fixture");
+    let (tokens, errors) = scan(&source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("path fixture should parse");
+    let configuration = CompilerConfiguration::from_input_path_read_only(&path)
+        .expect("project configuration should load");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    );
+
+    analyze_with_imports_for_target(
+        &program,
+        &resolver,
+        &actus::target::TargetSpec::host().expect("host target"),
+    )
+    .expect("qualified std path types should resolve from the project configuration");
+}
+
+#[test]
 fn rejects_imports_inside_nested_configuration_sources() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open policy;");
@@ -472,6 +532,23 @@ fn rejects_repeated_imports_with_a_stable_module_diagnostic() {
         matches!(error, ModuleError::ImportBindingCollision { ref binding, .. } if binding == "shared")
     );
     assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1115");
+}
+
+#[test]
+fn allows_equal_import_bindings_in_distinct_module_sources() {
+    let fixture = Fixture::new();
+    fixture.write("api/api.act", "open left; open right;");
+    fixture
+        .write("api/left.act", "import shared; open verb left() -> Int { return shared::read(); }");
+    fixture.write(
+        "api/right.act",
+        "import shared; open verb right() -> Int { return shared::read(); }",
+    );
+    fixture.write("shared/shared.act", "open verbs;");
+    fixture.write("shared/verbs.act", "open verb read() -> Int { return 7; }");
+
+    analyze_module_with_overlays(&ModuleResolver::new(&fixture.root), "api", &Default::default())
+        .expect("imports are scoped to their declaring source file");
 }
 
 #[test]

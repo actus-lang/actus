@@ -4,7 +4,9 @@ Runtime profile demonstration.
 The `std` build profile supplies the compiler-owned standard library. The
 application imports the public `std::io` facade without a path dependency.
 """
-import std::io;
+import {
+    open std::io,
+};
 
 verb main() -> Void {
     erg text = "text output";
