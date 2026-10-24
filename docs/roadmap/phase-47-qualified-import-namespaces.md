@@ -112,7 +112,7 @@ diagnostics with qualified names and spans.
       compiler capability.
 - [x] Migrate selected standard-library consumers to qualified access only
       after the shared semantic and backend gates pass.
-- [ ] Keep migration changes separate from compiler implementation changes.
+- [x] Keep migration changes separate from compiler implementation changes.
 - [x] Document remaining `open` uses and their reasons.
 
 Inventory evidence (2026-10-24): the standard library contains 346 `open`
@@ -134,6 +134,11 @@ aggregation regression test covers this facade-signature case. Remaining
 module-level `open` declarations are retained for canonical facade re-exports;
 the other filesystem consumers remain follow-up candidates until their
 qualified signatures are migrated and tested independently.
+
+Change-boundary evidence (2026-10-24): compiler/parser/semantic changes,
+backend lowering, standard-library migration, and roadmap documentation were
+committed as separate thematic commits. No standard-library migration is
+mixed into the compiler implementation commit.
 
 ### Gate 47.6 — Compatibility and release evidence
 
