@@ -63,8 +63,10 @@ impl<'program> ProgramLayouts<'program> {
             .filter_map(|declaration| match declaration {
                 TopLevelDecl::Perform(perform) if perform.role_name == "Drop" => {
                     let target = perform.target.canonical_key();
+                    let symbol_namespace =
+                        perform.module_import_namespace.as_deref().unwrap_or(namespace);
                     let symbol = SymbolIdentity::specialized(
-                        namespace,
+                        symbol_namespace,
                         SymbolKind::Performance,
                         "drop",
                         &["Drop", &target],
