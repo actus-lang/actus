@@ -1,7 +1,7 @@
 use super::super::contract::{ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
 use super::super::path::ActusPath;
 use super::super::types::{ActusMetadata, BufferHandle};
-use super::path_bridge::{with_host_path, with_host_paths};
+use super::path_bridge::{replace_output_path, with_host_path, with_host_paths};
 use super::{actus_handle, with_file};
 
 /// Writes file metadata into a caller-owned C-layout output struct.
@@ -62,6 +62,29 @@ pub unsafe extern "C" fn actus_file_symlink_metadata_path(
     let result = unsafe { with_host_path(path, |native| native.symlink_metadata()) };
     match result {
         Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
+        _ => ABI_STATUS_FAILURE,
+    }
+}
+
+/// Resolves one validated path through the host filesystem and writes the
+/// resulting identity path into an owned Actus destination.
+///
+/// # Safety
+/// `path` must be a valid immutable path and `output` must be writable for
+/// the duration of this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_canonicalize_path(
+    path: *const ActusPath,
+    output: *mut ActusPath,
+) -> i32 {
+    if output.is_null() {
+        return ABI_STATUS_FAILURE;
+    }
+    let result = unsafe { with_host_path(path, |value| std::fs::canonicalize(value)) };
+    match result {
+        Some(Ok(canonical)) if unsafe { replace_output_path(output, &canonical) } => {
+            super::super::contract::ABI_STATUS_SUCCESS
+        }
         _ => ABI_STATUS_FAILURE,
     }
 }

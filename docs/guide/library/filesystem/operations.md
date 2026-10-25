@@ -6,6 +6,12 @@
 validated `Path` values and perform one hosted side effect. They return a
 status or copied byte count through `Result`.
 
+`canonicalize` is the separate filesystem-identity operation. It resolves all
+path components and symbolic links through the host, returning a new absolute
+`Path`; it does not mutate the lexical input. Missing components are errors.
+Use `std::path::normalize` when only lexical cleanup is required and no
+filesystem lookup is allowed.
+
 `remove_dir` is for an empty directory according to the host provider. A
 missing, protected, non-empty, or otherwise rejected target is reported as
 `IoError.Failed`.

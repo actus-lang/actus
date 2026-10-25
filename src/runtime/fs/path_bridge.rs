@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use super::super::allocation::{actus_buffer_allocate, actus_buffer_drop};
 use super::super::path::ActusPath;
 #[cfg(unix)]
 use super::super::path::{ActusPathCView, actus_path_c_view};
@@ -36,6 +37,47 @@ pub(crate) unsafe fn with_host_path<T>(
     }
     #[allow(unreachable_code)]
     None
+}
+
+/// Replaces an owned Actus path only after the host operation produced a path.
+pub(crate) unsafe fn replace_output_path(output: *mut ActusPath, path: &Path) -> bool {
+    if output.is_null() {
+        return false;
+    }
+    let Some(mut storage) = path_bytes(path) else { return false };
+    storage.push(0);
+    let handle = actus_buffer_allocate(storage.len());
+    if handle.is_null() {
+        return false;
+    }
+    let buffer = unsafe { &mut *handle };
+    unsafe { std::ptr::copy_nonoverlapping(storage.as_ptr(), buffer.data, storage.len()) };
+    let output = unsafe { &mut *output };
+    if !output.storage.is_null() {
+        unsafe { actus_buffer_drop(output.storage) };
+    }
+    output.storage = handle;
+    output.platform = if cfg!(windows) { 1 } else { 0 };
+    output.length = i32::try_from(storage.len() - 1).unwrap_or(-1);
+    output.capacity = i32::try_from(storage.len()).unwrap_or(-1);
+    output.terminated = 1;
+    output.length >= 0 && output.capacity >= 0
+}
+
+#[cfg(unix)]
+fn path_bytes(path: &Path) -> Option<Vec<u8>> {
+    use std::os::unix::ffi::OsStrExt;
+    Some(path.as_os_str().as_bytes().to_vec())
+}
+
+#[cfg(windows)]
+fn path_bytes(path: &Path) -> Option<Vec<u8>> {
+    use std::os::windows::ffi::OsStrExt;
+    let mut bytes = Vec::new();
+    for unit in path.as_os_str().encode_wide() {
+        bytes.extend_from_slice(&unit.to_ne_bytes());
+    }
+    Some(bytes)
 }
 
 /// Runs one operation with two borrowed host paths and rejects invalid views.

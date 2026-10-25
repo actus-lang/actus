@@ -17,11 +17,11 @@ pub use file::{
     actus_file_seek_buffer, actus_file_sync_all, actus_file_sync_data, actus_file_write,
 };
 pub use operations::{
-    actus_file_copy_buffer, actus_file_copy_path, actus_file_create_dir_buffer,
-    actus_file_create_dir_path, actus_file_metadata_buffer, actus_file_metadata_handle_buffer,
-    actus_file_metadata_path, actus_file_remove_buffer, actus_file_remove_dir_buffer,
-    actus_file_remove_dir_path, actus_file_remove_path, actus_file_rename_buffer,
-    actus_file_rename_path, actus_file_symlink_metadata_path,
+    actus_file_canonicalize_path, actus_file_copy_buffer, actus_file_copy_path,
+    actus_file_create_dir_buffer, actus_file_create_dir_path, actus_file_metadata_buffer,
+    actus_file_metadata_handle_buffer, actus_file_metadata_path, actus_file_remove_buffer,
+    actus_file_remove_dir_buffer, actus_file_remove_dir_path, actus_file_remove_path,
+    actus_file_rename_buffer, actus_file_rename_path, actus_file_symlink_metadata_path,
 };
 pub use path_open::{actus_file_open_options_path, actus_file_open_path};
 pub use temporary::{actus_directory_create_temporary_path, actus_file_open_temporary_path};

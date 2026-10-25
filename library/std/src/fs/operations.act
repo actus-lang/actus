@@ -36,6 +36,17 @@ unsafe extern "C" verb actus_file_copy_path(
 ) -> Int;
 
 """
+Resolve `path` through the host filesystem and write the canonical identity
+path into `output`. The bridge returns zero only after every component exists
+and the destination owns a validated platform path; `-1` reports a missing,
+invalid, inaccessible, or unsupported path without replacing the destination.
+"""
+unsafe extern "C" verb actus_file_canonicalize_path(
+    abs path: path_module::Path,
+    ins output: path_module::Path
+) -> Int;
+
+"""
 Create the directory named by `path`.
 
 The path is an `abs` view. The bridge returns zero on success or `-1` when
@@ -91,6 +102,35 @@ or otherwise rejected paths. The bridge does not retain or allocate a path.
 open verb remove_file(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_path(path: abs path);
     return fs_status(status: erg status);
+}
+
+verb finish_canonicalize(dat output: path_module::Path, erg status: Int) -> Result[path_module::Path, io::IoError] {
+    if status == 0 {
+        return Ok(output);
+    }
+    drop(output);
+    return Err(io::IoError.Failed);
+}
+
+"""
+Resolve one lexical path to its filesystem identity.
+
+Unlike `std::path::normalize`, this operation performs blocking filesystem
+I/O, resolves symbolic links, requires every component to exist, and returns
+a new owned `Path`. The input is only an `abs` view and is never modified.
+"""
+open verb canonicalize(abs path: path_module::Path) -> Result[path_module::Path, io::IoError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    erg placeholder = path_module::path_from_ascii(storage: dat raw);
+    return case dat placeholder {
+        Result.Err(_) => Err(io::IoError.Failed),
+        Result.Ok(output) => {
+            erg status = actus_file_canonicalize_path(path: abs path, output: ins output);
+            return finish_canonicalize(output: dat output, status: erg status);
+        },
+    };
 }
 
 """

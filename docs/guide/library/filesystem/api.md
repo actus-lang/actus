@@ -99,6 +99,7 @@ explicit; no host default is silently selected by the builder chain.
 
 ```actus
 verb remove_file(abs path: Path) -> Result[Int, IoError];
+verb canonicalize(abs path: Path) -> Result[Path, IoError];
 verb rename(abs from: Path, abs to: Path) -> Result[Int, IoError];
 verb copy_file(abs from: Path, abs to: Path) -> Result[Int, IoError];
 verb create_dir(abs path: Path) -> Result[Int, IoError];
@@ -117,6 +118,12 @@ Path operations borrow paths. `read_to_bytes` transfers an owned result buffer
 on success. `read_to_string` transfers a buffer only after UTF-8 validation.
 `write_file_atomic` consumes the staging path so failure cleanup has one clear
 owner.
+
+`canonicalize` performs blocking host filesystem resolution, follows symbolic
+links, requires every component to exist, and returns a new owned identity
+`Path`. It is distinct from lexical `std::path::normalize`, which performs no
+filesystem access. A missing, inaccessible, invalid, or unsupported path is
+reported as `IoError.Failed` and the input path is not modified.
 
 ## Results
 

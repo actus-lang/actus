@@ -101,7 +101,7 @@ collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
       backend-specific pointer details.
 - [x] Add regression coverage for component-source byte/code-unit reads,
       including extension and file-name views on POSIX and Windows paths.
-- [ ] Add a separate canonicalization operation that resolves filesystem
+- [x] Add a separate canonicalization operation that resolves filesystem
       identity and reports missing components instead of changing lexical
       paths implicitly.
 - [x] Define absolute, relative, root, separator, dot, and dot-dot behavior
@@ -122,6 +122,12 @@ retain their source path and offsets. The mirrored fixtures
 lexical dot and dot-dot normalization, component extraction, ownership, and
 embedded-null/invalid-encoding failures. Filesystem identity resolution,
 reserved-name policy, traversal rejection, and `same_file` remain open.
+
+Gate 2 canonicalization evidence (2026-10-26): `std::fs::canonicalize` uses
+the host filesystem resolver, returns a new owned absolute `Path`, preserves
+the lexical input, and rejects missing components. The mirrored
+`tests/library/fs/operations.act` fixture covers both an existing path and a
+missing path under strict execution.
 
 ## Gate 3: Directory handle lifecycle
 
