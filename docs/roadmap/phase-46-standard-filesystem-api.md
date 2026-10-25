@@ -11,7 +11,7 @@ filesystem dependency.
 
 ## Gate 0: Contract, scope, and capability boundary
 
-- [ ] Accept the filesystem API as a standard-library capability, separate
+- [x] Accept the filesystem API as a standard-library capability, separate
       from compiler internals and application-specific ingestion logic.
 - [ ] Define the hosted-filesystem target contract and the behavior of builds
       that do not provide a filesystem capability.

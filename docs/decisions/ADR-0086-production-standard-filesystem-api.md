@@ -1,6 +1,6 @@
 # ADR-0086: Production Standard Filesystem API
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-22
 - Scope: Hosted `std::fs`, `std::path`, native filesystem bridges, and
   applications that need bounded file and directory access
