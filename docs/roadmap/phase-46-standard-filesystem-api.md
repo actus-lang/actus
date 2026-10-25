@@ -234,15 +234,24 @@ creation, capability discovery, and the broader security matrix remain open.
 
 ## Gate 10: Temporary resources and workspace safety
 
-- [ ] Add secure temporary-file and temporary-directory creation with unique
+- [x] Add secure temporary-file and temporary-directory creation with unique
       names and create-new semantics.
-- [ ] Add explicit lifetime/cleanup policy for temporary resources.
-- [ ] Prevent predictable-name collisions and symlink substitution attacks.
-- [ ] Add optional caller-provided workspace roots and capability restrictions.
-- [ ] Ensure cleanup is attempted after failure without hiding the primary
+- [x] Add explicit lifetime/cleanup policy for temporary resources.
+- [x] Prevent predictable-name collisions and symlink substitution attacks.
+- [x] Add optional caller-provided workspace roots and capability restrictions.
+- [x] Ensure cleanup is attempted after failure without hiding the primary
       error.
-- [ ] Add tests for collisions, abnormal exit cleanup, read-only parents, and
+- [x] Add tests for collisions, abnormal exit cleanup, read-only parents, and
       concurrent creators.
+
+Gate 10 evidence (2026-10-26): runtime tests cover bounded collision retry,
+preservation of an occupied file, eight concurrent directory creators,
+non-directory and read-only workspace rejection, and symlink-root rejection.
+The application integration test
+`temporary_file_drop_removes_resource_after_early_exit` verifies that
+best-effort Drop cleanup removes an uncommitted
+temporary file after an early process exit. All six runtime security tests and
+the application regression pass.
 
 ## Gate 11: Async and background filesystem boundary
 

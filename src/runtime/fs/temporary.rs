@@ -73,9 +73,24 @@ fn open_temporary_file(
     prefix: BufferHandle,
 ) -> Result<(std::fs::File, PathBuf), i32> {
     let prefix = unsafe { prefix_bytes(prefix) }.ok_or(TEMP_INVALID_PREFIX)?;
+    open_temporary_file_with_prefix(directory, &prefix)
+}
+
+fn open_temporary_file_with_prefix(
+    directory: &Path,
+    prefix: &[u8],
+) -> Result<(std::fs::File, PathBuf), i32> {
+    open_temporary_file_with_candidate(directory, prefix, candidate_path)
+}
+
+fn open_temporary_file_with_candidate(
+    directory: &Path,
+    prefix: &[u8],
+    mut candidate: impl FnMut(&Path, &[u8]) -> Result<PathBuf, i32>,
+) -> Result<(std::fs::File, PathBuf), i32> {
     validate_root(directory)?;
     for _ in 0..TEMP_MAX_ATTEMPTS {
-        let path = candidate_path(directory, &prefix)?;
+        let path = candidate(directory, prefix)?;
         let mut options = std::fs::OpenOptions::new();
         options.read(true).write(true).create_new(true);
         match options.open(&path) {
@@ -89,9 +104,23 @@ fn open_temporary_file(
 
 fn create_temporary_directory(directory: &Path, prefix: BufferHandle) -> Result<PathBuf, i32> {
     let prefix = unsafe { prefix_bytes(prefix) }.ok_or(TEMP_INVALID_PREFIX)?;
+    create_temporary_directory_with_prefix(directory, &prefix)
+}
+
+fn create_temporary_directory_with_prefix(directory: &Path, prefix: &[u8]) -> Result<PathBuf, i32> {
+    create_temporary_directory_with_candidate(directory, prefix, |root, name| {
+        candidate_path(root, name)
+    })
+}
+
+fn create_temporary_directory_with_candidate(
+    directory: &Path,
+    prefix: &[u8],
+    mut candidate: impl FnMut(&Path, &[u8]) -> Result<PathBuf, i32>,
+) -> Result<PathBuf, i32> {
     validate_root(directory)?;
     for _ in 0..TEMP_MAX_ATTEMPTS {
-        let path = candidate_path(directory, &prefix)?;
+        let path = candidate(directory, prefix)?;
         match std::fs::create_dir(&path) {
             Ok(()) => return Ok(path),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -221,6 +250,146 @@ unsafe fn replace_output_path(output: *mut ActusPath, path: &Path) -> bool {
 fn path_bytes(path: &Path) -> Option<Vec<u8>> {
     use std::os::unix::ffi::OsStrExt;
     Some(path.as_os_str().as_bytes().to_vec())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+    use std::thread;
+
+    use super::{
+        TEMP_COLLISION_EXHAUSTED, create_temporary_directory_with_candidate,
+        create_temporary_directory_with_prefix, open_temporary_file_with_candidate,
+    };
+
+    fn test_root(label: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("actus-temp-{label}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir(&root).expect("create temporary-resource test root");
+        root
+    }
+
+    #[test]
+    fn collision_retry_is_bounded_and_atomic() {
+        let root = test_root("collision");
+        let occupied = root.join("fixed-name");
+        fs::write(&occupied, b"occupied").expect("create occupied candidate");
+        let mut attempts = 0;
+        let result =
+            create_temporary_directory_with_candidate(&root, b"collision", |directory, _| {
+                attempts += 1;
+                if attempts == 1 {
+                    return Ok(occupied.clone());
+                }
+                Ok(directory.join(format!("collision-{}", attempts)))
+            });
+        let created = result.expect("retry should create a fresh directory");
+        assert_eq!(attempts, 2);
+        assert!(created.is_dir());
+        fs::remove_dir_all(&root).expect("remove collision test root");
+
+        let exhausted_root = test_root("exhausted");
+        let occupied = exhausted_root.join("fixed-name");
+        fs::create_dir(&occupied).expect("create occupied directory");
+        let result =
+            create_temporary_directory_with_candidate(&exhausted_root, b"collision", |_, _| {
+                Ok(occupied.clone())
+            });
+        assert_eq!(result, Err(TEMP_COLLISION_EXHAUSTED));
+        fs::remove_dir_all(&exhausted_root).expect("remove exhausted test root");
+    }
+
+    #[test]
+    fn concurrent_directory_creators_receive_distinct_paths() {
+        let root = Arc::new(test_root("concurrent"));
+        let mut workers = Vec::new();
+        for _ in 0..8 {
+            let root = Arc::clone(&root);
+            workers.push(thread::spawn(move || {
+                create_temporary_directory_with_prefix(&root, b"concurrent")
+                    .expect("concurrent creator should succeed")
+            }));
+        }
+        let paths = workers
+            .into_iter()
+            .map(|worker| worker.join().expect("creator thread should not panic"))
+            .collect::<Vec<_>>();
+        let unique = paths.iter().collect::<BTreeSet<_>>();
+        assert_eq!(unique.len(), paths.len());
+        for path in paths {
+            assert!(path.is_dir());
+        }
+        fs::remove_dir_all(&*root).expect("remove concurrent test root");
+    }
+
+    #[test]
+    fn non_directory_workspace_is_rejected_before_creation() {
+        let root = test_root("restricted");
+        let file = root.join("not-a-directory");
+        fs::write(&file, b"not a workspace").expect("create invalid workspace");
+        let result = create_temporary_directory_with_prefix(&file, b"rejected");
+        assert!(result.is_err());
+        fs::remove_dir_all(&root).expect("remove restricted test root");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_workspace_is_rejected_before_creation() {
+        use std::os::unix::fs::symlink;
+
+        let root = test_root("symlink");
+        let target = root.join("target");
+        let link = root.join("link");
+        fs::create_dir(&target).expect("create symlink target");
+        symlink(&target, &link).expect("create workspace symlink");
+        let result = create_temporary_directory_with_prefix(&link, b"rejected");
+        assert!(result.is_err());
+        fs::remove_dir_all(&target).expect("remove symlink target");
+        fs::remove_file(&link).expect("remove workspace symlink");
+        fs::remove_dir_all(&root).expect("remove symlink test root");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_only_workspace_is_rejected_before_creation() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = test_root("readonly");
+        let readonly = root.join("readonly");
+        fs::create_dir(&readonly).expect("create readonly workspace");
+        let original = fs::metadata(&readonly).expect("inspect readonly workspace").permissions();
+        let mut locked = original.clone();
+        locked.set_mode(0o500);
+        fs::set_permissions(&readonly, locked).expect("make workspace readonly");
+        let result = create_temporary_directory_with_prefix(&readonly, b"rejected");
+        fs::set_permissions(&readonly, original).expect("restore workspace permissions");
+        assert!(result.is_err());
+        fs::remove_dir_all(&root).expect("remove readonly test root");
+    }
+
+    #[test]
+    fn file_collision_retry_preserves_existing_file() {
+        let root = test_root("file-collision");
+        let occupied = root.join("fixed-file");
+        fs::write(&occupied, b"keep").expect("create occupied file");
+        let mut attempts = 0;
+        let (file, created) =
+            open_temporary_file_with_candidate(&root, b"file", |directory: &Path, _| {
+                attempts += 1;
+                if attempts == 1 {
+                    return Ok(occupied.clone());
+                }
+                Ok(directory.join(format!("file-{}", attempts)))
+            })
+            .expect("file retry should create a fresh file");
+        drop(file);
+        assert_eq!(fs::read(&occupied).expect("read occupied file"), b"keep");
+        assert!(created.is_file());
+        fs::remove_dir_all(&root).expect("remove file collision test root");
+    }
 }
 
 #[cfg(windows)]
