@@ -33,3 +33,13 @@ bytes.
 path owner is moved or mutated. Handle invalid storage, invalid roots,
 encoding, separators, and capacity failures before using a returned path or
 component.
+
+## Invalid and reserved names
+
+Path construction rejects embedded NUL units, malformed UTF-16, inconsistent
+terminators, and invalid platform storage. It does not reject a syntactically
+valid lexical name merely because a hosted filesystem may reserve it. For
+example, a Windows `CON` component can exist as a `Path` value; a later
+`std::fs` operation reports the host's typed failure if that name cannot be
+opened or created. This keeps lexical path manipulation independent from
+filesystem identity and platform policy.

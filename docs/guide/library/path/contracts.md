@@ -45,6 +45,12 @@ Use `std::fs` for external filesystem effects.
 | `CapacityExceeded` | A builder cannot fit the result in existing storage. | Reserve capacity before mutation or use a larger owned buffer. |
 | `UnsupportedPlatform` | POSIX and Windows representations were combined. | Convert through an explicit platform boundary. |
 
+Valid lexical components are preserved even when a hosted provider reserves
+their names (for example, Windows device names). Reserved-name enforcement is
+therefore a filesystem-operation concern, not a hidden transformation or
+rejection in `std::path`. Embedded NUL units, malformed encoding, missing
+terminators, and inconsistent storage remain constructor errors.
+
 ## Concurrency and views
 
 `PathComponent` and `PathComponents` are borrowed views. Do not retain them

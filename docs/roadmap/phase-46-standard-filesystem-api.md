@@ -106,7 +106,7 @@ collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
       paths implicitly.
 - [x] Define absolute, relative, root, separator, dot, and dot-dot behavior
       for POSIX and Windows targets.
-- [ ] Define whether a path operation preserves or rejects embedded NUL,
+- [x] Define whether a path operation preserves or rejects embedded NUL,
       invalid UTF-8, reserved names, and platform-invalid components.
 - [ ] Add `same_file` or equivalent identity comparison where the target can
       provide it, with an explicit unsupported result otherwise.
@@ -128,6 +128,13 @@ the host filesystem resolver, returns a new owned absolute `Path`, preserves
 the lexical input, and rejects missing components. The mirrored
 `tests/library/fs/operations.act` fixture covers both an existing path and a
 missing path under strict execution.
+
+Gate 2 path-input policy evidence (2026-10-26): constructors reject embedded
+NUL units, malformed encoding, missing terminators, and inconsistent storage.
+Valid lexical names that a host may reserve are preserved by `std::path`; the
+filesystem operation owns enforcement and returns typed failure. The Windows
+fixture `windows_reserved_name_remains_lexical`, together with the existing
+embedded-NUL and invalid-UTF-16 fixtures, records this boundary.
 
 ## Gate 3: Directory handle lifecycle
 
