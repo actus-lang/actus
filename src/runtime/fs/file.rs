@@ -71,6 +71,36 @@ pub extern "C" fn actus_file_flush(handle: i64) -> i32 {
     }) as i32
 }
 
+/// Synchronizes file contents through the host file descriptor.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_sync_data(handle: i64) -> i32 {
+    if handle < 0 {
+        return ABI_STATUS_FAILURE;
+    }
+    with_file(handle, |file| {
+        if file.sync_data().is_ok() {
+            i64::from(ABI_STATUS_SUCCESS)
+        } else {
+            i64::from(ABI_STATUS_FAILURE)
+        }
+    }) as i32
+}
+
+/// Synchronizes file contents and metadata through the host file descriptor.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_sync_all(handle: i64) -> i32 {
+    if handle < 0 {
+        return ABI_STATUS_FAILURE;
+    }
+    with_file(handle, |file| {
+        if file.sync_all().is_ok() {
+            i64::from(ABI_STATUS_SUCCESS)
+        } else {
+            i64::from(ABI_STATUS_FAILURE)
+        }
+    }) as i32
+}
+
 /// Closes a host file, returning zero or `-1`.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_close(handle: i64) -> i32 {

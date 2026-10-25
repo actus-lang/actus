@@ -1,0 +1,61 @@
+"""Canonical facade coverage for qualified hosted filesystem access."""
+import {
+    std::fs,
+    std::path,
+};
+
+verb current_directory() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+meta test
+verb qualified_filesystem_facade_opens_and_closes_directory() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = fs::read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    erg entry = fs::next_dir_entry(directory: ins directory);
+                    erg entry_code = case dat entry {
+                        Result.Err(_) => 3,
+                        Result.Ok(value) => {
+                            drop(value);
+                            0;
+                        },
+                    };
+                    erg closed = fs::close_dir(directory: ins directory);
+                    return case dat closed {
+                        Result.Err(_) => 4,
+                        Result.Ok(_) => entry_code,
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb qualified_filesystem_facade_reports_directory_metadata() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg inspected = fs::metadata(path: abs path);
+            return case dat inspected {
+                Result.Err(_) => 2,
+                Result.Ok(metadata) => {
+                    if metadata.is_dir == 1 {
+                        return 0;
+                    }
+                    return 3;
+                },
+            };
+        },
+    };
+}

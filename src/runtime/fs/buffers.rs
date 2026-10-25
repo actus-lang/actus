@@ -3,8 +3,8 @@ use std::io::Read;
 use super::super::contract::ABI_STATUS_FAILURE;
 use super::super::types::BufferHandle;
 use super::file::{
-    actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_write,
-    handle_to_actus, open_with_options,
+    actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_sync_all,
+    actus_file_sync_data, actus_file_write, handle_to_actus, open_with_options,
 };
 
 /// Opens a file from the Actus buffer representation used by external verbs.
@@ -134,6 +134,16 @@ pub unsafe extern "C" fn actus_file_write_buffer(handle: i32, buffer: BufferHand
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_flush_buffer(handle: i32) -> i32 {
     actus_file_flush(super::file::actus_handle(handle))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_sync_data_buffer(handle: i32) -> i32 {
+    actus_file_sync_data(super::file::actus_handle(handle))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_sync_all_buffer(handle: i32) -> i32 {
+    actus_file_sync_all(super::file::actus_handle(handle))
 }
 
 #[unsafe(no_mangle)]
