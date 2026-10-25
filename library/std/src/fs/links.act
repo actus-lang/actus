@@ -1,0 +1,23 @@
+"""Explicit symbolic-link inspection without implicit link following."""
+import {
+    io,
+    path as path_module,
+};
+
+"""
+Report whether `path` itself is a symbolic link.
+
+The path is borrowed for inspection and no link target is opened or retained.
+The result is false for ordinary files and directories.
+"""
+open verb is_symlink(abs path: path_module::Path) -> Result[Bool, io::IoError] {
+    erg inspected = symlink_metadata(path: abs path);
+    return case dat inspected {
+        Result.Err(error) => Result[Bool, io::IoError].Err(error),
+        Result.Ok(value) => {
+            erg result = value.is_symlink == 1;
+            drop(value);
+            return Result[Bool, io::IoError].Ok(result);
+        },
+    };
+}

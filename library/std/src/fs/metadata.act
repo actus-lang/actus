@@ -22,6 +22,8 @@ open struct Metadata {
     erg is_dir: Int,
     """One when the host marks the file read-only, otherwise zero."""
     erg readonly: Int,
+    """One when the path itself is a symbolic link, otherwise zero."""
+    erg is_symlink: Int,
 }
 
 """
@@ -32,6 +34,18 @@ caller. The bridge returns zero on success and `-1` when the host cannot
 inspect the path; the public wrapper translates that status to `IoError`.
 """
 unsafe extern "C" verb actus_file_metadata_path(
+    abs path: path_module::Path,
+    ins output: Metadata
+) -> Int;
+
+"""
+Fill `output` with metadata for `path` without following a symbolic link.
+
+The path view and output ownership rules match `actus_file_metadata_path`.
+The bridge returns zero on success and `-1` when the host cannot inspect the
+path itself.
+"""
+unsafe extern "C" verb actus_file_symlink_metadata_path(
     abs path: path_module::Path,
     ins output: Metadata
 ) -> Int;
@@ -79,6 +93,7 @@ open verb metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError]
         is_file: 0,
         is_dir: 0,
         readonly: 0,
+        is_symlink: 0,
     };
     erg status = actus_file_metadata_path(path: abs path, output: ins output);
     return case status {
@@ -99,8 +114,31 @@ open verb file_metadata(ins self: File) -> Result[Metadata, io::IoError] {
         is_file: 0,
         is_dir: 0,
         readonly: 0,
+        is_symlink: 0,
     };
     erg status = actus_file_metadata_handle_buffer(handle: abs self.handle, output: ins output);
+    return case status {
+        -1 => metadata_failed(output: dat output),
+        _ => Result[Metadata, io::IoError].Ok(output),
+    };
+}
+
+"""
+Inspect one path without following a symbolic link.
+
+`Ok(Metadata)` contains copied scalar facts, including whether the path
+itself is a symbolic link. The operation never creates, follows, or retains a
+link target.
+"""
+open verb symlink_metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError] {
+    erg output = Metadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+        is_symlink: 0,
+    };
+    erg status = actus_file_symlink_metadata_path(path: abs path, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
         _ => Result[Metadata, io::IoError].Ok(output),

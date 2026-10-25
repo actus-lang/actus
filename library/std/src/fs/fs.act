@@ -8,6 +8,9 @@ open file;
 """Re-export typed metadata values and metadata providers."""
 open metadata;
 
+"""Re-export explicit symbolic-link inspection operations."""
+open links;
+
 """Re-export typed readonly and permission inspection operations."""
 open permissions;
 

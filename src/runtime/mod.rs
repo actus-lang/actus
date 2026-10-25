@@ -79,8 +79,8 @@ pub use fs::{
     actus_file_read, actus_file_read_buffer, actus_file_remove_buffer,
     actus_file_remove_dir_buffer, actus_file_remove_dir_path, actus_file_remove_path,
     actus_file_rename_buffer, actus_file_rename_path, actus_file_seek, actus_file_seek_buffer,
-    actus_file_sync_all, actus_file_sync_all_buffer, actus_file_sync_data,
-    actus_file_sync_data_buffer, actus_file_write, actus_file_write_buffer,
+    actus_file_symlink_metadata_path, actus_file_sync_all, actus_file_sync_all_buffer,
+    actus_file_sync_data, actus_file_sync_data_buffer, actus_file_write, actus_file_write_buffer,
 };
 pub use input::{actus_read_byte, actus_read_stdin_line};
 pub use path::{

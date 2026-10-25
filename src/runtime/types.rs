@@ -13,6 +13,7 @@ pub struct ActusMetadata {
     pub is_file: i32,
     pub is_dir: i32,
     pub readonly: i32,
+    pub is_symlink: i32,
 }
 
 pub type BufferHandle = *mut ActusBuffer;

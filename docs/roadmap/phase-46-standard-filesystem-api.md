@@ -55,6 +55,12 @@ Gate 1 evidence (2026-10-25): `library/std/src/fs/fs.act` is the canonical
 facade and `tests/library/fs/fs.act` passes strict qualified facade coverage
 for directory lifecycle and metadata access.
 
+Gate 1 implementation evidence (2026-10-25): permissions, atomic publication,
+and symbolic-link inspection are now isolated behind responsibility-specific
+children (`permissions.act`, `publication.act`, and `links.act`). Temporary
+resources and the remaining facade/export audit are still open, so the split
+checkbox remains intentionally unchecked.
+
 ## Gate 2: Typed paths and filesystem identity
 
 - [ ] Reuse the existing `Path` representation and document its encoding and
@@ -199,6 +205,11 @@ passes.
       without probing by destructive failure.
 - [ ] Add security tests for symlink escape, path traversal, permission
       boundaries, and race-prone check-then-open sequences.
+
+Gate 9 implementation evidence (2026-10-25): the standard filesystem exposes
+read-only `symlink_metadata` and `is_symlink` operations without following the
+link target, with mirrored strict coverage for a regular directory. Symlink
+creation, capability discovery, and the broader security matrix remain open.
 
 ## Gate 10: Temporary resources and workspace safety
 

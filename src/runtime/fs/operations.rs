@@ -46,6 +46,26 @@ pub unsafe extern "C" fn actus_file_metadata_path(
     }
 }
 
+/// Writes metadata for a validated path without following a symbolic link.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor and `output` must be
+/// writable for one `ActusMetadata`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_symlink_metadata_path(
+    path: *const ActusPath,
+    output: *mut ActusMetadata,
+) -> i32 {
+    if output.is_null() {
+        return ABI_STATUS_FAILURE;
+    }
+    let result = unsafe { with_host_path(path, |native| native.symlink_metadata()) };
+    match result {
+        Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
+        _ => ABI_STATUS_FAILURE,
+    }
+}
+
 /// Writes metadata for an already-open file handle into an output struct.
 ///
 /// # Safety
@@ -203,6 +223,7 @@ unsafe fn write_metadata(output: *mut ActusMetadata, metadata: &std::fs::Metadat
             is_file: i32::from(metadata.is_file()),
             is_dir: i32::from(metadata.is_dir()),
             readonly: i32::from(metadata.permissions().readonly()),
+            is_symlink: i32::from(metadata.file_type().is_symlink()),
         };
     }
     ABI_STATUS_SUCCESS
