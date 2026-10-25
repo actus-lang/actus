@@ -182,13 +182,13 @@ canonical parent must be able to refer to one another through complete module
 paths, without relying on ambiguous ambient openings. This follow-up is part
 of the Actus module and facade contract, separate from compiler implementation.
 
-- [ ] Replace consumer-side ambiguous `open` entries with canonical imports
+- [x] Replace consumer-side ambiguous `open` entries with canonical imports
       such as `import parent::child;` where qualified ownership is required.
-- [ ] Use `child::...` at call sites so the owning nested module remains
+- [x] Use `child::...` at call sites so the owning nested module remains
       visible.
-- [ ] Keep `open sibling;` only where it is an intentional canonical-facade
+- [x] Keep `open sibling;` only where it is an intentional canonical-facade
       re-export; remove it from ordinary nested consumers.
-- [ ] Add explicit aliases when nested imports share a final segment, such as
+- [x] Add explicit aliases when nested imports share a final segment, such as
       `import parent::child as local_child;` and
       `import other::child as other_child;`.
 - [x] Add a regression fixture proving nested sibling imports, qualified
@@ -202,6 +202,13 @@ mirrored consumers. The mirrored fixture preserves descendant canonical
 imports such as `parent::left::contract` and `parent::right::contract`,
 qualified types, and same-final-segment aliases. `cli_test_workflow` passes
 22/22 and the module aggregation suite passes 102/102.
+
+Consumer migration evidence (2026-10-25): an audit found no ordinary
+consumer-level module `open` in `src/`. Remaining module-level `open`
+declarations in `library/std/src` are canonical facade re-exports. The
+qualified consumer migration is covered by `library/std/src/fs/options.act`,
+which uses `io::IoError` and `path_module::Path`; no facade re-export was
+removed.
 
 ### Gate 47.7 — Test selection, internal fixtures, and mirrored layout
 
