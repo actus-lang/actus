@@ -13,22 +13,27 @@ filesystem dependency.
 
 - [x] Accept the filesystem API as a standard-library capability, separate
       from compiler internals and application-specific ingestion logic.
-- [ ] Define the hosted-filesystem target contract and the behavior of builds
+- [x] Define the hosted-filesystem target contract and the behavior of builds
       that do not provide a filesystem capability.
-- [ ] Define whether filesystem verbs are blocking and document that they are
+- [x] Define whether filesystem verbs are blocking and document that they are
       forbidden in inference, impulse forwarding, and other realtime hot paths.
-- [ ] Define the distinction between a lexical `Path`, an opened filesystem
+- [x] Define the distinction between a lexical `Path`, an opened filesystem
       handle, and a canonicalized filesystem location.
-- [ ] Define that filesystem paths and handles are never serialized into Actus
+- [x] Define that filesystem paths and handles are never serialized into Actus
       application state or binary persistence formats.
-- [ ] Define the platform-neutral error contract and the mapping from native
+- [x] Define the platform-neutral error contract and the mapping from native
       error classes to typed `IoError` variants.
-- [ ] Define the maximum path length, component length, directory depth, and
+- [x] Define the maximum path length, component length, directory depth, and
       entry-name size supported by each target profile.
-- [ ] Record unsupported operations explicitly instead of silently emulating
+- [x] Record unsupported operations explicitly instead of silently emulating
       them with shell commands or platform-specific source code.
-- [ ] Add an ADR covering ownership, cleanup, ordering, security, and target
+- [x] Add an ADR covering ownership, cleanup, ordering, security, and target
       capability behavior before implementation expands.
+
+Gate 0 evidence (2026-10-25): ADR-0086 is accepted and defines the hosted
+filesystem capability boundary, blocking behavior, path and handle semantics,
+serialization restrictions, typed errors, target limits, unsupported
+operations, ownership, cleanup, ordering, security, and target profiles.
 
 ## Gate 1: Canonical module and public facade
 
