@@ -140,6 +140,57 @@ fn test_mirror_gate_rejects_unmapped_nested_test_files() {
 
 #[cfg(unix)]
 #[test]
+fn fixture_resolves_nested_sibling_aliases_and_qualified_types() {
+    let root = create_test_project(
+        "runner-mirrored-qualified-consumer",
+        "placeholder.act",
+        "meta test\nverb unused() -> Int { return 0; }\n",
+    );
+    fs::remove_file(root.join("tests/placeholder.act")).expect("remove placeholder test");
+    fs::create_dir_all(root.join("src/parent/left/contract"))
+        .expect("create left contract directory");
+    fs::create_dir_all(root.join("src/parent/right/contract"))
+        .expect("create right contract directory");
+
+    fs::write(root.join("src/parent/parent.act"), "open left; open right;\n")
+        .expect("write parent facade");
+    fs::write(root.join("src/parent/left/left.act"), "open contract;\n")
+        .expect("write left facade");
+    fs::write(root.join("src/parent/right/right.act"), "open contract;\n")
+        .expect("write right facade");
+    fs::write(
+        root.join("src/parent/left/contract/contract.act"),
+        "open verb left_value() -> Int { return 20; }\n",
+    )
+    .expect("write left contract");
+    fs::write(
+        root.join("src/parent/right/contract/contract.act"),
+        "open verb right_value() -> Int { return 22; }\n",
+    )
+    .expect("write right contract");
+    fs::create_dir_all(root.join("src/types")).expect("create qualified type module");
+    fs::write(root.join("src/types/types.act"), "open struct Envelope { value: Int, }\n")
+        .expect("write qualified type facade");
+    fs::write(
+        root.join("tests/qualified_consumer.act"),
+        "import { types, parent::left::contract as left_contract, parent::right::contract as right_contract };\nverb combine() -> Int { erg envelope: types::Envelope = types::Envelope { value: 0, }; return envelope.value + left_contract::left_value() + right_contract::right_value(); }\nmeta test\nverb nested_sibling_aliases() -> Int { return combine() - 42; }\n",
+    )
+    .expect("write qualified consumer test");
+
+    let output = run_command(&root, &["test", "--strict"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("<root>::nested_sibling_aliases ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_links_imported_module_objects_for_meta_tests() {
     let root = create_test_project(
         "runner-module",
