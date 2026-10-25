@@ -150,9 +150,15 @@ filesystem dependency.
       entire file into memory.
 - [ ] Add file locking or an explicit unsupported result for targets that do
       not provide advisory locks.
-- [ ] Add durable sync operations for data and metadata where supported.
+- [x] Add durable sync operations for data and metadata where supported.
 - [ ] Add tests for concurrent open modes, short I/O, EOF, locks, flush, and
       persistence failures.
+
+Evidence (2026-10-25): `file_sync_data` and `file_sync_all` are exposed through
+the hosted `std::fs` facade, Rust runtime bridges, and buffer ABI adapters.
+`tests/library/fs/file.act` passes the strict synchronization fixture; the
+runtime passes `cargo check --all-targets`, and the public documentation suite
+passes.
 
 ## Gate 8: Mutation, publication, and recovery operations
 
