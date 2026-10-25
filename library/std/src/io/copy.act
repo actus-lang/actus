@@ -25,6 +25,7 @@ open verb copy_write_error(dat error: IoError) -> Result[Int, IoError] {
         IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
         IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
         IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+        IoError.Unsupported => Result[Int, IoError].Err(IoError.Unsupported),
     };
 }
 
@@ -40,6 +41,7 @@ open verb copy_read_error(dat error: IoError, erg total: Int) -> Result[Int, IoE
         IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
         IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
         IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+        IoError.Unsupported => Result[Int, IoError].Err(IoError.Unsupported),
     };
 }
 
@@ -85,7 +87,11 @@ open verb copy_stream_write[W: Writer](
 ) -> Result[Int, IoError] {
     erg write_result: Result[Int, IoError] = writer.write(buffer: abs scratch);
     return case dat write_result {
-        Result.Ok(written) => copy_written_chunk(total: total, expected: expected, actual: written),
+        Result.Ok(written) => copy_written_chunk(
+            total: total,
+            expected: expected,
+            actual: written
+        ),
         Result.Err(error) => copy_write_error(error: dat error),
     };
 }

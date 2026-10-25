@@ -89,6 +89,61 @@ pub unsafe extern "C" fn actus_file_canonicalize_path(
     }
 }
 
+/// Compares two validated paths using the host's stable filesystem identity.
+///
+/// # Safety
+/// Both paths must be valid immutable descriptors for the duration of the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_same_path(
+    left: *const ActusPath,
+    right: *const ActusPath,
+) -> i32 {
+    let result = unsafe { with_host_paths(left, right, same_file_identity) };
+    match result {
+        Some(Ok(true)) => 1,
+        Some(Ok(false)) => 0,
+        Some(Err(IdentityError::Unsupported)) => -2,
+        _ => ABI_STATUS_FAILURE,
+    }
+}
+
+enum IdentityError {
+    Failed,
+    Unsupported,
+}
+
+fn same_file_identity(
+    left: &std::path::Path,
+    right: &std::path::Path,
+) -> Result<bool, IdentityError> {
+    let left = std::fs::metadata(left).map_err(|_| IdentityError::Failed)?;
+    let right = std::fs::metadata(right).map_err(|_| IdentityError::Failed)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        return Ok(left.dev() == right.dev() && left.ino() == right.ino());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        let Some(left_volume) = left.volume_serial_number() else {
+            return Err(IdentityError::Unsupported);
+        };
+        let Some(right_volume) = right.volume_serial_number() else {
+            return Err(IdentityError::Unsupported);
+        };
+        let Some(left_index) = left.file_index() else {
+            return Err(IdentityError::Unsupported);
+        };
+        let Some(right_index) = right.file_index() else {
+            return Err(IdentityError::Unsupported);
+        };
+        return Ok(left_volume == right_volume && left_index == right_index);
+    }
+    #[allow(unreachable_code)]
+    Err(IdentityError::Unsupported)
+}
+
 /// Writes metadata for an already-open file handle into an output struct.
 ///
 /// # Safety

@@ -46,6 +46,12 @@ unsafe extern "C" verb actus_file_canonicalize_path(
     ins output: path_module::Path
 ) -> Int;
 
+"""Compare two existing paths by filesystem identity, not lexical spelling."""
+unsafe extern "C" verb actus_file_same_path(
+    abs left: path_module::Path,
+    abs right: path_module::Path
+) -> Int;
+
 """
 Create the directory named by `path`.
 
@@ -130,6 +136,24 @@ open verb canonicalize(abs path: path_module::Path) -> Result[path_module::Path,
             erg status = actus_file_canonicalize_path(path: abs path, output: ins output);
             return finish_canonicalize(output: dat output, status: erg status);
         },
+    };
+}
+
+"""
+Compare two paths by the host filesystem identity they name.
+
+The operation follows symbolic links and requires both paths to exist. It
+returns `Ok(true)` only when the target identity matches, `Ok(false)` for two
+different existing identities, `Failed` for host lookup failure, and
+`Unsupported` when the selected target cannot provide a stable identity.
+"""
+open verb same_file(abs left: path_module::Path, abs right: path_module::Path) -> Result[Bool, io::IoError] {
+    erg status = actus_file_same_path(left: abs left, right: abs right);
+    return case status {
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        0 => Ok(false),
+        _ => Ok(true),
     };
 }
 
@@ -243,6 +267,7 @@ open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoE
         io::IoError.Failed => Result[Buffer, io::IoError].Err(io::IoError.Failed),
         io::IoError.InvalidInput => Result[Buffer, io::IoError].Err(io::IoError.InvalidInput),
         io::IoError.InvalidData => Result[Buffer, io::IoError].Err(io::IoError.InvalidData),
+        io::IoError.Unsupported => Result[Buffer, io::IoError].Err(io::IoError.Unsupported),
     };
 }
 

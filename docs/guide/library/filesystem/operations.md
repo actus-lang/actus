@@ -12,6 +12,11 @@ path components and symbolic links through the host, returning a new absolute
 Use `std::path::normalize` when only lexical cleanup is required and no
 filesystem lookup is allowed.
 
+`same_file` is identity-based rather than lexical. It follows links and
+compares the native identity pair supplied by the target (POSIX device/inode
+or the Windows volume/file index). Targets without a stable identity return
+`IoError.Unsupported`.
+
 `remove_dir` is for an empty directory according to the host provider. A
 missing, protected, non-empty, or otherwise rejected target is reported as
 `IoError.Failed`.

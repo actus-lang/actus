@@ -13,4 +13,6 @@ open enum IoError {
     InvalidInput,
     """The byte sequence cannot be interpreted under the requested encoding."""
     InvalidData,
+    """The selected target cannot provide the requested operation."""
+    Unsupported,
 }

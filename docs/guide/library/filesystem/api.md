@@ -100,6 +100,7 @@ explicit; no host default is silently selected by the builder chain.
 ```actus
 verb remove_file(abs path: Path) -> Result[Int, IoError];
 verb canonicalize(abs path: Path) -> Result[Path, IoError];
+verb same_file(abs left: Path, abs right: Path) -> Result[Bool, IoError];
 verb rename(abs from: Path, abs to: Path) -> Result[Int, IoError];
 verb copy_file(abs from: Path, abs to: Path) -> Result[Int, IoError];
 verb create_dir(abs path: Path) -> Result[Int, IoError];
@@ -125,6 +126,9 @@ links, requires every component to exist, and returns a new owned identity
 filesystem access. A missing, inaccessible, invalid, or unsupported path is
 reported as `IoError.Failed` and the input path is not modified.
 
+`same_file` follows symbolic links and compares host identity metadata. It
+returns `Unsupported` when the target cannot provide a stable identity.
+
 ## Results
 
 | Operation group | Success value | Typical failure |
@@ -139,6 +143,7 @@ reported as `IoError.Failed` and the input path is not modified.
 | read-to-string | UTF-8 `Buffer` | I/O error, `InvalidData` |
 | rename/copy/remove/dir | status or count | `Failed` |
 | atomic write | written byte count | write, flush, rename, or cleanup error |
+| same-file comparison | `Bool` | lookup failure or `Unsupported` |
 
 ## Temporary resources
 

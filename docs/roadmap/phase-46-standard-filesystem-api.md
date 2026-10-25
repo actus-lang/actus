@@ -108,7 +108,7 @@ collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
       for POSIX and Windows targets.
 - [x] Define whether a path operation preserves or rejects embedded NUL,
       invalid UTF-8, reserved names, and platform-invalid components.
-- [ ] Add `same_file` or equivalent identity comparison where the target can
+- [x] Add `same_file` or equivalent identity comparison where the target can
       provide it, with an explicit unsupported result otherwise.
 - [ ] Add accepted and rejected tests for traversal, malformed encoding,
       roots, separators, and platform-specific reserved names.
@@ -135,6 +135,12 @@ Valid lexical names that a host may reserve are preserved by `std::path`; the
 filesystem operation owns enforcement and returns typed failure. The Windows
 fixture `windows_reserved_name_remains_lexical`, together with the existing
 embedded-NUL and invalid-UTF-16 fixtures, records this boundary.
+
+Gate 2 identity evidence (2026-10-26): `std::fs::same_file` compares POSIX
+device/inode or Windows volume/file-index identity, follows host metadata
+semantics, and returns `IoError.Unsupported` where no stable identity is
+available. The mirrored filesystem operations fixture covers equal existing
+paths.
 
 ## Gate 3: Directory handle lifecycle
 
