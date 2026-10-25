@@ -371,11 +371,38 @@ fn collect_unit(
             friend_modules,
         )?;
     }
+    append_unit_declarations(
+        &unit,
+        module_path,
+        caller_declarations,
+        appended_symbols,
+        namespace,
+        friend,
+        open_import,
+        selected,
+    );
+    if first_load {
+        units.push(unit);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_unit_declarations(
+    unit: &ModuleUnit,
+    module_path: &str,
+    caller_declarations: &mut Vec<TopLevelDecl>,
+    appended_symbols: &mut HashSet<(String, String, String)>,
+    namespace: Option<&str>,
+    friend: bool,
+    open_import: bool,
+    selected: &[String],
+) {
     if friend {
         if selected.is_empty() {
             append_internal_declarations(
                 caller_declarations,
-                &unit,
+                unit,
                 module_path,
                 namespace,
                 appended_symbols,
@@ -385,7 +412,7 @@ fn collect_unit(
             if selected.is_empty() {
                 append_internal_declarations(
                     caller_declarations,
-                    &unit,
+                    unit,
                     module_path,
                     None,
                     appended_symbols,
@@ -393,7 +420,7 @@ fn collect_unit(
             } else {
                 append_public_declarations(
                     caller_declarations,
-                    &unit,
+                    unit,
                     module_path,
                     namespace,
                     selected,
@@ -401,7 +428,7 @@ fn collect_unit(
                 );
                 append_public_declarations(
                     caller_declarations,
-                    &unit,
+                    unit,
                     module_path,
                     None,
                     selected,
@@ -409,30 +436,27 @@ fn collect_unit(
                 );
             }
         }
-    } else {
+        return;
+    }
+
+    append_public_declarations(
+        caller_declarations,
+        unit,
+        module_path,
+        namespace,
+        selected,
+        appended_symbols,
+    );
+    if open_import || !selected.is_empty() {
         append_public_declarations(
             caller_declarations,
-            &unit,
+            unit,
             module_path,
-            namespace,
+            None,
             selected,
             appended_symbols,
         );
-        if open_import || !selected.is_empty() {
-            append_public_declarations(
-                caller_declarations,
-                &unit,
-                module_path,
-                None,
-                selected,
-                appended_symbols,
-            );
-        }
     }
-    if first_load {
-        units.push(unit);
-    }
-    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
