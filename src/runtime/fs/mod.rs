@@ -4,6 +4,7 @@ mod file;
 mod operations;
 mod path_bridge;
 mod path_open;
+mod temporary;
 
 pub use buffers::{
     actus_file_close_buffer, actus_file_flush_buffer, actus_file_open_buffer,
@@ -23,6 +24,7 @@ pub use operations::{
     actus_file_rename_path, actus_file_symlink_metadata_path,
 };
 pub use path_open::{actus_file_open_options_path, actus_file_open_path};
+pub use temporary::{actus_directory_create_temporary_path, actus_file_open_temporary_path};
 
 pub(super) use file::{actus_handle, handle_to_actus, with_file};
 pub(super) const MODE_CREATE: u32 = 1;

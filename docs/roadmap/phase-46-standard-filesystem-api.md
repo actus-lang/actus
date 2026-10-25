@@ -45,7 +45,7 @@ operations, ownership, cleanup, ordering, security, and target profiles.
 - [ ] Keep native extern declarations in a platform-specific implementation
       boundary; do not leak C or OS types into the public Actus API.
 - [ ] Add public documentation for every type, enum, constant, and verb.
-- [ ] Add module-visibility tests proving `import std::fs;` with qualified
+- [x] Add module-visibility tests proving `import std::fs;` with qualified
       `fs::...` access, and `import { open std::fs };` for intentional
       unqualified access, are the supported paths.
 - [ ] Reject direct imports of private implementation children where the
@@ -56,10 +56,31 @@ facade and `tests/library/fs/fs.act` passes strict qualified facade coverage
 for directory lifecycle and metadata access.
 
 Gate 1 implementation evidence (2026-10-25): permissions, atomic publication,
-and symbolic-link inspection are now isolated behind responsibility-specific
-children (`permissions.act`, `publication.act`, and `links.act`). Temporary
-resources and the remaining facade/export audit are still open, so the split
-checkbox remains intentionally unchecked.
+symbolic-link inspection, and temporary resources are now isolated behind
+responsibility-specific children (`permissions.act`, `publication.act`,
+`links.act`, and `temporary.act`). The remaining facade/export audit is still
+open, so the split checkbox remains intentionally unchecked.
+
+Gate 1 visibility evidence (2026-10-25): `tests/library/fs/fs.act` now covers
+both qualified `fs::...` access and intentional unqualified access through
+`import { open std::fs };`; both forms pass strict execution.
+
+### Gate 1.1: Secure temporary resources
+
+- [x] Add secure temporary-file and temporary-directory creation below a
+      caller-selected workspace root.
+- [x] Use OS-provided entropy, atomic create-new/mkdir semantics, bounded
+      collision retries, and rejection of symlink workspace roots.
+- [x] Return the generated path with the owned resource and provide explicit
+      cleanup plus best-effort Drop cleanup.
+- [x] Add mirrored strict fixtures for creation, cleanup, and prefix rejection.
+
+Gate 1.1 evidence (2026-10-25): the runtime exposes secure temporary file and
+directory creation with caller-selected roots, OS entropy (`/dev/urandom` on
+Unix and `BCryptGenRandom` on Windows), atomic creation, bounded retries, and
+typed Actus cleanup wrappers. `tests/library/fs/temporary.act` covers both
+resource kinds, cleanup removal, and unsafe-prefix rejection. Adversarial
+collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
 
 ## Gate 2: Typed paths and filesystem identity
 

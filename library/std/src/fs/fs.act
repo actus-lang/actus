@@ -25,3 +25,6 @@ open publication;
 
 """Re-export file cursor origins and seek contracts."""
 open seek;
+
+"""Re-export secure temporary-resource creation and cleanup."""
+open temporary;

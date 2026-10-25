@@ -1,0 +1,149 @@
+"""Mirrored strict coverage for secure temporary filesystem resources."""
+import {
+    std::fs,
+    std::path,
+};
+
+verb current_directory() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb file_prefix() -> Buffer {
+    erg prefix: Buffer = Buffer[0];
+    append(prefix, 97u8);
+    append(prefix, 99u8);
+    append(prefix, 116u8);
+    append(prefix, 117u8);
+    append(prefix, 115u8);
+    append(prefix, 45u8);
+    append(prefix, 103u8);
+    append(prefix, 49u8);
+    append(prefix, 49u8);
+    append(prefix, 45u8);
+    append(prefix, 102u8);
+    append(prefix, 105u8);
+    append(prefix, 108u8);
+    append(prefix, 101u8);
+    return prefix;
+}
+
+verb directory_prefix() -> Buffer {
+    erg prefix: Buffer = Buffer[0];
+    append(prefix, 97u8);
+    append(prefix, 99u8);
+    append(prefix, 116u8);
+    append(prefix, 117u8);
+    append(prefix, 115u8);
+    append(prefix, 45u8);
+    append(prefix, 103u8);
+    append(prefix, 49u8);
+    append(prefix, 49u8);
+    append(prefix, 45u8);
+    append(prefix, 100u8);
+    append(prefix, 105u8);
+    append(prefix, 114u8);
+    append(prefix, 101u8);
+    return prefix;
+}
+
+meta test
+verb secure_temporary_file_is_created_and_cleaned() -> Int {
+    erg root_result = current_directory();
+    return case dat root_result {
+        Result.Err(_) => 1,
+        Result.Ok(root) => {
+            erg prefix = file_prefix();
+            erg created = fs::temporary_file_open(root: abs root, prefix: abs prefix);
+            return case dat created {
+                Result.Err(_) => 2,
+                Result.Ok(resource) => {
+                    erg inspected = fs::metadata(path: abs resource.path);
+                    return case dat inspected {
+                        Result.Err(_) => {
+                            fs::temporary_file_cleanup(self: ins resource);
+                            return 3;
+                        },
+                        Result.Ok(metadata) => {
+                            drop(metadata);
+                            erg cleaned = fs::temporary_file_cleanup(self: ins resource);
+                            return case dat cleaned {
+                                Result.Err(_) => 5,
+                                Result.Ok(_) => {
+                                    erg after = fs::metadata(path: abs resource.path);
+                                    return case dat after {
+                                        Result.Err(_) => 0,
+                                        Result.Ok(_) => 6,
+                                    };
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb secure_temporary_directory_is_created_and_cleaned() -> Int {
+    erg root_result = current_directory();
+    return case dat root_result {
+        Result.Err(_) => 1,
+        Result.Ok(root) => {
+            erg prefix = directory_prefix();
+            erg created = fs::temporary_directory_open(root: abs root, prefix: abs prefix);
+            return case dat created {
+                Result.Err(_) => 2,
+                Result.Ok(resource) => {
+                    erg inspected = fs::metadata(path: abs resource.path);
+                    return case dat inspected {
+                        Result.Err(_) => {
+                            fs::temporary_directory_cleanup(self: ins resource);
+                            return 3;
+                        },
+                        Result.Ok(metadata) => {
+                            drop(metadata);
+                            erg cleaned = fs::temporary_directory_cleanup(self: ins resource);
+                            return case dat cleaned {
+                                Result.Err(_) => 5,
+                                Result.Ok(_) => {
+                                    erg after = fs::metadata(path: abs resource.path);
+                                    return case dat after {
+                                        Result.Err(_) => 0,
+                                        Result.Ok(_) => 6,
+                                    };
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb temporary_prefix_is_validated() -> Int {
+    erg root_result = current_directory();
+    return case dat root_result {
+        Result.Err(_) => 1,
+        Result.Ok(root) => {
+            erg invalid: Buffer = Buffer[0];
+            append(invalid, 47u8);
+            erg created = fs::temporary_file_open(root: abs root, prefix: abs invalid);
+            return case dat created {
+                Result.Err(error) => case dat error {
+                    fs::TemporaryError.InvalidPrefix => 0,
+                    _ => 2,
+                },
+                Result.Ok(resource) => {
+                    fs::temporary_file_cleanup(self: ins resource);
+                    3;
+                },
+            };
+        },
+    };
+}

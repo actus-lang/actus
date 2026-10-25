@@ -23,6 +23,7 @@ struct Metadata {
     is_file: Int,
     is_dir: Int,
     readonly: Int,
+    is_symlink: Int,
 }
 ```
 
@@ -79,6 +80,7 @@ success. Seek and metadata return the resulting position or copied facts.
 
 ```actus
 verb metadata(abs path: Path) -> Result[Metadata, IoError];
+verb symlink_metadata(abs path: Path) -> Result[Metadata, IoError];
 verb options_new() -> OpenOptions;
 verb options_read(dat options: OpenOptions) -> OpenOptions;
 verb options_write(dat options: OpenOptions) -> OpenOptions;
@@ -125,7 +127,44 @@ owner.
 | flush/close | runtime status | `Failed` |
 | seek | absolute byte position | `Failed` |
 | metadata | `Metadata` | `Failed` |
+| symlink metadata | `Metadata` | `Failed` |
 | read-to-bytes | owned `Buffer` | `Failed`, `EndOfStream` |
 | read-to-string | UTF-8 `Buffer` | I/O error, `InvalidData` |
 | rename/copy/remove/dir | status or count | `Failed` |
 | atomic write | written byte count | write, flush, rename, or cleanup error |
+
+## Temporary resources
+
+```actus
+enum TemporaryError {
+    Failed,
+    InvalidPrefix,
+    CollisionExhausted,
+}
+
+struct TemporaryFile {
+    file: File,
+    path: Path,
+}
+
+struct TemporaryDirectory {
+    path: Path,
+}
+
+verb temporary_file_open(abs root: Path, abs prefix: Buffer)
+    -> Result[TemporaryFile, TemporaryError];
+verb temporary_directory_open(abs root: Path, abs prefix: Buffer)
+    -> Result[TemporaryDirectory, TemporaryError];
+verb temporary_file_cleanup(ins self: TemporaryFile)
+    -> Result[Int, IoError];
+verb temporary_directory_cleanup(ins self: TemporaryDirectory)
+    -> Result[Int, IoError];
+```
+
+The caller supplies the workspace root; the API never selects a global
+temporary directory implicitly. The runtime rejects symlink roots, restricts
+the prefix to bounded ASCII name bytes, obtains OS entropy, and uses atomic
+create-new or mkdir semantics with bounded collision retries. The returned
+resource owns the generated path. Explicit cleanup closes/removes the file or
+removes the empty directory and returns failures; Drop performs best-effort
+cleanup when control leaves scope unexpectedly.
