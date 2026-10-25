@@ -215,9 +215,7 @@ fn remove_internal_module_imports(program: &mut Program, module_path: &str) {
 }
 
 fn is_internal_module_path(import_path: &str, module_path: &str) -> bool {
-    import_path == module_path
-        || import_path.starts_with(&format!("{module_path}::"))
-        || module_path.starts_with(&format!("{import_path}::"))
+    import_path == module_path || module_path.starts_with(&format!("{import_path}::"))
 }
 
 fn module_path_for_test(path: &Path, source_root: &Path, project_root: &Path) -> String {

@@ -191,11 +191,17 @@ of the Actus module and facade contract, separate from compiler implementation.
 - [ ] Add explicit aliases when nested imports share a final segment, such as
       `import parent::child as local_child;` and
       `import other::child as other_child;`.
-- [ ] Add a regression fixture proving nested sibling imports, qualified
+- [x] Add a regression fixture proving nested sibling imports, qualified
       types, and same-final-segment aliases across one canonical parent.
 - [ ] Record compiler revision, formatter output, strict checks, and the
       resulting facade/module-visibility evidence before marking this
       follow-up complete.
+
+Regression evidence (2026-10-25): the CLI workflow covers both external and
+mirrored consumers. The mirrored fixture preserves descendant canonical
+imports such as `parent::left::contract` and `parent::right::contract`,
+qualified types, and same-final-segment aliases. `cli_test_workflow` passes
+22/22 and the module aggregation suite passes 102/102.
 
 ### Gate 47.7 — Test selection, internal fixtures, and mirrored layout
 
