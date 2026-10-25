@@ -70,11 +70,7 @@ pub(super) fn build_object_plan(
         if !owners.insert(module_path.clone()) {
             return Err(ModuleError::DuplicateObjectOwner { module_path });
         }
-        let internal_scope = compilation.has_friend_scope()
-            && compilation.friend_modules().iter().any(|friend| {
-                module.identity().module_path() == friend
-                    || module.identity().module_path().starts_with(&format!("{friend}::"))
-            });
+        let internal_scope = module_is_reachable_from_friend_scope(compilation, module);
         let exported_verbs = exported_implementation_names(module, internal_scope);
         units.push(ModuleObjectUnit {
             owner: ModuleObjectOwner::Imported { module_path },
@@ -84,6 +80,33 @@ pub(super) fn build_object_plan(
         });
     }
     Ok(ModuleObjectPlan { units })
+}
+
+fn module_is_reachable_from_friend_scope(
+    compilation: &ModuleCompilationPlan,
+    module: &super::unit::ModuleUnit,
+) -> bool {
+    let target = module.identity().module_path();
+    let mut pending = compilation.friend_modules().iter().cloned().collect::<Vec<_>>();
+    let mut visited = HashSet::new();
+    while let Some(current) = pending.pop() {
+        if !visited.insert(current.clone()) {
+            continue;
+        }
+        if current == target || target.starts_with(&format!("{current}::")) {
+            return true;
+        }
+        let Some(unit) =
+            compilation.units().iter().find(|unit| unit.identity().module_path() == current)
+        else {
+            continue;
+        };
+        for declaration in &unit.implementation().declarations {
+            let crate::ast::TopLevelDecl::Import(import) = declaration else { continue };
+            pending.push(super::plan::qualify_import_path(&current, &import.path));
+        }
+    }
+    false
 }
 
 fn exported_implementation_names(
@@ -328,23 +351,37 @@ fn append_imported_declarations(
     declarations: &mut Vec<TopLevelDecl>,
 ) {
     let imports = imported_dependencies(module, compilation);
-    for (dependency, namespace) in imports {
+    for (dependency, namespace, open_import, selected) in imports {
         let first_visit = imported_paths.insert(dependency.identity().module_path().to_owned());
         append_dependency_imports(dependency, declarations);
         let module_path = module.identity().module_path();
         let dependency_path = dependency.identity().module_path();
         let parent_scope = module_path == dependency_path
-            || module_path.starts_with(&format!("{dependency_path}::"));
-        let friend = parent_scope
-            || compilation.friend_modules().iter().any(|friend| {
-                dependency_path == friend || dependency_path.starts_with(&format!("{friend}::"))
-            });
+            || module_path.starts_with(&format!("{dependency_path}::"))
+            || dependency_path.starts_with(&format!("{module_path}::"));
+        let friend = selected.is_empty()
+            && !open_import
+            && (parent_scope
+                || compilation.friend_modules().iter().any(|friend| {
+                    dependency_path == friend || dependency_path.starts_with(&format!("{friend}::"))
+                }));
         for declaration in &dependency.implementation().declarations {
+            if !selected.is_empty()
+                && export_identity(declaration)
+                    .is_none_or(|(_, name)| !selected.iter().any(|item| item == &name))
+            {
+                continue;
+            }
+            let qualified_namespace = if open_import {
+                namespace.as_deref()
+            } else {
+                friend.then_some(namespace.as_deref()).flatten()
+            };
             let Some(exported) = exported_dependency_declaration(
                 dependency,
                 declaration,
                 friend,
-                friend.then_some(namespace.as_deref()).flatten(),
+                qualified_namespace,
             ) else {
                 continue;
             };
@@ -352,6 +389,18 @@ fn append_imported_declarations(
             let identity = (kind.to_owned(), name);
             if declaration_identities.insert(identity) {
                 declarations.push(exported);
+            }
+            if open_import || !selected.is_empty() {
+                let Some(opened) =
+                    exported_dependency_declaration(dependency, declaration, false, None)
+                else {
+                    continue;
+                };
+                let Some((kind, name)) = export_identity(&opened) else { continue };
+                let identity = (kind.to_owned(), name);
+                if declaration_identities.insert(identity) {
+                    declarations.push(opened);
+                }
             }
         }
         if first_visit {
@@ -392,7 +441,7 @@ fn append_dependency_imports(
 fn imported_dependencies<'a>(
     module: &super::unit::ModuleUnit,
     compilation: &'a ModuleCompilationPlan,
-) -> Vec<(&'a super::unit::ModuleUnit, Option<String>)> {
+) -> Vec<(&'a super::unit::ModuleUnit, Option<String>, bool, Vec<String>)> {
     module
         .implementation()
         .declarations
@@ -405,10 +454,10 @@ fn imported_dependencies<'a>(
                 .units()
                 .iter()
                 .find(|unit| unit.identity().module_path() == import_path)?;
-            let namespace = (!import.is_open).then(|| {
+            let namespace = Some({
                 import.alias.clone().or_else(|| import.path.rsplit("::").next().map(str::to_owned))
             });
-            Some((unit, namespace.flatten()))
+            Some((unit, namespace.flatten(), import.is_open, import.selected.clone()))
         })
         .collect()
 }

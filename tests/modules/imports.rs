@@ -96,6 +96,38 @@ fn resolves_qualified_call_through_an_open_import() {
 }
 
 #[test]
+fn grouped_open_import_preserves_legacy_qualified_and_unqualified_access() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source(
+        "import { open shared }; verb main() -> Int { return shared::read() + read(); }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("grouped open imports should preserve both legacy access forms");
+}
+
+#[test]
+fn selective_import_exposes_only_selected_public_declarations() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write(
+        "shared/api.act",
+        "open verb read() -> Int { return 7; } open verb ignored() -> Int { return 9; }",
+    );
+    let program = parse_source("import { shared { read } }; verb main() -> Int { return read(); }");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("selective public import should build");
+    assert!(plan.caller().declarations.iter().any(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "read")
+    }));
+    assert!(!plan.caller().declarations.iter().any(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "ignored")
+    }));
+}
+
+#[test]
 fn resolves_qualified_call_through_an_open_nested_facade_import() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open nested;");
@@ -106,6 +138,48 @@ fn resolves_qualified_call_through_an_open_nested_facade_import() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("qualified calls should resolve through an open nested facade");
+}
+
+#[test]
+fn preserves_private_runtime_sentinel_through_a_parent_package_scope() {
+    let fixture = Fixture::new();
+    fixture.write("ie/ie.act", "open runtime; open resident;");
+    fixture.write("ie/runtime/runtime.act", "open fabric;");
+    fixture.write("ie/runtime/fabric.act", "verb marker() -> u32 { return 0u32; }");
+    fixture.write("ie/runtime/sentinels.act", "verb null_index() -> u32 { return 0u32; }");
+    fixture.write("runner/runner.act", "import ie;");
+    fixture.write(
+        "ie/resident.act",
+        "import ie::runtime; verb resident_marker() -> u32 { return runtime::null_index(); }",
+    );
+    let program = parse_source("import { open runner }; verb main() -> Int { return 0; }");
+    let plan =
+        actus::modules::build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+            .expect("test compilation plan should build");
+    let object_plan = plan.object_plan().expect("object plan should build");
+    for unit in object_plan.units() {
+        actus::semantic::analyze(unit.program())
+            .expect("object unit should resolve private sentinel");
+    }
+}
+
+#[test]
+fn test_scope_preserves_private_open_child_helpers_for_parent_siblings() {
+    let fixture = Fixture::new();
+    fixture.write("pkg/pkg.act", "open child; open sibling;");
+    fixture.write("pkg/sibling.act", "verb use_helper() -> Int { return helper(); }");
+    fixture.write("pkg/child/child.act", "open codec;");
+    fixture.write("pkg/child/codec.act", "verb helper() -> Int { return 1; }");
+    let program = parse_source(
+        "import { open pkg }; meta test\nverb smoke() -> Int { return use_helper() - 1; }",
+    );
+    let plan =
+        actus::modules::build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+            .expect("test plan should preserve the parent module scope");
+    for unit in plan.object_plan().expect("object plan should build").units() {
+        actus::semantic::analyze(unit.program())
+            .expect("private child helper should remain visible to parent siblings");
+    }
 }
 
 #[test]

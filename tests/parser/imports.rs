@@ -14,6 +14,7 @@ fn parses_extension_free_module_imports() {
     assert_eq!(import.path, "driver::gpio");
     assert_eq!(import.alias, None);
     assert!(!import.is_open);
+    assert!(import.selected.is_empty());
     assert!(!import.grouped);
     assert_eq!(import.span.start, 0);
 }
@@ -31,6 +32,7 @@ fn parses_grouped_imports_as_normalized_namespace_bindings() {
             TopLevelDecl::Import(import) => {
                 assert!(import.alias.is_none());
                 assert!(!import.is_open);
+                assert!(import.selected.is_empty());
                 assert!(import.grouped);
                 import.path.as_str()
             }
@@ -57,15 +59,34 @@ fn parses_namespace_alias_and_open_items_in_one_import_block() {
         .collect::<Vec<_>>();
     assert_eq!(imports.len(), 6);
     assert_eq!(imports[0].path, "driver::i2c");
+    assert!(!imports[0].is_open);
+    assert!(imports[0].selected.is_empty());
     assert_eq!(imports[1].path, "driver::uart");
+    assert!(!imports[1].is_open);
+    assert!(imports[1].selected.is_empty());
     assert_eq!(imports[2].path, "telemetry::uart");
     assert_eq!(imports[2].alias.as_deref(), Some("telem_uart"));
+    assert!(!imports[2].is_open);
+    assert!(imports[2].selected.is_empty());
     assert_eq!(imports[3].path, "sensors::imu");
     assert!(imports[3].is_open);
     assert_eq!(imports[4].path, "config::MAX_SPEED");
     assert!(imports[4].is_open);
     assert_eq!(imports[5].path, "config::MIN_VOLTAGE");
     assert!(imports[5].is_open);
+}
+
+#[test]
+fn parses_selected_public_members_without_opening_the_module() {
+    let (tokens, errors) = scan("import { module4::submodule { verb1, verb2, }, };");
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("selected import should parse");
+    let TopLevelDecl::Import(import) = &program.declarations[0] else {
+        panic!("expected import declaration");
+    };
+    assert_eq!(import.path, "module4::submodule");
+    assert!(!import.is_open);
+    assert_eq!(import.selected, ["verb1", "verb2"]);
 }
 
 #[test]

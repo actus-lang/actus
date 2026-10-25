@@ -432,6 +432,16 @@ impl Formatter<'_> {
             self.output.push_str("open ");
         }
         self.output.push_str(&import.path);
+        if !import.selected.is_empty() {
+            self.output.push_str(" {");
+            for (index, name) in import.selected.iter().enumerate() {
+                if index > 0 {
+                    self.output.push_str(", ");
+                }
+                self.output.push_str(name);
+            }
+            self.output.push('}');
+        }
         if let Some(alias) = &import.alias {
             self.output.push_str(" as ");
             self.output.push_str(alias);
@@ -448,6 +458,16 @@ impl Formatter<'_> {
                 self.output.push_str("open ");
             }
             self.output.push_str(&import.path);
+            if !import.selected.is_empty() {
+                self.output.push_str(" {");
+                for (index, name) in import.selected.iter().enumerate() {
+                    if index > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.output.push_str(name);
+                }
+                self.output.push('}');
+            }
             if let Some(alias) = &import.alias {
                 self.output.push_str(" as ");
                 self.output.push_str(alias);

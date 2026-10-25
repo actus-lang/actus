@@ -47,6 +47,7 @@ pub struct ImportDecl {
     pub path: String,
     pub alias: Option<String>,
     pub is_open: bool,
+    pub selected: Vec<String>,
     pub grouped: bool,
     pub span: SourceSpan,
 }

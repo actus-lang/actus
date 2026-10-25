@@ -255,6 +255,8 @@ fn collect_root_imports(
             caller_declarations,
             appended_symbols,
             namespace.as_deref(),
+            import.is_open,
+            &import.selected,
             friend_modules,
         )?;
     }
@@ -262,13 +264,13 @@ fn collect_root_imports(
 }
 
 fn import_namespace(import: &crate::ast::ImportDecl) -> Option<String> {
-    (!import.is_open).then(|| {
+    Some(
         import
             .alias
             .clone()
             .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
-            .unwrap_or_else(|| import.path.clone())
-    })
+            .unwrap_or_else(|| import.path.clone()),
+    )
 }
 
 fn validate_symbol_collisions(
@@ -344,6 +346,8 @@ fn collect_unit(
     caller_declarations: &mut Vec<TopLevelDecl>,
     appended_symbols: &mut HashSet<(String, String, String)>,
     namespace: Option<&str>,
+    open_import: bool,
+    selected: &[String],
     friend_modules: &HashSet<String>,
 ) -> Result<(), ModuleError> {
     let unit = super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
@@ -368,21 +372,62 @@ fn collect_unit(
         )?;
     }
     if friend {
-        append_internal_declarations(
-            caller_declarations,
-            &unit,
-            module_path,
-            namespace,
-            appended_symbols,
-        );
+        if selected.is_empty() {
+            append_internal_declarations(
+                caller_declarations,
+                &unit,
+                module_path,
+                namespace,
+                appended_symbols,
+            );
+        }
+        if open_import || !selected.is_empty() {
+            if selected.is_empty() {
+                append_internal_declarations(
+                    caller_declarations,
+                    &unit,
+                    module_path,
+                    None,
+                    appended_symbols,
+                );
+            } else {
+                append_public_declarations(
+                    caller_declarations,
+                    &unit,
+                    module_path,
+                    namespace,
+                    selected,
+                    appended_symbols,
+                );
+                append_public_declarations(
+                    caller_declarations,
+                    &unit,
+                    module_path,
+                    None,
+                    selected,
+                    appended_symbols,
+                );
+            }
+        }
     } else {
         append_public_declarations(
             caller_declarations,
             &unit,
             module_path,
             namespace,
+            selected,
             appended_symbols,
         );
+        if open_import || !selected.is_empty() {
+            append_public_declarations(
+                caller_declarations,
+                &unit,
+                module_path,
+                None,
+                selected,
+                appended_symbols,
+            );
+        }
     }
     if first_load {
         units.push(unit);
@@ -416,6 +461,8 @@ fn collect_imported_units(
             caller_declarations,
             appended_symbols,
             imported_namespace.as_deref(),
+            import.is_open,
+            &import.selected,
             friend_modules,
         )?;
     }

@@ -165,7 +165,7 @@ fn parent_facade_preserves_generic_pack_constant_and_performance_exports() {
     fixture.write("device/runtime/runtime.act", "open api;");
     fixture.write(
         "device/runtime/api.act",
-        "open struct Packet[T] { item: T, } open pack Register { erg storage: u8; layout little; fields { erg ready: u1 at 0; } } open const LIMIT: u8 = 8u8; open verb make[T](erg item: T) -> Packet[T] { return Packet[T] { item: item, }; } open role Reader { verb read(abs self: Register) -> u8; } open perform Reader for Register { verb read(abs self: Register) -> u8 { return self.ready; } }",
+        "open struct Packet[T] { item: T, } open pack Register { erg storage: u8; layout little; fields { erg ready: u1 at 0; } } open enum Mode { Ready, } open const LIMIT: u8 = 8u8; open verb make[T](erg item: T) -> Packet[T] { return Packet[T] { item: item, }; } open role Reader { verb read(abs self: Register) -> u8; } open perform Reader for Register { verb read(abs self: Register) -> u8 { return self.ready; } }",
     );
 
     let exports = exports_module(&ModuleResolver::new(&fixture.root), "device")
@@ -173,6 +173,7 @@ fn parent_facade_preserves_generic_pack_constant_and_performance_exports() {
 
     assert!(exports.contains("struct", "Packet"));
     assert!(exports.contains("pack", "Register"));
+    assert!(exports.contains("enum", "Mode"));
     assert!(exports.contains("const", "LIMIT"));
     assert!(exports.contains("verb", "make"));
     assert!(exports.contains("role", "Reader"));

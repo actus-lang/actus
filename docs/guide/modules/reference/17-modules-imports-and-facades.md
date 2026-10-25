@@ -20,8 +20,8 @@ fs::file_open(...);
 path::from_bytes(...);
 ```
 
-When unqualified access is intentional, put `open` explicitly inside the
-unified import block:
+An `open` entry in a unified import block imports the canonical facade and
+makes all of its public declarations available unqualified:
 
 ```act
 import {
@@ -30,6 +30,39 @@ import {
     open std::path,
 };
 ```
+
+This is equivalent to the legacy form:
+
+```act
+import std::io;
+open std::io;
+```
+
+An entry without `open` keeps namespace-only behavior, including inside the
+unified block:
+
+```act
+import {
+    std::io,
+};
+
+io::println(...);
+```
+
+Specific public declarations can be selected without opening the complete
+module:
+
+```act
+import {
+    teaching::contract {
+        AdapterEnvelope,
+        validate_adapter_envelope,
+    },
+};
+```
+
+Selected names must be declarations exposed by the module facade. Private
+declarations cannot be made public by listing them in an import.
 
 Grouped imports and aliases are also valid:
 
@@ -68,6 +101,15 @@ open error;
 Sibling files share internal module scope. External users see only declarations
 exposed through the canonical facade. Direct sibling bypasses, missing
 facades, duplicate declarations, and malformed exports must be rejected.
+
+An opened facade re-exports every declaration whose declaration-level
+visibility is `open`, not only verbs. This includes constants, structs, packs,
+serializable declarations, enums, roles, performances, external verbs, and
+opened child-module exports. Consumers must not list those declarations one by
+one when importing the complete facade; importing the canonical facade is
+sufficient. Selective imports may list individual public declarations.
+Declarations without
+`open` remain implementation-private and do not cross the facade boundary.
 
 ### 17.3 Package configuration facade
 
@@ -188,10 +230,24 @@ Do not use Rust `pub`, Go `export`, or C header conventions in Actus source.
 Fields do not have a separate `pub` keyword; aggregate visibility follows the
 declared facade and type contract.
 
-This rule has two scopes. In external consumer code, `open` is only an import
-item inside `import { ... };`. In a canonical directory facade, `open sibling;`
+This rule has two scopes. In external consumer code, `open` is an import item
+inside `import { ... };`. In a canonical directory facade, `open sibling;`
 remains the public re-export declaration. Facade re-exports are not external
 consumer imports and remain valid for every public child or sibling export.
+
+The public surface is transitive through canonical facades:
+
+```text
+ie/ie.act                 open runtime;
+ie/runtime/runtime.act    open fabric;
+ie/runtime/fabric.act     open struct Fabric;
+```
+
+An external `import ie;` can use the opened `Fabric` declaration through the
+facade chain. It does not need a separate import for `fabric` or a separate
+import for each opened declaration. This applies equally to opened verbs,
+enums, structs, packs, constants, roles, performances, serializable
+declarations, and external verbs.
 
 ### 17.5 Hierarchical facades
 

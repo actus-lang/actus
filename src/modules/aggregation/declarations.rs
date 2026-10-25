@@ -53,6 +53,7 @@ pub(super) fn append_public_declarations(
     unit: &ModuleUnit,
     module_path: &str,
     namespace: Option<&str>,
+    selected: &[String],
     appended_symbols: &mut HashSet<(String, String, String)>,
 ) {
     for declaration in &unit.implementation().declarations {
@@ -75,6 +76,9 @@ pub(super) fn append_public_declarations(
     for declaration in &unit.implementation().declarations {
         let Some((kind, name)) = export_identity(declaration) else { continue };
         if !unit.exports().contains(kind, &name) {
+            continue;
+        }
+        if !selected.is_empty() && !selected.iter().any(|item| item == &name) {
             continue;
         }
         let symbol_namespace = (kind == "verb").then(|| namespace.unwrap_or_default().to_owned());

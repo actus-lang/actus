@@ -209,7 +209,7 @@ impl Parser {
             items = self.parse_import_items()?;
         }
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        if !is_block && items.iter().any(|(_, _, is_open, _, _)| *is_open) {
+        if !is_block && items.iter().any(|(_, _, is_open, _, _, _)| *is_open) {
             return Err(ParseError {
                 code: ParseErrorCode::OpenImportRequiresBlock,
                 kind: ParseErrorKind::OpenImportRequiresBlock,
@@ -218,11 +218,12 @@ impl Parser {
         }
         Ok(items
             .into_iter()
-            .map(|(path, alias, is_open, grouped, span)| {
+            .map(|(path, alias, is_open, grouped, selected, span)| {
                 TopLevelDecl::Import(crate::ast::ImportDecl {
                     path,
                     alias,
                     is_open,
+                    selected,
                     grouped,
                     span: if is_block { span } else { SourceSpan::new(start, end) },
                 })
@@ -233,7 +234,8 @@ impl Parser {
     #[allow(clippy::type_complexity)]
     fn parse_import_items(
         &mut self,
-    ) -> Result<Vec<(String, Option<String>, bool, bool, SourceSpan)>, ParseError> {
+    ) -> Result<Vec<(String, Option<String>, bool, bool, Vec<String>, SourceSpan)>, ParseError>
+    {
         let is_open = self.match_simple(TokenKind::Open);
         let item_start = if is_open {
             self.previous().span.start
@@ -254,6 +256,7 @@ impl Parser {
                         alias,
                         is_open,
                         true,
+                        Vec::new(),
                         SourceSpan::new(item_start, item_end),
                     ));
                     if self.match_simple(TokenKind::Comma) {
@@ -270,12 +273,30 @@ impl Parser {
             segments.push(identifier_text(&self.take_identifier("module name")?.kind));
         }
         let alias = self.parse_import_alias()?;
+        let selected = if self.match_simple(TokenKind::LeftBrace) {
+            let mut names = Vec::new();
+            loop {
+                names.push(identifier_text(&self.take_identifier("imported declaration")?.kind));
+                if self.match_simple(TokenKind::Comma) {
+                    if self.check_simple(&TokenKind::RightBrace) {
+                        break;
+                    }
+                    continue;
+                }
+                break;
+            }
+            self.expect_simple(TokenKind::RightBrace, "`}`")?;
+            names
+        } else {
+            Vec::new()
+        };
         let item_end = self.previous().span.end;
         Ok(vec![(
             segments.join("::"),
             alias,
             is_open,
             false,
+            selected,
             SourceSpan::new(item_start, item_end),
         )])
     }

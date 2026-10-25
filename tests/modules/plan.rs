@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::lexer::scan;
-use actus::modules::{ModuleError, ModuleObjectOwner, ModuleResolver, build_compilation_plan};
+use actus::modules::{
+    ModuleError, ModuleObjectOwner, ModuleResolver, build_compilation_plan,
+    build_test_compilation_plan,
+};
 use actus::parser::parse;
 
 struct Fixture(PathBuf);
@@ -230,6 +233,25 @@ fn object_metadata_lists_only_facade_exported_verbs() {
     let objects = plan.object_plan().unwrap();
     let exported = objects.units()[1].exported_verbs();
     assert_eq!(exported, &["read".to_owned()]);
+}
+
+#[test]
+fn object_metadata_keeps_private_verbs_for_transitive_friend_dependencies() {
+    let fixture = Fixture::new();
+    fixture.write("runner/runner.act", "open teaching;");
+    fixture.write("runner/teaching.act", "import shared;");
+    fixture.write("shared/shared.act", "verb private_helper() -> Int { return 1; }");
+    let (tokens, errors) =
+        scan("import { open runner }; meta test\nverb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    let objects = plan.object_plan().unwrap();
+    let shared = objects.units().iter().find(|unit| {
+        matches!(unit.owner(), ModuleObjectOwner::Imported { module_path } if module_path == "shared")
+    }).expect("transitive dependency object should exist");
+    assert_eq!(shared.exported_verbs(), &["private_helper".to_owned()]);
 }
 
 #[test]
