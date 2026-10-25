@@ -110,7 +110,7 @@ collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
       invalid UTF-8, reserved names, and platform-invalid components.
 - [x] Add `same_file` or equivalent identity comparison where the target can
       provide it, with an explicit unsupported result otherwise.
-- [ ] Add accepted and rejected tests for traversal, malformed encoding,
+- [x] Add accepted and rejected tests for traversal, malformed encoding,
       roots, separators, and platform-specific reserved names.
 
 Gate 2 lexical-path evidence (2026-10-26): `std::path::Path` owns validated
@@ -121,7 +121,8 @@ retain their source path and offsets. The mirrored fixtures
 `path_builders.act` cover source reads, POSIX/Windows roots and separators,
 lexical dot and dot-dot normalization, component extraction, ownership, and
 embedded-null/invalid-encoding failures. Filesystem identity resolution,
-reserved-name policy, traversal rejection, and `same_file` remain open.
+reserved-name policy, traversal semantics, and `same_file` remain covered;
+consumer-specific symlink escape policy remains open for Gate 6 and Gate 9.
 
 Gate 2 canonicalization evidence (2026-10-26): `std::fs::canonicalize` uses
 the host filesystem resolver, returns a new owned absolute `Path`, preserves

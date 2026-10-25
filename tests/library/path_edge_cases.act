@@ -157,3 +157,35 @@ verb path_edge_cases_and_windows_roots() -> Int {
     };
     return verify_windows_root(windows: abs windows);
 }
+
+meta test
+verb relative_parent_components_remain_lexical() -> Int {
+    erg raw = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 46u8);
+    append(raw, 47u8);
+    append(raw, 99u8);
+    append(raw, 104u8);
+    append(raw, 105u8);
+    append(raw, 108u8);
+    append(raw, 100u8);
+    append(raw, 0u8);
+    erg result = path_from_posix(storage: dat raw);
+    return case dat result {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg normalized = normalize(dat path);
+            return case dat normalized {
+                Result.Err(_) => 2,
+                Result.Ok(value) => {
+                    if value.length != 8 {
+                        drop(value);
+                        return 3;
+                    }
+                    drop(value);
+                    0;
+                },
+            };
+        },
+    };
+}

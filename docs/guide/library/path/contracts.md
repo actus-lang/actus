@@ -34,6 +34,12 @@ Path operations inspect and transform path data only. They do not:
 
 Use `std::fs` for external filesystem effects.
 
+Relative `..` components remain lexical during normalization when they would
+escape the relative root; `std::path` does not invent a sandbox root or
+silently delete traversal intent. Applications that need containment must
+resolve through `std::fs::canonicalize` and compare the resulting identity
+against an approved workspace before opening or mutating a resource.
+
 ## Error matrix
 
 | Error | Typical cause | Caller action |
