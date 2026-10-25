@@ -3,7 +3,9 @@ use crate::semantic::SemanticErrorKind;
 use super::pack_codes;
 
 pub(super) fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
-    enum_semantic_message(kind)
+    dynamic_role_message(kind)
+        .or_else(|| constant_message(kind))
+        .or_else(|| enum_semantic_message(kind))
         .or_else(|| guard_semantic_message(kind))
         .or_else(|| struct_semantic_message(kind))
         .or_else(|| pack_codes::message(kind))
@@ -12,6 +14,33 @@ pub(super) fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<Stri
         .or_else(|| array_semantic_message(kind))
         .or_else(|| operator_semantic_message(kind))
         .or_else(|| type_semantic_message(kind))
+}
+
+fn dynamic_role_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::DynamicRequiresAbs { parameter } => {
+            format!("dynamic parameter `{parameter}` must use the `abs` role")
+        }
+        SemanticErrorKind::UnknownDynamicRole { name } => format!("unknown dynamic role `{name}`"),
+        SemanticErrorKind::DynamicRoleMismatch { role, found } => {
+            format!("type `{found}` has no performance implementation for dynamic role `{role}`")
+        }
+        _ => return None,
+    };
+    Some(message)
+}
+
+fn constant_message(kind: &SemanticErrorKind) -> Option<String> {
+    let message = match kind {
+        SemanticErrorKind::DuplicateConstantName { name } => {
+            format!("duplicate constant declaration `{name}`")
+        }
+        SemanticErrorKind::ConstantCycle { name } => {
+            format!("constant `{name}` participates in a cyclic initializer")
+        }
+        _ => return None,
+    };
+    Some(message)
 }
 
 fn serialization_message(kind: &SemanticErrorKind) -> Option<String> {

@@ -59,6 +59,8 @@ fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::DuplicatePackName { .. } => "E1081",
         SemanticErrorKind::InvalidSerializationContract { .. } => "E1098",
         SemanticErrorKind::EmptyEnum { .. } => "E1810",
+        SemanticErrorKind::DuplicateConstantName { .. } => "E1117",
+        SemanticErrorKind::ConstantCycle { .. } => "E1118",
         SemanticErrorKind::DuplicateStructField { .. } => "E1030",
         SemanticErrorKind::UnknownStructField { .. } => "E1031",
         SemanticErrorKind::MissingStructField { .. } => "E1032",
@@ -178,6 +180,9 @@ fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::InvalidGuardAccess { .. } => "E1062",
         SemanticErrorKind::GuardTypeMismatch { .. } => "E1063",
         SemanticErrorKind::BranchStateMismatch { .. } => "E1061",
+        SemanticErrorKind::DynamicRequiresAbs { .. } => "E1089",
+        SemanticErrorKind::UnknownDynamicRole { .. } => "E1099",
+        SemanticErrorKind::DynamicRoleMismatch { .. } => "E1116",
         _ => return None,
     })
 }

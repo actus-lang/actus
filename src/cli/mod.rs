@@ -165,7 +165,7 @@ fn command_help_text(command: &str) -> Option<&'static str> {
             "usage: actus watch [file.act] [--once|--build] [--interval <ms>] [--release|--profile <name>]\n\nCheck an Actus project after source changes.",
         ),
         "test" => Some(
-            "usage: actus test [--strict]\n\nCollect and run Actus meta tests.\n\nSet ACTUS_TEST_TIMEOUT_SECONDS to override the per-test process timeout; the default is 30 seconds.",
+            "usage: actus test [FILTER] [--module PATH] [--file PATH] [--exact] [--list] [--mirror] [--strict]\n\nCollect and run Actus meta tests. FILTER, --module, and --file select tests by substring; --exact requires exact matches, --list prints selected tests without executing them, and --mirror requires tests/<path>.act to map to src/<path>.act or its canonical facade.\n\nSet ACTUS_TEST_TIMEOUT_SECONDS to override the per-test process timeout; the default is 30 seconds.",
         ),
         "conformance" => Some(
             "usage: actus conformance [--strict]\n\nReport source structure and size conformance across the repository.",

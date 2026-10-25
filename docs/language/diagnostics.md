@@ -16,8 +16,10 @@ edition.
 | `E1036`–`E1038` | Method lookup and receiver validation |
 | `E1040`–`E1079` | Enum patterns, roles, generics, packs, and arenas |
 | `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |
+| `E1083`–`E1099` | Bounded arrays, arenas, dynamic roles, and compile-time expressions |
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
 | `E1109` | Private module declaration or public-signature visibility violation |
+| `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |
 | `E1110` | Deterministic native symbol or ABI collision across module implementations |
 | `E1104` | Unknown sibling referenced by a module facade |
 | `E1105` | Module source read failure or defensive module-source fallback |

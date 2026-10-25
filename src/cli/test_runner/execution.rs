@@ -8,6 +8,7 @@ use crate::lexer::SourceSpan;
 use crate::modules::{ModuleResolver, build_compilation_plan};
 
 use super::super::conformance::ConformanceMode;
+use super::TestOptions;
 use super::collection::{DiscoveredTest, TestCollection};
 use super::output::TestOutputStyle;
 use super::process::{TestProcessResult, run_test_process};
@@ -15,10 +16,16 @@ use super::process::{TestProcessResult, run_test_process};
 pub(super) fn run_tests(
     collection: TestCollection,
     configuration: &CompilerConfiguration,
-    mode: ConformanceMode,
+    options: &TestOptions,
 ) -> i32 {
     let output_style = TestOutputStyle::detect();
-    print_test_header(collection.tests.len(), collection.filtered, mode);
+    print_test_header(collection.tests.len(), collection.filtered, options.mode);
+    if options.list {
+        for test in &collection.tests {
+            println!("{}::{}", test.module, test.name);
+        }
+        return 0;
+    }
     let mut passed = 0;
     for (index, test) in collection.tests.iter().enumerate() {
         let started = Instant::now();
@@ -48,23 +55,23 @@ fn report_test_result(
     match result {
         Ok(TestProcessResult::Exited(0)) => {
             let status = output_style.success(&format!("ok ({elapsed} ms, exit code 0)"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             true
         }
         Ok(TestProcessResult::Exited(code)) => {
             let status = output_style.failure(&format!("FAILED ({elapsed} ms, exit code {code})"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             false
         }
         Ok(TestProcessResult::Signaled) => {
             let status =
                 output_style.failure(&format!("FAILED ({elapsed} ms, terminated by signal)"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             false
         }
         Err(error) => {
             let status = output_style.failure(&format!("FAILED ({elapsed} ms, {error})"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             false
         }
     }

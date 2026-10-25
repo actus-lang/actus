@@ -170,7 +170,13 @@ fn strict_commands_reject_unknown_forms_and_extra_arguments() {
     );
     assert_eq!(
         run_with_args(
-            vec!["test".to_owned(), "--strict".to_owned(), "unexpected.act".to_owned()].into_iter(),
+            vec![
+                "test".to_owned(),
+                "--strict".to_owned(),
+                "first-filter".to_owned(),
+                "second-filter".to_owned(),
+            ]
+            .into_iter(),
         ),
         2
     );
@@ -198,7 +204,13 @@ fn strict_commands_reject_misplaced_and_conflicting_forms() {
     );
     assert_eq!(
         run_with_args(
-            vec!["test".to_owned(), "unexpected.act".to_owned(), "--strict".to_owned()].into_iter(),
+            vec![
+                "test".to_owned(),
+                "first-filter".to_owned(),
+                "--strict".to_owned(),
+                "second-filter".to_owned(),
+            ]
+            .into_iter(),
         ),
         2
     );

@@ -196,3 +196,39 @@ of the Actus module and facade contract, separate from compiler implementation.
 - [ ] Record compiler revision, formatter output, strict checks, and the
       resulting facade/module-visibility evidence before marking this
       follow-up complete.
+
+### Gate 47.7 — Test selection, internal fixtures, and mirrored layout
+
+The test runner must support focused execution without weakening production
+visibility. A `meta test` stored under a mirrored `tests/` path is compiled
+with the corresponding `src/` module implementation as its test-only internal
+scope; this is a test friend boundary, not a public visibility exception.
+
+- [x] Accept one Rust-style positional substring filter for test identities.
+- [x] Filter by canonical module path with `--module`.
+- [x] Filter by project-relative test file with `--file`.
+- [x] Support `--exact` matching and `--list` discovery without execution.
+- [x] Add `--mirror` validation requiring `tests/<path>.act` to map to
+      `src/<path>.act` or the corresponding canonical facade.
+- [x] Preserve package-root test files as explicit root-scope tests while
+      giving nested mirrored tests their canonical module identity.
+- [x] Add regression coverage for combined filters, list mode, mirror
+      failures, and internal access through a mirrored module fixture.
+- [ ] Record installed compiler revision, formatter output, strict checks, and
+      the full runner evidence before closing the gate.
+
+The supported forms are:
+
+```text
+actus test FILTER
+actus test --module ie::runtime
+actus test --file ie/runtime/training/auxiliary/cursor.act
+actus test FILTER --module ie --file ie/runtime --exact
+actus test --list
+actus test --mirror --strict
+```
+
+Filters are selection-only: they do not change module aggregation, production
+imports, ownership roles, or runtime behavior. The test compiler receives the
+same canonical module implementation and public imports as ordinary builds;
+the only additional declarations are the selected `meta test` verbs.

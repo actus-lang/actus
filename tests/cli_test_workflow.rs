@@ -75,6 +75,71 @@ fn test_reports_target_filtered_counts_deterministically() {
 
 #[cfg(unix)]
 #[test]
+fn test_filters_by_name_module_and_file_without_running_other_tests() {
+    let root = create_test_project(
+        "runner-filters",
+        "unit.act",
+        "meta test\nverb selected_unit() -> Int { return 0; }\nmeta test\nverb skipped_unit() -> Int { return 7; }\n",
+    );
+    fs::create_dir_all(root.join("tests/domain")).expect("create nested tests directory");
+    fs::write(
+        root.join("tests/domain/other.act"),
+        "meta test\nverb selected_domain() -> Int { return private_value(); }\n",
+    )
+    .expect("write second test file");
+    fs::create_dir_all(root.join("src/domain")).expect("create source module directory");
+    fs::write(root.join("src/domain/domain.act"), "open other;\n").expect("write source facade");
+    fs::write(root.join("src/domain/other.act"), "verb private_value() -> Int { return 0; }\n")
+        .expect("write source mirror");
+
+    let output = run_command(
+        &root,
+        &["test", "selected", "--module", "domain", "--file", "domain/other.act"],
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    assert!(stdout.contains("selected_domain"), "stdout: {stdout}");
+    assert!(!stdout.contains("selected_unit"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_lists_filtered_canonical_test_names_without_execution() {
+    let root = create_test_project(
+        "runner-list",
+        "list.act",
+        "meta test\nverb listed() -> Int { return 7; }\n",
+    );
+    let output = run_command(&root, &["test", "--list"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("<root>::listed"), "stdout: {stdout}");
+    assert!(!stdout.contains("passed"), "list mode must not execute tests: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_mirror_gate_rejects_unmapped_nested_test_files() {
+    let root = create_test_project(
+        "runner-mirror",
+        "unmapped.act",
+        "meta test\nverb unmapped() -> Int { return 0; }\n",
+    );
+    fs::create_dir_all(root.join("tests/unmapped")).expect("create nested test directory");
+    fs::rename(root.join("tests/unmapped.act"), root.join("tests/unmapped/case.act"))
+        .expect("move test into nested directory");
+    let output = run_command(&root, &["test", "--mirror"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "mirror gate unexpectedly passed");
+    assert!(stderr.contains("has no source mirror"), "stderr: {stderr}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_links_imported_module_objects_for_meta_tests() {
     let root = create_test_project(
         "runner-module",

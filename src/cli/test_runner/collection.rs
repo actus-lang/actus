@@ -10,9 +10,12 @@ use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
+use super::TestOptions;
 
 pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
+    pub(super) module: String,
+    pub(super) relative_path: PathBuf,
     pub(super) name: String,
     pub(super) program: Program,
     pub(super) source_program: Program,
@@ -31,7 +34,7 @@ struct CollectedFile {
 pub(super) fn collect_tests(
     files: Vec<PathBuf>,
     configuration: &CompilerConfiguration,
-    mode: ConformanceMode,
+    options: &TestOptions,
 ) -> Result<TestCollection, String> {
     let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
@@ -42,7 +45,7 @@ pub(super) fn collect_tests(
     let mut tests = Vec::new();
     let mut filtered = 0;
     for path in files {
-        let collected = collect_file_tests(&path, configuration, mode, &resolver)?;
+        let collected = collect_file_tests(&path, configuration, options, &resolver)?;
         tests.extend(collected.tests);
         filtered += collected.filtered;
     }
@@ -53,25 +56,70 @@ pub(super) fn collect_tests(
 fn collect_file_tests(
     path: &Path,
     configuration: &CompilerConfiguration,
-    mode: ConformanceMode,
+    options: &TestOptions,
     resolver: &ModuleResolver,
 ) -> Result<CollectedFile, String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
-    validate_source(path, &source, mode, configuration)?;
-    let Some((source_program, program, test_names)) =
-        parse_source(path, &source, resolver, configuration.source_root())?
+    if options.mirror && path.starts_with(configuration.project_root().join("tests")) {
+        validate_test_mirror(path, configuration)?;
+    }
+    validate_source(path, &source, options.mode, configuration)?;
+    let Some((source_program, program, test_names)) = parse_source(
+        path,
+        &source,
+        resolver,
+        configuration.source_root(),
+        configuration.project_root(),
+        options,
+    )?
     else {
         return Ok(CollectedFile { tests: Vec::new(), filtered: 0 });
     };
     let declared = test_count(&program);
     let program = filter_program_for_target(&program, configuration.target());
     let filtered = declared.saturating_sub(test_count(&program));
-    validate_semantics(path, &source, &program, mode)?;
+    validate_semantics(path, &source, &program, options.mode)?;
+    let module =
+        module_path_for_test(path, configuration.source_root(), configuration.project_root());
+    let relative_path =
+        path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
+    let discovered =
+        discover_tests(path, &module, &relative_path, source_program, program, &test_names);
+    let selected = discovered.iter().filter(|test| test_matches(test, options)).count();
+    let selection_filtered = discovered.len().saturating_sub(selected);
     Ok(CollectedFile {
-        tests: discover_tests(path, source_program, program, &test_names),
-        filtered,
+        tests: discovered.into_iter().filter(|test| test_matches(test, options)).collect(),
+        filtered: filtered + selection_filtered,
     })
+}
+
+fn validate_test_mirror(path: &Path, configuration: &CompilerConfiguration) -> Result<(), String> {
+    let tests_root = configuration.project_root().join("tests");
+    let relative = path
+        .strip_prefix(&tests_root)
+        .map_err(|_| format!("test file `{}` is outside the tests directory", path.display()))?;
+    if !is_nested_test_path(relative) {
+        return Ok(());
+    }
+    let candidate = configuration.source_root().join(relative);
+    if candidate.is_file() {
+        return Ok(());
+    }
+    let Some(stem) = candidate.file_stem().and_then(|value| value.to_str()) else {
+        return Err(format!("test file `{}` has no source mirror", path.display()));
+    };
+    let facade = candidate.with_file_name(stem).join(format!("{stem}.act"));
+    if facade.is_file() {
+        Ok(())
+    } else {
+        Err(format!(
+            "test file `{}` has no source mirror; expected `{}` or `{}`",
+            path.display(),
+            candidate.display(),
+            facade.display()
+        ))
+    }
 }
 
 fn validate_source(
@@ -92,6 +140,8 @@ fn parse_source(
     source: &str,
     resolver: &ModuleResolver,
     source_root: &Path,
+    project_root: &Path,
+    options: &TestOptions,
 ) -> Result<Option<(Program, Program, Vec<String>)>, String> {
     let (tokens, errors) = scan(source);
     if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
@@ -106,12 +156,26 @@ fn parse_source(
     if test_names.is_empty() {
         return Ok(None);
     }
-    let compilation_source = module_source(path, source_root)
+    let module_path = module_path_for_test(path, source_root, project_root);
+    let module = if module_path.is_empty() { "<root>" } else { &module_path };
+    let relative_path = path.strip_prefix(project_root).unwrap_or(path);
+    if !test_names.iter().any(|name| raw_test_matches(name, module, relative_path, options)) {
+        return Ok(None);
+    }
+    let compilation_source = (!module_path.is_empty())
+        .then_some(module_path.as_str())
         .map(|module_path| {
-            parse_module(resolver, &module_path)
+            parse_module(resolver, module_path)
                 .map_err(|error| format!("cannot load module `{module_path}`: {error}"))
         })
         .transpose()?
+        .map(|mut program| {
+            if !path.starts_with(source_root) {
+                append_mirrored_test_declarations(&mut program, &source_program, &module_path);
+            }
+            remove_internal_module_imports(&mut program, &module_path);
+            program
+        })
         .unwrap_or_else(|| source_program.clone());
     resolve_imports(&compilation_source, resolver)
         .map(|program| Some((compilation_source, program, test_names)))
@@ -119,6 +183,62 @@ fn parse_source(
             let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
             format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
         })
+}
+
+fn append_mirrored_test_declarations(
+    module_program: &mut Program,
+    test_program: &Program,
+    module_path: &str,
+) {
+    module_program.declarations.extend(
+        test_program
+            .declarations
+            .iter()
+            .filter(|declaration| match declaration {
+                TopLevelDecl::Import(import) => import.path != module_path,
+                TopLevelDecl::OpenSibling(_) => false,
+                _ => true,
+            })
+            .cloned(),
+    );
+}
+
+fn remove_internal_module_imports(program: &mut Program, module_path: &str) {
+    program.declarations.retain(|declaration| {
+        let TopLevelDecl::Import(import) = declaration else { return true };
+        !is_internal_module_path(&import.path, module_path)
+    });
+}
+
+fn is_internal_module_path(import_path: &str, module_path: &str) -> bool {
+    import_path == module_path
+        || import_path.starts_with(&format!("{module_path}::"))
+        || module_path.starts_with(&format!("{import_path}::"))
+}
+
+fn module_path_for_test(path: &Path, source_root: &Path, project_root: &Path) -> String {
+    let source_path = if path.starts_with(source_root) {
+        Some(path.to_path_buf())
+    } else {
+        let relative = path.strip_prefix(project_root.join("tests")).ok();
+        relative.and_then(|relative| {
+            if !is_nested_test_path(relative) {
+                return None;
+            }
+            let candidate = source_root.join(relative);
+            candidate.is_file().then_some(candidate.clone()).or_else(|| {
+                let stem = candidate.file_stem()?.to_str()?;
+                let facade = candidate.with_file_name(stem).join(format!("{stem}.act"));
+                facade.is_file().then_some(facade)
+            })
+        })
+    };
+    let Some(source_path) = source_path else { return String::new() };
+    module_source(&source_path, source_root).unwrap_or_default()
+}
+
+fn is_nested_test_path(path: &Path) -> bool {
+    path.parent().is_some_and(|parent| !parent.as_os_str().is_empty())
 }
 
 fn module_source(path: &Path, source_root: &Path) -> Option<String> {
@@ -132,7 +252,12 @@ fn module_source(path: &Path, source_root: &Path) -> Option<String> {
         segments.push(module_name);
         directory = directory.parent()?.to_owned();
     }
-    segments.last().cloned()
+    if segments.is_empty() {
+        None
+    } else {
+        segments.reverse();
+        Some(segments.join("::"))
+    }
 }
 
 fn validate_semantics(
@@ -152,6 +277,8 @@ fn validate_semantics(
 
 fn discover_tests(
     path: &Path,
+    module: &str,
+    relative_path: &Path,
     source_program: Program,
     program: Program,
     names: &[String],
@@ -165,6 +292,8 @@ fn discover_tests(
             {
                 Some(DiscoveredTest {
                     path: path.to_path_buf(),
+                    module: if module.is_empty() { "<root>".to_owned() } else { module.to_owned() },
+                    relative_path: relative_path.to_path_buf(),
                     name: verb.name.clone(),
                     program: program.clone(),
                     source_program: source_program.clone(),
@@ -173,6 +302,26 @@ fn discover_tests(
             _ => None,
         })
         .collect()
+}
+
+fn test_matches(test: &DiscoveredTest, options: &TestOptions) -> bool {
+    raw_test_matches(&test.name, &test.module, &test.relative_path, options)
+}
+
+fn raw_test_matches(name: &str, module: &str, relative_path: &Path, options: &TestOptions) -> bool {
+    let identity = format!("{module}::{name}");
+    let matches = |value: &str, candidate: &str| {
+        if options.exact { candidate == value } else { candidate.contains(value) }
+    };
+    options
+        .filter
+        .as_deref()
+        .is_none_or(|filter| matches(filter, &identity) || matches(filter, name))
+        && options.module.as_deref().is_none_or(|filter| matches(filter, module))
+        && options
+            .file
+            .as_deref()
+            .is_none_or(|file| matches(file, &relative_path.to_string_lossy()))
 }
 
 fn test_names(program: &Program) -> Vec<String> {
