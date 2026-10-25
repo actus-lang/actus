@@ -193,7 +193,7 @@ of the Actus module and facade contract, separate from compiler implementation.
       `import other::child as other_child;`.
 - [x] Add a regression fixture proving nested sibling imports, qualified
       types, and same-final-segment aliases across one canonical parent.
-- [ ] Record compiler revision, formatter output, strict checks, and the
+- [x] Record compiler revision, formatter output, strict checks, and the
       resulting facade/module-visibility evidence before marking this
       follow-up complete.
 
@@ -227,8 +227,19 @@ scope; this is a test friend boundary, not a public visibility exception.
       giving nested mirrored tests their canonical module identity.
 - [x] Add regression coverage for combined filters, list mode, mirror
       failures, and internal access through a mirrored module fixture.
-- [ ] Record installed compiler revision, formatter output, strict checks, and
+- [x] Record installed compiler revision, formatter output, strict checks, and
       the full runner evidence before closing the gate.
+
+Gate evidence (2026-10-25): compiler revision
+`b810305d683ad3abe8b1cb070bbe984affa44ef0`; installed compiler
+`/home/magradze/.local/bin/actus` digest
+`12c05cd4fd693bc82b986bfd480b9ba15d36d84d6cdf78f2bc4c1c4189330bb1`;
+`actus fmt --check` passed; `cargo test --all-features --quiet` passed all
+backend, runner, source-limit, example, and strict fixture suites. Focused
+runner evidence is `cli_test_workflow` 22/22, `modules` 102/102, and the
+mirrored descendant-import regression is green. Root-level `actus check
+--strict` is not applicable to the compiler repository because it has no
+Actus package entry at `src/main.act`.
 
 The supported forms are:
 
