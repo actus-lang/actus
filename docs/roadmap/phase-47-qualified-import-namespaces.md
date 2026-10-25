@@ -232,3 +232,25 @@ Filters are selection-only: they do not change module aggregation, production
 imports, ownership roles, or runtime behavior. The test compiler receives the
 same canonical module implementation and public imports as ordinary builds;
 the only additional declarations are the selected `meta test` verbs.
+
+#### Consumer import convention
+
+Nested consumers use explicit complete namespace imports. For example:
+
+```actus
+import {
+    parent::contract,
+    parent::pipelines::direct,
+    parent::transport::format,
+};
+
+contract::TeachingFileError;
+direct::training_metrics_to_teaching(...);
+format::file_record_length(...);
+```
+
+Consumer-side `open` entries and `open verb` declarations are not substitutes
+for this form. Sibling implementation files retain their shared internal
+scope; only a module-boundary dependency needs the canonical qualified import.
+This rule is naming/visibility migration only and must preserve the existing
+function and runtime logic.

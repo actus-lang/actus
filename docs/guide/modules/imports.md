@@ -119,6 +119,27 @@ import parent::child as local_child;
 import other::child as other_child;
 ```
 
+For example, a consumer that uses declarations owned by three nested modules
+declares those namespaces explicitly:
+
+```actus
+import {
+    parent::contract,
+    parent::pipelines::direct,
+    parent::transport::format,
+};
+
+contract::TeachingFileError;
+direct::training_metrics_to_teaching(...);
+format::file_record_length(...);
+```
+
+This is the canonical consumer form. It replaces consumer-side `open
+contract;`, `open direct;`, and `open format;`; it does not require changing
+the implementation logic or making private verbs public. `open` remains
+appropriate for declarations inside a canonical facade and for an explicit
+`open` item inside a unified external import block.
+
 ## Binding and resolution rules
 
 - Every path segment is resolved through the corresponding canonical facade.

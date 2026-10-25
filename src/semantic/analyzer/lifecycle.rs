@@ -94,7 +94,7 @@ impl Analyzer {
     fn register_import_namespaces(&mut self, program: &Program) {
         for declaration in &program.declarations {
             match declaration {
-                crate::ast::TopLevelDecl::Import(import) if !import.is_open => {
+                crate::ast::TopLevelDecl::Import(import) => {
                     let binding = import
                         .alias
                         .clone()

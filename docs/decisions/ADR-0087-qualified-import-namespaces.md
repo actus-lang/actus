@@ -93,6 +93,30 @@ import other::cache as other_cache;
 Every segment still resolves through its canonical parent facade; this
 convention does not make implementation children directly importable.
 
+### Consumer migration rule
+
+When a consumer needs declarations from nested modules, it must import each
+canonical namespace explicitly and retain the namespace at the use site:
+
+```actus
+import {
+    parent::contract,
+    parent::pipelines::direct,
+    parent::transport::format,
+};
+
+contract::TeachingFileError;
+direct::training_metrics_to_teaching(...);
+format::file_record_length(...);
+```
+
+Do not replace this with consumer-side `open contract;`, `open direct;`, or
+`open format;`, and do not change a verb to `open verb` merely to make a
+cross-module reference compile. Sibling files within one module continue to
+share their internal scope; crossing a module boundary uses the complete
+qualified import and the imported namespace. This migration changes name
+resolution only and must not alter the consumer's behavior or function logic.
+
 ### Binding and package-resolution rules
 
 - A plain import binds the final module segment as its local namespace. For

@@ -235,6 +235,54 @@ fn grouped_open_import_grants_meta_tests_internal_friend_scope() {
 
 #[cfg(unix)]
 #[test]
+fn grouped_open_import_preserves_qualified_meta_test_namespace() {
+    let root = create_test_project(
+        "runner-qualified-friend-scope",
+        "qualified.act",
+        "import { open math }; meta test\nverb reads_qualified_helper() -> Int { return math::private_value() - 42; }\n",
+    );
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+        .expect("write private implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("reads_qualified_helper ... ok"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn meta_tests_reach_private_verbs_through_qualified_imports() {
+    let root = create_test_project(
+        "runner-qualified-closed-scope",
+        "qualified.act",
+        "import math; meta test\nverb reads_qualified_helper() -> Int { return math::private_value() - 42; }\n",
+    );
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+        .expect("write private implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("reads_qualified_helper ... ok"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_discovers_meta_tests_inside_a_child_facade_tree() {
     let root = create_test_project(
         "runner-child-module",

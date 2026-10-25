@@ -7,7 +7,6 @@ use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnost
 use crate::lexer::{TokenKind, scan};
 use crate::modules::{
     ModuleCompilationPlan, ModuleResolver, build_test_compilation_plan, parse_module,
-    resolve_imports,
 };
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
@@ -180,15 +179,8 @@ fn parse_source(
             program
         })
         .unwrap_or_else(|| source_program.clone());
-    let resolved =
-        if compilation_source.declarations.iter().any(
-            |declaration| matches!(declaration, TopLevelDecl::Import(import) if import.is_open),
-        ) {
-            build_test_compilation_plan(&compilation_source, resolver)
-                .map(|plan| (plan.caller().clone(), Some(plan)))
-        } else {
-            resolve_imports(&compilation_source, resolver).map(|program| (program, None))
-        };
+    let resolved = build_test_compilation_plan(&compilation_source, resolver)
+        .map(|plan| (plan.caller().clone(), Some(plan)));
     resolved.map(|(program, plan)| Some((compilation_source, program, plan, test_names))).map_err(
         |error| {
             let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());

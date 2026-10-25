@@ -91,7 +91,11 @@ impl<'program> ProgramLayouts<'program> {
                 .name
                 .split_once("::")
                 .and_then(|(namespace, member)| {
-                    self.imported_namespaces.contains_key(namespace).then(|| member.to_owned())
+                    (self.imported_namespaces.contains_key(namespace)
+                        || self.structs.contains_key(member)
+                        || self.enums.contains_key(member)
+                        || self.packs.contains_key(member))
+                    .then(|| member.to_owned())
                 })
                 .unwrap_or_else(|| type_name.name.clone()),
             arguments: type_name

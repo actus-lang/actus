@@ -143,7 +143,7 @@ pub fn build_test_compilation_plan(
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::Import(import) if import.is_open => Some(import.path.clone()),
+            TopLevelDecl::Import(import) => Some(import.path.clone()),
             _ => None,
         })
         .collect();

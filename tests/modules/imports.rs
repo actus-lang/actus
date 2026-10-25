@@ -84,6 +84,31 @@ fn accepts_explicit_abs_view_of_scalar_through_imported_helper() {
 }
 
 #[test]
+fn resolves_qualified_call_through_an_open_import() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program =
+        parse_source("import { open shared }; verb main() -> Int { return shared::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("open imports should preserve their qualified namespace binding");
+}
+
+#[test]
+fn resolves_qualified_call_through_an_open_nested_facade_import() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open nested;");
+    fixture.write("shared/nested/nested.act", "open api;");
+    fixture.write("shared/nested/api.act", "open verb read() -> Int { return 7; }");
+    let program =
+        parse_source("import { open shared }; verb main() -> Int { return shared::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified calls should resolve through an open nested facade");
+}
+
+#[test]
 fn legacy_open_and_qualified_import_share_one_imported_module_identity() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open api;");

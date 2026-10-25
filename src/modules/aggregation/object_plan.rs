@@ -329,30 +329,16 @@ fn append_imported_declarations(
 ) {
     let imports = imported_dependencies(module, compilation);
     for (dependency, namespace) in imports {
-        if !imported_paths.insert(dependency.identity().module_path().to_owned()) {
-            continue;
-        }
-        for declaration in &dependency.implementation().declarations {
-            let TopLevelDecl::Import(import) = declaration else { continue };
-            if import.is_open {
-                continue;
-            }
-            let mut imported = import.clone();
-            imported.path =
-                super::plan::qualify_import_path(dependency.identity().module_path(), &import.path);
-            let already_present = declarations.iter().any(|declaration| {
-                let TopLevelDecl::Import(existing) = declaration else { return false };
-                import_binding(existing) == import_binding(&imported)
-                    && existing.is_open == imported.is_open
+        let first_visit = imported_paths.insert(dependency.identity().module_path().to_owned());
+        append_dependency_imports(dependency, declarations);
+        let module_path = module.identity().module_path();
+        let dependency_path = dependency.identity().module_path();
+        let parent_scope = module_path == dependency_path
+            || module_path.starts_with(&format!("{dependency_path}::"));
+        let friend = parent_scope
+            || compilation.friend_modules().iter().any(|friend| {
+                dependency_path == friend || dependency_path.starts_with(&format!("{friend}::"))
             });
-            if !already_present {
-                declarations.push(TopLevelDecl::Import(imported));
-            }
-        }
-        let friend = compilation.friend_modules().iter().any(|friend| {
-            dependency.identity().module_path() == friend
-                || dependency.identity().module_path().starts_with(&format!("{friend}::"))
-        });
         for declaration in &dependency.implementation().declarations {
             let Some(exported) = exported_dependency_declaration(
                 dependency,
@@ -368,13 +354,38 @@ fn append_imported_declarations(
                 declarations.push(exported);
             }
         }
-        append_imported_declarations(
-            dependency,
-            compilation,
-            imported_paths,
-            declaration_identities,
-            declarations,
-        );
+        if first_visit {
+            append_imported_declarations(
+                dependency,
+                compilation,
+                imported_paths,
+                declaration_identities,
+                declarations,
+            );
+        }
+    }
+}
+
+fn append_dependency_imports(
+    dependency: &super::unit::ModuleUnit,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    for declaration in &dependency.implementation().declarations {
+        let TopLevelDecl::Import(import) = declaration else { continue };
+        if import.is_open {
+            continue;
+        }
+        let mut imported = import.clone();
+        imported.path =
+            super::plan::qualify_import_path(dependency.identity().module_path(), &import.path);
+        let already_present = declarations.iter().any(|declaration| {
+            let TopLevelDecl::Import(existing) = declaration else { return false };
+            import_binding(existing) == import_binding(&imported)
+                && existing.is_open == imported.is_open
+        });
+        if !already_present {
+            declarations.push(TopLevelDecl::Import(imported));
+        }
     }
 }
 

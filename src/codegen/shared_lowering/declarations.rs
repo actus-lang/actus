@@ -261,7 +261,7 @@ pub(crate) fn build_backend_externals(
     for (external, signature) in externals.iter().zip(signatures) {
         let lowered = scalar_external(external, signature, symbols)?;
         if let Some(existing) = unique.get(&lowered.symbol) {
-            if existing.parameters != lowered.parameters
+            if !compatible_external_signature(existing, &lowered)
                 || existing.return_value != lowered.return_value
                 || existing.runtime_pointer_return != lowered.runtime_pointer_return
             {
@@ -273,6 +273,14 @@ pub(crate) fn build_backend_externals(
     }
     Ok(unique.into_values().collect())
 }
+
+fn compatible_external_signature(left: &BackendExternal, right: &BackendExternal) -> bool {
+    left.parameters.len() == right.parameters.len()
+        && left.parameters.iter().zip(&right.parameters).all(|(left, right)| {
+            left.role == right.role && left.ty == right.ty && left.passing == right.passing
+        })
+}
+
 fn performance_external(
     signature: &BackendSignature,
 ) -> Result<BackendExternal, BackendContractError> {
