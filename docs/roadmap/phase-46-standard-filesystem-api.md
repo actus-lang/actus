@@ -37,7 +37,7 @@ operations, ownership, cleanup, ordering, security, and target profiles.
 
 ## Gate 1: Canonical module and public facade
 
-- [ ] Create the canonical `library/std/src/fs/fs.act` facade.
+- [x] Create the canonical `library/std/src/fs/fs.act` facade.
 - [ ] Split implementation by responsibility: handles, directory iteration,
       metadata, paths, permissions, links, temporary resources, and atomic
       publication.
@@ -50,6 +50,10 @@ operations, ownership, cleanup, ordering, security, and target profiles.
       unqualified access, are the supported paths.
 - [ ] Reject direct imports of private implementation children where the
       compiler's module rules require the canonical facade.
+
+Gate 1 evidence (2026-10-25): `library/std/src/fs/fs.act` is the canonical
+facade and `tests/library/fs/fs.act` passes strict qualified facade coverage
+for directory lifecycle and metadata access.
 
 ## Gate 2: Typed paths and filesystem identity
 
