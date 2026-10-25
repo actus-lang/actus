@@ -47,6 +47,18 @@ fn std_fs_raw_bridge_is_not_importable_through_the_public_facade() {
 }
 
 #[test]
+fn std_fs_private_child_must_be_reached_through_the_canonical_facade() {
+    let error = std_resolver()
+        .resolve("fs::file")
+        .expect_err("std::fs::file must not bypass the std::fs facade");
+    assert!(matches!(
+        error,
+        actus::modules::ModuleResolutionError::BypassesFacade { parent, .. }
+            if parent == "fs"
+    ));
+}
+
+#[test]
 fn std_path_raw_bridge_is_not_importable_through_the_public_facade() {
     let source = parse_source(
         "import path; verb main() -> Int { return actus_path_is_absolute(path: missing); }",

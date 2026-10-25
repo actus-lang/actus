@@ -38,17 +38,17 @@ operations, ownership, cleanup, ordering, security, and target profiles.
 ## Gate 1: Canonical module and public facade
 
 - [x] Create the canonical `library/std/src/fs/fs.act` facade.
-- [ ] Split implementation by responsibility: handles, directory iteration,
+- [x] Split implementation by responsibility: handles, directory iteration,
       metadata, paths, permissions, links, temporary resources, and atomic
       publication.
-- [ ] Export only intentional public declarations from the facade.
+- [x] Export only intentional public declarations from the facade.
 - [ ] Keep native extern declarations in a platform-specific implementation
       boundary; do not leak C or OS types into the public Actus API.
-- [ ] Add public documentation for every type, enum, constant, and verb.
+- [x] Add public documentation for every type, enum, constant, and verb.
 - [x] Add module-visibility tests proving `import std::fs;` with qualified
       `fs::...` access, and `import { open std::fs };` for intentional
       unqualified access, are the supported paths.
-- [ ] Reject direct imports of private implementation children where the
+- [x] Reject direct imports of private implementation children where the
       compiler's module rules require the canonical facade.
 
 Gate 1 evidence (2026-10-25): `library/std/src/fs/fs.act` is the canonical
@@ -64,6 +64,13 @@ open, so the split checkbox remains intentionally unchecked.
 Gate 1 visibility evidence (2026-10-25): `tests/library/fs/fs.act` now covers
 both qualified `fs::...` access and intentional unqualified access through
 `import { open std::fs };`; both forms pass strict execution.
+
+Gate 1 facade evidence (2026-10-26): responsibility-specific children are
+exported only through `library/std/src/fs/fs.act`; public declaration
+documentation is enforced by the documentation suite, and
+`tests/stdlib_visibility.rs` rejects direct resolution of `std::fs::file`.
+Native runtime symbols remain behind `src/runtime/fs`; the Actus FFI boundary
+is intentionally retained as a separate follow-up for the platform ABI gate.
 
 ### Gate 1.1: Secure temporary resources
 
