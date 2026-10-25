@@ -70,7 +70,9 @@ open verb wire_header_decode(abs input: Buffer) -> Result[WireHeader, WireError]
     if input_length < (WIRE_HEADER_BYTES as Int) {
         return Result[WireHeader, WireError].Err(WireError.Truncated);
     }
-    erg header = WireHeader {storage: Array[u8, 12]()};
+    erg header = WireHeader {
+        storage: Array[u8, 12](),
+    };
     header.magic_0 = input[0];
     header.magic_1 = input[1];
     header.version = input[2];

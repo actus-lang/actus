@@ -17,7 +17,7 @@ fn hosted_std_time_bridge_builds_and_runs() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); erg elapsed: u64 = finished - started; if finished >= started && elapsed >= 0u64 { return 0; } return 1; }",
+        "import { open std::time }; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); erg elapsed: u64 = finished - started; if finished >= started && elapsed >= 0u64 { return 0; } return 1; }",
     )
     .expect("fixture source should be written");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -79,7 +79,7 @@ fn typed_instant_and_duration_api_builds_and_runs() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb main() -> Int { erg started: Instant = now(); erg finished: Instant = now(); erg raw_nanos: u64 = 42u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start_ticks: u64 = instant_ticks(abs started); erg finish_ticks: u64 = instant_ticks(abs finished); erg span_nanos: u64 = duration_as_nanos(abs span); erg sleep_result = sleep(duration: abs span); return case dat sleep_result { Result.Ok(_) => if finish_ticks >= start_ticks && span_nanos == 42u64 { 0 } else { 1 }, Result.Err(_) => 2, }; }",
+        "import { open std::time }; verb main() -> Int { erg started: Instant = now(); erg finished: Instant = now(); erg raw_nanos: u64 = 42u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start_ticks: u64 = instant_ticks(abs started); erg finish_ticks: u64 = instant_ticks(abs finished); erg span_nanos: u64 = duration_as_nanos(abs span); erg sleep_result = sleep(duration: abs span); return case dat sleep_result { Result.Ok(_) => if finish_ticks >= start_ticks && span_nanos == 42u64 { 0 } else { 1 }, Result.Err(_) => 2, }; }",
     )
     .expect("fixture source should be written");
 
@@ -117,7 +117,7 @@ fn monotonic_deadline_api_builds_and_runs() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb main() -> Int { erg raw_nanos: u64 = 1000000000u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start: Instant = now(); erg candidate = deadline_after(start: abs start, duration: abs span); return case dat candidate { Result.Ok(deadline) => if expired(deadline: abs deadline) { 1 } else { 0 }, Result.Err(_) => 2, }; }",
+        "import { open std::time }; verb main() -> Int { erg raw_nanos: u64 = 1000000000u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start: Instant = now(); erg candidate = deadline_after(start: abs start, duration: abs span); return case dat candidate { Result.Ok(deadline) => if expired(deadline: abs deadline) { 1 } else { 0 }, Result.Err(_) => 2, }; }",
     )
     .expect("fixture source should be written");
 
@@ -155,7 +155,7 @@ fn checked_duration_units_and_arithmetic_run_natively() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb unwrap_duration(erg candidate: Result[Duration, TimeError]) -> Duration { return case dat candidate { Result.Ok(value) => value, Result.Err(_) => Duration { nanos: 0u64, }, }; } verb main() -> Int { erg one: u64 = 1u64; erg two: u64 = 2u64; erg second_result = duration_seconds(seconds: erg one); erg millisecond_result = duration_milliseconds(milliseconds: erg one); erg microsecond_result = duration_microseconds(microseconds: erg one); erg one_second: Duration = unwrap_duration(candidate: erg second_result); erg one_millisecond: Duration = unwrap_duration(candidate: erg millisecond_result); erg one_microsecond: Duration = unwrap_duration(candidate: erg microsecond_result); erg sum_result = duration_add(left: abs one_second, right: abs one_millisecond); erg scaled_result = duration_mul(duration: abs one_microsecond, multiplier: two); erg sum: Duration = unwrap_duration(candidate: erg sum_result); erg scaled: Duration = unwrap_duration(candidate: erg scaled_result); erg nanos: u64 = duration_as_nanos(abs sum); erg scaled_nanos: u64 = duration_as_nanos(abs scaled); if nanos == 1001000000u64 && scaled_nanos == 2000u64 { return 0; } return 1; }",
+        "import { open std::time }; verb unwrap_duration(erg candidate: Result[Duration, TimeError]) -> Duration { return case dat candidate { Result.Ok(value) => value, Result.Err(_) => Duration { nanos: 0u64, }, }; } verb main() -> Int { erg one: u64 = 1u64; erg two: u64 = 2u64; erg second_result = duration_seconds(seconds: erg one); erg millisecond_result = duration_milliseconds(milliseconds: erg one); erg microsecond_result = duration_microseconds(microseconds: erg one); erg one_second: Duration = unwrap_duration(candidate: erg second_result); erg one_millisecond: Duration = unwrap_duration(candidate: erg millisecond_result); erg one_microsecond: Duration = unwrap_duration(candidate: erg microsecond_result); erg sum_result = duration_add(left: abs one_second, right: abs one_millisecond); erg scaled_result = duration_mul(duration: abs one_microsecond, multiplier: two); erg sum: Duration = unwrap_duration(candidate: erg sum_result); erg scaled: Duration = unwrap_duration(candidate: erg scaled_result); erg nanos: u64 = duration_as_nanos(abs sum); erg scaled_nanos: u64 = duration_as_nanos(abs scaled); if nanos == 1001000000u64 && scaled_nanos == 2000u64 { return 0; } return 1; }",
     )
     .expect("fixture source should be written");
 
@@ -191,8 +191,11 @@ fn freestanding_std_time_is_rejected_before_native_emission() {
         "[package]\nname = \"std_time_freestanding\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\ntarget = \"x86_64-unknown-none\"\n",
     )
     .expect("fixture manifest should be written");
-    fs::write(source_root.join("main.act"), "import std::time; verb main() -> Int { return 0; }")
-        .expect("fixture source should be written");
+    fs::write(
+        source_root.join("main.act"),
+        "import { open std::time }; verb main() -> Int { return 0; }",
+    )
+    .expect("fixture source should be written");
 
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args([
@@ -221,7 +224,7 @@ fn unsigned_elapsed_underflow_is_rejected_before_native_execution() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); return (started - finished) as Int; }",
+        "import { open std::time }; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); return (started - finished) as Int; }",
     )
     .expect("fixture source should be written");
 
@@ -258,7 +261,7 @@ fn duration_boundaries_and_typed_failures_run_natively() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb is_overflow(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.Overflow => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_precision_loss(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.PrecisionLoss => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_zero_divisor(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.ZeroDivisor => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_negative(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.NegativeDuration => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_exact(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Ok(value) => if duration_as_nanos(abs value) == 2u64 { 0 } else { 1 }, Result.Err(_) => 2, }; } verb main() -> Int { erg max_input: u64 = 18446744073u64; erg overflow_input: u64 = 18446744074u64; erg overflow_millis_input: u64 = 18446744073710u64; erg overflow_micros_input: u64 = 18446744073709552u64; erg divisor: u64 = 2u64; erg zero: u64 = 0u64; erg four: Duration = Duration { nanos: 4u64, }; erg five: Duration = Duration { nanos: 5u64, }; erg one: Duration = Duration { nanos: 1u64, }; erg two: Duration = Duration { nanos: 2u64, }; erg max_seconds = duration_seconds(seconds: erg max_input); erg overflow_seconds = duration_seconds(seconds: erg overflow_input); erg overflow_millis = duration_milliseconds(milliseconds: erg overflow_millis_input); erg overflow_micros = duration_microseconds(microseconds: erg overflow_micros_input); erg exact = duration_div(duration: abs four, divisor: erg divisor); erg non_exact = duration_div(duration: abs five, divisor: erg divisor); erg zero_divisor = duration_div(duration: abs four, divisor: erg zero); erg underflow = duration_sub(left: abs one, right: abs two); if is_overflow(result: erg overflow_seconds) != 0 || is_overflow(result: erg overflow_millis) != 0 || is_overflow(result: erg overflow_micros) != 0 || is_precision_loss(result: erg non_exact) != 0 || is_zero_divisor(result: erg zero_divisor) != 0 || is_negative(result: erg underflow) != 0 || is_exact(result: erg exact) != 0 || is_overflow(result: erg max_seconds) != 2 { return 1; } return 0; }",
+        "import { open std::time }; verb is_overflow(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.Overflow => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_precision_loss(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.PrecisionLoss => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_zero_divisor(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.ZeroDivisor => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_negative(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.NegativeDuration => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb is_exact(erg result: Result[Duration, TimeError]) -> Int { return case dat result { Result.Ok(value) => if duration_as_nanos(abs value) == 2u64 { 0 } else { 1 }, Result.Err(_) => 2, }; } verb main() -> Int { erg max_input: u64 = 18446744073u64; erg overflow_input: u64 = 18446744074u64; erg overflow_millis_input: u64 = 18446744073710u64; erg overflow_micros_input: u64 = 18446744073709552u64; erg divisor: u64 = 2u64; erg zero: u64 = 0u64; erg four: Duration = Duration { nanos: 4u64, }; erg five: Duration = Duration { nanos: 5u64, }; erg one: Duration = Duration { nanos: 1u64, }; erg two: Duration = Duration { nanos: 2u64, }; erg max_seconds = duration_seconds(seconds: erg max_input); erg overflow_seconds = duration_seconds(seconds: erg overflow_input); erg overflow_millis = duration_milliseconds(milliseconds: erg overflow_millis_input); erg overflow_micros = duration_microseconds(microseconds: erg overflow_micros_input); erg exact = duration_div(duration: abs four, divisor: erg divisor); erg non_exact = duration_div(duration: abs five, divisor: erg divisor); erg zero_divisor = duration_div(duration: abs four, divisor: erg zero); erg underflow = duration_sub(left: abs one, right: abs two); if is_overflow(result: erg overflow_seconds) != 0 || is_overflow(result: erg overflow_millis) != 0 || is_overflow(result: erg overflow_micros) != 0 || is_precision_loss(result: erg non_exact) != 0 || is_zero_divisor(result: erg zero_divisor) != 0 || is_negative(result: erg underflow) != 0 || is_exact(result: erg exact) != 0 || is_overflow(result: erg max_seconds) != 2 { return 1; } return 0; }",
     )
     .expect("fixture source should be written");
 
@@ -298,7 +301,7 @@ fn deadline_overflow_is_rejected_natively() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb is_overflow(erg result: Result[Deadline, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.Overflow => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb main() -> Int { erg start: Instant = Instant { ticks: 18446744073709551615u64, }; erg duration: Duration = Duration { nanos: 1u64, }; erg result = deadline_after(start: abs start, duration: abs duration); return is_overflow(result: erg result); }",
+        "import { open std::time }; verb is_overflow(erg result: Result[Deadline, TimeError]) -> Int { return case dat result { Result.Err(error) => case dat error { TimeError.Overflow => 0, _ => 1, }, Result.Ok(_) => 2, }; } verb main() -> Int { erg start: Instant = Instant { ticks: 18446744073709551615u64, }; erg duration: Duration = Duration { nanos: 1u64, }; erg result = deadline_after(start: abs start, duration: abs duration); return is_overflow(result: erg result); }",
     )
     .expect("fixture source should be written");
 
@@ -337,7 +340,7 @@ fn zero_duration_busy_wait_delay_runs_natively() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import std::time; verb main() -> Int { erg zero: Duration = Duration { nanos: 0u64, }; erg result = delay(duration: abs zero); return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, }; }",
+        "import { open std::time }; verb main() -> Int { erg zero: Duration = Duration { nanos: 0u64, }; erg result = delay(duration: abs zero); return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, }; }",
     )
     .expect("fixture source should be written");
 

@@ -41,7 +41,7 @@ impl Parser {
     ) -> Result<PerformDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Perform, "`perform`")?.span.start;
         let role_token = self.take_identifier("role name after `perform`")?;
-        let role_name = identifier_text(&role_token.kind);
+        let role_name = self.parse_qualified_identifier(identifier_text(&role_token.kind))?;
         self.expect_keyword(TokenKind::For, "`for`")?;
         let target = self.parse_type_name()?;
         self.expect_simple(TokenKind::LeftBrace, "`{`")?;
@@ -53,6 +53,8 @@ impl Parser {
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(PerformDecl {
             is_open,
+            module_import: false,
+            module_import_namespace: None,
             doc,
             role_name,
             target,

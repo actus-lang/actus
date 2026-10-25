@@ -10,6 +10,29 @@ use super::errors::{SemanticError, SemanticErrorKind};
 use super::state::{AccessState, OwnershipState};
 
 impl Analyzer {
+    pub(super) fn validate_explicit_owner_view(
+        &self,
+        callee: &str,
+        argument: &Argument,
+        parameter_index: usize,
+        signature: &VerbSignature,
+        role: &Role,
+    ) -> Result<(), SemanticError> {
+        if *role == Role::Abs
+            && argument.role == Some(Role::Abs)
+            && (self.is_readable_owner(&argument.expression)
+                || self.is_readonly_scalar_expression(&argument.expression))
+        {
+            return Ok(());
+        }
+        self.validate_argument_role(
+            callee,
+            &signature.params[parameter_index].0,
+            role,
+            &argument.expression,
+        )
+    }
+
     pub(super) fn validate_argument_type(
         &self,
         callee: &str,
@@ -52,15 +75,16 @@ impl Analyzer {
         expected: &str,
         expression: &Expr,
     ) -> Result<(), SemanticError> {
+        let normalized_expected = self.normalize_imported_type_key(expected);
         let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
-        if argument_type_matches(expected, &found, expression) {
+        if argument_type_matches(&normalized_expected, &found, expression) {
             return Ok(());
         }
         Err(SemanticError {
             kind: SemanticErrorKind::TypeMismatch {
                 callee: callee.to_owned(),
                 parameter: parameter.to_owned(),
-                expected: expected.to_owned(),
+                expected: normalized_expected,
                 found,
             },
             span: expression_span(expression),
@@ -227,6 +251,27 @@ impl Analyzer {
                 OwnershipState::Active | OwnershipState::PartiallyMoved { .. }
             )
             && !self.model.bindings[index].access.is_suspended()
+    }
+
+    pub(super) fn is_readonly_scalar_expression(&self, expression: &Expr) -> bool {
+        if !self.expression_type_name(expression).is_some_and(|name| is_scalar_name(&name)) {
+            return false;
+        }
+        match expression {
+            Expr::Integer { .. } | Expr::BoolLiteral { .. } => true,
+            Expr::Binary { left, right, .. } => {
+                self.is_readonly_scalar_expression(left)
+                    && self.is_readonly_scalar_expression(right)
+            }
+            Expr::Cast { expression, .. } | Expr::Unary { expression, .. } => {
+                self.is_readonly_scalar_expression(expression)
+            }
+            Expr::Grouping { expression, .. } => self.is_readonly_scalar_expression(expression),
+            Expr::Identifier { .. } | Expr::FieldAccess { .. } | Expr::Index { .. } => {
+                self.is_readable_owner(expression)
+            }
+            _ => false,
+        }
     }
 
     pub(super) fn is_exclusive_owner(&self, expression: &Expr) -> bool {

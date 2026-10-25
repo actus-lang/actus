@@ -103,8 +103,14 @@ pub(super) fn lower_shared_functions(
         external_symbols,
         bindings,
     };
-    let mut functions =
-        Vec::with_capacity(declarations.verbs.len() + declarations.performances.len());
+    let mut functions = Vec::with_capacity(
+        declarations.verbs.len()
+            + declarations
+                .performances
+                .iter()
+                .filter(|(perform, _)| !perform.module_import)
+                .count(),
+    );
     for verb in &declarations.verbs {
         functions.push(lower_shared_verb(
             namespace,
@@ -124,8 +130,11 @@ pub(super) fn lower_shared_functions(
             bindings,
         )?);
     }
-    for ((perform, method), signature) in
-        declarations.performances.iter().zip(&declarations.performance_signatures)
+    for ((perform, method), signature) in declarations
+        .performances
+        .iter()
+        .zip(&declarations.performance_signatures)
+        .filter(|((perform, _), _)| !perform.module_import)
     {
         functions.push(lower_shared_performance(
             &context,

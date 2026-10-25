@@ -15,7 +15,9 @@ pack ControlRegister {
 }
 
 verb configure_control() -> Int {
-    erg control = ControlRegister {storage: 0};
+    erg control = ControlRegister {
+        storage: 0,
+    };
     control.enabled = 1;
     control.prescaler = 5;
     control.mode = 2;

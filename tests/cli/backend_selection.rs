@@ -1006,7 +1006,7 @@ fn llvm_backend_builds_and_runs_scalar_imported_module() {
         "[package]\nname = \"llvm-module-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
     )
     .expect("write LLVM module fixture manifest");
-    fs::write(&input, "import math; verb main() -> Int { return add(); }\n")
+    fs::write(&input, "import { open math }; verb main() -> Int { return add(); }\n")
         .expect("write LLVM module root source");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write LLVM module facade");
     fs::write(root.join("src/math/api.act"), "open verb add() -> Int { return 40; }\n")
@@ -1081,7 +1081,7 @@ fn llvm_backend_builds_and_runs_a_const_generic_from_an_imported_module() {
         "[package]\nname = \"llvm-module-generic-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
     )
     .expect("write LLVM generic module fixture manifest");
-    fs::write(&input, "import math; verb main() -> u32 { return read_capacity[4](); }\n")
+    fs::write(&input, "import { open math }; verb main() -> u32 { return read_capacity[4](); }\n")
         .expect("write LLVM generic module root source");
     fs::write(root.join("src/math/math.act"), "open api;\n")
         .expect("write LLVM generic module facade");
@@ -1160,7 +1160,7 @@ fn cranelift_backend_builds_and_runs_scalar_imported_module_through_shared_lower
         "[package]\nname = \"cranelift-module-cli\"\nversion = \"1.0.0\"\n",
     )
     .expect("write Cranelift module fixture manifest");
-    fs::write(&input, "import math; verb main() -> Int { return add(); }\n")
+    fs::write(&input, "import { open math }; verb main() -> Int { return add(); }\n")
         .expect("write Cranelift module root source");
     fs::write(root.join("src/math/math.act"), "open api;\n")
         .expect("write Cranelift module facade");

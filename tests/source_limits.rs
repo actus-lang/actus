@@ -18,7 +18,7 @@ fn policy() -> SourceLimitPolicy {
 
 #[test]
 fn preferred_file_limit_reports_decomposition_evidence() {
-    let diagnostics = source_limit_diagnostics(Path::new("src/example.rs"), &lines(301), policy());
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.rs"), &lines(501), policy());
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].code(), "E1850");
     assert_eq!(diagnostics[0].source_path(), Some("src/example.rs"));
@@ -37,7 +37,7 @@ fn comments_and_blank_lines_do_not_count_toward_file_limit() {
 #[test]
 fn actus_documentation_blocks_count_toward_file_limit() {
     let mut source = String::from("verb main() { return; }\n");
-    for index in 0..400 {
+    for index in 0..600 {
         source.push_str(&format!("\"\"\"architectural note {index}\"\"\"\n"));
     }
     let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
@@ -87,22 +87,22 @@ fn actus_hash_comments_do_not_count_toward_function_limit() {
 #[test]
 fn code_lines_still_count_when_comments_are_present() {
     let mut source = String::new();
-    for index in 0..301 {
+    for index in 0..501 {
         source.push_str(&format!("line_{index}; // inline explanation\n"));
         source.push_str("// separate explanation\n\n");
     }
     let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
     assert_eq!(diagnostics[0].code(), "E1850");
-    assert!(diagnostics[0].message().contains("301 code lines"));
+    assert!(diagnostics[0].message().contains("501 code lines"));
 }
 
 #[test]
 fn strict_file_thresholds_escalate_and_stop_at_one_violation() {
-    let split = source_limit_diagnostics(Path::new("src/example.rs"), &lines(400), policy());
+    let split = source_limit_diagnostics(Path::new("src/example.rs"), &lines(600), policy());
     assert_eq!(split[0].code(), "E1851");
     assert_eq!(split[0].severity(), DiagnosticSeverity::Error);
 
-    let hard = source_limit_diagnostics(Path::new("src/example.rs"), &lines(501), policy());
+    let hard = source_limit_diagnostics(Path::new("src/example.rs"), &lines(801), policy());
     assert_eq!(hard[0].code(), "E1852");
     assert_eq!(hard[0].severity(), DiagnosticSeverity::Error);
 }
@@ -126,7 +126,7 @@ fn file_limitless_metadata_skips_file_and_function_diagnostics() {
 #[test]
 fn verb_limitless_metadata_skips_only_function_diagnostic() {
     let mut source = String::from("meta limitless(\"verb\") verb large() {\n");
-    for index in 0..60 {
+    for index in 0..80 {
         source.push_str(&format!("\"\"\"documentation {index}\"\"\"\n"));
     }
     source.push_str("return;\n}\n");
@@ -186,7 +186,7 @@ fn package_limitless_report_records_policy_approval() {
 #[test]
 fn rust_functions_are_measured_without_counting_comment_text() {
     let mut source = String::from("/* fn fake() {\nstill comment } */\nfn real() {\n");
-    source.push_str(&lines(40));
+    source.push_str(&lines(60));
     source.push_str("}\n");
     let diagnostics = source_limit_diagnostics(Path::new("src/example.rs"), &source, policy());
     assert!(diagnostics.iter().any(|diagnostic| diagnostic.code() == "E1854"));
@@ -199,7 +199,7 @@ fn rust_functions_are_measured_without_counting_comment_text() {
 #[test]
 fn actus_verbs_use_the_same_function_contract() {
     let mut source = String::from("verb run() {\n");
-    source.push_str(&lines(60));
+    source.push_str(&lines(80));
     source.push_str("}\n");
     let diagnostics =
         source_limit_diagnostics(Path::new("library/std/src/run.act"), &source, policy());

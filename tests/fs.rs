@@ -90,7 +90,8 @@ fn prepare_source(source: &str) -> String {
         .replace("erg path = Buffer[0];", "erg raw = Buffer[0];")
         .replace("erg renamed = Buffer[0];", "erg renamed_raw = Buffer[0];")
         .replace("erg source = Buffer[0];", "erg source_raw = Buffer[0];")
-        .replace("import io; import fs;", "import io; import path; import fs;");
+        .replace("import io; import fs;", "import { open io, open path, open fs };")
+        .replace("import io; import path; import fs;", "import { open io, open path, open fs };");
     format!("{source}\n{}", make_path_source())
 }
 

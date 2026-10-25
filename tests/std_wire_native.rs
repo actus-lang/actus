@@ -24,7 +24,7 @@ fn unused_wire_modules_are_absent_from_native_object_set() {
     );
     fs::write(
         root.join("src/main.act"),
-        "import std::wire; verb main() -> Int { return WIRE_VERSION as Int; }\n",
+        "import { open std::wire }; verb main() -> Int { return WIRE_VERSION as Int; }\n",
     )
     .expect("source");
     let output = root.join("wire.o");
@@ -72,7 +72,7 @@ fn freestanding_wire_types_emit_without_host_runtime_imports() {
     );
     fs::write(
         root.join("src/main.act"),
-        "import std::wire; verb boot() -> Int { erg header = WireHeader { storage: Array[u8, 12]() }; header.version = WIRE_VERSION; return header.version as Int; }\n",
+        "import { open std::wire }; verb boot() -> Int { erg header = WireHeader { storage: Array[u8, 12]() }; header.version = WIRE_VERSION; return header.version as Int; }\n",
     )
     .expect("source");
     let output = root.join("wire.o");
@@ -125,7 +125,7 @@ fn hosted_wire_crc16_executes_with_deterministic_reference_value() {
     );
     fs::write(
         root.join("src/main.act"),
-        r#"import std::wire;
+        r#"import { open std::wire };
 verb crc_status() -> Int {
     erg crc_input: Buffer = Buffer[0];
     append(crc_input, 1u8);
@@ -447,7 +447,7 @@ fn hosted_wire_endpoint_parser_is_optional_and_bounded() {
     );
     fs::write(
         root.join("src/main.act"),
-        r#"import std::wire;
+        r#"import { open std::wire };
 verb valid_status() -> Int {
     erg input = Buffer[25];
     input[0] = 119u8; input[1] = 105u8; input[2] = 114u8; input[3] = 101u8;
@@ -513,7 +513,7 @@ fn hosted_wire_parser_accepts_split_frame_chunks() {
     );
     fs::write(
         root.join("src/main.act"),
-        r#"import std::wire;
+        r#"import { open std::wire };
 verb feed_chunks(abs encoded: Buffer) -> Int {
     erg first: Buffer = Buffer[0];
     for erg index: u32 in 0u32 .. 5u32 { append(first, encoded[index]); }
@@ -660,7 +660,7 @@ fn hosted_wire_sequence_window_rejects_replays_and_stale_contexts() {
     );
     fs::write(
         root.join("src/main.act"),
-        r#"import std::wire;
+        r#"import { open std::wire };
 verb accept_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, };
@@ -766,7 +766,7 @@ fn hosted_wire_fragment_reassembly_executes_bounded_lifecycle() {
     );
     fs::write(
         root.join("src/main.act"),
-        r#"import std::wire;
+        r#"import { open std::wire };
 verb make_fragment(ins output: Buffer, abs payload: Buffer, erg offset: u32, erg index: u16) -> Int {
     erg header = WireFragmentHeader {storage: Array[u8, 17]()};
     header.version = WIRE_FRAGMENT_VERSION;

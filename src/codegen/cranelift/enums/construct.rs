@@ -36,7 +36,7 @@ fn constructor_layouts<'a>(
     let enum_name = super::types::enum_receiver_name(receiver)
         .ok_or_else(|| BackendEmitError("enum constructor requires a type receiver".to_owned()))?;
     let (enum_id, variant_layout) =
-        layouts.enum_constructor(enum_name, variant).ok_or_else(|| {
+        layouts.enum_constructor(&enum_name, variant).ok_or_else(|| {
             BackendEmitError(format!("unknown enum constructor `{enum_name}.{variant}`"))
         })?;
     let enum_layout = layouts

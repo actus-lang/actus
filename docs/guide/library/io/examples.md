@@ -3,7 +3,7 @@
 ## Print text bytes
 
 ```actus
-import std::io;
+import { open std::io };
 
 verb main() -> Int {
     erg text = Buffer[0];
@@ -21,7 +21,7 @@ I/O verbs only inspect it through `abs`.
 ## Read a line into caller storage
 
 ```actus
-import std::io;
+import { open std::io };
 
 verb read_once(ins destination: Buffer) -> Result[Int, IoError] {
     return read_line(buffer: ins destination);
@@ -34,7 +34,7 @@ return a new buffer.
 ## Use a cursor as both reader and writer
 
 ```actus
-import std::io;
+import { open std::io };
 
 verb round_trip() -> Result[Int, IoError] {
     erg input = Buffer[0];
@@ -59,7 +59,7 @@ Both cursors own their buffers. `copy_stream` uses the static `Reader` and
 ## Buffered output
 
 ```actus
-import std::io;
+import { open std::io };
 
 verb buffered_output(ins target: Cursor, abs payload: Buffer) -> Result[Int, IoError] {
     erg scratch = Buffer[0];
@@ -79,7 +79,7 @@ explicit final `flush_buffer` handles the remaining partial chunk.
 ## Implement a custom reader contract
 
 ```actus
-import std::io;
+import { open std::io };
 
 struct FixedReader {
     erg marker: Int,

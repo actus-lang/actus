@@ -6,6 +6,20 @@ use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
 
 impl Analyzer {
+    pub(crate) fn is_constant_name(&self, name: &str) -> bool {
+        if self.constants.contains_key(name) {
+            return true;
+        }
+        self.imported_member_name(name).is_some_and(|member| self.constants.contains_key(member))
+    }
+
+    pub(crate) fn constant_type(&self, name: &str) -> Option<&crate::ast::TypeName> {
+        if let Some(ty) = self.constants.get(name) {
+            return Some(ty);
+        }
+        self.imported_member_name(name).and_then(|member| self.constants.get(member))
+    }
+
     pub(super) fn register_constants(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Constant(constant) = declaration else { continue };

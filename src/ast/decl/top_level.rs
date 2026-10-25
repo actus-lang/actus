@@ -45,6 +45,10 @@ pub struct OpenSiblingDecl {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImportDecl {
     pub path: String,
+    pub alias: Option<String>,
+    pub is_open: bool,
+    pub selected: Vec<String>,
+    pub grouped: bool,
     pub span: SourceSpan,
 }
 
@@ -69,6 +73,8 @@ pub struct RoleMethod {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PerformDecl {
     pub is_open: bool,
+    pub module_import: bool,
+    pub module_import_namespace: Option<String>,
     pub doc: Option<String>,
     pub role_name: String,
     pub target: TypeName,

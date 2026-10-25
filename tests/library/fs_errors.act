@@ -1,6 +1,8 @@
-import io;
-import fs;
-import path;
+import {
+    open io,
+    open fs,
+    open path,
+};
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_ascii(storage: dat raw);
@@ -70,8 +72,8 @@ verb directory_path() -> Path {
 verb prepare_file(abs path: Path) -> Int {
     erg stale = remove_file(path: abs path);
     case dat stale {
-        Result.Ok(_) => { },
-        Result.Err(_) => { },
+        Result.Ok(_) => {},
+        Result.Err(_) => {},
     };
     erg contents = Buffer[0];
     append(contents, 65);
@@ -79,10 +81,14 @@ verb prepare_file(abs path: Path) -> Int {
     erg written = write_file(path: abs path, contents: abs contents);
     case dat written {
         Result.Ok(count) => case count {
-            2 => { },
-            _ => { return 1; },
+            2 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -106,7 +112,9 @@ verb read_bytes_buffer(abs path: Path) -> Int {
             erg status = verify_owned_buffer(dat output);
             return status;
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 1;
 }
@@ -118,7 +126,9 @@ verb read_text_buffer(abs path: Path) -> Int {
             erg status = verify_owned_buffer(dat output);
             return status;
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 1;
 }
@@ -128,18 +138,24 @@ verb read_helpers_return_owned_buffers() -> Int {
     erg path = file_path();
     erg prepared = prepare_file(path: abs path);
     case prepared {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg bytes = read_bytes_buffer(path: abs path);
     case bytes {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg text = read_text_buffer(path: abs path);
     case text {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg removed = remove_file(path: abs path);
     return case dat removed {
@@ -151,15 +167,17 @@ verb read_helpers_return_owned_buffers() -> Int {
 verb write_invalid_file(abs path: Path) -> Int {
     erg stale = remove_file(path: abs path);
     case dat stale {
-        Result.Ok(_) => { },
-        Result.Err(_) => { },
+        Result.Ok(_) => {},
+        Result.Err(_) => {},
     };
     erg invalid = Buffer[0];
     append(invalid, 255);
     erg written = write_file(path: abs path, contents: abs invalid);
     case dat written {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -168,8 +186,10 @@ verb read_invalid_file(abs path: Path) -> Int {
     erg loaded = read_to_string(path: abs path);
     erg removed = remove_file(path: abs path);
     case dat removed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     case dat loaded {
         Result.Ok(output) => {
@@ -191,8 +211,10 @@ verb invalid_text_returns_typed_error() -> Int {
     erg path = file_path();
     erg prepared = write_invalid_file(path: abs path);
     case prepared {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     return read_invalid_file(path: abs path);
 }
@@ -221,13 +243,15 @@ verb directory_child_path() -> Path {
 verb create_directory_fixture(abs directory: Path) -> Int {
     erg stale = remove_dir(path: abs directory);
     case dat stale {
-        Result.Ok(_) => { },
-        Result.Err(_) => { },
+        Result.Ok(_) => {},
+        Result.Err(_) => {},
     };
     erg created = create_dir(path: abs directory);
     case dat created {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg info = metadata(path: abs directory);
     return case dat info {
@@ -247,18 +271,26 @@ verb remove_nonempty_directory(abs directory: Path, abs child_name: Path) -> Int
         Result.Ok(child) => {
             erg created_file = file_create(path: abs child);
             case dat created_file {
-                Result.Ok(file) => { drop(file); },
-                Result.Err(_) => { return 1; },
+                Result.Ok(file) => {
+                    drop(file);
+                },
+                Result.Err(_) => {
+                    return 1;
+                },
             };
             erg nonempty = remove_dir(path: abs directory);
             case dat nonempty {
-                Result.Ok(_) => { return 1; },
-                Result.Err(_) => { },
+                Result.Ok(_) => {
+                    return 1;
+                },
+                Result.Err(_) => {},
             };
             erg child_removed = remove_file(path: abs child);
             case dat child_removed {
-                Result.Ok(_) => { },
-                Result.Err(_) => { return 1; },
+                Result.Ok(_) => {},
+                Result.Err(_) => {
+                    return 1;
+                },
             };
             erg removed = remove_dir(path: abs directory);
             return case dat removed {
@@ -274,8 +306,10 @@ verb directory_metadata_and_nonempty_remove_are_typed() -> Int {
     erg directory = directory_path();
     erg created = create_directory_fixture(directory: abs directory);
     case created {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg child_name = directory_child_path();
     return remove_nonempty_directory(directory: abs directory, child_name: abs child_name);

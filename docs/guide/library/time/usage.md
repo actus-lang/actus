@@ -3,7 +3,7 @@
 ## Measure a bounded operation
 
 ```actus
-import std::time;
+import { open std::time };
 
 open verb measure() -> Result[Duration, TimeError] {
     erg started: Instant = now();

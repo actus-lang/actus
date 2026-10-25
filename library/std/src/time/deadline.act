@@ -28,7 +28,9 @@ open verb deadline_after(abs start: Instant, abs duration: Duration) -> Result[D
         return Result[Deadline, TimeError].Err(TimeError.Overflow);
     }
     erg expires_at: u64 = start.ticks + duration.nanos;
-    return Result[Deadline, TimeError].Ok(Deadline {expires_at: expires_at});
+    return Result[Deadline, TimeError].Ok(Deadline {
+        expires_at: expires_at,
+    });
 }
 
 """

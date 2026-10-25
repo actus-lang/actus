@@ -1,11 +1,40 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{Program, TopLevelDecl};
+use crate::ast::{ImportDecl, Program, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
 use super::super::resolver::ResolvedChildModule;
 use super::types::{DuplicateDeclaration, ModuleError, ModuleLocation};
+
+pub(super) fn validate_import_bindings(program: &Program) -> Result<(), ModuleError> {
+    let mut bindings = HashMap::new();
+    for declaration in &program.declarations {
+        let TopLevelDecl::Import(import) = declaration else { continue };
+        let binding = import_binding(import);
+        if let Some(first) = bindings.insert(binding.clone(), import.span) {
+            return Err(ModuleError::ImportBindingCollision {
+                binding,
+                first,
+                second: import.span,
+            });
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn declaration_import_binding(declaration: &TopLevelDecl) -> Option<String> {
+    let TopLevelDecl::Import(import) = declaration else { return None };
+    Some(import_binding(import))
+}
+
+fn import_binding(import: &ImportDecl) -> String {
+    import
+        .alias
+        .clone()
+        .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+        .unwrap_or_else(|| import.path.clone())
+}
 
 pub(super) fn check_declaration_name(
     declaration: &TopLevelDecl,

@@ -13,11 +13,14 @@ struct File {
 }
 
 role Writer {
- verb write(abs self: File) -> Int; }
+    verb write(abs self: File) -> Int;
+}
 
-perform Writer for File { verb write(abs self: File) -> Int {
-    return self.value + 1;
-} }
+perform Writer for File {
+    verb write(abs self: File) -> Int {
+        return self.value + 1;
+    }
+}
 
 enum Color {
     Red,
@@ -35,14 +38,23 @@ verb consume(dat item: Buffer) -> Int {
 }
 
 verb main() -> Int {
-    erg file = File {value: 41};
-    erg static_score = file.write();
+    erg file = File {
+        value: 41,
+    };
+    abs file_view = ref file;
+    erg static_score = file_view.write();
     erg color = Color.Red;
     erg inspected = case abs color {
         Color.Red => 1,
         _ => 0,
     };
-    erg outer = Outer {inner: Inner {first: Buffer[1], second: Buffer[2]}, tail: Buffer[3]};
+    erg outer = Outer {
+        inner: Inner {
+            first: Buffer[1],
+            second: Buffer[2],
+        },
+        tail: Buffer[3],
+    };
     consume(item: outer.inner.first);
     consume(item: outer.inner.second);
     erg message = Message.Data(code: 1);

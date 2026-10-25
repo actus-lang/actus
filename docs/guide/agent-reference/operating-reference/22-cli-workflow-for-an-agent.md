@@ -170,7 +170,7 @@ it is not an implicit array conversion, an unbounded heap, or a filesystem
 handle.
 
 ```act
-import std::region;
+import { open std::region };
 
 verb read_first(dat backing: Buffer) -> Result[Int, RegionError] {
     erg opened = region_open[u32](

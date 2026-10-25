@@ -306,6 +306,6 @@ fn format_type_name(type_name: &crate::ast::TypeName) -> String {
     format!(
         "{}[{}]",
         type_name.name,
-        type_name.arguments.iter().map(format_type_name).collect::<Vec<_>>().join(",")
+        type_name.arguments.iter().map(format_type_name).collect::<Vec<_>>().join(", ")
     )
 }

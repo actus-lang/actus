@@ -65,10 +65,13 @@ pub(super) fn generic_inputs(
         .object_plan()
         .map_err(|error| BackendEmitError(format!("module object planning failed: {error:?}")))?;
     let mut unique_instances = Vec::new();
+    let mut combined_program =
+        crate::ast::Program { file_metadata: Vec::new(), declarations: Vec::new() };
     for unit in object_plan.units() {
         let expansion_program = crate::codegen::normalize_program(
             &crate::semantic::filter_program_for_target(unit.program(), configuration.target()),
         );
+        combined_program.declarations.extend(expansion_program.declarations.clone());
         let generic_instances = crate::semantic::analyze(&expansion_program)
             .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
             .generic_instances;
@@ -82,6 +85,17 @@ pub(super) fn generic_inputs(
             }) {
                 unique_instances.push(instance);
             }
+        }
+    }
+    let expanded_instances =
+        crate::codegen::expand_generic_instances(&combined_program, &unique_instances)?;
+    for instance in expanded_instances {
+        if !unique_instances.iter().any(|known: &crate::semantic::GenericInstance| {
+            known.identity() == instance.identity()
+                && known.caller == instance.caller
+                && known.call_span == instance.call_span
+        }) {
+            unique_instances.push(instance);
         }
     }
     let generic_types =
@@ -203,18 +217,7 @@ fn required_performance_symbols(
 }
 
 fn called_symbols(module: &crate::codegen::BackendModule) -> std::collections::BTreeSet<String> {
-    module
-        .functions
-        .iter()
-        .flat_map(|function| function.blocks.iter())
-        .flat_map(|block| block.instructions.iter())
-        .filter_map(|instruction| match instruction {
-            crate::codegen::BackendInstruction::Call { callee, .. } => {
-                Some(callee.as_str().to_owned())
-            }
-            _ => None,
-        })
-        .collect()
+    module.functions.iter().flat_map(called_symbols_in_function).collect()
 }
 
 fn reachable_module_symbols(
@@ -254,7 +257,7 @@ fn reachable_module_symbols(
 fn called_symbols_in_function(
     function: &crate::codegen::BackendFunction,
 ) -> std::collections::BTreeSet<String> {
-    function
+    let mut called = function
         .blocks
         .iter()
         .flat_map(|block| block.instructions.iter())
@@ -264,7 +267,16 @@ fn called_symbols_in_function(
             }
             _ => None,
         })
-        .collect()
+        .collect::<std::collections::BTreeSet<_>>();
+    called.extend(
+        function
+            .cleanup
+            .iter()
+            .flat_map(|cleanup| cleanup.resolved_bridges.iter().flatten())
+            .filter_map(|descriptor| descriptor.performance_symbol.as_ref())
+            .map(|symbol| symbol.as_str().to_owned()),
+    );
+    called
 }
 
 fn retain_referenced_externals(module: &mut crate::codegen::BackendModule) {
@@ -280,6 +292,15 @@ fn retain_referenced_externals(module: &mut crate::codegen::BackendModule) {
             _ => None,
         })
         .collect::<std::collections::BTreeSet<_>>();
+    referenced.extend(
+        module
+            .functions
+            .iter()
+            .flat_map(|function| function.cleanup.iter())
+            .flat_map(|cleanup| cleanup.resolved_bridges.iter().flatten())
+            .filter_map(|descriptor| descriptor.performance_symbol.as_ref())
+            .map(|symbol| symbol.as_str().to_owned()),
+    );
     if referenced.contains(crate::runtime::REGION_OPEN_SYMBOL)
         || module.functions.iter().any(|function| {
             function.parameters.iter().any(|parameter| {

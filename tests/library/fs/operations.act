@@ -1,0 +1,93 @@
+import {
+    open fs,
+    open path,
+};
+
+verb read_many_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 115u8);
+    append(raw, 116u8);
+    append(raw, 100u8);
+    append(raw, 45u8);
+    append(raw, 102u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 114u8);
+    append(raw, 101u8);
+    append(raw, 97u8);
+    append(raw, 100u8);
+    append(raw, 45u8);
+    append(raw, 109u8);
+    append(raw, 97u8);
+    append(raw, 110u8);
+    append(raw, 121u8);
+    append(raw, 46u8);
+    append(raw, 98u8);
+    append(raw, 105u8);
+    append(raw, 110u8);
+    append(raw, 0u8);
+    erg result = path_from_ascii(storage: dat raw);
+    return case dat result {
+        Result.Ok(value) => value,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+meta test
+verb read_to_bytes_closes_each_owned_file() -> Int {
+    erg path = read_many_path();
+    erg stale = remove_file(path: abs path);
+    case dat stale {
+        Result.Ok(_) => {},
+        Result.Err(_) => {},
+    };
+    erg contents = Buffer[0];
+    append(contents, 65u8);
+    erg written = write_file(path: abs path, contents: abs contents);
+    erg write_ok: Bool = false;
+    case dat written {
+        Result.Ok(count) => {
+            write_ok = count == 1;
+        },
+        _ => {
+            write_ok = false;
+        },
+    };
+    if !write_ok {
+        return 1;
+    }
+    for erg attempt: u32 in 0u32 .. 2048u32 {
+        erg loaded = read_to_bytes(path: abs path);
+        case dat loaded {
+            Result.Ok(bytes) => {
+                if bytes[0] != 65u8 {
+                    drop(bytes);
+                    remove_file(path: abs path);
+                    return 2;
+                }
+                drop(bytes);
+            },
+            Result.Err(_) => {
+                remove_file(path: abs path);
+                return 3;
+            },
+        };
+    }
+    erg removed = remove_file(path: abs path);
+    return case dat removed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 4,
+    };
+}

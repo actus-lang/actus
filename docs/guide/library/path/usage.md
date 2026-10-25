@@ -6,7 +6,7 @@ Path construction validates the source representation and transfers caller
 storage when the constructor takes `dat`:
 
 ```actus
-import std::path;
+import { open std::path };
 
 open verb make_path(dat storage: Buffer) -> Result[Path, PathError] {
     return path_from_ascii(storage: dat storage);

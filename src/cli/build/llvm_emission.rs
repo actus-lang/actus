@@ -13,7 +13,11 @@ pub(super) fn emit_objects_llvm(
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
-    let bindings = llvm_module_bindings(&object_plan, &generic_instances)?;
+    let bindings = if plan.has_friend_scope() {
+        llvm_module_bindings_with_preferred_unique_sources(&object_plan, &generic_instances)?
+    } else {
+        llvm_module_bindings(&object_plan, &generic_instances)?
+    };
     let modules = super::shared_emission::lower_shared_modules(
         &object_plan,
         symbol,
@@ -55,6 +59,21 @@ fn llvm_module_bindings(
     plan: &ModuleObjectPlan,
     generic_instances: &[crate::semantic::GenericInstance],
 ) -> Result<BackendSymbolBindings, BackendEmitError> {
+    llvm_module_bindings_with_policy(plan, generic_instances, false)
+}
+
+fn llvm_module_bindings_with_preferred_unique_sources(
+    plan: &ModuleObjectPlan,
+    generic_instances: &[crate::semantic::GenericInstance],
+) -> Result<BackendSymbolBindings, BackendEmitError> {
+    llvm_module_bindings_with_policy(plan, generic_instances, true)
+}
+
+fn llvm_module_bindings_with_policy(
+    plan: &ModuleObjectPlan,
+    generic_instances: &[crate::semantic::GenericInstance],
+    prefer_first_unique_source: bool,
+) -> Result<BackendSymbolBindings, BackendEmitError> {
     let mut bindings = Vec::new();
     for unit in &plan.units()[1..] {
         for name in unit.exported_verbs() {
@@ -66,8 +85,16 @@ fn llvm_module_bindings(
                 name.clone(),
                 symbol.as_str().to_owned(),
             ));
-            for instance in generic_instances.iter().filter(|instance| &instance.name == name) {
-                let specialized = crate::codegen::specialized_generic_name(instance);
+            for instance in generic_instances
+                .iter()
+                .filter(|instance| instance.name.rsplit("::").next() == Some(name.as_str()))
+            {
+                let specialized_full = crate::codegen::specialized_generic_name(instance);
+                let specialized = specialized_full
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or(specialized_full.as_str())
+                    .to_owned();
                 let symbol = SymbolIdentity::new(
                     unit.namespace().symbol_prefix(),
                     SymbolKind::Verb,
@@ -82,5 +109,9 @@ fn llvm_module_bindings(
             }
         }
     }
-    Ok(BackendSymbolBindings::new(bindings))
+    Ok(if prefer_first_unique_source {
+        BackendSymbolBindings::new_prefer_first_unique_source(bindings)
+    } else {
+        BackendSymbolBindings::new(bindings)
+    })
 }

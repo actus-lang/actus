@@ -156,6 +156,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::MalformedVerbContract { reason } => {
             format!("malformed verb contract: {reason}")
         }
+        ParseErrorKind::OpenImportRequiresBlock => {
+            "`open` imports are only allowed inside an `import { ... };` block".to_owned()
+        }
     }
 }
 

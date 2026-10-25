@@ -259,12 +259,15 @@ impl Analyzer {
     fn binding_type_name(&self, expression: &Expr) -> Option<String> {
         let Expr::Identifier { name, span } = expression else { return None };
         let index = self.binding(name, *span).ok()?;
-        self.binding_type_names.get(&index).map(super::super::analyzer::canonical_type_name)
+        self.binding_type_names.get(&index).map(|type_name| {
+            let normalized = self.normalize_imported_type_name(type_name);
+            super::super::analyzer::canonical_type_name(&normalized)
+        })
     }
 
     fn constant_type_name(&self, expression: &Expr) -> Option<String> {
         let Expr::Identifier { name, .. } = expression else { return None };
-        self.constants.get(name).map(super::super::analyzer::canonical_type_name)
+        self.constant_type(name).map(super::super::analyzer::canonical_type_name)
     }
 
     fn expression_case_type_name(&self, expression: &Expr) -> Option<String> {

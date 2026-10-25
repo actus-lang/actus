@@ -3,7 +3,7 @@ use std::fs;
 
 #[test]
 fn imported_io_copy_does_not_capture_scalar_copy_intrinsic() {
-    let source = r#"import io;
+    let source = r#"import { open io };
 
 verb scalar_copy() -> Int {
     erg value: u32 = 41u32;
@@ -24,14 +24,14 @@ verb main() -> Int {
 
 #[test]
 fn nested_facade_keeps_scalar_copy_intrinsic_separate_from_imported_io_copy() {
-    let source = "import feature; verb main() -> Int { return scalar_copy(); }\n";
+    let source = "import { open feature }; verb main() -> Int { return scalar_copy(); }\n";
     let (root, input, output) = project("nested-imported-io-copy-intrinsic", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature module");
     fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
         .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        r#"import io;
+        r#"import { open io };
 
 open struct Storage[N: Usize] {
     erg value: u32,

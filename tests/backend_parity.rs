@@ -8,7 +8,7 @@ use std::process::Command;
 use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol, RelocationTarget};
 
 const BACKENDS: [&str; 2] = ["cranelift", "llvm"];
-const SOURCE: &str = "import std::region; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
+const SOURCE: &str = "import { open std::region }; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
 
 fn fixture_root(name: &str, backend: &str) -> PathBuf {
     std::env::temp_dir()
@@ -132,6 +132,106 @@ fn hosted_cli_backends_accept_named_array_capacity_constants() {
             Command::new(&output).status().expect("run named array capacity parity fixture");
         assert_eq!(status.code(), Some(42), "{backend} named array capacity result");
         fs::remove_dir_all(root).expect("remove named array capacity fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_lower_qualified_imports_identically() {
+    let source = "import config; verb main() -> Int { return config::LIMIT as Int; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-imports", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/config")).expect("create config module directory");
+        fs::write(root.join("src/config/config.act"), "open values;\n")
+            .expect("write config facade");
+        fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
+            .expect("write config values");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified import build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified import fixture");
+        assert_eq!(status.code(), Some(30), "{backend} qualified import result");
+        fs::remove_dir_all(root).expect("remove qualified import fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_lower_qualified_enum_values_identically() {
+    let source = "import colors; verb main() -> Int { erg color: colors::Color = colors::Color.Red; return colors::score(value: erg color); }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-enum", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/colors")).expect("create colors module directory");
+        fs::write(root.join("src/colors/colors.act"), "open api;\n").expect("write colors facade");
+        fs::write(
+            root.join("src/colors/api.act"),
+            "open enum Color { Red, Blue, } open verb score(erg value: Color) -> Int { return case dat value { Color.Red => 42, Color.Blue => 1, }; }\n",
+        )
+        .expect("write colors API");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified enum build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified enum fixture");
+        assert_eq!(status.code(), Some(42), "{backend} qualified enum result");
+        fs::remove_dir_all(root).expect("remove qualified enum fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_lower_qualified_aggregate_constructors_identically() {
+    let source = "import shapes; verb main() -> Int { erg packet: shapes::Packet = shapes::Packet { value: 42, }; return packet.value; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-aggregate", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/shapes")).expect("create shapes module directory");
+        fs::write(root.join("src/shapes/shapes.act"), "open api;\n").expect("write shapes facade");
+        fs::write(root.join("src/shapes/api.act"), "open struct Packet { value: Int, }\n")
+            .expect("write shapes API");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified aggregate build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified aggregate fixture");
+        assert_eq!(status.code(), Some(42), "{backend} qualified aggregate result");
+        fs::remove_dir_all(root).expect("remove qualified aggregate fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_lower_qualified_generic_calls_identically() {
+    let source = "import generic; verb main() -> Int { erg value: Int = 41; return generic::identity[Int](value: erg value); }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("qualified-generic", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        fs::create_dir_all(root.join("src/generic")).expect("create generic module directory");
+        fs::write(root.join("src/generic/generic.act"), "open api;\n")
+            .expect("write generic facade");
+        fs::write(
+            root.join("src/generic/api.act"),
+            "open verb identity[T](erg value: T) -> T { return value; }\n",
+        )
+        .expect("write generic API");
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} qualified generic build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let status = Command::new(&output).status().expect("run qualified generic fixture");
+        assert_eq!(status.code(), Some(41), "{backend} qualified generic result");
+        fs::remove_dir_all(root).expect("remove qualified generic fixture");
     }
 }
 

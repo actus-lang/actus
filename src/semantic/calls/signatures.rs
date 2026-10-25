@@ -5,7 +5,7 @@ use crate::ast::{
 
 use super::super::analyzer::canonical_type_name;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub(crate) struct VerbSignature {
     pub(crate) params: Vec<(String, Role, String)>,
     pub(crate) dynamic_params: Vec<DispatchMode>,

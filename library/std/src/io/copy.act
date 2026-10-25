@@ -8,7 +8,10 @@ The copy-specific C bridge reserves that storage without retaining the buffer.
 Only `EndOfStream` terminates the transfer successfully; all other errors
 are returned to the caller unchanged.
 """
-unsafe extern "C" verb actus_copy_buffer_reserve(ins buffer: Buffer, erg capacity: Int) -> Int;
+unsafe extern "C" verb actus_copy_buffer_reserve(
+    ins buffer: Buffer,
+    erg capacity: Int
+) -> Int;
 
 """
 Translate a writer failure into the public copy result contract.
@@ -17,7 +20,12 @@ The `dat error` payload is consumed during exhaustive mapping and is not
 retained. `Err` preserves the concrete `IoError` variant for the caller.
 """
 open verb copy_write_error(dat error: IoError) -> Result[Int, IoError] {
-    return case dat error { IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+    return case dat error {
+        IoError.EndOfStream => Result[Int, IoError].Err(IoError.EndOfStream),
+        IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
+        IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
+        IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+    };
 }
 
 """
@@ -27,7 +35,12 @@ The `dat error` payload is consumed. `EndOfStream` returns the accumulated
 byte count as success; every other variant remains a typed failure.
 """
 open verb copy_read_error(dat error: IoError, erg total: Int) -> Result[Int, IoError] {
-    return case dat error { IoError.EndOfStream => Result[Int, IoError].Ok(total), IoError.Failed => Result[Int, IoError].Err(IoError.Failed), IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput), IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData), };
+    return case dat error {
+        IoError.EndOfStream => Result[Int, IoError].Ok(total),
+        IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
+        IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
+        IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+    };
 }
 
 """
@@ -39,7 +52,42 @@ verb returns `Err(IoError.Failed)` without retaining any input state.
 """
 open verb copy_written_chunk(erg total: Int, erg expected: Int, erg actual: Int) -> Result[Int, IoError] {
     erg difference = actual - expected;
-    return case difference { 0 => Result[Int, IoError].Ok(total + actual), _ => Result[Int, IoError].Err(IoError.Failed), };
+    return case difference {
+        0 => Result[Int, IoError].Ok(total + actual),
+        _ => Result[Int, IoError].Err(IoError.Failed),
+    };
+}
+
+"""Allocate the one reusable copy buffer and report a typed allocation failure."""
+open verb copy_scratch() -> Result[Buffer, IoError] {
+    erg scratch = Buffer[0];
+    erg capacity = 4096;
+    erg reserved = actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
+    if reserved == -1 {
+        drop(scratch);
+        return Result[Buffer, IoError].Err(IoError.Failed);
+    }
+    return Result[Buffer, IoError].Ok(scratch);
+}
+
+"""
+Write one reader chunk and return the next byte total or its typed error.
+
+The `ins writer` loan and `abs scratch` view are call-scoped; no storage is
+allocated or retained. `Ok` reports the accumulated count and `Err` preserves
+the typed writer failure.
+"""
+open verb copy_stream_write[W: Writer](
+    ins writer: W,
+    abs scratch: Buffer,
+    erg expected: Int,
+    erg total: Int
+) -> Result[Int, IoError] {
+    erg write_result: Result[Int, IoError] = writer.write(buffer: abs scratch);
+    return case dat write_result {
+        Result.Ok(written) => copy_written_chunk(total: total, expected: expected, actual: written),
+        Result.Err(error) => copy_write_error(error: dat error),
+    };
 }
 
 """
@@ -48,25 +96,22 @@ The result is the exact count or a typed error; EndOfStream is handled as the
 successful termination condition and all scratch storage is cleaned up.
 """
 open verb copy_stream[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
-    erg scratch = Buffer[0]; erg capacity = 4096;
-    erg reserved = actus_copy_buffer_reserve(buffer: ins scratch, capacity: capacity);
-    case reserved { -1 => { return Result[Int, IoError].Err(IoError.Failed); }, _ => { }, };
+    erg scratch = copy_scratch()?;
     erg total = 0;
     loop {
         erg read_result: Result[Int, IoError] = reader.read(buffer: ins scratch);
         case dat read_result {
             Result.Ok(count) => case count {
-                0 => { return Result[Int, IoError].Err(IoError.InvalidData); },
+                0 => {
+                    return Result[Int, IoError].Err(IoError.InvalidData);
+                },
                 _ => {
-                    erg write_result: Result[Int, IoError] = writer.write(buffer: abs scratch);
-                    case dat write_result {
-                        Result.Ok(written) => {
-                            total = copy_written_chunk(total: total, expected: count, actual: written)?;
-                        },
-                        Result.Err(error) => {
-                            return copy_write_error(error: dat error);
-                        },
-                    };
+                    total = copy_stream_write(
+                        writer: ins writer,
+                        scratch: abs scratch,
+                        expected: count,
+                        total: total
+                    )?;
                 },
             },
             Result.Err(error) => {

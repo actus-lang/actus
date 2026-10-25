@@ -12,12 +12,16 @@ impl Analyzer {
     pub(super) fn register_enums(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Enum(definition) = declaration else { continue };
-            if self.enum_types.insert(definition.name.clone(), definition.clone()).is_some() {
+            if let Some(existing) = self.enum_types.get(&definition.name) {
+                if existing == definition {
+                    continue;
+                }
                 return Err(SemanticError {
                     kind: SemanticErrorKind::DuplicateEnumName { name: definition.name.clone() },
                     span: definition.span,
                 });
             }
+            self.enum_types.insert(definition.name.clone(), definition.clone());
         }
         for definition in builtin_enum_definitions() {
             self.enum_types.entry(definition.name.clone()).or_insert(definition);

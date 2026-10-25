@@ -111,18 +111,17 @@ pub(super) fn lower_aggregate_expression(
             structs::lower_struct_literal_expression(provider, expression, instructions)
         }
         Expr::FieldAccess { object, field, span } => {
-            if let Expr::Identifier { name, .. } = object.as_ref() {
-                let type_name = parse_type_name(name, *span);
-                if provider.enum_variant(&type_name, field).is_some() {
-                    return super::super::constructors::lower_named_unit_enum(
-                        provider,
-                        &type_name,
-                        field,
-                        &[],
-                        *span,
-                        instructions,
-                    );
-                }
+            if let Some(type_name) = parse_receiver_type_name(object, *span)
+                && provider.enum_variant(&type_name, field).is_some()
+            {
+                return super::super::constructors::lower_named_unit_enum(
+                    provider,
+                    &type_name,
+                    field,
+                    &[],
+                    *span,
+                    instructions,
+                );
             }
             fields::lower_field_access_expression(provider, object, field, *span, instructions)
         }
@@ -140,4 +139,26 @@ fn parse_type_name(name: &str, span: crate::lexer::SourceSpan) -> TypeName {
         reference_role: None,
         span,
     })
+}
+
+fn parse_receiver_type_name(
+    expression: &crate::ast::Expr,
+    span: crate::lexer::SourceSpan,
+) -> Option<TypeName> {
+    match expression {
+        crate::ast::Expr::Identifier { name, .. } => Some(parse_type_name(name, span)),
+        crate::ast::Expr::Index { target, index, .. } => {
+            let crate::ast::Expr::Identifier { name, .. } = target.as_ref() else { return None };
+            let crate::ast::Expr::Identifier { name: argument, .. } = index.as_ref() else {
+                return None;
+            };
+            Some(TypeName {
+                name: name.clone(),
+                arguments: vec![parse_type_name(argument, span)],
+                reference_role: None,
+                span,
+            })
+        }
+        _ => None,
+    }
 }

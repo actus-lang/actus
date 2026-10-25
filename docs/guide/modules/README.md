@@ -11,6 +11,11 @@ facades define public boundaries, and how imports resolve.
 - [Nested modules](nested-modules.md)
 - [Module diagnostics](module-diagnostics.md)
 
+External consumers should start with [Imports](imports.md). It documents the
+qualified namespace, grouped import, alias, and unified `import { ... }`
+forms. The `open` examples in [Canonical facades](canonical-facades.md) are
+facade re-exports, not external consumer imports.
+
 ## Complete reference details
 
 The [modules reference directory](reference/) preserves the detailed source

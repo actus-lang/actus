@@ -32,21 +32,15 @@ pub(super) fn items(
     let mut semantic_items = Vec::new();
     labels.extend((1..=128).map(|width| format!("u{width}")));
     labels.extend((1..=128).map(|width| format!("i{width}")));
-    if source.is_some()
-        && let Some(ParseSnapshot::Valid(program)) = context.store.parse_snapshot(uri)
-    {
-        let program = crate::semantic::filter_program_for_target(&program, context.target);
-        labels.extend(super::module_scope::internal_symbols(&program));
-        labels.extend(super::module_scope::imported_public_symbols(uri, &program, overlays));
-        semantic_items.extend(binding_items(&program));
-        semantic_items.extend(pack_items(&program));
-        for declaration in program.declarations {
-            if let TopLevelDecl::Pack(pack) = declaration {
-                labels.push(pack.name);
-                labels.extend(pack.fields.into_iter().map(|field| field.name));
-            }
-        }
-    }
+    extend_program_items(
+        &mut labels,
+        &mut semantic_items,
+        uri,
+        source,
+        overlays,
+        position,
+        &context,
+    );
     let replacement =
         source.and_then(|text| position.and_then(|value| replacement_range(text, value)));
     let mut items = labels
@@ -71,6 +65,36 @@ pub(super) fn items(
         item
     }));
     serde_json::Value::Array(items)
+}
+
+fn extend_program_items(
+    labels: &mut Vec<String>,
+    semantic_items: &mut Vec<serde_json::Value>,
+    uri: &str,
+    source: Option<&str>,
+    overlays: &HashMap<PathBuf, String>,
+    position: Option<&LspPosition>,
+    context: &Context<'_>,
+) {
+    let Some(source) = source else { return };
+    let Some(ParseSnapshot::Valid(program)) = context.store.parse_snapshot(uri) else { return };
+    let program = crate::semantic::filter_program_for_target(&program, context.target);
+    labels.extend(super::module_scope::internal_symbols(&program));
+    let namespace = position.and_then(|value| namespace_before_cursor(source, value));
+    labels.extend(super::module_scope::imported_public_symbols(
+        uri,
+        &program,
+        overlays,
+        namespace.as_deref(),
+    ));
+    semantic_items.extend(binding_items(&program));
+    semantic_items.extend(pack_items(&program));
+    for declaration in program.declarations {
+        if let TopLevelDecl::Pack(pack) = declaration {
+            labels.push(pack.name);
+            labels.extend(pack.fields.into_iter().map(|field| field.name));
+        }
+    }
 }
 
 fn completion_kind(label: &str) -> u8 {
@@ -265,6 +289,20 @@ fn replacement_range(source: &str, position: &LspPosition) -> Option<serde_json:
         .map_or(offset, |span| span.start);
     let index = LineIndex::new(source);
     Some(json!({"start": index.position(source, start), "end": index.position(source, offset)}))
+}
+
+fn namespace_before_cursor(source: &str, position: &LspPosition) -> Option<String> {
+    let offset = LineIndex::new(source).byte_offset(source, position)?;
+    let tokens = scan(source).0;
+    let separator = tokens.iter().position(|token| {
+        matches!(token.kind, TokenKind::ColonColon)
+            && token.span.start <= offset.saturating_add(1)
+            && token.span.end.saturating_add(1) >= offset
+    })?;
+    let TokenKind::Identifier(namespace) = &tokens.get(separator.checked_sub(1)?)?.kind else {
+        return None;
+    };
+    Some(namespace.clone())
 }
 
 fn identifier_span(source: &str, name: &str) -> Option<SourceSpan> {

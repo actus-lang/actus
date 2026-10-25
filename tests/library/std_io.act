@@ -1,4 +1,6 @@
-import io;
+import {
+    open io,
+};
 
 meta test
 verb cursor_reads_owned_bytes_through_reader() -> Int {
@@ -79,10 +81,14 @@ verb direct_cursor_verbs_match_stream_contracts() -> Int {
     erg written = cursor_write(self: ins cursor, buffer: abs source);
     case dat written {
         Result.Ok(count) => case count {
-            1 => { },
-            _ => { return 1; },
+            1 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg destination = Buffer[1];
     erg moved = cursor_read(self: ins cursor, buffer: ins destination);

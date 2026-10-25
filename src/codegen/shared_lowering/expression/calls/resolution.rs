@@ -13,6 +13,11 @@ pub(super) fn callee_for(
         .get(callee)
         .cloned()
         .or_else(|| {
+            callee
+                .rsplit_once("::")
+                .and_then(|(_, member)| provider.external_symbols.get(member).cloned())
+        })
+        .or_else(|| {
             provider
                 .bindings
                 .map(|bindings| bindings.external_symbol(provider.namespace, callee))

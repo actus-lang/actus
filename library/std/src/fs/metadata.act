@@ -4,8 +4,11 @@
 the value can cross the runtime boundary in a deterministic C-compatible
 layout.
 """
-import io;
-import path;
+import {
+    io,
+    path as path_module,
+};
+
 """
 An owned scalar metadata record returned by filesystem inspection.
 Its erg fields are copied facts and require no host-handle cleanup.
@@ -29,7 +32,7 @@ caller. The bridge returns zero on success and `-1` when the host cannot
 inspect the path; the public wrapper translates that status to `IoError`.
 """
 unsafe extern "C" verb actus_file_metadata_path(
-    abs path: Path,
+    abs path: path_module::Path,
     ins output: Metadata
 ) -> Int;
 
@@ -53,13 +56,13 @@ open handles satisfy this same operation through static performance dispatch.
 """
 open role MetadataProvider {
     """Inspect an ins file handle and return metadata facts or typed failure."""
-    verb metadata(ins self: File) -> Result[Metadata, IoError];
+    verb metadata(ins self: File) -> Result[Metadata, io::IoError];
 }
 
 """Drop an incomplete metadata value before returning `IoError.Failed`."""
-open verb metadata_failed(dat output: Metadata) -> Result[Metadata, IoError] {
+open verb metadata_failed(dat output: Metadata) -> Result[Metadata, io::IoError] {
     drop(output);
-    return Result[Metadata, IoError].Err(IoError.Failed);
+    return Result[Metadata, io::IoError].Err(io::IoError.Failed);
 }
 
 """
@@ -70,12 +73,17 @@ Inspect one filesystem path without transferring path ownership.
 the host could not inspect the path. The operation performs no path-string
 conversion and does not allocate an owned path representation.
 """
-open verb metadata(abs path: Path) -> Result[Metadata, IoError] {
-    erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
+open verb metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError] {
+    erg output = Metadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+    };
     erg status = actus_file_metadata_path(path: abs path, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
-        _ => Result[Metadata, IoError].Ok(output),
+        _ => Result[Metadata, io::IoError].Ok(output),
     };
 }
 
@@ -85,14 +93,16 @@ Inspect an open file through an exclusively loaned handle.
 The returned metadata owns only copied scalar facts. The file handle remains
 owned by the caller, and a failed native status becomes `Err(Failed)`.
 """
-open verb file_metadata(ins self: File) -> Result[Metadata, IoError] {
-    erg output = Metadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, };
-    erg status = actus_file_metadata_handle_buffer(
-        handle: abs self.handle,
-        output: ins output
-    );
+open verb file_metadata(ins self: File) -> Result[Metadata, io::IoError] {
+    erg output = Metadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+    };
+    erg status = actus_file_metadata_handle_buffer(handle: abs self.handle, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
-        _ => Result[Metadata, IoError].Ok(output),
+        _ => Result[Metadata, io::IoError].Ok(output),
     };
 }

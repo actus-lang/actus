@@ -3,7 +3,7 @@
 ## Open, read, publish, and close
 
 ```actus
-import std::region;
+import { open std::region };
 
 verb run_region() -> Result[Int, RegionError] {
     erg backing: Buffer = Buffer[4];

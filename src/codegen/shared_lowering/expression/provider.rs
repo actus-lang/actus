@@ -230,7 +230,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     ) -> Result<(), BackendContractError> {
         let value = self.materialize_aggregate_assignment(value, span, instructions)?;
         if let Some((destination, layout)) = self.aggregate_loan_parameter(name) {
-            assign_aggregate_loan(
+            crate::codegen::shared_lowering::aggregate_assignment::assign_aggregate_loan(
                 self,
                 destination,
                 value,
@@ -323,13 +323,15 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         if let Expr::MethodCall { receiver, method, arguments, span } = expression
-            && let Expr::Identifier { name, .. } = receiver.as_ref()
-            && name.starts_with("Result[")
+            && let Some(result_type) = super::constructors::parse_constructor_receiver_type(
+                receiver.as_ref(),
+                *span,
+            )
+            && result_type.name == "Result"
+            && result_type.arguments.len() == 2
             && matches!(method.as_str(), "Ok" | "Err")
             && arguments.len() == 1
         {
-            let result_type = crate::semantic::parse_type_name_key(name, *span)
-                .ok_or_else(|| unsupported(*span, "Result constructor receiver is invalid"))?;
             let payload = self.lower_expression(&arguments[0].expression, instructions)?;
             let payload_type = self
                 .value_type(payload)

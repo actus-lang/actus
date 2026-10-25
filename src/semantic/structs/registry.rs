@@ -10,12 +10,16 @@ impl Analyzer {
     pub(crate) fn register_structs(&mut self, program: &Program) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Struct(definition) = declaration else { continue };
-            if self.struct_types.insert(definition.name.clone(), definition.clone()).is_some() {
+            if let Some(existing) = self.struct_types.get(&definition.name) {
+                if same_struct_definition(existing, definition) {
+                    continue;
+                }
                 return Err(SemanticError {
                     kind: SemanticErrorKind::DuplicateStructName { name: definition.name.clone() },
                     span: definition.span,
                 });
             }
+            self.struct_types.insert(definition.name.clone(), definition.clone());
         }
         let definitions = self.struct_types.values().cloned().collect::<Vec<_>>();
         for definition in definitions {
@@ -93,4 +97,29 @@ impl Analyzer {
         self.binding_type_names.insert(index, type_name);
         Ok(())
     }
+}
+
+fn same_struct_definition(left: &StructDef, right: &StructDef) -> bool {
+    left.is_open == right.is_open
+        && left.doc == right.doc
+        && left.name == right.name
+        && left.generic_parameters == right.generic_parameters
+        && left.fields.len() == right.fields.len()
+        && left.fields.iter().zip(&right.fields).all(|(left, right)| {
+            left.doc == right.doc
+                && left.role == right.role
+                && left.name == right.name
+                && same_type_name(&left.ty, &right.ty)
+        })
+}
+
+fn same_type_name(left: &TypeName, right: &TypeName) -> bool {
+    left.name == right.name
+        && left.reference_role == right.reference_role
+        && left.arguments.len() == right.arguments.len()
+        && left
+            .arguments
+            .iter()
+            .zip(&right.arguments)
+            .all(|(left, right)| same_type_name(left, right))
 }

@@ -1,4 +1,6 @@
-import path;
+import {
+    open path,
+};
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
@@ -42,10 +44,14 @@ verb path_iteration_and_normalization() -> Int {
             erg second = next_component(iter: ins iter);
             case dat first {
                 Option.Some(component) => case component.length {
-                    1 => { },
-                    _ => { return 1; },
+                    1 => {},
+                    _ => {
+                        return 1;
+                    },
                 },
-                Option.None => { return 1; },
+                Option.None => {
+                    return 1;
+                },
             };
             return case dat second {
                 Option.Some(component) => case component.length {

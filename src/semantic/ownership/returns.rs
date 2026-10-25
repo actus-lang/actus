@@ -43,7 +43,7 @@ impl Analyzer {
     }
 
     fn move_returned_binding(&mut self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
-        if self.constants.contains_key(name) {
+        if self.is_constant_name(name) {
             return Ok(());
         }
         let index = self.binding(name, span)?;
@@ -117,7 +117,10 @@ impl Analyzer {
         }
         let Some(expected) = self.current_return_type_name.as_ref() else { return Ok(()) };
         let expected_name = super::super::analyzer::canonical_type_name(expected);
-        let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
+        let found = self
+            .expression_type_name(expression)
+            .map(|name| self.normalize_imported_type_key(&name))
+            .unwrap_or_else(|| "unknown".to_owned());
         if return_value_matches(expected, &expected_name, &found, expression) {
             return Ok(());
         }
@@ -141,7 +144,9 @@ impl Analyzer {
         } else if let Expr::Case { branches, .. } = expression {
             branches.iter().all(|branch| self.case_branch_returns_result(branch, expected))
         } else {
-            let found = self.expression_type_name(expression);
+            let found = self
+                .expression_type_name(expression)
+                .map(|name| self.normalize_imported_type_key(&name));
             found.as_deref() == Some(super::super::analyzer::canonical_type_name(expected).as_str())
                 || found.as_deref() == Some("Result")
         };
@@ -153,6 +158,7 @@ impl Analyzer {
                 expected: super::super::analyzer::canonical_type_name(expected),
                 found: self
                     .expression_type_name(expression)
+                    .map(|name| self.normalize_imported_type_key(&name))
                     .unwrap_or_else(|| "unknown".to_owned()),
             },
             span: expression_span(expression),
@@ -167,7 +173,10 @@ impl Analyzer {
         let expected = super::super::analyzer::canonical_type_name(expected);
         match &branch.body {
             crate::ast::CaseBody::Expression(expression) => {
-                self.expression_type_name(expression).as_deref() == Some(expected.as_str())
+                self.expression_type_name(expression)
+                    .map(|name| self.normalize_imported_type_key(&name))
+                    .as_deref()
+                    == Some(expected.as_str())
             }
             crate::ast::CaseBody::Block(block) => {
                 let Some(statement) = block.statements.last() else { return false };
@@ -176,7 +185,10 @@ impl Analyzer {
                     | crate::ast::Stmt::Return { value: Some(expression), .. } => expression,
                     _ => return false,
                 };
-                self.expression_type_name(expression).as_deref() == Some(expected.as_str())
+                self.expression_type_name(expression)
+                    .map(|name| self.normalize_imported_type_key(&name))
+                    .as_deref()
+                    == Some(expected.as_str())
             }
         }
     }

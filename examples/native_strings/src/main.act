@@ -12,18 +12,18 @@ verb main() -> Void {
     case ready {
         true => {
             erg message = "ACTUS_EVENT branch=case status=ready";
-            println(abs message);
+            io::println(abs message);
         },
         _ => {
             erg not_ready_message = "ACTUS_EVENT branch=case status=not-ready";
-            println(abs not_ready_message);
+            io::println(abs not_ready_message);
         },
     };
     if false {
         erg skipped_message = "ACTUS_EVENT branch=if status=skipped";
-        println(abs skipped_message);
+        io::println(abs skipped_message);
     } else if true {
         erg complete_message = "ACTUS_EVENT branch=else-if status=complete";
-        println(abs complete_message);
+        io::println(abs complete_message);
     }
 }

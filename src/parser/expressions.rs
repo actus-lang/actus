@@ -81,6 +81,7 @@ impl Parser {
         name: String,
         span: SourceSpan,
     ) -> Result<Expr, ParseError> {
+        let name = self.parse_qualified_identifier(name)?;
         if let Some(buffer) = self.parse_buffer_literal(&name, span)? {
             return Ok(buffer);
         }
@@ -94,6 +95,18 @@ impl Parser {
             return Ok(call);
         }
         self.parse_identifier_suffix(name, type_arguments, span)
+    }
+
+    pub(super) fn parse_qualified_identifier(
+        &mut self,
+        mut name: String,
+    ) -> Result<String, ParseError> {
+        while self.match_simple(TokenKind::ColonColon) {
+            let segment = identifier_text(&self.take_identifier("qualified name segment")?.kind);
+            name.push_str("::");
+            name.push_str(&segment);
+        }
+        Ok(name)
     }
 
     fn should_parse_type_arguments(&self) -> bool {
@@ -120,17 +133,41 @@ impl Parser {
         if matches!(next.kind, TokenKind::LeftParen | TokenKind::LeftBrace) {
             return true;
         }
-        matches!(next.kind, TokenKind::Dot) && self.tokens.get(self.cursor + 1).is_some_and(|token| {
-            matches!(&token.kind, TokenKind::Identifier(name) if name.chars().next().is_some_and(char::is_uppercase))
-                || matches!(
-                    token.kind,
-                    TokenKind::IntType { .. }
-                        | TokenKind::FloatType { .. }
-                        | TokenKind::VoidType
-                        | TokenKind::Abs
-                        | TokenKind::Ins
-                )
-        })
+        matches!(next.kind, TokenKind::Dot) && self.type_argument_starts_with_type_name()
+    }
+
+    fn type_argument_starts_with_type_name(&self) -> bool {
+        let mut index = self.cursor + 1;
+        let Some(first) = self.tokens.get(index) else { return false };
+        if !matches!(
+            first.kind,
+            TokenKind::Identifier(_)
+                | TokenKind::IntType { .. }
+                | TokenKind::FloatType { .. }
+                | TokenKind::VoidType
+                | TokenKind::Abs
+                | TokenKind::Ins
+        ) {
+            return false;
+        }
+        let mut final_identifier = match &first.kind {
+            TokenKind::Identifier(name) => Some(name.as_str()),
+            _ => None,
+        };
+        while matches!(
+            self.tokens.get(index + 1).map(|token| &token.kind),
+            Some(TokenKind::ColonColon)
+        ) {
+            let Some(segment) = self.tokens.get(index + 2) else { return false };
+            let TokenKind::Identifier(name) = &segment.kind else { return false };
+            final_identifier = Some(name.as_str());
+            index += 2;
+        }
+        match first.kind {
+            TokenKind::Identifier(_) => final_identifier
+                .is_some_and(|name| name.chars().next().is_some_and(char::is_uppercase)),
+            _ => true,
+        }
     }
 
     fn parse_buffer_literal(
@@ -182,7 +219,11 @@ impl Parser {
             let qualified_name = format_type_application(&name, &type_arguments);
             return Ok(Expr::Identifier { name: qualified_name, span });
         }
-        let is_type_name = name.chars().next().is_some_and(char::is_uppercase);
+        let is_type_name = name
+            .rsplit("::")
+            .next()
+            .and_then(|segment| segment.chars().next())
+            .is_some_and(char::is_uppercase);
         if !self.case_subject
             && (is_type_name || !type_arguments.is_empty())
             && self.looks_like_struct_literal()

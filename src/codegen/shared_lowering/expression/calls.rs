@@ -93,7 +93,7 @@ fn lower_user_call(
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let result_type = provider.return_types.get(callee).copied().flatten();
+    let result_type = provider.return_type_for(callee).flatten();
     let result = result_type.map(|_| provider.allocate());
     if let (Some(result), Some(result_type)) = (result, result_type) {
         provider.remember_value(result, result_type);
@@ -139,10 +139,16 @@ fn remember_return_metadata(
     result: BackendValueId,
     callee: &str,
 ) {
-    if let Some(Some(nominal_type)) = provider.return_nominal_types.get(callee) {
+    let metadata_key = callee
+        .rsplit_once("::")
+        .and_then(|(_, member)| {
+            provider.return_nominal_types.contains_key(member).then_some(member)
+        })
+        .unwrap_or(callee);
+    if let Some(Some(nominal_type)) = provider.return_nominal_types.get(metadata_key) {
         provider.remember_nominal_type(result, nominal_type.clone());
     }
-    if let Some(payload_types) = provider.return_payload_types.get(callee) {
+    if let Some(payload_types) = provider.return_payload_types.get(metadata_key) {
         for (discriminant, payload_type) in payload_types.iter().enumerate() {
             if let Some(payload_type) = payload_type {
                 provider.remember_enum_payload(result, discriminant as u32, *payload_type);

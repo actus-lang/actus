@@ -63,15 +63,28 @@ impl Analyzer {
                 span: registration.span,
             });
         }
-        if self.signatures.contains_key(registration.name) {
+        if let Some(existing) = self.signatures.get(registration.name) {
+            if equivalent_signature(existing, &registration.signature) {
+                let (existing_imported, existing_span) = self.signature_origins[registration.name];
+                if (registration.imported && existing_imported)
+                    || (registration.imported != existing_imported
+                        && existing_span == registration.span)
+                {
+                    return Ok(());
+                }
+            }
             return Err(SemanticError {
                 kind: SemanticErrorKind::DuplicateVerbName { name: registration.name.to_owned() },
                 span: registration.span,
             });
         }
         self.signatures.insert(registration.name.to_owned(), registration.signature);
+        self.signature_origins
+            .insert(registration.name.to_owned(), (registration.imported, registration.span));
         if !registration.imported {
             self.local_signatures.insert(registration.name.to_owned());
+        } else {
+            self.imported_signatures.insert(registration.name.to_owned());
         }
         Ok(())
     }
@@ -109,6 +122,9 @@ impl Analyzer {
         }
         for declaration in &program.declarations {
             if let TopLevelDecl::Perform(perform) = declaration {
+                if perform.module_import {
+                    continue;
+                }
                 for method in &perform.methods {
                     let parameters = method.generic_parameters.clone();
                     self.with_generic_scope(&parameters, |analyzer| {
@@ -119,4 +135,13 @@ impl Analyzer {
         }
         Ok(())
     }
+}
+
+fn equivalent_signature(left: &VerbSignature, right: &VerbSignature) -> bool {
+    left.params == right.params
+        && left.dynamic_params == right.dynamic_params
+        && left.return_type == right.return_type
+        && left.return_type_name == right.return_type_name
+        && left.return_access == right.return_access
+        && left.generic_parameters == right.generic_parameters
 }

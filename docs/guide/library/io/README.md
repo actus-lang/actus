@@ -13,7 +13,7 @@ stream-shaped components. It contains six related parts:
 | `copy_stream` | Copying data between compatible reader and writer values. |
 
 ```actus
-import std::io;
+import { open std::io };
 
 verb main() -> Int {
     erg message = Buffer[0];

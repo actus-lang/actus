@@ -128,10 +128,13 @@ impl Analyzer {
         target: &Expr,
         index: &Expr,
     ) -> Result<TypeName, SemanticError> {
-        let target_type = self.resolved_type_name(target).ok_or_else(|| SemanticError {
-            kind: SemanticErrorKind::NonIndexableTarget { found: "unknown".to_owned() },
-            span: expression_span(target),
-        })?;
+        let target_type = self
+            .resolved_type_name(target)
+            .map(|type_name| self.normalize_imported_type_name(&type_name))
+            .ok_or_else(|| SemanticError {
+                kind: SemanticErrorKind::NonIndexableTarget { found: "unknown".to_owned() },
+                span: expression_span(target),
+            })?;
         if target_type.name == "Buffer" && target_type.arguments.is_empty() {
             self.validate_integer_index(index)?;
             return Ok(TypeName {
@@ -151,7 +154,7 @@ impl Analyzer {
         }
         self.validate_integer_index(index)?;
         self.validate_constant_index(index, &target_type.arguments[1])?;
-        Ok(target_type.arguments[0].clone())
+        Ok(self.normalize_imported_type_name(&target_type.arguments[0]))
     }
 
     pub(crate) fn validate_index_value(
@@ -216,7 +219,7 @@ impl Analyzer {
     }
 
     fn visit_identifier(&self, name: &str, span: SourceSpan) -> Result<(), SemanticError> {
-        if self.constants.contains_key(name) || self.is_const_generic_parameter(name) {
+        if self.is_constant_name(name) || self.is_const_generic_parameter(name) {
             return Ok(());
         }
         let index = self.binding(name, span)?;
@@ -338,6 +341,7 @@ impl Analyzer {
         fields: &[crate::ast::StructFieldInit],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        let name = self.imported_member_name(name).unwrap_or(name);
         if self.pack_types.contains_key(name) {
             self.validate_pack_literal(name, fields, span)
         } else {

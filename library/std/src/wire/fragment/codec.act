@@ -32,17 +32,35 @@ open pack WireFragmentHeader {
     }
 }
 
-verb wire_fragment_header_valid(abs metadata: WireFragmentHeader, erg payload_length: u32) -> Result[Int, WireError] {
-    if metadata.version != WIRE_FRAGMENT_VERSION { return Result[Int, WireError].Err(WireError.FragmentUnsupportedVersion); }
-    if metadata.fragment_count == 0u16 || metadata.fragment_count > WIRE_FRAGMENT_MAX_COUNT { return Result[Int, WireError].Err(WireError.FragmentCountInvalid); }
-    if metadata.fragment_index >= metadata.fragment_count { return Result[Int, WireError].Err(WireError.FragmentIndexInvalid); }
-    if payload_length > WIRE_FRAGMENT_MAX_PAYLOAD_BYTES { return Result[Int, WireError].Err(WireError.FragmentTooLarge); }
-    if metadata.total_length == 0u32 || metadata.total_length > WIRE_REASSEMBLY_MAX_BYTES { return Result[Int, WireError].Err(WireError.FragmentRangeInvalid); }
-    if metadata.offset > metadata.total_length || payload_length > metadata.total_length - metadata.offset { return Result[Int, WireError].Err(WireError.FragmentRangeInvalid); }
+verb wire_fragment_header_valid(
+    abs metadata: WireFragmentHeader,
+    erg payload_length: u32
+) -> Result[Int, WireError] {
+    if metadata.version != WIRE_FRAGMENT_VERSION {
+        return Result[Int, WireError].Err(WireError.FragmentUnsupportedVersion);
+    }
+    if metadata.fragment_count == 0u16 || metadata.fragment_count > WIRE_FRAGMENT_MAX_COUNT {
+        return Result[Int, WireError].Err(WireError.FragmentCountInvalid);
+    }
+    if metadata.fragment_index >= metadata.fragment_count {
+        return Result[Int, WireError].Err(WireError.FragmentIndexInvalid);
+    }
+    if payload_length > WIRE_FRAGMENT_MAX_PAYLOAD_BYTES {
+        return Result[Int, WireError].Err(WireError.FragmentTooLarge);
+    }
+    if metadata.total_length == 0u32 || metadata.total_length > WIRE_REASSEMBLY_MAX_BYTES {
+        return Result[Int, WireError].Err(WireError.FragmentRangeInvalid);
+    }
+    if metadata.offset > metadata.total_length || payload_length > metadata.total_length - metadata.offset {
+        return Result[Int, WireError].Err(WireError.FragmentRangeInvalid);
+    }
     return Result[Int, WireError].Ok(0);
 }
 
-verb wire_fragment_write_header(abs header: WireFragmentHeader, ins output: Buffer) -> Void {
+verb wire_fragment_write_header(
+    abs header: WireFragmentHeader,
+    ins output: Buffer
+) -> Void {
     output[0] = header.version;
     output[1] = (header.fragment_index & 255u16) as u8;
     output[2] = ((header.fragment_index >> 8u16) & 255u16) as u8;
@@ -66,7 +84,9 @@ verb wire_fragment_write_payload(abs payload: Buffer, ins output: Buffer) -> Voi
     erg length: u32 = buffer_length(buffer: abs payload) as u32;
     erg index: u32 = 0u32;
     loop {
-        if index >= length { break; }
+        if index >= length {
+            break;
+        }
         output[WIRE_FRAGMENT_HEADER_BYTES + index] = payload[index];
         index += 1u32;
     }
@@ -78,22 +98,32 @@ Encode validated fragment metadata and payload into caller-owned storage.
 The input buffers are borrowed, the output buffer is mutated in place, and the
 result is the encoded byte count. No allocation, I/O, or cleanup occurs.
 """
-open verb wire_fragment_encode(abs header: WireFragmentHeader, abs payload: Buffer, ins output: Buffer) -> Result[u32, WireError] {
+open verb wire_fragment_encode(
+    abs header: WireFragmentHeader,
+    abs payload: Buffer,
+    ins output: Buffer
+) -> Result[u32, WireError] {
     erg payload_length: u32 = buffer_length(buffer: abs payload) as u32;
     erg valid = wire_fragment_header_valid(metadata: abs header, payload_length: erg payload_length);
     case dat valid {
-        Result.Err(error) => { return Result[u32, WireError].Err(error); },
+        Result.Err(error) => {
+            return Result[u32, WireError].Err(error);
+        },
         Result.Ok(_) => {},
     };
     erg required: u32 = WIRE_FRAGMENT_HEADER_BYTES + payload_length;
-    if (buffer_length(buffer: abs output) as u32) < required { return Result[u32, WireError].Err(WireError.InsufficientCapacity); }
+    if (buffer_length(buffer: abs output) as u32) < required {
+        return Result[u32, WireError].Err(WireError.InsufficientCapacity);
+    }
     wire_fragment_write_header(header: abs header, output: ins output);
     wire_fragment_write_payload(payload: abs payload, output: ins output);
     return Result[u32, WireError].Ok(required);
 }
 
 verb wire_fragment_read_header(abs input: Buffer) -> WireFragmentHeader {
-    erg header = WireFragmentHeader {storage: Array[u8, 17]()};
+    erg header = WireFragmentHeader {
+        storage: Array[u8, 17](),
+    };
     header.version = input[0];
     header.fragment_index = (input[1] as u16) | ((input[2] as u16) << 8u16);
     header.fragment_count = (input[3] as u16) | ((input[4] as u16) << 8u16);
@@ -112,12 +142,16 @@ inputs return typed errors. The operation performs no allocation, I/O, or
 cleanup.
 """
 open verb wire_fragment_decode(abs input: Buffer) -> Result[WireFragmentHeader, WireError] {
-    if (buffer_length(buffer: abs input) as u32) < WIRE_FRAGMENT_HEADER_BYTES { return Result[WireFragmentHeader, WireError].Err(WireError.Truncated); }
+    if (buffer_length(buffer: abs input) as u32) < WIRE_FRAGMENT_HEADER_BYTES {
+        return Result[WireFragmentHeader, WireError].Err(WireError.Truncated);
+    }
     erg header: WireFragmentHeader = wire_fragment_read_header(input: abs input);
     erg payload_length: u32 = (buffer_length(buffer: abs input) as u32) - WIRE_FRAGMENT_HEADER_BYTES;
     erg valid = wire_fragment_header_valid(metadata: abs header, payload_length: erg payload_length);
     case dat valid {
-        Result.Err(error) => { return Result[WireFragmentHeader, WireError].Err(error); },
+        Result.Err(error) => {
+            return Result[WireFragmentHeader, WireError].Err(error);
+        },
         Result.Ok(_) => {},
     };
     return Result[WireFragmentHeader, WireError].Ok(header);

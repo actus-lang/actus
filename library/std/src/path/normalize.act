@@ -1,5 +1,4 @@
 """Lexical path normalization without filesystem or symlink resolution."""
-
 """Normalize an owned path in place through the Rust runtime without allocation.
 
 `self` is an `ins` call-scope loan at the ABI boundary so the runtime can

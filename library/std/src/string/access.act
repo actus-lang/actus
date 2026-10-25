@@ -7,6 +7,7 @@ the validated byte length. The hosted provider validates UTF-8 before exposing
 either result, so malformed data is never silently replaced or truncated.
 """
 unsafe extern "C" verb actus_string_length(abs text: String) -> Int;
+
 unsafe extern "C" verb actus_string_byte_at(abs text: String, erg index: Int) -> Int;
 
 """

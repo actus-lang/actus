@@ -55,8 +55,7 @@ fn lsp_definition_resolves_a_configuration_constant_through_its_facade() {
     fs::write(root.join("src/config/config.act"), "open values;\n").expect("write config facade");
     fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
         .expect("write config values");
-    let source =
-        "import config;\nverb main() -> Int { erg number = LIMIT as Int; return number; }\n";
+    let source = "import config;\nverb main() -> Int { erg number = config::LIMIT as Int; return number; }\n";
     let main = root.join("src/main.act");
     fs::write(&main, source).expect("write main");
     let uri = file_uri(&main);
@@ -68,7 +67,7 @@ fn lsp_definition_resolves_a_configuration_constant_through_its_facade() {
 
 fn configuration_definition_messages(uri: &str, source: &str) -> Vec<Value> {
     let local_position = position_after(source, "return number");
-    let external_position = position_after(source, "= LIMIT");
+    let external_position = position_after(source, "= config::LIMIT");
     vec![
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
@@ -92,14 +91,14 @@ fn write_definition_fixture(root: &Path) -> String {
         "open verb add(erg left: Int, erg right: Int) -> Int { return left + right; }\n",
     )
     .expect("write sibling");
-    let source = "import math;\nverb main() -> Int { erg number = add(left: 40, right: 2); return number; }\n".to_owned();
+    let source = "import math;\nverb main() -> Int { erg number = math::add(left: 40, right: 2); return number; }\n".to_owned();
     fs::write(root.join("src/main.act"), &source).expect("write main");
     source
 }
 
 fn definition_messages(uri: &str, source: &str) -> Vec<Value> {
     let local_position = position_after(source, "return number");
-    let external_position = position_after(source, "= add");
+    let external_position = position_after(source, "= math::add");
     vec![
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),

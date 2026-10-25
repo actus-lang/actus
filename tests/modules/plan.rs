@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::lexer::scan;
-use actus::modules::{ModuleError, ModuleObjectOwner, ModuleResolver, build_compilation_plan};
+use actus::modules::{
+    ModuleError, ModuleObjectOwner, ModuleResolver, build_compilation_plan,
+    build_test_compilation_plan,
+};
 use actus::parser::parse;
 
 struct Fixture(PathBuf);
@@ -52,7 +55,7 @@ fn compilation_plan_separates_public_caller_and_internal_module_units() {
 }
 
 #[test]
-fn compilation_plan_deduplicates_repeated_module_imports() {
+fn compilation_plan_rejects_repeated_module_imports() {
     let fixture = Fixture::new();
     fixture.write("math/math.act", "open ops;");
     fixture.write("math/ops.act", "open verb add() -> Int { return 1; }");
@@ -60,24 +63,27 @@ fn compilation_plan_deduplicates_repeated_module_imports() {
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
 
-    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
-    assert_eq!(plan.units().len(), 1);
-    assert_eq!(
-        plan.caller()
-            .declarations
-            .iter()
-            .filter(|declaration| {
-                matches!(
-                    declaration,
-                    actus::ast::TopLevelDecl::Verb(verb) if verb.name == "add"
-                ) || matches!(
-                    declaration,
-                    actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "add"
-                )
-            })
-            .count(),
-        1
+    let error = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect_err("repeated imports must be rejected");
+    assert!(
+        matches!(error, ModuleError::ImportBindingCollision { ref binding, .. } if binding == "math")
     );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1115");
+}
+
+#[test]
+fn rejects_duplicate_local_import_bindings_before_module_resolution() {
+    let (tokens, errors) =
+        scan("import left as device; import right as device; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+    let error = build_compilation_plan(&program, &ModuleResolver::new(std::path::Path::new(".")))
+        .expect_err("duplicate aliases must be rejected before resolving modules");
+    assert!(matches!(
+        error,
+        ModuleError::ImportBindingCollision { ref binding, .. } if binding == "device"
+    ));
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1115");
 }
 
 #[test]
@@ -92,13 +98,13 @@ fn nested_sibling_facade_preserves_transitive_public_verbs_in_object_plan() {
         "open runtime; open verb resident_step() -> u32 { return allocate_column_index(); }",
     );
     let (tokens, errors) =
-        scan("import aie; verb main() -> Int { return allocate_column_index() as Int; }");
+        scan("import aie; verb main() -> Int { return aie::allocate_column_index() as Int; }");
     assert!(errors.is_empty());
     let program = parse(tokens).unwrap();
 
     let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
     assert!(plan.caller().declarations.iter().any(|declaration| {
-        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "allocate_column_index")
+        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "aie::allocate_column_index")
     }));
     let object_plan = plan.object_plan().unwrap();
     assert!(
@@ -144,6 +150,21 @@ fn deduplicates_compatible_external_symbols_across_modules() {
 
     build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
         .expect("compatible external ABI declarations should be shared");
+}
+
+#[test]
+fn deduplicates_identical_declarations_across_nested_module_scopes() {
+    let fixture = Fixture::new();
+    fixture.write("left/left.act", "open api;");
+    fixture.write("left/api.act", "open enum SharedError { Missing, }");
+    fixture.write("right/right.act", "open api;");
+    fixture.write("right/api.act", "open enum SharedError { Missing, }");
+    let (tokens, errors) = scan("import left; import right; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect("identical declarations should be shared across module scopes");
 }
 
 #[test]
@@ -215,7 +236,26 @@ fn object_metadata_lists_only_facade_exported_verbs() {
 }
 
 #[test]
-fn imported_object_program_excludes_module_directives() {
+fn object_metadata_keeps_private_verbs_for_transitive_friend_dependencies() {
+    let fixture = Fixture::new();
+    fixture.write("runner/runner.act", "open teaching;");
+    fixture.write("runner/teaching.act", "import shared;");
+    fixture.write("shared/shared.act", "verb private_helper() -> Int { return 1; }");
+    let (tokens, errors) =
+        scan("import { open runner }; meta test\nverb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+
+    let plan = build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
+    let objects = plan.object_plan().unwrap();
+    let shared = objects.units().iter().find(|unit| {
+        matches!(unit.owner(), ModuleObjectOwner::Imported { module_path } if module_path == "shared")
+    }).expect("transitive dependency object should exist");
+    assert_eq!(shared.exported_verbs(), &["private_helper".to_owned()]);
+}
+
+#[test]
+fn imported_object_program_preserves_imports_but_excludes_facade_directives() {
     let fixture = Fixture::new();
     fixture.write("math/math.act", "open ops;");
     fixture.write("math/ops.act", "open verb add() -> Int { return 1; }");
@@ -226,10 +266,11 @@ fn imported_object_program_excludes_module_directives() {
     let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0)).unwrap();
     let objects = plan.object_plan().unwrap();
     let object = objects.units()[1].program();
-    assert!(object.declarations.iter().all(|declaration| {
-        !matches!(declaration, actus::ast::TopLevelDecl::Import(_))
-            && !matches!(declaration, actus::ast::TopLevelDecl::OpenSibling(_))
-    }));
+    assert!(
+        object.declarations.iter().all(|declaration| {
+            !matches!(declaration, actus::ast::TopLevelDecl::OpenSibling(_))
+        })
+    );
 }
 
 #[test]

@@ -33,6 +33,20 @@ fn parses_performance_for_a_target_type() {
 }
 
 #[test]
+fn parses_qualified_performance_role_names() {
+    let (tokens, errors) = scan(
+        "role Reader { verb read(ins self: File) -> Int; } perform io::Reader for File { verb read(ins self: File) -> Int { return 0; } }",
+    );
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("qualified performance role should parse");
+
+    let TopLevelDecl::Perform(performance) = &program.declarations[1] else {
+        panic!("expected performance")
+    };
+    assert_eq!(performance.role_name, "io::Reader");
+}
+
+#[test]
 fn parses_dynamic_dispatch_parameter_type() {
     let (tokens, errors) = scan(
         "role Writer { verb write(abs self: File) -> Int; } \

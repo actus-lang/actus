@@ -8,6 +8,7 @@ impl Analyzer {
         &self,
         type_name: &mut TypeName,
     ) -> Result<(), SemanticError> {
+        *type_name = self.normalize_imported_type_name(type_name);
         self.resolve_type_reference(type_name)?;
         if type_name.name == "Array" && type_name.arguments.len() == 2 {
             self.normalize_array_capacities(&mut type_name.arguments[0])?;

@@ -1,5 +1,4 @@
 """Runtime-backed path predicates and component-aware comparisons."""
-
 """Inspect absolute-root state without consuming or allocating the path."""
 unsafe extern "C" verb actus_path_is_absolute(abs self: Path) -> Bool;
 

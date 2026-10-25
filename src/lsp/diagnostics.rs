@@ -90,6 +90,13 @@ fn analyze_test_fixture(
 ) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
     let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
+    let syntax_fixture_roots = [
+        configuration.project_root().join("tests/fixtures/formatter"),
+        configuration.project_root().join("tests/fixtures/parser"),
+    ];
+    if syntax_fixture_roots.iter().any(|root| path.starts_with(root)) {
+        return Some(Ok(()));
+    }
     let tests_root = configuration.project_root().join("tests");
     if !path.starts_with(tests_root) {
         return None;

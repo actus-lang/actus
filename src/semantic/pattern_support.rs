@@ -24,7 +24,10 @@ pub(super) fn pattern_name(pattern: &Pattern) -> String {
 
 pub(super) fn variant_key(pattern: &Pattern, enum_name: &str) -> Option<String> {
     match pattern {
-        Pattern::Variant { enum_name: found, variant, .. } if found == enum_name => {
+        Pattern::Variant { enum_name: found, variant, .. }
+            if found.rsplit_once("::").map_or(found.as_str(), |(_, member)| member)
+                == enum_name =>
+        {
             Some(variant.clone())
         }
         _ => None,

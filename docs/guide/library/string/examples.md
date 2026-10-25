@@ -3,7 +3,7 @@
 ## Validate a buffer
 
 ```actus
-import std::string;
+import { open std::string };
 
 open verb validate(dat storage: Buffer)
     -> Result[Utf8Buffer, StringError] {
@@ -17,7 +17,7 @@ The returned value owns the validated buffer. The caller must handle the
 ## Copy a borrowed string
 
 ```actus
-import std::string;
+import { open std::string };
 
 open verb retain(abs source: String, dat destination: Buffer)
     -> Result[Utf8Buffer, StringError] {
@@ -32,7 +32,7 @@ the resulting bytes pass UTF-8 validation.
 ## Inspect a byte safely
 
 ```actus
-import std::string;
+import { open std::string };
 
 open verb inspect(abs value: Utf8Buffer, erg index: Int)
     -> Result[Int, StringError] {

@@ -11,7 +11,7 @@ fn generic_result_facade_project_named(
     import_path: &str,
     name: &str,
 ) -> (PathBuf, PathBuf, PathBuf) {
-    let source = format!("import {import_path}; verb main() -> Int {{ return 0; }}\n");
+    let source = format!("import {{ open {import_path} }}; verb main() -> Int {{ return 0; }}\n");
     let (root, input, output) = project(name, &source);
     fs::write(
         root.join("Actus.toml"),
@@ -276,7 +276,7 @@ verb main() -> Int {
 
 #[test]
 fn nested_facade_generic_result_preserves_aggregate_payload_natively() {
-    let source = "import feature; verb main() -> Int { erg result = forward[4](); return case dat result { Result.Ok(payload) => payload.value as Int, Result.Err(_) => 0, }; }\n";
+    let source = "import { open feature }; verb main() -> Int { erg result = forward[4](); return case dat result { Result.Ok(payload) => payload.value as Int, Result.Err(_) => 0, }; }\n";
     let (root, input, output) = project("nested-facade-aggregate-enum", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature facade");
     fs::write(root.join("src/feature/feature.act"), "open api;\n").expect("write feature facade");
@@ -375,7 +375,7 @@ verb main() -> Int {
 
 #[test]
 fn nested_facade_result_case_with_aggregate_payload_preserves_native_identity() {
-    let source = "import feature; verb main() -> Int { return run(); }\n";
+    let source = "import { open feature }; verb main() -> Int { return run(); }\n";
     let (root, input, output) = project("nested-facade-result-aggregate-case", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
     fs::write(root.join("src/feature/feature.act"), "open api;\n").expect("write feature facade");

@@ -15,18 +15,18 @@ impl Parser {
     pub(super) fn parse_top_level_decl_with_doc(
         &mut self,
         mut doc: Option<String>,
-    ) -> Result<TopLevelDecl, ParseError> {
+    ) -> Result<Vec<TopLevelDecl>, ParseError> {
         if self.check_simple(&TokenKind::Meta) {
             let metadata = self.parse_metadata_group()?;
             doc = doc.or_else(|| self.take_doc_string_group());
-            return self.parse_metadata_declaration(metadata, doc);
+            return Ok(vec![self.parse_metadata_declaration(metadata, doc)?]);
         }
         if let Some(declaration) = self.parse_keyword_declaration(doc.clone())? {
             return Ok(declaration);
         }
         self.parse_unknown_keyword()?;
         let declaration = self.parse_verb_with_metadata(false, Vec::new(), doc)?;
-        Ok(TopLevelDecl::Verb(declaration))
+        Ok(vec![TopLevelDecl::Verb(declaration)])
     }
 
     pub(super) fn parse_metadata_group(
@@ -78,28 +78,28 @@ impl Parser {
     fn parse_keyword_declaration(
         &mut self,
         doc: Option<String>,
-    ) -> Result<Option<TopLevelDecl>, ParseError> {
+    ) -> Result<Option<Vec<TopLevelDecl>>, ParseError> {
         if let Some(declaration) = self.parse_module_keyword(doc.clone())? {
             return Ok(Some(declaration));
         }
         if let Some(declaration) = self.parse_external_keyword(doc.clone())? {
-            return Ok(Some(declaration));
+            return Ok(Some(vec![declaration]));
         }
         if self.check_simple(&TokenKind::Const) {
-            return Ok(Some(TopLevelDecl::Constant(self.parse_constant(false, doc)?)));
+            return Ok(Some(vec![TopLevelDecl::Constant(self.parse_constant(false, doc)?)]));
         }
-        self.parse_type_keyword(doc)
+        Ok(self.parse_type_keyword(doc)?.map(|declaration| vec![declaration]))
     }
 
     fn parse_module_keyword(
         &mut self,
         doc: Option<String>,
-    ) -> Result<Option<TopLevelDecl>, ParseError> {
+    ) -> Result<Option<Vec<TopLevelDecl>>, ParseError> {
         if self.check_simple(&TokenKind::Import) {
             return Ok(Some(self.parse_import_decl()?));
         }
         if self.check_simple(&TokenKind::Open) {
-            return Ok(Some(self.parse_open_top_level(doc)?));
+            return Ok(Some(vec![self.parse_open_top_level(doc)?]));
         }
         Ok(None)
     }
@@ -189,18 +189,123 @@ impl Parser {
         )?))
     }
 
-    fn parse_import_decl(&mut self) -> Result<TopLevelDecl, ParseError> {
+    fn parse_import_decl(&mut self) -> Result<Vec<TopLevelDecl>, ParseError> {
         let start = self.expect_keyword(TokenKind::Import, "`import`")?.span.start;
-        let mut segments = vec![identifier_text(&self.take_identifier("module name")?.kind)];
-        while self.match_simple(TokenKind::Colon) {
-            self.expect_simple(TokenKind::Colon, "`:`")?;
-            segments.push(identifier_text(&self.take_identifier("module name")?.kind));
+        let mut items = Vec::new();
+        let is_block = self.match_simple(TokenKind::LeftBrace);
+        if is_block {
+            loop {
+                items.extend(self.parse_import_items()?);
+                if self.match_simple(TokenKind::Comma) {
+                    if self.check_simple(&TokenKind::RightBrace) {
+                        break;
+                    }
+                    continue;
+                }
+                break;
+            }
+            self.expect_simple(TokenKind::RightBrace, "`}`")?;
+        } else {
+            items = self.parse_import_items()?;
         }
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(TopLevelDecl::Import(crate::ast::ImportDecl {
-            path: segments.join("::"),
-            span: SourceSpan::new(start, end),
-        }))
+        if !is_block && items.iter().any(|(_, _, is_open, _, _, _)| *is_open) {
+            return Err(ParseError {
+                code: ParseErrorCode::OpenImportRequiresBlock,
+                kind: ParseErrorKind::OpenImportRequiresBlock,
+                span: SourceSpan::new(start, end),
+            });
+        }
+        Ok(items
+            .into_iter()
+            .map(|(path, alias, is_open, grouped, selected, span)| {
+                TopLevelDecl::Import(crate::ast::ImportDecl {
+                    path,
+                    alias,
+                    is_open,
+                    selected,
+                    grouped,
+                    span: if is_block { span } else { SourceSpan::new(start, end) },
+                })
+            })
+            .collect())
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn parse_import_items(
+        &mut self,
+    ) -> Result<Vec<(String, Option<String>, bool, bool, Vec<String>, SourceSpan)>, ParseError>
+    {
+        let is_open = self.match_simple(TokenKind::Open);
+        let item_start = if is_open {
+            self.previous().span.start
+        } else {
+            self.peek().map_or(0, |token| token.span.start)
+        };
+        let mut segments = vec![identifier_text(&self.take_identifier("module name")?.kind)];
+        while self.match_simple(TokenKind::ColonColon) {
+            if self.match_simple(TokenKind::LeftBrace) {
+                let mut items = Vec::new();
+                loop {
+                    let mut path = segments.clone();
+                    path.push(identifier_text(&self.take_identifier("imported name")?.kind));
+                    let alias = self.parse_import_alias()?;
+                    let item_end = self.previous().span.end;
+                    items.push((
+                        path.join("::"),
+                        alias,
+                        is_open,
+                        true,
+                        Vec::new(),
+                        SourceSpan::new(item_start, item_end),
+                    ));
+                    if self.match_simple(TokenKind::Comma) {
+                        if self.check_simple(&TokenKind::RightBrace) {
+                            break;
+                        }
+                        continue;
+                    }
+                    break;
+                }
+                self.expect_simple(TokenKind::RightBrace, "`}`")?;
+                return Ok(items);
+            }
+            segments.push(identifier_text(&self.take_identifier("module name")?.kind));
+        }
+        let alias = self.parse_import_alias()?;
+        let selected = if self.match_simple(TokenKind::LeftBrace) {
+            let mut names = Vec::new();
+            loop {
+                names.push(identifier_text(&self.take_identifier("imported declaration")?.kind));
+                if self.match_simple(TokenKind::Comma) {
+                    if self.check_simple(&TokenKind::RightBrace) {
+                        break;
+                    }
+                    continue;
+                }
+                break;
+            }
+            self.expect_simple(TokenKind::RightBrace, "`}`")?;
+            names
+        } else {
+            Vec::new()
+        };
+        let item_end = self.previous().span.end;
+        Ok(vec![(
+            segments.join("::"),
+            alias,
+            is_open,
+            false,
+            selected,
+            SourceSpan::new(item_start, item_end),
+        )])
+    }
+
+    fn parse_import_alias(&mut self) -> Result<Option<String>, ParseError> {
+        if !self.match_simple(TokenKind::As) {
+            return Ok(None);
+        }
+        Ok(Some(identifier_text(&self.take_identifier("import alias")?.kind)))
     }
 
     fn parse_open_top_level(&mut self, doc: Option<String>) -> Result<TopLevelDecl, ParseError> {

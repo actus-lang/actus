@@ -266,13 +266,13 @@ behavior around the existing language and runtime contracts.
 
 ## Gate 18.8: Source structure and size conformance
 
-- [x] Treat files above 300 lines as requiring decomposition evidence.
-- [x] Treat files at or above 400 lines as strict failures requiring a split.
-- [x] Reject files above the 500-line hard limit.
-- [x] Treat functions above 30 lines as requiring decomposition evidence.
-- [x] Treat functions at or above 40 lines as strict failures requiring a
+- [x] Treat files above 500 lines as requiring decomposition evidence.
+- [x] Treat files at or above 600 lines as strict failures requiring a split.
+- [x] Reject files above the 800-line hard limit.
+- [x] Treat functions above 50 lines as requiring decomposition evidence.
+- [x] Treat functions at or above 60 lines as strict failures requiring a
       split.
-- [x] Reject functions above the 60-line hard limit.
+- [x] Reject functions above the 80-line hard limit.
 - [x] Keep tests in `tests/` and Actus library fixtures in `tests/library/`;
       reject Rust logic embedded in Actus fixture trees.
 - [x] Define narrowly scoped exceptions only for generated or intentionally

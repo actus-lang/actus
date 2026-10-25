@@ -14,14 +14,11 @@ Maximum number of process arguments accepted by this API. The count includes
 user-supplied arguments are available when the limit is reached.
 """
 open const PROCESS_MAX_ARGUMENTS: Int = 64;
-
-
 """
 Maximum UTF-8 byte length accepted for one argument. This is a byte limit, not
 a character limit; a multi-byte UTF-8 character consumes multiple bytes.
 """
 open const PROCESS_MAX_ARGUMENT_BYTES: Int = 4096;
-
 
 """
 Stateful bounded cursor over one validated snapshot of the host argument
@@ -58,7 +55,11 @@ open verb arguments() -> Result[Arguments, ProcessError] {
     if count == -7 {
         return Result[Arguments, ProcessError].Err(ProcessError.ArgumentTooLarge);
     }
-    return Result[Arguments, ProcessError].Ok(Arguments {next_index: 0, count: count, valid: true});
+    return Result[Arguments, ProcessError].Ok(Arguments {
+        next_index: 0,
+        count: count,
+        valid: true,
+    });
 }
 
 """

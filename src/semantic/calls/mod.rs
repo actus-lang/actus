@@ -66,10 +66,11 @@ impl Analyzer {
             return result;
         }
         let explicit_type_application = parse_generic_call_arguments(callee, span);
-        let lookup_name = explicit_type_application
+        let parsed_lookup_name = explicit_type_application
             .as_ref()
             .map_or(callee, |type_name| type_name.name.as_str())
             .to_owned();
+        let lookup_name = self.qualified_call_lookup_name(&parsed_lookup_name, span)?;
         let Some(mut signature) = self.signatures.get(&lookup_name).cloned() else {
             for argument in arguments {
                 self.visit_expression(&argument.expression)?;
@@ -209,14 +210,18 @@ impl Analyzer {
         payload_type: &crate::ast::TypeName,
     ) -> Result<(), SemanticError> {
         self.visit_expression_with_expected(&argument.expression, Some(payload_type))?;
-        let found =
-            self.expression_type_name(&argument.expression).unwrap_or_else(|| "unknown".to_owned());
-        if found != super::analyzer::canonical_type_name(payload_type) {
+        let found = self
+            .expression_type_name(&argument.expression)
+            .map(|name| self.normalize_imported_type_key(&name))
+            .unwrap_or_else(|| "unknown".to_owned());
+        let expected =
+            self.normalize_imported_type_key(&super::analyzer::canonical_type_name(payload_type));
+        if found != expected {
             return Err(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     callee: constructor.to_owned(),
                     parameter: "payload".to_owned(),
-                    expected: super::analyzer::canonical_type_name(payload_type),
+                    expected,
                     found,
                 },
                 span: argument_span(argument),
@@ -396,28 +401,6 @@ impl Analyzer {
             return Err(invalid_call_role(callee, parameter_index, argument, signature));
         }
         self.validate_explicit_owner_view(callee, argument, parameter_index, signature, role)
-    }
-
-    fn validate_explicit_owner_view(
-        &self,
-        callee: &str,
-        argument: &Argument,
-        parameter_index: usize,
-        signature: &VerbSignature,
-        role: &Role,
-    ) -> Result<(), SemanticError> {
-        if *role == Role::Abs
-            && argument.role == Some(Role::Abs)
-            && self.is_readable_owner(&argument.expression)
-        {
-            return Ok(());
-        }
-        self.validate_argument_role(
-            callee,
-            &signature.params[parameter_index].0,
-            role,
-            &argument.expression,
-        )
     }
 
     pub(super) fn performance_signature(

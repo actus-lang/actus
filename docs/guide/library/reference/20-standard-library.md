@@ -87,7 +87,7 @@ Use `std::io::print`/`println` for `String` and `printb`/`printlnb` for raw
 Use `std::time` for elapsed-time measurement and explicit monotonic deadlines:
 
 ```act
-import std::time;
+import { open std::time };
 
 verb measure() -> u64 {
     erg started: Instant = now();

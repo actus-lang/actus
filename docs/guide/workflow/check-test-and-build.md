@@ -13,6 +13,41 @@ Use the package manifest from the project root. Check validates source and
 configuration, test runs the package's tests, and build emits native output for
 the selected target and runtime.
 
+## Focused tests and internal fixtures
+
+`actus test` accepts a Rust-style positional substring filter, so a large test
+suite does not need to run in full:
+
+```sh
+actus test persistence
+actus test --module ie::runtime
+actus test --file ie/runtime/training/auxiliary/cursor.act
+actus test persistence --module ie::runtime --exact
+actus test --list
+```
+
+The positional filter, `--module`, and `--file` are substring filters by
+default. Add `--exact` when the value must match exactly. `--list` discovers
+and prints the selected canonical test identities without executing them.
+
+Tests should mirror the source tree. For example,
+`tests/ie/runtime/training/auxiliary/cursor.act` is paired with the matching
+source path under `src/`, or with that path's canonical facade when the source
+module is a directory module. Use `--mirror` to enforce this mapping:
+
+```sh
+actus test --mirror --strict
+```
+
+When a mirrored file contains a `meta test`, the runner compiles that test
+with the corresponding module's internal implementation scope. This permits
+testing private helpers without exporting them through a facade or changing
+ordinary importer visibility. The friend scope exists only in the temporary
+test artifact; it does not make private declarations public.
+
+Package-root test files remain root-scope compatibility fixtures. New nested
+test files should use the mirrored layout and should pass the `--mirror` gate.
+
 For repository compiler work, also use the repository's Rust checks:
 
 ```sh

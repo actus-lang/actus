@@ -13,6 +13,13 @@ pub(super) fn validate_import_visibility(
     module_path: &str,
     unit: &ModuleUnit,
 ) -> Result<(), ModuleError> {
+    if program
+        .declarations
+        .iter()
+        .any(|declaration| matches!(declaration, TopLevelDecl::OpenSibling(_)))
+    {
+        return Ok(());
+    }
     let private_verbs = private_names(unit, &["verb"]);
     let private_types = private_names(unit, &["struct", "pack", "enum"]);
     let private_constants = private_names(unit, &["const"]);

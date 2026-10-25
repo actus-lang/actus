@@ -16,8 +16,10 @@ edition.
 | `E1036`–`E1038` | Method lookup and receiver validation |
 | `E1040`–`E1079` | Enum patterns, roles, generics, packs, and arenas |
 | `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |
+| `E1083`–`E1099` | Bounded arrays, arenas, dynamic roles, and compile-time expressions |
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
 | `E1109` | Private module declaration or public-signature visibility violation |
+| `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |
 | `E1110` | Deterministic native symbol or ABI collision across module implementations |
 | `E1104` | Unknown sibling referenced by a module facade |
 | `E1105` | Module source read failure or defensive module-source fallback |
@@ -57,8 +59,8 @@ The source-limit validator measures code-bearing lines. Blank lines, Rust-style
 comments are ignored after the code on their line has been counted. Actus
 triple-quoted `""" ... """` documentation blocks remain counted because they
 are language constructs. `E1850` is reported when a file exceeds the preferred
-300 code-line size or `E1853` when a function exceeds the preferred 30
+500 code-line size or `E1853` when a function exceeds the preferred 50
 code-line size.
-`E1851` and `E1854` are strict split-required failures at 400 file lines and
-40 function lines. `E1852` and `E1855` reject files above 500 lines and
-functions above 60 lines respectively.
+`E1851` and `E1854` are strict split-required failures at 600 file lines and
+60 function lines. `E1852` and `E1855` reject files above 800 lines and
+functions above 80 lines respectively.

@@ -11,7 +11,9 @@ verb notify(erg value: Int) -> Void {
 }
 
 verb main() -> Int {
-    erg fabric: Fabric = Fabric { columns: Array[Column, 2]() };
+    erg fabric: Fabric = Fabric {
+        columns: Array[Column, 2](),
+    };
     erg index: Usize = 0;
     if index == 0 {
         fabric.columns[index].axon_0 = 1;

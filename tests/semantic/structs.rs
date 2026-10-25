@@ -116,6 +116,12 @@ fn rejects_duplicate_struct_names_and_fields() {
 }
 
 #[test]
+fn accepts_identical_reexported_struct_definitions() {
+    analyze_source("struct Point { x: Int, } struct Point { x: Int, }")
+        .expect("identical re-exported struct definitions should be accepted");
+}
+
+#[test]
 fn rejects_persistent_instrumental_struct_fields() {
     let error = analyze_source("struct Session { ins scratch: Buffer, }")
         .expect_err("ins fields cannot outlive their call scope");

@@ -63,38 +63,6 @@ pub(super) fn lower_unit_call(
     calls::lower_unit_call(provider, expression, instructions)
 }
 
-pub(super) fn assign_aggregate_loan(
-    provider: &mut SharedExpressionProvider<'_>,
-    destination: BackendValueId,
-    value: BackendValueId,
-    layout: super::super::BackendLayout,
-    span: SourceSpan,
-    instructions: &mut Vec<BackendInstruction>,
-) -> Result<(), BackendContractError> {
-    let destination_is_buffer =
-        provider.nominal_type(destination).is_some_and(|type_name| type_name.name == "Buffer");
-    let source_is_buffer =
-        provider.nominal_type(value).is_some_and(|type_name| type_name.name == "Buffer");
-    if destination_is_buffer && source_is_buffer {
-        instructions.push(BackendInstruction::Call {
-            callee: SymbolIdentity::external_raw(crate::runtime::BUFFER_MOVE_SYMBOL)
-                .map_err(|error| unsupported(span, error.to_string()))?,
-            arguments: vec![destination, value],
-            result: None,
-            span,
-        });
-    } else {
-        instructions.push(BackendInstruction::MemoryCopy {
-            destination,
-            source: value,
-            size: layout.size,
-            alignment: layout.alignment,
-            span,
-        });
-    }
-    Ok(())
-}
-
 impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn new(
         namespace: &'a str,
@@ -291,8 +259,14 @@ impl<'a> SharedExpressionProvider<'a> {
 include!("expression/provider.rs");
 
 impl SharedExpressionProvider<'_> {
+    pub(super) fn return_type_for(&self, callee: &str) -> Option<Option<BackendValueType>> {
+        self.return_types.get(callee).copied().or_else(|| {
+            callee.rsplit_once("::").and_then(|(_, member)| self.return_types.get(member).copied())
+        })
+    }
+
     pub(super) fn call_returns_unit(&self, callee: &str) -> bool {
-        self.return_types.get(callee).is_some_and(Option::is_none)
+        self.return_type_for(callee).is_some_and(|return_type| return_type.is_none())
     }
 
     fn lower_method_call(

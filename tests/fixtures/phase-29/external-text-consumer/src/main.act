@@ -1,5 +1,7 @@
 """Generic external-consumer fixture for the public text boundary."""
-import std::string;
+import {
+    open std::string,
+};
 
 verb inspect_text(dat storage: Buffer) -> Int {
     erg owned = utf8_from_buffer(storage: dat storage);
@@ -9,7 +11,11 @@ verb inspect_text(dat storage: Buffer) -> Int {
             erg first = utf8_byte_at(text: abs value, index: erg zero);
             drop(value);
             return case dat first {
-                Result.Ok(first_byte) => if first_byte == 65 { 0 } else { 1 },
+                Result.Ok(first_byte) => if first_byte == 65 {
+                    0;
+                } else {
+                    1;
+                },
                 Result.Err(_) => 2,
             };
         },

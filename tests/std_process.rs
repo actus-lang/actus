@@ -28,7 +28,7 @@ fn project(name: &str) -> (PathBuf, PathBuf, PathBuf) {
 }
 
 fn fixture_source() -> &'static str {
-    r#"import process;
+    r#"import { open process };
 verb main() -> Int {
     erg created = arguments();
     return case dat created {

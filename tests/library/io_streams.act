@@ -1,17 +1,27 @@
-import io;
+import {
+    open io,
+};
 
 meta test
 verb copy_transfers_cursor_streams() -> Int {
     erg input_bytes = Buffer[0];
     append(input_bytes, 65);
     append(input_bytes, 66);
-    erg reader: Cursor = Cursor { buffer: input_bytes, position: 0, };
+    erg reader: Cursor = Cursor {
+        buffer: input_bytes,
+        position: 0,
+    };
     erg output_bytes = Buffer[0];
-    erg writer: Cursor = Cursor { buffer: output_bytes, position: 0, };
+    erg writer: Cursor = Cursor {
+        buffer: output_bytes,
+        position: 0,
+    };
     erg result = copy_stream(reader: ins reader, writer: ins writer);
     case dat result {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg offset = 0;
     writer.seek(offset: offset);
@@ -51,8 +61,10 @@ verb buffered_writer_flushes_cursor_storage() -> Int {
     erg storage_capacity = 2;
     erg reserved = reserve(buffer: ins storage, capacity: storage_capacity);
     case dat reserved {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg writer = buffered_writer(dat target, dat storage);
     erg input = Buffer[0];
@@ -61,10 +73,14 @@ verb buffered_writer_flushes_cursor_storage() -> Int {
     erg written = buffered_write(writer: ins writer, input: abs input);
     case dat written {
         Result.Ok(count) => case count {
-            2 => { },
-            _ => { return 1; },
+            2 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg flushed = flush_buffer(writer: ins writer);
     return case dat flushed {
@@ -115,9 +131,19 @@ verb clear_one_byte(ins storage: Buffer) -> Int {
 
 verb append_and_clear_buffer(ins storage: Buffer, abs source: Buffer) -> Int {
     erg appended = append_one_byte(storage: ins storage, source: abs source);
-    case appended { 0 => { }, _ => { return 1; }, };
+    case appended {
+        0 => {},
+        _ => {
+            return 1;
+        },
+    };
     erg valid_length = buffer_has_one_byte(storage: abs storage);
-    case valid_length { 0 => { }, _ => { return 1; }, };
+    case valid_length {
+        0 => {},
+        _ => {
+            return 1;
+        },
+    };
     return clear_one_byte(storage: ins storage);
 }
 
@@ -127,8 +153,10 @@ verb buffer_utilities_preserve_reusable_storage() -> Int {
     erg capacity = 4;
     erg reserved = reserve(buffer: ins storage, capacity: capacity);
     case dat reserved {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg source = Buffer[0];
     append(source, 65);
@@ -157,12 +185,16 @@ verb emit_standard_output(abs text: Buffer) -> Int {
     erg printed = printb(text: abs text);
     erg line = printlnb(text: abs text);
     case dat integer {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     case dat printed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return case dat line {
         Result.Ok(_) => 0,
@@ -176,12 +208,16 @@ verb emit_error_output(abs text: Buffer) -> Int {
     erg printed = eprint(buffer: abs text);
     erg line = eprintln(buffer: abs text);
     case dat integer {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     case dat printed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return case dat line {
         Result.Ok(_) => 0,
@@ -193,8 +229,10 @@ verb emit_buffer_output(abs text: Buffer) -> Int {
     erg written = write(buffer: abs text);
     erg flushed = flush();
     case dat written {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return case dat flushed {
         Result.Ok(_) => 0,
@@ -207,13 +245,17 @@ verb output_wrappers_return_typed_status() -> Int {
     erg text = Buffer[0];
     erg standard = emit_standard_output(text: abs text);
     case standard {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg error = emit_error_output(text: abs text);
     case error {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     return emit_buffer_output(text: abs text);
 }

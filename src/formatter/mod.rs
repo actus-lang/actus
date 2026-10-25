@@ -1,6 +1,7 @@
 use crate::ast::{Program, Role, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
+mod declaration_widths;
 mod declarations;
 mod expressions;
 mod statements;
@@ -25,7 +26,7 @@ pub fn format_program_with_comments(program: &Program, comments: &[SourceComment
     };
     formatter.program(program);
     formatter.emit_remaining_comments();
-    if !formatter.output.is_empty() {
+    if !formatter.output.is_empty() && !formatter.output.ends_with('\n') {
         formatter.output.push('\n');
     }
     formatter.output
@@ -46,13 +47,53 @@ impl Formatter<'_> {
                 self.output.push_str("meta limitless(\"file\")\n");
             }
         }
-        for (index, declaration) in program.declarations.iter().enumerate() {
-            if index > 0 || !program.file_metadata.is_empty() {
-                self.output.push('\n');
-                self.output.push('\n');
+        let imports = program
+            .declarations
+            .iter()
+            .filter(|declaration| matches!(declaration, TopLevelDecl::Import(_)))
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut imports_emitted = false;
+        let mut index = 0;
+        while index < program.declarations.len() {
+            let declaration = &program.declarations[index];
+            if matches!(declaration, TopLevelDecl::Import(_)) && imports_emitted {
+                index += 1;
+                continue;
             }
-            self.emit_comments_before(declaration_span(declaration).start);
-            self.top_level(declaration);
+            let adjacent_constants = index > 0
+                && matches!(program.declarations[index - 1], TopLevelDecl::Constant(_))
+                && matches!(declaration, TopLevelDecl::Constant(_));
+            if (index > 0 && !adjacent_constants) || !program.file_metadata.is_empty() {
+                if self.output.ends_with('\n') {
+                    self.output.push('\n');
+                } else {
+                    self.output.push_str("\n\n");
+                }
+            }
+            if self.render_ast_docs && declaration_doc(declaration).is_some() {
+                self.skip_comments_before(declaration_span(declaration).start);
+            } else {
+                self.emit_comments_before(declaration_span(declaration).start);
+            }
+            if matches!(declaration, TopLevelDecl::Import(_)) {
+                if !imports_emitted {
+                    let requires_block = imports.len() > 1
+                        || imports.iter().any(|declaration| {
+                            matches!(declaration, TopLevelDecl::Import(import) if import.is_open)
+                        });
+                    if requires_block {
+                        self.import_group(&imports);
+                    } else {
+                        self.top_level(declaration);
+                    }
+                    imports_emitted = true;
+                }
+                index += 1;
+            } else {
+                self.top_level(declaration);
+                index += 1;
+            }
         }
     }
 
@@ -156,30 +197,48 @@ impl Formatter<'_> {
     }
 
     pub(super) fn emit_comments_before(&mut self, source_start: usize) {
+        let mut previous_text: Option<String> = None;
         while self.next_comment < self.comments.len()
             && self.comments[self.next_comment].span.start < source_start
         {
             let text = self.comments[self.next_comment].text.clone();
+            self.next_comment += 1;
+            if previous_text.as_deref() == Some(text.as_str()) {
+                continue;
+            }
+            previous_text = Some(text.clone());
             if !self.output.is_empty() && !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
             self.line_indent();
             self.output.push_str(text.trim_end_matches('\r'));
             self.output.push('\n');
+        }
+    }
+
+    pub(super) fn skip_comments_before(&mut self, source_start: usize) {
+        while self.next_comment < self.comments.len()
+            && self.comments[self.next_comment].span.start < source_start
+        {
             self.next_comment += 1;
         }
     }
 
     fn emit_remaining_comments(&mut self) {
+        let mut previous_text: Option<String> = None;
         while self.next_comment < self.comments.len() {
             let text = self.comments[self.next_comment].text.clone();
+            self.next_comment += 1;
+            if previous_text.as_deref() == Some(text.as_str()) {
+                continue;
+            }
+            previous_text = Some(text.clone());
             if !self.output.is_empty() && !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
             self.line_indent();
             self.output.push_str(text.trim_end_matches('\r'));
             self.output.push('\n');
-            self.next_comment += 1;
         }
     }
 }
@@ -197,6 +256,22 @@ fn declaration_span(declaration: &TopLevelDecl) -> SourceSpan {
         TopLevelDecl::Perform(value) => value.span,
         TopLevelDecl::OpenSibling(value) => value.span,
         TopLevelDecl::Import(value) => value.span,
+    }
+}
+
+fn declaration_doc(declaration: &TopLevelDecl) -> Option<&str> {
+    match declaration {
+        TopLevelDecl::Constant(value) => value.doc.as_deref(),
+        TopLevelDecl::Verb(value) => value.doc.as_deref(),
+        TopLevelDecl::ExternalVerb(value) => value.doc.as_deref(),
+        TopLevelDecl::Struct(value) => value.doc.as_deref(),
+        TopLevelDecl::Pack(value) => value.doc.as_deref(),
+        TopLevelDecl::Serialize(value) => value.doc.as_deref(),
+        TopLevelDecl::Enum(value) => value.doc.as_deref(),
+        TopLevelDecl::Role(value) => value.doc.as_deref(),
+        TopLevelDecl::Perform(value) => value.doc.as_deref(),
+        TopLevelDecl::OpenSibling(value) => value.doc.as_deref(),
+        TopLevelDecl::Import(_) => None,
     }
 }
 

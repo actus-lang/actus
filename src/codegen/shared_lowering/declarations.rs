@@ -191,11 +191,19 @@ fn build_performance_metadata(
     symbols.extend(context_symbols);
     return_types.extend(context_return_types);
     nominal_types.extend(context_nominal_types);
-    let externals = inputs
+    let imported_externals = inputs
+        .performances
+        .iter()
+        .zip(&inputs.performance_signatures)
+        .filter(|((perform, _), _)| perform.module_import)
+        .map(|(_, signature)| performance_external(signature))
+        .collect::<Result<Vec<_>, _>>()?;
+    let context_externals = inputs
         .context_performance_signatures
         .iter()
         .map(performance_external)
         .collect::<Result<Vec<_>, _>>()?;
+    let externals = imported_externals.into_iter().chain(context_externals).collect();
     Ok((symbols, return_types, nominal_types, externals))
 }
 
@@ -253,7 +261,7 @@ pub(crate) fn build_backend_externals(
     for (external, signature) in externals.iter().zip(signatures) {
         let lowered = scalar_external(external, signature, symbols)?;
         if let Some(existing) = unique.get(&lowered.symbol) {
-            if existing.parameters != lowered.parameters
+            if !compatible_external_signature(existing, &lowered)
                 || existing.return_value != lowered.return_value
                 || existing.runtime_pointer_return != lowered.runtime_pointer_return
             {
@@ -265,6 +273,14 @@ pub(crate) fn build_backend_externals(
     }
     Ok(unique.into_values().collect())
 }
+
+fn compatible_external_signature(left: &BackendExternal, right: &BackendExternal) -> bool {
+    left.parameters.len() == right.parameters.len()
+        && left.parameters.iter().zip(&right.parameters).all(|(left, right)| {
+            left.role == right.role && left.ty == right.ty && left.passing == right.passing
+        })
+}
+
 fn performance_external(
     signature: &BackendSignature,
 ) -> Result<BackendExternal, BackendContractError> {
@@ -310,8 +326,9 @@ fn lower_performance_signature(
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendSignature, BackendContractError> {
     let target = perform.target.canonical_key();
+    let symbol_namespace = perform.module_import_namespace.as_deref().unwrap_or(namespace);
     let symbol = SymbolIdentity::specialized(
-        namespace,
+        symbol_namespace,
         SymbolKind::Performance,
         &method.name,
         &[&perform.role_name, &target],

@@ -6,7 +6,7 @@
 `string_byte_at` returns one byte at a checked index.
 
 ```actus
-import std::string;
+import { open std::string };
 
 open verb first_byte(abs text: String) -> Result[Int, StringError] {
     return string_byte_at(text: abs text, index: 0);
@@ -23,7 +23,7 @@ The destination is supplied explicitly. Its capacity is part of the caller's
 design and must account for the UTF-8 bytes that will be copied.
 
 ```actus
-import std::string;
+import { open std::string };
 
 open verb copy_text(abs source: String, dat storage: Buffer)
     -> Result[Utf8Buffer, StringError] {
@@ -41,7 +41,7 @@ Use `utf8_from_buffer` when the bytes are already in a `Buffer` and should be
 treated as UTF-8 data.
 
 ```actus
-import std::string;
+import { open std::string };
 
 open verb validate_text(dat storage: Buffer)
     -> Result[Utf8Buffer, StringError] {

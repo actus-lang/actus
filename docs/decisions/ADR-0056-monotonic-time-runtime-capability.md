@@ -36,7 +36,7 @@ benchmark results depend on code outside Actus.
 Actus will provide a public hosted standard-library API:
 
 ```act
-import std::time;
+import { open std::time };
 
 open verb monotonic_nanos() -> u64;
 ```
@@ -47,7 +47,7 @@ Actus code measures elapsed time by reading the value twice and subtracting the
 earlier reading from the later reading:
 
 ```act
-import std::time;
+import { open std::time };
 
 verb measure() -> u64 {
     erg started: u64 = monotonic_nanos();

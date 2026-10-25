@@ -26,6 +26,7 @@ impl Analyzer {
         mode: crate::ast::CaseMode,
         subject: &Expr,
     ) -> Result<(), SemanticError> {
+        let enum_name = self.imported_member_name(enum_name).unwrap_or(enum_name);
         let Some(definition) = self.enum_types.get(enum_name) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::UnknownType { name: enum_name.to_owned() },

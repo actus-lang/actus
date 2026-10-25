@@ -146,10 +146,12 @@ fn expand_transitive_once(
         .map_err(|error| {
             BackendEmitError(format!("generic instance expansion failed: {error:?}"))
         })?;
-        for nested_template in snapshot
-            .iter()
-            .filter(|instance| instance.caller.as_deref() == Some(caller_instance.name.as_str()))
-        {
+        for nested_template in snapshot.iter().filter(|instance| {
+            instance.caller.as_deref().is_some_and(|caller| {
+                caller == caller_instance.name
+                    || caller.rsplit("::").next() == caller_instance.name.rsplit("::").next()
+            })
+        }) {
             changed |= append_specialized_nested_instance(
                 expanded,
                 caller_instance,
@@ -199,8 +201,14 @@ fn generic_parameters_for<'a>(
     name: &str,
 ) -> Option<&'a [crate::ast::GenericParam]> {
     program.declarations.iter().find_map(|declaration| match declaration {
-        TopLevelDecl::Verb(verb) if verb.name == name => Some(verb.generic_parameters.as_slice()),
-        TopLevelDecl::ExternalVerb(verb) if verb.name == name => {
+        TopLevelDecl::Verb(verb)
+            if verb.name == name || name.rsplit("::").next() == Some(verb.name.as_str()) =>
+        {
+            Some(verb.generic_parameters.as_slice())
+        }
+        TopLevelDecl::ExternalVerb(verb)
+            if verb.name == name || name.rsplit("::").next() == Some(verb.name.as_str()) =>
+        {
             Some(verb.generic_parameters.as_slice())
         }
         _ => None,
@@ -254,6 +262,12 @@ fn specialize_external_verb(
         call_bindings,
     )?;
     let substitution = substitution.with_call_bindings(&call_bindings);
+    let specialized_name = specialized_name(instance);
+    let native_symbol = if verb.module_import {
+        Some(specialized_name.rsplit("::").next().unwrap_or(&specialized_name).to_owned())
+    } else {
+        Some(verb.native_symbol.clone().unwrap_or_else(|| verb.name.clone()))
+    };
     Ok(ExternalVerbDecl {
         is_open: verb.is_open,
         doc: verb.doc.clone(),
@@ -262,9 +276,8 @@ fn specialize_external_verb(
         module_import: verb.module_import,
         abi: verb.abi,
         metadata: verb.metadata.clone(),
-        name: specialized_name(instance),
-        native_symbol: (!verb.module_import)
-            .then(|| verb.native_symbol.clone().unwrap_or_else(|| verb.name.clone())),
+        name: specialized_name,
+        native_symbol,
         generic_parameters: Vec::new(),
         params: verb.params.iter().map(|param| specialize_param(param, &substitution)).collect(),
         return_type: verb
@@ -283,7 +296,7 @@ fn specialize_verbs(
     let mut specialized = Vec::new();
     let mut names = std::collections::HashSet::new();
     for instance in instances.iter().filter(|instance| instance_matches_verb(instance, verb)) {
-        if names.insert(specialized_name(instance)) {
+        if names.insert(specialized_local_name(&verb.name, &instance.arguments)) {
             specialized.push(specialize_verb(verb, instance, instances, call_bindings)?);
         }
     }
@@ -316,7 +329,7 @@ fn specialize_verb(
         doc: verb.doc.clone(),
         contract: verb.contract.clone(),
         metadata: verb.metadata.clone(),
-        name: specialized_name(instance),
+        name: specialized_local_name(&verb.name, &instance.arguments),
         generic_parameters: Vec::new(),
         params: verb.params.iter().map(|param| specialize_param(param, &substitution)).collect(),
         return_type: verb
@@ -344,8 +357,9 @@ fn nested_call_bindings(
     .map_err(|error| BackendEmitError(format!("nested generic substitution failed: {error:?}")))?;
     let mut bindings = inherited.clone();
     for template in instances.iter().filter(|instance| {
-        instance.caller.as_deref() == Some(caller_name)
-            && instance.arguments.iter().any(|argument| substitution.apply(argument) != *argument)
+        instance.caller.as_deref().is_some_and(|caller| {
+            caller == caller_name || caller.rsplit("::").next() == caller_name.rsplit("::").next()
+        }) && instance.arguments.iter().any(|argument| substitution.apply(argument) != *argument)
     }) {
         let arguments = template
             .arguments
@@ -368,6 +382,14 @@ fn specialized_name(instance: &GenericInstance) -> String {
     specialized_generic_name(instance)
 }
 
+fn specialized_local_name(name: &str, arguments: &[TypeName]) -> String {
+    format!(
+        "{}__{}",
+        name.rsplit("::").next().unwrap_or(name),
+        encode_specialization_arguments(arguments)
+    )
+}
+
 fn encode_specialization_arguments(arguments: &[TypeName]) -> String {
     arguments
         .iter()
@@ -380,7 +402,7 @@ fn encode_specialization_arguments(arguments: &[TypeName]) -> String {
 }
 
 fn instance_matches_verb(instance: &GenericInstance, verb: &VerbDecl) -> bool {
-    instance.name == verb.name
+    (instance.name == verb.name || instance.name.rsplit("::").next() == Some(verb.name.as_str()))
         && instance.arguments.len() == verb.generic_parameters.len()
         && instance
             .arguments
@@ -389,7 +411,7 @@ fn instance_matches_verb(instance: &GenericInstance, verb: &VerbDecl) -> bool {
 }
 
 fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl) -> bool {
-    instance.name == verb.name
+    (instance.name == verb.name || instance.name.rsplit("::").next() == Some(verb.name.as_str()))
         && instance.arguments.len() == verb.generic_parameters.len()
         && instance
             .arguments

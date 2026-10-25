@@ -31,7 +31,7 @@ The capability must distinguish elapsed monotonic time from wall-clock time:
 The public surface is:
 
 ```act
-import std::time;
+import { open std::time };
 
 verb measure() -> u64 {
     erg started: u64 = monotonic_nanos();
@@ -152,7 +152,9 @@ provide direct source, native, and execution evidence.
   no one-nanosecond resolution guarantee.
 - Added semantic fixtures for valid import/call usage and rejection of the
   private bridge. Added a runtime-plan fixture proving canonical
-  `import std::time;` resolves to the builtin facade.
+  `import std::time;` resolves to the builtin facade. In current consumer
+  syntax, the namespace is used as `time::...`, or opened explicitly with
+  `import { open std::time };`.
 - Verified the public facade and sibling module with the documentation and
   module visibility suites. Native linkage is intentionally deferred to
   Gate 28.2.
@@ -200,7 +202,8 @@ provide direct source, native, and execution evidence.
 ### Gate 28.3 evidence
 
 - The existing semantic/module resolver path resolves canonical
-  `import std::time;` imports and exposes only the facade's public verb.
+  `import std::time;` namespace imports and exposes only the facade's public
+  surface. Unqualified consumers use `import { open std::time };` explicitly.
 - The existing external-verb lowering path preserves the declared `u64`
   return ABI without adding a time-specific expression-lowering branch.
 - Hosted object acceptance verifies that the undefined canonical `std::time`
@@ -240,7 +243,8 @@ provide direct source, native, and execution evidence.
 
 ## Gate 28.5: Tooling and cross-profile behavior
 
-- [x] Add formatter coverage for `import std::time` and timer calls.
+- [x] Add formatter coverage for qualified `import std::time` and explicit
+      `import { open std::time }` timer calls.
 - [x] Add LSP completion, hover, definition, and diagnostics for the public
       facade and verb.
 - [x] Add strict-check and test-runner coverage using the same module contract.
@@ -320,7 +324,7 @@ the same.
 The canonical Actus surface will be built incrementally around these types:
 
 ```act
-import std::time;
+import { open std::time };
 
 erg started: Instant = now();
 erg budget: Duration = milliseconds(10u64);

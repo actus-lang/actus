@@ -19,7 +19,7 @@ fn hosted_string_byte_access_handles_ascii_multibyte_empty_and_bounds() {
     fs::write(
         root.join("src/main.act"),
         r#"meta limitless("file")
-import std::string;
+import { open std::string };
 verb inspect_owned(dat value: Utf8Buffer) -> Int {
     erg length_result = utf8_length(text: abs value);
     drop(value);
@@ -132,8 +132,7 @@ fn hosted_io_and_string_facades_share_compatible_buffer_bridge() {
     .expect("manifest");
     fs::write(
         root.join("src/main.act"),
-        r#"import std::io;
-import std::string;
+        r#"import { open std::io, open std::string };
 
 verb main() -> Int {
     erg text: String = "abc";
@@ -200,7 +199,7 @@ fn hosted_nested_facade_preserves_borrowed_string_arguments() {
         .expect("nested facade");
     fs::write(
         root.join("src/text/tokenizer/byte.act"),
-        r#"import std::string;
+        r#"import { open std::string };
 open const TOKEN_VERSION: u16 = 1u16;
 open struct ByteRecord { id: u32, offset: u32, length: u16, version: u16, }
 open struct TokenSequence { records: Array[ByteRecord, 256], length: u32, valid: Bool, status: Int, }
@@ -245,10 +244,9 @@ open verb inspect(abs text: String) -> TokenSequence {
     .expect("nested implementation");
     fs::write(
         root.join("src/main.act"),
-        r#"import text;
-import std::io;
+        r#"import { open text };
+import { open std::io, open std::string };
 import std::time;
-import std::string;
 meta limitless("verb")
 verb main() -> Int {
     erg phrase: String = "Hello Giorgi";

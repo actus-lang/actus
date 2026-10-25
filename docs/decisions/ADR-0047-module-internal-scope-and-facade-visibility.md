@@ -214,6 +214,21 @@ The same two views apply to language tooling:
 - unsaved overlays must rebuild the affected module unit and its interface
   deterministically.
 
+### 8. Test-only internal friend scope
+
+`meta test` is a test-runner capability, not a production visibility escape
+hatch. A test file under a mirrored `tests/<path>.act` location may be paired
+with `src/<path>.act` or its canonical facade. During test compilation the
+runner adds the selected test declarations to that module's implementation
+program, so the test can exercise private helpers without adding `open`
+exports or public imports. The resulting test artifact is temporary and does
+not alter the module's public export table or ordinary importer analysis.
+
+The runner supports Rust-style focused selection: a positional substring
+filter, `--module`, `--file`, `--exact`, and `--list`. `--mirror` validates the
+tests-to-source correspondence explicitly. Filters only select discovered
+tests; they never alter semantic visibility or production code generation.
+
 ## Invariants
 
 1. A facade is the only external gateway to a directory module.
@@ -233,6 +248,8 @@ The same two views apply to language tooling:
    generated implementation symbols.
 10. The rule applies equally to ordinary modules, standard-library modules,
     overlays, tests, and LSP analysis.
+11. Test-only internal access is available only through the test runner's
+    mirrored compilation path and never through ordinary imports.
 
 ## Compatibility and migration
 

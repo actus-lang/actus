@@ -21,7 +21,7 @@ fn strict_check_rejects_a_source_that_reaches_the_split_threshold() {
     let input =
         std::env::temp_dir().join(format!("actus-strict-limits-{}.act", std::process::id()));
     let mut source =
-        (0..399).map(|index| format!("\"\"\"filler {index}\"\"\"\n")).collect::<String>();
+        (0..599).map(|index| format!("\"\"\"filler {index}\"\"\"\n")).collect::<String>();
     source.push_str("verb main() -> Int { return 42; }\n");
     fs::write(&input, source).expect("write oversized source");
 
@@ -170,7 +170,13 @@ fn strict_commands_reject_unknown_forms_and_extra_arguments() {
     );
     assert_eq!(
         run_with_args(
-            vec!["test".to_owned(), "--strict".to_owned(), "unexpected.act".to_owned()].into_iter(),
+            vec![
+                "test".to_owned(),
+                "--strict".to_owned(),
+                "first-filter".to_owned(),
+                "second-filter".to_owned(),
+            ]
+            .into_iter(),
         ),
         2
     );
@@ -198,7 +204,13 @@ fn strict_commands_reject_misplaced_and_conflicting_forms() {
     );
     assert_eq!(
         run_with_args(
-            vec!["test".to_owned(), "unexpected.act".to_owned(), "--strict".to_owned()].into_iter(),
+            vec![
+                "test".to_owned(),
+                "first-filter".to_owned(),
+                "--strict".to_owned(),
+                "second-filter".to_owned(),
+            ]
+            .into_iter(),
         ),
         2
     );

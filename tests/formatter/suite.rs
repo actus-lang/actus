@@ -73,6 +73,15 @@ fn formats_scalar_reuse_and_indexed_selection_idempotently() {
 }
 
 #[test]
+fn formats_generic_local_binding_types_with_argument_spacing() {
+    let formatted =
+        format_source("verb main() -> Int { erg result: Result[Int,IoError] = Ok(0); return 0; }");
+
+    assert!(formatted.contains("result: Result[Int, IoError]"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_omitted_inferred_roles_without_inventing_source_text() {
     let formatted = format_source(
         "verb read(abs value: Int) -> Int { return 0; } verb main() -> Int { erg source = 1; abs view = ref source; return read(value: view); }",
@@ -120,6 +129,43 @@ fn formats_boolean_literals_without_rewriting_their_values() {
     let formatted = format_source("verb main() -> Bool { erg linked: Bool = false; return true; }");
     assert!(formatted.contains("linked: Bool = false;"));
     assert!(formatted.contains("return true;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn keeps_adjacent_constants_on_consecutive_lines() {
+    let formatted = format_source(
+        "open const FIRST: u8 = 1u8; open const SECOND: u8 = 2u8; verb main() -> Int { return 0; }",
+    );
+    assert!(formatted.contains("open const FIRST: u8 = 1u8;\nopen const SECOND: u8 = 2u8;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn keeps_one_blank_line_between_top_level_declarations() {
+    let formatted = format_source(
+        "open const FRAME_BYTES: u8 = 12u8; open pack Frame { erg storage: Array[u8, 1]; layout little; fields { erg value: u8 at 0; } }",
+    );
+    assert!(formatted.contains("12u8;\n\nopen pack Frame"));
+    assert!(!formatted.contains("12u8;\n\n\nopen pack Frame"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn keeps_one_blank_line_after_braced_top_level_declarations() {
+    let formatted = format_source(
+        "enum Error { Invalid, } verb complete() -> Void { return; } verb main() -> Int { return 0; }",
+    );
+    assert!(formatted.contains("}\n\nverb complete"));
+    assert!(formatted.contains("return;\n}\n\nverb main"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn places_role_closing_brace_on_its_own_line() {
+    let formatted = format_source("open role Writer { verb write(abs self: Int); }");
+    assert!(formatted.contains("    verb write(abs self: Int);\n}"));
+    assert!(!formatted.contains("\n verb write(abs self: Int);"));
     assert_eq!(format_source(&formatted), formatted);
 }
 
@@ -211,6 +257,44 @@ fn formats_const_generic_declarations_without_changing_meaning() {
     assert!(formatted.contains("struct Fabric[N: Usize] {"));
     assert!(formatted.contains("cells: Array[Int, N]"));
     assert!(formatted.contains("return false;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_qualified_import_paths_and_uses_idempotently() {
+    let source = concat!(
+        "import { driver::{i2c, uart}, telemetry::uart as telem_uart, open sensors::imu };\n",
+        "verb main() -> Int { return 0; }\n",
+    );
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("telemetry::uart as telem_uart"));
+    assert!(formatted.contains("import {"));
+    assert!(formatted.contains("driver::i2c,"));
+    assert!(formatted.contains("driver::i2c"));
+    assert!(formatted.contains("open sensors::imu"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn groups_contiguous_imports_without_opening_their_namespaces() {
+    let source = "import std::io; import std::wire; verb main() -> Int { return 0; }";
+    let formatted = format_source(source);
+
+    assert!(formatted.contains("import {\n    std::io,\n    std::wire,\n};"));
+    assert!(!formatted.contains("import std::io;"));
+    assert!(!formatted.contains("import std::wire;"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn groups_all_file_imports_even_when_source_separates_them() {
+    let source = "import std::io; verb helper() -> Int { return 0; } import std::wire; verb main() -> Int { return helper(); }";
+    let formatted = format_source(source);
+
+    assert_eq!(formatted.matches("import {").count(), 1);
+    assert!(formatted.contains("std::io,"));
+    assert!(formatted.contains("std::wire,"));
     assert_eq!(format_source(&formatted), formatted);
 }
 
@@ -353,6 +437,49 @@ fn preserves_docstrings_before_declarations() {
 
     assert!(formatted.contains("\"\"\"Keeps this public documentation.\"\"\""));
     assert!(formatted.contains("open struct Reader"));
+}
+
+#[test]
+fn does_not_duplicate_open_sibling_docstrings() {
+    let source = "\"\"\"Re-export the time implementation.\"\"\"\nopen timer;\n";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let comments = tokens
+        .iter()
+        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
+        .map(|token| SourceComment {
+            span: token.span,
+            text: source[token.span.start..token.span.end].to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let program = parse(tokens).expect("source should parse");
+    let formatted = format_program_with_comments(&program, &comments);
+
+    assert_eq!(formatted.matches("Re-export the time implementation.").count(), 1);
+    assert_eq!(format_program_with_comments(&program, &comments), formatted);
+}
+
+#[test]
+fn collapses_adjacent_identical_docstrings() {
+    let source = concat!(
+        "\"\"\"Facade documentation.\"\"\"\n",
+        "\"\"\"Facade documentation.\"\"\"\n",
+        "open io;\n",
+    );
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let comments = tokens
+        .iter()
+        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
+        .map(|token| SourceComment {
+            span: token.span,
+            text: source[token.span.start..token.span.end].to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let program = parse(tokens).expect("source should parse");
+    let formatted = format_program_with_comments(&program, &comments);
+
+    assert_eq!(formatted.matches("Facade documentation.").count(), 1);
 }
 
 #[test]

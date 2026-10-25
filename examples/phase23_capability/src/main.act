@@ -25,7 +25,9 @@ verb update(ins fabric: Fabric[2]) {
 }
 
 verb main() -> Int {
-    erg fabric: Fabric[2] = Fabric[2] {cells: Array[Cell, 2]()};
+    erg fabric: Fabric[2] = Fabric[2] {
+        cells: Array[Cell, 2](),
+    };
     update(fabric: ins fabric);
     return fabric.cells[1].charge as Int + 1;
 }

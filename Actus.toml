@@ -13,6 +13,7 @@ charmap = { path = "library/std" }
 
 [build]
 target = "host"
+runtime = "std"
 profile = "debug"
 native_module = "actus"
 position_independent = true

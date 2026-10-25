@@ -1,12 +1,14 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::codegen::cranelift::emit_program_object;
+use actus::configuration::CompilerConfiguration;
 use actus::lexer::scan;
 use actus::modules::{
-    ModuleError, ModuleResolver, analyze_with_imports, build_compilation_plan, load_module_unit,
-    parse_module,
+    ModuleError, ModuleResolver, analyze_module_with_overlays, analyze_with_imports,
+    analyze_with_imports_for_target, build_compilation_plan, load_module_unit, parse_module,
 };
 use actus::parser::parse;
 
@@ -58,12 +60,246 @@ fn resolves_only_facade_exports_into_the_importing_unit() {
 }
 
 #[test]
+fn records_imported_namespace_and_resolves_qualified_call() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source("import shared; verb main() -> Int { return shared::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified call should resolve through the imported namespace");
+}
+
+#[test]
+fn accepts_explicit_abs_view_of_scalar_through_imported_helper() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read(abs value: u32) -> u32 { return value; }");
+    let program = parse_source(
+        "import { open shared }; verb main() -> u32 { erg value: u32 = 1u32; return read(value: abs value); }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("an imported helper should accept an explicit abs scalar view");
+}
+
+#[test]
+fn resolves_qualified_call_through_an_open_import() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program =
+        parse_source("import { open shared }; verb main() -> Int { return shared::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("open imports should preserve their qualified namespace binding");
+}
+
+#[test]
+fn grouped_open_import_preserves_legacy_qualified_and_unqualified_access() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source(
+        "import { open shared }; verb main() -> Int { return shared::read() + read(); }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("grouped open imports should preserve both legacy access forms");
+}
+
+#[test]
+fn selective_import_exposes_only_selected_public_declarations() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write(
+        "shared/api.act",
+        "open verb read() -> Int { return 7; } open verb ignored() -> Int { return 9; }",
+    );
+    let program = parse_source("import { shared { read } }; verb main() -> Int { return read(); }");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("selective public import should build");
+    assert!(plan.caller().declarations.iter().any(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "read")
+    }));
+    assert!(!plan.caller().declarations.iter().any(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "ignored")
+    }));
+}
+
+#[test]
+fn resolves_qualified_call_through_an_open_nested_facade_import() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open nested;");
+    fixture.write("shared/nested/nested.act", "open api;");
+    fixture.write("shared/nested/api.act", "open verb read() -> Int { return 7; }");
+    let program =
+        parse_source("import { open shared }; verb main() -> Int { return shared::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified calls should resolve through an open nested facade");
+}
+
+#[test]
+fn preserves_private_runtime_sentinel_through_a_parent_package_scope() {
+    let fixture = Fixture::new();
+    fixture.write("ie/ie.act", "open runtime; open resident;");
+    fixture.write("ie/runtime/runtime.act", "open fabric;");
+    fixture.write("ie/runtime/fabric.act", "verb marker() -> u32 { return 0u32; }");
+    fixture.write("ie/runtime/sentinels.act", "verb null_index() -> u32 { return 0u32; }");
+    fixture.write("runner/runner.act", "import ie;");
+    fixture.write(
+        "ie/resident.act",
+        "import ie::runtime; verb resident_marker() -> u32 { return runtime::null_index(); }",
+    );
+    let program = parse_source("import { open runner }; verb main() -> Int { return 0; }");
+    let plan =
+        actus::modules::build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+            .expect("test compilation plan should build");
+    let object_plan = plan.object_plan().expect("object plan should build");
+    for unit in object_plan.units() {
+        actus::semantic::analyze(unit.program())
+            .expect("object unit should resolve private sentinel");
+    }
+}
+
+#[test]
+fn test_scope_preserves_private_open_child_helpers_for_parent_siblings() {
+    let fixture = Fixture::new();
+    fixture.write("pkg/pkg.act", "open child; open sibling;");
+    fixture.write("pkg/sibling.act", "verb use_helper() -> Int { return helper(); }");
+    fixture.write("pkg/child/child.act", "open codec;");
+    fixture.write("pkg/child/codec.act", "verb helper() -> Int { return 1; }");
+    let program = parse_source(
+        "import { open pkg }; meta test\nverb smoke() -> Int { return use_helper() - 1; }",
+    );
+    let plan =
+        actus::modules::build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+            .expect("test plan should preserve the parent module scope");
+    for unit in plan.object_plan().expect("object plan should build").units() {
+        actus::semantic::analyze(unit.program())
+            .expect("private child helper should remain visible to parent siblings");
+    }
+}
+
+#[test]
+fn legacy_open_and_qualified_import_share_one_imported_module_identity() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let legacy = parse_source("import { open shared }; verb main() -> Int { return read(); }");
+    let qualified = parse_source("import shared; verb main() -> Int { return shared::read(); }");
+
+    let legacy_plan = build_compilation_plan(&legacy, &ModuleResolver::new(&fixture.root))
+        .expect("legacy open program should remain valid");
+    let qualified_plan = build_compilation_plan(&qualified, &ModuleResolver::new(&fixture.root))
+        .expect("qualified program should remain valid");
+    let imported_modules = |plan: &actus::modules::ModuleCompilationPlan| {
+        plan.units().iter().map(|unit| unit.identity().module_path().to_owned()).collect::<Vec<_>>()
+    };
+
+    assert_eq!(imported_modules(&legacy_plan), imported_modules(&qualified_plan));
+}
+
+#[test]
+fn keeps_imported_performance_bodies_in_their_module_scope() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write(
+        "shared/api.act",
+        "open struct File { value: Int, } open role Writer { verb write(abs self: File) -> Int; } open verb helper(abs value: Int) -> Int { return value; } open perform Writer for File { verb write(abs self: File) -> Int { return helper(value: abs self.value); } }",
+    );
+    let program = parse_source("import shared; verb main() -> Int { return 0; }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("an imported performance body should resolve its module-local helper");
+}
+
+#[test]
+fn preserves_abs_scalar_roles_inside_imported_module_bodies() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write(
+        "shared/api.act",
+        "open verb helper(abs value: u32) -> u32 { return value; } open verb outer() -> u32 { erg value: u32 = 1u32; return helper(value: abs value); }",
+    );
+    let program = parse_source("import shared; verb main() -> Int { return 0; }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("imported module bodies should preserve scalar abs roles");
+}
+
+#[test]
+fn preserves_abs_scalar_roles_through_nested_facades() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open codec; open generation;");
+    fixture.write("shared/codec.act", "verb append_u32(abs value: u32) -> Int { return 0; }");
+    fixture.write("shared/generation/generation.act", "open codec;");
+    fixture.write(
+        "shared/generation/codec.act",
+        "open verb split(abs value: u64) -> u32 { erg low: u32 = (value & 4294967295u64) as u32; append_u32(value: abs (low * 2u32)); return 0u32; }",
+    );
+    let program = parse_source("import shared; verb main() -> Int { return 0; }");
+
+    let resolver = ModuleResolver::new(&fixture.root);
+    analyze_with_imports(&program, &resolver)
+        .expect("nested facades should preserve scalar abs roles");
+    let plan = build_compilation_plan(&program, &resolver).expect("nested plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("nested facade object codegen should preserve scalar abs roles");
+}
+
+#[test]
+fn rejects_unqualified_call_through_a_closed_import() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source("import shared; verb main() -> Int { return read(); }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("closed imports must not inject unqualified declarations");
+    assert!(matches!(
+        error,
+        ModuleError::Semantic(ref semantic)
+            if matches!(semantic.kind, actus::semantic::SemanticErrorKind::UnknownVerb { ref name } if name == "read")
+    ));
+}
+
+#[test]
+fn resolves_qualified_call_through_a_namespace_alias() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program =
+        parse_source("import shared as telem; verb main() -> Int { return telem::read(); }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified alias should resolve through the imported namespace");
+}
+
+#[test]
+fn rejects_qualified_call_through_an_unimported_namespace() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb read() -> Int { return 7; }");
+    let program = parse_source("import shared; verb main() -> Int { return missing::read(); }");
+
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("unknown namespace must be rejected");
+    assert!(matches!(
+        error,
+        ModuleError::Semantic(ref semantic)
+            if matches!(semantic.kind, actus::semantic::SemanticErrorKind::UnknownVerb { ref name } if name == "missing::read")
+    ));
+}
+
+#[test]
 fn resolves_public_child_declarations_through_the_parent_facade() {
     let fixture = Fixture::new();
     fixture.write("aie/aie.act", "open runtime;");
     fixture.write("aie/runtime/runtime.act", "open api;");
     fixture.write("aie/runtime/api.act", "open verb start() -> Int { return 7; }");
-    let program = parse_source("import aie; verb main() -> Int { return start(); }");
+    let program = parse_source("import { open aie }; verb main() -> Int { return start(); }");
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("child exports should be visible through the parent facade");
@@ -78,11 +314,39 @@ fn accepts_equality_for_a_unit_enum_reexported_through_a_facade() {
         "open enum TeachingMode { Direct, Replay, } open verb accepts(erg mode: TeachingMode) -> Bool { return mode == TeachingMode.Direct; }",
     );
     let program = parse_source(
-        "import teaching; verb main() -> Bool { erg mode = TeachingMode.Direct; return accepts(mode: erg mode); }",
+        "import { open teaching }; verb main() -> Bool { erg mode = TeachingMode.Direct; return accepts(mode: erg mode); }",
     );
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("re-exported unit enum equality should be accepted");
+}
+
+#[test]
+fn deduplicates_identical_type_reexports_through_nested_open_facades() {
+    let fixture = Fixture::new();
+    fixture.write("ie/ie.act", "open resident;");
+    fixture.write(
+        "ie/resident.act",
+        "open enum ResidentError { Missing, } open verb status() -> ResidentError { return ResidentError.Missing; }",
+    );
+    fixture.write("runner/runner.act", "open startup; open teaching;");
+    fixture.write(
+        "runner/startup.act",
+        "import { open ie }; open verb startup() -> ResidentError { return status(); }",
+    );
+    fixture.write(
+        "runner/teaching.act",
+        "import { open ie }; open verb teaching() -> ResidentError { return status(); }",
+    );
+
+    let program = parse_source("import { open runner }; verb main() -> Int { return 0; }");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("identical facade re-exports should be deduplicated");
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("deduplicated facade re-exports should remain semantically valid");
+    assert!(plan.caller().declarations.iter().filter(|declaration| {
+        matches!(declaration, actus::ast::TopLevelDecl::Enum(definition) if definition.name == "ResidentError")
+    }).count() == 1);
 }
 
 #[test]
@@ -115,7 +379,7 @@ fn lowers_nested_generic_option_payload_through_a_facade() {
         "open validation; open verb read_nested() -> Result[Option[DatasetError], DatasetError] { return Result[Option[DatasetError], DatasetError].Ok(Option[DatasetError].Some(DatasetError.Invalid)); }",
     );
     let program = parse_source(
-        "import dataset; verb main() -> Int { erg result = read_nested(); return case dat result { Result.Ok(option) => case dat option { Option.Some(_) => 0, Option.None => 1, }, Result.Err(_) => 2, }; }",
+        "import dataset; verb main() -> Int { erg result = dataset::read_nested(); return case dat result { Result.Ok(option) => case dat option { Option.Some(_) => 0, Option.None => 1, }, Result.Err(_) => 2, }; }",
     );
 
     let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
@@ -139,7 +403,7 @@ fn keeps_inferred_types_scoped_across_imported_declarations() {
         "open enum AuxLinkError { Capacity, } open verb allocate_aux_record(erg value: Int) -> Option[Int] { return Option[Int].Some(value); } open verb acquire_aux_record(erg value: Int) -> Result[Int, AuxLinkError] { erg allocated = allocate_aux_record(value: erg value); erg selected: Int = case dat allocated { Option.None => 0, Option.Some(item) => item, }; erg layout = read_fixed_header_layout(); return Result[Int, AuxLinkError].Ok(selected + layout.value); }",
     );
     let program = parse_source(
-        "import layout; import aux; verb main() -> Int { erg input: Int = 1; erg result = acquire_aux_record(value: erg input); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }",
+        "import { open layout, open aux }; verb main() -> Int { erg input: Int = 1; erg result = acquire_aux_record(value: erg input); return case dat result { Result.Ok(value) => value, Result.Err(_) => 0, }; }",
     );
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
@@ -199,6 +463,121 @@ fn accepts_transitive_public_configuration_constants_semantically() {
 }
 
 #[test]
+fn resolves_qualified_configuration_constant_semantically() {
+    let fixture = Fixture::new();
+    fixture.write("config/config.act", "open values;");
+    fixture.write("config/values.act", "open const LIMIT: u8 = 30u8;");
+    let program =
+        parse_source("import config; verb main() -> Int { return config::LIMIT as Int; }");
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified configuration constants should resolve semantically");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified configuration constant plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("qualified configuration constant should lower");
+}
+
+#[test]
+fn resolves_qualified_enum_type_and_variant_semantically() {
+    let fixture = Fixture::new();
+    fixture.write("colors/colors.act", "open values;");
+    fixture.write("colors/values.act", "open enum Color { Red, Blue, }");
+    let program = parse_source(
+        "import colors; verb main() -> Int { erg color: colors::Color = colors::Color.Red; return 0; }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified enum types and variants should resolve semantically");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified enum plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("qualified enum type and variant should lower");
+}
+
+#[test]
+fn resolves_qualified_struct_type_semantically() {
+    let fixture = Fixture::new();
+    fixture.write("paths/paths.act", "open values;");
+    fixture.write("paths/values.act", "open struct Path { value: Int, }");
+    let program = parse_source(
+        "import paths; verb main() -> paths::Path { return paths::Path { value: 1, }; }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified struct types should resolve semantically");
+}
+
+#[test]
+fn resolves_qualified_struct_type_from_a_dependency_alias() {
+    let fixture = Fixture::new();
+    fixture.write("path/path.act", "open types;");
+    fixture.write("path/types.act", "open struct Path { value: Int, }");
+    let mut dependencies = BTreeMap::new();
+    dependencies.insert("path".to_owned(), fixture.root.clone());
+    let resolver = ModuleResolver::with_dependencies(fixture.root.join("app"), &dependencies);
+    let program =
+        parse_source("import path; verb main() -> path::Path { return path::Path { value: 1, }; }");
+
+    analyze_with_imports(&program, &resolver)
+        .expect("qualified struct types should resolve through dependency aliases");
+    analyze_with_imports_for_target(
+        &program,
+        &resolver,
+        &actus::target::TargetSpec::host().expect("host target"),
+    )
+    .expect("target-aware qualified struct types should resolve through dependency aliases");
+}
+
+#[test]
+fn resolves_qualified_std_path_types_from_the_project_configuration() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/path_components.act");
+    let source = fs::read_to_string(&path).expect("read path fixture");
+    let (tokens, errors) = scan(&source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("path fixture should parse");
+    let configuration = CompilerConfiguration::from_input_path_read_only(&path)
+        .expect("project configuration should load");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    );
+
+    analyze_with_imports_for_target(
+        &program,
+        &resolver,
+        &actus::target::TargetSpec::host().expect("host target"),
+    )
+    .expect("qualified std path types should resolve from the project configuration");
+}
+
+#[test]
+fn resolves_qualified_types_in_a_standard_facade_signature() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/std_fs.act");
+    let source = fs::read_to_string(&path).expect("read std fs fixture");
+    let (tokens, errors) = scan(&source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("std fs fixture should parse");
+    let configuration = CompilerConfiguration::from_input_path_read_only(&path)
+        .expect("project configuration should load");
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    );
+
+    analyze_with_imports_for_target(
+        &program,
+        &resolver,
+        &actus::target::TargetSpec::host().expect("host target"),
+    )
+    .expect("standard facade signatures should resolve qualified aliased types");
+}
+
+#[test]
 fn rejects_imports_inside_nested_configuration_sources() {
     let fixture = Fixture::new();
     fixture.write("config/config.act", "open policy;");
@@ -236,11 +615,15 @@ fn resolves_generic_nested_calls_through_parent_facade() {
         "open struct Packet[T] { item: T, } open verb inner[T](erg value: T) -> Packet[T] { return Packet[T] { item: value, }; } open verb outer[T](erg value: T) -> Packet[T] { return inner(value: erg value); }",
     );
     let program = parse_source(
-        "import device; verb main() -> Int { erg value = 41; erg packet = outer(value: erg value); return packet.item + 1; }",
+        "import device; verb main() -> Int { erg value = 41; erg packet = device::outer(value: erg value); return packet.item + 1; }",
     );
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("generic nested calls should resolve through the parent facade");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("qualified generic plan should build");
+    emit_program_object(&plan.implementation(), "main")
+        .expect("qualified generic call should lower");
 }
 
 #[test]
@@ -366,7 +749,7 @@ fn accepts_public_types_nested_in_exported_result_signatures() {
 }
 
 #[test]
-fn resolves_repeated_imports_once() {
+fn rejects_repeated_imports_with_a_stable_module_diagnostic() {
     let fixture = Fixture::new();
     fixture.write("shared/shared.act", "open types;");
     fixture.write("shared/types.act", "open struct Token { byte: Int, }");
@@ -374,8 +757,29 @@ fn resolves_repeated_imports_once() {
         "import shared; import shared; verb main() -> Int { erg token = Token { byte: 7, }; return token.byte; }",
     );
 
-    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
-        .expect("repeated imports must not duplicate exported declarations");
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("repeated imports must be rejected");
+    assert!(
+        matches!(error, ModuleError::ImportBindingCollision { ref binding, .. } if binding == "shared")
+    );
+    assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E1115");
+}
+
+#[test]
+fn allows_equal_import_bindings_in_distinct_module_sources() {
+    let fixture = Fixture::new();
+    fixture.write("api/api.act", "open left; open right;");
+    fixture
+        .write("api/left.act", "import shared; open verb left() -> Int { return shared::read(); }");
+    fixture.write(
+        "api/right.act",
+        "import shared; open verb right() -> Int { return shared::read(); }",
+    );
+    fixture.write("shared/shared.act", "open verbs;");
+    fixture.write("shared/verbs.act", "open verb read() -> Int { return 7; }");
+
+    analyze_module_with_overlays(&ModuleResolver::new(&fixture.root), "api", &Default::default())
+        .expect("imports are scoped to their declaring source file");
 }
 
 #[test]

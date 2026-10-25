@@ -9,6 +9,10 @@ text parsing.
 import std::wire;
 ```
 
+This binds the `wire` namespace. Use `wire::...` for qualified access, or use
+`import { open std::wire };` when the example intentionally uses the public
+declarations without a namespace prefix.
+
 The core protocol operates on caller-owned `Buffer` values. It does not open
 sockets, access a filesystem, allocate a heap buffer, select a transport, or
 require a `wire://` string. A desktop application may use the optional

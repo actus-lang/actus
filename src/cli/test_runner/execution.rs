@@ -5,9 +5,10 @@ use crate::ast::{Block, Expr, Stmt, TopLevelDecl, TypeName, VerbDecl};
 use crate::codegen::link_objects;
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::SourceSpan;
-use crate::modules::{ModuleResolver, build_compilation_plan};
+use crate::modules::{ModuleResolver, build_test_compilation_plan};
 
 use super::super::conformance::ConformanceMode;
+use super::TestOptions;
 use super::collection::{DiscoveredTest, TestCollection};
 use super::output::TestOutputStyle;
 use super::process::{TestProcessResult, run_test_process};
@@ -15,10 +16,16 @@ use super::process::{TestProcessResult, run_test_process};
 pub(super) fn run_tests(
     collection: TestCollection,
     configuration: &CompilerConfiguration,
-    mode: ConformanceMode,
+    options: &TestOptions,
 ) -> i32 {
     let output_style = TestOutputStyle::detect();
-    print_test_header(collection.tests.len(), collection.filtered, mode);
+    print_test_header(collection.tests.len(), collection.filtered, options.mode);
+    if options.list {
+        for test in &collection.tests {
+            println!("{}::{}", test.module, test.name);
+        }
+        return 0;
+    }
     let mut passed = 0;
     for (index, test) in collection.tests.iter().enumerate() {
         let started = Instant::now();
@@ -48,23 +55,23 @@ fn report_test_result(
     match result {
         Ok(TestProcessResult::Exited(0)) => {
             let status = output_style.success(&format!("ok ({elapsed} ms, exit code 0)"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             true
         }
         Ok(TestProcessResult::Exited(code)) => {
             let status = output_style.failure(&format!("FAILED ({elapsed} ms, exit code {code})"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             false
         }
         Ok(TestProcessResult::Signaled) => {
             let status =
                 output_style.failure(&format!("FAILED ({elapsed} ms, terminated by signal)"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             false
         }
         Err(error) => {
             let status = output_style.failure(&format!("FAILED ({elapsed} ms, {error})"));
-            println!("test {}::{} ... {status}", test.path.display(), test.name);
+            println!("test {}::{} ... {status}", test.module, test.name);
             false
         }
     }
@@ -128,7 +135,7 @@ fn test_compilation_plan(
     test: &DiscoveredTest,
     configuration: &CompilerConfiguration,
 ) -> Result<crate::modules::ModuleCompilationPlan, String> {
-    let mut program = test_program(&test.source_program, &test.name);
+    let mut program = test_program(&test.program, &test.name);
     if program
         .declarations
         .iter()
@@ -137,13 +144,16 @@ fn test_compilation_plan(
         return Err("meta test program already defines `main`".to_owned());
     }
     program.declarations.push(test_main(&test.name));
+    if let Some(plan) = &test.compilation_plan {
+        return Ok(plan.with_caller_program(program));
+    }
     let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
     );
-    build_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
+    build_test_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
 }
 
 fn test_program(source_program: &crate::ast::Program, test_name: &str) -> crate::ast::Program {

@@ -18,12 +18,12 @@ pub struct SourceLimitPolicy {
 impl Default for SourceLimitPolicy {
     fn default() -> Self {
         Self {
-            preferred_file_lines: 300,
-            file_split_lines: 400,
-            hard_file_lines: 500,
-            preferred_function_lines: 30,
-            function_split_lines: 40,
-            hard_function_lines: 60,
+            preferred_file_lines: 500,
+            file_split_lines: 600,
+            hard_file_lines: 800,
+            preferred_function_lines: 50,
+            function_split_lines: 60,
+            hard_function_lines: 80,
         }
     }
 }

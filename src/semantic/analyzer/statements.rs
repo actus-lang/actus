@@ -312,7 +312,8 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         if let Some(type_name) = declared_type {
-            self.binding_type_names.insert(binding_index, type_name.clone());
+            self.binding_type_names
+                .insert(binding_index, self.normalize_imported_type_name(type_name));
         } else {
             self.record_inferred_binding_type(binding_index, initializer, span);
         }

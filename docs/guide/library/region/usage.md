@@ -7,7 +7,7 @@ resident window start, and a resident window count. `T` must have a fixed
 native layout supported by the selected compiler/runtime.
 
 ```actus
-import std::region;
+import { open std::region };
 
 open verb open_bytes(dat storage: Buffer)
     -> Result[Region[u8], RegionError] {

@@ -15,7 +15,7 @@ fn lsp_resolves_the_public_utf8_boundary_from_the_standard_runtime() {
     )
     .expect("write manifest");
     let source = concat!(
-        "import std::string;\n",
+        "import { open std::string };\n",
         "verb main() -> Int {\n",
         "erg storage = Buffer[0];\n",
         "erg result = utf8_from_buffer(storage: dat storage);\n",
@@ -28,7 +28,7 @@ fn lsp_resolves_the_public_utf8_boundary_from_the_standard_runtime() {
         json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
         json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
         json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"utf8_from_buffer")}}),
-        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":18}}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/completion","params":{"textDocument":{"uri":uri},"position":{"line":0,"character":28}}}),
         json!({"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":position_after(source,"utf8_from_buffer")}}),
         json!({"jsonrpc":"2.0","id":5,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}),
         json!({"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}),
@@ -57,7 +57,7 @@ fn lsp_exposes_the_public_wire_surface_to_editor_clients() {
     )
     .expect("write manifest");
     let source = concat!(
-        "import std::wire;\n",
+        "import { open std::wire };\n",
         "verb main() -> Int {\n",
         "erg input: Buffer = Buffer[0];\n",
         "erg start: u32 = 0u32;\n",
@@ -101,7 +101,7 @@ fn lsp_exposes_the_public_region_surface_to_editor_clients() {
     )
     .expect("write manifest");
     let source = concat!(
-        "import std::region;\n",
+        "import { open std::region };\n",
         "verb main() -> Int {\n",
         "erg backing: Buffer = Buffer[4];\n",
         "erg length: u64 = 1u64;\n",

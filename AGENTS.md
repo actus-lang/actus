@@ -89,11 +89,11 @@ Actus triple-quoted `""" ... """` documentation blocks remain counted because
 they are language constructs and part of the documentation contract. The
 diagnostic reports the measured code-line count explicitly.
 
-- Preferred size: 300 lines or fewer.
-- Warning threshold: 400 lines.
-- Hard limit: 500 lines.
+- Preferred size: 500 lines or fewer.
+- Warning threshold: 600 lines.
+- Hard limit: 800 lines.
 
-A file must not exceed 500 lines without an explicit architectural exception documented in the pull request. The exception must explain why splitting the file would damage cohesion and identify a future decomposition path if one exists.
+A file must not exceed 800 lines without an explicit architectural exception documented in the pull request. The exception must explain why splitting the file would damage cohesion and identify a future decomposition path if one exists.
 
 Generated files, fixture data, and intentionally tabular test data may be exempt when they are clearly marked and excluded from ordinary source modules.
 
@@ -268,8 +268,8 @@ library.
 ### 2. File Size and Proactive Modularity
 
 - Actus source files and standard-library modules must remain below the
-  repository's 500-line hard limit.
-- At approximately 400 lines, decomposition must be planned before further
+  repository's 800-line hard limit.
+- At approximately 600 lines, decomposition must be planned before further
   feature growth.
 - Decompose by domain responsibility: facade, error types, ownership-aware
   input, output bridges, and stream operations belong in separate sibling

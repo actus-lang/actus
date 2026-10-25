@@ -108,6 +108,46 @@ fn renders_duplicate_pack_diagnostics_with_a_stable_code() {
 }
 
 #[test]
+fn renders_dynamic_and_constant_diagnostics_without_renderer_panics() {
+    let cases = [
+        (
+            SemanticErrorKind::DynamicRequiresAbs { parameter: "writer".to_owned() },
+            "E1089",
+            "dynamic parameter `writer` must use the `abs` role",
+        ),
+        (
+            SemanticErrorKind::UnknownDynamicRole { name: "Missing".to_owned() },
+            "E1099",
+            "unknown dynamic role `Missing`",
+        ),
+        (
+            SemanticErrorKind::DynamicRoleMismatch {
+                role: "Writer".to_owned(),
+                found: "Other".to_owned(),
+            },
+            "E1116",
+            "type `Other` has no performance implementation for dynamic role `Writer`",
+        ),
+        (
+            SemanticErrorKind::DuplicateConstantName { name: "LIMIT".to_owned() },
+            "E1117",
+            "duplicate constant declaration `LIMIT`",
+        ),
+        (
+            SemanticErrorKind::ConstantCycle { name: "LIMIT".to_owned() },
+            "E1118",
+            "constant `LIMIT` participates in a cyclic initializer",
+        ),
+    ];
+    for (kind, code, message) in cases {
+        let error = actus::semantic::SemanticError { kind, span: SourceSpan::new(0, 1) };
+        let diagnostic = semantic_diagnostic(&error);
+        assert_eq!(diagnostic.code(), code);
+        assert_eq!(diagnostic.message(), message);
+    }
+}
+
+#[test]
 fn renders_unknown_metadata_with_a_stable_code() {
     let source = "meta experimental";
     let (tokens, errors) = scan(source);

@@ -40,7 +40,7 @@ fn dependency_fixture() -> Fixture {
     );
     fixture.write(
         "app/src/main.act",
-        "import foo; verb main() -> Int { return add(left: 40, right: 2); }\n",
+        "import foo; verb main() -> Int { return foo::add(left: 40, right: 2); }\n",
     );
     fixture.write("foo/Actus.toml", "[package]\nname = \"foo\"\nversion = \"1.2.0\"\n");
     fixture.write("foo/src/foo/foo.act", "open ops;");
@@ -71,7 +71,7 @@ fn resolves_a_local_package_namespace_from_actus_manifest() {
     assert!(expanded.declarations.iter().any(|declaration| {
         matches!(
             declaration,
-            actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "add"
+            actus::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == "foo::add"
         )
     }));
 }

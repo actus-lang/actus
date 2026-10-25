@@ -9,15 +9,10 @@ suppression only; it does not authenticate a sender or a transport.
 """
 """The fixed number of sequence positions retained by the replay window."""
 open const WIRE_SEQUENCE_WINDOW_BITS: u32 = 64u32;
-
-
 """The largest forward sequence jump accepted in one context."""
 open const WIRE_SEQUENCE_MAX_FORWARD: u32 = 1024u32;
-
-
 """The midpoint used to classify modular sequence distance and wrap."""
 open const WIRE_SEQUENCE_HALF_RANGE: u32 = 2147483648u32;
-
 
 """
 Caller-owned replay window for one wire context.
@@ -46,7 +41,12 @@ allocation, authentication, or context selection; the first accepted frame
 establishes the supplied context explicitly at `wire_sequence_accept`.
 """
 open verb wire_sequence_empty() -> WireSequenceWindow {
-    return WireSequenceWindow {initialized: false, context_id: 0u32, highest: 0u32, received: 0u64};
+    return WireSequenceWindow {
+        initialized: false,
+        context_id: 0u32,
+        highest: 0u32,
+        received: 0u64,
+    };
 }
 
 """

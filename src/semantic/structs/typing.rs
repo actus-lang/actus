@@ -5,15 +5,21 @@ use super::super::type_substitution::TypeSubstitution;
 
 impl Analyzer {
     pub(crate) fn expression_struct_type(&self, expression: &Expr) -> Option<String> {
-        self.resolved_type_name(expression)
-            .filter(|type_name| self.struct_types.contains_key(&type_name.name))
-            .map(|type_name| super::access::canonical_type_name(&type_name))
+        self.resolved_type_name(expression).and_then(|type_name| {
+            let type_name = self.normalize_imported_type_name(&type_name);
+            self.struct_types
+                .contains_key(&type_name.name)
+                .then(|| super::access::canonical_type_name(&type_name))
+        })
     }
 
     pub(crate) fn expression_pack_type(&self, expression: &Expr) -> Option<String> {
-        self.resolved_type_name(expression)
-            .filter(|type_name| self.pack_types.contains_key(&type_name.name))
-            .map(|type_name| super::access::canonical_type_name(&type_name))
+        self.resolved_type_name(expression).and_then(|type_name| {
+            let type_name = self.normalize_imported_type_name(&type_name);
+            self.pack_types
+                .contains_key(&type_name.name)
+                .then(|| super::access::canonical_type_name(&type_name))
+        })
     }
 
     pub(crate) fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
@@ -80,6 +86,7 @@ impl Analyzer {
         type_name: &TypeName,
         field: &str,
     ) -> Option<TypeName> {
+        let type_name = self.normalize_imported_type_name(type_name);
         if field == "storage"
             && let Some(pack) = self.pack_types.get(&type_name.name)
         {

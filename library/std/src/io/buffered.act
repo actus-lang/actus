@@ -31,7 +31,10 @@ Both `dat` arguments transfer ownership into the reader, which performs
 deterministic cleanup for the source and buffer and returns the new reader.
 """
 open verb buffered_reader[Source: Reader](dat source: Source, dat buffer: Buffer) -> BufferedReader[Source] {
-    return BufferedReader[Source] {source: source, buffer: buffer};
+    return BufferedReader[Source] {
+        source: source,
+        buffer: buffer,
+    };
 }
 
 """
@@ -41,7 +44,10 @@ Both `dat` arguments transfer ownership into the writer. No second
 allocation is performed by the constructor, which returns the new writer.
 """
 open verb buffered_writer[Target: Writer](dat target: Target, dat buffer: Buffer) -> BufferedWriter[Target] {
-    return BufferedWriter[Target] {target: target, buffer: buffer};
+    return BufferedWriter[Target] {
+        target: target,
+        buffer: buffer,
+    };
 }
 
 """
@@ -175,17 +181,31 @@ open verb buffered_write[Target: Writer](
             },
             _ => {},
         };
-        erg accepted = append_buffered_chunk(target: ins writer.buffer, source: abs input, offset: total, length: remaining)?;
+        erg accepted = append_buffered_chunk(
+            target: ins writer.buffer,
+            source: abs input,
+            offset: total,
+            length: remaining
+        )?;
         total = total + accepted;
-        erg full = buffered_storage_is_full(buffer: abs writer.buffer)?;
-        case full {
-            1 => {
-                flush_buffer(writer: ins writer)?;
-            },
-            _ => {},
-        };
+        flush_buffer_if_full(writer: ins writer)?;
     }
     return Result[Int, IoError].Ok(total);
+}
+
+"""
+Flush a buffered writer only after its storage reaches capacity.
+
+The `ins writer` loan is returned unchanged on success. `Ok(0)` means no
+flush was needed; `Err(IoError)` reports buffer inspection or target-write
+failure. The helper performs no allocation.
+"""
+open verb flush_buffer_if_full[Target: Writer](ins writer: BufferedWriter[Target]) -> Result[Int, IoError] {
+    erg full = buffered_storage_is_full(buffer: abs writer.buffer)?;
+    return case full {
+        1 => flush_buffer(writer: ins writer),
+        _ => Result[Int, IoError].Ok(0),
+    };
 }
 
 """

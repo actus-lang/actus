@@ -1,6 +1,8 @@
-import io;
-import fs;
-import path;
+import {
+    open io,
+    open fs,
+    open path,
+};
 
 verb make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_ascii(storage: dat raw);
@@ -23,15 +25,21 @@ verb write_file_payload(ins file: File) -> Int {
     erg written = file.write(buffer: abs payload);
     case dat written {
         Result.Ok(count) => case count {
-            2 => { },
-            _ => { return 1; },
+            2 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg flushed = file.flush();
     case dat flushed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -41,25 +49,35 @@ verb rewind_and_read(ins file: File) -> Int {
     erg moved = file.seek(from: dat origin);
     case dat moved {
         Result.Ok(position) => case position {
-            0 => { },
-            _ => { return 1; },
+            0 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg destination = Buffer[0];
     erg destination_capacity = 2;
     erg reserved = reserve(buffer: ins destination, capacity: destination_capacity);
     case dat reserved {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg read_result = file.read(buffer: ins destination);
     case dat read_result {
         Result.Ok(count) => case count {
-            2 => { },
-            _ => { return 1; },
+            2 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -68,25 +86,35 @@ verb verify_file_positions(ins file: File) -> Int {
     erg current_offset = 0;
     erg current = file_seek_current(self: ins file, offset: abs current_offset);
     case dat current {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg end_offset = 0;
     erg end = file_seek_end(self: ins file, offset: abs end_offset);
     case dat end {
         Result.Ok(position) => case position {
-            2 => { },
-            _ => { return 1; },
+            2 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg information = file.metadata();
     case dat information {
         Result.Ok(metadata) => case metadata.size {
-            2 => { },
-            _ => { return 1; },
+            2 => {},
+            _ => {
+                return 1;
+            },
         },
-        Result.Err(_) => { return 1; },
+        Result.Err(_) => {
+            return 1;
+        },
     };
     return 0;
 }
@@ -94,18 +122,24 @@ verb verify_file_positions(ins file: File) -> Int {
 verb exercise_file(dat file: File, abs path: Path) -> Int {
     erg written = write_file_payload(file: ins file);
     case written {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg read = rewind_and_read(file: ins file);
     case read {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     erg verified = verify_file_positions(file: ins file);
     case verified {
-        0 => { },
-        _ => { return 1; },
+        0 => {},
+        _ => {
+            return 1;
+        },
     };
     drop(file);
     erg final_remove = remove_file(path: abs path);
@@ -169,8 +203,8 @@ verb file_handle_methods_and_seeker_origins() -> Int {
     erg path = handle_file_path();
     erg cleanup = remove_file(path: abs path);
     case dat cleanup {
-        Result.Ok(_) => { },
-        Result.Err(_) => { },
+        Result.Ok(_) => {},
+        Result.Err(_) => {},
     };
     erg opened = file_create(path: abs path);
     return case dat opened {
@@ -184,21 +218,26 @@ verb options_and_directory_operations_succeed() -> Int {
     erg directory = handle_directory_path();
     erg removed = remove_dir(path: abs directory);
     case dat removed {
-        Result.Ok(_) => { },
-        Result.Err(_) => { },
+        Result.Ok(_) => {},
+        Result.Err(_) => {},
     };
     erg created = create_dir(path: abs directory);
     case dat created {
-        Result.Ok(_) => { },
-        Result.Err(_) => { return 1; },
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
     };
     erg options = options_new();
     erg writable = options_write(dat options);
     erg creatable = options_create(dat writable);
     erg opened = options_open(options: dat creatable, path: abs directory);
     case dat opened {
-        Result.Ok(file) => { drop(file); return 1; },
-        Result.Err(_) => { },
+        Result.Ok(file) => {
+            drop(file);
+            return 1;
+        },
+        Result.Err(_) => {},
     };
     erg final_remove = remove_dir(path: abs directory);
     return case dat final_remove {

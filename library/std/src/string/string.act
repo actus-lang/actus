@@ -8,7 +8,9 @@ provides the same checked provider contract.
 """
 """Re-export null, UTF-8, bounds, and provider failures for String access."""
 open errors;
+
 """Re-export allocation-free borrowed byte and length operations."""
 open access;
+
 """Re-export owned, caller-buffer-backed UTF-8 construction."""
 open owned;

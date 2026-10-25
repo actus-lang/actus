@@ -5,8 +5,11 @@ The handle is an opaque runtime token. File construction returns a typed
 Result, and the Drop performance closes the underlying operating-system
 resource exactly once when ownership leaves scope.
 """
-import io;
-import path;
+import {
+    io,
+    path as path_module,
+};
+
 """
 An owned opaque file handle backed by one host operating-system resource.
 The erg handle is closed by its Drop performance and never stores a Path.
@@ -22,7 +25,10 @@ not retained or copied. The bridge performs no path allocation. The result is
 a new owned `File`, or `-1` on native failure; the facade maps failure to
 `IoError.Failed`.
 """
-unsafe extern "C" verb actus_file_open_path(abs path: Path, abs mode: Int) -> Int;
+unsafe extern "C" verb actus_file_open_path(
+    abs path: path_module::Path,
+    abs mode: Int
+) -> Int;
 
 """
 Read into the existing `ins` buffer. Non-negative values are byte counts;
@@ -35,7 +41,10 @@ Write the logical bytes of an `abs` buffer. Non-negative values are byte
 counts; `-1` is `Failed` and `-2` is `EndOfStream`.
 """
 """The C ABI returns a byte count, `-1` for failure, or `-2` for EOF."""
-unsafe extern "C" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int;
+unsafe extern "C" verb actus_file_write_buffer(
+    abs handle: Int,
+    abs buffer: Buffer
+) -> Int;
 
 """Flush an owned handle through the C ABI; zero is success and `-1` is `Failed`."""
 unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
@@ -51,7 +60,9 @@ unsafe extern "C" verb actus_file_seek_buffer(
 ) -> Int;
 
 """Consume an invalid scalar handle and return it so constructor branches join cleanly."""
-open verb discard_handle(dat handle: Int) -> Int { return handle; }
+open verb discard_handle(dat handle: Int) -> Int {
+    return handle;
+}
 
 """
 Open an existing filesystem path for reading.
@@ -61,12 +72,17 @@ in the returned resource. `Ok(File)` transfers ownership of the new host
 handle to the caller, while `Err(IoError.Failed)` reports that the path could
 not be opened. The `File` Drop performance closes a successful handle once.
 """
-open verb file_open(abs path: Path) -> Result[File, IoError] {
+open verb file_open(abs path: path_module::Path) -> Result[File, io::IoError] {
     erg mode = 0;
     erg handle = actus_file_open_path(path: abs path, mode: abs mode);
     return case handle {
-        -1 => { discard_handle(handle: dat handle); return Err(IoError.Failed); },
-        _ => Ok(File { handle: handle, }),
+        -1 => {
+            discard_handle(handle: dat handle);
+            return Err(io::IoError.Failed);
+        },
+        _ => Ok(File {
+            handle: handle,
+        }),
     };
 }
 
@@ -77,12 +93,17 @@ Create or truncate a filesystem path for writing.
 the caller ownership of the new host handle; `Err(IoError.Failed)` means the
 host rejected creation or truncation. No path buffer is retained by `File`.
 """
-open verb file_create(abs path: Path) -> Result[File, IoError] {
+open verb file_create(abs path: path_module::Path) -> Result[File, io::IoError] {
     erg mode = 1;
     erg handle = actus_file_open_path(path: abs path, mode: abs mode);
     return case handle {
-        -1 => { discard_handle(handle: dat handle); return Err(IoError.Failed); },
-        _ => Ok(File { handle: handle, }),
+        -1 => {
+            discard_handle(handle: dat handle);
+            return Err(io::IoError.Failed);
+        },
+        _ => Ok(File {
+            handle: handle,
+        }),
     };
 }
 
@@ -91,11 +112,11 @@ Read bytes from an exclusively loaned open file into an exclusively loaned
 buffer. `Ok` is the exact byte count; `Err` maps failure and end-of-stream
 statuses. The file remains owned by the caller after the loan ends.
 """
-open verb file_read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] {
+open verb file_read(ins self: File, ins buffer: Buffer) -> Result[Int, io::IoError] {
     erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
     return case status {
-        -1 => Err(IoError.Failed),
-        -2 => Err(IoError.EndOfStream),
+        -1 => Err(io::IoError.Failed),
+        -2 => Err(io::IoError.EndOfStream),
         _ => Ok(status),
     };
 }
@@ -104,20 +125,20 @@ open verb file_read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] 
 Write an immutable buffer through an exclusively loaned file. `Ok` reports
 the exact byte count; `Err` reports a typed runtime failure.
 """
-open verb file_write(ins self: File, abs buffer: Buffer) -> Result[Int, IoError] {
+open verb file_write(ins self: File, abs buffer: Buffer) -> Result[Int, io::IoError] {
     erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
     return case status {
-        -1 => Err(IoError.Failed),
-        -2 => Err(IoError.EndOfStream),
+        -1 => Err(io::IoError.Failed),
+        -2 => Err(io::IoError.EndOfStream),
         _ => Ok(status),
     };
 }
 
 """Flush a file loan and return zero on success or a typed I/O failure."""
-open verb file_flush(ins self: File) -> Result[Int, IoError] {
+open verb file_flush(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_flush_buffer(handle: abs self.handle);
     return case status {
-        -1 => Err(IoError.Failed),
+        -1 => Err(io::IoError.Failed),
         _ => Ok(status),
     };
 }
@@ -127,43 +148,45 @@ Close an exclusively loaned file exactly once. A successful close marks the
 handle invalid so the Drop performance remains idempotent; a failed close
 leaves it live for deterministic cleanup retry.
 """
-open verb file_close(ins self: File) -> Result[Int, IoError] {
+open verb file_close(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_close_buffer(handle: abs self.handle);
     return case status {
-        -1 => Err(IoError.Failed),
-        _ => { self.handle = -1; return Ok(status); },
+        -1 => Err(io::IoError.Failed),
+        _ => {
+            self.handle = -1;
+            return Ok(status);
+        },
     };
 }
 
 """Read file bytes into caller-provided storage without allocating per call."""
-open perform Reader for File {
+open perform io::Reader for File {
     """Read through ins loans, mutate caller storage, and return count or typed error."""
-    verb read(ins self: File, ins buffer: Buffer) -> Result[Int, IoError] {
+    verb read(ins self: File, ins buffer: Buffer) -> Result[Int, io::IoError] {
         return file_read(self: ins self, buffer: ins buffer);
     }
 }
 
 """Write borrowed bytes and flush a file through the Writer contract."""
-open perform Writer for File {
+open perform io::Writer for File {
     """
     Write an `abs` byte view through an `ins` file loan. No input buffer is
     allocated or retained. `Result.Ok(count)` is the exact byte count;
     `Err` reports the typed I/O failure.
     """
-    verb write(ins self: File, abs buffer: Buffer) -> Result[Int, IoError] {
+    verb write(ins self: File, abs buffer: Buffer) -> Result[Int, io::IoError] {
         return file_write(self: ins self, buffer: abs buffer);
     }
-
     """Flush through an ins file loan and return zero or typed failure."""
-    verb flush(ins self: File) -> Result[Int, IoError] {
+    verb flush(ins self: File) -> Result[Int, io::IoError] {
         return file_flush(self: ins self);
     }
 }
 
 """Translate a runtime cursor position into a typed result."""
-open verb file_seek_status(erg status: Int) -> Result[Int, IoError] {
+open verb file_seek_status(erg status: Int) -> Result[Int, io::IoError] {
     return case status {
-        -1 => Err(IoError.Failed),
+        -1 => Err(io::IoError.Failed),
         _ => Ok(status),
     };
 }
@@ -173,7 +196,7 @@ Seek through the `ins` file loan from the beginning. The file position is
 mutated in the runtime without allocating a buffer. `Ok(position)` returns the
 new position; `Err(IoError.Failed)` reports rejection.
 """
-open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 0;
     erg status = actus_file_seek_buffer(
         handle: abs self.handle,
@@ -188,7 +211,7 @@ Seek through the `ins` file loan relative to its current position. The
 position mutation is allocation-free. `Ok(position)` returns the new position;
 `Err(IoError.Failed)` reports runtime rejection.
 """
-open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 1;
     erg status = actus_file_seek_buffer(
         handle: abs self.handle,
@@ -203,7 +226,7 @@ Seek through the `ins` file loan relative to the end of the file. The runtime
 mutates only the cursor position and allocates no buffer. `Ok(position)` is the
 new position; `Err(IoError.Failed)` reports rejection.
 """
-open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, IoError] {
+open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 2;
     erg status = actus_file_seek_buffer(
         handle: abs self.handle,
@@ -214,27 +237,27 @@ open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, IoError]
 }
 
 """Satisfy the positional stream contract through the host runtime."""
-open perform Seeker for File {
+open perform io::Seeker for File {
     """Seek through an ins file loan and dat cursor origin, returning a position or error."""
-    verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError] {
+    verb seek(ins self: File, dat from: io::SeekFrom) -> Result[Int, io::IoError] {
         return case dat from {
-            SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
-            SeekFrom.Current(offset) => file_seek_current(self: ins self, offset: abs offset),
-            SeekFrom.End(offset) => file_seek_end(self: ins self, offset: abs offset),
+            io::SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
+            io::SeekFrom.Current(offset) => file_seek_current(self: ins self, offset: abs offset),
+            io::SeekFrom.End(offset) => file_seek_end(self: ins self, offset: abs offset),
         };
     }
 }
 
 """Return metadata for this open file without transferring its handle, or typed failure."""
-open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, IoError] {
+open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, io::IoError] {
     drop(output);
-    return Result[Metadata, IoError].Err(IoError.Failed);
+    return Result[Metadata, io::IoError].Err(io::IoError.Failed);
 }
 
 """Provide metadata through an ins file loan and return scalar facts or error."""
 open perform MetadataProvider for File {
     """Inspect metadata through an ins file loan and return scalar facts or failure."""
-    verb metadata(ins self: File) -> Result[Metadata, IoError] {
+    verb metadata(ins self: File) -> Result[Metadata, io::IoError] {
         return file_metadata(self: ins self);
     }
 }

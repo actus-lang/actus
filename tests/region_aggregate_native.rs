@@ -83,7 +83,7 @@ fn build_and_run_with_backend(
 #[test]
 fn aggregate_region_lifecycle_builds_and_runs_through_llvm_cli() {
     let root = std::env::temp_dir().join(format!("actus-llvm-region-{}", std::process::id()));
-    let source = r#"import std::region;
+    let source = r#"import { open std::region };
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
     erg logical_length: u64 = 1u64;
@@ -114,7 +114,7 @@ verb main() -> Int {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn aggregate_region_lifecycle_has_matching_hosted_backend_results() {
-    let source = r#"import std::region;
+    let source = r#"import { open std::region };
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
     erg logical_length: u64 = 1u64;
@@ -157,7 +157,7 @@ fn aggregate_region_lifecycle_is_native() {
     let root = std::env::temp_dir().join(format!("actus-region-aggregate-{}", std::process::id()));
     write_fixture(
         &root,
-        r#"import std::region;
+        r#"import { open std::region };
 
 verb finish_lifecycle(ins region: Region[Array[u8, 16]], abs source: Buffer) -> Int {
     erg index: u64 = 0u64;
@@ -223,7 +223,7 @@ fn aggregate_region_object_emission_exposes_runtime_bridges() {
     let root = std::env::temp_dir().join(format!("actus-region-object-{}", std::process::id()));
     write_fixture(
         &root,
-        r#"import std::region;
+        r#"import { open std::region };
 
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
@@ -249,7 +249,7 @@ fn region_layout_registry_stays_consistent_across_semantic_intrinsics_and_runtim
     let root = std::env::temp_dir()
         .join(format!("actus-region-layout-consistency-{}", std::process::id()));
     let source = r#"
-import std::region;
+import { open std::region };
 
 struct Pair {
     first: u16,
@@ -310,7 +310,7 @@ fn hosted_bulk_range_accepts_the_configured_limit() {
     let root = std::env::temp_dir().join(format!("actus-region-range-{}", std::process::id()));
     write_fixture(
         &root,
-        r#"import std::region;
+        r#"import { open std::region };
 
 verb copy_bulk(ins region: Region[u8], abs source: Buffer) -> Int {
     erg start: u64 = 0u64;
@@ -362,7 +362,7 @@ fn aggregate_region_rejects_wrong_buffer_without_dirtying_state() {
         std::env::temp_dir().join(format!("actus-region-invalid-buffer-{}", std::process::id()));
     write_fixture(
         &root,
-        r#"import std::region;
+        r#"import { open std::region };
 
 verb reject_write(ins region: Region[Array[u8, 16]]) -> Int {
     erg source: Buffer = Buffer[15];
@@ -410,7 +410,7 @@ fn aggregate_region_rejects_wrong_destination_size() {
         .join(format!("actus-region-invalid-destination-{}", std::process::id()));
     write_fixture(
         &root,
-        r#"import std::region;
+        r#"import { open std::region };
 
 verb reject_read(ins region: Region[Array[u8, 16]]) -> Int {
     erg destination: Buffer = Buffer[15];
@@ -451,7 +451,7 @@ fn hosted_bulk_range_rejects_payload_above_the_limit() {
         std::env::temp_dir().join(format!("actus-region-range-limit-{}", std::process::id()));
     write_fixture(
         &root,
-        r#"import std::region;
+        r#"import { open std::region };
 
 verb reject_bulk(ins region: Region[u8]) -> Int {
     erg source: Buffer = Buffer[131073];

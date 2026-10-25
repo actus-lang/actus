@@ -1,37 +1,39 @@
 lockfile_version = 3
-runtime = "core"
+runtime = "std"
+runtime_version = "0.1.0"
+runtime_checksum = "fb99a287487ceadd"
 
 [[package]]
 name = "charmap"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "fb99a287487ceadd"
 
 [[package]]
 name = "fs"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "fb99a287487ceadd"
 
 [[package]]
 name = "io"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "fb99a287487ceadd"
 
 [[package]]
 name = "path"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "fb99a287487ceadd"
 
 [[package]]
 name = "process"
 version = "0.1.0"
 source = "path"
 path = "library/std"
-checksum = "822c759656164551"
+checksum = "fb99a287487ceadd"

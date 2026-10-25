@@ -25,8 +25,10 @@ impl Analyzer {
             .return_type
             .as_ref()
             .and_then(|return_type| lookup_builtin_type(&return_type.ty.name));
-        self.current_return_type_name =
-            verb.return_type.as_ref().map(|return_type| return_type.ty.clone());
+        self.current_return_type_name = verb
+            .return_type
+            .as_ref()
+            .map(|return_type| self.normalize_imported_type_name(&return_type.ty));
         self.current_return_is_builtin_result =
             verb.return_type.as_ref().is_some_and(|return_type| {
                 return_type.ty.name == "Result"

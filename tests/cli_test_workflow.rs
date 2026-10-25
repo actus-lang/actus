@@ -75,11 +75,184 @@ fn test_reports_target_filtered_counts_deterministically() {
 
 #[cfg(unix)]
 #[test]
+fn test_filters_by_name_module_and_file_without_running_other_tests() {
+    let root = create_test_project(
+        "runner-filters",
+        "unit.act",
+        "meta test\nverb selected_unit() -> Int { return 0; }\nmeta test\nverb skipped_unit() -> Int { return 7; }\n",
+    );
+    fs::create_dir_all(root.join("tests/domain")).expect("create nested tests directory");
+    fs::write(
+        root.join("tests/domain/other.act"),
+        "meta test\nverb selected_domain() -> Int { return private_value(); }\n",
+    )
+    .expect("write second test file");
+    fs::create_dir_all(root.join("src/domain")).expect("create source module directory");
+    fs::write(root.join("src/domain/domain.act"), "open other;\n").expect("write source facade");
+    fs::write(root.join("src/domain/other.act"), "verb private_value() -> Int { return 0; }\n")
+        .expect("write source mirror");
+
+    let output = run_command(
+        &root,
+        &["test", "selected", "--module", "domain", "--file", "domain/other.act"],
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    assert!(stdout.contains("selected_domain"), "stdout: {stdout}");
+    assert!(!stdout.contains("selected_unit"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_lists_filtered_canonical_test_names_without_execution() {
+    let root = create_test_project(
+        "runner-list",
+        "list.act",
+        "meta test\nverb listed() -> Int { return 7; }\n",
+    );
+    let output = run_command(&root, &["test", "--list"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("<root>::listed"), "stdout: {stdout}");
+    assert!(!stdout.contains("passed"), "list mode must not execute tests: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_mirror_gate_rejects_unmapped_nested_test_files() {
+    let root = create_test_project(
+        "runner-mirror",
+        "unmapped.act",
+        "meta test\nverb unmapped() -> Int { return 0; }\n",
+    );
+    fs::create_dir_all(root.join("tests/unmapped")).expect("create nested test directory");
+    fs::rename(root.join("tests/unmapped.act"), root.join("tests/unmapped/case.act"))
+        .expect("move test into nested directory");
+    let output = run_command(&root, &["test", "--mirror"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "mirror gate unexpectedly passed");
+    assert!(stderr.contains("has no source mirror"), "stderr: {stderr}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn fixture_resolves_nested_sibling_aliases_and_qualified_types() {
+    let root = create_test_project(
+        "runner-mirrored-qualified-consumer",
+        "placeholder.act",
+        "meta test\nverb unused() -> Int { return 0; }\n",
+    );
+    fs::remove_file(root.join("tests/placeholder.act")).expect("remove placeholder test");
+    fs::create_dir_all(root.join("src/parent/left/contract"))
+        .expect("create left contract directory");
+    fs::create_dir_all(root.join("src/parent/right/contract"))
+        .expect("create right contract directory");
+
+    fs::write(root.join("src/parent/parent.act"), "open left; open right;\n")
+        .expect("write parent facade");
+    fs::write(root.join("src/parent/left/left.act"), "open contract;\n")
+        .expect("write left facade");
+    fs::write(root.join("src/parent/right/right.act"), "open contract;\n")
+        .expect("write right facade");
+    fs::write(
+        root.join("src/parent/left/contract/contract.act"),
+        "open verb left_value() -> Int { return 20; }\n",
+    )
+    .expect("write left contract");
+    fs::write(
+        root.join("src/parent/right/contract/contract.act"),
+        "open verb right_value() -> Int { return 22; }\n",
+    )
+    .expect("write right contract");
+    fs::create_dir_all(root.join("src/types")).expect("create qualified type module");
+    fs::write(root.join("src/types/types.act"), "open struct Envelope { value: Int, }\n")
+        .expect("write qualified type facade");
+    fs::write(
+        root.join("tests/qualified_consumer.act"),
+        "import { types, parent::left::contract as left_contract, parent::right::contract as right_contract };\nverb combine() -> Int { erg envelope: types::Envelope = types::Envelope { value: 0, }; return envelope.value + left_contract::left_value() + right_contract::right_value(); }\nmeta test\nverb nested_sibling_aliases() -> Int { return combine() - 42; }\n",
+    )
+    .expect("write qualified consumer test");
+
+    let output = run_command(&root, &["test", "--strict"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("<root>::nested_sibling_aliases ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn mirrored_fixture_preserves_descendant_canonical_imports() {
+    let root = create_test_project(
+        "runner-mirrored-descendant-imports",
+        "placeholder.act",
+        "meta test\nverb unused() -> Int { return 0; }\n",
+    );
+    fs::remove_file(root.join("tests/placeholder.act")).expect("remove placeholder test");
+    fs::create_dir_all(root.join("tests/parent")).expect("create mirrored test directory");
+    fs::create_dir_all(root.join("src/parent/left/contract"))
+        .expect("create left contract directory");
+    fs::create_dir_all(root.join("src/parent/right/contract"))
+        .expect("create right contract directory");
+    fs::create_dir_all(root.join("src/types")).expect("create qualified type module");
+
+    fs::write(root.join("src/parent/parent.act"), "open left; open right;\n")
+        .expect("write parent facade");
+    fs::write(root.join("src/parent/left/left.act"), "open contract;\n")
+        .expect("write left facade");
+    fs::write(root.join("src/parent/right/right.act"), "open contract;\n")
+        .expect("write right facade");
+    fs::write(
+        root.join("src/parent/left/contract/contract.act"),
+        "open verb left_value() -> Int { return 20; }\n",
+    )
+    .expect("write left contract");
+    fs::write(
+        root.join("src/parent/right/contract/contract.act"),
+        "open verb right_value() -> Int { return 22; }\n",
+    )
+    .expect("write right contract");
+    fs::write(root.join("src/types/types.act"), "open struct Envelope { value: Int, }\n")
+        .expect("write qualified type facade");
+    fs::write(
+        root.join("src/parent/consumer.act"),
+        "import { types, parent::left::contract as left_contract, parent::right::contract as right_contract };\nverb combine() -> Int { erg envelope: types::Envelope = types::Envelope { value: 0, }; return envelope.value + left_contract::left_value() + right_contract::right_value(); }\n",
+    )
+    .expect("write mirrored consumer source");
+    fs::write(
+        root.join("tests/parent/consumer.act"),
+        "meta test\nverb nested_sibling_aliases() -> Int { return combine() - 42; }\n",
+    )
+    .expect("write mirrored consumer test");
+
+    let output = run_command(&root, &["test", "--mirror", "--strict"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("parent::nested_sibling_aliases ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_links_imported_module_objects_for_meta_tests() {
     let root = create_test_project(
         "runner-module",
         "module.act",
-        "import math; meta test\nverb smoke() -> Int { return add(); }\n",
+        "import { open math }; meta test\nverb smoke() -> Int { return add(); }\n",
     );
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
@@ -100,7 +273,7 @@ fn test_treats_configuration_as_a_package_module() {
     let root = create_test_project(
         "runner-config",
         "config_test.act",
-        "import config; meta test\nverb reads_config() -> Int { return LIMIT as Int - 30; }\n",
+        "import { open config }; meta test\nverb reads_config() -> Int { return LIMIT as Int - 30; }\n",
     );
     fs::create_dir_all(root.join("src/config")).expect("create config directory");
     fs::write(root.join("src/config/config.act"), "open values;\n").expect("write config facade");
@@ -145,6 +318,79 @@ fn test_compiles_meta_tests_against_their_complete_sibling_module() {
 
 #[cfg(unix)]
 #[test]
+fn grouped_open_import_grants_meta_tests_internal_friend_scope() {
+    let root = create_test_project(
+        "runner-internal-friend-scope",
+        "internal.act",
+        "import { open math }; meta test\nverb sees_private_helper() -> Int { return private_value() - 42; }\n",
+    );
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+        .expect("write private implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("sees_private_helper ... ok"), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn grouped_open_import_preserves_qualified_meta_test_namespace() {
+    let root = create_test_project(
+        "runner-qualified-friend-scope",
+        "qualified.act",
+        "import { open math }; meta test\nverb reads_qualified_helper() -> Int { return math::private_value() - 42; }\n",
+    );
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+        .expect("write private implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("reads_qualified_helper ... ok"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn meta_tests_reach_private_verbs_through_qualified_imports() {
+    let root = create_test_project(
+        "runner-qualified-closed-scope",
+        "qualified.act",
+        "import math; meta test\nverb reads_qualified_helper() -> Int { return math::private_value() - 42; }\n",
+    );
+    fs::create_dir_all(root.join("src/math")).expect("create module directory");
+    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+        .expect("write private implementation");
+
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "stdout: {stdout}\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(stdout.contains("reads_qualified_helper ... ok"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_discovers_meta_tests_inside_a_child_facade_tree() {
     let root = create_test_project(
         "runner-child-module",
@@ -178,7 +424,7 @@ fn test_native_runner_keeps_transitive_sibling_facade_dependencies() {
     let root = create_test_project(
         "runner-transitive-sibling-facade",
         "transitive.act",
-        "import aie; meta test\nverb smoke() -> Int { return allocate_column_index() as Int - 1; }\n",
+        "import { open aie }; meta test\nverb smoke() -> Int { return allocate_column_index() as Int - 1; }\n",
     );
     fs::create_dir_all(root.join("src/aie/runtime")).expect("create runtime directory");
     fs::write(root.join("src/aie/aie.act"), "open runtime; open resident;\n")
@@ -210,7 +456,7 @@ fn file_limitless_metadata_does_not_change_nested_native_dependency_roots() {
     let root = create_test_project(
         "runner-limitless-roots",
         "nested.act",
-        "meta limitless(\"file\")\nimport aie;\nmeta test\nverb forwards_through_nested_facade() -> Int { return step() - 42; }\n",
+        "meta limitless(\"file\")\nimport { open aie };\nmeta test\nverb forwards_through_nested_facade() -> Int { return step() - 42; }\n",
     );
     let forwarding = root.join("src/aie/runtime");
     fs::create_dir_all(&forwarding).expect("create nested runtime directory");
@@ -236,7 +482,7 @@ fn test_specializes_nested_generic_facade_dependencies() {
     let root = create_test_project(
         "runner-generic-closure",
         "nested_generic.act",
-        "import aie;\nmeta test\nverb nested_generic() -> Int {\n    erg storage: Storage[4] = Storage[4] { values: Array[u32, 4]() };\n    return outer(storage: ins storage) as Int - 4;\n}\n",
+        "import { open aie };\nmeta test\nverb nested_generic() -> Int {\n    erg storage: Storage[4] = Storage[4] { values: Array[u32, 4]() };\n    return outer(storage: ins storage) as Int - 4;\n}\n",
     );
     let api = root.join("src/aie/runtime");
     fs::create_dir_all(&api).expect("create nested generic module");

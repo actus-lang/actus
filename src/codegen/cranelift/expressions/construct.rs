@@ -121,7 +121,7 @@ fn lower_method_construct(
         return value;
     }
     if enum_receiver_name(receiver)
-        .and_then(|name| context.layouts.enum_constructor(name, method))
+        .and_then(|name| context.layouts.enum_constructor(&name, method))
         .is_some()
     {
         lower_enum_constructor(function, receiver, method, arguments, context)
@@ -172,7 +172,7 @@ fn lower_field_construct(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if enum_receiver_name(object)
-        .and_then(|name| context.layouts.enum_constructor(name, field))
+        .and_then(|name| context.layouts.enum_constructor(&name, field))
         .is_some()
     {
         lower_enum_constructor(function, object, field, &[], context)

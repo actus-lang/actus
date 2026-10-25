@@ -60,7 +60,15 @@ pub fn organize_imports(source: &str) -> Option<(LspRange, String)> {
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::Import(import) => Some((import.span, format!("import {};", import.path))),
+            TopLevelDecl::Import(import) => Some((
+                import.span,
+                format!(
+                    "import {}{}{};",
+                    if import.is_open { "open " } else { "" },
+                    import.path,
+                    import.alias.as_ref().map_or_else(String::new, |alias| format!(" as {alias}")),
+                ),
+            )),
             TopLevelDecl::OpenSibling(open) => Some((open.span, format!("open {};", open.name))),
             _ => None,
         })
