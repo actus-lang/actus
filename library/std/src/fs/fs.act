@@ -14,5 +14,8 @@ open operations;
 """Re-export explicit open-mode configuration and constructors."""
 open options;
 
+"""Re-export staged writes and atomic publication operations."""
+open publication;
+
 """Re-export file cursor origins and seek contracts."""
 open seek;

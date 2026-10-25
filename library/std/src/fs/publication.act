@@ -1,0 +1,104 @@
+"""Staged filesystem writes and explicit atomic publication operations."""
+import {
+    io,
+    path as path_module,
+};
+
+"""
+Create or truncate `path`, write borrowed contents, and close the file.
+
+`path` and `contents` are `abs` views borrowed only for their respective
+runtime calls. `Ok(count)` is the exact number of bytes written;
+`Err(IoError.Failed)` or `Err(IoError.EndOfStream)` reports failure after the
+owned `File` has been deterministically cleaned up.
+"""
+open verb write_file(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
+    return write_and_flush(path: abs path, contents: abs contents);
+}
+
+"""
+Write a complete file through a staging path and publish it with one rename.
+
+`path` is the final destination and `staging` is a caller-selected temporary
+path in the same filesystem. The contents are written and the handle is
+flushed before the rename. A write, flush, or rename failure removes the staging file
+and returns the typed error; cleanup is deterministic and the final destination
+is never partially written. The operation performs no hidden allocation.
+"""
+open verb write_file_atomic(
+    abs path: path_module::Path,
+    dat staging: path_module::Path,
+    abs contents: Buffer
+) -> Result[Int, io::IoError] {
+    erg written = write_and_flush(path: abs staging, contents: abs contents);
+    return case dat written {
+        Result.Err(error) => cleanup_atomic_failure(staging: dat staging, error: dat error),
+        Result.Ok(count) => {
+            erg published = rename(from: abs staging, to: abs path);
+            return case dat published {
+                Result.Ok(_) => {
+                    drop(staging);
+                    return Result[Int, io::IoError].Ok(count);
+                },
+                Result.Err(error) => cleanup_atomic_failure(staging: dat staging, error: dat error),
+            };
+        },
+    };
+}
+
+"""Write bytes to a new file and flush the handle before returning a typed result."""
+open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
+    erg opened = file_create(path: abs path);
+    return case dat opened {
+        Result.Err(error) => Result[Int, io::IoError].Err(error),
+        Result.Ok(value) => {
+            erg file: File = value;
+            erg written = file.write(buffer: abs contents);
+            return case dat written {
+                Result.Err(error) => {
+                    erg closed_on_write_error = file_close(self: ins file);
+                    return Result[Int, io::IoError].Err(error);
+                },
+                Result.Ok(count) => {
+                    erg expected_result = io::buffer_size(buffer: abs contents);
+                    return case dat expected_result {
+                        Result.Err(error) => {
+                            erg closed_on_size_error = file_close(self: ins file);
+                            return Result[Int, io::IoError].Err(error);
+                        },
+                        Result.Ok(expected) => {
+                            if count != expected {
+                                erg closed_on_size_mismatch = file_close(self: ins file);
+                                return Result[Int, io::IoError].Err(io::IoError.Failed);
+                            }
+                            erg flushed = file.flush();
+                            return case dat flushed {
+                                Result.Ok(_) => {
+                                    erg closed_after_flush = file_close(self: ins file);
+                                    return case dat closed_after_flush {
+                                        Result.Ok(_) => Result[Int, io::IoError].Ok(count),
+                                        Result.Err(error) => Result[Int, io::IoError].Err(error),
+                                    };
+                                },
+                                Result.Err(error) => {
+                                    erg closed_on_flush_error = file_close(self: ins file);
+                                    return Result[Int, io::IoError].Err(error);
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+"""Clean up failed staging storage and return the original atomic-write error."""
+open verb cleanup_atomic_failure(
+    dat staging: path_module::Path,
+    dat error: io::IoError
+) -> Result[Int, io::IoError] {
+    remove_file(path: abs staging);
+    drop(staging);
+    return Result[Int, io::IoError].Err(error);
+}
