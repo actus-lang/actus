@@ -91,20 +91,20 @@ collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
 
 ## Gate 2: Typed paths and filesystem identity
 
-- [ ] Reuse the existing `Path` representation and document its encoding and
+- [x] Reuse the existing `Path` representation and document its encoding and
       platform rules.
-- [ ] Add explicit path operations for `join`, `parent`, `file_name`,
+- [x] Add explicit path operations for `join`, `parent`, `file_name`,
       `extension`, `file_stem`, `components`, and `normalize`.
-- [ ] Guarantee that every non-owning `PathComponent` view preserves a valid
+- [x] Guarantee that every non-owning `PathComponent` view preserves a valid
       source reference and that reads through `source.storage`, `offset`, and
       `length` observe the original platform representation without exposing
       backend-specific pointer details.
-- [ ] Add regression coverage for component-source byte/code-unit reads,
+- [x] Add regression coverage for component-source byte/code-unit reads,
       including extension and file-name views on POSIX and Windows paths.
 - [ ] Add a separate canonicalization operation that resolves filesystem
       identity and reports missing components instead of changing lexical
       paths implicitly.
-- [ ] Define absolute, relative, root, separator, dot, and dot-dot behavior
+- [x] Define absolute, relative, root, separator, dot, and dot-dot behavior
       for POSIX and Windows targets.
 - [ ] Define whether a path operation preserves or rejects embedded NUL,
       invalid UTF-8, reserved names, and platform-invalid components.
@@ -112,6 +112,16 @@ collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
       provide it, with an explicit unsupported result otherwise.
 - [ ] Add accepted and rejected tests for traversal, malformed encoding,
       roots, separators, and platform-specific reserved names.
+
+Gate 2 lexical-path evidence (2026-10-26): `std::path::Path` owns validated
+raw POSIX bytes or target-endian Windows UTF-16 units, while component views
+retain their source path and offsets. The mirrored fixtures
+`tests/library/path_component_source.act`, `path_components.act`,
+`path_platform.act`, `path_edge_cases.act`, `path_iteration.act`, and
+`path_builders.act` cover source reads, POSIX/Windows roots and separators,
+lexical dot and dot-dot normalization, component extraction, ownership, and
+embedded-null/invalid-encoding failures. Filesystem identity resolution,
+reserved-name policy, traversal rejection, and `same_file` remain open.
 
 ## Gate 3: Directory handle lifecycle
 
