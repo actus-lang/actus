@@ -1,0 +1,24 @@
+"""Typed filesystem permission and readonly-state inspection operations."""
+import {
+    io,
+    path as path_module,
+};
+
+"""
+Inspect readonly state without exposing host permission structures.
+
+`path` is an `abs` view borrowed for metadata inspection. The operation is
+blocking on hosted targets, allocates no filesystem handle, and returns a
+typed error when the target cannot be inspected.
+"""
+open verb is_readonly(abs path: path_module::Path) -> Result[Bool, io::IoError] {
+    erg inspected = metadata(path: abs path);
+    return case dat inspected {
+        Result.Err(error) => Result[Bool, io::IoError].Err(error),
+        Result.Ok(value) => {
+            erg readonly = value.readonly == 1;
+            drop(value);
+            return Result[Bool, io::IoError].Ok(readonly);
+        },
+    };
+}

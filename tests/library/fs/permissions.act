@@ -1,0 +1,44 @@
+"""Mirrored readonly-state error coverage for the hosted filesystem facade."""
+import {
+    fs,
+    path,
+};
+
+verb missing_path() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 110u8);
+    append(raw, 111u8);
+    append(raw, 45u8);
+    append(raw, 115u8);
+    append(raw, 117u8);
+    append(raw, 99u8);
+    append(raw, 104u8);
+    append(raw, 45u8);
+    append(raw, 112u8);
+    append(raw, 97u8);
+    append(raw, 116u8);
+    append(raw, 104u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+meta test
+verb readonly_inspection_propagates_missing_path() -> Int {
+    erg candidate = missing_path();
+    return case dat candidate {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg inspected = fs::is_readonly(path: abs path);
+            return case dat inspected {
+                Result.Err(_) => 0,
+                Result.Ok(_) => 2,
+            };
+        },
+    };
+}

@@ -8,6 +8,9 @@ open file;
 """Re-export typed metadata values and metadata providers."""
 open metadata;
 
+"""Re-export typed readonly and permission inspection operations."""
+open permissions;
+
 """Re-export path-based filesystem operations and typed statuses."""
 open operations;
 
