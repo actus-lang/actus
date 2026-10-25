@@ -65,10 +65,13 @@ pub(super) fn generic_inputs(
         .object_plan()
         .map_err(|error| BackendEmitError(format!("module object planning failed: {error:?}")))?;
     let mut unique_instances = Vec::new();
+    let mut combined_program =
+        crate::ast::Program { file_metadata: Vec::new(), declarations: Vec::new() };
     for unit in object_plan.units() {
         let expansion_program = crate::codegen::normalize_program(
             &crate::semantic::filter_program_for_target(unit.program(), configuration.target()),
         );
+        combined_program.declarations.extend(expansion_program.declarations.clone());
         let generic_instances = crate::semantic::analyze(&expansion_program)
             .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
             .generic_instances;
@@ -82,6 +85,17 @@ pub(super) fn generic_inputs(
             }) {
                 unique_instances.push(instance);
             }
+        }
+    }
+    let expanded_instances =
+        crate::codegen::expand_generic_instances(&combined_program, &unique_instances)?;
+    for instance in expanded_instances {
+        if !unique_instances.iter().any(|known: &crate::semantic::GenericInstance| {
+            known.identity() == instance.identity()
+                && known.caller == instance.caller
+                && known.call_span == instance.call_span
+        }) {
+            unique_instances.push(instance);
         }
     }
     let generic_types =
