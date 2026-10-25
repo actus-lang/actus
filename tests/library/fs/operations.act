@@ -5,11 +5,6 @@ import {
 
 verb read_many_path() -> Path {
     erg raw = Buffer[0];
-    append(raw, 47u8);
-    append(raw, 116u8);
-    append(raw, 109u8);
-    append(raw, 112u8);
-    append(raw, 47u8);
     append(raw, 97u8);
     append(raw, 99u8);
     append(raw, 116u8);
