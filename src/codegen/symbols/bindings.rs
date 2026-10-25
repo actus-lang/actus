@@ -8,6 +8,19 @@ pub struct BackendSymbolBindings {
 
 impl BackendSymbolBindings {
     pub fn new(bindings: impl IntoIterator<Item = (String, String, String)>) -> Self {
+        Self::new_with_unique_source_policy(bindings, false)
+    }
+
+    pub(crate) fn new_prefer_first_unique_source(
+        bindings: impl IntoIterator<Item = (String, String, String)>,
+    ) -> Self {
+        Self::new_with_unique_source_policy(bindings, true)
+    }
+
+    fn new_with_unique_source_policy(
+        bindings: impl IntoIterator<Item = (String, String, String)>,
+        prefer_first: bool,
+    ) -> Self {
         let mut external = BTreeMap::new();
         let mut unique_source = BTreeMap::new();
         for (namespace, source, symbol) in bindings {
@@ -17,9 +30,10 @@ impl BackendSymbolBindings {
                     unique_source.insert(source, symbol);
                 }
                 Some(existing) if existing == &symbol => {}
-                Some(_) => {
+                Some(_) if !prefer_first => {
                     unique_source.remove(&source);
                 }
+                Some(_) => {}
             }
         }
         Self { external, unique_source }

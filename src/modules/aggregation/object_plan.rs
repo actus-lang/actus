@@ -70,24 +70,33 @@ pub(super) fn build_object_plan(
         if !owners.insert(module_path.clone()) {
             return Err(ModuleError::DuplicateObjectOwner { module_path });
         }
+        let internal_scope = compilation.has_friend_scope()
+            && compilation.friend_modules().iter().any(|friend| {
+                module.identity().module_path() == friend
+                    || module.identity().module_path().starts_with(&format!("{friend}::"))
+            });
+        let exported_verbs = exported_implementation_names(module, internal_scope);
         units.push(ModuleObjectUnit {
             owner: ModuleObjectOwner::Imported { module_path },
             namespace: module.identity().namespace().clone(),
             program: implementation_declarations(module, compilation, generic_types),
-            exported_verbs: exported_implementation_names(module),
+            exported_verbs,
         });
     }
     Ok(ModuleObjectPlan { units })
 }
 
-fn exported_implementation_names(module: &super::unit::ModuleUnit) -> Vec<String> {
+fn exported_implementation_names(
+    module: &super::unit::ModuleUnit,
+    internal_scope: bool,
+) -> Vec<String> {
     module
         .implementation()
         .declarations
         .iter()
         .filter_map(|declaration| {
             let TopLevelDecl::Verb(verb) = declaration else { return None };
-            verb.is_open.then(|| verb.name.clone())
+            (internal_scope || verb.is_open).then(|| verb.name.clone())
         })
         .collect()
 }
@@ -127,6 +136,17 @@ fn implementation_declarations(
             .into_iter()
             .filter(|declaration| !matches!(declaration, TopLevelDecl::Import(_))),
     );
+    append_friend_import_aliases(
+        module,
+        compilation,
+        &mut declaration_identities,
+        &mut declarations,
+    );
+    append_shared_internal_declarations(
+        compilation,
+        &mut declaration_identities,
+        &mut declarations,
+    );
     for declaration in &declarations {
         if let Some(identity) = type_declaration_identity(declaration) {
             declaration_identities.insert(identity);
@@ -139,6 +159,74 @@ fn implementation_declarations(
         &mut declarations,
     );
     Program { file_metadata: Vec::new(), declarations }
+}
+
+fn append_friend_import_aliases(
+    module: &super::unit::ModuleUnit,
+    compilation: &ModuleCompilationPlan,
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    let local = module
+        .implementation()
+        .declarations
+        .iter()
+        .filter(|declaration| {
+            matches!(declaration, TopLevelDecl::Verb(_) | TopLevelDecl::ExternalVerb(_))
+        })
+        .collect::<Vec<_>>();
+    for import in module.implementation().declarations.iter().filter_map(|declaration| {
+        let TopLevelDecl::Import(import) = declaration else { return None };
+        if import.is_open {
+            return None;
+        }
+        let path = super::plan::qualify_import_path(module.identity().module_path(), &import.path);
+        let friend = compilation
+            .friend_modules()
+            .iter()
+            .any(|root| path == *root || path.starts_with(&format!("{root}::")));
+        friend.then(|| {
+            import.alias.clone().or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+        })
+    }) {
+        let Some(namespace) = import else { continue };
+        for declaration in &local {
+            let imported = dependency_declaration(declaration, Some(&namespace));
+            let Some((kind, name)) = export_identity(&imported) else { continue };
+            if declaration_identities.insert((kind.to_owned(), name)) {
+                declarations.push(imported);
+            }
+        }
+    }
+}
+
+fn append_shared_internal_declarations(
+    compilation: &ModuleCompilationPlan,
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    if compilation.friend_modules().is_empty() {
+        return;
+    }
+    for declaration in &compilation.caller().declarations {
+        let include = match declaration {
+            TopLevelDecl::Constant(_)
+            | TopLevelDecl::Struct(_)
+            | TopLevelDecl::Enum(_)
+            | TopLevelDecl::Pack(_)
+            | TopLevelDecl::Role(_) => true,
+            TopLevelDecl::ExternalVerb(verb) => verb.module_import,
+            _ => false,
+        };
+        if !include {
+            continue;
+        }
+        let Some((kind, name)) = export_identity(declaration) else { continue };
+        let identity = (kind.to_owned(), name);
+        if declaration_identities.insert(identity) {
+            declarations.push(declaration.clone());
+        }
+    }
 }
 
 fn append_generic_type_declarations(
@@ -227,6 +315,7 @@ fn type_declaration_identity(declaration: &TopLevelDecl) -> Option<(String, Stri
         TopLevelDecl::Struct(definition) => Some(("struct".to_owned(), definition.name.clone())),
         TopLevelDecl::Enum(definition) => Some(("enum".to_owned(), definition.name.clone())),
         TopLevelDecl::Pack(definition) => Some(("pack".to_owned(), definition.name.clone())),
+        TopLevelDecl::Role(definition) => Some(("role".to_owned(), definition.name.clone())),
         _ => None,
     }
 }
@@ -238,18 +327,8 @@ fn append_imported_declarations(
     declaration_identities: &mut HashSet<(String, String)>,
     declarations: &mut Vec<TopLevelDecl>,
 ) {
-    let imports = module
-        .implementation()
-        .declarations
-        .iter()
-        .filter_map(|declaration| {
-            let TopLevelDecl::Import(import) = declaration else { return None };
-            let import_path =
-                super::plan::qualify_import_path(module.identity().module_path(), &import.path);
-            compilation.units().iter().find(|unit| unit.identity().module_path() == import_path)
-        })
-        .collect::<Vec<_>>();
-    for dependency in imports {
+    let imports = imported_dependencies(module, compilation);
+    for (dependency, namespace) in imports {
         if !imported_paths.insert(dependency.identity().module_path().to_owned()) {
             continue;
         }
@@ -270,8 +349,17 @@ fn append_imported_declarations(
                 declarations.push(TopLevelDecl::Import(imported));
             }
         }
+        let friend = compilation.friend_modules().iter().any(|friend| {
+            dependency.identity().module_path() == friend
+                || dependency.identity().module_path().starts_with(&format!("{friend}::"))
+        });
         for declaration in &dependency.implementation().declarations {
-            let Some(exported) = exported_dependency_declaration(dependency, declaration) else {
+            let Some(exported) = exported_dependency_declaration(
+                dependency,
+                declaration,
+                friend,
+                friend.then_some(namespace.as_deref()).flatten(),
+            ) else {
                 continue;
             };
             let Some((kind, name)) = export_identity(&exported) else { continue };
@@ -290,6 +378,30 @@ fn append_imported_declarations(
     }
 }
 
+fn imported_dependencies<'a>(
+    module: &super::unit::ModuleUnit,
+    compilation: &'a ModuleCompilationPlan,
+) -> Vec<(&'a super::unit::ModuleUnit, Option<String>)> {
+    module
+        .implementation()
+        .declarations
+        .iter()
+        .filter_map(|declaration| {
+            let TopLevelDecl::Import(import) = declaration else { return None };
+            let import_path =
+                super::plan::qualify_import_path(module.identity().module_path(), &import.path);
+            let unit = compilation
+                .units()
+                .iter()
+                .find(|unit| unit.identity().module_path() == import_path)?;
+            let namespace = (!import.is_open).then(|| {
+                import.alias.clone().or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+            });
+            Some((unit, namespace.flatten()))
+        })
+        .collect()
+}
+
 fn import_binding(import: &crate::ast::ImportDecl) -> String {
     import
         .alias
@@ -301,12 +413,15 @@ fn import_binding(import: &crate::ast::ImportDecl) -> String {
 fn exported_dependency_declaration(
     dependency: &super::unit::ModuleUnit,
     declaration: &TopLevelDecl,
+    friend: bool,
+    namespace: Option<&str>,
 ) -> Option<TopLevelDecl> {
     let (kind, name) = export_identity(declaration)?;
-    dependency.exports().contains(kind, &name).then(|| dependency_declaration(declaration))
+    (friend || dependency.exports().contains(kind, &name))
+        .then(|| dependency_declaration(declaration, namespace))
 }
 
-fn dependency_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
+fn dependency_declaration(declaration: &TopLevelDecl, namespace: Option<&str>) -> TopLevelDecl {
     match declaration {
         TopLevelDecl::Verb(verb) => TopLevelDecl::ExternalVerb(ExternalVerbDecl {
             is_open: verb.is_open,
@@ -316,8 +431,9 @@ fn dependency_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
             module_import: true,
             abi: ForeignAbi::C,
             metadata: verb.metadata.clone(),
-            name: verb.name.clone(),
-            native_symbol: None,
+            name: namespace
+                .map_or_else(|| verb.name.clone(), |value| format!("{value}::{}", verb.name)),
+            native_symbol: namespace.map(|_| verb.name.clone()),
             generic_parameters: verb.generic_parameters.clone(),
             params: verb.params.clone(),
             return_type: verb.return_type.clone(),
@@ -327,6 +443,10 @@ fn dependency_declaration(declaration: &TopLevelDecl) -> TopLevelDecl {
             let mut imported = verb.clone();
             imported.unsafe_boundary = false;
             imported.module_import = true;
+            if let Some(namespace) = namespace {
+                imported.native_symbol = Some(imported.name.clone());
+                imported.name = format!("{namespace}::{}", imported.name);
+            }
             TopLevelDecl::ExternalVerb(imported)
         }
         _ => declaration.clone(),

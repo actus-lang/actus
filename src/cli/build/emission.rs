@@ -154,7 +154,8 @@ fn emit_objects_cranelift(
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
-    let bindings = module_bindings(&object_plan, &generic_instances)?;
+    let bindings =
+        module_bindings_with_policy(&object_plan, &generic_instances, plan.has_friend_scope())?;
     emit_shared_cranelift(&object_plan, symbol, configuration, &bindings, &generic_instances)
 }
 
@@ -195,9 +196,10 @@ fn emit_objects_cranelift(
 }
 
 #[cfg(feature = "cranelift")]
-fn module_bindings(
+fn module_bindings_with_policy(
     plan: &crate::modules::ModuleObjectPlan,
     generic_instances: &[crate::semantic::GenericInstance],
+    prefer_first_unique_source: bool,
 ) -> Result<crate::codegen::BackendSymbolBindings, BackendEmitError> {
     let mut bindings = Vec::new();
     for unit in &plan.units()[1..] {
@@ -237,7 +239,11 @@ fn module_bindings(
             }
         }
     }
-    Ok(crate::codegen::BackendSymbolBindings::new(bindings))
+    Ok(if prefer_first_unique_source {
+        crate::codegen::BackendSymbolBindings::new_prefer_first_unique_source(bindings)
+    } else {
+        crate::codegen::BackendSymbolBindings::new(bindings)
+    })
 }
 
 fn first_defined_verb(program: &crate::ast::Program) -> Option<&str> {

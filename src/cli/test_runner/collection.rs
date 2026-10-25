@@ -5,7 +5,10 @@ use crate::ast::{MetaAttribute, Program, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnostic};
 use crate::lexer::{TokenKind, scan};
-use crate::modules::{ModuleResolver, parse_module, resolve_imports};
+use crate::modules::{
+    ModuleCompilationPlan, ModuleResolver, build_test_compilation_plan, parse_module,
+    resolve_imports,
+};
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target;
 
@@ -18,7 +21,7 @@ pub(super) struct DiscoveredTest {
     pub(super) relative_path: PathBuf,
     pub(super) name: String,
     pub(super) program: Program,
-    pub(super) source_program: Program,
+    pub(super) compilation_plan: Option<ModuleCompilationPlan>,
 }
 
 pub(super) struct TestCollection {
@@ -65,7 +68,7 @@ fn collect_file_tests(
         validate_test_mirror(path, configuration)?;
     }
     validate_source(path, &source, options.mode, configuration)?;
-    let Some((source_program, program, test_names)) = parse_source(
+    let Some((_source_program, program, compilation_plan, test_names)) = parse_source(
         path,
         &source,
         resolver,
@@ -85,7 +88,7 @@ fn collect_file_tests(
     let relative_path =
         path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
     let discovered =
-        discover_tests(path, &module, &relative_path, source_program, program, &test_names);
+        discover_tests(path, &module, &relative_path, program, compilation_plan, &test_names);
     let selected = discovered.iter().filter(|test| test_matches(test, options)).count();
     let selection_filtered = discovered.len().saturating_sub(selected);
     Ok(CollectedFile {
@@ -142,7 +145,7 @@ fn parse_source(
     source_root: &Path,
     project_root: &Path,
     options: &TestOptions,
-) -> Result<Option<(Program, Program, Vec<String>)>, String> {
+) -> Result<Option<(Program, Program, Option<ModuleCompilationPlan>, Vec<String>)>, String> {
     let (tokens, errors) = scan(source);
     if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
         return Ok(None);
@@ -177,12 +180,21 @@ fn parse_source(
             program
         })
         .unwrap_or_else(|| source_program.clone());
-    resolve_imports(&compilation_source, resolver)
-        .map(|program| Some((compilation_source, program, test_names)))
-        .map_err(|error| {
+    let resolved =
+        if compilation_source.declarations.iter().any(
+            |declaration| matches!(declaration, TopLevelDecl::Import(import) if import.is_open),
+        ) {
+            build_test_compilation_plan(&compilation_source, resolver)
+                .map(|plan| (plan.caller().clone(), Some(plan)))
+        } else {
+            resolve_imports(&compilation_source, resolver).map(|program| (program, None))
+        };
+    resolved.map(|(program, plan)| Some((compilation_source, program, plan, test_names))).map_err(
+        |error| {
             let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
             format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
-        })
+        },
+    )
 }
 
 fn append_mirrored_test_declarations(
@@ -279,8 +291,8 @@ fn discover_tests(
     path: &Path,
     module: &str,
     relative_path: &Path,
-    source_program: Program,
     program: Program,
+    compilation_plan: Option<ModuleCompilationPlan>,
     names: &[String],
 ) -> Vec<DiscoveredTest> {
     program
@@ -296,7 +308,7 @@ fn discover_tests(
                     relative_path: relative_path.to_path_buf(),
                     name: verb.name.clone(),
                     program: program.clone(),
-                    source_program: source_program.clone(),
+                    compilation_plan: compilation_plan.clone(),
                 })
             }
             _ => None,

@@ -1,5 +1,6 @@
 mod analysis;
 mod collision;
+mod declarations;
 mod exports;
 mod identity;
 mod object_plan;
@@ -22,6 +23,7 @@ pub use object_plan::{ModuleObjectOwner, ModuleObjectPlan, ModuleObjectUnit};
 pub use parsing::parse_module;
 pub use plan::{
     ModuleCompilationPlan, build_compilation_plan, build_compilation_plan_with_overlays,
+    build_test_compilation_plan,
 };
 pub use types::{DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation};
 pub use unit::{

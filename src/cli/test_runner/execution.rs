@@ -5,7 +5,7 @@ use crate::ast::{Block, Expr, Stmt, TopLevelDecl, TypeName, VerbDecl};
 use crate::codegen::link_objects;
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::SourceSpan;
-use crate::modules::{ModuleResolver, build_compilation_plan};
+use crate::modules::{ModuleResolver, build_test_compilation_plan};
 
 use super::super::conformance::ConformanceMode;
 use super::TestOptions;
@@ -135,7 +135,7 @@ fn test_compilation_plan(
     test: &DiscoveredTest,
     configuration: &CompilerConfiguration,
 ) -> Result<crate::modules::ModuleCompilationPlan, String> {
-    let mut program = test_program(&test.source_program, &test.name);
+    let mut program = test_program(&test.program, &test.name);
     if program
         .declarations
         .iter()
@@ -144,13 +144,16 @@ fn test_compilation_plan(
         return Err("meta test program already defines `main`".to_owned());
     }
     program.declarations.push(test_main(&test.name));
+    if let Some(plan) = &test.compilation_plan {
+        return Ok(plan.with_caller_program(program));
+    }
     let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
     );
-    build_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
+    build_test_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
 }
 
 fn test_program(source_program: &crate::ast::Program, test_name: &str) -> crate::ast::Program {
