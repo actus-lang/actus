@@ -3,12 +3,12 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::{Program, TopLevelDecl};
 
 use super::super::resolver::ModuleResolver;
-use super::collision::{ExternalContract, external_contract};
 use super::declarations::{append_internal_declarations, append_public_declarations};
 use super::object_plan::{ModuleObjectPlan, build_object_plan};
+use super::plan_validation::validate_symbol_collisions;
 use super::types::ModuleError;
 use super::unit::ModuleUnit;
-use super::validation::{declaration_import_binding, export_identity, validate_import_bindings};
+use super::validation::{declaration_import_binding, validate_import_bindings};
 use super::visibility::validate_import_visibility;
 
 pub(super) use super::declarations::qualify_import_path;
@@ -273,68 +273,6 @@ fn import_namespace(import: &crate::ast::ImportDecl) -> Option<String> {
     )
 }
 
-fn validate_symbol_collisions(
-    local_declarations: &[TopLevelDecl],
-    units: &[ModuleUnit],
-) -> Result<(), ModuleError> {
-    let mut symbols = HashMap::new();
-    record_symbols("<root>", local_declarations, &mut symbols)?;
-    for unit in units {
-        record_symbols(
-            unit.identity().module_path(),
-            &unit.implementation().declarations,
-            &mut symbols,
-        )?;
-    }
-    Ok(())
-}
-
-fn record_symbols(
-    module: &str,
-    declarations: &[TopLevelDecl],
-    symbols: &mut HashMap<(String, String), SymbolRecord>,
-) -> Result<(), ModuleError> {
-    for declaration in declarations {
-        let Some((kind, name)) = export_identity(declaration) else { continue };
-        let key = (kind.to_owned(), name.clone());
-        let record = SymbolRecord {
-            module: module.to_owned(),
-            external_contract: external_contract(declaration),
-            declaration: declaration.clone(),
-        };
-        if let Some(first) = symbols.get(&key)
-            && first.module != module
-        {
-            if first.declaration == *declaration {
-                continue;
-            }
-            if first.external_contract.is_some()
-                && first.external_contract == record.external_contract
-            {
-                continue;
-            }
-            return Err(ModuleError::SymbolCollision {
-                symbol: if record.external_contract.is_some() {
-                    format!("native symbol `{name}`")
-                } else {
-                    format!("{kind} `{name}`")
-                },
-                first_module: first.module.clone(),
-                second_module: module.to_owned(),
-            });
-        }
-        symbols.insert(key, record);
-    }
-    Ok(())
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct SymbolRecord {
-    module: String,
-    external_contract: Option<ExternalContract>,
-    declaration: TopLevelDecl,
-}
-
 #[allow(clippy::too_many_arguments)]
 fn collect_unit(
     module_path: &str,
@@ -399,46 +337,81 @@ fn append_unit_declarations(
     selected: &[String],
 ) {
     if friend {
-        if selected.is_empty() {
-            append_internal_declarations(
-                caller_declarations,
-                unit,
-                module_path,
-                namespace,
-                appended_symbols,
-            );
-        }
-        if open_import || !selected.is_empty() {
-            if selected.is_empty() {
-                append_internal_declarations(
-                    caller_declarations,
-                    unit,
-                    module_path,
-                    None,
-                    appended_symbols,
-                );
-            } else {
-                append_public_declarations(
-                    caller_declarations,
-                    unit,
-                    module_path,
-                    namespace,
-                    selected,
-                    appended_symbols,
-                );
-                append_public_declarations(
-                    caller_declarations,
-                    unit,
-                    module_path,
-                    None,
-                    selected,
-                    appended_symbols,
-                );
-            }
-        }
+        append_friend_unit_declarations(
+            unit,
+            module_path,
+            caller_declarations,
+            appended_symbols,
+            namespace,
+            open_import,
+            selected,
+        );
+    } else {
+        append_public_unit_declarations(
+            unit,
+            module_path,
+            caller_declarations,
+            appended_symbols,
+            namespace,
+            open_import,
+            selected,
+        );
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_friend_unit_declarations(
+    unit: &ModuleUnit,
+    module_path: &str,
+    caller_declarations: &mut Vec<TopLevelDecl>,
+    appended_symbols: &mut HashSet<(String, String, String)>,
+    namespace: Option<&str>,
+    open_import: bool,
+    selected: &[String],
+) {
+    if selected.is_empty() {
+        append_internal_declarations(
+            caller_declarations,
+            unit,
+            module_path,
+            namespace,
+            appended_symbols,
+        );
+    }
+    if !open_import && selected.is_empty() {
         return;
     }
+    if selected.is_empty() {
+        append_internal_declarations(
+            caller_declarations,
+            unit,
+            module_path,
+            None,
+            appended_symbols,
+        );
+        return;
+    }
+    append_public_unit_declarations(
+        unit,
+        module_path,
+        caller_declarations,
+        appended_symbols,
+        namespace,
+        true,
+        selected,
+    );
+}
 
+#[allow(clippy::too_many_arguments)]
+fn append_public_unit_declarations(
+    unit: &ModuleUnit,
+    module_path: &str,
+    caller_declarations: &mut Vec<TopLevelDecl>,
+    appended_symbols: &mut HashSet<(String, String, String)>,
+    namespace: Option<&str>,
+    open_import: bool,
+    selected: &[String],
+) {
     append_public_declarations(
         caller_declarations,
         unit,

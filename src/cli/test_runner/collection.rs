@@ -33,6 +33,8 @@ struct CollectedFile {
     filtered: usize,
 }
 
+type ParsedTestSource = Option<(Program, Program, Option<ModuleCompilationPlan>, Vec<String>)>;
+
 pub(super) fn collect_tests(
     files: Vec<PathBuf>,
     configuration: &CompilerConfiguration,
@@ -144,7 +146,7 @@ fn parse_source(
     source_root: &Path,
     project_root: &Path,
     options: &TestOptions,
-) -> Result<Option<(Program, Program, Option<ModuleCompilationPlan>, Vec<String>)>, String> {
+) -> Result<ParsedTestSource, String> {
     let (tokens, errors) = scan(source);
     if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
         return Ok(None);

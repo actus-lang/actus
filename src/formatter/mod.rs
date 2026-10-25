@@ -1,6 +1,7 @@
 use crate::ast::{Program, Role, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
+mod declaration_widths;
 mod declarations;
 mod expressions;
 mod statements;

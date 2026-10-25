@@ -3,41 +3,11 @@ use std::collections::HashSet;
 use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 
 use super::identity::ModuleNamespace;
+use super::object_types::{declaration_type_dependencies, type_declaration_identity};
+pub use super::object_units::{ModuleObjectOwner, ModuleObjectUnit};
 use super::plan::ModuleCompilationPlan;
 use super::types::ModuleError;
 use super::validation::export_identity;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ModuleObjectOwner {
-    Root,
-    Imported { module_path: String },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ModuleObjectUnit {
-    owner: ModuleObjectOwner,
-    namespace: ModuleNamespace,
-    program: Program,
-    exported_verbs: Vec<String>,
-}
-
-impl ModuleObjectUnit {
-    pub fn owner(&self) -> &ModuleObjectOwner {
-        &self.owner
-    }
-
-    pub fn namespace(&self) -> &ModuleNamespace {
-        &self.namespace
-    }
-
-    pub fn program(&self) -> &Program {
-        &self.program
-    }
-
-    pub fn exported_verbs(&self) -> &[String] {
-        &self.exported_verbs
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleObjectPlan {
@@ -308,41 +278,6 @@ fn append_generic_type_declaration(
     }
 }
 
-fn declaration_type_dependencies(declaration: &TopLevelDecl) -> Vec<&crate::ast::TypeName> {
-    match declaration {
-        TopLevelDecl::Struct(definition) => {
-            definition.fields.iter().map(|field| &field.ty).collect()
-        }
-        TopLevelDecl::Enum(definition) => definition
-            .variants
-            .iter()
-            .flat_map(|variant| match &variant.payload {
-                crate::ast::EnumPayload::Unit => Vec::new(),
-                crate::ast::EnumPayload::Tuple(fields) => fields.iter().collect(),
-                crate::ast::EnumPayload::Struct(fields) => {
-                    fields.iter().map(|field| &field.ty).collect()
-                }
-            })
-            .collect(),
-        TopLevelDecl::Pack(definition) => {
-            let mut dependencies = vec![definition.storage.type_name()];
-            dependencies.extend(definition.fields.iter().map(|field| &field.ty));
-            dependencies
-        }
-        _ => Vec::new(),
-    }
-}
-
-fn type_declaration_identity(declaration: &TopLevelDecl) -> Option<(String, String)> {
-    match declaration {
-        TopLevelDecl::Struct(definition) => Some(("struct".to_owned(), definition.name.clone())),
-        TopLevelDecl::Enum(definition) => Some(("enum".to_owned(), definition.name.clone())),
-        TopLevelDecl::Pack(definition) => Some(("pack".to_owned(), definition.name.clone())),
-        TopLevelDecl::Role(definition) => Some(("role".to_owned(), definition.name.clone())),
-        _ => None,
-    }
-}
-
 fn append_imported_declarations(
     module: &super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
@@ -354,55 +289,16 @@ fn append_imported_declarations(
     for (dependency, namespace, open_import, selected) in imports {
         let first_visit = imported_paths.insert(dependency.identity().module_path().to_owned());
         append_dependency_imports(dependency, declarations);
-        let module_path = module.identity().module_path();
-        let dependency_path = dependency.identity().module_path();
-        let parent_scope = module_path == dependency_path
-            || module_path.starts_with(&format!("{dependency_path}::"))
-            || dependency_path.starts_with(&format!("{module_path}::"));
-        let friend = selected.is_empty()
-            && !open_import
-            && (parent_scope
-                || compilation.friend_modules().iter().any(|friend| {
-                    dependency_path == friend || dependency_path.starts_with(&format!("{friend}::"))
-                }));
-        for declaration in &dependency.implementation().declarations {
-            if !selected.is_empty()
-                && export_identity(declaration)
-                    .is_none_or(|(_, name)| !selected.iter().any(|item| item == &name))
-            {
-                continue;
-            }
-            let qualified_namespace = if open_import {
-                namespace.as_deref()
-            } else {
-                friend.then_some(namespace.as_deref()).flatten()
-            };
-            let Some(exported) = exported_dependency_declaration(
-                dependency,
-                declaration,
-                friend,
-                qualified_namespace,
-            ) else {
-                continue;
-            };
-            let Some((kind, name)) = export_identity(&exported) else { continue };
-            let identity = (kind.to_owned(), name);
-            if declaration_identities.insert(identity) {
-                declarations.push(exported);
-            }
-            if open_import || !selected.is_empty() {
-                let Some(opened) =
-                    exported_dependency_declaration(dependency, declaration, false, None)
-                else {
-                    continue;
-                };
-                let Some((kind, name)) = export_identity(&opened) else { continue };
-                let identity = (kind.to_owned(), name);
-                if declaration_identities.insert(identity) {
-                    declarations.push(opened);
-                }
-            }
-        }
+        append_dependency_declarations(
+            module,
+            compilation,
+            dependency,
+            namespace.as_deref(),
+            open_import,
+            &selected,
+            declaration_identities,
+            declarations,
+        );
         if first_visit {
             append_imported_declarations(
                 dependency,
@@ -412,6 +308,87 @@ fn append_imported_declarations(
                 declarations,
             );
         }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_dependency_declarations(
+    module: &super::unit::ModuleUnit,
+    compilation: &ModuleCompilationPlan,
+    dependency: &super::unit::ModuleUnit,
+    namespace: Option<&str>,
+    open_import: bool,
+    selected: &[String],
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    let module_path = module.identity().module_path();
+    let dependency_path = dependency.identity().module_path();
+    let parent_scope = module_path == dependency_path
+        || module_path.starts_with(&format!("{dependency_path}::"))
+        || dependency_path.starts_with(&format!("{module_path}::"));
+    let friend = selected.is_empty()
+        && !open_import
+        && (parent_scope
+            || compilation.friend_modules().iter().any(|friend| {
+                dependency_path == friend || dependency_path.starts_with(&format!("{friend}::"))
+            }));
+    for declaration in &dependency.implementation().declarations {
+        append_dependency_declaration(
+            dependency,
+            declaration,
+            namespace,
+            open_import,
+            selected,
+            friend,
+            declaration_identities,
+            declarations,
+        );
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_dependency_declaration(
+    dependency: &super::unit::ModuleUnit,
+    declaration: &TopLevelDecl,
+    namespace: Option<&str>,
+    open_import: bool,
+    selected: &[String],
+    friend: bool,
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    if !selected.is_empty()
+        && export_identity(declaration)
+            .is_none_or(|(_, name)| !selected.iter().any(|item| item == &name))
+    {
+        return;
+    }
+    let qualified_namespace =
+        if open_import { namespace } else { friend.then_some(namespace).flatten() };
+    let Some(exported) =
+        exported_dependency_declaration(dependency, declaration, friend, qualified_namespace)
+    else {
+        return;
+    };
+    append_declaration_if_new(exported, declaration_identities, declarations);
+    if open_import || !selected.is_empty() {
+        let Some(opened) = exported_dependency_declaration(dependency, declaration, false, None)
+        else {
+            return;
+        };
+        append_declaration_if_new(opened, declaration_identities, declarations);
+    }
+}
+
+fn append_declaration_if_new(
+    declaration: TopLevelDecl,
+    declaration_identities: &mut HashSet<(String, String)>,
+    declarations: &mut Vec<TopLevelDecl>,
+) {
+    let Some((kind, name)) = export_identity(&declaration) else { return };
+    if declaration_identities.insert((kind.to_owned(), name)) {
+        declarations.push(declaration);
     }
 }
 
