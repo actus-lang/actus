@@ -36,7 +36,10 @@ or the Windows volume/file index). Targets without a stable identity return
 
 `read_dir` returns one owned `Directory` handle. `next_dir_entry` streams one
 owned `DirectoryEntry` at a time and returns `Ok(Option.None)` at end of
-directory. Each entry owns its name and relative path component and carries a
+directory; it never materializes the complete directory as an array. Native
+directory order is unspecified and must not be used as reproducible input for
+builds or deterministic consumers. Each entry owns its name and relative path
+component and carries a
 copied `Metadata` snapshot plus a `DirectoryEntryKind` classification. The
 native bridge uses link metadata, so `Symlink` describes the directory entry
 itself and does not follow its target; a broken link remains classifiable as a

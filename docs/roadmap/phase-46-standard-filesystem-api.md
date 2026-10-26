@@ -255,10 +255,10 @@ the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
 
 ## Gate 5: Deterministic and bounded enumeration
 
-- [ ] Keep enumeration streaming; never require an `Array` containing every
+- [x] Keep enumeration streaming; never require an `Array` containing every
       directory entry.
-- [ ] Define native enumeration order as unspecified and unsuitable for
-      reproducible builds or deterministic training.
+- [x] Define native enumeration order as unspecified and unsuitable for
+      reproducible builds or deterministic consumers.
 - [ ] Add an explicit ordering policy with at least `Native` and
       `Lexicographic` modes.
 - [ ] Define lexicographic ordering over the canonical byte representation,
@@ -272,6 +272,12 @@ the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
       bounded profiles.
 - [ ] Add tests proving identical ordering across repeated runs and both
       native backends.
+
+Gate 5 initial evidence (2026-10-27): the basic iterator remains bounded to
+one native directory handle and one returned entry at a time; it does not
+materialize an array of entries. Native order is explicitly unspecified in
+the filesystem guide and is not a reproducible ordering contract. Explicit
+ordering, filtering, and bounded sorting remain separate follow-up work.
 
 ## Gate 6: Recursive walking and traversal policy
 
