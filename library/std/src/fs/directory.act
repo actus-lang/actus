@@ -14,7 +14,7 @@ open const DIRECTORY_ENTRY_BUFFER_BYTES: Int = 4096;
 
 """An owned opaque directory handle backed by one host directory resource."""
 open struct Directory {
-    """Owned erg scalar token for one host directory; the owner must call `close_dir` before release."""
+    """Owned erg scalar token for one host directory; Drop provides best-effort scope cleanup."""
     erg handle: Int,
 }
 
@@ -44,8 +44,9 @@ Open a directory and return a handle owned by the resulting `Directory`.
 Inputs: `path` is an `abs` path view and is borrowed, not consumed. Returns:
 `Ok(Directory)` owns the host handle; `Err(IoError.Failed)` reports a missing,
 invalid, or inaccessible directory. Errors leave no live handle exposed.
-The operation performs no unbounded allocation; the caller must later use
-`close_dir` to release the returned resource.
+The operation performs no unbounded allocation; callers may release the
+resource explicitly with `close_dir`, while Drop provides best-effort cleanup
+on scope exit.
 """
 open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError] {
     erg handle = actus_directory_open(path: abs path);
@@ -136,4 +137,12 @@ open verb close_dir(ins directory: Directory) -> Result[Int, io::IoError] {
             Ok(status);
         },
     };
+}
+
+"""Close a live directory handle during deterministic scope cleanup."""
+open perform Drop for Directory {
+    """Close the owned Directory resource through an ins loan during best-effort early return, branch exit, and implicit scope cleanup."""
+    verb drop(ins self: Directory) {
+        close_dir(directory: ins self);
+    }
 }

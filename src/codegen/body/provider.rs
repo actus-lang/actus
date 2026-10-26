@@ -1,7 +1,7 @@
 use super::super::body_contract::unsupported;
 use super::{
-    BackendBlock, BackendContractError, BackendFailure, BackendInstruction, BackendIntegerBinaryOp,
-    BackendValueId, SymbolIdentity,
+    BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendInstruction,
+    BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
 };
 use crate::ast::{CompoundAssignmentOp, Expr};
 use crate::codegen::BackendValueType;
@@ -67,6 +67,10 @@ pub trait BackendExpressionProvider {
         None
     }
 
+    fn snapshot_bindings(&self) -> std::collections::BTreeMap<String, BackendValueId> {
+        std::collections::BTreeMap::new()
+    }
+
     fn append_parameter_writebacks(&self, _instructions: &mut Vec<BackendInstruction>) {}
 
     fn snapshot_scalar_loan_bindings(&self) -> Vec<(String, BackendValueId)> {
@@ -99,6 +103,15 @@ pub trait BackendExpressionProvider {
         Ok(())
     }
 
+    fn exit_scope_with_bindings(
+        &mut self,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+        _binding_values: &std::collections::BTreeMap<String, BackendValueId>,
+    ) -> Result<(), BackendContractError> {
+        self.exit_scope(span, instructions)
+    }
+
     fn exit_scope_without_cleanup(&mut self) -> Result<(), BackendContractError> {
         Ok(())
     }
@@ -108,6 +121,10 @@ pub trait BackendExpressionProvider {
         _span: SourceSpan,
         _blocks: &mut Vec<BackendBlock>,
         _start: usize,
+        _block_bindings: &std::collections::BTreeMap<
+            BackendBlockId,
+            std::collections::BTreeMap<String, BackendValueId>,
+        >,
     ) -> Result<(), BackendContractError> {
         Ok(())
     }

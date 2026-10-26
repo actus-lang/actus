@@ -237,6 +237,7 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
             return Err(error);
         }
     };
+    let scope_bindings = lowering.provider.snapshot_bindings();
     let nested_block_start = lowering.blocks.len();
     let branch_result = lower_bound_case_branch(
         lowering,
@@ -248,18 +249,29 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
             fallthrough,
             guard_failure,
             nested_block_start,
+            scope_bindings: scope_bindings.clone(),
         },
     );
     match branch_result {
         Ok(mut body) => {
             if branch.guard.is_none() {
                 body.instructions.splice(0..0, body_prefix);
-                lowering.provider.distribute_scope_cleanup(
-                    branch.span,
-                    &mut lowering.blocks,
-                    nested_block_start,
-                )?;
-                lowering.provider.exit_scope(branch.span, &mut body.instructions)?;
+                lowering.distribute_scope_cleanup(branch.span, nested_block_start)?;
+                let cleanup_on_exit = match body.instructions.last() {
+                    Some(BackendInstruction::Jump { target, .. }) => {
+                        fallthrough.is_some_and(|continuation| continuation == *target)
+                    }
+                    _ => true,
+                };
+                if cleanup_on_exit {
+                    lowering.provider.exit_scope_with_bindings(
+                        branch.span,
+                        &mut body.instructions,
+                        &scope_bindings,
+                    )?;
+                } else {
+                    lowering.provider.exit_scope_without_cleanup()?;
+                }
             }
             Ok(body)
         }
@@ -303,6 +315,7 @@ fn lower_bound_case_branch<P: BackendExpressionProvider>(
         fallthrough,
         guard_failure,
         nested_block_start,
+        scope_bindings,
     } = input;
     if branch.guard.is_some() {
         return lower_guarded_case_branch(
@@ -315,6 +328,7 @@ fn lower_bound_case_branch<P: BackendExpressionProvider>(
                 guard_failure,
                 guard_instructions: std::mem::take(body_prefix),
                 nested_block_start,
+                scope_bindings,
             },
         );
     }
@@ -333,6 +347,7 @@ fn lower_guarded_case_branch<P: BackendExpressionProvider>(
         guard_failure,
         mut guard_instructions,
         nested_block_start,
+        scope_bindings,
     } = input;
     let body_id = lowering.allocate_block();
     let guard_failure_id = lowering.allocate_block();
@@ -358,12 +373,22 @@ fn lower_guarded_case_branch<P: BackendExpressionProvider>(
             span: branch.span,
         }],
     });
-    lowering.provider.distribute_scope_cleanup(
-        branch.span,
-        &mut lowering.blocks,
-        nested_block_start,
-    )?;
-    lowering.provider.exit_scope(branch.span, &mut body.instructions)?;
+    lowering.distribute_scope_cleanup(branch.span, nested_block_start)?;
+    let cleanup_on_exit = match body.instructions.last() {
+        Some(BackendInstruction::Jump { target, .. }) => {
+            fallthrough.is_some_and(|continuation| continuation == *target)
+        }
+        _ => true,
+    };
+    if cleanup_on_exit {
+        lowering.provider.exit_scope_with_bindings(
+            branch.span,
+            &mut body.instructions,
+            &scope_bindings,
+        )?;
+    } else {
+        lowering.provider.exit_scope_without_cleanup()?;
+    }
     lowering.blocks.push(body);
     Ok(BackendBlock { parameters: Vec::new(), id, instructions: guard_instructions })
 }

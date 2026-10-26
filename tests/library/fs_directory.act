@@ -172,3 +172,42 @@ verb closed_directory_rejects_reuse() -> Int {
         },
     };
 }
+
+verb open_directory_then_return_early() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(_) => 0,
+            };
+        },
+    };
+}
+
+meta test
+verb directory_drop_closes_on_early_return() -> Int {
+    erg early = open_directory_then_return_early();
+    if early != 0 {
+        return early;
+    }
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 3,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 4,
+                Result.Ok(directory) => {
+                    erg closed = close_dir(directory: ins directory);
+                    case dat closed {
+                        Result.Ok(_) => 0,
+                        Result.Err(_) => 5,
+                    };
+                },
+            };
+        },
+    };
+}

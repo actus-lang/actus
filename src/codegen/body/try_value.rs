@@ -190,7 +190,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             self.lower_block_in_scope(continuation, &continuation_block, fallthrough)?;
         self.blocks.push(continuation_block);
         let cleanup_start = self.blocks.len().saturating_sub(3);
-        self.provider.distribute_scope_cleanup(block.span, &mut self.blocks, cleanup_start)?;
+        self.distribute_scope_cleanup(block.span, cleanup_start)?;
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: ok_block,
@@ -249,7 +249,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             instructions: parameter_writeback_return(self.provider, source, span),
         });
         let cleanup_start = self.blocks.len().saturating_sub(2);
-        self.provider.distribute_scope_cleanup(block_span, &mut self.blocks, cleanup_start)?;
+        self.distribute_scope_cleanup(block_span, cleanup_start)?;
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: ok_block,
@@ -369,11 +369,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         }];
         continuation_block.instructions.splice(0..0, binding_instructions);
         self.blocks.push(continuation_block);
-        self.provider.distribute_scope_cleanup(
-            context.block.span,
-            &mut self.blocks,
-            cleanup_start,
-        )?;
+        self.distribute_scope_cleanup(context.block.span, cleanup_start)?;
         Ok(BackendBlock {
             parameters: Vec::new(),
             id: context.id,

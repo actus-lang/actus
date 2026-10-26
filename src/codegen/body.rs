@@ -6,6 +6,7 @@ use super::{
 use crate::ast::{Block, CompoundAssignmentOp, Expr, Place, Stmt, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
+use std::collections::BTreeMap;
 mod case;
 mod case_value;
 mod control_flow;
@@ -36,6 +37,7 @@ pub fn lower_verb_body_with_expressions(
         provider,
         next_block: 1,
         blocks: Vec::new(),
+        block_bindings: BTreeMap::new(),
         loop_targets: Vec::new(),
         carried_scopes: Vec::new(),
         implicit_unit_return: verb
@@ -86,6 +88,7 @@ pub(super) struct BodyLowering<'a, P> {
     pub(super) provider: &'a mut P,
     next_block: u32,
     pub(super) blocks: Vec<BackendBlock>,
+    pub(super) block_bindings: BTreeMap<BackendBlockId, BTreeMap<String, BackendValueId>>,
     loop_targets: Vec<LoopTargets>,
     carried_scopes: Vec<Vec<String>>,
     implicit_unit_return: bool,
@@ -183,6 +186,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         block: &Block,
         fallthrough: Option<BackendBlockId>,
     ) -> Result<BackendBlock, BackendContractError> {
+        self.block_bindings.insert(id, self.provider.snapshot_bindings());
         let normalized = nested_case::normalize_block(block);
         let block = &normalized;
         let mut instructions = Vec::new();
@@ -206,27 +210,16 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                     instructions,
                 );
             }
-            if matches!(
-                statement,
-                Stmt::Loop(_)
-                    | Stmt::ForRange { .. }
-                    | Stmt::ForArray { .. }
-                    | Stmt::Block(_)
-                    | Stmt::If { .. }
-                    | Stmt::OwnerDecl { initializer: Expr::If { .. }, .. }
-                    | Stmt::Return { value: Some(Expr::If { .. }), .. }
-                    | Stmt::Return { value: Some(Expr::Case { .. }), .. }
-                    | Stmt::Expression { expression: Expr::Case { .. }, .. }
-                    | Stmt::OwnerDecl { initializer: Expr::Case { .. }, .. }
-                    | Stmt::Assignment { value: Expr::Case { .. }, .. }
-            ) && let Some(result) = self.lower_structured_statement(
-                id,
-                block,
-                index,
-                statement,
-                fallthrough,
-                std::mem::take(&mut instructions),
-            )? {
+            if is_structured_statement(statement)
+                && let Some(result) = self.lower_structured_statement(
+                    id,
+                    block,
+                    index,
+                    statement,
+                    fallthrough,
+                    std::mem::take(&mut instructions),
+                )?
+            {
                 return Ok(result);
             }
             self.lower_statement(statement, &mut instructions)?;
@@ -253,6 +246,14 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             instructions.push(BackendInstruction::Return { value: None, span });
         }
         BackendBlock { parameters: Vec::new(), id, instructions }
+    }
+
+    pub(super) fn distribute_scope_cleanup(
+        &mut self,
+        span: SourceSpan,
+        start: usize,
+    ) -> Result<(), BackendContractError> {
+        self.provider.distribute_scope_cleanup(span, &mut self.blocks, start, &self.block_bindings)
     }
 
     fn lower_statement(
@@ -422,6 +423,23 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             self.provider.lower_integer_binary(operation, current, value, span, instructions)?;
         self.provider.assign_owner(name, result, span, instructions)
     }
+}
+
+fn is_structured_statement(statement: &Stmt) -> bool {
+    matches!(
+        statement,
+        Stmt::Loop(_)
+            | Stmt::ForRange { .. }
+            | Stmt::ForArray { .. }
+            | Stmt::Block(_)
+            | Stmt::If { .. }
+            | Stmt::OwnerDecl { initializer: Expr::If { .. }, .. }
+            | Stmt::Return { value: Some(Expr::If { .. }), .. }
+            | Stmt::Return { value: Some(Expr::Case { .. }), .. }
+            | Stmt::Expression { expression: Expr::Case { .. }, .. }
+            | Stmt::OwnerDecl { initializer: Expr::Case { .. }, .. }
+            | Stmt::Assignment { value: Expr::Case { .. }, .. }
+    )
 }
 
 fn is_case_condition(statement: &Stmt) -> bool {

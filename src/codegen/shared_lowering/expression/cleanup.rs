@@ -49,6 +49,9 @@ pub(super) fn emit_scope_cleanup(
     provider: &SharedExpressionProvider<'_>,
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
+    binding_values: Option<
+        &std::collections::BTreeMap<String, super::super::super::BackendValueId>,
+    >,
 ) {
     let returned_value = match instructions.last() {
         Some(BackendInstruction::Return { value, .. }) => *value,
@@ -66,7 +69,12 @@ pub(super) fn emit_scope_cleanup(
                 | super::super::super::BackendCleanupAction::DropBindingFields { name, .. } => name,
                 _ => continue,
             };
-            let Some(value) = local_value(provider, name) else { continue };
+            let Some(value) = binding_values
+                .and_then(|values| values.get(name).copied())
+                .or_else(|| local_value(provider, name))
+            else {
+                continue;
+            };
             if returned_value == Some(value) {
                 continue;
             }

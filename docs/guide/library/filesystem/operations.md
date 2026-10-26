@@ -26,6 +26,10 @@ directory. Repeating `next_dir_entry` after EOF continues to return
 the host iterator and marks the owner closed, so its Drop cleanup is
 idempotent. A subsequent read or close on that closed owner returns a typed
 failure; a moved owner is rejected statically by the ownership checker.
+`Directory` implements `Drop`: leaving scope with a live handle performs a
+best-effort close, so early returns and branch exits do not silently retain the
+host iterator. The compiler binds this cleanup to the owner value live in each
+control-flow block.
 
 `remove_dir` is for an empty directory according to the host provider. A
 missing, protected, non-empty, or otherwise rejected target is reported as

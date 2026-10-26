@@ -155,7 +155,7 @@ paths.
 - [x] Reject reads and close operations on an already-closed or moved handle.
 - [ ] Guarantee cleanup on early return, branch exit, loop exit, and error
       paths through the Actus ownership model.
-- [ ] Define whether a dropped live handle is rejected, implicitly closed, or
+- [x] Define whether a dropped live handle is rejected, implicitly closed, or
       diagnosed; choose one policy and test it on every backend.
 - [ ] Ensure no directory handle can escape its declared ownership scope.
 - [ ] Add native leak, double-close, use-after-close, and early-return tests.
@@ -164,10 +164,42 @@ Gate 3 initial lifecycle evidence (2026-10-27): `Directory` owns one opaque
 host iterator, `read_dir` opens it, `next_dir_entry` streams bounded owned
 entry paths, and `close_dir(ins directory)` invalidates the owner after
 release. The mirrored `tests/library/fs_directory.act` fixture covers valid
-opening, missing-directory rejection, entry closure, and repeated EOF reads;
-closed-handle reuse is now covered; moved-handle and native leak tests remain
-rejection is covered by the compiler-level `std_directory_moved_owner_is_rejected_before_codegen`
-regression; native leak tests remain open below.
+opening, missing-directory rejection, entry closure, repeated EOF reads, and
+early-return Drop cleanup; closed-handle reuse is now covered. Moved-handle
+rejection is covered by the compiler-level
+`std_directory_moved_owner_is_rejected_before_codegen` regression; native leak
+and full backend-matrix tests remain open below.
+
+## Gate 3.1: Branch-aware native cleanup lowering
+
+This sub-gate is an Actus compiler prerequisite for Gate 3 cleanup and Drop
+claims. Cleanup operands must remain tied to the owner value that is live in
+the block where cleanup is emitted.
+
+- [x] Represent branch-local owner bindings with their block-local SSA values;
+      do not resolve cleanup operands from a single mutable name-to-value map.
+- [x] Lower cleanup independently for `case` branches, loop bodies, loop
+      exits, `return`, `break`, `continue`, and error paths.
+- [ ] Validate before backend emission that every cleanup operand is defined in
+      the block or is supplied by a dominating predecessor/block parameter.
+- [ ] Preserve exactly-once cleanup for `Buffer`, `Region`, aggregate values,
+      and user-defined `Drop` performances.
+- [ ] Verify equivalent behavior in every supported native backend, including
+      Cranelift's verifier and linker path.
+- [x] Add compiler regressions for nested `case` plus loop cleanup, early
+      return, branch exit, repeated cleanup prevention, and moved owners.
+- [x] Add the mirrored standard-library regression proving `Directory`'s
+      implicit-close policy without changing its public `ins` contract.
+- [ ] Record the compiler revision, backend matrix, strict fixture output, and
+      the absence of non-dominating-value verifier failures.
+
+Gate 3.1 implementation evidence (2026-10-26): cleanup lowering now snapshots
+active bindings at block entry and uses the matching snapshot for distributed
+scope cleanup and case-scope exit. This prevents the previous Cranelift
+non-dominating-value failure where one cleanup reused SSA value `29` in blocks
+whose live owners were `17` and `27`. The compiler regression and mirrored
+directory fixture pass; dominance validation, backend parity, and native leak
+coverage remain open.
 
 ## Gate 4: Directory entry and metadata model
 

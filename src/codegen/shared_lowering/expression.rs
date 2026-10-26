@@ -21,9 +21,9 @@ mod packed;
 mod parameter_state;
 mod state;
 use super::super::{
-    BackendCleanupOrigin, BackendContractError, BackendExpressionProvider, BackendInstruction,
-    BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp, BackendPassingMode,
-    BackendSymbolBindings, BackendValueId, BackendValueType, SymbolIdentity,
+    BackendBlockId, BackendCleanupOrigin, BackendContractError, BackendExpressionProvider,
+    BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp,
+    BackendPassingMode, BackendSymbolBindings, BackendValueId, BackendValueType, SymbolIdentity,
 };
 use super::support::{expression_span, unsupported};
 pub(crate) struct SharedExpressionProvider<'a> {
