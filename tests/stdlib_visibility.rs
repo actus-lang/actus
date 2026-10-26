@@ -68,6 +68,15 @@ fn std_directory_moved_owner_is_rejected_before_codegen() {
 }
 
 #[test]
+fn std_directory_entry_types_are_public_through_the_facade() {
+    let source = parse_source(
+        "import { open fs }; verb main() -> Int { erg kind: DirectoryEntryKind = DirectoryEntryKind.Other; return 0; }",
+    );
+    analyze_with_imports(&source, &std_resolver())
+        .expect("directory entry kind should be public through std::fs");
+}
+
+#[test]
 fn std_path_raw_bridge_is_not_importable_through_the_public_facade() {
     let source = parse_source(
         "import path; verb main() -> Int { return actus_path_is_absolute(path: missing); }",

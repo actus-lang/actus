@@ -19,6 +19,44 @@ open struct Directory {
 }
 
 """
+Classifies one streamed directory entry without exposing host-specific type
+bits or retaining a native directory pointer. `File`, `Directory`, and
+`Symlink` are provider observations; `Other` covers entries that do not have
+one of those stable portable classifications. The enum is a copied scalar
+fact owned by its containing `DirectoryEntry` value and requires no cleanup.
+"""
+open enum DirectoryEntryKind {
+    """The provider identified the entry as a regular file."""
+    File,
+    """The provider identified the entry as a directory."""
+    Directory,
+    """The provider identified the entry as a symbolic link."""
+    Symlink,
+    """The provider reported another, special, or unsupported entry kind."""
+    Other,
+}
+
+"""
+Owned facts for one directory entry.
+
+`name` is the entry name returned by the provider. `relative_path` is the
+owned path component used by the directory consumer. `kind` and `metadata`
+are copied provider facts. Every path field owns its `Buffer`; the value does
+not retain the parent `Directory`, a native directory handle, or a borrowed
+host pointer. Dropping this value releases only its owned path storage.
+"""
+open struct DirectoryEntry {
+    """Owned path storage for the provider-reported entry name."""
+    erg name: path_module::Path,
+    """Owned path storage for the entry's relative consumer path."""
+    erg relative_path: path_module::Path,
+    """Owned copied classification; no native pointer or directory handle is retained."""
+    erg kind: DirectoryEntryKind,
+    """Owned copied metadata facts; they require no native handle cleanup."""
+    erg metadata: Metadata,
+}
+
+"""
 Open one directory for streaming enumeration.
 
 `path` is borrowed only for the runtime call. The returned `Directory` owns
