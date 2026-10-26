@@ -269,7 +269,7 @@ the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
       hidden entries, and symlink policy without requiring function pointers.
 - [x] Define maximum entries, maximum name length, and overflow behavior for
       bounded profiles.
-- [ ] Add tests proving identical ordering across repeated runs and both
+- [x] Add tests proving identical ordering across repeated runs and both
       native backends.
 
 Gate 5 initial evidence (2026-10-27): the basic iterator remains bounded to
@@ -279,8 +279,14 @@ the filesystem guide and is not a reproducible ordering contract. The ordered
 iterator provides bounded lexicographic sorting with a 4096-entry limit and
 the native regression confirms bytewise `alpha` before `zeta`. Declarative
 filtering now covers regular files, directories, symlinks, leading-dot names,
-and exact extensions without function pointers. Cross-backend repeated-order
-evidence remains open.
+and exact extensions without function pointers. The backend-parity fixture
+`hosted_cli_backends_preserve_bounded_lexicographic_directory_order` creates
+the same `alpha`/`zeta` entries, runs the ordered iterator twice under both
+Cranelift and LLVM, and verifies the same result each time. The parity run also
+closed a shared-lowering defect: an imported performance cleanup symbol could
+be declared as external in the module that defined it, producing a duplicate
+LLVM symbol and a link failure. Module assembly now removes external entries
+whose symbol is defined by the same lowered module.
 
 ## Gate 6: Recursive walking and traversal policy
 

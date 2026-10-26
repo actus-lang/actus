@@ -119,7 +119,7 @@ pub unsafe extern "C" fn actus_directory_next(handle: i32, storage: BufferHandle
         Err(_) => return ABI_STATUS_FAILURE,
     };
     let Some(name) = entry.file_name() else { return ABI_STATUS_FAILURE };
-    unsafe { write_entry_name(output, &name) }
+    unsafe { write_entry_name(output, name) }
 }
 
 /// Writes one entry name and a symlink-preserving metadata snapshot.

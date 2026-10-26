@@ -136,6 +136,34 @@ fn hosted_cli_backends_lower_directory_drop_cleanup_identically() {
 }
 
 #[test]
+fn hosted_cli_backends_preserve_bounded_lexicographic_directory_order() {
+    let source = "import { open std::fs, open std::path, }; verb entries_path() -> Result[Path, PathError] { erg raw: Buffer = Buffer[0]; append(raw, 101u8); append(raw, 110u8); append(raw, 116u8); append(raw, 114u8); append(raw, 105u8); append(raw, 101u8); append(raw, 115u8); append(raw, 0u8); return path_from_ascii(storage: dat raw); } verb check_order(ins directory: Directory) -> Int { erg first = next_dir_entry(directory: ins directory); return case dat first { Result.Err(_) => 3, Result.Ok(value) => case dat value { Option.None => 4, Option.Some(first_entry) => { erg first_byte: u8 = first_entry.name.storage[0]; drop(first_entry); erg second = next_dir_entry(directory: ins directory); return case dat second { Result.Err(_) => 5, Result.Ok(next) => case dat next { Option.None => 6, Option.Some(second_entry) => { erg second_byte: u8 = second_entry.name.storage[0]; drop(second_entry); close_dir(directory: ins directory); if first_byte == 97u8 && second_byte == 122u8 { return 0; } return 7; }, }, }; }, }, }; } verb main() -> Int { erg path = entries_path(); return case dat path { Result.Err(_) => 1, Result.Ok(value) => { erg selected_order = DirectoryOrder.Lexicographic; erg opened = read_dir_ordered(path: abs value, order: erg selected_order); return case dat opened { Result.Err(_) => 2, Result.Ok(directory) => check_order(directory: ins directory), }; }, }; }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("ordered-directory", backend);
+        fs::create_dir_all(root.join("entries")).expect("create ordered directory fixture");
+        fs::write(root.join("entries").join("zeta"), b"zeta").expect("write zeta directory entry");
+        fs::write(root.join("entries").join("alpha"), b"alpha")
+            .expect("write alpha directory entry");
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} ordered-directory build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        for _ in 0..2 {
+            let status = Command::new(&output)
+                .current_dir(&root)
+                .status()
+                .expect("run ordered-directory parity fixture");
+            assert_eq!(status.code(), Some(0), "{backend} ordered-directory result");
+        }
+        fs::remove_dir_all(root).expect("remove ordered directory parity fixture");
+    }
+}
+
+#[test]
 fn hosted_cli_backends_accept_named_array_capacity_constants() {
     let source = "const CAPACITY: Usize = 8u64 as Usize; verb main() -> Int { erg values: Array[u8, CAPACITY] = Array[u8, CAPACITY](); values[0] = 41u8; return values[0] as Int + 1; }\n";
     for backend in BACKENDS {
