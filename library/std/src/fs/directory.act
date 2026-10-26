@@ -57,6 +57,75 @@ open struct DirectoryEntry {
 }
 
 """
+Report whether `entry` was classified as a regular file.
+
+`entry` is an `abs` immutable view and remains owned by the caller. The
+result is `true` only for `DirectoryEntryKind.File`; the helper does not
+inspect the filesystem, follow links, allocate, mutate the entry, or retain
+any reference after returning.
+"""
+open verb directory_entry_is_file(abs entry: DirectoryEntry) -> Bool {
+    erg result: Bool = false;
+    case entry.kind {
+        DirectoryEntryKind.File => {
+            result = true;
+        },
+        _ => {},
+    };
+    return result;
+}
+
+"""
+Report whether `entry` was classified as a directory. Returns `true` only
+when its copied kind is `Directory`.
+
+`entry` is borrowed through `abs` and is neither moved nor modified. The
+boolean is derived from the copied `DirectoryEntryKind` snapshot, so the
+helper performs no filesystem I/O, allocation, link traversal, or cleanup.
+"""
+open verb directory_entry_is_dir(abs entry: DirectoryEntry) -> Bool {
+    erg result: Bool = false;
+    case entry.kind {
+        DirectoryEntryKind.Directory => {
+            result = true;
+        },
+        _ => {},
+    };
+    return result;
+}
+
+"""
+Report whether `entry` was classified as a symbolic link.
+
+The `abs` entry view remains owned by the caller. The result reflects the
+captured link-preserving classification from `next_dir_entry`; it does not
+follow the target, query the host again, allocate storage, mutate state, or
+retain a borrowed reference.
+"""
+open verb directory_entry_is_symlink(abs entry: DirectoryEntry) -> Bool {
+    erg result: Bool = false;
+    case entry.kind {
+        DirectoryEntryKind.Symlink => {
+            result = true;
+        },
+        _ => {},
+    };
+    return result;
+}
+
+"""
+Return the copied portable file-type classification for `entry`.
+
+`entry` is borrowed immutably with `abs` and remains available to the caller.
+The returned `DirectoryEntryKind` is a copied scalar value; this helper does
+not transfer path ownership, allocate, perform filesystem I/O, follow links,
+or retain any reference to the entry.
+"""
+open verb directory_entry_file_type(abs entry: DirectoryEntry) -> DirectoryEntryKind {
+    return entry.kind;
+}
+
+"""
 Open one directory for streaming enumeration.
 
 `path` is borrowed only for the runtime call. The returned `Directory` owns

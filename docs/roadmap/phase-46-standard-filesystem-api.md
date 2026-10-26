@@ -230,7 +230,7 @@ non-dominating-value verifier or linker failure was observed.
       metadata field.
 - [x] Define whether entry metadata follows symlinks or describes the link
       itself; expose both operations when the platform supports both.
-- [ ] Add explicit `is_file`, `is_dir`, `is_symlink`, and file-type helpers.
+- [x] Add explicit `is_file`, `is_dir`, `is_symlink`, and file-type helpers.
 - [ ] Add tests for empty directories, mixed entry kinds, broken symlinks,
       unreadable entries, and metadata races.
 
@@ -239,9 +239,10 @@ Gate 4 entry evidence (2026-10-27): `std::fs` now exposes the documented
 facade. `next_dir_entry` fills both owned path components and a copied
 metadata snapshot through the native runtime bridge. Classification uses
 `symlink_metadata`, so `Symlink` describes the link itself and does not depend
-on its target being present. The native classification regression and the
-strict mirrored directory fixture pass; metadata field expansion, public
-file-type helpers, and mixed-kind/error-matrix coverage remain open.
+on its target being present. The read-only classification helpers are exposed
+through the same facade and do not perform a second filesystem lookup. The
+native classification regression and strict mirrored directory fixture pass;
+metadata field expansion and mixed-kind/error-matrix coverage remain open.
 
 ## Gate 5: Deterministic and bounded enumeration
 

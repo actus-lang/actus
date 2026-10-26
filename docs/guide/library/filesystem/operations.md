@@ -27,6 +27,12 @@ native bridge uses link metadata, so `Symlink` describes the directory entry
 itself and does not follow its target; a broken link remains classifiable as a
 symlink when the host exposes it.
 
+Use `directory_entry_is_file`, `directory_entry_is_dir`, and
+`directory_entry_is_symlink` for boolean classification, or
+`directory_entry_file_type` when the complete `DirectoryEntryKind` value is
+needed. These helpers borrow the entry immutably and do not inspect the host
+filesystem again.
+
 Repeating `next_dir_entry` after EOF continues to return `Ok(Option.None)`;
 EOF is not a failure. `close_dir(ins directory)` releases the host iterator
 and marks the owner closed, so its Drop cleanup is idempotent. A subsequent

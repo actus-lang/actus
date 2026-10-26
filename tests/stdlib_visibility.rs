@@ -70,7 +70,7 @@ fn std_directory_moved_owner_is_rejected_before_codegen() {
 #[test]
 fn std_directory_entry_types_are_public_through_the_facade() {
     let source = parse_source(
-        "import { open fs }; verb main() -> Int { erg kind: DirectoryEntryKind = DirectoryEntryKind.Other; return 0; }",
+        "import { open fs }; verb inspect(abs entry: DirectoryEntry) -> Bool { return directory_entry_is_file(entry: abs entry); } verb main() -> Int { erg kind: DirectoryEntryKind = DirectoryEntryKind.Other; return 0; }",
     );
     analyze_with_imports(&source, &std_resolver())
         .expect("directory entry kind should be public through std::fs");
