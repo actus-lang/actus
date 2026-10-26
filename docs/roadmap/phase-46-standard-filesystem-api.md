@@ -226,7 +226,7 @@ non-dominating-value verifier or linker failure was observed.
       extend it only through an intentional public API change.
 - [x] Define metadata fields for file type, byte size, readonly state,
       modification time, access time, creation time, and platform identity.
-- [ ] Distinguish a missing target, an inaccessible target, and an unsupported
+- [x] Distinguish a missing target, an inaccessible target, and an unsupported
       metadata field.
 - [x] Define whether entry metadata follows symlinks or describes the link
       itself; expose both operations when the platform supports both.
@@ -245,8 +245,9 @@ native classification regression and strict mirrored directory fixture pass.
 Metadata now carries signed Unix-second timestamps with explicit available,
 unsupported, and unavailable statuses, plus an opaque platform identity pair;
 native and path-level strict coverage validate the available POSIX snapshot.
-Missing/inaccessible distinction and mixed-kind/error-matrix coverage remain
-open.
+The detailed metadata verbs preserve not-found, permission-denied,
+unsupported, and generic provider failures while compatibility verbs retain
+the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
 
 ## Gate 5: Deterministic and bounded enumeration
 

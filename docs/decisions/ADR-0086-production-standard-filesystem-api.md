@@ -204,6 +204,12 @@ maps them to volume/file index. An identity status distinguishes an available
 pair from a provider that cannot expose one. The snapshot owns no host handle
 and performs no follow-up filesystem lookup.
 
+Applications that need the operation failure cause use
+`metadata_detailed(path)` or `symlink_metadata_detailed(path)`. These return a
+typed metadata error distinguishing not-found, permission-denied, unsupported,
+and generic provider failure. The compatibility metadata verbs retain the
+existing `IoError` result surface and intentionally collapse those causes.
+
 ### Recursive walking
 
 Recursion is a separate API and is never hidden inside `read_dir`:

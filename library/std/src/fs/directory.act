@@ -198,6 +198,11 @@ available for explicit close.
 """
 open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEntry], io::IoError] {
     erg storage: Buffer = Buffer[4096];
+    erg modified_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg accessed_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg created_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg identity_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg identity_kind: Int = METADATA_IDENTITY_NONE;
     erg metadata = Metadata {
         size: 0,
         is_file: 0,
@@ -205,15 +210,15 @@ open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEnt
         readonly: 0,
         is_symlink: 0,
         modified_seconds: 0i64,
-        modified_status: 2,
+        modified_status: modified_status,
         accessed_seconds: 0i64,
-        accessed_status: 2,
+        accessed_status: accessed_status,
         created_seconds: 0i64,
-        created_status: 2,
+        created_status: created_status,
         identity_primary: 0u64,
         identity_secondary: 0u64,
-        identity_kind: 0,
-        identity_status: 2,
+        identity_kind: identity_kind,
+        identity_status: identity_status,
     };
     erg status = actus_directory_next_entry(
         handle: abs directory.handle,

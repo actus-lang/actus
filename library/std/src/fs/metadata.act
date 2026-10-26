@@ -24,6 +24,18 @@ open const METADATA_IDENTITY_POSIX: Int = 1;
 """The identity pair contains Windows volume and file-index values."""
 open const METADATA_IDENTITY_WINDOWS: Int = 2;
 
+"""Typed causes for a metadata request that did not produce a snapshot."""
+open enum MetadataError {
+    """The requested path does not exist or was removed during inspection."""
+    NotFound,
+    """The provider denied metadata inspection for the requested path."""
+    PermissionDenied,
+    """The selected provider cannot perform this metadata operation."""
+    Unsupported,
+    """The provider rejected the request without a more specific cause."""
+    Failed,
+}
+
 """
 An owned scalar metadata record returned by filesystem inspection.
 Its erg fields are copied facts and require no host-handle cleanup.
@@ -61,6 +73,31 @@ open struct Metadata {
     erg identity_status: Int,
 }
 
+verb metadata_default() -> Metadata {
+    erg modified_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg accessed_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg created_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg identity_status: Int = METADATA_VALUE_UNAVAILABLE;
+    erg identity_kind: Int = METADATA_IDENTITY_NONE;
+    return Metadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+        is_symlink: 0,
+        modified_seconds: 0i64,
+        modified_status: modified_status,
+        accessed_seconds: 0i64,
+        accessed_status: accessed_status,
+        created_seconds: 0i64,
+        created_status: created_status,
+        identity_primary: 0u64,
+        identity_secondary: 0u64,
+        identity_kind: identity_kind,
+        identity_status: identity_status,
+    };
+}
+
 """
 Fill `output` with metadata for `path` without retaining either buffer.
 
@@ -84,6 +121,23 @@ unsafe extern "C" verb actus_file_symlink_metadata_path(
     abs path: path_module::Path,
     ins output: Metadata
 ) -> Int;
+
+"""
+Native metadata status values used by the detailed metadata operations.
+
+Zero is success; `-2` means not found, `-3` permission denied, `-4`
+unsupported, and `-1` an unspecified provider failure. The output slot is
+initialized only on success.
+"""
+verb metadata_detailed_failed(dat output: Metadata, erg status: Int) -> Result[Metadata, MetadataError] {
+    drop(output);
+    return case status {
+        -2 => Err(MetadataError.NotFound),
+        -3 => Err(MetadataError.PermissionDenied),
+        -4 => Err(MetadataError.Unsupported),
+        _ => Err(MetadataError.Failed),
+    };
+}
 
 """
 Fill `output` from the open handle identified by `handle`.
@@ -123,27 +177,31 @@ the host could not inspect the path. The operation performs no path-string
 conversion and does not allocate an owned path representation.
 """
 open verb metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError] {
-    erg output = Metadata {
-        size: 0,
-        is_file: 0,
-        is_dir: 0,
-        readonly: 0,
-        is_symlink: 0,
-        modified_seconds: 0i64,
-        modified_status: 2,
-        accessed_seconds: 0i64,
-        accessed_status: 2,
-        created_seconds: 0i64,
-        created_status: 2,
-        identity_primary: 0u64,
-        identity_secondary: 0u64,
-        identity_kind: 0,
-        identity_status: 2,
-    };
+    erg output = metadata_default();
     erg status = actus_file_metadata_path(path: abs path, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
+        -2 => metadata_failed(output: dat output),
+        -3 => metadata_failed(output: dat output),
+        -4 => metadata_failed(output: dat output),
         _ => Result[Metadata, io::IoError].Ok(output),
+    };
+}
+
+"""
+Inspect one path and preserve the provider's metadata failure cause.
+
+`path` is borrowed through `abs`; `Ok(Metadata)` owns only copied scalar
+facts. `Err(MetadataError)` distinguishes not found, permission denied,
+unsupported, and generic provider failure. No path, handle, or allocation is
+retained after the operation.
+"""
+open verb metadata_detailed(abs path: path_module::Path) -> Result[Metadata, MetadataError] {
+    erg output = metadata_default();
+    erg status = actus_file_metadata_path(path: abs path, output: ins output);
+    return case status {
+        0 => Ok(output),
+        _ => metadata_detailed_failed(output: dat output, status: status),
     };
 }
 
@@ -154,23 +212,7 @@ The returned metadata owns only copied scalar facts. The file handle remains
 owned by the caller, and a failed native status becomes `Err(Failed)`.
 """
 open verb file_metadata(ins self: File) -> Result[Metadata, io::IoError] {
-    erg output = Metadata {
-        size: 0,
-        is_file: 0,
-        is_dir: 0,
-        readonly: 0,
-        is_symlink: 0,
-        modified_seconds: 0i64,
-        modified_status: 2,
-        accessed_seconds: 0i64,
-        accessed_status: 2,
-        created_seconds: 0i64,
-        created_status: 2,
-        identity_primary: 0u64,
-        identity_secondary: 0u64,
-        identity_kind: 0,
-        identity_status: 2,
-    };
+    erg output = metadata_default();
     erg status = actus_file_metadata_handle_buffer(handle: abs self.handle, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
@@ -186,26 +228,30 @@ itself is a symbolic link. The operation never creates, follows, or retains a
 link target.
 """
 open verb symlink_metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError] {
-    erg output = Metadata {
-        size: 0,
-        is_file: 0,
-        is_dir: 0,
-        readonly: 0,
-        is_symlink: 0,
-        modified_seconds: 0i64,
-        modified_status: 2,
-        accessed_seconds: 0i64,
-        accessed_status: 2,
-        created_seconds: 0i64,
-        created_status: 2,
-        identity_primary: 0u64,
-        identity_secondary: 0u64,
-        identity_kind: 0,
-        identity_status: 2,
-    };
+    erg output = metadata_default();
     erg status = actus_file_symlink_metadata_path(path: abs path, output: ins output);
     return case status {
         -1 => metadata_failed(output: dat output),
+        -2 => metadata_failed(output: dat output),
+        -3 => metadata_failed(output: dat output),
+        -4 => metadata_failed(output: dat output),
         _ => Result[Metadata, io::IoError].Ok(output),
+    };
+}
+
+"""
+Inspect one path without following a symbolic link and preserve failure cause.
+
+The `abs` path remains owned by the caller. Success returns copied metadata;
+failure distinguishes not found, permission denied, unsupported, and generic
+provider rejection. The operation performs no hidden link traversal or
+resource retention.
+"""
+open verb symlink_metadata_detailed(abs path: path_module::Path) -> Result[Metadata, MetadataError] {
+    erg output = metadata_default();
+    erg status = actus_file_symlink_metadata_path(path: abs path, output: ins output);
+    return case status {
+        0 => Ok(output),
+        _ => metadata_detailed_failed(output: dat output, status: status),
     };
 }

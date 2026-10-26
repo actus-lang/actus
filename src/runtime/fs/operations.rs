@@ -11,6 +11,9 @@ pub(crate) const METADATA_IDENTITY_NONE: i32 = 0;
 pub(crate) const METADATA_IDENTITY_POSIX: i32 = 1;
 #[cfg(windows)]
 pub(crate) const METADATA_IDENTITY_WINDOWS: i32 = 2;
+const METADATA_STATUS_NOT_FOUND: i32 = -2;
+const METADATA_STATUS_PERMISSION_DENIED: i32 = -3;
+const METADATA_STATUS_UNSUPPORTED: i32 = -4;
 
 /// Writes file metadata into a caller-owned C-layout output struct.
 ///
@@ -30,8 +33,10 @@ pub unsafe extern "C" fn actus_file_metadata_buffer(
         return ABI_STATUS_FAILURE;
     }
     let bytes = unsafe { buffer_bytes(path) };
-    let Ok(metadata) = host_path(bytes).metadata() else { return ABI_STATUS_FAILURE };
-    unsafe { write_metadata(output, &metadata) }
+    match host_path(bytes).metadata() {
+        Ok(metadata) => unsafe { write_metadata(output, &metadata) },
+        Err(error) => metadata_error_status(&error),
+    }
 }
 
 /// Writes metadata for a validated borrowed `ActusPath`.
@@ -50,7 +55,8 @@ pub unsafe extern "C" fn actus_file_metadata_path(
     let result = unsafe { with_host_path(path, |native| native.metadata()) };
     match result {
         Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
-        _ => ABI_STATUS_FAILURE,
+        Some(Err(error)) => metadata_error_status(&error),
+        None => ABI_STATUS_FAILURE,
     }
 }
 
@@ -70,6 +76,16 @@ pub unsafe extern "C" fn actus_file_symlink_metadata_path(
     let result = unsafe { with_host_path(path, |native| native.symlink_metadata()) };
     match result {
         Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
+        Some(Err(error)) => metadata_error_status(&error),
+        None => ABI_STATUS_FAILURE,
+    }
+}
+
+fn metadata_error_status(error: &std::io::Error) -> i32 {
+    match error.kind() {
+        std::io::ErrorKind::NotFound => METADATA_STATUS_NOT_FOUND,
+        std::io::ErrorKind::PermissionDenied => METADATA_STATUS_PERMISSION_DENIED,
+        std::io::ErrorKind::Unsupported => METADATA_STATUS_UNSUPPORTED,
         _ => ABI_STATUS_FAILURE,
     }
 }

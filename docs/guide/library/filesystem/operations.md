@@ -11,6 +11,12 @@ identity is represented by two opaque scalar components plus
 volume/file-index. Portable callers must inspect the status before using a
 timestamp or identity component.
 
+Use `metadata_detailed` or `symlink_metadata_detailed` when the operation
+failure itself must be preserved. Their `MetadataError` result distinguishes
+`NotFound`, `PermissionDenied`, `Unsupported`, and generic `Failed`; the
+compatibility `metadata` and `symlink_metadata` verbs continue to expose the
+existing `IoError` surface.
+
 `remove_file`, `rename`, `copy_file`, `create_dir`, and `remove_dir` borrow
 validated `Path` values and perform one hosted side effect. They return a
 status or copied byte count through `Result`.

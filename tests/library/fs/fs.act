@@ -11,6 +11,35 @@ verb current_directory() -> Result[path::Path, path::PathError] {
     return path::path_from_ascii(storage: dat raw);
 }
 
+verb missing_metadata_path() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 47u8);
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 109u8);
+    append(raw, 105u8);
+    append(raw, 115u8);
+    append(raw, 115u8);
+    append(raw, 105u8);
+    append(raw, 110u8);
+    append(raw, 103u8);
+    append(raw, 45u8);
+    append(raw, 109u8);
+    append(raw, 101u8);
+    append(raw, 116u8);
+    append(raw, 97u8);
+    append(raw, 100u8);
+    append(raw, 97u8);
+    append(raw, 116u8);
+    append(raw, 97u8);
+    append(raw, 0u8);
+    return path::path_from_posix(storage: dat raw);
+}
+
 meta test
 verb qualified_filesystem_facade_opens_and_closes_directory() -> Int {
     erg current = current_directory();
@@ -60,6 +89,33 @@ verb qualified_filesystem_facade_reports_directory_metadata() -> Int {
                     return 3;
                 },
             };
+        },
+    };
+}
+
+meta test
+verb qualified_filesystem_facade_distinguishes_missing_metadata() -> Int {
+    erg path = missing_metadata_path();
+    return case dat path {
+        Result.Err(_) => 1,
+        Result.Ok(value) => {
+            erg inspected = fs::metadata_detailed(path: abs value);
+            erg result: Int = 2;
+            case dat inspected {
+                Result.Err(error) => {
+                    case error {
+                        MetadataError.NotFound => {
+                            result = 0;
+                        },
+                        _ => {},
+                    };
+                },
+                Result.Ok(metadata) => {
+                    drop(metadata);
+                    result = 3;
+                },
+            };
+            result;
         },
     };
 }
