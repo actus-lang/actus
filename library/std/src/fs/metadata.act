@@ -1,13 +1,28 @@
 """Basic filesystem facts returned without exposing host-specific handles.
 
-`size` is the logical byte length. The remaining fields are scalar flags so
-the value can cross the runtime boundary in a deterministic C-compatible
-layout.
+`size` is the logical byte length. Timestamps are signed Unix seconds and
+carry an explicit status because hosts may not provide every timestamp. The
+identity pair is opaque portable data: POSIX uses device/inode and Windows
+uses volume/file index. The value contains only copied facts and no host
+handle.
 """
 import {
     io,
     path as path_module,
 };
+
+"""The metadata value was read successfully and its scalar is valid."""
+open const METADATA_VALUE_AVAILABLE: Int = 0;
+"""The host does not expose the requested metadata value."""
+open const METADATA_VALUE_UNSUPPORTED: Int = 1;
+"""The host exposed the field but its value cannot be represented here."""
+open const METADATA_VALUE_UNAVAILABLE: Int = 2;
+"""No portable platform identity is present in the metadata snapshot."""
+open const METADATA_IDENTITY_NONE: Int = 0;
+"""The identity pair contains POSIX device and inode values."""
+open const METADATA_IDENTITY_POSIX: Int = 1;
+"""The identity pair contains Windows volume and file-index values."""
+open const METADATA_IDENTITY_WINDOWS: Int = 2;
 
 """
 An owned scalar metadata record returned by filesystem inspection.
@@ -24,6 +39,26 @@ open struct Metadata {
     erg readonly: Int,
     """One when the path itself is a symbolic link, otherwise zero."""
     erg is_symlink: Int,
+    """Signed Unix seconds for modification time when modified_status is available."""
+    erg modified_seconds: i64,
+    """Status of modified_seconds: available, unsupported, or unavailable."""
+    erg modified_status: Int,
+    """Signed Unix seconds for access time when accessed_status is available."""
+    erg accessed_seconds: i64,
+    """Status of accessed_seconds: available, unsupported, or unavailable."""
+    erg accessed_status: Int,
+    """Signed Unix seconds for creation time when created_status is available."""
+    erg created_seconds: i64,
+    """Status of created_seconds: available, unsupported, or unavailable."""
+    erg created_status: Int,
+    """First opaque platform identity component."""
+    erg identity_primary: u64,
+    """Second opaque platform identity component."""
+    erg identity_secondary: u64,
+    """Identity layout discriminator: none, POSIX, or Windows."""
+    erg identity_kind: Int,
+    """Status of the platform identity pair."""
+    erg identity_status: Int,
 }
 
 """
@@ -94,6 +129,16 @@ open verb metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError]
         is_dir: 0,
         readonly: 0,
         is_symlink: 0,
+        modified_seconds: 0i64,
+        modified_status: 2,
+        accessed_seconds: 0i64,
+        accessed_status: 2,
+        created_seconds: 0i64,
+        created_status: 2,
+        identity_primary: 0u64,
+        identity_secondary: 0u64,
+        identity_kind: 0,
+        identity_status: 2,
     };
     erg status = actus_file_metadata_path(path: abs path, output: ins output);
     return case status {
@@ -115,6 +160,16 @@ open verb file_metadata(ins self: File) -> Result[Metadata, io::IoError] {
         is_dir: 0,
         readonly: 0,
         is_symlink: 0,
+        modified_seconds: 0i64,
+        modified_status: 2,
+        accessed_seconds: 0i64,
+        accessed_status: 2,
+        created_seconds: 0i64,
+        created_status: 2,
+        identity_primary: 0u64,
+        identity_secondary: 0u64,
+        identity_kind: 0,
+        identity_status: 2,
     };
     erg status = actus_file_metadata_handle_buffer(handle: abs self.handle, output: ins output);
     return case status {
@@ -137,6 +192,16 @@ open verb symlink_metadata(abs path: path_module::Path) -> Result[Metadata, io::
         is_dir: 0,
         readonly: 0,
         is_symlink: 0,
+        modified_seconds: 0i64,
+        modified_status: 2,
+        accessed_seconds: 0i64,
+        accessed_status: 2,
+        created_seconds: 0i64,
+        created_status: 2,
+        identity_primary: 0u64,
+        identity_secondary: 0u64,
+        identity_kind: 0,
+        identity_status: 2,
     };
     erg status = actus_file_symlink_metadata_path(path: abs path, output: ins output);
     return case status {

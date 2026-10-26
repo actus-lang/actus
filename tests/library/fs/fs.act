@@ -51,7 +51,11 @@ verb qualified_filesystem_facade_reports_directory_metadata() -> Int {
                 Result.Err(_) => 2,
                 Result.Ok(metadata) => {
                     if metadata.is_dir == 1 {
-                        return 0;
+                        if metadata.modified_status == METADATA_VALUE_AVAILABLE &&
+                            metadata.identity_status == METADATA_VALUE_AVAILABLE &&
+                            metadata.identity_kind != METADATA_IDENTITY_NONE {
+                            return 0;
+                        }
                     }
                     return 3;
                 },

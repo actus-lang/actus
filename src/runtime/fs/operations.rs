@@ -4,6 +4,14 @@ use super::super::types::{ActusMetadata, BufferHandle};
 use super::path_bridge::{replace_output_path, with_host_path, with_host_paths};
 use super::{actus_handle, with_file};
 
+pub(crate) const METADATA_VALUE_AVAILABLE: i32 = 0;
+pub(crate) const METADATA_VALUE_UNSUPPORTED: i32 = 1;
+pub(crate) const METADATA_VALUE_UNAVAILABLE: i32 = 2;
+pub(crate) const METADATA_IDENTITY_NONE: i32 = 0;
+pub(crate) const METADATA_IDENTITY_POSIX: i32 = 1;
+#[cfg(windows)]
+pub(crate) const METADATA_IDENTITY_WINDOWS: i32 = 2;
+
 /// Writes file metadata into a caller-owned C-layout output struct.
 ///
 /// # Safety
@@ -298,6 +306,10 @@ pub(crate) unsafe fn write_metadata(
     metadata: &std::fs::Metadata,
 ) -> i32 {
     let Ok(size) = i32::try_from(metadata.len()) else { return ABI_STATUS_FAILURE };
+    let modified = metadata_timestamp(metadata.modified());
+    let accessed = metadata_timestamp(metadata.accessed());
+    let created = metadata_timestamp(metadata.created());
+    let identity = metadata_identity(metadata);
     unsafe {
         *output = ActusMetadata {
             size,
@@ -305,9 +317,51 @@ pub(crate) unsafe fn write_metadata(
             is_dir: i32::from(metadata.is_dir()),
             readonly: i32::from(metadata.permissions().readonly()),
             is_symlink: i32::from(metadata.file_type().is_symlink()),
+            modified_seconds: modified.0,
+            modified_status: modified.1,
+            accessed_seconds: accessed.0,
+            accessed_status: accessed.1,
+            created_seconds: created.0,
+            created_status: created.1,
+            identity_primary: identity.0,
+            identity_secondary: identity.1,
+            identity_kind: identity.2,
+            identity_status: identity.3,
         };
     }
     ABI_STATUS_SUCCESS
+}
+
+fn metadata_timestamp(value: std::io::Result<std::time::SystemTime>) -> (i64, i32) {
+    let Ok(value) = value else { return (0, METADATA_VALUE_UNSUPPORTED) };
+    let Ok(duration) = value.duration_since(std::time::UNIX_EPOCH) else {
+        return (0, METADATA_VALUE_UNAVAILABLE);
+    };
+    let Ok(seconds) = i64::try_from(duration.as_secs()) else {
+        return (0, METADATA_VALUE_UNAVAILABLE);
+    };
+    (seconds, METADATA_VALUE_AVAILABLE)
+}
+
+fn metadata_identity(metadata: &std::fs::Metadata) -> (u64, u64, i32, i32) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        return (metadata.dev(), metadata.ino(), METADATA_IDENTITY_POSIX, METADATA_VALUE_AVAILABLE);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        let Some(volume) = metadata.volume_serial_number() else {
+            return (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED);
+        };
+        let Some(index) = metadata.file_index() else {
+            return (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED);
+        };
+        return (u64::from(volume), index, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_AVAILABLE);
+    }
+    #[allow(unreachable_code)]
+    (0, 0, METADATA_IDENTITY_NONE, METADATA_VALUE_UNSUPPORTED)
 }
 
 unsafe fn path_operation<F>(path: BufferHandle, operation: F) -> i32

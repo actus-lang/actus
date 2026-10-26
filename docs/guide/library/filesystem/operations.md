@@ -2,6 +2,15 @@
 
 ## Direct filesystem operations
 
+Metadata snapshots contain the file kind, byte size, readonly flag, and
+signed Unix-second timestamps for modification, access, and creation when the
+provider supplies them. Each timestamp has a status: `METADATA_VALUE_AVAILABLE`,
+`METADATA_VALUE_UNSUPPORTED`, or `METADATA_VALUE_UNAVAILABLE`. Platform
+identity is represented by two opaque scalar components plus
+`identity_kind`/`identity_status`; POSIX uses device/inode and Windows uses
+volume/file-index. Portable callers must inspect the status before using a
+timestamp or identity component.
+
 `remove_file`, `rename`, `copy_file`, `create_dir`, and `remove_dir` borrow
 validated `Path` values and perform one hosted side effect. They return a
 status or copied byte count through `Result`.

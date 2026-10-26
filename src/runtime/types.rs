@@ -14,6 +14,16 @@ pub struct ActusMetadata {
     pub is_dir: i32,
     pub readonly: i32,
     pub is_symlink: i32,
+    pub modified_seconds: i64,
+    pub modified_status: i32,
+    pub accessed_seconds: i64,
+    pub accessed_status: i32,
+    pub created_seconds: i64,
+    pub created_status: i32,
+    pub identity_primary: u64,
+    pub identity_secondary: u64,
+    pub identity_kind: i32,
+    pub identity_status: i32,
 }
 
 pub type BufferHandle = *mut ActusBuffer;

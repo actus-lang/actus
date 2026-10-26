@@ -158,6 +158,26 @@ mod tests {
     use super::*;
     use crate::runtime::path::ActusPath;
 
+    fn empty_metadata() -> ActusMetadata {
+        ActusMetadata {
+            size: 0,
+            is_file: 0,
+            is_dir: 0,
+            readonly: 0,
+            is_symlink: 0,
+            modified_seconds: 0,
+            modified_status: 0,
+            accessed_seconds: 0,
+            accessed_status: 0,
+            created_seconds: 0,
+            created_status: 0,
+            identity_primary: 0,
+            identity_secondary: 0,
+            identity_kind: 0,
+            identity_status: 0,
+        }
+    }
+
     #[test]
     fn directory_next_entry_writes_file_classification() {
         use std::os::unix::ffi::OsStrExt;
@@ -187,14 +207,17 @@ mod tests {
         let mut entry_bytes = vec![0u8; 4096];
         let mut entry_buffer =
             ActusBuffer { data: entry_bytes.as_mut_ptr(), length: 0, capacity: entry_bytes.len() };
-        let mut metadata =
-            ActusMetadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, is_symlink: 0 };
+        let mut metadata = empty_metadata();
         let status =
             unsafe { actus_directory_next_entry(handle, &mut entry_buffer, &mut metadata) };
         assert_eq!(status, 0);
         assert_eq!(metadata.is_file, 1);
         assert_eq!(metadata.is_dir, 0);
         assert_eq!(metadata.is_symlink, 0);
+        assert_eq!(metadata.modified_status, 0);
+        assert_eq!(metadata.accessed_status, 0);
+        assert_eq!(metadata.identity_kind, 1);
+        assert_eq!(metadata.identity_status, 0);
         assert_eq!(unsafe { actus_directory_close(handle) }, 0);
         std::fs::remove_file(file).expect("temporary entry should be removed");
         std::fs::remove_dir(root).expect("temporary directory should be removed");

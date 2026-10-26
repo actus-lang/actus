@@ -195,6 +195,15 @@ platform identity. `metadata` may follow links; `symlink_metadata` describes
 the link itself. Missing, inaccessible, unsupported, and raced metadata are
 distinct outcomes where the target can distinguish them.
 
+The portable snapshot stores modification, access, and creation timestamps as
+signed Unix seconds. Each timestamp has a status with `Available`,
+`Unsupported`, and `Unavailable` meanings; a timestamp value is consumed only
+when its status is `Available`. Platform identity is two opaque unsigned
+components plus an identity kind: POSIX maps them to device/inode and Windows
+maps them to volume/file index. An identity status distinguishes an available
+pair from a provider that cannot expose one. The snapshot owns no host handle
+and performs no follow-up filesystem lookup.
+
 ### Recursive walking
 
 Recursion is a separate API and is never hidden inside `read_dir`:

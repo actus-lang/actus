@@ -224,7 +224,7 @@ non-dominating-value verifier or linker failure was observed.
       path component, kind, and metadata snapshot.
 - [x] Reuse the existing `Metadata` type where its fields are sufficient;
       extend it only through an intentional public API change.
-- [ ] Define metadata fields for file type, byte size, readonly state,
+- [x] Define metadata fields for file type, byte size, readonly state,
       modification time, access time, creation time, and platform identity.
 - [ ] Distinguish a missing target, an inaccessible target, and an unsupported
       metadata field.
@@ -241,8 +241,12 @@ metadata snapshot through the native runtime bridge. Classification uses
 `symlink_metadata`, so `Symlink` describes the link itself and does not depend
 on its target being present. The read-only classification helpers are exposed
 through the same facade and do not perform a second filesystem lookup. The
-native classification regression and strict mirrored directory fixture pass;
-metadata field expansion and mixed-kind/error-matrix coverage remain open.
+native classification regression and strict mirrored directory fixture pass.
+Metadata now carries signed Unix-second timestamps with explicit available,
+unsupported, and unavailable statuses, plus an opaque platform identity pair;
+native and path-level strict coverage validate the available POSIX snapshot.
+Missing/inaccessible distinction and mixed-kind/error-matrix coverage remain
+open.
 
 ## Gate 5: Deterministic and bounded enumeration
 

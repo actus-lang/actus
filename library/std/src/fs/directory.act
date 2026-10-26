@@ -204,6 +204,16 @@ open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEnt
         is_dir: 0,
         readonly: 0,
         is_symlink: 0,
+        modified_seconds: 0i64,
+        modified_status: 2,
+        accessed_seconds: 0i64,
+        accessed_status: 2,
+        created_seconds: 0i64,
+        created_status: 2,
+        identity_primary: 0u64,
+        identity_secondary: 0u64,
+        identity_kind: 0,
+        identity_status: 2,
     };
     erg status = actus_directory_next_entry(
         handle: abs directory.handle,
