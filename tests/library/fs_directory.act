@@ -1,6 +1,7 @@
 """Minimal hosted directory enumeration contract tests."""
 import {
     open fs,
+    open io,
     open path,
 };
 
@@ -209,5 +210,53 @@ verb directory_drop_closes_on_early_return() -> Int {
                 },
             };
         },
+    };
+}
+
+verb open_directory_then_break() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    loop {
+                        break;
+                    }
+                    0;
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb directory_drop_closes_after_loop_exit() -> Int {
+    erg result = open_directory_then_break();
+    return result;
+}
+
+verb open_directory_then_error() -> Result[Int, io::IoError] {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => Err(io::IoError.InvalidInput),
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(error) => Err(error),
+                Result.Ok(_) => Err(io::IoError.Failed),
+            };
+        },
+    };
+}
+
+meta test
+verb directory_drop_closes_on_typed_error() -> Int {
+    erg result = open_directory_then_error();
+    return case dat result {
+        Result.Err(_) => 0,
+        Result.Ok(_) => 1,
     };
 }
