@@ -180,7 +180,7 @@ the block where cleanup is emitted.
       do not resolve cleanup operands from a single mutable name-to-value map.
 - [x] Lower cleanup independently for `case` branches, loop bodies, loop
       exits, `return`, `break`, `continue`, and error paths.
-- [ ] Validate before backend emission that every cleanup operand is defined in
+- [x] Validate before backend emission that every cleanup operand is defined in
       the block or is supplied by a dominating predecessor/block parameter.
 - [ ] Preserve exactly-once cleanup for `Buffer`, `Region`, aggregate values,
       and user-defined `Drop` performances.
@@ -198,8 +198,10 @@ active bindings at block entry and uses the matching snapshot for distributed
 scope cleanup and case-scope exit. This prevents the previous Cranelift
 non-dominating-value failure where one cleanup reused SSA value `29` in blocks
 whose live owners were `17` and `27`. The compiler regression and mirrored
-directory fixture pass; dominance validation, backend parity, and native leak
-coverage remain open.
+directory fixture pass. The backend contract now computes block dominators and
+rejects cleanup operands that are undefined, sibling-branch values, or defined
+after the cleanup in the same block; a direct regression covers the rejected
+sibling-branch case. Backend parity and native leak coverage remain open.
 
 ## Gate 4: Directory entry and metadata model
 
