@@ -192,7 +192,7 @@ the block where cleanup is emitted.
       return, branch exit, repeated cleanup prevention, and moved owners.
 - [x] Add the mirrored standard-library regression proving `Directory`'s
       implicit-close policy without changing its public `ins` contract.
-- [ ] Record the compiler revision, backend matrix, strict fixture output, and
+- [x] Record the compiler revision, backend matrix, strict fixture output, and
       the absence of non-dominating-value verifier failures.
 
 Gate 3.1 implementation evidence (2026-10-26): cleanup lowering now snapshots
@@ -207,7 +207,11 @@ sibling-branch case. Exactly-once cleanup is covered for Buffer, Region,
 partial aggregate fields, and user-defined Drop performances across the shared
 lowering regressions. The backend parity suite now runs 11 hosted/freestanding
 Cranelift/LLVM fixtures, including the `std::fs::read_dir` early-return Drop
-fixture; all 11 pass. Native leak and double-close coverage remain open.
+fixture; all 11 pass. Native leak and double-close coverage pass on the
+runtime bridge test. Final Gate 3.1 evidence at compiler revision `d5803f0a`:
+the Rust lib suite is 150/150, the Cranelift/LLVM backend matrix is 11/11,
+the strict directory fixture is 5/5, documentation validation is 4/4, and no
+non-dominating-value verifier or linker failure was observed.
 
 ## Gate 4: Directory entry and metadata model
 
