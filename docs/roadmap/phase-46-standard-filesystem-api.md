@@ -153,7 +153,7 @@ paths.
 - [x] Define end-of-directory as `Ok(Option.None)`, not as a generic failure.
 - [x] Define behavior for repeated reads after EOF.
 - [x] Reject reads and close operations on an already-closed or moved handle.
-- [ ] Guarantee cleanup on early return, branch exit, loop exit, and error
+- [x] Guarantee cleanup on early return, branch exit, loop exit, and error
       paths through the Actus ownership model.
 - [x] Define whether a dropped live handle is rejected, implicitly closed, or
       diagnosed; choose one policy and test it on every backend.
@@ -170,7 +170,8 @@ rejection is covered by the compiler-level
 `std_directory_moved_owner_is_rejected_before_codegen` regression. The native
 runtime test verifies that the directory token table returns to its prior size
 after close, rejects a second close, and rejects reads after close; the strict
-Actus fixture covers early-return cleanup.
+Actus fixture covers early return, branch exit, loop exit, and typed-error
+cleanup with seven strict tests passing.
 
 ## Gate 3.1: Branch-aware native cleanup lowering
 
