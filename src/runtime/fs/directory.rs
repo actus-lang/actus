@@ -178,31 +178,35 @@ mod tests {
         }
     }
 
-    #[test]
-    fn directory_next_entry_writes_file_classification() {
+    fn with_native_path<T>(path: &std::path::Path, operation: impl FnOnce(&ActusPath) -> T) -> T {
         use std::os::unix::ffi::OsStrExt;
 
+        let mut bytes = path.as_os_str().as_bytes().to_vec();
+        let length = bytes.len();
+        bytes.push(0);
+        let mut buffer = ActusBuffer {
+            data: bytes.as_mut_ptr(),
+            length: bytes.len(),
+            capacity: bytes.capacity(),
+        };
+        let descriptor = ActusPath {
+            storage: &mut buffer,
+            platform: 0,
+            length: i32::try_from(length).expect("temporary path should fit ABI"),
+            capacity: i32::try_from(length).expect("temporary path should fit ABI"),
+            terminated: 1,
+        };
+        operation(&descriptor)
+    }
+
+    #[test]
+    fn directory_next_entry_writes_file_classification() {
         let root =
             std::env::temp_dir().join(format!("actus-directory-entry-{}", std::process::id()));
         std::fs::create_dir_all(&root).expect("temporary directory should be created");
         let file = root.join("entry");
         std::fs::write(&file, b"entry").expect("temporary entry should be created");
-        let mut path_bytes = root.as_os_str().as_bytes().to_vec();
-        let path_length = path_bytes.len();
-        path_bytes.push(0);
-        let mut path_buffer = ActusBuffer {
-            data: path_bytes.as_mut_ptr(),
-            length: path_bytes.len(),
-            capacity: path_bytes.capacity(),
-        };
-        let path = ActusPath {
-            storage: &mut path_buffer,
-            platform: 0,
-            length: i32::try_from(path_length).expect("temporary path should fit ABI"),
-            capacity: i32::try_from(path_length).expect("temporary path should fit ABI"),
-            terminated: 1,
-        };
-        let handle = unsafe { actus_directory_open(&path) };
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
         assert!(handle > 0);
         let mut entry_bytes = vec![0u8; 4096];
         let mut entry_buffer =
@@ -220,6 +224,76 @@ mod tests {
         assert_eq!(metadata.identity_status, 0);
         assert_eq!(unsafe { actus_directory_close(handle) }, 0);
         std::fs::remove_file(file).expect("temporary entry should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_next_entry_classifies_mixed_children_and_eof() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-mixed-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("child")).expect("child directory should be created");
+        std::fs::write(root.join("file"), b"file").expect("child file should be created");
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
+        assert!(handle > 0);
+        let mut files = 0;
+        let mut directories = 0;
+        for _ in 0..2 {
+            let mut bytes = vec![0u8; 4096];
+            let mut buffer =
+                ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+            let mut metadata = empty_metadata();
+            assert_eq!(
+                unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) },
+                0
+            );
+            files += metadata.is_file;
+            directories += metadata.is_dir;
+        }
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, -2);
+        assert_eq!(files, 1);
+        assert_eq!(directories, 1);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(root.join("file")).expect("temporary file should be removed");
+        std::fs::remove_dir(root.join("child")).expect("child directory should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_next_entry_returns_eof_for_empty_directory() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-empty-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
+        assert!(handle > 0);
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, -2);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_next_entry_classifies_broken_symlink() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-link-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        std::os::unix::fs::symlink("missing-target", root.join("link"))
+            .expect("broken symbolic link should be created");
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
+        assert!(handle > 0);
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, 0);
+        assert_eq!(metadata.is_symlink, 1);
+        assert_eq!(metadata.is_file, 0);
+        assert_eq!(metadata.is_dir, 0);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(root.join("link")).expect("symbolic link should be removed");
         std::fs::remove_dir(root).expect("temporary directory should be removed");
     }
 

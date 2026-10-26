@@ -231,8 +231,8 @@ non-dominating-value verifier or linker failure was observed.
 - [x] Define whether entry metadata follows symlinks or describes the link
       itself; expose both operations when the platform supports both.
 - [x] Add explicit `is_file`, `is_dir`, `is_symlink`, and file-type helpers.
-- [ ] Add tests for empty directories, mixed entry kinds, broken symlinks,
-      unreadable entries, and metadata races.
+- [x] Add tests for empty directories, mixed entry kinds, and broken symlinks.
+- [ ] Add portable tests for unreadable entries and metadata races.
 
 Gate 4 entry evidence (2026-10-27): `std::fs` now exposes the documented
 `DirectoryEntryKind` and owned `DirectoryEntry` values through its canonical
@@ -241,7 +241,11 @@ metadata snapshot through the native runtime bridge. Classification uses
 `symlink_metadata`, so `Symlink` describes the link itself and does not depend
 on its target being present. The read-only classification helpers are exposed
 through the same facade and do not perform a second filesystem lookup. The
-native classification regression and strict mirrored directory fixture pass.
+native classification regression covers regular files, empty directories,
+mixed file/directory entries with EOF, and broken symlinks; the strict mirrored
+directory fixture also passes. Portable unreadable-entry and metadata-race
+coverage remains open because those conditions require a stable cross-platform
+test harness rather than host-specific permission or timing assumptions.
 Metadata now carries signed Unix-second timestamps with explicit available,
 unsupported, and unavailable statuses, plus an opaque platform identity pair;
 native and path-level strict coverage validate the available POSIX snapshot.
