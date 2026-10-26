@@ -24,7 +24,8 @@ owned entry `Path` at a time and returns `Ok(Option.None)` at end of
 directory. Repeating `next_dir_entry` after EOF continues to return
 `Ok(Option.None)`; EOF is not a failure. `close_dir(ins directory)` releases
 the host iterator and marks the owner closed, so its Drop cleanup is
-idempotent.
+idempotent. A subsequent read or close on that closed owner returns a typed
+failure; a moved owner is rejected statically by the ownership checker.
 
 `remove_dir` is for an empty directory according to the host provider. A
 missing, protected, non-empty, or otherwise rejected target is reported as

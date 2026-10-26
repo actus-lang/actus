@@ -165,7 +165,8 @@ host iterator, `read_dir` opens it, `next_dir_entry` streams bounded owned
 entry paths, and `close_dir(ins directory)` invalidates the owner after
 release. The mirrored `tests/library/fs_directory.act` fixture covers valid
 opening, missing-directory rejection, entry closure, and repeated EOF reads;
-closed/moved-handle and native leak tests remain open below.
+closed-handle reuse is now covered; moved-handle and native leak tests remain
+open below.
 
 ## Gate 4: Directory entry and metadata model
 
