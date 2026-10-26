@@ -182,7 +182,7 @@ the block where cleanup is emitted.
       exits, `return`, `break`, `continue`, and error paths.
 - [x] Validate before backend emission that every cleanup operand is defined in
       the block or is supplied by a dominating predecessor/block parameter.
-- [ ] Preserve exactly-once cleanup for `Buffer`, `Region`, aggregate values,
+- [x] Preserve exactly-once cleanup for `Buffer`, `Region`, aggregate values,
       and user-defined `Drop` performances.
 - [x] Verify equivalent behavior in every supported native backend, including
       Cranelift's verifier and linker path.
@@ -201,9 +201,11 @@ whose live owners were `17` and `27`. The compiler regression and mirrored
 directory fixture pass. The backend contract now computes block dominators and
 rejects cleanup operands that are undefined, sibling-branch values, or defined
 after the cleanup in the same block; a direct regression covers the rejected
-sibling-branch case. The backend parity suite now runs 11 hosted/freestanding
+sibling-branch case. Exactly-once cleanup is covered for Buffer, Region,
+partial aggregate fields, and user-defined Drop performances across the shared
+lowering regressions. The backend parity suite now runs 11 hosted/freestanding
 Cranelift/LLVM fixtures, including the `std::fs::read_dir` early-return Drop
-fixture; all 11 pass. Exactly-once and native leak coverage remain open.
+fixture; all 11 pass. Native leak and double-close coverage remain open.
 
 ## Gate 4: Directory entry and metadata model
 
