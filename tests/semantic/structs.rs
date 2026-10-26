@@ -153,6 +153,14 @@ fn validates_struct_field_types_and_known_field_types() {
 }
 
 #[test]
+fn accepts_typed_constants_in_primitive_struct_fields() {
+    analyze_source(
+        "const DISABLED: Int = 0; struct Options { read: Int, } verb main() { erg options = Options { read: DISABLED, }; }",
+    )
+    .expect("typed constants should match primitive struct fields");
+}
+
+#[test]
 fn rejects_missing_unknown_and_invalid_field_access() {
     let missing = analyze_source(
         "struct Point { x: Int, y: Int, } verb main() { erg point = Point { x: 1, }; }",

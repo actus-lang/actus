@@ -1,26 +1,41 @@
 """
 Describes the three origins accepted by file cursor movement.
 
-The offset is signed so callers can move backward from the current position
-or from the end of a file. The runtime returns the resulting absolute byte
-position in `Result.Ok`.
+Each variant owns one signed scalar offset. `Start` interprets it from byte
+zero, `Current` from the cursor's current absolute position, and `End` from
+the provider's end position. Negative offsets are meaningful where the host
+allows backward movement; invalid positions are reported by the `Seeker`
+operation as `IoError.Failed`. Constructing a `SeekFrom` performs no I/O,
+allocation, cursor mutation, or resource cleanup.
 """
 open enum SeekFrom {
-    """Interpret the signed offset from byte zero of the file."""
+    """Owned signed offset interpreted from byte zero of the file."""
     Start(Int),
-    """Interpret the signed offset from the current file position."""
+    """Owned signed offset interpreted from the current file position."""
     Current(Int),
-    """Interpret the signed offset from the file's end."""
+    """Owned signed offset interpreted from the file's end position."""
     End(Int),
 }
 
 """
 The positional stream contract for owned file handles.
 
-`ins self` temporarily loans the handle for movement. The operation does not
-transfer or duplicate the underlying resource.
+Implementations receive an exclusive `ins self` loan and a consumed `dat from`
+origin. The file resource stays owned by the caller; the origin is selected
+once and cannot be reused after dispatch. A successful call mutates only the
+native cursor and returns its absolute byte position. It allocates no buffer,
+does not close or duplicate the handle, and returns a typed `IoError` when the
+provider rejects the requested position.
 """
 open role Seeker {
-    """Move through an ins handle and dat origin, returning position or typed error."""
+    """
+    Move the cursor through an exclusive file loan.
+
+    `self` remains open and caller-owned after the call. `from` is transferred
+    with `dat` and determines whether the signed offset is relative to the
+    beginning, current position, or end. `Result.Ok(position)` is the new
+    absolute byte position; `Err(IoError.Failed)` reports native rejection.
+    No path, buffer, hidden allocation, or implicit cleanup is introduced.
+    """
     verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError];
 }

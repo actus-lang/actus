@@ -125,6 +125,7 @@ impl Analyzer {
             && let Some(expected_builtin) = lookup_builtin_type(expected)
         {
             self.expression_type(value) == Some(expected_builtin)
+                || self.expression_type_name(value).as_deref() == Some(expected_name.as_str())
         } else {
             self.expression_type_name(value).as_deref() == Some(expected_name.as_str())
         };

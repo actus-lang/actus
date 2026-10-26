@@ -8,6 +8,11 @@ import {
     path as path_module,
 };
 
+"""Scalar value used when an open-option switch is disabled."""
+open const OPEN_OPTION_DISABLED: Int = 0;
+"""Scalar value used when an open-option switch is enabled."""
+open const OPEN_OPTION_ENABLED: Int = 1;
+
 """
 An owned set of erg scalar switches consumed by an open operation.
 The record has no external resource and is returned after each builder.
@@ -27,48 +32,40 @@ open struct OpenOptions {
     erg create_new: Int,
 }
 
-"""Create an option set with every access mode disabled."""
+"""
+Create a fresh file-open configuration with every switch disabled.
+
+The returned `OpenOptions` owns only six scalar flags and owns no path,
+handle, buffer, or operating-system resource. This builder performs no I/O,
+allocation, validation against a host filesystem, or implicit default access;
+callers must explicitly enable at least the access mode required by the later
+`options_open` operation.
+"""
 open verb options_new() -> OpenOptions {
     return OpenOptions {
-        read: 0,
-        write: 0,
-        append: 0,
-        truncate: 0,
-        create: 0,
-        create_new: 0,
+        read: OPEN_OPTION_DISABLED,
+        write: OPEN_OPTION_DISABLED,
+        append: OPEN_OPTION_DISABLED,
+        truncate: OPEN_OPTION_DISABLED,
+        create: OPEN_OPTION_DISABLED,
+        create_new: OPEN_OPTION_DISABLED,
     };
 }
 
-"""Enable read access and return the updated owned configuration."""
+"""
+Enable read access in an owned open configuration.
+
+`options` is consumed with `dat`; all other switches are copied unchanged
+into the returned `OpenOptions`, so the caller must use the returned value and
+cannot reuse the consumed binding. The builder performs no I/O, allocation, or
+host validation. Read permission is applied only when the returned options are
+later passed to `options_open`.
+"""
 open verb options_read(dat options: OpenOptions) -> OpenOptions {
     return OpenOptions {
-        read: 1,
+        read: OPEN_OPTION_ENABLED,
         write: options.write,
         append: options.append,
-        truncate: options.truncate,
-        create: options.create,
-        create_new: options.create_new,
-    };
-}
-
-"""Enable write access and return the updated owned configuration."""
-open verb options_write(dat options: OpenOptions) -> OpenOptions {
-    return OpenOptions {
-        read: options.read,
-        write: 1,
-        append: options.append,
-        truncate: options.truncate,
-        create: options.create,
-        create_new: options.create_new,
-    };
-}
-
-"""Enable append mode and return the updated owned configuration."""
-open verb options_append(dat options: OpenOptions) -> OpenOptions {
-    return OpenOptions {
-        read: options.read,
-        write: options.write,
-        append: 1,
         truncate: options.truncate,
         create: options.create,
         create_new: options.create_new,
@@ -76,25 +73,73 @@ open verb options_append(dat options: OpenOptions) -> OpenOptions {
 }
 
 """
-Enable truncation while consuming `dat options`. The returned options retain
-owned configuration storage; the consumed value is not leaked and no path is
-allocated. The option is applied only when a later open uses it.
+Enable write access in an owned open configuration.
+
+The `dat options` transfer consumes the previous scalar record and returns a
+new record with `write` enabled while preserving all other switches. No file
+is opened and no path or handle is allocated. Existing append, truncate, and
+creation flags remain caller-selected and are interpreted together by the
+later `options_open` call.
+"""
+open verb options_write(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: OPEN_OPTION_ENABLED,
+        append: options.append,
+        truncate: options.truncate,
+        create: options.create,
+        create_new: options.create_new,
+    };
+}
+
+"""
+Enable append mode in an owned open configuration.
+
+`options` is transferred with `dat` and replaced by a record whose `append`
+flag is enabled; every other flag is preserved. This builder performs no
+filesystem operation and cannot itself create or truncate a file. The host
+applies append semantics only when `options_open` consumes the returned
+configuration, and the provider may reject incompatible combinations.
+"""
+open verb options_append(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: options.write,
+        append: OPEN_OPTION_ENABLED,
+        truncate: options.truncate,
+        create: options.create,
+        create_new: options.create_new,
+    };
+}
+
+"""
+Enable truncation in an owned open configuration.
+
+The previous `OpenOptions` is consumed with `dat` and replaced with a record
+that preserves all switches while setting `truncate`. No path, file handle, or
+buffer is created and no truncation occurs in this pure builder. The later
+`options_open` call and its host provider determine whether truncation is
+valid for the selected access and creation modes.
 """
 open verb options_truncate(dat options: OpenOptions) -> OpenOptions {
     return OpenOptions {
         read: options.read,
         write: options.write,
         append: options.append,
-        truncate: 1,
+        truncate: OPEN_OPTION_ENABLED,
         create: options.create,
         create_new: options.create_new,
     };
 }
 
 """
-Enable creation while consuming `dat options`. `OpenOptions` is returned with
-the updated owned flags; no path conversion or hidden allocation occurs, and
-the original options are not reused after the transfer.
+Enable creation in an owned open configuration.
+
+`dat options` transfers the prior scalar record into this builder. The
+returned configuration has `create` enabled and preserves read, write,
+append, truncate, and create-new selections. The builder performs no I/O,
+path conversion, or hidden allocation; creation is attempted only by a later
+`options_open` call.
 """
 open verb options_create(dat options: OpenOptions) -> OpenOptions {
     return OpenOptions {
@@ -102,15 +147,19 @@ open verb options_create(dat options: OpenOptions) -> OpenOptions {
         write: options.write,
         append: options.append,
         truncate: options.truncate,
-        create: 1,
+        create: OPEN_OPTION_ENABLED,
         create_new: options.create_new,
     };
 }
 
 """
-Require creation of a new path while consuming `dat options`. The returned
-owned flags are deterministic; no path allocation occurs here. A later open
-returns `Err(IoError.Failed)` when the target already exists.
+Require exclusive creation of a new path in an owned open configuration.
+
+The `dat options` record is consumed and returned with `create_new` enabled;
+all other switches are preserved. This builder does not inspect the path or
+perform I/O. When the returned configuration reaches `options_open`, an
+existing target is rejected as `Err(IoError.Failed)` by the current public
+filesystem error surface, while successful creation returns an owned `File`.
 """
 open verb options_create_new(dat options: OpenOptions) -> OpenOptions {
     return OpenOptions {
@@ -119,7 +168,7 @@ open verb options_create_new(dat options: OpenOptions) -> OpenOptions {
         append: options.append,
         truncate: options.truncate,
         create: options.create,
-        create_new: 1,
+        create_new: OPEN_OPTION_ENABLED,
     };
 }
 
@@ -143,9 +192,16 @@ unsafe extern "C" verb actus_file_open_options_path(
 ) -> Int;
 
 """
-Consume `dat options` and inspect an `abs path` without copying or allocating
-path text. `Ok(File)` transfers ownership of the opened handle; `Err` reports
-the typed `IoError` and all consumed resources are cleaned up.
+Open a path using the complete consumed `OpenOptions` configuration.
+
+`options` is transferred with `dat`; the path is an immutable `abs` view used
+only for the native call and is not retained. Read/write, append, truncate, create,
+and create-new flags are forwarded together without path copying or hidden
+buffer allocation. `Ok(File)` transfers ownership of the new host handle to
+the caller, whose `Drop` performance closes it. On `Err(IoError.Failed)` no
+live `File` is returned and the rejected native handle is consumed safely.
+The host provider remains responsible for rejecting incompatible flag
+combinations and existing-target violations.
 """
 open verb options_open(dat options: OpenOptions, abs path: path_module::Path) -> Result[File, io::IoError] {
     erg handle = actus_file_open_options_path(

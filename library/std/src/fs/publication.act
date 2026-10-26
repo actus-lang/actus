@@ -5,12 +5,16 @@ import {
 };
 
 """
-Create or truncate `path`, write borrowed contents, and close the file.
+Create or truncate `path`, write the complete borrowed contents, flush, and
+close the file before returning.
 
-`path` and `contents` are `abs` views borrowed only for their respective
-runtime calls. `Ok(count)` is the exact number of bytes written;
-`Err(IoError.Failed)` or `Err(IoError.EndOfStream)` reports failure after the
-owned `File` has been deterministically cleaned up.
+`path` and `contents` are immutable `abs` views; neither is transferred,
+retained, or replaced. The operation creates one owned `File` internally and
+closes it on every success and failure branch. `Ok(count)` is the exact byte
+count and is returned only after the count equals the complete input length
+and flush succeeds. A short write, open failure, flush failure, close failure,
+or end-of-stream condition becomes a typed `IoError`; no partial success is
+reported and no hidden result buffer is allocated.
 """
 open verb write_file(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
     return write_and_flush(path: abs path, contents: abs contents);
@@ -19,11 +23,14 @@ open verb write_file(abs path: path_module::Path, abs contents: Buffer) -> Resul
 """
 Write a complete file through a staging path and publish it with one rename.
 
-`path` is the final destination and `staging` is a caller-selected temporary
-path in the same filesystem. The contents are written and the handle is
-flushed before the rename. A write, flush, or rename failure removes the staging file
-and returns the typed error; cleanup is deterministic and the final destination
-is never partially written. The operation performs no hidden allocation.
+`path` and `contents` are immutable `abs` views. `staging` is transferred with
+`dat`, must be on the same filesystem as the final destination, and is never
+returned after this operation. The contents are fully written, length-checked,
+flushed, and closed before the rename is attempted. Only a successful rename
+publishes the staged bytes; write, short-write, flush, close, or rename failure
+returns the original typed error and invokes deterministic best-effort staging
+cleanup. The final destination is not exposed to partially written staged
+contents, and the operation performs no hidden result-buffer allocation.
 """
 open verb write_file_atomic(
     abs path: path_module::Path,
@@ -46,7 +53,17 @@ open verb write_file_atomic(
     };
 }
 
-"""Write bytes to a new file and flush the handle before returning a typed result."""
+"""
+Create or truncate a file, write all borrowed bytes, flush, and close it.
+
+`path` and `contents` are immutable `abs` views used only for the operation;
+the created `File` is an internal owner and never escapes. The function checks
+the native count against the complete input length, rejects short writes,
+flushes before reporting success, and closes the handle on every branch.
+`Ok(count)` is therefore a complete committed-to-the-provider write, while
+`Err(IoError)` reports open, write, size, flush, or close failure. No staging
+path, replacement buffer, or hidden allocation is introduced here.
+"""
 open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
     erg opened = file_create(path: abs path);
     return case dat opened {
@@ -93,7 +110,15 @@ open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> 
     };
 }
 
-"""Clean up failed staging storage and return the original atomic-write error."""
+"""
+Clean up failed atomic-publication staging storage and preserve the root error.
+
+`staging` and `error` are consumed with `dat`; the staging path is removed on
+a best-effort basis and then released, while the original write, flush, or
+rename error is returned unchanged. Cleanup failure is intentionally not
+substituted for the root failure, and this helper performs no retry, final
+destination mutation, or hidden allocation.
+"""
 open verb cleanup_atomic_failure(
     dat staging: path_module::Path,
     dat error: io::IoError
