@@ -119,3 +119,57 @@ unsafe fn write_entry_name(output: &mut ActusBuffer, name: &OsStr) -> i32 {
     #[allow(unreachable_code)]
     ABI_STATUS_FAILURE
 }
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use crate::runtime::path::ActusPath;
+
+    #[test]
+    fn directory_close_releases_native_token_exactly_once() {
+        let before = directories().lock().expect("directory table should lock").len();
+        let mut bytes = b".\0".to_vec();
+        let mut buffer = ActusBuffer {
+            data: bytes.as_mut_ptr(),
+            length: bytes.len(),
+            capacity: bytes.capacity(),
+        };
+        let path =
+            ActusPath { storage: &mut buffer, platform: 0, length: 1, capacity: 1, terminated: 1 };
+        let handle = unsafe { actus_directory_open(&path) };
+        assert!(handle > 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before + 1);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before);
+        assert_eq!(unsafe { actus_directory_close(handle) }, ABI_STATUS_FAILURE);
+        let mut output = ActusBuffer { data: std::ptr::null_mut(), length: 0, capacity: 0 };
+        assert_eq!(unsafe { actus_directory_next(handle, &mut output) }, ABI_STATUS_FAILURE);
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use crate::runtime::path::ActusPath;
+
+    #[test]
+    fn directory_close_releases_native_token_exactly_once() {
+        let before = directories().lock().expect("directory table should lock").len();
+        let mut units = vec![46u16, 0u16];
+        let mut buffer = ActusBuffer {
+            data: units.as_mut_ptr().cast(),
+            length: units.len() * 2,
+            capacity: units.capacity() * 2,
+        };
+        let path =
+            ActusPath { storage: &mut buffer, platform: 1, length: 1, capacity: 1, terminated: 1 };
+        let handle = unsafe { actus_directory_open(&path) };
+        assert!(handle > 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before + 1);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before);
+        assert_eq!(unsafe { actus_directory_close(handle) }, ABI_STATUS_FAILURE);
+        let mut output = ActusBuffer { data: std::ptr::null_mut(), length: 0, capacity: 0 };
+        assert_eq!(unsafe { actus_directory_next(handle, &mut output) }, ABI_STATUS_FAILURE);
+    }
+}
