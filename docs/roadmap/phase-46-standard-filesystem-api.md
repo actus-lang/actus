@@ -158,7 +158,7 @@ paths.
 - [x] Define whether a dropped live handle is rejected, implicitly closed, or
       diagnosed; choose one policy and test it on every backend.
 - [ ] Ensure no directory handle can escape its declared ownership scope.
-- [ ] Add native leak, double-close, use-after-close, and early-return tests.
+- [x] Add native leak, double-close, use-after-close, and early-return tests.
 
 Gate 3 initial lifecycle evidence (2026-10-27): `Directory` owns one opaque
 host iterator, `read_dir` opens it, `next_dir_entry` streams bounded owned
@@ -167,8 +167,10 @@ release. The mirrored `tests/library/fs_directory.act` fixture covers valid
 opening, missing-directory rejection, entry closure, repeated EOF reads, and
 early-return Drop cleanup; closed-handle reuse is now covered. Moved-handle
 rejection is covered by the compiler-level
-`std_directory_moved_owner_is_rejected_before_codegen` regression; native leak
-and full backend-matrix tests remain open below.
+`std_directory_moved_owner_is_rejected_before_codegen` regression. The native
+runtime test verifies that the directory token table returns to its prior size
+after close, rejects a second close, and rejects reads after close; the strict
+Actus fixture covers early-return cleanup.
 
 ## Gate 3.1: Branch-aware native cleanup lowering
 
