@@ -59,6 +59,15 @@ fn std_fs_private_child_must_be_reached_through_the_canonical_facade() {
 }
 
 #[test]
+fn std_directory_moved_owner_is_rejected_before_codegen() {
+    let source = parse_source(
+        "import { open fs }; verb main() -> Int { erg directory: Directory = Directory { handle: 1, }; drop(directory); next_dir_entry(directory: ins directory); return 0; }",
+    );
+    analyze_with_imports(&source, &std_resolver())
+        .expect_err("a dropped directory owner must not reach directory code generation");
+}
+
+#[test]
 fn std_path_raw_bridge_is_not_importable_through_the_public_facade() {
     let source = parse_source(
         "import path; verb main() -> Int { return actus_path_is_absolute(path: missing); }",

@@ -152,7 +152,7 @@ paths.
 - [x] Add `close_dir(ins directory: Directory) -> Result[Int, IoError]`.
 - [x] Define end-of-directory as `Ok(Option.None)`, not as a generic failure.
 - [x] Define behavior for repeated reads after EOF.
-- [ ] Reject reads and close operations on an already-closed or moved handle.
+- [x] Reject reads and close operations on an already-closed or moved handle.
 - [ ] Guarantee cleanup on early return, branch exit, loop exit, and error
       paths through the Actus ownership model.
 - [ ] Define whether a dropped live handle is rejected, implicitly closed, or
@@ -166,7 +166,8 @@ entry paths, and `close_dir(ins directory)` invalidates the owner after
 release. The mirrored `tests/library/fs_directory.act` fixture covers valid
 opening, missing-directory rejection, entry closure, and repeated EOF reads;
 closed-handle reuse is now covered; moved-handle and native leak tests remain
-open below.
+rejection is covered by the compiler-level `std_directory_moved_owner_is_rejected_before_codegen`
+regression; native leak tests remain open below.
 
 ## Gate 4: Directory entry and metadata model
 
