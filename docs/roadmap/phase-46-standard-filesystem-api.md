@@ -157,7 +157,7 @@ paths.
       paths through the Actus ownership model.
 - [x] Define whether a dropped live handle is rejected, implicitly closed, or
       diagnosed; choose one policy and test it on every backend.
-- [ ] Ensure no directory handle can escape its declared ownership scope.
+- [x] Ensure no directory handle can escape its declared ownership scope.
 - [x] Add native leak, double-close, use-after-close, and early-return tests.
 
 Gate 3 initial lifecycle evidence (2026-10-27): `Directory` owns one opaque
@@ -171,7 +171,9 @@ rejection is covered by the compiler-level
 runtime test verifies that the directory token table returns to its prior size
 after close, rejects a second close, and rejects reads after close; the strict
 Actus fixture covers early return, branch exit, loop exit, and typed-error
-cleanup with seven strict tests passing.
+cleanup with seven strict tests passing. A Directory value may leave a scope
+only through an explicit owned transfer or return; borrowed and moved owners
+cannot be reused or escape through the semantic boundary.
 
 ## Gate 3.1: Branch-aware native cleanup lowering
 
