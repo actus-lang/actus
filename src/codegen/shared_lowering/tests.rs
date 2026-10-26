@@ -155,8 +155,28 @@ fn lowers_drop_cleanup_with_case_branch_and_loop_control_flow() {
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "Drop CFG fixture should lex: {errors:?}");
     let program = parse(tokens).expect("Drop CFG fixture should parse");
-    super::super::lower_program_to_backend_module("actus_root", &program, Some("main"), None)
-        .expect("branch-aware Drop cleanup should lower without non-dominating SSA values");
+    let module =
+        super::super::lower_program_to_backend_module("actus_root", &program, Some("main"), None)
+            .expect("branch-aware Drop cleanup should lower without non-dominating SSA values");
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("main"))
+        .expect("main function should be present");
+    let terminal_cleanup_counts = main.blocks.iter().filter_map(|block| {
+        block.instructions.last().and_then(|instruction| {
+            matches!(instruction, BackendInstruction::Return { .. }).then(|| {
+                block
+                    .instructions
+                    .iter()
+                    .filter(|instruction| matches!(instruction, BackendInstruction::Cleanup { .. }))
+                    .count()
+            })
+        })
+    });
+    let counts = terminal_cleanup_counts.collect::<Vec<_>>();
+    assert!(counts.contains(&1));
+    assert!(counts.iter().all(|count| *count <= 1));
 }
 
 #[test]
