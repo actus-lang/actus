@@ -11,7 +11,9 @@ pub use buffers::{
     actus_file_open_options_buffer, actus_file_read_buffer, actus_file_sync_all_buffer,
     actus_file_sync_data_buffer, actus_file_write_buffer,
 };
-pub use directory::{actus_directory_close, actus_directory_next, actus_directory_open};
+pub use directory::{
+    actus_directory_close, actus_directory_next, actus_directory_next_entry, actus_directory_open,
+};
 pub use file::{
     actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_seek,
     actus_file_seek_buffer, actus_file_sync_all, actus_file_sync_data, actus_file_write,

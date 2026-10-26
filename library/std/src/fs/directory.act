@@ -1,7 +1,7 @@
 """
 Streaming directory access through one owned host directory handle.
 
-The iterator returns one owned entry `Path` at a time. It does not retain the
+The iterator returns one owned `DirectoryEntry` at a time. It does not retain the
 parent path, expose a native pointer, or allocate an unbounded entry array.
 """
 import {
@@ -73,6 +73,20 @@ the fixed destination storage is too small.
 """
 unsafe extern "C" verb actus_directory_next(abs handle: Int, ins storage: Buffer) -> Int;
 
+"""
+Write the next entry name and a copied metadata snapshot into caller-owned
+storage. The runtime uses link metadata, so a symbolic link is classified as
+`Symlink` even when its target is missing or has another type.
+"""
+unsafe extern "C" verb actus_directory_next_entry(
+    abs handle: Int,
+    ins storage: Buffer,
+    ins metadata: Metadata
+) -> Int;
+
+"""Read one initialized byte from entry storage without transferring ownership."""
+unsafe extern "C" verb actus_buffer_byte_at(abs storage: Buffer, erg index: Int) -> Int;
+
 """Close one owned directory handle exactly once through the runtime bridge."""
 unsafe extern "C" verb actus_directory_close(abs handle: Int) -> Int;
 
@@ -104,59 +118,125 @@ open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError
 }
 
 """
-Return the next entry name as an owned `Path`.
+Classify and return the next entry as an owned `DirectoryEntry`.
 
 `Ok(None)` is normal end-of-directory. Each successful call allocates only
-the returned entry path; the iterator itself remains bounded by one host
-handle and the fixed entry-name buffer. Errors are returned as typed
-`IoError` values and leave the directory owner available for explicit close.
+the two owned path values and the copied scalar metadata; the iterator itself
+remains bounded by one host handle and the fixed entry-name buffer. Metadata
+describes the directory entry itself rather than following a symbolic link.
+Errors are returned as typed `IoError` values and leave the directory owner
+available for explicit close.
 """
-open verb next_dir_entry(ins directory: Directory) -> Result[Option[path_module::Path], io::IoError] {
+open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEntry], io::IoError] {
     erg storage: Buffer = Buffer[4096];
-    erg status = actus_directory_next(handle: abs directory.handle, storage: ins storage);
+    erg metadata = Metadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+        is_symlink: 0,
+    };
+    erg status = actus_directory_next_entry(
+        handle: abs directory.handle,
+        storage: ins storage,
+        metadata: ins metadata
+    );
     return case status {
         -1 => {
             drop(storage);
+            drop(metadata);
             Err(io::IoError.Failed);
         },
         -2 => {
             drop(storage);
-            Ok(Option[path_module::Path].None);
+            drop(metadata);
+            Ok(Option[DirectoryEntry].None);
         },
         -3 => {
             drop(storage);
+            drop(metadata);
             Err(io::IoError.InvalidInput);
         },
         0 => {
-            return directory_entry_from_storage(storage: dat storage, status: status);
+            return directory_entry_from_storage(
+                storage: dat storage,
+                metadata: dat metadata,
+                status: status
+            );
         },
         1 => {
-            return directory_entry_from_storage(storage: dat storage, status: status);
+            return directory_entry_from_storage(
+                storage: dat storage,
+                metadata: dat metadata,
+                status: status
+            );
         },
         _ => {
             drop(storage);
+            drop(metadata);
             Err(io::IoError.Failed);
         },
     };
 }
 
-verb directory_entry_from_storage(dat storage: Buffer, erg status: Int) -> Result[Option[path_module::Path], io::IoError] {
-    return case status {
-        0 => {
-            erg result = path_module::path_from_posix(storage: dat storage);
-            return case dat result {
-                Result.Err(_) => Err(io::IoError.InvalidData),
-                Result.Ok(value) => Ok(Option[path_module::Path].Some(dat value)),
-            };
-        },
-        _ => {
-            erg result = path_module::path_from_windows_utf16(storage: dat storage);
-            return case dat result {
-                Result.Err(_) => Err(io::IoError.InvalidData),
-                Result.Ok(value) => Ok(Option[path_module::Path].Some(dat value)),
-            };
+verb copy_entry_storage(abs source: Buffer) -> Result[Buffer, io::IoError] {
+    erg output: Buffer = Buffer[0];
+    erg length = io::buffer_size(buffer: abs source)?;
+    erg index: Int = 0;
+    loop {
+        if index >= length {
+            break;
+        }
+        erg byte = actus_buffer_byte_at(storage: abs source, index: erg index);
+        append(output, byte as u8);
+        index += 1;
+    }
+    return Ok(output);
+}
+
+verb directory_entry_kind(abs metadata: Metadata) -> DirectoryEntryKind {
+    return case metadata.is_symlink {
+        1 => DirectoryEntryKind.Symlink,
+        _ => case metadata.is_file {
+            1 => DirectoryEntryKind.File,
+            _ => case metadata.is_dir {
+                1 => DirectoryEntryKind.Directory,
+                _ => DirectoryEntryKind.Other,
+            },
         },
     };
+}
+
+verb directory_path_result(dat result: Result[path_module::Path, path_module::PathError]) -> Result[path_module::Path, io::IoError] {
+    return case dat result {
+        Result.Err(_) => Err(io::IoError.InvalidData),
+        Result.Ok(value) => Ok(value),
+    };
+}
+
+verb directory_entry_from_storage(
+    dat storage: Buffer,
+    dat metadata: Metadata,
+    erg status: Int
+) -> Result[Option[DirectoryEntry], io::IoError] {
+    erg relative_storage = copy_entry_storage(source: abs storage)?;
+    erg name_result = case status {
+        0 => path_module::path_from_posix(storage: dat storage),
+        _ => path_module::path_from_windows_utf16(storage: dat storage),
+    };
+    erg name = directory_path_result(result: dat name_result)?;
+    erg relative_result = case status {
+        0 => path_module::path_from_posix(storage: dat relative_storage),
+        _ => path_module::path_from_windows_utf16(storage: dat relative_storage),
+    };
+    erg relative_path = directory_path_result(result: dat relative_result)?;
+    erg kind = directory_entry_kind(metadata: abs metadata);
+    return Ok(Option[DirectoryEntry].Some(DirectoryEntry {
+        name: name,
+        relative_path: relative_path,
+        kind: kind,
+        metadata: metadata,
+    }));
 }
 
 """

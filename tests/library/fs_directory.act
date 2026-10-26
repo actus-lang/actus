@@ -12,10 +12,10 @@ verb current_directory() -> Result[Path, PathError] {
     return path_from_ascii(storage: dat raw);
 }
 
-verb close_directory_entry(ins directory: Directory, dat value: Option[Path]) -> Int {
+verb close_directory_entry(ins directory: Directory, dat value: Option[DirectoryEntry]) -> Int {
     erg entry_code = case dat value {
         Option.None => 5,
-        Option.Some(name) => case name.length {
+        Option.Some(entry) => case entry.name.length {
             0 => 6,
             _ => 0,
         },
@@ -90,8 +90,8 @@ verb verify_repeated_eof(ins directory: Directory) -> Int {
                     Result.Err(_) => 2,
                 };
             },
-            Option.Some(name) => {
-                drop(name);
+            Option.Some(entry) => {
+                drop(entry);
                 close_dir(directory: ins directory);
                 3;
             },
@@ -117,8 +117,8 @@ verb repeated_directory_eof_remains_clean() -> Int {
                                 return 3;
                             },
                             Result.Ok(value) => case dat value {
-                                Option.Some(name) => {
-                                    drop(name);
+                                Option.Some(item) => {
+                                    drop(item);
                                 },
                                 Option.None => {
                                     return verify_repeated_eof(directory: ins directory);
@@ -152,8 +152,8 @@ verb closed_directory_rejects_reuse() -> Int {
                             case dat next {
                                 Result.Ok(value) => {
                                     case dat value {
-                                        Option.Some(name) => {
-                                            drop(name);
+                                        Option.Some(entry) => {
+                                            drop(entry);
                                         },
                                         Option.None => {},
                                     };

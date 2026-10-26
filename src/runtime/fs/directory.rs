@@ -5,7 +5,8 @@ use std::sync::{Mutex, OnceLock};
 
 use super::super::contract::{ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
 use super::super::path::ActusPath;
-use super::super::types::{ActusBuffer, BufferHandle};
+use super::super::types::{ActusBuffer, ActusMetadata, BufferHandle};
+use super::operations::write_metadata;
 use super::path_bridge::with_host_path;
 
 const DIRECTORY_STATUS_BUFFER_TOO_SMALL: i32 = -3;
@@ -53,6 +54,38 @@ pub unsafe extern "C" fn actus_directory_next(handle: i32, storage: BufferHandle
     let Ok(entry) = entry else { return ABI_STATUS_FAILURE };
     let name = entry.file_name();
     unsafe { write_entry_name(output, &name) }
+}
+
+/// Writes one entry name and a symlink-preserving metadata snapshot.
+///
+/// # Safety
+/// `storage` must point to a valid writable `ActusBuffer`, `metadata` must
+/// point to writable `ActusMetadata`, and `handle` must be a live token
+/// returned by `actus_directory_open`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_directory_next_entry(
+    handle: i32,
+    storage: BufferHandle,
+    metadata: *mut ActusMetadata,
+) -> i32 {
+    let Some(output) = (unsafe { writable_buffer(storage) }) else {
+        return ABI_STATUS_FAILURE;
+    };
+    if metadata.is_null() {
+        return ABI_STATUS_FAILURE;
+    }
+    let Ok(mut table) = directories().lock() else { return ABI_STATUS_FAILURE };
+    let Some(directory) = table.get_mut(&handle) else { return ABI_STATUS_FAILURE };
+    let next = directory.next();
+    let Some(entry) = next else { return ABI_STATUS_END_OF_STREAM };
+    let Ok(entry) = entry else { return ABI_STATUS_FAILURE };
+    let Ok(snapshot) = entry.path().symlink_metadata() else { return ABI_STATUS_FAILURE };
+    let name_status = unsafe { write_entry_name(output, &entry.file_name()) };
+    if name_status < 0 {
+        return name_status;
+    }
+    unsafe { write_metadata(metadata, &snapshot) };
+    name_status
 }
 
 /// Closes one directory token and releases its host iterator.
@@ -124,6 +157,48 @@ unsafe fn write_entry_name(output: &mut ActusBuffer, name: &OsStr) -> i32 {
 mod tests {
     use super::*;
     use crate::runtime::path::ActusPath;
+
+    #[test]
+    fn directory_next_entry_writes_file_classification() {
+        use std::os::unix::ffi::OsStrExt;
+
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-entry-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        let file = root.join("entry");
+        std::fs::write(&file, b"entry").expect("temporary entry should be created");
+        let mut path_bytes = root.as_os_str().as_bytes().to_vec();
+        let path_length = path_bytes.len();
+        path_bytes.push(0);
+        let mut path_buffer = ActusBuffer {
+            data: path_bytes.as_mut_ptr(),
+            length: path_bytes.len(),
+            capacity: path_bytes.capacity(),
+        };
+        let path = ActusPath {
+            storage: &mut path_buffer,
+            platform: 0,
+            length: i32::try_from(path_length).expect("temporary path should fit ABI"),
+            capacity: i32::try_from(path_length).expect("temporary path should fit ABI"),
+            terminated: 1,
+        };
+        let handle = unsafe { actus_directory_open(&path) };
+        assert!(handle > 0);
+        let mut entry_bytes = vec![0u8; 4096];
+        let mut entry_buffer =
+            ActusBuffer { data: entry_bytes.as_mut_ptr(), length: 0, capacity: entry_bytes.len() };
+        let mut metadata =
+            ActusMetadata { size: 0, is_file: 0, is_dir: 0, readonly: 0, is_symlink: 0 };
+        let status =
+            unsafe { actus_directory_next_entry(handle, &mut entry_buffer, &mut metadata) };
+        assert_eq!(status, 0);
+        assert_eq!(metadata.is_file, 1);
+        assert_eq!(metadata.is_dir, 0);
+        assert_eq!(metadata.is_symlink, 0);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(file).expect("temporary entry should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
 
     #[test]
     fn directory_close_releases_native_token_exactly_once() {

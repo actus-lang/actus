@@ -20,12 +20,18 @@ or the Windows volume/file index). Targets without a stable identity return
 ## Directory handle lifecycle
 
 `read_dir` returns one owned `Directory` handle. `next_dir_entry` streams one
-owned entry `Path` at a time and returns `Ok(Option.None)` at end of
-directory. Repeating `next_dir_entry` after EOF continues to return
-`Ok(Option.None)`; EOF is not a failure. `close_dir(ins directory)` releases
-the host iterator and marks the owner closed, so its Drop cleanup is
-idempotent. A subsequent read or close on that closed owner returns a typed
-failure; a moved owner is rejected statically by the ownership checker.
+owned `DirectoryEntry` at a time and returns `Ok(Option.None)` at end of
+directory. Each entry owns its name and relative path component and carries a
+copied `Metadata` snapshot plus a `DirectoryEntryKind` classification. The
+native bridge uses link metadata, so `Symlink` describes the directory entry
+itself and does not follow its target; a broken link remains classifiable as a
+symlink when the host exposes it.
+
+Repeating `next_dir_entry` after EOF continues to return `Ok(Option.None)`;
+EOF is not a failure. `close_dir(ins directory)` releases the host iterator
+and marks the owner closed, so its Drop cleanup is idempotent. A subsequent
+read or close on that closed owner returns a typed failure; a moved owner is
+rejected statically by the ownership checker.
 `Directory` implements `Drop`: leaving scope with a live handle performs a
 best-effort close, so early returns and branch exits do not silently retain the
 host iterator. The compiler binds this cleanup to the owner value live in each

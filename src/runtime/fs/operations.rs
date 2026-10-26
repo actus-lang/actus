@@ -293,7 +293,10 @@ fn host_path(bytes: &[u8]) -> std::path::PathBuf {
     std::path::PathBuf::new()
 }
 
-unsafe fn write_metadata(output: *mut ActusMetadata, metadata: &std::fs::Metadata) -> i32 {
+pub(crate) unsafe fn write_metadata(
+    output: *mut ActusMetadata,
+    metadata: &std::fs::Metadata,
+) -> i32 {
     let Ok(size) = i32::try_from(metadata.len()) else { return ABI_STATUS_FAILURE };
     unsafe {
         *output = ActusMetadata {
