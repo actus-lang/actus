@@ -17,6 +17,15 @@ compares the native identity pair supplied by the target (POSIX device/inode
 or the Windows volume/file index). Targets without a stable identity return
 `IoError.Unsupported`.
 
+## Directory handle lifecycle
+
+`read_dir` returns one owned `Directory` handle. `next_dir_entry` streams one
+owned entry `Path` at a time and returns `Ok(Option.None)` at end of
+directory. Repeating `next_dir_entry` after EOF continues to return
+`Ok(Option.None)`; EOF is not a failure. `close_dir(ins directory)` releases
+the host iterator and marks the owner closed, so its Drop cleanup is
+idempotent.
+
 `remove_dir` is for an empty directory according to the host provider. A
 missing, protected, non-empty, or otherwise rejected target is reported as
 `IoError.Failed`.

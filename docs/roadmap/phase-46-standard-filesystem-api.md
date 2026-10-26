@@ -145,13 +145,13 @@ paths.
 
 ## Gate 3: Directory handle lifecycle
 
-- [ ] Add a typed directory handle that owns one native directory resource.
-- [ ] Add `read_dir(abs path: Path) -> Result[Directory, IoError]`.
-- [ ] Add `next_dir_entry(ins directory: Directory) ->
+- [x] Add a typed directory handle that owns one native directory resource.
+- [x] Add `read_dir(abs path: Path) -> Result[Directory, IoError]`.
+- [x] Add `next_dir_entry(ins directory: Directory) ->
       Result[Option[DirectoryEntry], IoError]`.
-- [ ] Add `close_dir(dat directory: Directory) -> Result[Int, IoError]`.
-- [ ] Define end-of-directory as `Ok(Option.None)`, not as a generic failure.
-- [ ] Define behavior for repeated reads after EOF.
+- [x] Add `close_dir(ins directory: Directory) -> Result[Int, IoError]`.
+- [x] Define end-of-directory as `Ok(Option.None)`, not as a generic failure.
+- [x] Define behavior for repeated reads after EOF.
 - [ ] Reject reads and close operations on an already-closed or moved handle.
 - [ ] Guarantee cleanup on early return, branch exit, loop exit, and error
       paths through the Actus ownership model.
@@ -159,6 +159,13 @@ paths.
       diagnosed; choose one policy and test it on every backend.
 - [ ] Ensure no directory handle can escape its declared ownership scope.
 - [ ] Add native leak, double-close, use-after-close, and early-return tests.
+
+Gate 3 initial lifecycle evidence (2026-10-27): `Directory` owns one opaque
+host iterator, `read_dir` opens it, `next_dir_entry` streams bounded owned
+entry paths, and `close_dir(ins directory)` invalidates the owner after
+release. The mirrored `tests/library/fs_directory.act` fixture covers valid
+opening, missing-directory rejection, entry closure, and repeated EOF reads;
+closed/moved-handle and native leak tests remain open below.
 
 ## Gate 4: Directory entry and metadata model
 
