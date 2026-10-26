@@ -218,11 +218,11 @@ non-dominating-value verifier or linker failure was observed.
 
 ## Gate 4: Directory entry and metadata model
 
-- [ ] Add `DirectoryEntryKind` with at least `File`, `Directory`, `Symlink`,
+- [x] Add `DirectoryEntryKind` with at least `File`, `Directory`, `Symlink`,
       and `Other` variants.
-- [ ] Add a documented `DirectoryEntry` containing the entry name, relative
+- [x] Add a documented `DirectoryEntry` containing the entry name, relative
       path component, kind, and metadata snapshot.
-- [ ] Reuse the existing `Metadata` type where its fields are sufficient;
+- [x] Reuse the existing `Metadata` type where its fields are sufficient;
       extend it only through an intentional public API change.
 - [ ] Define metadata fields for file type, byte size, readonly state,
       modification time, access time, creation time, and platform identity.
@@ -233,6 +233,13 @@ non-dominating-value verifier or linker failure was observed.
 - [ ] Add explicit `is_file`, `is_dir`, `is_symlink`, and file-type helpers.
 - [ ] Add tests for empty directories, mixed entry kinds, broken symlinks,
       unreadable entries, and metadata races.
+
+Gate 4 type-model evidence (2026-10-27): `std::fs` now exposes the documented
+`DirectoryEntryKind` and owned `DirectoryEntry` value types through its
+canonical facade. The entry owns both path values and copied `Metadata` facts;
+it retains no directory handle or borrowed host pointer. The visibility
+regression passes, while native entry classification and integration with
+`next_dir_entry` remain the next filesystem work.
 
 ## Gate 5: Deterministic and bounded enumeration
 
