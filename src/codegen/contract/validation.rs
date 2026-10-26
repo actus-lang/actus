@@ -1,10 +1,12 @@
 use std::collections::BTreeSet;
 
-use super::super::{BackendAggregateField, BackendBlock, BackendBlockId};
+use super::super::{BackendAggregateField, BackendBlock, BackendBlockId, BackendParameter};
 use super::cleanup::validate_cleanup_operand;
 use super::{BackendContractError, BackendInstruction, validate_value_type};
 
 pub(super) fn validate_instructions(
+    entry: BackendBlockId,
+    parameters: &[BackendParameter],
     blocks: &[BackendBlock],
     block_ids: &BTreeSet<BackendBlockId>,
 ) -> Result<(), BackendContractError> {
@@ -13,6 +15,7 @@ pub(super) fn validate_instructions(
             validate_instruction(instruction, blocks, block_ids)?;
         }
     }
+    super::dominance::validate_cleanup_value_dominance(entry, parameters, blocks)?;
     Ok(())
 }
 
