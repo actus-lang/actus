@@ -60,6 +60,14 @@ Use `directory_entry_is_file`, `directory_entry_is_dir`, and
 needed. These helpers borrow the entry immutably and do not inspect the host
 filesystem again.
 
+`read_dir_filtered` applies a transferred `DirectoryFilter` before returning
+an entry. `regular_files_only` takes precedence over the kind flags;
+`include_directories` and `include_symlinks` control those kinds, while
+`include_hidden` means leading-dot names rather than host-specific hidden
+attributes. An optional extension is compared bytewise and case-sensitively.
+Rejected entries are consumed and never returned, and filtering does not
+materialize an unbounded collection.
+
 Repeating `next_dir_entry` after EOF continues to return `Ok(Option.None)`;
 EOF is not a failure. `close_dir(ins directory)` releases the host iterator
 and marks the owner closed, so its Drop cleanup is idempotent. A subsequent

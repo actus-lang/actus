@@ -51,33 +51,56 @@ verb directory_iteration_returns_entry_and_closes() -> Int {
     };
 }
 
+verb verify_filtered_directory(ins directory: Directory) -> Int {
+    erg entry = next_dir_entry(directory: ins directory);
+    return case dat entry {
+        Result.Err(_) => {
+            close_dir(directory: ins directory);
+            3;
+        },
+        Result.Ok(value) => case dat value {
+            Option.None => {
+                close_dir(directory: ins directory);
+                4;
+            },
+            Option.Some(entry_value) => {
+                erg is_file = directory_entry_is_file(entry: abs entry_value);
+                drop(entry_value);
+                erg closed = close_dir(directory: ins directory);
+                case dat closed {
+                    Result.Err(_) => 5,
+                    Result.Ok(_) => case is_file {
+                        true => 0,
+                        _ => 6,
+                    },
+                };
+            },
+        },
+    };
+}
+
 meta test
 verb lexicographic_directory_iteration_is_bounded() -> Int {
     erg current = current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
+            erg filter = DirectoryFilter {
+                regular_files_only: true,
+                include_directories: false,
+                include_symlinks: false,
+                include_hidden: false,
+                extension: Option[Path].None,
+            };
             erg selected_order = DirectoryOrder.Lexicographic;
-            erg opened = read_dir_ordered(path: abs path, order: erg selected_order);
+            erg opened = read_dir_filtered(
+                path: abs path,
+                order: erg selected_order,
+                filter: dat filter
+            );
             return case dat opened {
                 Result.Err(_) => 2,
-                Result.Ok(directory) => {
-                    erg entry = next_dir_entry(directory: ins directory);
-                    case dat entry {
-                        Result.Err(_) => {
-                            close_dir(directory: ins directory);
-                            3;
-                        },
-                        Result.Ok(value) => {
-                            drop(value);
-                            erg closed = close_dir(directory: ins directory);
-                            case dat closed {
-                                Result.Ok(_) => 0,
-                                Result.Err(_) => 4,
-                            };
-                        },
-                    };
-                },
+                Result.Ok(directory) => verify_filtered_directory(directory: ins directory),
             };
         },
     };

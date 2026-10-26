@@ -12,10 +12,34 @@ import {
 """Maximum raw storage reserved for one returned directory entry name."""
 open const DIRECTORY_ENTRY_BUFFER_BYTES: Int = 4096;
 
+"""
+Declarative filters for streamed directory entries.
+
+`regular_files_only` takes precedence over the other kind flags. A false
+`include_directories` or `include_symlinks` excludes that kind; hidden means a
+leading-dot final name, not a host-specific hidden attribute. `extension`,
+when present, is matched bytewise and case-sensitively against the final file
+extension.
+"""
+open struct DirectoryFilter {
+    """Keep only entries classified as regular files when true."""
+    erg regular_files_only: Bool,
+    """Keep directory entries when true unless regular-files-only is active."""
+    erg include_directories: Bool,
+    """Owned erg flag; keep symbolic-link entries when true."""
+    erg include_symlinks: Bool,
+    """Owned erg flag; keep leading-dot names when true."""
+    erg include_hidden: Bool,
+    """Optional owned extension to match against each final file extension."""
+    erg extension: Option[path_module::Path],
+}
+
 """An owned opaque directory handle backed by one host directory resource."""
 open struct Directory {
     """Owned erg scalar token for one host directory; Drop provides best-effort scope cleanup."""
     erg handle: Int,
+    """Owned filtering policy applied before each entry is returned."""
+    erg filter: DirectoryFilter,
 }
 
 """
@@ -187,8 +211,27 @@ unsafe extern "C" verb actus_directory_next_entry(
 """Read one initialized byte from entry storage without transferring ownership."""
 unsafe extern "C" verb actus_buffer_byte_at(abs storage: Buffer, erg index: Int) -> Int;
 
+"""Inspect whether a borrowed path has a leading-dot final name."""
+unsafe extern "C" verb actus_path_is_hidden(abs path: path_module::Path) -> Bool;
+
+"""Compare a borrowed path's final extension with an owned filter path."""
+unsafe extern "C" verb actus_path_extension_equals(
+    abs path: path_module::Path,
+    abs extension: path_module::Path
+) -> Bool;
+
 """Close one owned directory handle exactly once through the runtime bridge."""
 unsafe extern "C" verb actus_directory_close(abs handle: Int) -> Int;
+
+verb directory_filter_default() -> DirectoryFilter {
+    return DirectoryFilter {
+        regular_files_only: false,
+        include_directories: true,
+        include_symlinks: true,
+        include_hidden: true,
+        extension: Option[path_module::Path].None,
+    };
+}
 
 """
 Open a directory and return a handle owned by the resulting `Directory`.
@@ -207,12 +250,14 @@ open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError
         true => {
             erg rejected = Directory {
                 handle: handle,
+                filter: directory_filter_default(),
             };
             drop(rejected);
             Err(io::IoError.Failed);
         },
         _ => Ok(Directory {
             handle: handle,
+            filter: directory_filter_default(),
         }),
     };
 }
@@ -227,6 +272,19 @@ name or directory exceeds the bounded snapshot contract. The operation does
 not expose native pointers or allow an unbounded array.
 """
 open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrder) -> Result[Directory, io::IoError] {
+    erg filter = directory_filter_default();
+    return read_dir_ordered_with_filter(
+        path: abs path,
+        order: erg order,
+        filter: dat filter
+    );
+}
+
+verb read_dir_ordered_with_filter(
+    abs path: path_module::Path,
+    erg order: DirectoryOrder,
+    dat filter: DirectoryFilter
+) -> Result[Directory, io::IoError] {
     erg order_code = case order {
         DirectoryOrder.Native => 0,
         DirectoryOrder.Lexicographic => 1,
@@ -239,6 +297,7 @@ open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrde
         true => {
             erg rejected = Directory {
                 handle: handle,
+                filter: filter,
             };
             drop(rejected);
             return case invalid_input {
@@ -251,7 +310,49 @@ open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrde
         },
         _ => Ok(Directory {
             handle: handle,
+            filter: filter,
         }),
+    };
+}
+
+"""
+Open a directory with an explicit ordering policy and declarative entry filter.
+
+The filter is transferred into the returned `Directory`, so its optional
+extension path remains owned for the iterator lifetime. Entries rejected by
+the filter are consumed from the native stream and never returned to callers.
+"""
+open verb read_dir_filtered(
+    abs path: path_module::Path,
+    erg order: DirectoryOrder,
+    dat filter: DirectoryFilter
+) -> Result[Directory, io::IoError] {
+    return read_dir_ordered_with_filter(
+        path: abs path,
+        order: erg order,
+        filter: dat filter
+    );
+}
+
+verb directory_entry_matches(
+    abs entry: DirectoryEntry,
+    abs filter: DirectoryFilter
+) -> Bool {
+    if filter.regular_files_only && !directory_entry_is_file(entry: abs entry) {
+        return false;
+    }
+    if !filter.include_directories && directory_entry_is_dir(entry: abs entry) {
+        return false;
+    }
+    if !filter.include_symlinks && directory_entry_is_symlink(entry: abs entry) {
+        return false;
+    }
+    if !filter.include_hidden && actus_path_is_hidden(path: abs entry.name) {
+        return false;
+    }
+    return case filter.extension {
+        Option.None => true,
+        Option.Some(extension) => actus_path_extension_equals(path: abs entry.name, extension: abs extension),
     };
 }
 
@@ -266,70 +367,100 @@ Errors are returned as typed `IoError` values and leave the directory owner
 available for explicit close.
 """
 open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEntry], io::IoError] {
-    erg storage: Buffer = Buffer[4096];
-    erg modified_status: Int = METADATA_VALUE_UNAVAILABLE;
-    erg accessed_status: Int = METADATA_VALUE_UNAVAILABLE;
-    erg created_status: Int = METADATA_VALUE_UNAVAILABLE;
-    erg identity_status: Int = METADATA_VALUE_UNAVAILABLE;
-    erg identity_kind: Int = METADATA_IDENTITY_NONE;
-    erg metadata = Metadata {
-        size: 0,
-        is_file: 0,
-        is_dir: 0,
-        readonly: 0,
-        is_symlink: 0,
-        modified_seconds: 0i64,
-        modified_status: modified_status,
-        accessed_seconds: 0i64,
-        accessed_status: accessed_status,
-        created_seconds: 0i64,
-        created_status: created_status,
-        identity_primary: 0u64,
-        identity_secondary: 0u64,
-        identity_kind: identity_kind,
-        identity_status: identity_status,
-    };
-    erg status = actus_directory_next_entry(
-        handle: abs directory.handle,
-        storage: ins storage,
-        metadata: ins metadata
-    );
-    return case status {
-        -1 => {
-            drop(storage);
-            drop(metadata);
-            Err(io::IoError.Failed);
-        },
-        -2 => {
-            drop(storage);
-            drop(metadata);
-            Ok(Option[DirectoryEntry].None);
-        },
-        -3 => {
-            drop(storage);
-            drop(metadata);
-            Err(io::IoError.InvalidInput);
-        },
-        0 => {
-            return directory_entry_from_storage(
-                storage: dat storage,
-                metadata: dat metadata,
-                status: status
-            );
-        },
-        1 => {
-            return directory_entry_from_storage(
-                storage: dat storage,
-                metadata: dat metadata,
-                status: status
-            );
-        },
-        _ => {
-            drop(storage);
-            drop(metadata);
-            Err(io::IoError.Failed);
-        },
-    };
+    loop {
+        erg storage: Buffer = Buffer[4096];
+        erg modified_status: Int = METADATA_VALUE_UNAVAILABLE;
+        erg accessed_status: Int = METADATA_VALUE_UNAVAILABLE;
+        erg created_status: Int = METADATA_VALUE_UNAVAILABLE;
+        erg identity_status: Int = METADATA_VALUE_UNAVAILABLE;
+        erg identity_kind: Int = METADATA_IDENTITY_NONE;
+        erg metadata = Metadata {
+            size: 0,
+            is_file: 0,
+            is_dir: 0,
+            readonly: 0,
+            is_symlink: 0,
+            modified_seconds: 0i64,
+            modified_status: modified_status,
+            accessed_seconds: 0i64,
+            accessed_status: accessed_status,
+            created_seconds: 0i64,
+            created_status: created_status,
+            identity_primary: 0u64,
+            identity_secondary: 0u64,
+            identity_kind: identity_kind,
+            identity_status: identity_status,
+        };
+        erg status = actus_directory_next_entry(
+            handle: abs directory.handle,
+            storage: ins storage,
+            metadata: ins metadata
+        );
+        case status {
+            -1 => {
+                drop(storage);
+                drop(metadata);
+                return Err(io::IoError.Failed);
+            },
+            -2 => {
+                drop(storage);
+                drop(metadata);
+                return Ok(Option[DirectoryEntry].None);
+            },
+            -3 => {
+                drop(storage);
+                drop(metadata);
+                return Err(io::IoError.InvalidInput);
+            },
+            0 => {
+                erg candidate = directory_entry_from_storage(
+                    storage: dat storage,
+                    metadata: dat metadata,
+                    status: status
+                );
+                return case dat candidate {
+                    Result.Err(error) => Err(error),
+                    Result.Ok(value) => case dat value {
+                        Option.None => Ok(Option[DirectoryEntry].None),
+                        Option.Some(entry) => {
+                            erg keep = directory_entry_matches(entry: abs entry, filter: abs directory.filter);
+                            if keep {
+                                return Ok(Option[DirectoryEntry].Some(entry));
+                            }
+                            drop(entry);
+                            continue;
+                        },
+                    },
+                };
+            },
+            1 => {
+                erg candidate = directory_entry_from_storage(
+                    storage: dat storage,
+                    metadata: dat metadata,
+                    status: status
+                );
+                return case dat candidate {
+                    Result.Err(error) => Err(error),
+                    Result.Ok(value) => case dat value {
+                        Option.None => Ok(Option[DirectoryEntry].None),
+                        Option.Some(entry) => {
+                            erg keep = directory_entry_matches(entry: abs entry, filter: abs directory.filter);
+                            if keep {
+                                return Ok(Option[DirectoryEntry].Some(entry));
+                            }
+                            drop(entry);
+                            continue;
+                        },
+                    },
+                };
+            },
+            _ => {
+                drop(storage);
+                drop(metadata);
+                return Err(io::IoError.Failed);
+            },
+        };
+    }
 }
 
 verb copy_entry_storage(abs source: Buffer) -> Result[Buffer, io::IoError] {

@@ -265,7 +265,7 @@ the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
       comparison is case-sensitive and performs no Unicode normalization.
 - [x] Perform sorting in the standard-library iterator through a bounded
       snapshot; do not hide an unbounded allocation in the basic iterator.
-- [ ] Add an optional entry filter contract for regular files, extension,
+- [x] Add an optional entry filter contract for regular files, extension,
       hidden entries, and symlink policy without requiring function pointers.
 - [x] Define maximum entries, maximum name length, and overflow behavior for
       bounded profiles.
@@ -277,8 +277,10 @@ one native directory handle and one returned entry at a time; it does not
 materialize an array of entries. Native order is explicitly unspecified in
 the filesystem guide and is not a reproducible ordering contract. The ordered
 iterator provides bounded lexicographic sorting with a 4096-entry limit and
-the native regression confirms bytewise `alpha` before `zeta`. Filtering and
-cross-backend repeated-order evidence remain open.
+the native regression confirms bytewise `alpha` before `zeta`. Declarative
+filtering now covers regular files, directories, symlinks, leading-dot names,
+and exact extensions without function pointers. Cross-backend repeated-order
+evidence remains open.
 
 ## Gate 6: Recursive walking and traversal policy
 

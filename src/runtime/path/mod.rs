@@ -73,8 +73,8 @@ pub use component_views::{
 pub use components::{Components, components, extension, file_name, file_stem};
 pub use normalize::actus_path_normalize;
 pub use predicates::{
-    actus_path_ends_with, actus_path_has_root, actus_path_is_absolute, actus_path_is_relative,
-    actus_path_starts_with,
+    actus_path_ends_with, actus_path_extension_equals, actus_path_has_root, actus_path_is_absolute,
+    actus_path_is_hidden, actus_path_is_relative, actus_path_starts_with,
 };
 pub(crate) use validation::{path_length, path_units, validate_windows_units};
 pub use validation::{validate_posix, validate_windows};

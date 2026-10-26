@@ -157,19 +157,22 @@ open struct DirectoryFilter {
     erg extension: Option[Path],
 }
 
-open verb read_dir_ordered(
+open verb read_dir_filtered(
     abs path: Path,
     erg order: DirectoryOrder,
-    abs filter: DirectoryFilter
+    dat filter: DirectoryFilter
 ) -> Result[Directory, IoError];
 ```
 
 Lexicographic ordering is defined over the canonical path byte representation.
 Case sensitivity, Unicode normalization, and invalid-name behavior are part
-of the target profile. Ordering must be stable across repeated runs and both
-native backends. If a target cannot provide the requested order within its
-declared resource limits, it returns a typed error instead of silently using
-native order.
+of the target profile. The current profile is case-sensitive and performs no
+Unicode normalization. Filtering is declarative: regular-file-only mode,
+directory and symlink inclusion, leading-dot hidden-name inclusion, and an
+optional exact extension are evaluated before an entry is returned. Ordering
+must be stable across repeated runs and both native backends. If a target
+cannot provide the requested order within its declared resource limits, it
+returns a typed error instead of silently using native order.
 
 ### Metadata
 
