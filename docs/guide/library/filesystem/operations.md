@@ -45,6 +45,15 @@ native bridge uses link metadata, so `Symlink` describes the directory entry
 itself and does not follow its target; a broken link remains classifiable as a
 symlink when the host exposes it.
 
+Use `read_dir_ordered(path, DirectoryOrder.Native)` to state that native order
+is intentional, or `read_dir_ordered(path, DirectoryOrder.Lexicographic)` for
+bounded reproducible order. Lexicographic mode snapshots and sorts at most
+`DIRECTORY_MAX_ORDERED_ENTRIES` entries and rejects a larger directory or a
+name exceeding the entry storage bound. Comparison is bytewise over the
+platform's canonical name representation, is case-sensitive, and performs no
+Unicode normalization; callers needing another policy must normalize names
+before creating a separate bounded consumer contract.
+
 Use `directory_entry_is_file`, `directory_entry_is_dir`, and
 `directory_entry_is_symlink` for boolean classification, or
 `directory_entry_file_type` when the complete `DirectoryEntryKind` value is

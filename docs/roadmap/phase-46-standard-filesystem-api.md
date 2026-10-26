@@ -259,16 +259,15 @@ the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
       directory entry.
 - [x] Define native enumeration order as unspecified and unsuitable for
       reproducible builds or deterministic consumers.
-- [ ] Add an explicit ordering policy with at least `Native` and
+- [x] Add an explicit ordering policy with at least `Native` and
       `Lexicographic` modes.
-- [ ] Define lexicographic ordering over the canonical byte representation,
-      including case sensitivity and Unicode normalization behavior.
-- [ ] Decide where sorting occurs: in the standard-library iterator with
-      documented bounded/resource behavior, or in a separate bounded consumer
-      layer. Do not hide an unbounded allocation in the basic iterator.
+- [x] Define lexicographic ordering over the canonical byte representation:
+      comparison is case-sensitive and performs no Unicode normalization.
+- [x] Perform sorting in the standard-library iterator through a bounded
+      snapshot; do not hide an unbounded allocation in the basic iterator.
 - [ ] Add an optional entry filter contract for regular files, extension,
       hidden entries, and symlink policy without requiring function pointers.
-- [ ] Define maximum entries, maximum name length, and overflow behavior for
+- [x] Define maximum entries, maximum name length, and overflow behavior for
       bounded profiles.
 - [ ] Add tests proving identical ordering across repeated runs and both
       native backends.
@@ -276,8 +275,10 @@ the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
 Gate 5 initial evidence (2026-10-27): the basic iterator remains bounded to
 one native directory handle and one returned entry at a time; it does not
 materialize an array of entries. Native order is explicitly unspecified in
-the filesystem guide and is not a reproducible ordering contract. Explicit
-ordering, filtering, and bounded sorting remain separate follow-up work.
+the filesystem guide and is not a reproducible ordering contract. The ordered
+iterator provides bounded lexicographic sorting with a 4096-entry limit and
+the native regression confirms bytewise `alpha` before `zeta`. Filtering and
+cross-backend repeated-order evidence remain open.
 
 ## Gate 6: Recursive walking and traversal policy
 

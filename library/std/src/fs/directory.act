@@ -19,6 +19,24 @@ open struct Directory {
 }
 
 """
+Select the order used by a directory iterator.
+
+`Native` preserves the provider's streaming order and makes no reproducibility
+promise. `Lexicographic` takes a bounded snapshot at open time and emits names
+in canonical byte order; it rejects directories exceeding the declared entry
+or name limits instead of allocating without a bound.
+"""
+open enum DirectoryOrder {
+    """Use the host provider's native streaming order."""
+    Native,
+    """Sort a bounded directory snapshot by canonical name bytes."""
+    Lexicographic,
+}
+
+"""Maximum entries retained by one lexicographic directory snapshot."""
+open const DIRECTORY_MAX_ORDERED_ENTRIES: Int = 4096;
+
+"""
 Classifies one streamed directory entry without exposing host-specific type
 bits or retaining a native directory pointer. `File`, `Directory`, and
 `Symlink` are provider observations; `Other` covers entries that do not have
@@ -134,6 +152,19 @@ the host handle and does not retain the source path.
 unsafe extern "C" verb actus_directory_open(abs path: path_module::Path) -> Int;
 
 """
+Open one directory with an explicit ordering policy.
+
+The order code is `0` for native streaming order and `1` for bounded
+lexicographic order. The bridge returns `-1` for provider failure, `-3` when
+the bounded snapshot cannot fit its resource limits, and `-4` when the order
+is unsupported or invalid.
+"""
+unsafe extern "C" verb actus_directory_open_ordered(
+    abs path: path_module::Path,
+    erg order: Int
+) -> Int;
+
+"""
 Write the next entry name into caller-owned storage.
 
 The bridge returns zero for POSIX path storage, one for Windows UTF-16 path
@@ -179,6 +210,44 @@ open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError
             };
             drop(rejected);
             Err(io::IoError.Failed);
+        },
+        _ => Ok(Directory {
+            handle: handle,
+        }),
+    };
+}
+
+"""
+Open one directory with an explicit ordering policy.
+
+`path` is borrowed and the returned `Directory` owns its iterator. `Native`
+preserves provider order without retaining entries. `Lexicographic` retains at
+most `DIRECTORY_MAX_ORDERED_ENTRIES` entries and returns `InvalidInput` when a
+name or directory exceeds the bounded snapshot contract. The operation does
+not expose native pointers or allow an unbounded array.
+"""
+open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrder) -> Result[Directory, io::IoError] {
+    erg order_code = case order {
+        DirectoryOrder.Native => 0,
+        DirectoryOrder.Lexicographic => 1,
+    };
+    erg handle = actus_directory_open_ordered(path: abs path, order: erg order_code);
+    erg failed: Bool = handle < 0;
+    erg invalid_input: Bool = handle == -3;
+    erg unsupported: Bool = handle == -4;
+    return case failed {
+        true => {
+            erg rejected = Directory {
+                handle: handle,
+            };
+            drop(rejected);
+            return case invalid_input {
+                true => Err(io::IoError.InvalidInput),
+                _ => case unsupported {
+                    true => Err(io::IoError.Unsupported),
+                    _ => Err(io::IoError.Failed),
+                },
+            };
         },
         _ => Ok(Directory {
             handle: handle,

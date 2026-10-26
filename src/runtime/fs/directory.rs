@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::ReadDir;
+use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 use super::super::contract::{ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
@@ -10,11 +11,34 @@ use super::operations::write_metadata;
 use super::path_bridge::with_host_path;
 
 const DIRECTORY_STATUS_BUFFER_TOO_SMALL: i32 = -3;
+const DIRECTORY_STATUS_UNSUPPORTED: i32 = -4;
+const DIRECTORY_MAX_ORDERED_ENTRIES: usize = 4096;
+const DIRECTORY_MAX_ENTRY_NAME_BYTES: usize = 4095;
 
-static DIRECTORIES: OnceLock<Mutex<HashMap<i32, ReadDir>>> = OnceLock::new();
+enum DirectoryState {
+    Native(ReadDir),
+    Lexicographic { entries: Vec<PathBuf>, next: usize },
+}
+
+impl DirectoryState {
+    fn next_path(&mut self) -> std::io::Result<Option<PathBuf>> {
+        match self {
+            Self::Native(directory) => {
+                directory.next().map(|item| item.map(|entry| entry.path())).transpose()
+            }
+            Self::Lexicographic { entries, next } => {
+                let Some(path) = entries.get(*next).cloned() else { return Ok(None) };
+                *next += 1;
+                Ok(Some(path))
+            }
+        }
+    }
+}
+
+static DIRECTORIES: OnceLock<Mutex<HashMap<i32, DirectoryState>>> = OnceLock::new();
 static NEXT_DIRECTORY: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(1);
 
-fn directories() -> &'static Mutex<HashMap<i32, ReadDir>> {
+fn directories() -> &'static Mutex<HashMap<i32, DirectoryState>> {
     DIRECTORIES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -33,7 +57,47 @@ pub unsafe extern "C" fn actus_directory_open(path: *const ActusPath) -> i32 {
         return ABI_HANDLE_FAILURE as i32;
     }
     let Ok(mut table) = directories().lock() else { return ABI_HANDLE_FAILURE as i32 };
-    table.insert(handle, directory);
+    table.insert(handle, DirectoryState::Native(directory));
+    handle
+}
+
+/// Opens one host directory using the requested ordering policy.
+///
+/// # Safety
+/// `path` must be a valid immutable `ActusPath` for the duration of the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_directory_open_ordered(path: *const ActusPath, order: i32) -> i32 {
+    if order == 0 {
+        return unsafe { actus_directory_open(path) };
+    }
+    if order != 1 {
+        return DIRECTORY_STATUS_UNSUPPORTED;
+    }
+    let Some(result) = (unsafe { with_host_path(path, |native| std::fs::read_dir(native)) }) else {
+        return ABI_HANDLE_FAILURE as i32;
+    };
+    let Ok(directory) = result else { return ABI_HANDLE_FAILURE as i32 };
+    let mut entries = Vec::new();
+    for item in directory {
+        if entries.len() >= DIRECTORY_MAX_ORDERED_ENTRIES {
+            return DIRECTORY_STATUS_BUFFER_TOO_SMALL;
+        }
+        let Ok(entry) = item else { return ABI_STATUS_FAILURE };
+        if entry_name_key(entry.file_name().as_os_str()).len() > DIRECTORY_MAX_ENTRY_NAME_BYTES {
+            return DIRECTORY_STATUS_BUFFER_TOO_SMALL;
+        }
+        entries.push(entry.path());
+    }
+    entries.sort_by(|left, right| {
+        entry_name_key(left.file_name().unwrap_or_default())
+            .cmp(&entry_name_key(right.file_name().unwrap_or_default()))
+    });
+    let handle = NEXT_DIRECTORY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if handle <= 0 {
+        return ABI_HANDLE_FAILURE as i32;
+    }
+    let Ok(mut table) = directories().lock() else { return ABI_HANDLE_FAILURE as i32 };
+    table.insert(handle, DirectoryState::Lexicographic { entries, next: 0 });
     handle
 }
 
@@ -49,10 +113,12 @@ pub unsafe extern "C" fn actus_directory_next(handle: i32, storage: BufferHandle
     };
     let Ok(mut table) = directories().lock() else { return ABI_STATUS_FAILURE };
     let Some(directory) = table.get_mut(&handle) else { return ABI_STATUS_FAILURE };
-    let next = directory.next();
-    let Some(entry) = next else { return ABI_STATUS_END_OF_STREAM };
-    let Ok(entry) = entry else { return ABI_STATUS_FAILURE };
-    let name = entry.file_name();
+    let entry = match directory.next_path() {
+        Ok(Some(entry)) => entry,
+        Ok(None) => return ABI_STATUS_END_OF_STREAM,
+        Err(_) => return ABI_STATUS_FAILURE,
+    };
+    let Some(name) = entry.file_name() else { return ABI_STATUS_FAILURE };
     unsafe { write_entry_name(output, &name) }
 }
 
@@ -76,16 +142,34 @@ pub unsafe extern "C" fn actus_directory_next_entry(
     }
     let Ok(mut table) = directories().lock() else { return ABI_STATUS_FAILURE };
     let Some(directory) = table.get_mut(&handle) else { return ABI_STATUS_FAILURE };
-    let next = directory.next();
-    let Some(entry) = next else { return ABI_STATUS_END_OF_STREAM };
-    let Ok(entry) = entry else { return ABI_STATUS_FAILURE };
-    let Ok(snapshot) = entry.path().symlink_metadata() else { return ABI_STATUS_FAILURE };
-    let name_status = unsafe { write_entry_name(output, &entry.file_name()) };
+    let entry = match directory.next_path() {
+        Ok(Some(entry)) => entry,
+        Ok(None) => return ABI_STATUS_END_OF_STREAM,
+        Err(_) => return ABI_STATUS_FAILURE,
+    };
+    let Ok(snapshot) = entry.symlink_metadata() else { return ABI_STATUS_FAILURE };
+    let Some(name) = entry.file_name() else { return ABI_STATUS_FAILURE };
+    let name_status = unsafe { write_entry_name(output, name) };
     if name_status < 0 {
         return name_status;
     }
     unsafe { write_metadata(metadata, &snapshot) };
     name_status
+}
+
+fn entry_name_key(name: &std::ffi::OsStr) -> Vec<u8> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        return name.as_bytes().to_vec();
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        return name.encode_wide().flat_map(u16::to_le_bytes).collect();
+    }
+    #[allow(unreachable_code)]
+    name.to_string_lossy().as_bytes().to_vec()
 }
 
 /// Closes one directory token and releases its host iterator.
@@ -258,6 +342,29 @@ mod tests {
         assert_eq!(unsafe { actus_directory_close(handle) }, 0);
         std::fs::remove_file(root.join("file")).expect("temporary file should be removed");
         std::fs::remove_dir(root.join("child")).expect("child directory should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_ordered_entry_uses_lexicographic_name_bytes() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-ordered-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        std::fs::write(root.join("zeta"), b"zeta").expect("zeta should be created");
+        std::fs::write(root.join("alpha"), b"alpha").expect("alpha should be created");
+        let handle =
+            with_native_path(&root, |path| unsafe { actus_directory_open_ordered(path, 1) });
+        assert!(handle > 0);
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, 0);
+        let name = String::from_utf8(bytes[..buffer.length - 1].to_vec())
+            .expect("ordered entry name should be UTF-8");
+        assert_eq!(name, "alpha");
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(root.join("zeta")).expect("zeta should be removed");
+        std::fs::remove_file(root.join("alpha")).expect("alpha should be removed");
         std::fs::remove_dir(root).expect("temporary directory should be removed");
     }
 

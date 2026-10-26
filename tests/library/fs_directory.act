@@ -12,7 +12,10 @@ verb current_directory() -> Result[Path, PathError] {
     return path_from_ascii(storage: dat raw);
 }
 
-verb close_directory_entry(ins directory: Directory, dat value: Option[DirectoryEntry]) -> Int {
+verb close_directory_entry(
+    ins directory: Directory,
+    dat value: Option[DirectoryEntry]
+) -> Int {
     erg entry_code = case dat value {
         Option.None => 5,
         Option.Some(entry) => case entry.name.length {
@@ -41,6 +44,38 @@ verb directory_iteration_returns_entry_and_closes() -> Int {
                     return case dat entry {
                         Result.Err(_) => 3,
                         Result.Ok(value) => close_directory_entry(directory: ins directory, value: dat value),
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb lexicographic_directory_iteration_is_bounded() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg selected_order = DirectoryOrder.Lexicographic;
+            erg opened = read_dir_ordered(path: abs path, order: erg selected_order);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    erg entry = next_dir_entry(directory: ins directory);
+                    case dat entry {
+                        Result.Err(_) => {
+                            close_dir(directory: ins directory);
+                            3;
+                        },
+                        Result.Ok(value) => {
+                            drop(value);
+                            erg closed = close_dir(directory: ins directory);
+                            case dat closed {
+                                Result.Ok(_) => 0,
+                                Result.Err(_) => 4,
+                            };
+                        },
                     };
                 },
             };

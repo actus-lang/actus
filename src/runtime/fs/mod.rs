@@ -13,6 +13,7 @@ pub use buffers::{
 };
 pub use directory::{
     actus_directory_close, actus_directory_next, actus_directory_next_entry, actus_directory_open,
+    actus_directory_open_ordered,
 };
 pub use file::{
     actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_seek,
