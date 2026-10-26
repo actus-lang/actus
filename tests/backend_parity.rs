@@ -116,6 +116,26 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
 }
 
 #[test]
+fn hosted_cli_backends_lower_directory_drop_cleanup_identically() {
+    let source = "import { open std::fs, open std::path, }; verb current() -> Result[Path, PathError] { erg raw: Buffer = Buffer[0]; append(raw, 46u8); append(raw, 0u8); return path_from_ascii(storage: dat raw); } verb main() -> Int { erg current_path = current(); return case dat current_path { Result.Err(_) => 1, Result.Ok(path) => { erg opened = read_dir(path: abs path); return case dat opened { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
+    let mut statuses = Vec::new();
+    for backend in BACKENDS {
+        let root = fixture_root("directory-drop", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} directory-drop build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        statuses.push(Command::new(&output).status().expect("run directory-drop fixture").code());
+        fs::remove_dir_all(root).expect("remove directory-drop parity fixture");
+    }
+    assert_eq!(statuses, vec![Some(0), Some(0)]);
+}
+
+#[test]
 fn hosted_cli_backends_accept_named_array_capacity_constants() {
     let source = "const CAPACITY: Usize = 8u64 as Usize; verb main() -> Int { erg values: Array[u8, CAPACITY] = Array[u8, CAPACITY](); values[0] = 41u8; return values[0] as Int + 1; }\n";
     for backend in BACKENDS {
