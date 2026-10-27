@@ -396,6 +396,30 @@ open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEnt
             storage: ins storage,
             metadata: ins metadata
         );
+        if status == 0 || status == 1 {
+            erg candidate = directory_entry_from_storage(
+                storage: dat storage,
+                metadata: dat metadata,
+                status: status
+            );
+            return case dat candidate {
+                Result.Err(error) => Err(error),
+                Result.Ok(value) => case dat value {
+                    Option.None => Ok(Option[DirectoryEntry].None),
+                    Option.Some(entry) => {
+                        erg keep = directory_entry_matches(
+                            entry: abs entry,
+                            filter: abs directory.filter
+                        );
+                        if keep {
+                            return Ok(Option[DirectoryEntry].Some(entry));
+                        }
+                        drop(entry);
+                        continue;
+                    },
+                },
+            };
+        }
         case status {
             -1 => {
                 drop(storage);
@@ -411,48 +435,6 @@ open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEnt
                 drop(storage);
                 drop(metadata);
                 return Err(io::IoError.InvalidInput);
-            },
-            0 => {
-                erg candidate = directory_entry_from_storage(
-                    storage: dat storage,
-                    metadata: dat metadata,
-                    status: status
-                );
-                return case dat candidate {
-                    Result.Err(error) => Err(error),
-                    Result.Ok(value) => case dat value {
-                        Option.None => Ok(Option[DirectoryEntry].None),
-                        Option.Some(entry) => {
-                            erg keep = directory_entry_matches(entry: abs entry, filter: abs directory.filter);
-                            if keep {
-                                return Ok(Option[DirectoryEntry].Some(entry));
-                            }
-                            drop(entry);
-                            continue;
-                        },
-                    },
-                };
-            },
-            1 => {
-                erg candidate = directory_entry_from_storage(
-                    storage: dat storage,
-                    metadata: dat metadata,
-                    status: status
-                );
-                return case dat candidate {
-                    Result.Err(error) => Err(error),
-                    Result.Ok(value) => case dat value {
-                        Option.None => Ok(Option[DirectoryEntry].None),
-                        Option.Some(entry) => {
-                            erg keep = directory_entry_matches(entry: abs entry, filter: abs directory.filter);
-                            if keep {
-                                return Ok(Option[DirectoryEntry].Some(entry));
-                            }
-                            drop(entry);
-                            continue;
-                        },
-                    },
-                };
             },
             _ => {
                 drop(storage);
