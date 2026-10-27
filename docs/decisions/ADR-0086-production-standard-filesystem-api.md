@@ -465,6 +465,27 @@ to one child test process. The fixture must assert the resulting publication
 state rather than merely checking an error code. Fault names are a closed
 compiler/runtime set; they do not represent arbitrary OS errno values.
 
+### Gate 8.2 compare-before-publish boundary
+
+Compare-before-publish is a separate contract from replacement publication.
+The expected value must be an opaque token derived from the target's native
+object identity: POSIX device/inode or the Windows volume/file identifier.
+Size, timestamps, permissions, and a prior metadata snapshot are not identity
+tokens and must not be used as a substitute.
+
+The public operation will have four typed outcomes: publication succeeded,
+the expected identity did not match (`Conflict`), the target has no native
+atomic compare-and-publish primitive (`Unsupported`), or the provider failed
+(`Failed`). The implementation must never perform `metadata -> compare ->
+rename` as a fallback. A cooperative lock-based implementation may exist as a
+separate explicitly weaker API, but it cannot claim protection from writers
+that do not honor the same lock.
+
+The gate remains open until each supported target either supplies and invokes
+the native atomic primitive or returns `Unsupported` with capability evidence,
+and concurrent-writer fixtures prove that no stale expected identity can
+overwrite a newer publication.
+
 ## Rejected alternatives
 
 1. Returning `Array[Path, N]` from `read_dir`: rejected because it imposes an

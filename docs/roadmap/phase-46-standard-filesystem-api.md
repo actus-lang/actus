@@ -431,6 +431,27 @@ ordinary release archive contains no fault symbol and rejects fault-bearing
 tests with an explicit rebuild diagnostic. The ordinary runtime path remains
 unchanged.
 
+## Gate 8.2: Compare-before-publish contract
+
+- [ ] Define an opaque expected-identity token sourced from native file
+      identity, never from size or timestamps alone.
+- [ ] Add typed publication outcomes for `Published`, `Conflict`,
+      `Unsupported`, and provider `Failed` states.
+- [ ] Implement a target capability boundary backed by a native atomic
+      compare-and-publish primitive; unsupported targets must return
+      `IoError.Unsupported` and must not fall back to check-then-rename.
+- [ ] Keep cooperative lock-based publication separate from the native
+      compare contract and document that it protects only cooperating writers.
+- [ ] Add Unix and Windows capability fixtures plus adversarial concurrent
+      writer tests for unchanged, changed, missing, and unsupported targets.
+- [ ] Record identity semantics, crash ordering, rollback behavior, and
+      compiler/runtime evidence before closing the gate.
+
+Gate 8.2 is not closable by reading metadata and then calling `rename`. The
+implementation must either call a target-level atomic compare primitive or
+return `IoError.Unsupported`; a portable approximation would create a TOCTOU
+race and is explicitly rejected.
+
 ## Gate 9: Links, permissions, and platform capabilities
 
 - [ ] Add read-only symlink inspection and explicit symlink creation where
