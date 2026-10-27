@@ -134,6 +134,14 @@ verb write_file_atomic_synced(
     dat staging: Path,
     abs contents: Buffer,
 ) -> Result[Int, IoError];
+verb metadata_absent() -> Metadata;
+enum CoordinatedPublication { Published, Conflict }
+verb publish_file_coordinated(
+    abs lock_path: Path,
+    abs staging: Path,
+    abs destination: Path,
+    abs expected: Metadata,
+) -> Result[CoordinatedPublication, IoError];
 ```
 
 Path operations borrow paths. `read_to_bytes` transfers an owned result buffer
@@ -145,6 +153,16 @@ sync is unsupported or fails, but the destination has already been published
 in that case; callers must treat durability as uncertain. The Unix backend
 supports the directory sync, while unsupported targets return
 `IoError.Unsupported`.
+
+`metadata_absent` constructs an expected-identity token for a destination that
+must not exist. `publish_file_coordinated` serializes cooperating writers with
+an exclusive `lock_path`, compares the destination's native identity while
+holding that lock, and atomically replaces the destination only when the
+identity still matches. A stale identity returns `Conflict` without
+publishing. `Unsupported` is returned when the target cannot provide the
+required locking or atomic replacement; the API never uses an unlocked
+check-then-rename fallback. Writers that bypass the same lock are outside the
+coordinator guarantee.
 
 `canonicalize` performs blocking host filesystem resolution, follows symbolic
 links, requires every component to exist, and returns a new owned identity

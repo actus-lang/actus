@@ -155,6 +155,24 @@ owner for cleanup. It does not allocate a hidden path or buffer.
 callers that publish through another validated rename path. It borrows the
 path, performs no publication, and has no hidden allocation.
 
+## Coordinated compare-before-publish
+
+`publish_file_coordinated` is the safe compare-before-publish surface for
+cooperating writers. The caller obtains an expected `Metadata` snapshot (or
+uses `metadata_absent()` for an expected missing destination), chooses one
+lock path shared by all writers, and supplies a staged path:
+
+1. the runtime opens and exclusively locks the coordinator path;
+2. it compares the destination's native identity under that lock;
+3. it returns `Conflict` if the identity is stale or the destination appeared;
+4. it atomically replaces the destination while still holding the lock.
+
+The lock protects only callers that use the same coordinator path. It does not
+claim to serialize an unrelated process that writes the destination directly.
+Targets without the required locking or atomic replacement return
+`IoError.Unsupported`; the implementation never degrades to an unlocked
+metadata check followed by rename.
+
 ## Failure behavior
 
 A write, short count, flush, or rename failure is returned as a typed error.

@@ -281,6 +281,10 @@ jobs:
         shell: bash
         run: ./scripts/check_stdlib.sh
 
+      - name: Run coordinated publication capability fixture
+        shell: bash
+        run: cargo run --bin actus -- test --file tests/library/fs/publication_coordinator.act --strict
+
   cranelift-only:
     name: Cranelift-only feature contract
     runs-on: ubuntu-latest
