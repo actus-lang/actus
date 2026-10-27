@@ -359,7 +359,7 @@ publication. The Gate 7 file-operation validation matrix is complete.
       compare primitive; do not emulate it with a check-then-rename sequence.
 - [x] Define crash-recovery guarantees and the exact point at which a write is
       considered published.
-- [ ] Add failure-injection tests for truncated writes, failed flushes,
+- [x] Add failure-injection tests for truncated writes, failed flushes,
       failed renames, stale staging files, and interrupted publication.
 
 Gate 8 copy-policy evidence (2026-10-27): `CopyOptions` separates destination
@@ -393,7 +393,10 @@ fixture now covers failed destination rename with staging cleanup and stale
 staging replacement, in addition to successful publication, parent sync, and
 atomic destination replacement. The fixture passes 5/5 in strict Unix mode.
 Detailed fault injection is kept in the separate Gate 8.1 test-only runtime
-and does not expose a production control surface.
+and does not expose a production control surface. Gate 8.1 now adds 11
+publication-phase faults across the original 10-test and additional 6-test
+mirrored fixtures; all 16 fault/publication tests pass with the dedicated
+fault-enabled compiler.
 
 ## Gate 8.1: Test-only publication fault injection
 
