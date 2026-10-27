@@ -35,7 +35,11 @@ pub use operations::{
     actus_file_symlink_metadata_path,
 };
 pub use path_open::{actus_file_open_options_path, actus_file_open_path};
-pub use publication::{actus_file_replace_atomic_path, actus_file_sync_parent_path};
+#[allow(unused_imports)]
+pub use publication::{
+    actus_file_publish_coordinated_path, actus_file_replace_atomic_path,
+    actus_file_sync_parent_path,
+};
 pub use temporary::{actus_directory_create_temporary_path, actus_file_open_temporary_path};
 #[allow(unused_imports)]
 pub use walk::{ActusWalkEvent, actus_walker_close, actus_walker_next, actus_walker_open};

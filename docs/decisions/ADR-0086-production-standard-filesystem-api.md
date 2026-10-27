@@ -310,9 +310,14 @@ cleanup must not hide the primary failure.
 `replace_file_atomic` is exposed separately from ordinary `rename`: Unix uses
 the host replacement rename, while unsupported targets return
 `IoError.Unsupported`; the library never emulates replacement as remove then
-rename. Compare-before-publish is intentionally not exposed yet because a
-check followed by rename has a TOCTOU race and the portable runtime does not
-have an atomic expected-identity exchange primitive.
+rename. `publish_file_coordinated` adds a stronger cooperative contract: all
+writers use one exclusive lock path, the destination's native identity is
+compared while that lock is held, and the staged file is atomically replaced
+before the lock is released. A stale identity returns `Conflict` without
+publishing. This protects only writers that use the same coordinator; an
+uncoordinated external writer remains outside the guarantee. Targets without
+the required locking or replacement capability return `IoError.Unsupported`.
+The API never falls back to an unlocked check-then-rename sequence.
 
 ### Crash-recovery contract
 

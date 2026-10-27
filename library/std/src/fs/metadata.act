@@ -73,7 +73,16 @@ open struct Metadata {
     erg identity_status: Int,
 }
 
-verb metadata_default() -> Metadata {
+"""
+Construct the empty metadata token used when a publication destination is
+expected to be absent.
+
+The returned identity kind is `METADATA_IDENTITY_NONE`; it is not a claim
+that any path currently exists. Callers may pass this token to a coordinated
+publication operation to require an absent destination. All scalar facts are
+marked unavailable or zero and no filesystem access occurs.
+"""
+open verb metadata_absent() -> Metadata {
     erg modified_status: Int = METADATA_VALUE_UNAVAILABLE;
     erg accessed_status: Int = METADATA_VALUE_UNAVAILABLE;
     erg created_status: Int = METADATA_VALUE_UNAVAILABLE;
@@ -96,6 +105,10 @@ verb metadata_default() -> Metadata {
         identity_kind: identity_kind,
         identity_status: identity_status,
     };
+}
+
+verb metadata_default() -> Metadata {
+    return metadata_absent();
 }
 
 """

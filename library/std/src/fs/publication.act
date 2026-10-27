@@ -4,6 +4,66 @@ import {
     path as path_module,
 };
 
+"""Outcome of a coordinator-serialized compare-before-publish attempt."""
+open enum CoordinatedPublication {
+    """The expected identity matched and the staged path was published."""
+    Published,
+    """The destination identity changed or appeared since the expected snapshot."""
+    Conflict,
+}
+
+"""
+Publish `staging` to `destination` under an exclusive coordinator lock.
+
+`lock_path` names a lock file shared by every cooperating writer. `expected`
+contains the native identity snapshot returned by `metadata(destination: ...)`;
+an identity kind of `METADATA_IDENTITY_NONE` means that the destination is
+expected to be absent. The runtime takes the lock, compares the identity, and
+performs the atomic replacement before releasing the lock. A stale snapshot
+returns `Ok(CoordinatedPublication.Conflict)` and does not modify the
+destination. `Err(IoError.Busy)` reports lock contention, while
+`Err(IoError.Unsupported)` reports a target without the required locking or
+replacement capability. This is a coordinator contract: writers that bypass
+the same lock are outside its guarantee.
+"""
+unsafe extern "C" verb actus_file_publish_coordinated_path(
+    abs lock_path: path_module::Path,
+    abs staging: path_module::Path,
+    abs destination: path_module::Path,
+    abs expected: Metadata
+) -> Int;
+
+"""
+Perform compare-before-publish through the shared coordinator protocol.
+
+All path and metadata arguments are borrowed and remain caller-owned. On a
+successful publication the staging path no longer names a file because the
+atomic replacement moves it; the path value itself is not consumed. No
+check-then-rename fallback is used; unsupported
+targets return `IoError.Unsupported`. The operation may block while acquiring
+the coordinator lock and while publishing the staged file.
+"""
+open verb publish_file_coordinated(
+    abs lock_path: path_module::Path,
+    abs staging: path_module::Path,
+    abs destination: path_module::Path,
+    abs expected: Metadata
+) -> Result[CoordinatedPublication, io::IoError] {
+    erg status = actus_file_publish_coordinated_path(
+        lock_path: abs lock_path,
+        staging: abs staging,
+        destination: abs destination,
+        expected: abs expected
+    );
+    return case status {
+        -4 => Err(io::IoError.Busy),
+        -3 => Ok(CoordinatedPublication.Conflict),
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(CoordinatedPublication.Published),
+    };
+}
+
 """
 Synchronize the parent directory of `path` after a published rename.
 

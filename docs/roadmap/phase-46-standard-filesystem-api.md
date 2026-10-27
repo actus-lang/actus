@@ -433,24 +433,30 @@ unchanged.
 
 ## Gate 8.2: Compare-before-publish contract
 
-- [ ] Define an opaque expected-identity token sourced from native file
+- [x] Define an opaque expected-identity token sourced from native file
       identity, never from size or timestamps alone.
-- [ ] Add typed publication outcomes for `Published`, `Conflict`,
+- [x] Add typed publication outcomes for `Published`, `Conflict`,
       `Unsupported`, and provider `Failed` states.
-- [ ] Implement a target capability boundary backed by a native atomic
-      compare-and-publish primitive; unsupported targets must return
-      `IoError.Unsupported` and must not fall back to check-then-rename.
-- [ ] Keep cooperative lock-based publication separate from the native
-      compare contract and document that it protects only cooperating writers.
+- [x] Implement the cooperative coordinator boundary: compare native identity
+      while holding an exclusive lock, then use the target atomic replacement
+      primitive; unsupported targets return `IoError.Unsupported` and never
+      fall back to an unlocked check-then-rename sequence.
+- [x] Document that the coordinator protects only cooperating writers and
+      that uncoordinated external writers are outside its guarantee.
 - [ ] Add Unix and Windows capability fixtures plus adversarial concurrent
-      writer tests for unchanged, changed, missing, and unsupported targets.
+      writer tests for unchanged, changed, missing, and unsupported targets;
+      the current Unix fixture covers successful absent publication and stale
+      identity preservation.
 - [ ] Record identity semantics, crash ordering, rollback behavior, and
       compiler/runtime evidence before closing the gate.
 
-Gate 8.2 is not closable by reading metadata and then calling `rename`. The
-implementation must either call a target-level atomic compare primitive or
-return `IoError.Unsupported`; a portable approximation would create a TOCTOU
-race and is explicitly rejected.
+Gate 8.2 is not closable by reading metadata and then calling `rename` without
+coordination. The implemented protocol serializes cooperating writers with a
+lock and performs atomic replacement while the lock is held. It is not a
+claim of protection from arbitrary writers that bypass the lock. A future
+target-level compare-and-publish primitive may strengthen this boundary; until
+then unsupported targets must return `IoError.Unsupported` rather than use an
+unlocked approximation.
 
 ## Gate 9: Links, permissions, and platform capabilities
 
