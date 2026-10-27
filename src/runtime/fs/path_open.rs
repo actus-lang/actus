@@ -52,6 +52,12 @@ pub unsafe extern "C" fn actus_file_open_options_path(
 }
 
 fn open_host_path(path: &Path, mode: u32) -> i64 {
+    #[cfg(actus_test_faults)]
+    if mode == MODE_CREATE
+        && super::test_faults::take_fault(super::test_faults::FAULT_STAGING_OPEN_FAILURE)
+    {
+        return ABI_HANDLE_FAILURE;
+    }
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     if mode == MODE_CREATE {

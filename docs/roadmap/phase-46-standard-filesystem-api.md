@@ -392,17 +392,17 @@ Gate 8 deterministic failure evidence (2026-10-27): the mirrored publication
 fixture now covers failed destination rename with staging cleanup and stale
 staging replacement, in addition to successful publication, parent sync, and
 atomic destination replacement. The fixture passes 5/5 in strict Unix mode.
-True truncated-write, flush-failure, and interrupted-process injection remain
-open because the production runtime intentionally exposes no fault-injection
-control surface.
+Detailed fault injection is kept in the separate Gate 8.1 test-only runtime
+and does not expose a production control surface.
 
 ## Gate 8.1: Test-only publication fault injection
 
 - [x] Add a dedicated test-runtime build profile; production runtime archives
       must not contain fault controls.
 - [x] Add typed test metadata for one scoped publication fault per test:
-      short-write, flush failure, rename failure, parent-sync failure, and
-      interrupted publication.
+      staging open, write, short-write, flush, close, cleanup, rename,
+      pre-rename interruption, parent open, parent sync, and post-rename
+      interruption.
 - [x] Pass the selected fault from the test runner to the child process through
       a private test ABI or equivalent scoped channel, never through a public
       standard-library verb or mutable production global.
@@ -421,11 +421,12 @@ not to add operational fault switches to applications.
 Gate 8.1 implementation evidence (2026-10-27): the `test-fault-injection`
 compiler feature builds a separate runtime archive containing a private
 one-shot fault ABI. Typed `meta fault(...)` metadata causes the test runner to
-inject short-write, flush, rename, parent-sync, or interruption faults into one
-child process. The Unix publication fixture passes 10/10, including expected
-interruption handling; the ordinary release archive contains no fault symbol
-and rejects fault-bearing tests with an explicit rebuild diagnostic. The
-ordinary runtime path remains unchanged.
+inject all eleven supported publication-phase faults into one child process.
+The original Unix publication fixture passes 10/10 and the additional mirrored
+fault fixture passes 6/6, including expected interruption handling. The
+ordinary release archive contains no fault symbol and rejects fault-bearing
+tests with an explicit rebuild diagnostic. The ordinary runtime path remains
+unchanged.
 
 ## Gate 9: Links, permissions, and platform capabilities
 

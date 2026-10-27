@@ -203,6 +203,10 @@ pub unsafe extern "C" fn actus_file_remove_buffer(path: BufferHandle) -> i32 {
 /// `path` must be a valid immutable path descriptor for this call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_remove_path(path: *const ActusPath) -> i32 {
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_CLEANUP_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
     unsafe { with_host_path(path, |value| std::fs::remove_file(value)) }
         .and_then(Result::ok)
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
@@ -229,6 +233,14 @@ pub unsafe extern "C" fn actus_file_rename_path(
     #[cfg(actus_test_faults)]
     if super::test_faults::take_fault(super::test_faults::FAULT_RENAME_FAILURE) {
         return ABI_STATUS_FAILURE;
+    }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::has_fault(super::test_faults::FAULT_CLEANUP_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_INTERRUPTED_BEFORE_RENAME) {
+        std::process::abort();
     }
     match unsafe {
         with_host_paths(from, to, |source, destination| std::fs::rename(source, destination))

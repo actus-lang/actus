@@ -61,13 +61,23 @@ boundary, not a test failure.
 The currently supported fault names are fixed by the compiler and runtime; they
 are not free-form labels:
 
+- `staging_open_failure`: opening the staging file fails before any bytes are
+  written;
+- `write_failure`: the native write fails without reporting a partial count;
 - `short_write`: the native write reports that fewer bytes were written;
 - `flush_failure`: flushing the staged file fails;
+- `close_failure`: closing the staged file fails after the write or flush;
+- `cleanup_failure`: the pre-publication failure cleanup itself fails, so the
+  root publication error and leftover staging state can be checked;
 - `rename_failure`: publishing the staged file fails before replacement;
+- `interrupted_before_rename`: the child terminates before the publication
+  rename, so the old destination remains authoritative;
+- `parent_open_failure`: opening the destination parent for synchronization
+  fails after publication;
 - `parent_sync_failure`: syncing the destination directory fails after the
   file publication step;
-- `interrupted_publication`: the child process terminates during publication,
-  so the fixture can verify crash-state recovery.
+- `interrupted_publication`: the child terminates after the publication rename,
+  so the fixture can verify post-rename crash-state recovery.
 
 For example, a test may select exactly one of these values:
 

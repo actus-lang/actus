@@ -45,6 +45,10 @@ fn replace_atomic(from: &std::path::Path, to: &std::path::Path) -> std::io::Resu
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_sync_parent_path(path: *const ActusPath) -> i32 {
     #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_PARENT_OPEN_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
+    #[cfg(actus_test_faults)]
     if super::test_faults::take_fault(super::test_faults::FAULT_PARENT_SYNC_FAILURE) {
         return ABI_STATUS_FAILURE;
     }

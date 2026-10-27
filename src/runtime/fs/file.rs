@@ -158,6 +158,10 @@ pub extern "C" fn actus_file_close(handle: i64) -> i32 {
     if handle < 0 {
         return ABI_STATUS_FAILURE;
     }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_CLOSE_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
     close_file(handle)
 }
 

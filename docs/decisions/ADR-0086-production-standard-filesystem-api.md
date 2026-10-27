@@ -457,11 +457,13 @@ must not export or consult that control channel. Fault selection belongs to the
 test runner and child-process setup; the standard filesystem facade exposes no
 fault verb and application code cannot select a fault in a production build.
 
-The first implementation must preserve the existing Actus publication path
-and inject only at the native phase boundary: write count, flush, rename,
-parent-directory sync, or process interruption. Each fault is one-shot and
-scoped to one child test process. The fixture must assert the resulting
-publication state rather than merely checking an error code.
+The implementation preserves the existing Actus publication path and injects
+only at native phase boundaries: staging open, write result, flush, close,
+pre-publication cleanup, rename, pre- or post-rename interruption, parent
+directory open, and parent-directory sync. Each fault is one-shot and scoped
+to one child test process. The fixture must assert the resulting publication
+state rather than merely checking an error code. Fault names are a closed
+compiler/runtime set; they do not represent arbitrary OS errno values.
 
 ## Rejected alternatives
 

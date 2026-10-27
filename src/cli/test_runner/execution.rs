@@ -69,7 +69,10 @@ fn report_test_result(
             false
         }
         Ok(TestProcessResult::Signaled) => {
-            if test.fault == Some(TestFault::InterruptedPublication) {
+            if matches!(
+                test.fault,
+                Some(TestFault::InterruptedBeforeRename | TestFault::InterruptedPublication)
+            ) {
                 let status =
                     output_style.success(&format!("ok ({elapsed} ms, expected interruption)"));
                 println!("test {}::{} ... {status}", test.module, test.name);

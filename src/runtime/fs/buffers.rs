@@ -130,6 +130,10 @@ pub unsafe extern "C" fn actus_file_write_buffer(handle: i32, buffer: BufferHand
         return ABI_STATUS_FAILURE;
     }
     #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_WRITE_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
+    #[cfg(actus_test_faults)]
     if super::test_faults::take_fault(super::test_faults::FAULT_SHORT_WRITE) {
         return i32::try_from(buffer.length.saturating_sub(1)).unwrap_or(ABI_STATUS_FAILURE);
     }
