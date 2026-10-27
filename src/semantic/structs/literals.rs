@@ -118,16 +118,17 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let expected_name = canonical_type_name(expected_type);
+        let expected_name = self.normalize_imported_type_key(&canonical_type_name(expected_type));
         let expected = expected_type.name.as_str();
         let found = self.expression_type_name(value).unwrap_or_else(|| "unknown".to_owned());
+        let normalized_found = self.normalize_imported_type_key(&found);
         let matches = if expected_type.arguments.is_empty()
             && let Some(expected_builtin) = lookup_builtin_type(expected)
         {
             self.expression_type(value) == Some(expected_builtin)
-                || self.expression_type_name(value).as_deref() == Some(expected_name.as_str())
+                || normalized_found == expected_name
         } else {
-            self.expression_type_name(value).as_deref() == Some(expected_name.as_str())
+            normalized_found == expected_name
         };
         if matches {
             return Ok(());
