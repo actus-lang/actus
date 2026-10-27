@@ -153,12 +153,11 @@ verb conflict_case(
         Result.Ok(expected) => {
             fs::remove_file(path: abs destination);
             erg changed_value: u8 = 67u8;
-            erg changed = write_pair(path: abs destination, value: erg changed_value);
+            erg changed = write_value(path: abs staging, value: erg changed_value);
             if changed != 0 {
                 return 3;
             }
-            erg replacement_value: u8 = 68u8;
-            erg staged = write_value(path: abs staging, value: erg replacement_value);
+            erg staged = write_pair(path: abs destination, value: erg changed_value);
             if staged != 0 {
                 return 4;
             }
