@@ -307,6 +307,13 @@ is already published and the caller must treat durability as uncertain. A
 failed pre-publication step must leave the previous active file valid. Staging
 cleanup must not hide the primary failure.
 
+`replace_file_atomic` is exposed separately from ordinary `rename`: Unix uses
+the host replacement rename, while unsupported targets return
+`IoError.Unsupported`; the library never emulates replacement as remove then
+rename. Compare-before-publish is intentionally not exposed yet because a
+check followed by rename has a TOCTOU race and the portable runtime does not
+have an atomic expected-identity exchange primitive.
+
 ### Permissions, links, and security
 
 The API exposes capability-checked operations for readonly state, permissions,

@@ -117,3 +117,75 @@ verb atomic_publication_syncs_parent_directory() -> Int {
         },
     };
 }
+
+verb write_replace_fixture(abs path: path::Path, abs value: u8) -> Bool {
+    erg payload = Buffer[0];
+    append(payload, value);
+    erg written = fs::write_file(path: abs path, contents: abs payload);
+    return case dat written {
+        Result.Err(_) => false,
+        Result.Ok(count) => count == 1,
+    };
+}
+
+verb read_replace_fixture(abs path: path::Path) -> Int {
+    erg loaded = fs::read_to_bytes(path: abs path);
+    return case dat loaded {
+        Result.Err(_) => 6,
+        Result.Ok(bytes) => {
+            erg valid = bytes[0] == 78u8;
+            drop(bytes);
+            if valid {
+                return 0;
+            }
+            7;
+        },
+    };
+}
+
+verb cleanup_replace_fixture(abs destination: path::Path, abs staging: path::Path) {
+    fs::remove_file(path: abs destination);
+    fs::remove_file(path: abs staging);
+}
+
+meta target("unix")
+meta test
+verb atomic_replace_replaces_existing_destination() -> Int {
+    erg destination_suffix: u8 = 57u8;
+    erg staging_suffix: u8 = 58u8;
+    erg old_value: u8 = 79u8;
+    erg new_value: u8 = 78u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                    if !write_replace_fixture(path: abs destination, value: abs old_value) {
+                        cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                        return 3;
+                    }
+                    if !write_replace_fixture(path: abs staging, value: abs new_value) {
+                        cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                        return 4;
+                    }
+                    erg replaced = fs::replace_file_atomic(from: abs staging, to: abs destination);
+                    return case dat replaced {
+                        Result.Err(_) => {
+                            cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                            5;
+                        },
+                        Result.Ok(_) => {
+                            erg result = read_replace_fixture(path: abs destination);
+                            cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                            result;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}

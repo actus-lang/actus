@@ -14,6 +14,21 @@ directory synchronization and `-1` means the provider rejected the request.
 unsafe extern "C" verb actus_file_sync_parent_path(abs path: path_module::Path) -> Int;
 
 """
+Replace an existing destination with a staged path through the target's
+atomic replacement primitive.
+
+Both paths are immutable borrowed views and neither is retained. The Unix
+backend performs one atomic same-filesystem rename that replaces the existing
+destination. Targets without an equivalent replacement primitive return
+`IoError.Unsupported`; this operation never emulates replacement as a
+remove-then-rename sequence.
+"""
+unsafe extern "C" verb actus_file_replace_atomic_path(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Int;
+
+"""
 Translate the parent-directory synchronization status into a typed result.
 
 `status` is a copied scalar. This adapter performs no I/O, allocation, or
@@ -40,6 +55,28 @@ without a directory-sync capability return `IoError.Unsupported`.
 open verb sync_parent_directory(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_sync_parent_path(path: abs path);
     return sync_parent_status(status: erg status);
+}
+
+"""
+Replace an existing destination with `from` atomically where the target
+provides that primitive.
+
+`from` and `to` are immutable borrowed paths and remain caller-owned. On Unix,
+the operation is a same-filesystem rename with destination replacement. The
+destination is not removed first, and no copy or hidden buffer is allocated.
+Unsupported targets return `IoError.Unsupported`; provider failures return
+`IoError.Failed` and the source remains owned by the caller.
+"""
+open verb replace_file_atomic(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Result[Int, io::IoError] {
+    erg status = actus_file_replace_atomic_path(from: abs from, to: abs to);
+    return case status {
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
 }
 
 """

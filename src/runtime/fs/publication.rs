@@ -1,8 +1,42 @@
 use super::super::contract::{ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
 use super::super::path::ActusPath;
-use super::path_bridge::with_host_path;
+use super::path_bridge::{with_host_path, with_host_paths};
 
 const PUBLICATION_STATUS_UNSUPPORTED: i32 = -2;
+
+/// Replaces an existing path through the host's atomic rename primitive.
+///
+/// # Safety
+/// `from` and `to` must be valid immutable `ActusPath` descriptors for the
+/// duration of this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_replace_atomic_path(
+    from: *const ActusPath,
+    to: *const ActusPath,
+) -> i32 {
+    let result = unsafe { with_host_paths(from, to, replace_atomic) };
+    match result {
+        Some(Ok(())) => ABI_STATUS_SUCCESS,
+        Some(Err(error)) if error.kind() == std::io::ErrorKind::Unsupported => {
+            PUBLICATION_STATUS_UNSUPPORTED
+        }
+        Some(Err(_)) | None => ABI_STATUS_FAILURE,
+    }
+}
+
+fn replace_atomic(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        return std::fs::rename(from, to);
+    }
+    #[cfg(windows)]
+    {
+        let _ = (from, to);
+        return Err(std::io::Error::from(std::io::ErrorKind::Unsupported));
+    }
+    #[allow(unreachable_code)]
+    Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+}
 
 /// Synchronizes the directory containing a validated path.
 ///

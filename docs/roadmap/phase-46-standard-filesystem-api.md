@@ -354,8 +354,9 @@ publication. The Gate 7 file-operation validation matrix is complete.
 - [x] Add `copy_file` with explicit overwrite and metadata policies.
 - [x] Add atomic write helpers using staged file, flush, rename, and optional
       parent-directory sync ordering.
-- [ ] Add atomic replace and compare-before-publish operations where the
-      target backend can provide them.
+- [x] Add atomic replace where the target backend can provide it.
+- [ ] Add a compare-before-publish operation backed by a target-level atomic
+      compare primitive; do not emulate it with a check-then-rename sequence.
 - [ ] Define crash-recovery guarantees and the exact point at which a write is
       considered published.
 - [ ] Add failure-injection tests for truncated writes, failed flushes,
@@ -380,8 +381,11 @@ file remains published and durability is reported as uncertain. Windows and
 other targets without directory-handle synchronization return
 `IoError.Unsupported`. The mirrored Unix fixture in
 `tests/library/fs/publication.act` verifies the full write/publish/sync/read
-path; atomic replace, compare-before-publish, crash-recovery guarantees, and
-failure injection remain open follow-up work.
+path and atomic replacement. Compare-before-publish, crash-recovery
+guarantees, and failure injection remain open follow-up work. The Unix-only
+`atomic_replace_replaces_existing_destination` fixture verifies replacement
+without a remove-then-rename gap; compare-before-publish remains open because
+the portable runtime has no atomic expected-identity exchange primitive.
 
 ## Gate 9: Links, permissions, and platform capabilities
 
