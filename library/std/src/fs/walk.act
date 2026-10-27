@@ -344,6 +344,18 @@ open verb next_walk_event(ins walker: Walker) -> Result[Option[WalkEvent], io::I
                     discard_walk_path(path: dat path);
                     Err(io::IoError.Failed);
                 },
+                -3 => {
+                    discard_walk_path(path: dat path);
+                    Err(io::IoError.InvalidInput);
+                },
+                -5 => {
+                    discard_walk_path(path: dat path);
+                    Err(io::IoError.PermissionDenied);
+                },
+                -6 => {
+                    discard_walk_path(path: dat path);
+                    Err(io::IoError.Unsupported);
+                },
                 _ => Ok(Option[WalkEvent].Some(WalkEvent {
                     path: path,
                     depth: output.depth as u32,

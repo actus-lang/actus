@@ -16,6 +16,9 @@ const WALK_ERROR_FAILED: i32 = 0;
 const WALK_ERROR_NOT_FOUND: i32 = 1;
 const WALK_ERROR_PERMISSION_DENIED: i32 = 2;
 const WALK_ERROR_UNSUPPORTED: i32 = 4;
+const WALK_STATUS_NOT_FOUND: i32 = -4;
+const WALK_STATUS_PERMISSION_DENIED: i32 = -5;
+const WALK_STATUS_UNSUPPORTED: i32 = -6;
 const WALK_MAX_DEPTH: u32 = 256;
 const WALK_MAX_VISITED_DIRECTORIES: usize = 4096;
 const WALK_MAX_ENTRIES_PER_DIRECTORY: usize = 4096;
@@ -121,6 +124,24 @@ fn error_code(error: &std::io::Error) -> i32 {
         std::io::ErrorKind::NotFound => WALK_ERROR_NOT_FOUND,
         std::io::ErrorKind::PermissionDenied => WALK_ERROR_PERMISSION_DENIED,
         std::io::ErrorKind::Unsupported => WALK_ERROR_UNSUPPORTED,
+        _ => WALK_ERROR_FAILED,
+    }
+}
+
+fn failure_status(error: i32) -> i32 {
+    match error {
+        WALK_ERROR_NOT_FOUND => WALK_STATUS_NOT_FOUND,
+        WALK_ERROR_PERMISSION_DENIED => WALK_STATUS_PERMISSION_DENIED,
+        WALK_ERROR_UNSUPPORTED => WALK_STATUS_UNSUPPORTED,
+        _ => ABI_STATUS_FAILURE,
+    }
+}
+
+fn status_error_code(status: i32) -> i32 {
+    match status {
+        WALK_STATUS_NOT_FOUND => WALK_ERROR_NOT_FOUND,
+        WALK_STATUS_PERMISSION_DENIED => WALK_ERROR_PERMISSION_DENIED,
+        WALK_STATUS_UNSUPPORTED => WALK_ERROR_UNSUPPORTED,
         _ => WALK_ERROR_FAILED,
     }
 }
@@ -242,7 +263,7 @@ fn report_io_error(
 ) -> Result<Option<PendingEvent>, i32> {
     let code = error_code(error);
     if state.options.error_policy == 0 {
-        return Err(-code);
+        return Err(failure_status(code));
     }
     Ok(Some(PendingEvent { path, depth, kind: WALK_KIND_ERROR, error: code }))
 }
@@ -253,16 +274,21 @@ fn report_status_error(
     depth: u32,
     status: i32,
 ) -> Result<Option<PendingEvent>, i32> {
-    let failure = if status == 0 { ABI_STATUS_FAILURE } else { status };
+    let failure = if status == 0 {
+        ABI_STATUS_FAILURE
+    } else if status == -WALK_ERROR_NOT_FOUND {
+        WALK_STATUS_NOT_FOUND
+    } else if status == -WALK_ERROR_PERMISSION_DENIED {
+        WALK_STATUS_PERMISSION_DENIED
+    } else if status == -WALK_ERROR_UNSUPPORTED {
+        WALK_STATUS_UNSUPPORTED
+    } else {
+        status
+    };
     if state.options.error_policy == 0 {
         return Err(failure);
     }
-    Ok(Some(PendingEvent {
-        path,
-        depth,
-        kind: WALK_KIND_ERROR,
-        error: if status < 0 { -status } else { WALK_ERROR_FAILED },
-    }))
+    Ok(Some(PendingEvent { path, depth, kind: WALK_KIND_ERROR, error: status_error_code(status) }))
 }
 
 fn descend_candidate(
@@ -579,5 +605,19 @@ mod tests {
             .expect("permission failure should produce an event");
         assert_eq!(event.kind, WALK_KIND_ERROR);
         assert_eq!(event.error, WALK_ERROR_PERMISSION_DENIED);
+    }
+
+    #[test]
+    fn permission_denied_fail_fast_does_not_become_eof() {
+        let state = WalkerState {
+            options: options(1, false, 0),
+            frames: Vec::new(),
+            visited: Vec::new(),
+            pending: None,
+        };
+        let native_error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let result = report_io_error(&state, PathBuf::from("protected"), 1, &native_error);
+        assert!(matches!(result, Err(status) if status == WALK_STATUS_PERMISSION_DENIED));
+        assert_ne!(WALK_STATUS_PERMISSION_DENIED, ABI_STATUS_END_OF_STREAM);
     }
 }
