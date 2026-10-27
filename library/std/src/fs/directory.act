@@ -356,6 +356,27 @@ verb directory_entry_matches(
     };
 }
 
+verb directory_entry_status(
+    erg status: Int,
+    dat storage: Buffer,
+    dat metadata: Metadata
+) -> Result[Option[DirectoryEntry], io::IoError] {
+    if status == 0 || status == 1 {
+        return directory_entry_from_storage(
+            storage: dat storage,
+            metadata: dat metadata,
+            status: status
+        );
+    }
+    drop(storage);
+    drop(metadata);
+    return case status {
+        -2 => Ok(Option[DirectoryEntry].None),
+        -3 => Err(io::IoError.InvalidInput),
+        _ => Err(io::IoError.Failed),
+    };
+}
+
 """
 Classify and return the next entry as an owned `DirectoryEntry`.
 
@@ -369,77 +390,32 @@ available for explicit close.
 open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEntry], io::IoError] {
     loop {
         erg storage: Buffer = Buffer[4096];
-        erg modified_status: Int = METADATA_VALUE_UNAVAILABLE;
-        erg accessed_status: Int = METADATA_VALUE_UNAVAILABLE;
-        erg created_status: Int = METADATA_VALUE_UNAVAILABLE;
-        erg identity_status: Int = METADATA_VALUE_UNAVAILABLE;
-        erg identity_kind: Int = METADATA_IDENTITY_NONE;
-        erg metadata = Metadata {
-            size: 0,
-            is_file: 0,
-            is_dir: 0,
-            readonly: 0,
-            is_symlink: 0,
-            modified_seconds: 0i64,
-            modified_status: modified_status,
-            accessed_seconds: 0i64,
-            accessed_status: accessed_status,
-            created_seconds: 0i64,
-            created_status: created_status,
-            identity_primary: 0u64,
-            identity_secondary: 0u64,
-            identity_kind: identity_kind,
-            identity_status: identity_status,
-        };
+        erg metadata = metadata_default();
         erg status = actus_directory_next_entry(
             handle: abs directory.handle,
             storage: ins storage,
             metadata: ins metadata
         );
-        if status == 0 || status == 1 {
-            erg candidate = directory_entry_from_storage(
-                storage: dat storage,
-                metadata: dat metadata,
-                status: status
-            );
-            return case dat candidate {
-                Result.Err(error) => Err(error),
-                Result.Ok(value) => case dat value {
-                    Option.None => Ok(Option[DirectoryEntry].None),
-                    Option.Some(entry) => {
-                        erg keep = directory_entry_matches(
-                            entry: abs entry,
-                            filter: abs directory.filter
-                        );
-                        if keep {
-                            return Ok(Option[DirectoryEntry].Some(entry));
-                        }
-                        drop(entry);
-                        continue;
-                    },
+        erg candidate = directory_entry_status(
+            status: status,
+            storage: dat storage,
+            metadata: dat metadata
+        );
+        return case dat candidate {
+            Result.Err(error) => Err(error),
+            Result.Ok(value) => case dat value {
+                Option.None => Ok(Option[DirectoryEntry].None),
+                Option.Some(entry) => {
+                    erg keep = directory_entry_matches(
+                        entry: abs entry,
+                        filter: abs directory.filter
+                    );
+                    if keep {
+                        return Ok(Option[DirectoryEntry].Some(entry));
+                    }
+                    drop(entry);
+                    continue;
                 },
-            };
-        }
-        case status {
-            -1 => {
-                drop(storage);
-                drop(metadata);
-                return Err(io::IoError.Failed);
-            },
-            -2 => {
-                drop(storage);
-                drop(metadata);
-                return Ok(Option[DirectoryEntry].None);
-            },
-            -3 => {
-                drop(storage);
-                drop(metadata);
-                return Err(io::IoError.InvalidInput);
-            },
-            _ => {
-                drop(storage);
-                drop(metadata);
-                return Err(io::IoError.Failed);
             },
         };
     }
