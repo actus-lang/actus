@@ -40,6 +40,15 @@ verb main() -> Int {
             IoError.PermissionDenied => {
                 return 7;
             },
+            IoError.Busy => {
+                return 8;
+            },
+            IoError.CrossDevice => {
+                return 9;
+            },
+            IoError.AlreadyExists => {
+                return 10;
+            },
         },
     };
 }

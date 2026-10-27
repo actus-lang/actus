@@ -36,6 +36,9 @@ verb main() -> Int {
                     IoError.InvalidData => 4,
                     IoError.Unsupported => 5,
                     IoError.PermissionDenied => 6,
+                    IoError.Busy => 7,
+                    IoError.CrossDevice => 8,
+                    IoError.AlreadyExists => 9,
                 },
                 Result.Ok(bytes) => {
                     drop(bytes);

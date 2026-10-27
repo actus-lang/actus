@@ -24,6 +24,7 @@ pub(crate) fn copy_standard_library(root: &Path) {
         "fs/directory.act",
         "fs/file.act",
         "fs/metadata.act",
+        "fs/locking.act",
         "fs/links.act",
         "fs/operations.act",
         "fs/options.act",
