@@ -1,6 +1,7 @@
 """Mirrored strict coverage for coordinator-serialized publication."""
 import {
-    fs,
+    open std::fs,
+    open std::io,
     path,
 };
 
@@ -177,6 +178,45 @@ verb conflict_case(
     };
 }
 
+verb existing_case(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path
+) -> Int {
+    erg initial_value: u8 = 69u8;
+    erg initial = write_value(path: abs destination, value: erg initial_value);
+    if initial != 0 {
+        return 1;
+    }
+    erg expected_result = fs::metadata(path: abs destination);
+    return case dat expected_result {
+        Result.Err(_) => 2,
+        Result.Ok(expected) => {
+            erg replacement_value: u8 = 70u8;
+            erg staged = write_pair(path: abs staging, value: erg replacement_value);
+            if staged != 0 {
+                return 3;
+            }
+            erg published = fs::publish_file_coordinated(
+                lock_path: abs lock_path,
+                staging: abs staging,
+                destination: abs destination,
+                expected: abs expected
+            );
+            return case dat published {
+                Result.Ok(outcome) => case dat outcome {
+                    CoordinatedPublication.Published => {
+                        erg expected_size: Int = 2;
+                        verify_size(destination: abs destination, expected: erg expected_size);
+                    },
+                    CoordinatedPublication.Conflict => 4,
+                },
+                _ => 4,
+            };
+        },
+    };
+}
+
 meta target("unix")
 meta test
 verb coordinator_publishes_when_identity_matches() -> Int {
@@ -254,6 +294,113 @@ verb coordinator_rejects_stale_identity() -> Int {
                             );
                             result;
                         },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb coordinator_publishes_matching_existing_identity() -> Int {
+    erg lock_suffix: u8 = 97u8;
+    erg destination_suffix: u8 = 98u8;
+    erg staging_suffix: u8 = 99u8;
+    erg lock_result = coordinator_path(suffix: erg lock_suffix);
+    return case dat lock_result {
+        Result.Err(_) => 1,
+        Result.Ok(lock_path) => {
+            erg destination_result = coordinator_path(suffix: erg destination_suffix);
+            return case dat destination_result {
+                Result.Err(_) => 2,
+                Result.Ok(destination) => {
+                    erg staging_result = coordinator_path(suffix: erg staging_suffix);
+                    return case dat staging_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging) => {
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            erg result = existing_case(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            result;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb windows_unsupported_case(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path
+) -> Int {
+    cleanup(
+        lock_path: abs lock_path,
+        destination: abs destination,
+        staging: abs staging
+    );
+    erg value: u8 = 71u8;
+    erg written = write_value(path: abs staging, value: erg value);
+    if written != 0 {
+        return 1;
+    }
+    erg expected = fs::metadata_absent();
+    erg published = fs::publish_file_coordinated(
+        lock_path: abs lock_path,
+        staging: abs staging,
+        destination: abs destination,
+        expected: abs expected
+    );
+    cleanup(
+        lock_path: abs lock_path,
+        destination: abs destination,
+        staging: abs staging
+    );
+    return case dat published {
+        Result.Err(error) => case dat error {
+            IoError.Unsupported => 0,
+            _ => 2,
+        },
+        _ => 2,
+    };
+}
+
+meta target("windows")
+meta test
+verb coordinator_reports_windows_unsupported() -> Int {
+    erg lock_suffix: u8 = 101u8;
+    erg destination_suffix: u8 = 102u8;
+    erg staging_suffix: u8 = 103u8;
+    erg lock_result = coordinator_path(suffix: erg lock_suffix);
+    return case dat lock_result {
+        Result.Err(_) => 1,
+        Result.Ok(lock_path) => {
+            erg destination_result = coordinator_path(suffix: erg destination_suffix);
+            return case dat destination_result {
+                Result.Err(_) => 2,
+                Result.Ok(destination) => {
+                    erg staging_result = coordinator_path(suffix: erg staging_suffix);
+                    return case dat staging_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging) => windows_unsupported_case(
+                            lock_path: abs lock_path,
+                            destination: abs destination,
+                            staging: abs staging
+                        ),
                     };
                 },
             };

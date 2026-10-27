@@ -143,6 +143,10 @@ fn compare_expected_identity(
             Some(Err(_)) | None => Err(ABI_STATUS_FAILURE),
         };
     }
+    #[cfg(windows)]
+    if expected.identity_kind == 2 {
+        return Err(PUBLICATION_STATUS_UNSUPPORTED);
+    }
     let Some(current) = current else {
         return Err(ABI_STATUS_FAILURE);
     };
