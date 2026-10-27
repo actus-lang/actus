@@ -328,7 +328,7 @@ runtime mapping tests.
 - [x] Add file locking or an explicit unsupported result for targets that do
       not provide advisory locks.
 - [x] Add durable sync operations for data and metadata where supported.
-- [ ] Add tests for concurrent open modes, short I/O, EOF, locks, flush, and
+- [x] Add tests for concurrent open modes, short I/O, EOF, locks, flush, and
       persistence failures.
 
 Evidence (2026-10-27): `File` exposes open/create/read/write/seek/flush/close,
@@ -341,8 +341,9 @@ facade, runtime bridges, and buffer ABI adapters. Strict file/operations
 fixtures and platform-selected Unix/Windows option fixtures cover the public
 contract. POSIX and Windows lock backends now cover shared, exclusive,
 non-blocking, and unlock operations; contention is `IoError.Busy` and targets
-without a backend return `IoError.Unsupported`. The broader concurrent
-open/short-I/O/flush/persistence regression matrix remains open.
+without a backend return `IoError.Unsupported`. Mirrored strict fixtures cover
+two-handle contention, write/flush/reopen/read, EOF, cleanup, and failed
+publication. The Gate 7 file-operation validation matrix is complete.
 
 ## Gate 8: Mutation, publication, and recovery operations
 

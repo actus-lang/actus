@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use super::super::contract::ABI_STATUS_FAILURE;
+use super::super::contract::{ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
 use super::super::types::BufferHandle;
 use super::file::{
     actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_sync_all,
@@ -81,8 +81,11 @@ pub unsafe extern "C" fn actus_file_read_buffer(handle: i32, buffer: BufferHandl
         unsafe { buffer.data.add(buffer.length) }
     };
     let bytes = unsafe { actus_file_read(super::file::actus_handle(handle), destination, spare) };
-    if bytes >= 0 {
+    if bytes > 0 {
         buffer.length = buffer.length.saturating_add(bytes as usize);
+    }
+    if bytes == 0 {
+        return ABI_STATUS_END_OF_STREAM;
     }
     i32::try_from(bytes).unwrap_or(ABI_STATUS_FAILURE)
 }
