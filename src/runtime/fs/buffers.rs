@@ -168,7 +168,7 @@ pub extern "C" fn actus_file_close_buffer(handle: i32) -> i32 {
         if status == ABI_STATUS_SUCCESS {
             super::file::remove_actus_handle(handle);
         }
-        return status;
+        status
     }
     #[cfg(not(windows))]
     actus_file_close(super::file::actus_handle(handle))
