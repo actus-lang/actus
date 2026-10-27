@@ -301,6 +301,18 @@ whose symbol is defined by the same lowered module.
 - [ ] Preserve deterministic ordering at every directory level when requested.
 - [ ] Add depth, cycle, symlink, permission, and very-wide-tree tests.
 
+Gate 6 implementation evidence (2026-10-27, partial): the separate bounded
+walker API is implemented behind `std::fs::fs.act`, with depth-first streaming
+events, explicit native/lexicographic ordering, hidden-entry filtering,
+non-followed symlink events, followed-link cycle detection, and fail-fast or
+error-event policies. Native runtime coverage is 6/6 for depth, cycle,
+broken-link, symlink, and very-wide-tree overflow behavior; the mirrored strict
+fixture is 3/3. The public `IoError.PermissionDenied` variant now preserves
+the native permission classification instead of collapsing it into
+`IoError.Failed`; deterministic runtime mapping coverage is added. A portable
+host-level permission matrix remains open and must be added before the Gate 6
+checklist is marked complete.
+
 ## Gate 7: File operations and open options
 
 - [ ] Expose explicit `file_open`, `file_create`, `file_read`, `file_write`,

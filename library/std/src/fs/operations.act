@@ -89,7 +89,13 @@ valid UTF-8; the C ABI returns non-zero for invalid data, mapped to
 """
 unsafe extern "C" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int;
 
-"""Translate a private runtime status into the public I/O result contract."""
+"""Translate the shared file-operation status ABI into a typed result.
+
+`status` is a copied scalar returned by a native bridge. `-1` becomes generic
+`IoError.Failed`, `-2` becomes `IoError.EndOfStream`, and non-negative values
+remain successful results. This helper performs no I/O and owns no resource.
+The legacy bridges using it do not expose a separate permission status.
+"""
 open verb fs_status(erg status: Int) -> Result[Int, io::IoError] {
     return case status {
         -1 => Err(io::IoError.Failed),
@@ -98,12 +104,12 @@ open verb fs_status(erg status: Int) -> Result[Int, io::IoError] {
     };
 }
 
-"""
-Remove one regular file.
+"""Remove one regular file at `path`.
 
-`path` is an `abs` view borrowed only during the runtime call. `Ok(0)` means
-the host removed the file; `Err(IoError.Failed)` covers missing, protected,
-or otherwise rejected paths. The bridge does not retain or allocate a path.
+`path` is an immutable `abs` view borrowed only during the native call and is
+never retained. `Ok(0)` means the host removed the file. Missing, protected,
+directory, and otherwise rejected targets are reported as `IoError.Failed` by
+this compatibility bridge; no partial deletion is reported as success.
 """
 open verb remove_file(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_path(path: abs path);
@@ -118,12 +124,12 @@ verb finish_canonicalize(dat output: path_module::Path, erg status: Int) -> Resu
     return Err(io::IoError.Failed);
 }
 
-"""
-Resolve one lexical path to its filesystem identity.
+"""Resolve one lexical path to its host filesystem identity.
 
-Unlike `std::path::normalize`, this operation performs blocking filesystem
-I/O, resolves symbolic links, requires every component to exist, and returns
-a new owned `Path`. The input is only an `abs` view and is never modified.
+Unlike `std::path::normalize`, this performs blocking filesystem I/O, follows
+symbolic links, requires every component to exist, and returns a newly owned
+canonical `Path`. The input is an immutable `abs` view and is never modified
+or retained. Partial output is dropped on failure.
 """
 open verb canonicalize(abs path: path_module::Path) -> Result[path_module::Path, io::IoError] {
     erg raw: Buffer = Buffer[0];
@@ -139,13 +145,12 @@ open verb canonicalize(abs path: path_module::Path) -> Result[path_module::Path,
     };
 }
 
-"""
-Compare two paths by the host filesystem identity they name.
+"""Compare two paths by host filesystem identity rather than spelling.
 
-The operation follows symbolic links and requires both paths to exist. It
-returns `Ok(true)` only when the target identity matches, `Ok(false)` for two
-different existing identities, `Failed` for host lookup failure, and
-`Unsupported` when the selected target cannot provide a stable identity.
+Both arguments are immutable `abs` views, symbolic links are followed, and
+both targets must exist. `Ok(true)` means equal identity; `Ok(false)` means
+different existing identities. Host lookup failure returns `IoError.Failed`
+and missing stable identity returns `IoError.Unsupported`. No path is retained.
 """
 open verb same_file(abs left: path_module::Path, abs right: path_module::Path) -> Result[Bool, io::IoError] {
     erg status = actus_file_same_path(left: abs left, right: abs right);
@@ -157,65 +162,72 @@ open verb same_file(abs left: path_module::Path, abs right: path_module::Path) -
     };
 }
 
-"""
-Rename one filesystem path to another.
+"""Rename one filesystem path from `from` to `to`.
 
-Both `from` and `to` are `abs` views valid only for this call. `Ok(0)` means
-the host completed the rename; `Err(IoError.Failed)` reports any host error.
-Neither borrowed view is retained after the runtime bridge returns.
+Both arguments are immutable `abs` views valid only for this call. `Ok(0)` is
+returned only after the host completes the rename; rejected, missing,
+cross-device, and other failures return `IoError.Failed`. Neither view is
+consumed or retained.
 """
 open verb rename(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_rename_path(from: abs from, to: abs to);
     return fs_status(status: erg status);
 }
 
-"""
-Copy one regular file and return the number of copied bytes.
+"""Copy one regular file and return the host-reported byte count.
 
-`from` and `to` are `abs` views borrowed for the call. `Ok(count)` is the
-exact host-reported byte count; `Err(IoError.Failed)` reports a copy failure.
-The runtime consumes neither path view and performs no UTF-8 conversion.
+`from` and `to` are immutable `abs` views borrowed for the call. `Ok(count)`
+is returned only when the native copy completes; source, destination,
+overwrite, and provider failures return `IoError.Failed`. No path view is
+consumed or retained and no UTF-8 conversion is performed.
 """
 open verb copy_file(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_copy_path(from: abs from, to: abs to);
     return fs_status(status: erg status);
 }
 
-"""
-Create one directory at `path`.
+"""Create exactly one directory at `path`.
 
-`path` is borrowed as an `abs` view and is not retained. `Ok(0)` means the
-directory was created; `Err(IoError.Failed)` reports an existing, invalid, or
-otherwise inaccessible target.
+`path` is an immutable `abs` view borrowed for the native call and is not
+retained. `Ok(0)` means the directory was created. Existing, invalid,
+parent-missing, protected, and inaccessible targets return `IoError.Failed`;
+missing parents are never created implicitly.
 """
 open verb create_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_create_dir_path(path: abs path);
     return fs_status(status: erg status);
 }
 
-"""
-Remove one empty directory at `path`.
+"""Remove one empty directory at `path`.
 
-`path` is an `abs` view borrowed for one runtime call. `Ok(0)` means removal
-succeeded; `Err(IoError.Failed)` covers a missing, non-empty, protected, or
-otherwise inaccessible directory.
+`path` is an immutable `abs` view borrowed for one native call. `Ok(0)` means
+the host removed the directory. Missing, non-empty, protected, file-shaped,
+and inaccessible targets return `IoError.Failed`; recursive deletion is never
+implicit.
 """
 open verb remove_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_dir_path(path: abs path);
     return fs_status(status: erg status);
 }
 
-"""
-Discard an incomplete owned read buffer with `dat` and return its typed native
-failure. The buffer is deterministically dropped before `Err(IoError.Failed)`
-is produced, so the caller receives no leaked allocation.
+"""Discard an incomplete owned read buffer before returning a typed failure.
+
+`output` is transferred as `dat` and is always dropped before
+`Err(IoError.Failed)` is constructed. The helper performs no I/O, returns no
+buffer, and guarantees that a failed read cannot leak partial allocation.
 """
 open verb discard_read_output(dat output: Buffer) -> Result[Buffer, io::IoError] {
     drop(output);
     return Result[Buffer, io::IoError].Err(io::IoError.Failed);
 }
 
-"""Read one open file into an owned buffer, close the file, and return typed failure when reading fails."""
+"""Read one owned open file into a new buffer and close it deterministically.
+
+`file` is transferred as `dat`, so this helper owns the handle and closes it
+before returning. `Ok(Buffer)` transfers the complete owned byte buffer;
+read or close failure drops that buffer and returns `IoError.Failed`. No file
+handle remains live after return, and the caller owns a successful buffer.
+"""
 open verb read_open_file(dat file: File) -> Result[Buffer, io::IoError] {
     erg output = Buffer[0];
     erg status = actus_file_read_all_buffer(handle: abs file.handle, buffer: ins output);
@@ -245,7 +257,11 @@ open verb read_to_bytes(abs path: path_module::Path) -> Result[Buffer, io::IoErr
     };
 }
 
-"""Drop invalid text storage before returning the typed encoding error."""
+"""Drop invalid text storage before returning `IoError.InvalidData`.
+
+`output` is transferred as `dat` and is always dropped before the error result
+is constructed. The helper performs no I/O and never returns partial text.
+"""
 open verb reject_invalid_text(dat output: Buffer) -> Result[Buffer, io::IoError] {
     drop(output);
     return Err(io::IoError.InvalidData);
@@ -260,7 +276,12 @@ open verb accept_valid_text(dat output: Buffer) -> Result[Buffer, io::IoError] {
     return Ok(output);
 }
 
-"""Rebuild a buffer-typed error result without retaining a borrowed payload."""
+"""Propagate one I/O error through a buffer-returning operation.
+
+`error` is transferred as `dat` and consumed exhaustively. The exact variant,
+including `PermissionDenied`, is rebuilt in `Err`; no allocation, I/O, or
+ownership is retained by this adapter.
+"""
 open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoError] {
     return case dat error {
         io::IoError.EndOfStream => Result[Buffer, io::IoError].Err(io::IoError.EndOfStream),
@@ -268,10 +289,16 @@ open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoE
         io::IoError.InvalidInput => Result[Buffer, io::IoError].Err(io::IoError.InvalidInput),
         io::IoError.InvalidData => Result[Buffer, io::IoError].Err(io::IoError.InvalidData),
         io::IoError.Unsupported => Result[Buffer, io::IoError].Err(io::IoError.Unsupported),
+        io::IoError.PermissionDenied => Result[Buffer, io::IoError].Err(io::IoError.PermissionDenied),
     };
 }
 
-"""Validate and consume one owned byte buffer as text, returning bytes or typed failure."""
+"""Validate one owned byte buffer as UTF-8 and preserve its result.
+
+`output` is transferred as `dat` and inspected for validation. Valid bytes
+return as the same owned `Buffer`; invalid bytes are dropped and return
+`IoError.InvalidData`. No filesystem I/O occurs and partial text escapes never.
+"""
 open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, io::IoError] {
     erg valid = actus_buffer_validate_utf8(buffer: abs output);
     return case valid {
@@ -280,7 +307,12 @@ open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, io::IoError]
     };
 }
 
-"""Read a file, reject invalid UTF-8, and return owned bytes or a typed error."""
+"""Map a completed byte read into validated text bytes or a typed error.
+
+`loaded` is transferred as `dat`. Reader failures preserve their exact
+`IoError` variant; successful bytes are transferred to UTF-8 validation, which
+drops invalid data. No intermediate buffer is duplicated or retained.
+"""
 open verb validate_loaded_text(dat loaded: Result[Buffer, io::IoError]) -> Result[Buffer, io::IoError] {
     return case dat loaded {
         Result.Err(error) => propagate_text_error(error: dat error),
@@ -288,12 +320,13 @@ open verb validate_loaded_text(dat loaded: Result[Buffer, io::IoError]) -> Resul
     };
 }
 
-"""
-Read a file and validate its bytes as UTF-8 without accepting a path string.
+"""Read a file and validate its bytes as UTF-8.
 
-`path` is an `abs` borrow used only while opening the file. `Ok(Buffer)` owns
-the validated bytes; `Err(IoError.Failed)` or `Err(IoError.InvalidData)` is
-returned after all temporary file and buffer ownership is cleaned up.
+`path` is an immutable `abs` borrow used only while opening the file. On
+success, `Ok(Buffer)` transfers ownership of the validated bytes. Open/read
+failures preserve their typed `IoError`; invalid UTF-8 returns
+`IoError.InvalidData` after all temporary file and buffer ownership is cleaned
+up. The operation performs blocking file I/O and never returns partial text.
 """
 open verb read_to_string(abs path: path_module::Path) -> Result[Buffer, io::IoError] {
     erg loaded = read_to_bytes(path: abs path);

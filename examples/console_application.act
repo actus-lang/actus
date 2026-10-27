@@ -34,6 +34,12 @@ verb main() -> Int {
             IoError.InvalidData => {
                 return 5;
             },
+            IoError.Unsupported => {
+                return 6;
+            },
+            IoError.PermissionDenied => {
+                return 7;
+            },
         },
     };
 }

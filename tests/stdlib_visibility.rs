@@ -22,6 +22,13 @@ fn std_io_internal_scope_still_analyzes_after_bridge_privacy_migration() {
 }
 
 #[test]
+fn std_io_qualified_import_preserves_public_performance_scope() {
+    let source = parse_source("import io; verb main() -> Int { return 0; }");
+    analyze_with_imports(&source, &std_resolver())
+        .expect("qualified std::io import should preserve public performance scope");
+}
+
+#[test]
 fn std_io_raw_bridge_is_not_importable_through_the_public_facade() {
     let source =
         parse_source("import io; verb main() -> Int { return actus_print_int(value: 1); }");
@@ -83,6 +90,24 @@ fn std_fs_walk_event_error_uses_canonical_io_error() {
     );
     analyze_with_imports(&source, &std_resolver())
         .expect("qualified std::fs walker errors should use one canonical IoError type");
+}
+
+#[test]
+fn std_fs_walk_event_type_preserves_nested_io_scope() {
+    let source = parse_source(
+        "import { fs, path }; verb inspect(abs event: fs::WalkEvent) -> Int { return event.depth as Int; } verb main() -> Int { return 0; }",
+    );
+    analyze_with_imports(&source, &std_resolver())
+        .expect("WalkEvent should preserve nested std::io declarations");
+}
+
+#[test]
+fn std_fs_next_walk_event_preserves_nested_io_scope() {
+    let source = parse_source(
+        "import { fs, path }; verb inspect() -> Int { erg walker = fs::Walker { handle: 1, }; erg event = fs::next_walk_event(walker: ins walker); return case dat event { Result.Err(_) => 0, Result.Ok(value) => { drop(value); 1; }, }; } verb main() -> Int { return 0; }",
+    );
+    analyze_with_imports(&source, &std_resolver())
+        .expect("next_walk_event should preserve nested std::io declarations");
 }
 
 #[test]

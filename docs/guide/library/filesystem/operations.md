@@ -78,6 +78,33 @@ best-effort close, so early returns and branch exits do not silently retain the
 host iterator. The compiler binds this cleanup to the owner value live in each
 control-flow block.
 
+## Recursive walking
+
+`walk` is a separate depth-first API; it never changes `read_dir` into a
+recursive operation. `WalkOptions.max_depth` is zero-based: depth zero emits
+the requested root lifecycle, and a child is visited only when its depth is at
+most the configured limit. `next_walk_event` streams owned events in this
+order for each directory: `EnterDirectory`, child events, then
+`LeaveDirectory`. A root file or non-followed root symlink emits one terminal
+event instead of directory lifecycle events.
+
+Set `follow_symlinks` explicitly. When false, links emit `Symlink` without a
+target lookup. When true, directory identities are canonicalized and tracked;
+re-entering an identity is a cycle. `WalkErrorPolicy.FailFast` returns the
+typed failure from `next_walk_event`, while `EmitError` emits an `Error` event,
+skips that entry, and continues with later siblings. Missing targets and
+unsupported operations are never silently ignored. A host permission failure
+is preserved as `IoError.PermissionDenied` in either policy rather than being
+collapsed into `IoError.Failed`.
+
+`DirectoryOrder.Native` preserves host iterator order and is not reproducible.
+`DirectoryOrder.Lexicographic` sorts each directory level by the canonical
+platform byte or code-unit name representation. The hosted walker bounds
+depth, visited directory identities, entries per directory, and entry-name
+length; exceeding a bound is a typed failure. `Ok(Option.None)` is clean end
+of stream. `close_walker(dat walker)` releases all retained frames, and the
+`Walker` Drop performance provides best-effort cleanup on early exits.
+
 `remove_dir` is for an empty directory according to the host provider. A
 missing, protected, non-empty, or otherwise rejected target is reported as
 `IoError.Failed`.

@@ -242,12 +242,17 @@ verb discard_walk_path(dat path: path_module::Path) {}
 
 """Start a bounded recursive traversal from `path`.
 
-`path` is an immutable lexical input and remains owned by the caller. `options`
-is also borrowed immutably and controls depth, link handling, hidden entries,
-ordering, and failure delivery. On success the returned `Walker` owns the
-native traversal state; on failure no walker is returned and the input path
-remains unchanged. The operation may perform blocking host metadata and
-directory I/O, but it does not read file contents or publish filesystem state.
+`path` and `options` are immutable views borrowed for this call; neither input
+is consumed or retained. On success the returned `Walker` owns the bounded
+native traversal state, including directory frames and followed-link identity
+tracking. The caller must advance it with `next_walk_event` and eventually
+transfer it to `close_walker`, or rely on `Drop` for best-effort cleanup.
+
+The operation may perform blocking metadata and directory I/O, but never reads
+file contents or publishes filesystem state. Invalid bounds or policy values
+return `IoError.InvalidInput`. A root permission failure returns
+`IoError.PermissionDenied`; other provider failures retain their mapped error
+class. No walker is returned on failure and the input views remain unchanged.
 """
 open verb walk(abs path: path_module::Path, abs options: WalkOptions) -> Result[Walker, io::IoError] {
     erg depth: Int = options.max_depth as Int;
@@ -270,7 +275,7 @@ open verb walk(abs path: path_module::Path, abs options: WalkOptions) -> Result[
         },
         -2 => {
             discard_walk_handle(handle: dat handle);
-            Err(io::IoError.Failed);
+            Err(io::IoError.PermissionDenied);
         },
         -3 => {
             discard_walk_handle(handle: dat handle);
@@ -295,19 +300,25 @@ verb walk_event_kind(abs kind: i32) -> WalkEventKind {
 verb walk_event_error(abs error: i32) -> io::IoError {
     return case error {
         1 => io::IoError.Failed,
-        2 => io::IoError.Failed,
+        2 => io::IoError.PermissionDenied,
         4 => io::IoError.Unsupported,
         _ => io::IoError.Failed,
     };
 }
 
-"""Return the next event from a streaming traversal.
+"""Return exactly one event from a streaming traversal.
 
 `walker` is an exclusive call-scoped loan and is restored for the caller after
-the event is produced. `Ok(Some(event))` transfers one owned event to the
-caller, `Ok(None)` is clean end of stream, and `Err(error)` represents a
-fail-fast traversal failure. The method never returns an event backed by a
-borrowed native directory entry and does not read file payloads.
+the call. `Ok(Some(event))` transfers an owned path snapshot and event payload
+to the caller. `Ok(None)` is clean end of stream; it is not an error and does
+not consume the walker. `Err(error)` is returned only for fail-fast traversal
+failure, including permission failures reported as
+`IoError.PermissionDenied`.
+
+The operation advances at most one event, does not read file contents, and
+does not retain the caller's temporary path storage. Under `EmitError`, an
+entry failure is returned as an owned `WalkEvent` with `kind == Error` and the
+typed cause in `error`; traversal then continues with later siblings.
 """
 open verb next_walk_event(ins walker: Walker) -> Result[Option[WalkEvent], io::IoError] {
     erg path_result = walk_path_placeholder();
@@ -344,12 +355,16 @@ open verb next_walk_event(ins walker: Walker) -> Result[Option[WalkEvent], io::I
     };
 }
 
-"""Close a walker explicitly and release all traversal frames.
+"""Close a walker explicitly and release all retained traversal state.
 
-`walker` is transferred as `dat`, so it cannot be reused after this call.
-Successful close returns `Ok(0)`; an invalid or already-released runtime token
-returns `Err(IoError.Failed)`. Callers may rely on `Drop` for early exits, but
-explicit close is the observable success path when release status matters.
+`walker` is transferred as `dat`; the caller cannot reuse it after this call.
+Successful close returns `Ok(0)` and releases every frame and visited-identity
+record. An invalid or already-released token returns `Err(IoError.Failed)`.
+The operation performs no path or file-content I/O and does not publish state.
+
+Explicit close is the status-bearing cleanup path. Callers may rely on `Drop`
+for early returns, but `Drop` intentionally discards the native close status
+because cleanup performances cannot report an error to the caller.
 """
 open verb close_walker(dat walker: Walker) -> Result[Int, io::IoError] {
     erg status = actus_walker_close(handle: abs walker.handle);
@@ -372,6 +387,10 @@ open perform Drop for Walker {
     handle for cleanup but does not transfer the owner to another binding.
     """
     verb drop(ins self: Walker) {
-        actus_walker_close(handle: abs self.handle);
+        erg owner = Walker {
+            handle: self.handle,
+        };
+        close_walker(walker: dat owner);
+        self.handle = -1;
     }
 }

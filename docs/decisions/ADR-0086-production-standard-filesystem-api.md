@@ -212,6 +212,8 @@ Applications that need the operation failure cause use
 typed metadata error distinguishing not-found, permission-denied, unsupported,
 and generic provider failure. The compatibility metadata verbs retain the
 existing `IoError` result surface and intentionally collapse those causes.
+The recursive walker does not use that compatibility collapse: a native
+permission failure is exposed as `IoError.PermissionDenied`.
 
 ### Recursive walking
 
@@ -241,7 +243,10 @@ open verb close_walker(dat walker: Walker) -> Result[Int, IoError];
 
 The walker enforces depth limits, detects symlink cycles when links are
 followed, preserves requested ordering, and exposes an explicit policy for
-permission failures: fail-fast or return an error event. It remains streaming.
+permission failures: fail-fast or return an error event. In either policy,
+the permission classification remains `IoError.PermissionDenied` at the Actus
+boundary; it is never rewritten as generic `IoError.Failed`. It remains
+streaming.
 
 ### Mutation and publication
 

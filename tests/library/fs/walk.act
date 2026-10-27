@@ -1,7 +1,7 @@
 """Mirrored strict coverage for bounded recursive filesystem walking."""
 import {
     std::fs,
-    std::io,
+    open std::io,
     std::path,
 };
 
@@ -22,10 +22,10 @@ verb bounded_options() -> fs::WalkOptions {
     };
 }
 
-verb open_root_walker() -> Result[fs::Walker, io::IoError] {
+verb open_root_walker() -> Result[fs::Walker, IoError] {
     erg root_result = current_directory();
     return case dat root_result {
-        Result.Err(_) => Err(io::IoError.Failed),
+        Result.Err(_) => Err(IoError.Failed),
         Result.Ok(root) => {
             erg options = bounded_options();
             return fs::walk(path: abs root, options: abs options);
@@ -45,8 +45,11 @@ verb walker_emits_root_enter_event() -> Int {
                 Result.Ok(value) => case dat value {
                     Option.None => 3,
                     Option.Some(event) => {
-                        erg result = if event.kind == fs::WalkEventKind.EnterDirectory &&
-                            event.depth == 0u32 { 0 } else { 4 };
+                        erg result = if event.kind == fs::WalkEventKind.EnterDirectory && event.depth == 0u32 {
+                            0;
+                        } else {
+                            4;
+                        };
                         drop(event);
                         result;
                     },
@@ -67,7 +70,9 @@ verb walker_emits_root_leave_event() -> Int {
             erg first = fs::next_walk_event(walker: ins walker);
             case dat first {
                 Result.Ok(value) => case dat value {
-                    Option.Some(event) => { drop(event); },
+                    Option.Some(event) => {
+                        drop(event);
+                    },
                     Option.None => {},
                 },
                 Result.Err(_) => {},
@@ -78,7 +83,11 @@ verb walker_emits_root_leave_event() -> Int {
                 Result.Ok(value) => case dat value {
                     Option.None => 3,
                     Option.Some(event) => {
-                        erg result = if event.kind == fs::WalkEventKind.LeaveDirectory { 0 } else { 4 };
+                        erg result = if event.kind == fs::WalkEventKind.LeaveDirectory {
+                            0;
+                        } else {
+                            4;
+                        };
                         drop(event);
                         result;
                     },
@@ -99,7 +108,9 @@ verb walker_reports_end_of_stream() -> Int {
             erg first = fs::next_walk_event(walker: ins walker);
             case dat first {
                 Result.Ok(value) => case dat value {
-                    Option.Some(event) => { drop(event); },
+                    Option.Some(event) => {
+                        drop(event);
+                    },
                     Option.None => {},
                 },
                 Result.Err(_) => {},
@@ -107,7 +118,9 @@ verb walker_reports_end_of_stream() -> Int {
             erg second = fs::next_walk_event(walker: ins walker);
             case dat second {
                 Result.Ok(value) => case dat value {
-                    Option.Some(event) => { drop(event); },
+                    Option.Some(event) => {
+                        drop(event);
+                    },
                     Option.None => {},
                 },
                 Result.Err(_) => {},

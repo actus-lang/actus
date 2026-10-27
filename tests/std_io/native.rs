@@ -441,7 +441,7 @@ fn std_io_native_copy_propagates_reader_failure() {
         "copy-reader-error",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
-        "import { open io }; struct BrokenReader { erg marker: Int, } perform Reader for BrokenReader { verb read(ins self: BrokenReader, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg reader = BrokenReader { marker: 0, }; erg output = Buffer[0]; erg writer = Cursor { buffer: output, position: 0, }; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+        "import { open io }; struct BrokenReader { erg marker: Int, } perform Reader for BrokenReader { verb read(ins self: BrokenReader, ins buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg reader = BrokenReader { marker: 0, }; erg output = Buffer[0]; erg writer = Cursor { buffer: output, position: 0, }; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, IoError.Unsupported => 1, IoError.PermissionDenied => 1, }, Result.Ok(_) => 1, }; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy reader error fixture should run");
@@ -455,7 +455,7 @@ fn std_io_native_copy_propagates_writer_failure() {
         "copy-writer-error",
         "open cursor;\nopen copy;\nopen reader;\nopen writer;\nopen error;\n",
         &["cursor.act", "copy.act", "reader.act", "writer.act", "error.act"],
-        "import { open io }; perform Writer for Int { verb write(ins self: Int, abs buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } verb flush(ins self: Int) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg input = Buffer[0]; append(input, 65); erg reader = Cursor { buffer: input, position: 0, }; erg writer = 0; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, }, Result.Ok(_) => 1, }; }\n",
+        "import { open io }; perform Writer for Int { verb write(ins self: Int, abs buffer: Buffer) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } verb flush(ins self: Int) -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); } } verb main() -> Int { erg input = Buffer[0]; append(input, 65); erg reader = Cursor { buffer: input, position: 0, }; erg writer = 0; erg result = copy_stream(reader: ins reader, writer: ins writer); return case dat result { Result.Err(error) => case dat error { IoError.Failed => 0, IoError.EndOfStream => 1, IoError.InvalidInput => 1, IoError.InvalidData => 1, IoError.Unsupported => 1, IoError.PermissionDenied => 1, }, Result.Ok(_) => 1, }; }\n",
     );
     build(&input, &output);
     let execution = Command::new(&output).output().expect("copy writer error fixture should run");
