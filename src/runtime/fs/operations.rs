@@ -37,6 +37,7 @@ pub(crate) const METADATA_VALUE_AVAILABLE: i32 = 0;
 pub(crate) const METADATA_VALUE_UNSUPPORTED: i32 = 1;
 pub(crate) const METADATA_VALUE_UNAVAILABLE: i32 = 2;
 pub(crate) const METADATA_IDENTITY_NONE: i32 = 0;
+#[cfg(unix)]
 pub(crate) const METADATA_IDENTITY_POSIX: i32 = 1;
 #[cfg(windows)]
 pub(crate) const METADATA_IDENTITY_WINDOWS: i32 = 2;

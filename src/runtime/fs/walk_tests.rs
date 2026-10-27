@@ -8,6 +8,7 @@ fn options(max_depth: u32, follow_symlinks: bool, error_policy: i32) -> WalkOpti
     WalkOptions { max_depth, follow_symlinks, include_hidden: false, order: 1, error_policy }
 }
 
+#[cfg(unix)]
 fn take_event(state: &mut WalkerState) -> PendingEvent {
     next_event(state).expect("walker should not fail").expect("event should exist")
 }

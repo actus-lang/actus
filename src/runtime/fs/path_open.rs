@@ -66,7 +66,9 @@ fn open_host_path(path: &Path, mode: u32) -> i64 {
     open_host_options(path, options, false)
 }
 
-fn open_host_options(path: &Path, mut options: std::fs::OpenOptions, close_on_exec: bool) -> i64 {
+fn open_host_options(path: &Path, options: std::fs::OpenOptions, close_on_exec: bool) -> i64 {
+    #[cfg(unix)]
+    let mut options = options;
     #[cfg(unix)]
     if close_on_exec {
         use std::os::unix::fs::OpenOptionsExt;

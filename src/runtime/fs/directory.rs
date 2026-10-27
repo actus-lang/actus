@@ -16,7 +16,7 @@ const DIRECTORY_MAX_ORDERED_ENTRIES: usize = 4096;
 const DIRECTORY_MAX_ENTRY_NAME_BYTES: usize = 4095;
 
 enum DirectoryState {
-    Native(ReadDir),
+    Native(Box<ReadDir>),
     Lexicographic { entries: Vec<PathBuf>, next: usize },
 }
 
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn actus_directory_open(path: *const ActusPath) -> i32 {
         return ABI_HANDLE_FAILURE as i32;
     }
     let Ok(mut table) = directories().lock() else { return ABI_HANDLE_FAILURE as i32 };
-    table.insert(handle, DirectoryState::Native(directory));
+    table.insert(handle, DirectoryState::Native(Box::new(directory)));
     handle
 }
 

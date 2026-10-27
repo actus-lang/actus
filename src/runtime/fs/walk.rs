@@ -41,7 +41,7 @@ struct WalkOptions {
 }
 
 enum WalkFrame {
-    Native { path: PathBuf, depth: u32, entries: ReadDir },
+    Native { path: PathBuf, depth: u32, entries: Box<ReadDir> },
     Ordered { path: PathBuf, depth: u32, entries: Vec<PathBuf>, next: usize },
 }
 
@@ -96,7 +96,7 @@ fn walkers() -> &'static Mutex<HashMap<i32, WalkerState>> {
 fn open_frame(path: PathBuf, depth: u32, order: i32) -> Result<WalkFrame, i32> {
     let directory = std::fs::read_dir(&path).map_err(|error| -error_code(&error))?;
     if order == 0 {
-        return Ok(WalkFrame::Native { path, depth, entries: directory });
+        return Ok(WalkFrame::Native { path, depth, entries: Box::new(directory) });
     }
     if order != 1 {
         return Err(-WALK_ERROR_FAILED);
