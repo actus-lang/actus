@@ -17,6 +17,7 @@ dependencies = [
  "serde_json",
  "target-lexicon",
  "toml",
+ "windows-sys",
 ]
 
 [[package]]

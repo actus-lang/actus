@@ -3,6 +3,10 @@ use super::super::path::ActusPath;
 use super::super::types::{ActusMetadata, BufferHandle};
 use super::path_bridge::{replace_output_path, with_host_path, with_host_paths};
 use super::{actus_handle, with_file};
+#[cfg(windows)]
+use std::os::windows::io::AsRawHandle;
+#[cfg(windows)]
+use windows_sys::Win32::Storage::FileSystem::GetFileInformationByHandle;
 
 pub(crate) const METADATA_VALUE_AVAILABLE: i32 = 0;
 pub(crate) const METADATA_VALUE_UNSUPPORTED: i32 = 1;
@@ -150,23 +154,26 @@ pub(super) fn same_file_identity(
     }
     #[cfg(windows)]
     {
-        use std::os::windows::fs::MetadataExt;
-        let Some(left_volume) = left.volume_serial_number() else {
-            return Err(IdentityError::Unsupported);
-        };
-        let Some(right_volume) = right.volume_serial_number() else {
-            return Err(IdentityError::Unsupported);
-        };
-        let Some(left_index) = left.file_index() else {
-            return Err(IdentityError::Unsupported);
-        };
-        let Some(right_index) = right.file_index() else {
-            return Err(IdentityError::Unsupported);
-        };
-        return Ok(left_volume == right_volume && left_index == right_index);
+        let left_identity = windows_file_identity(left)?;
+        let right_identity = windows_file_identity(right)?;
+        return Ok(left_identity == right_identity);
     }
     #[allow(unreachable_code)]
     Err(IdentityError::Unsupported)
+}
+
+#[cfg(windows)]
+fn windows_file_identity(path: &std::path::Path) -> Result<(u64, u64), IdentityError> {
+    let file = std::fs::File::open(path).map_err(|_| IdentityError::Failed)?;
+    let mut information = unsafe { std::mem::zeroed() };
+    let success = unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) };
+    if success == 0 {
+        return Err(IdentityError::Failed);
+    }
+    let volume = u64::from(information.dwVolumeSerialNumber);
+    let index =
+        (u64::from(information.nFileIndexHigh) << 32) | u64::from(information.nFileIndexLow);
+    Ok((volume, index))
 }
 
 /// Writes metadata for an already-open file handle into an output struct.
@@ -392,14 +399,8 @@ fn metadata_identity(metadata: &std::fs::Metadata) -> (u64, u64, i32, i32) {
     }
     #[cfg(windows)]
     {
-        use std::os::windows::fs::MetadataExt;
-        let Some(volume) = metadata.volume_serial_number() else {
-            return (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED);
-        };
-        let Some(index) = metadata.file_index() else {
-            return (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED);
-        };
-        return (u64::from(volume), index, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_AVAILABLE);
+        let _ = metadata;
+        return (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED);
     }
     #[allow(unreachable_code)]
     (0, 0, METADATA_IDENTITY_NONE, METADATA_VALUE_UNSUPPORTED)
