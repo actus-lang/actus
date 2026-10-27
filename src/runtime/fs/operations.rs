@@ -5,8 +5,33 @@ use super::path_bridge::{replace_output_path, with_host_path, with_host_paths};
 use super::{actus_handle, with_file};
 #[cfg(windows)]
 use std::os::windows::io::AsRawHandle;
+
 #[cfg(windows)]
-use windows_sys::Win32::Storage::FileSystem::GetFileInformationByHandle;
+#[repr(C)]
+struct WindowsFileInformation {
+    attributes: u32,
+    creation_time_low: u32,
+    creation_time_high: u32,
+    last_access_time_low: u32,
+    last_access_time_high: u32,
+    last_write_time_low: u32,
+    last_write_time_high: u32,
+    volume_serial_number: u32,
+    file_size_high: u32,
+    file_size_low: u32,
+    number_of_links: u32,
+    file_index_high: u32,
+    file_index_low: u32,
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetFileInformationByHandle(
+        handle: std::os::windows::io::RawHandle,
+        information: *mut WindowsFileInformation,
+    ) -> i32;
+}
 
 pub(crate) const METADATA_VALUE_AVAILABLE: i32 = 0;
 pub(crate) const METADATA_VALUE_UNSUPPORTED: i32 = 1;
@@ -145,10 +170,10 @@ pub(super) fn same_file_identity(
     left: &std::path::Path,
     right: &std::path::Path,
 ) -> Result<bool, IdentityError> {
-    let left = std::fs::metadata(left).map_err(|_| IdentityError::Failed)?;
-    let right = std::fs::metadata(right).map_err(|_| IdentityError::Failed)?;
     #[cfg(unix)]
     {
+        let left = std::fs::metadata(left).map_err(|_| IdentityError::Failed)?;
+        let right = std::fs::metadata(right).map_err(|_| IdentityError::Failed)?;
         use std::os::unix::fs::MetadataExt;
         return Ok(left.dev() == right.dev() && left.ino() == right.ino());
     }
@@ -165,14 +190,14 @@ pub(super) fn same_file_identity(
 #[cfg(windows)]
 fn windows_file_identity(path: &std::path::Path) -> Result<(u64, u64), IdentityError> {
     let file = std::fs::File::open(path).map_err(|_| IdentityError::Failed)?;
-    let mut information = unsafe { std::mem::zeroed() };
+    let mut information: WindowsFileInformation = unsafe { std::mem::zeroed() };
     let success = unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) };
     if success == 0 {
         return Err(IdentityError::Failed);
     }
-    let volume = u64::from(information.dwVolumeSerialNumber);
+    let volume = u64::from(information.volume_serial_number);
     let index =
-        (u64::from(information.nFileIndexHigh) << 32) | u64::from(information.nFileIndexLow);
+        (u64::from(information.file_index_high) << 32) | u64::from(information.file_index_low);
     Ok((volume, index))
 }
 
