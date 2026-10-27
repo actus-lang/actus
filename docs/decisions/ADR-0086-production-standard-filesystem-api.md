@@ -275,6 +275,11 @@ symlink(from, to)
 Recursive deletion is never implicit. Cross-device rename, overwrite policy,
 and link behavior are typed and documented.
 
+`create_dir` creates exactly one directory and never creates missing parents.
+`create_dir_all` creates each missing parent in order and treats already
+existing directories as success; neither operation replaces a file-shaped
+component or performs recursive deletion.
+
 For durable publication, the library provides:
 
 ```act

@@ -1,0 +1,123 @@
+"""Mirrored strict coverage for explicit parent-directory creation."""
+import {
+    open std::fs,
+    std::path,
+};
+
+verb relative_fixture_path(erg depth: u8) -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 103u8);
+    append(raw, 56u8);
+    append(raw, 45u8);
+    append(raw, 114u8);
+    append(raw, 111u8);
+    append(raw, 111u8);
+    append(raw, 116u8);
+    if depth >= 1u8 {
+        append(raw, 47u8);
+        append(raw, 99u8);
+        append(raw, 104u8);
+        append(raw, 105u8);
+        append(raw, 108u8);
+        append(raw, 100u8);
+    }
+    if depth >= 2u8 {
+        append(raw, 47u8);
+        append(raw, 103u8);
+        append(raw, 114u8);
+        append(raw, 97u8);
+        append(raw, 110u8);
+        append(raw, 100u8);
+    }
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb remove_fixture(erg depth: u8) -> Int {
+    erg path_result = relative_fixture_path(depth: erg depth);
+    return case dat path_result {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg removed = fs::remove_dir(path: abs path);
+            drop(removed);
+            return 0;
+        },
+    };
+}
+
+verb exercise_directory_chain(
+    dat nested: path::Path,
+    erg deepest: u8,
+    erg middle: u8,
+    erg root_depth: u8
+) -> Int {
+    erg first = fs::create_dir_all(path: abs nested);
+    return case dat first {
+        Result.Err(_) => {
+            remove_fixture(depth: erg deepest);
+            remove_fixture(depth: erg middle);
+            remove_fixture(depth: erg root_depth);
+            return 2;
+        },
+        Result.Ok(_) => {
+            erg second = fs::create_dir_all(path: abs nested);
+            return case dat second {
+                Result.Err(_) => {
+                    remove_fixture(depth: erg deepest);
+                    remove_fixture(depth: erg middle);
+                    remove_fixture(depth: erg root_depth);
+                    return 3;
+                },
+                Result.Ok(_) => {
+                    erg removed_nested = fs::remove_dir(path: abs nested);
+                    return case dat removed_nested {
+                        Result.Err(_) => {
+                            remove_fixture(depth: erg middle);
+                            remove_fixture(depth: erg root_depth);
+                            return 4;
+                        },
+                        Result.Ok(_) => {
+                            erg removed_child = remove_fixture(depth: erg middle);
+                            return case removed_child {
+                                0 => {
+                                    erg removed_root = remove_fixture(depth: erg root_depth);
+                                    return case removed_root {
+                                        0 => 0,
+                                        _ => 6,
+                                    };
+                                },
+                                _ => 5,
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb create_dir_all_creates_and_reuses_parent_chain() -> Int {
+    erg deepest: u8 = 2u8;
+    erg middle: u8 = 1u8;
+    erg root_depth: u8 = 0u8;
+    remove_fixture(depth: erg deepest);
+    remove_fixture(depth: erg middle);
+    remove_fixture(depth: erg root_depth);
+    erg nested_result = relative_fixture_path(depth: erg deepest);
+    return case dat nested_result {
+        Result.Err(_) => 1,
+        Result.Ok(nested) => exercise_directory_chain(
+            nested: dat nested,
+            deepest: erg deepest,
+            middle: erg middle,
+            root_depth: erg root_depth
+        ),
+    };
+}

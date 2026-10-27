@@ -62,6 +62,16 @@ converted string; the facade maps `-1` to `IoError.Failed`.
 unsafe extern "C" verb actus_file_create_dir_path(abs path: path_module::Path) -> Int;
 
 """
+Create `path` and every missing parent directory.
+
+The path is borrowed for one native call and is not retained. Zero means the
+complete directory chain exists after return; `-1` means the host rejected
+creation or encountered a provider failure. Existing directories are accepted
+as success, while no file-shaped component is removed or replaced.
+"""
+unsafe extern "C" verb actus_file_create_dir_all_path(abs path: path_module::Path) -> Int;
+
+"""
 Remove the empty directory named by `path`.
 
 The path is borrowed for the call. The bridge returns zero on success or
@@ -195,6 +205,21 @@ missing parents are never created implicitly.
 """
 open verb create_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_create_dir_path(path: abs path);
+    return fs_status(status: erg status);
+}
+
+"""
+Create a directory chain rooted at `path`.
+
+`path` is an immutable `abs` view borrowed only during the native operation.
+Missing parents are created in order, existing directories are harmless, and
+no path storage or filesystem handle is retained. `Ok(0)` means the complete
+chain exists; `Err(IoError.Failed)` reports a missing permission, file-shaped
+component, invalid path, or provider failure without deleting or replacing
+anything.
+"""
+open verb create_dir_all(abs path: path_module::Path) -> Result[Int, io::IoError] {
+    erg status = actus_file_create_dir_all_path(path: abs path);
     return fs_status(status: erg status);
 }
 

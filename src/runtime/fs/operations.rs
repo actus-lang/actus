@@ -274,6 +274,17 @@ pub unsafe extern "C" fn actus_file_create_dir_path(path: *const ActusPath) -> i
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
+/// Creates a directory and all missing parents at a validated path.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_create_dir_all_path(path: *const ActusPath) -> i32 {
+    unsafe { with_host_path(path, |value| std::fs::create_dir_all(value)) }
+        .and_then(Result::ok)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
+}
+
 /// Removes one empty directory at the requested path.
 ///
 /// # Safety
