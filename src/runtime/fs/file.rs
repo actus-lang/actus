@@ -411,4 +411,14 @@ mod windows_handles {
     pub fn get(id: i32) -> Option<i64> {
         table().lock().ok()?.get(&id).copied()
     }
+    pub fn remove(id: i32) {
+        if let Ok(mut handles) = table().lock() {
+            handles.remove(&id);
+        }
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn remove_actus_handle(handle: i32) {
+    windows_handles::remove(handle);
 }

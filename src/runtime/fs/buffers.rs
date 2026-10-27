@@ -1,5 +1,7 @@
 use std::io::Read;
 
+#[cfg(windows)]
+use super::super::contract::ABI_STATUS_SUCCESS;
 use super::super::contract::{ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
 use super::super::types::BufferHandle;
 use super::file::{
@@ -159,5 +161,15 @@ pub extern "C" fn actus_file_sync_all_buffer(handle: i32) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_close_buffer(handle: i32) -> i32 {
+    #[cfg(windows)]
+    {
+        let native = super::file::actus_handle(handle);
+        let status = actus_file_close(native);
+        if status == ABI_STATUS_SUCCESS {
+            super::file::remove_actus_handle(handle);
+        }
+        return status;
+    }
+    #[cfg(not(windows))]
     actus_file_close(super::file::actus_handle(handle))
 }
