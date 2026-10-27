@@ -7,6 +7,53 @@ const WHENCE_START: i32 = 0;
 const WHENCE_CURRENT: i32 = 1;
 const WHENCE_END: i32 = 2;
 
+pub(crate) const FILE_STATUS_BUSY: i32 = -3;
+pub(crate) const FILE_STATUS_UNSUPPORTED: i32 = -2;
+
+#[cfg(unix)]
+const LOCK_SH: i32 = 1;
+#[cfg(unix)]
+const LOCK_EX: i32 = 2;
+#[cfg(unix)]
+const LOCK_NB: i32 = 4;
+#[cfg(unix)]
+const LOCK_UN: i32 = 8;
+
+#[cfg(unix)]
+unsafe extern "C" {
+    fn flock(fd: i32, operation: i32) -> i32;
+}
+
+#[cfg(windows)]
+#[repr(C)]
+struct WindowsOverlapped {
+    internal: usize,
+    internal_high: usize,
+    offset: u32,
+    offset_high: u32,
+    event: *mut std::ffi::c_void,
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn LockFileEx(
+        file: *mut std::ffi::c_void,
+        flags: u32,
+        reserved: u32,
+        bytes_low: u32,
+        bytes_high: u32,
+        overlapped: *mut WindowsOverlapped,
+    ) -> i32;
+    fn UnlockFileEx(
+        file: *mut std::ffi::c_void,
+        reserved: u32,
+        bytes_low: u32,
+        bytes_high: u32,
+        overlapped: *mut WindowsOverlapped,
+    ) -> i32;
+}
+
 /// Opens a host file using the stable pointer-and-length C ABI.
 ///
 /// # Safety
@@ -108,6 +155,117 @@ pub extern "C" fn actus_file_close(handle: i64) -> i32 {
         return ABI_STATUS_FAILURE;
     }
     close_file(handle)
+}
+
+/// Acquires a shared advisory lock on the complete file.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_lock_shared(handle: i64) -> i32 {
+    advisory_lock(handle, false, false)
+}
+
+/// Acquires an exclusive advisory lock on the complete file.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_lock_exclusive(handle: i64) -> i32 {
+    advisory_lock(handle, true, false)
+}
+
+/// Attempts an exclusive advisory lock without waiting for another owner.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_try_lock(handle: i64) -> i32 {
+    advisory_lock(handle, true, true)
+}
+
+/// Releases the advisory lock associated with the complete file.
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_unlock(handle: i64) -> i32 {
+    if handle < 0 {
+        return ABI_STATUS_FAILURE;
+    }
+    #[cfg(unix)]
+    {
+        return if unsafe { flock(handle as i32, LOCK_UN) } == 0 {
+            ABI_STATUS_SUCCESS
+        } else {
+            map_lock_error()
+        };
+    }
+    #[cfg(windows)]
+    {
+        let mut overlapped = WindowsOverlapped {
+            internal: 0,
+            internal_high: 0,
+            offset: 0,
+            offset_high: 0,
+            event: std::ptr::null_mut(),
+        };
+        return if unsafe {
+            UnlockFileEx(handle as *mut std::ffi::c_void, 0, u32::MAX, u32::MAX, &mut overlapped)
+        } == 0
+        {
+            map_lock_error()
+        } else {
+            ABI_STATUS_SUCCESS
+        };
+    }
+    #[allow(unreachable_code)]
+    FILE_STATUS_UNSUPPORTED
+}
+
+fn advisory_lock(handle: i64, exclusive: bool, non_blocking: bool) -> i32 {
+    if handle < 0 {
+        return ABI_STATUS_FAILURE;
+    }
+    #[cfg(unix)]
+    {
+        let mut operation = if exclusive { LOCK_EX } else { LOCK_SH };
+        if non_blocking {
+            operation |= LOCK_NB;
+        }
+        return if unsafe { flock(handle as i32, operation) } == 0 {
+            ABI_STATUS_SUCCESS
+        } else {
+            map_lock_error()
+        };
+    }
+    #[cfg(windows)]
+    {
+        let mut flags = if exclusive { 2 } else { 0 };
+        if non_blocking {
+            flags |= 1;
+        }
+        let mut overlapped = WindowsOverlapped {
+            internal: 0,
+            internal_high: 0,
+            offset: 0,
+            offset_high: 0,
+            event: std::ptr::null_mut(),
+        };
+        return if unsafe {
+            LockFileEx(
+                handle as *mut std::ffi::c_void,
+                flags,
+                0,
+                u32::MAX,
+                u32::MAX,
+                &mut overlapped,
+            )
+        } == 0
+        {
+            map_lock_error()
+        } else {
+            ABI_STATUS_SUCCESS
+        };
+    }
+    #[allow(unreachable_code)]
+    FILE_STATUS_UNSUPPORTED
+}
+
+fn map_lock_error() -> i32 {
+    if std::io::Error::last_os_error().kind() == std::io::ErrorKind::WouldBlock {
+        FILE_STATUS_BUSY
+    } else {
+        ABI_STATUS_FAILURE
+    }
 }
 
 /// Moves a host file cursor and returns its resulting absolute position.

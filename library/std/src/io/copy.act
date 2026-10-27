@@ -27,6 +27,7 @@ open verb copy_write_error(dat error: IoError) -> Result[Int, IoError] {
         IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
         IoError.Unsupported => Result[Int, IoError].Err(IoError.Unsupported),
         IoError.PermissionDenied => Result[Int, IoError].Err(IoError.PermissionDenied),
+        IoError.Busy => Result[Int, IoError].Err(IoError.Busy),
     };
 }
 
@@ -44,6 +45,7 @@ open verb copy_read_error(dat error: IoError, erg total: Int) -> Result[Int, IoE
         IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
         IoError.Unsupported => Result[Int, IoError].Err(IoError.Unsupported),
         IoError.PermissionDenied => Result[Int, IoError].Err(IoError.PermissionDenied),
+        IoError.Busy => Result[Int, IoError].Err(IoError.Busy),
     };
 }
 

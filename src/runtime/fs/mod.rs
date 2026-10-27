@@ -17,8 +17,9 @@ pub use directory::{
     actus_directory_open_ordered,
 };
 pub use file::{
-    actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_seek,
-    actus_file_seek_buffer, actus_file_sync_all, actus_file_sync_data, actus_file_write,
+    actus_file_close, actus_file_flush, actus_file_lock_exclusive, actus_file_lock_shared,
+    actus_file_open, actus_file_read, actus_file_seek, actus_file_seek_buffer, actus_file_sync_all,
+    actus_file_sync_data, actus_file_try_lock, actus_file_unlock, actus_file_write,
 };
 pub use operations::{
     actus_file_canonicalize_path, actus_file_copy_buffer, actus_file_copy_path,

@@ -325,7 +325,7 @@ runtime mapping tests.
       native operation as implicit success for the complete buffer.
 - [x] Add bounded file-copy and file-stream operations without loading an
       entire file into memory.
-- [ ] Add file locking or an explicit unsupported result for targets that do
+- [x] Add file locking or an explicit unsupported result for targets that do
       not provide advisory locks.
 - [x] Add durable sync operations for data and metadata where supported.
 - [ ] Add tests for concurrent open modes, short I/O, EOF, locks, flush, and
@@ -339,8 +339,10 @@ targets. `copy_file` and the fixed-buffer `io::copy_stream` avoid whole-file
 loading. `file_sync_data` and `file_sync_all` are exposed through the hosted
 facade, runtime bridges, and buffer ABI adapters. Strict file/operations
 fixtures and platform-selected Unix/Windows option fixtures cover the public
-contract. Advisory locking and the broader concurrent open/short-I/O/flush/
-persistence regression matrix remain open.
+contract. POSIX and Windows lock backends now cover shared, exclusive,
+non-blocking, and unlock operations; contention is `IoError.Busy` and targets
+without a backend return `IoError.Unsupported`. The broader concurrent
+open/short-I/O/flush/persistence regression matrix remains open.
 
 ## Gate 8: Mutation, publication, and recovery operations
 

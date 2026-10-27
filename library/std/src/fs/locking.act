@@ -1,0 +1,80 @@
+"""Typed advisory-locking surface for hosted file handles."""
+import io;
+
+"""Acquire a shared lock on the complete host file; zero is success, `-2` is
+unsupported, `-3` is busy, and `-1` is another provider failure."""
+unsafe extern "C" verb actus_file_lock_shared(abs handle: Int) -> Int;
+
+"""Acquire an exclusive lock on the complete host file with the same status
+contract as the shared-lock bridge."""
+unsafe extern "C" verb actus_file_lock_exclusive(abs handle: Int) -> Int;
+
+"""Attempt an exclusive lock without waiting; `-3` reports contention."""
+unsafe extern "C" verb actus_file_try_lock(abs handle: Int) -> Int;
+
+"""Release the complete-file lock; zero is success and `-1` is failure."""
+unsafe extern "C" verb actus_file_unlock(abs handle: Int) -> Int;
+
+"""
+Translate one native advisory-lock status into the public typed result.
+
+`status` is consumed as an integer value and never retained. Zero and other
+non-negative statuses become `Ok(status)`; `-1` is a provider failure, `-2`
+is an unavailable platform capability, and `-3` is lock contention. This
+adapter performs no I/O, allocation, retry, or ownership transfer.
+"""
+open verb lock_status(erg status: Int) -> Result[Int, io::IoError] {
+    return case status {
+        -1 => Err(io::IoError.Failed),
+        -2 => Err(io::IoError.Unsupported),
+        -3 => Err(io::IoError.Busy),
+        _ => Ok(status),
+    };
+}
+
+"""
+Request a shared advisory lock without hiding unsupported targets.
+
+`file` remains owned by the caller through an exclusive loan and no path,
+handle, or buffer is transferred. `Ok(0)` means the complete file is shared
+locked; `Busy` and provider failures remain typed errors.
+"""
+open verb file_lock_shared(ins file: File) -> Result[Int, io::IoError] {
+    erg status = actus_file_lock_shared(handle: abs file.handle);
+    return lock_status(status: erg status);
+}
+
+"""
+Request an exclusive advisory lock without weakening the error contract.
+
+The borrowed file stays open and caller-owned; this operation performs no
+allocation and does not mutate file contents. `Ok(0)` confirms acquisition;
+`Err(IoError.Busy)` or another typed error confirms that it was not acquired.
+"""
+open verb file_lock_exclusive(ins file: File) -> Result[Int, io::IoError] {
+    erg status = actus_file_lock_exclusive(handle: abs file.handle);
+    return lock_status(status: erg status);
+}
+
+"""
+Try to acquire an exclusive advisory lock immediately.
+
+The operation does not wait, allocate, or transfer the file handle. `Ok(0)`
+confirms immediate acquisition; `Err(IoError.Busy)` reports contention without
+blocking.
+"""
+open verb file_try_lock(ins file: File) -> Result[Int, io::IoError] {
+    erg status = actus_file_try_lock(handle: abs file.handle);
+    return lock_status(status: erg status);
+}
+
+"""
+Release the advisory lock associated with a file handle.
+
+The file remains caller-owned and open. `Ok(0)` confirms release; failure is
+returned as a typed error rather than silently ignored.
+"""
+open verb file_unlock(ins file: File) -> Result[Int, io::IoError] {
+    erg status = actus_file_unlock(handle: abs file.handle);
+    return lock_status(status: erg status);
+}

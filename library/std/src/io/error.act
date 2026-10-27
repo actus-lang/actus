@@ -19,4 +19,6 @@ open enum IoError {
     Unsupported,
     """The host rejected the operation because the caller lacks permission."""
     PermissionDenied,
+    """Another owner currently holds an exclusive advisory resource lock."""
+    Busy,
 }

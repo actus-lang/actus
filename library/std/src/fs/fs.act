@@ -14,6 +14,9 @@ open links;
 """Re-export typed readonly and permission inspection operations."""
 open permissions;
 
+"""Re-export typed advisory-locking operations."""
+open locking;
+
 """Re-export path-based filesystem operations and typed statuses."""
 open operations;
 

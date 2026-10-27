@@ -319,6 +319,11 @@ unlock(file)
 
 Temporary creation uses unique names and create-new semantics. Locking and
 sharing behavior are capability-checked, and stale-lock policy is explicit.
+The standard library exposes shared, exclusive, try-lock, and unlock verbs.
+POSIX uses `flock`; Windows uses `LockFileEx` and `UnlockFileEx`. The complete
+file range is locked, non-blocking contention returns `IoError.Busy`, and
+provider failures remain typed. Targets without an advisory-lock primitive
+return `IoError.Unsupported`; no backend reports a false lock success.
 
 ### Errors and limits
 

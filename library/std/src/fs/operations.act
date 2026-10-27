@@ -290,6 +290,7 @@ open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoE
         io::IoError.InvalidData => Result[Buffer, io::IoError].Err(io::IoError.InvalidData),
         io::IoError.Unsupported => Result[Buffer, io::IoError].Err(io::IoError.Unsupported),
         io::IoError.PermissionDenied => Result[Buffer, io::IoError].Err(io::IoError.PermissionDenied),
+        io::IoError.Busy => Result[Buffer, io::IoError].Err(io::IoError.Busy),
     };
 }
 
