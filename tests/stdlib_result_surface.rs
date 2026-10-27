@@ -54,6 +54,15 @@ fn check_verb(path: &Path, verb: &VerbDecl, infallible: &BTreeSet<&'static str>)
 fn infallible_verbs() -> BTreeSet<&'static str> {
     [
         "path_error_from_status",
+        "directory_entry_is_file",
+        "directory_entry_is_dir",
+        "directory_entry_is_symlink",
+        "directory_entry_file_type",
+        "metadata_absent",
+        "copy_options_new",
+        "copy_options_overwrite",
+        "copy_options_preserve_metadata",
+        "temporary_file_status",
         "windows_is_separator",
         "posix_is_separator",
         "is_absolute",
