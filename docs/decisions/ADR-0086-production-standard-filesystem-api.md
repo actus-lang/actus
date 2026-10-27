@@ -449,6 +449,20 @@ file. It must preserve the last valid manifest after an intermediate failure
 and emit per-file plus aggregate metrics. It must never add one configuration
 entry per generated artifact or input file.
 
+### Gate 8.1 implementation boundary
+
+The compiler test runner may link a dedicated fault-enabled runtime archive
+when a test declares one typed publication fault. The ordinary runtime archive
+must not export or consult that control channel. Fault selection belongs to the
+test runner and child-process setup; the standard filesystem facade exposes no
+fault verb and application code cannot select a fault in a production build.
+
+The first implementation must preserve the existing Actus publication path
+and inject only at the native phase boundary: write count, flush, rename,
+parent-directory sync, or process interruption. Each fault is one-shot and
+scoped to one child test process. The fixture must assert the resulting
+publication state rather than merely checking an error code.
+
 ## Rejected alternatives
 
 1. Returning `Array[Path, N]` from `read_dir`: rejected because it imposes an

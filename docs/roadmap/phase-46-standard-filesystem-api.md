@@ -396,6 +396,28 @@ True truncated-write, flush-failure, and interrupted-process injection remain
 open because the production runtime intentionally exposes no fault-injection
 control surface.
 
+## Gate 8.1: Test-only publication fault injection
+
+- [ ] Add a dedicated test-runtime build profile; production runtime archives
+      must not contain fault controls.
+- [ ] Add typed test metadata for one scoped publication fault per test:
+      short-write, flush failure, rename failure, parent-sync failure, and
+      interrupted publication.
+- [ ] Pass the selected fault from the test runner to the child process through
+      a private test ABI or equivalent scoped channel, never through a public
+      standard-library verb or mutable production global.
+- [ ] Consume each injected fault deterministically at the named filesystem
+      phase and leave all non-selected phases unchanged.
+- [ ] Add mirrored strict fixtures proving active-destination preservation,
+      staging cleanup, post-rename publication state, and interrupted-process
+      behavior for every fault kind.
+- [ ] Prove that ordinary release builds reject or omit the test fault channel
+      and retain the existing filesystem ABI.
+
+Gate 8.1 is intentionally separate from ordinary filesystem behavior. Its
+purpose is to verify failure semantics of the existing publication contract,
+not to add operational fault switches to applications.
+
 ## Gate 9: Links, permissions, and platform capabilities
 
 - [ ] Add read-only symlink inspection and explicit symlink creation where
