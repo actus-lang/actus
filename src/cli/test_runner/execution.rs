@@ -1,7 +1,12 @@
 use std::fs;
 use std::time::Instant;
 
-use crate::ast::{Block, Expr, Stmt, TopLevelDecl, TypeName, VerbDecl};
+use crate::ast::{
+    Argument, ArgumentRoleResolution, Block, Expr, Role, Stmt, TestFault, TopLevelDecl, TypeName,
+    VerbDecl,
+};
+#[cfg(feature = "test-fault-injection")]
+use crate::ast::{DispatchMode, ExternalVerbDecl, ForeignAbi, Param};
 use crate::codegen::link_objects;
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::SourceSpan;
@@ -64,6 +69,12 @@ fn report_test_result(
             false
         }
         Ok(TestProcessResult::Signaled) => {
+            if test.fault == Some(TestFault::InterruptedPublication) {
+                let status =
+                    output_style.success(&format!("ok ({elapsed} ms, expected interruption)"));
+                println!("test {}::{} ... {status}", test.module, test.name);
+                return true;
+            }
             let status =
                 output_style.failure(&format!("FAILED ({elapsed} ms, terminated by signal)"));
             println!("test {}::{} ... {status}", test.module, test.name);
@@ -143,7 +154,20 @@ fn test_compilation_plan(
     {
         return Err("meta test program already defines `main`".to_owned());
     }
-    program.declarations.push(test_main(&test.name));
+    if let Some(fault) = test.fault {
+        #[cfg(not(feature = "test-fault-injection"))]
+        return Err(format!(
+            "test `{}` declares fault `{}`; rebuild Actus with `--features test-fault-injection`",
+            test.name,
+            fault.name()
+        ));
+        #[cfg(feature = "test-fault-injection")]
+        {
+            let _ = fault;
+            program.declarations.push(test_fault_declaration());
+        }
+    }
+    program.declarations.push(test_main(&test.name, test.fault));
     if let Some(plan) = &test.compilation_plan {
         return Ok(plan.with_caller_program(program));
     }
@@ -230,8 +254,73 @@ fn remove_artifact(path: &std::path::Path) -> Result<(), String> {
     }
 }
 
-fn test_main(name: &str) -> TopLevelDecl {
+#[cfg(feature = "test-fault-injection")]
+fn test_fault_declaration() -> TopLevelDecl {
     let span = SourceSpan::new(0, 0);
+    TopLevelDecl::ExternalVerb(ExternalVerbDecl {
+        is_open: false,
+        doc: None,
+        contract: None,
+        unsafe_boundary: true,
+        module_import: false,
+        abi: ForeignAbi::C,
+        metadata: Vec::new(),
+        name: "actus_test_publication_fault".to_owned(),
+        native_symbol: None,
+        generic_parameters: Vec::new(),
+        params: vec![Param {
+            role: Role::Abs,
+            name: "code".to_owned(),
+            dispatch: DispatchMode::Static,
+            ty: TypeName {
+                name: "Int".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span,
+            },
+            span,
+        }],
+        return_type: Some(crate::ast::ReturnType {
+            access: crate::ast::ReturnAccess::Owned,
+            ty: TypeName {
+                name: "Int".to_owned(),
+                arguments: Vec::new(),
+                reference_role: None,
+                span,
+            },
+            span,
+        }),
+        span,
+    })
+}
+
+fn test_main(name: &str, fault: Option<TestFault>) -> TopLevelDecl {
+    let span = SourceSpan::new(0, 0);
+    let mut statements = Vec::new();
+    if let Some(fault) = fault {
+        statements.push(Stmt::Expression {
+            expression: Expr::Call {
+                callee: "actus_test_publication_fault".to_owned(),
+                arguments: vec![Argument {
+                    name: None,
+                    role: Some(Role::Abs),
+                    role_span: None,
+                    role_resolution: ArgumentRoleResolution::Explicit,
+                    expression: Expr::Integer {
+                        value: fault.code().to_string(),
+                        suffix: None,
+                        span,
+                    },
+                }],
+                span,
+            },
+            span,
+        });
+    }
+    statements.push(Stmt::Return {
+        value: Some(Expr::Call { callee: name.to_owned(), arguments: Vec::new(), span }),
+        span,
+    });
     TopLevelDecl::Verb(VerbDecl {
         is_open: false,
         doc: None,
@@ -250,13 +339,7 @@ fn test_main(name: &str) -> TopLevelDecl {
             },
             span,
         }),
-        body: Block {
-            statements: vec![Stmt::Return {
-                value: Some(Expr::Call { callee: name.to_owned(), arguments: Vec::new(), span }),
-                span,
-            }],
-            span,
-        },
+        body: Block { statements, span },
         span,
     })
 }

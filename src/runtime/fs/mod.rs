@@ -7,6 +7,8 @@ mod path_bridge;
 mod path_open;
 mod publication;
 mod temporary;
+#[cfg(actus_test_faults)]
+mod test_faults;
 mod walk;
 
 pub use buffers::{

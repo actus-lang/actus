@@ -93,13 +93,11 @@ fn copy_file_with_policy(
             return Err(error);
         }
     };
-    if preserve_metadata {
-        if let Err(error) = output.set_permissions(source_metadata.permissions()) {
-            if !overwrite {
-                let _ = std::fs::remove_file(destination);
-            }
-            return Err(error);
+    if preserve_metadata && let Err(error) = output.set_permissions(source_metadata.permissions()) {
+        if !overwrite {
+            let _ = std::fs::remove_file(destination);
         }
+        return Err(error);
     }
     Ok(copied)
 }

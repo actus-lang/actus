@@ -1,4 +1,6 @@
-use crate::ast::{DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, VerbDecl};
+use crate::ast::{
+    DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, TestFault, VerbDecl,
+};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
 
@@ -152,6 +154,30 @@ impl Parser {
     }
 
     fn reject_duplicate_metadata(&self, metadata: &[MetaAttribute]) -> Result<(), ParseError> {
+        let Some((index, fault)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
+            if let MetaAttribute::Fault(fault) = attribute { Some((index, fault)) } else { None }
+        }) else {
+            return self.reject_duplicate_limitless_metadata(metadata);
+        };
+        if metadata[index + 1..]
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Fault(_)))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata {
+                    name: format!("fault(\"{}\")", fault.name()),
+                },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
+        self.reject_duplicate_limitless_metadata(metadata)
+    }
+
+    fn reject_duplicate_limitless_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
         let Some((index, scope)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
             matches!(attribute, MetaAttribute::Limitless(LimitlessScope::Verb))
                 .then_some((index, "limitless"))
@@ -251,6 +277,7 @@ impl Parser {
                 Ok(vec![MetaAttribute::Test])
             }
             "target" => self.parse_target_metadata(),
+            "fault" => self.parse_fault_metadata(),
             "limitless" => self.parse_limitless_metadata(),
             name => Err(ParseError {
                 code: ParseErrorCode::UnknownMetadata,
@@ -258,6 +285,31 @@ impl Parser {
                 span: attribute.span,
             }),
         }
+    }
+
+    fn parse_fault_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
+        self.expect_simple(TokenKind::LeftParen, "`(` after `fault`")?;
+        let fault_token = self.advance_required("fault name string")?;
+        let fault = match fault_token.kind {
+            TokenKind::StringLiteral(name) => TestFault::parse(&name).ok_or(ParseError {
+                code: ParseErrorCode::UnknownMetadata,
+                kind: ParseErrorKind::UnknownMetadata { name },
+                span: fault_token.span,
+            })?,
+            found => {
+                return Err(ParseError {
+                    code: ParseErrorCode::UnexpectedToken,
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: "a publication fault name string".to_owned(),
+                        found,
+                    },
+                    span: fault_token.span,
+                });
+            }
+        };
+        self.expect_simple(TokenKind::RightParen, "`)` after fault name")?;
+        let _ = self.match_simple(TokenKind::Semicolon);
+        Ok(vec![MetaAttribute::Fault(fault)])
     }
 
     fn parse_limitless_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {

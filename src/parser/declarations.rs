@@ -455,6 +455,7 @@ fn target_selector(attribute: &crate::ast::MetaAttribute) -> Option<&str> {
     match attribute {
         crate::ast::MetaAttribute::Target(selector) => Some(selector),
         crate::ast::MetaAttribute::Test => None,
+        crate::ast::MetaAttribute::Fault(_) => None,
         crate::ast::MetaAttribute::Limitless(_) => None,
     }
 }

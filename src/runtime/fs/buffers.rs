@@ -129,6 +129,10 @@ pub unsafe extern "C" fn actus_file_write_buffer(handle: i32, buffer: BufferHand
     if buffer.length > 0 && buffer.data.is_null() {
         return ABI_STATUS_FAILURE;
     }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_SHORT_WRITE) {
+        return i32::try_from(buffer.length.saturating_sub(1)).unwrap_or(ABI_STATUS_FAILURE);
+    }
     let bytes =
         unsafe { actus_file_write(super::file::actus_handle(handle), buffer.data, buffer.length) };
     i32::try_from(bytes).unwrap_or(ABI_STATUS_FAILURE)

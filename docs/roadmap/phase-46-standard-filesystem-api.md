@@ -398,25 +398,34 @@ control surface.
 
 ## Gate 8.1: Test-only publication fault injection
 
-- [ ] Add a dedicated test-runtime build profile; production runtime archives
+- [x] Add a dedicated test-runtime build profile; production runtime archives
       must not contain fault controls.
-- [ ] Add typed test metadata for one scoped publication fault per test:
+- [x] Add typed test metadata for one scoped publication fault per test:
       short-write, flush failure, rename failure, parent-sync failure, and
       interrupted publication.
-- [ ] Pass the selected fault from the test runner to the child process through
+- [x] Pass the selected fault from the test runner to the child process through
       a private test ABI or equivalent scoped channel, never through a public
       standard-library verb or mutable production global.
-- [ ] Consume each injected fault deterministically at the named filesystem
+- [x] Consume each injected fault deterministically at the named filesystem
       phase and leave all non-selected phases unchanged.
-- [ ] Add mirrored strict fixtures proving active-destination preservation,
+- [x] Add mirrored strict fixtures proving active-destination preservation,
       staging cleanup, post-rename publication state, and interrupted-process
       behavior for every fault kind.
-- [ ] Prove that ordinary release builds reject or omit the test fault channel
+- [x] Prove that ordinary release builds reject or omit the test fault channel
       and retain the existing filesystem ABI.
 
 Gate 8.1 is intentionally separate from ordinary filesystem behavior. Its
 purpose is to verify failure semantics of the existing publication contract,
 not to add operational fault switches to applications.
+
+Gate 8.1 implementation evidence (2026-10-27): the `test-fault-injection`
+compiler feature builds a separate runtime archive containing a private
+one-shot fault ABI. Typed `meta fault(...)` metadata causes the test runner to
+inject short-write, flush, rename, parent-sync, or interruption faults into one
+child process. The Unix publication fixture passes 10/10, including expected
+interruption handling; the ordinary release archive contains no fault symbol
+and rejects fault-bearing tests with an explicit rebuild diagnostic. The
+ordinary runtime path remains unchanged.
 
 ## Gate 9: Links, permissions, and platform capabilities
 

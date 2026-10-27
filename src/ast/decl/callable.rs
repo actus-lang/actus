@@ -65,7 +65,50 @@ pub enum VerbContractSectionKind {
 pub enum MetaAttribute {
     Test,
     Target(String),
+    Fault(TestFault),
     Limitless(LimitlessScope),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TestFault {
+    ShortWrite,
+    FlushFailure,
+    RenameFailure,
+    ParentSyncFailure,
+    InterruptedPublication,
+}
+
+impl TestFault {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::ShortWrite => "short_write",
+            Self::FlushFailure => "flush_failure",
+            Self::RenameFailure => "rename_failure",
+            Self::ParentSyncFailure => "parent_sync_failure",
+            Self::InterruptedPublication => "interrupted_publication",
+        }
+    }
+
+    pub const fn code(self) -> i32 {
+        match self {
+            Self::ShortWrite => 1,
+            Self::FlushFailure => 2,
+            Self::RenameFailure => 3,
+            Self::ParentSyncFailure => 4,
+            Self::InterruptedPublication => 5,
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "short_write" => Some(Self::ShortWrite),
+            "flush_failure" => Some(Self::FlushFailure),
+            "rename_failure" => Some(Self::RenameFailure),
+            "parent_sync_failure" => Some(Self::ParentSyncFailure),
+            "interrupted_publication" => Some(Self::InterruptedPublication),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -357,6 +357,7 @@ fn declarations(
             let active = metadata.iter().all(|attribute| match attribute {
                 MetaAttribute::Target(selector) => target.matches_platform(selector),
                 MetaAttribute::Test => true,
+                MetaAttribute::Fault(_) => true,
                 MetaAttribute::Limitless(_) => true,
             });
             let limitless = if program.file_metadata.contains(&crate::ast::LimitlessScope::File) {

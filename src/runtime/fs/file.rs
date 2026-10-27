@@ -109,6 +109,10 @@ pub extern "C" fn actus_file_flush(handle: i64) -> i32 {
     if handle < 0 {
         return ABI_STATUS_FAILURE;
     }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_FLUSH_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
     with_file(handle, |file| {
         if file.flush().is_ok() {
             i64::from(ABI_STATUS_SUCCESS)

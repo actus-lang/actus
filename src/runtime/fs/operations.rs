@@ -226,10 +226,20 @@ pub unsafe extern "C" fn actus_file_rename_path(
     from: *const ActusPath,
     to: *const ActusPath,
 ) -> i32 {
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_RENAME_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
     match unsafe {
         with_host_paths(from, to, |source, destination| std::fs::rename(source, destination))
     } {
-        Some(Ok(())) => ABI_STATUS_SUCCESS,
+        Some(Ok(())) => {
+            #[cfg(actus_test_faults)]
+            if super::test_faults::take_fault(super::test_faults::FAULT_INTERRUPTED_PUBLICATION) {
+                std::process::abort();
+            }
+            ABI_STATUS_SUCCESS
+        }
         Some(Err(error)) => rename_error_status(&error),
         None => ABI_STATUS_FAILURE,
     }

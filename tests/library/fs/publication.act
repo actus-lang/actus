@@ -337,3 +337,158 @@ verb atomic_publication_replaces_stale_staging() -> Int {
         },
     };
 }
+
+verb injected_prepublication_failure(erg destination_suffix: u8, erg staging_suffix: u8) -> Int {
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    erg staging_check_result = publication_path(suffix: erg staging_suffix);
+                    return case dat staging_check_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging_check) => {
+                            fs::remove_file(path: abs destination);
+                            fs::remove_file(path: abs staging);
+                            erg payload = Buffer[0];
+                            append(payload, 70u8);
+                            erg published = fs::write_file_atomic(
+                                path: abs destination,
+                                staging: dat staging,
+                                contents: abs payload
+                            );
+                            return case dat published {
+                                Result.Ok(_) => {
+                                    fs::remove_file(path: abs destination);
+                                    drop(staging_check);
+                                    4;
+                                },
+                                Result.Err(_) => {
+                                    erg result = verify_failed_publication(
+                                        destination: abs destination,
+                                        staging: abs staging_check
+                                    );
+                                    drop(staging_check);
+                                    result;
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta fault("short_write")
+meta test
+verb injected_short_write_is_rejected() -> Int {
+    erg destination_suffix: u8 = 65u8;
+    erg staging_suffix: u8 = 66u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta target("unix")
+meta fault("flush_failure")
+meta test
+verb injected_flush_failure_is_rejected() -> Int {
+    erg destination_suffix: u8 = 67u8;
+    erg staging_suffix: u8 = 68u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta target("unix")
+meta fault("rename_failure")
+meta test
+verb injected_rename_failure_is_rejected() -> Int {
+    erg destination_suffix: u8 = 69u8;
+    erg staging_suffix: u8 = 70u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta target("unix")
+meta fault("parent_sync_failure")
+meta test
+verb injected_parent_sync_failure_reports_published_file() -> Int {
+    erg destination_suffix: u8 = 71u8;
+    erg staging_suffix: u8 = 72u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    fs::remove_file(path: abs destination);
+                    fs::remove_file(path: abs staging);
+                    erg payload = Buffer[0];
+                    append(payload, 78u8);
+                    erg published = fs::write_file_atomic_synced(
+                        path: abs destination,
+                        staging: dat staging,
+                        contents: abs payload
+                    );
+                    return case dat published {
+                        Result.Ok(_) => {
+                            fs::remove_file(path: abs destination);
+                            3;
+                        },
+                        Result.Err(_) => {
+                            erg result = read_replace_fixture(path: abs destination);
+                            fs::remove_file(path: abs destination);
+                            if result == 0 {
+                                return 0;
+                            }
+                            4;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta fault("interrupted_publication")
+meta test
+verb interrupted_publication_is_expected_signal() -> Int {
+    erg destination_suffix: u8 = 73u8;
+    erg staging_suffix: u8 = 74u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    erg payload = Buffer[0];
+                    append(payload, 73u8);
+                    erg published = fs::write_file_atomic(
+                        path: abs destination,
+                        staging: dat staging,
+                        contents: abs payload
+                    );
+                    return case dat published {
+                        Result.Ok(_) => 3,
+                        Result.Err(_) => 4,
+                    };
+                },
+            };
+        },
+    };
+}

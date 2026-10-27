@@ -90,6 +90,26 @@ fn parses_target_and_test_metadata_together() {
 }
 
 #[test]
+fn parses_typed_publication_fault_metadata() {
+    let program = parse_source(
+        "meta fault(\"flush_failure\") meta test verb publication_test() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(verb.metadata.contains(&MetaAttribute::Fault(actus::ast::TestFault::FlushFailure)));
+    assert!(verb.metadata.contains(&MetaAttribute::Test));
+}
+
+#[test]
+fn rejects_multiple_publication_faults_on_one_test() {
+    let (tokens, errors) = scan(
+        "meta fault(\"flush_failure\") meta fault(\"rename_failure\") meta test verb publication_test() -> Int { return 0; }",
+    );
+    assert!(errors.is_empty());
+    let error = parse(tokens).expect_err("one publication fault must be scoped per test");
+    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
+}
+
+#[test]
 fn parses_limitless_metadata_at_verb_and_file_scope() {
     let program = parse_source(
         "meta limitless(\"file\")\nmeta limitless(\"verb\") verb large() { return 0; }",

@@ -74,6 +74,7 @@ fn declaration_matches_target(
     metadata.iter().all(|attribute| match attribute {
         crate::ast::MetaAttribute::Target(selector) => target.matches_platform(selector),
         crate::ast::MetaAttribute::Test => true,
+        crate::ast::MetaAttribute::Fault(_) => true,
         crate::ast::MetaAttribute::Limitless(_) => true,
     })
 }

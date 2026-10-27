@@ -48,6 +48,16 @@ test artifact; it does not make private declarations public.
 Package-root test files remain root-scope compatibility fixtures. New nested
 test files should use the mirrored layout and should pass the `--mirror` gate.
 
+Publication failure fixtures may declare one test-only fault, for example
+`meta fault("flush_failure")`. These faults require a compiler built with the
+`test-fault-injection` feature; the normal runtime archive does not contain the
+fault symbol or control path. The fault is installed by the test runner for
+one child process and is consumed once at the named native filesystem phase.
+Fault metadata is for strict publication tests only and is not an application
+filesystem API. A normal compiler intentionally reports that a fault-bearing
+test requires `--features test-fault-injection`; this is an expected build
+boundary, not a test failure.
+
 For repository compiler work, also use the repository's Rust checks:
 
 ```sh

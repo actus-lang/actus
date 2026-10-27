@@ -279,6 +279,7 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
     match metadata {
         crate::ast::MetaAttribute::Test => "test".to_owned(),
         crate::ast::MetaAttribute::Target(selector) => format!("target(\"{selector}\")"),
+        crate::ast::MetaAttribute::Fault(fault) => format!("fault(\"{}\")", fault.name()),
         crate::ast::MetaAttribute::Limitless(scope) => {
             let scope = match scope {
                 crate::ast::LimitlessScope::Verb => "verb",
