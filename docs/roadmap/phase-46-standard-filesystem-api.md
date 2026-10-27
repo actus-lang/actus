@@ -352,7 +352,7 @@ publication. The Gate 7 file-operation validation matrix is complete.
       removal operation; recursive deletion must never be implicit.
 - [x] Add `rename` with same-filesystem and cross-filesystem error semantics.
 - [x] Add `copy_file` with explicit overwrite and metadata policies.
-- [ ] Add atomic write helpers using staged file, flush, rename, and optional
+- [x] Add atomic write helpers using staged file, flush, rename, and optional
       parent-directory sync ordering.
 - [ ] Add atomic replace and compare-before-publish operations where the
       target backend can provide them.
@@ -370,6 +370,18 @@ copies timestamps, identity, ownership, or extended attributes. The legacy
 behavior. Mirrored strict fixtures cover unchanged existing destinations and
 compatibility overwrite; native runtime tests cover status classification and
 atomic create-new rejection.
+
+Gate 8 atomic-publication evidence (2026-10-27): `write_file_atomic` preserves
+the staged write, complete-count check, flush, close, same-filesystem rename,
+and deterministic pre-publication cleanup sequence. `sync_parent_directory`
+and `write_file_atomic_synced` add an explicit Unix parent-directory sync after
+the rename; a post-rename sync failure is returned as an error while the new
+file remains published and durability is reported as uncertain. Windows and
+other targets without directory-handle synchronization return
+`IoError.Unsupported`. The mirrored Unix fixture in
+`tests/library/fs/publication.act` verifies the full write/publish/sync/read
+path; atomic replace, compare-before-publish, crash-recovery guarantees, and
+failure injection remain open follow-up work.
 
 ## Gate 9: Links, permissions, and platform capabilities
 

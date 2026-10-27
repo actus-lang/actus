@@ -5,6 +5,44 @@ import {
 };
 
 """
+Synchronize the parent directory of `path` after a published rename.
+
+The path is borrowed for one native call and is never retained. Zero means
+the host accepted the directory sync; `-2` means the target cannot provide
+directory synchronization and `-1` means the provider rejected the request.
+"""
+unsafe extern "C" verb actus_file_sync_parent_path(abs path: path_module::Path) -> Int;
+
+"""
+Translate the parent-directory synchronization status into a typed result.
+
+`status` is a copied scalar. This adapter performs no I/O, allocation, or
+ownership transfer: `-2` becomes `IoError.Unsupported`, `-1` becomes
+`IoError.Failed`, and non-negative statuses remain successful.
+"""
+open verb sync_parent_status(erg status: Int) -> Result[Int, io::IoError] {
+    return case status {
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Synchronize the directory containing `path`.
+
+`path` is an immutable borrowed view and is not retained. On supported hosted
+targets this performs the blocking directory metadata sync required after a
+rename when callers need stronger crash-durability ordering. It does not sync
+file contents, publish a file, allocate storage, or mutate the path. Targets
+without a directory-sync capability return `IoError.Unsupported`.
+"""
+open verb sync_parent_directory(abs path: path_module::Path) -> Result[Int, io::IoError] {
+    erg status = actus_file_sync_parent_path(path: abs path);
+    return sync_parent_status(status: erg status);
+}
+
+"""
 Create or truncate `path`, write the complete borrowed contents, flush, and
 close the file before returning.
 
@@ -48,6 +86,41 @@ open verb write_file_atomic(
                     return Result[Int, io::IoError].Ok(count);
                 },
                 Result.Err(error) => cleanup_atomic_failure(staging: dat staging, error: dat error),
+            };
+        },
+    };
+}
+
+"""
+Write staged contents, publish them with rename, then synchronize the final
+file's parent directory.
+
+`path` and `contents` are immutable borrowed views. `staging` is transferred
+with `dat` and is cleaned up on every pre-publication failure. The operation
+performs complete write, flush, close, same-filesystem rename, and parent
+directory sync in that order. A successful result means the parent sync also
+completed. If the sync fails, the rename has already published the new file;
+the error is returned so the caller can report that durability is uncertain.
+No partial staged contents become visible, and cleanup never replaces the
+root write, rename, or sync error.
+"""
+open verb write_file_atomic_synced(
+    abs path: path_module::Path,
+    dat staging: path_module::Path,
+    abs contents: Buffer
+) -> Result[Int, io::IoError] {
+    erg published = write_file_atomic(
+        path: abs path,
+        staging: dat staging,
+        contents: abs contents
+    );
+    return case dat published {
+        Result.Err(error) => Err(error),
+        Result.Ok(count) => {
+            erg synced = sync_parent_directory(path: abs path);
+            return case dat synced {
+                Result.Err(error) => Err(error),
+                Result.Ok(_) => Ok(count),
             };
         },
     };

@@ -128,12 +128,23 @@ verb write_file_atomic(
     dat staging: Path,
     abs contents: Buffer,
 ) -> Result[Int, IoError];
+verb sync_parent_directory(abs path: Path) -> Result[Int, IoError];
+verb write_file_atomic_synced(
+    abs path: Path,
+    dat staging: Path,
+    abs contents: Buffer,
+) -> Result[Int, IoError];
 ```
 
 Path operations borrow paths. `read_to_bytes` transfers an owned result buffer
 on success. `read_to_string` transfers a buffer only after UTF-8 validation.
 `write_file_atomic` consumes the staging path so failure cleanup has one clear
-owner.
+owner. `write_file_atomic_synced` has the same ownership contract and performs
+an explicit parent-directory sync after rename. It returns an error if that
+sync is unsupported or fails, but the destination has already been published
+in that case; callers must treat durability as uncertain. The Unix backend
+supports the directory sync, while unsupported targets return
+`IoError.Unsupported`.
 
 `canonicalize` performs blocking host filesystem resolution, follows symbolic
 links, requires every component to exist, and returns a new owned identity

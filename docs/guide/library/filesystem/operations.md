@@ -143,8 +143,17 @@ The staging path should be on the same filesystem as the final path so rename
 has the provider's intended publication semantics. The final path is not
 published until the staged write and flush succeed.
 
+`write_file_atomic_synced` adds an explicit parent-directory sync after the
+rename. Unix supports this stronger directory-entry ordering; unsupported
+targets return `IoError.Unsupported`. A failure at this post-rename step does
+not undo publication, so callers must report durability as uncertain.
+
 The operation consumes `staging` because every failure path must have one clear
 owner for cleanup. It does not allocate a hidden path or buffer.
+
+`sync_parent_directory` exposes the directory-sync operation independently for
+callers that publish through another validated rename path. It borrows the
+path, performs no publication, and has no hidden allocation.
 
 ## Failure behavior
 

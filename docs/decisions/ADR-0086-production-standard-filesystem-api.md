@@ -298,9 +298,14 @@ sync_parent_directory(path)
 publish_file(staged, active)
 ```
 
-The publication sequence is staged write, flush, sync, rename/replace, and
-optional parent-directory sync. A failed publication must leave the previous
-active file valid. Staging cleanup must not hide the primary failure.
+The public `write_file_atomic_synced` helper performs staged write, flush,
+close, rename, and then `sync_parent_directory` in that order. The ordinary
+`write_file_atomic` helper stops after the rename. On Unix, parent-directory
+sync is supported; targets without directory-handle synchronization return
+`IoError.Unsupported`. A sync failure occurs after rename, so the destination
+is already published and the caller must treat durability as uncertain. A
+failed pre-publication step must leave the previous active file valid. Staging
+cleanup must not hide the primary failure.
 
 ### Permissions, links, and security
 
