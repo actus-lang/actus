@@ -1,0 +1,81 @@
+"""Platform-selected coverage for the non-inheritable file-open contract."""
+import {
+    open std::fs,
+    std::path,
+};
+
+verb platform_root() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb platform_prefix() -> Buffer {
+    erg prefix: Buffer = Buffer[0];
+    append(prefix, 97u8);
+    append(prefix, 99u8);
+    append(prefix, 116u8);
+    append(prefix, 117u8);
+    append(prefix, 115u8);
+    append(prefix, 45u8);
+    append(prefix, 99u8);
+    append(prefix, 108u8);
+    append(prefix, 111u8);
+    append(prefix, 101u8);
+    return prefix;
+}
+
+verb close_on_exec_open_succeeds() -> Int {
+    erg root_result = platform_root();
+    return case dat root_result {
+        Result.Err(_) => 1,
+        Result.Ok(root) => {
+            erg prefix = platform_prefix();
+            erg created = fs::temporary_file_open(root: abs root, prefix: abs prefix);
+            return case dat created {
+                Result.Err(_) => 2,
+                Result.Ok(resource) => {
+                    erg options = options_new();
+                    erg readable = options_read(dat options);
+                    erg isolated = options_close_on_exec(dat readable);
+                    erg opened = options_open(options: dat isolated, path: abs resource.path);
+                    return case dat opened {
+                        Result.Err(_) => {
+                            fs::temporary_file_cleanup(self: ins resource);
+                            return 3;
+                        },
+                        Result.Ok(file) => {
+                            erg closed = fs::file_close(self: ins file);
+                            return case dat closed {
+                                Result.Err(_) => {
+                                    fs::temporary_file_cleanup(self: ins resource);
+                                    return 4;
+                                },
+                                Result.Ok(_) => {
+                                    erg cleaned = fs::temporary_file_cleanup(self: ins resource);
+                                    return case dat cleaned {
+                                        Result.Err(_) => 5,
+                                        Result.Ok(_) => 0,
+                                    };
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb unix_close_on_exec_open_is_supported() -> Int {
+    return close_on_exec_open_succeeds();
+}
+
+meta target("windows")
+meta test
+verb windows_close_on_exec_open_is_supported() -> Int {
+    return close_on_exec_open_succeeds();
+}

@@ -30,12 +30,14 @@ open struct OpenOptions {
     erg create: Int,
     """Create only a new path; opening an existing path fails."""
     erg create_new: Int,
+    """Prevent the handle from crossing an exec/process-image boundary."""
+    erg close_on_exec: Int,
 }
 
 """
 Create a fresh file-open configuration with every switch disabled.
 
-The returned `OpenOptions` owns only six scalar flags and owns no path,
+    The returned `OpenOptions` owns only seven scalar flags and owns no path,
 handle, buffer, or operating-system resource. This builder performs no I/O,
 allocation, validation against a host filesystem, or implicit default access;
 callers must explicitly enable at least the access mode required by the later
@@ -49,6 +51,7 @@ open verb options_new() -> OpenOptions {
         truncate: OPEN_OPTION_DISABLED,
         create: OPEN_OPTION_DISABLED,
         create_new: OPEN_OPTION_DISABLED,
+        close_on_exec: OPEN_OPTION_DISABLED,
     };
 }
 
@@ -69,6 +72,7 @@ open verb options_read(dat options: OpenOptions) -> OpenOptions {
         truncate: options.truncate,
         create: options.create,
         create_new: options.create_new,
+        close_on_exec: options.close_on_exec,
     };
 }
 
@@ -89,6 +93,7 @@ open verb options_write(dat options: OpenOptions) -> OpenOptions {
         truncate: options.truncate,
         create: options.create,
         create_new: options.create_new,
+        close_on_exec: options.close_on_exec,
     };
 }
 
@@ -109,6 +114,7 @@ open verb options_append(dat options: OpenOptions) -> OpenOptions {
         truncate: options.truncate,
         create: options.create,
         create_new: options.create_new,
+        close_on_exec: options.close_on_exec,
     };
 }
 
@@ -129,6 +135,7 @@ open verb options_truncate(dat options: OpenOptions) -> OpenOptions {
         truncate: OPEN_OPTION_ENABLED,
         create: options.create,
         create_new: options.create_new,
+        close_on_exec: options.close_on_exec,
     };
 }
 
@@ -149,6 +156,7 @@ open verb options_create(dat options: OpenOptions) -> OpenOptions {
         truncate: options.truncate,
         create: OPEN_OPTION_ENABLED,
         create_new: options.create_new,
+        close_on_exec: options.close_on_exec,
     };
 }
 
@@ -169,6 +177,27 @@ open verb options_create_new(dat options: OpenOptions) -> OpenOptions {
         truncate: options.truncate,
         create: options.create,
         create_new: OPEN_OPTION_ENABLED,
+        close_on_exec: options.close_on_exec,
+    };
+}
+
+"""
+Request a handle that is not inherited across an exec or process-image change.
+
+`options` is consumed and every existing access, append, truncation, and
+creation flag is preserved. The builder performs no I/O. `options_open` passes
+the request to the host open primitive, which applies the guarantee at handle
+creation time where the target supports it and rejects unsupported targets.
+"""
+open verb options_close_on_exec(dat options: OpenOptions) -> OpenOptions {
+    return OpenOptions {
+        read: options.read,
+        write: options.write,
+        append: options.append,
+        truncate: options.truncate,
+        create: options.create,
+        create_new: options.create_new,
+        close_on_exec: OPEN_OPTION_ENABLED,
     };
 }
 
@@ -176,10 +205,12 @@ open verb options_create_new(dat options: OpenOptions) -> OpenOptions {
 Open `path` using every flag in the consumed `options` value.
 
 The path is an `abs` view. The scalar flags are passed by value to the
-runtime, which returns an opaque handle or `-1` on failure. A successful
+runtime, which returns an opaque handle or `-1` on failure. The call does not
+retain the path view, allocate an Actus buffer, or transfer ownership of the
+path. The close-on-exec request is applied during native handle creation where
+the target supports it; unsupported targets return failure. A successful
 handle becomes an owned `File`; the raw failure code is translated to
-`IoError.Failed` and is never exposed by the public API. No path bytes are
-copied or allocated at this ABI boundary.
+`IoError.Failed` and is never exposed by the public API.
 """
 unsafe extern "C" verb actus_file_open_options_path(
     abs path: Path,
@@ -188,20 +219,22 @@ unsafe extern "C" verb actus_file_open_options_path(
     abs append: Int,
     abs truncate: Int,
     abs create: Int,
-    abs create_new: Int
+    abs create_new: Int,
+    abs close_on_exec: Int
 ) -> Int;
 
 """
 Open a path using the complete consumed `OpenOptions` configuration.
 
 `options` is transferred with `dat`; the path is an immutable `abs` view used
-only for the native call and is not retained. Read/write, append, truncate, create,
-and create-new flags are forwarded together without path copying or hidden
-buffer allocation. `Ok(File)` transfers ownership of the new host handle to
-the caller, whose `Drop` performance closes it. On `Err(IoError.Failed)` no
-live `File` is returned and the rejected native handle is consumed safely.
-The host provider remains responsible for rejecting incompatible flag
-combinations and existing-target violations.
+only for the native call and is not retained. Read/write, append, truncate,
+create, create-new, and close-on-exec flags are forwarded together without
+path copying or hidden buffer allocation. `Ok(File)` transfers ownership of
+the new host handle to the caller, whose `Drop` performance closes it. On
+`Err(IoError.Failed)` no live `File` is returned and the rejected native handle
+is consumed safely. The host provider remains responsible for rejecting
+incompatible flag combinations, existing-target violations, and unsupported
+security semantics.
 """
 open verb options_open(dat options: OpenOptions, abs path: path_module::Path) -> Result[File, io::IoError] {
     erg handle = actus_file_open_options_path(
@@ -211,7 +244,8 @@ open verb options_open(dat options: OpenOptions, abs path: path_module::Path) ->
         append: abs options.append,
         truncate: abs options.truncate,
         create: abs options.create,
-        create_new: abs options.create_new
+        create_new: abs options.create_new,
+        close_on_exec: abs options.close_on_exec
     );
     return case handle {
         -1 => {

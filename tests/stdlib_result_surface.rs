@@ -71,6 +71,7 @@ fn infallible_verbs() -> BTreeSet<&'static str> {
         "options_truncate",
         "options_create",
         "options_create_new",
+        "options_close_on_exec",
         "buffered_reader",
         "buffered_writer",
         "cursor",

@@ -317,13 +317,13 @@ runtime mapping tests.
 
 ## Gate 7: File operations and open options
 
-- [ ] Expose explicit `file_open`, `file_create`, `file_read`, `file_write`,
+- [x] Expose explicit `file_open`, `file_create`, `file_read`, `file_write`,
       `file_seek`, `file_flush`, and `file_close` contracts.
-- [ ] Complete `OpenOptions` for read, write, append, truncate, create,
+- [x] Complete `OpenOptions` for read, write, append, truncate, create,
       create-new, and close-on-exec behavior where supported.
-- [ ] Define partial read and partial write handling; never treat a short
+- [x] Define partial read and partial write handling; never treat a short
       native operation as implicit success for the complete buffer.
-- [ ] Add bounded file-copy and file-stream operations without loading an
+- [x] Add bounded file-copy and file-stream operations without loading an
       entire file into memory.
 - [ ] Add file locking or an explicit unsupported result for targets that do
       not provide advisory locks.
@@ -331,11 +331,16 @@ runtime mapping tests.
 - [ ] Add tests for concurrent open modes, short I/O, EOF, locks, flush, and
       persistence failures.
 
-Evidence (2026-10-25): `file_sync_data` and `file_sync_all` are exposed through
-the hosted `std::fs` facade, Rust runtime bridges, and buffer ABI adapters.
-`tests/library/fs/file.act` passes the strict synchronization fixture; the
-runtime passes `cargo check --all-targets`, and the public documentation suite
-passes.
+Evidence (2026-10-27): `File` exposes open/create/read/write/seek/flush/close,
+with explicit short-I/O and EOF contracts. `OpenOptions` covers all seven
+scalar switches; close-on-exec is applied atomically with POSIX `O_CLOEXEC`,
+uses Windows' non-inheritable standard handle behavior, and rejects unsupported
+targets. `copy_file` and the fixed-buffer `io::copy_stream` avoid whole-file
+loading. `file_sync_data` and `file_sync_all` are exposed through the hosted
+facade, runtime bridges, and buffer ABI adapters. Strict file/operations
+fixtures and platform-selected Unix/Windows option fixtures cover the public
+contract. Advisory locking and the broader concurrent open/short-I/O/flush/
+persistence regression matrix remain open.
 
 ## Gate 8: Mutation, publication, and recovery operations
 

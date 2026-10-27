@@ -93,6 +93,14 @@ file_clone_handle(...)
 reads and short writes are reported or completed by the corresponding verb;
 they are never silently treated as complete-buffer success.
 
+`close_on_exec` is applied as part of native handle creation, not by a later
+best-effort flag mutation. POSIX targets use `O_CLOEXEC`; Windows relies on
+the standard non-inheritable handle created by `OpenOptions`. Targets without
+one of these guarantees reject a requested `close_on_exec` open with the
+typed failure surface. The option is therefore a security contract, not a
+documentation-only hint, and the platform-specific fixtures select their
+assertions with `meta target("unix")` and `meta target("windows")`.
+
 ### Directory handles and entries
 
 Directory enumeration is streaming. The API must not return an unbounded
