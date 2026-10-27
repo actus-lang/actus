@@ -28,3 +28,6 @@ open seek;
 
 """Re-export secure temporary-resource creation and cleanup."""
 open temporary;
+
+"""Re-export bounded recursive walking and traversal event contracts."""
+open walk;

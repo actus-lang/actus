@@ -5,6 +5,7 @@ mod operations;
 mod path_bridge;
 mod path_open;
 mod temporary;
+mod walk;
 
 pub use buffers::{
     actus_file_close_buffer, actus_file_flush_buffer, actus_file_open_buffer,
@@ -29,6 +30,8 @@ pub use operations::{
 };
 pub use path_open::{actus_file_open_options_path, actus_file_open_path};
 pub use temporary::{actus_directory_create_temporary_path, actus_file_open_temporary_path};
+#[allow(unused_imports)]
+pub use walk::{ActusWalkEvent, actus_walker_close, actus_walker_next, actus_walker_open};
 
 pub(super) use file::{actus_handle, handle_to_actus, with_file};
 pub(super) const MODE_CREATE: u32 = 1;

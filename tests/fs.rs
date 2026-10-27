@@ -72,7 +72,7 @@ fn fallback_path_fields() -> (&'static str, &'static str, &'static str) {
 fn make_path_source() -> String {
     let (storage, platform, capacity) = fallback_path_fields();
     format!(
-        "verb make_path(dat raw: Buffer) -> Path {{ erg result = {}(storage: dat raw); return case dat result {{ Result.Ok(value) => value, Result.Err(_) => Path {{ storage: {storage}, platform: {platform}, length: 0, capacity: {capacity}, terminated: 1, }}, }}; }}",
+        "verb make_path(dat raw: Buffer) -> Path {{ erg fallback = Path {{ storage: {storage}, platform: {platform}, length: 0, capacity: {capacity}, terminated: 1, }}; erg result = {}(storage: dat raw); return case dat result {{ Result.Ok(value) => value, Result.Err(_) => fallback, }}; }}",
         path_constructor(),
     )
 }
@@ -121,6 +121,7 @@ fn copy_std_library(root: &Path) {
         ("fs/permissions.act", library_file("fs/permissions.act")),
         ("fs/publication.act", library_file("fs/publication.act")),
         ("fs/temporary.act", library_file("fs/temporary.act")),
+        ("fs/walk.act", library_file("fs/walk.act")),
         ("path/path.act", library_file("path/path.act")),
         ("path/types.act", library_file("path/types.act")),
         ("path/storage.act", library_file("path/storage.act")),
