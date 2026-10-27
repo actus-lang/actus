@@ -12,6 +12,71 @@ import {
 open const OPEN_OPTION_DISABLED: Int = 0;
 """Scalar value used when an open-option switch is enabled."""
 open const OPEN_OPTION_ENABLED: Int = 1;
+"""Do not replace an existing copy destination."""
+open const COPY_OPTION_DISABLED: Int = 0;
+"""Permit replacement of an existing copy destination."""
+open const COPY_OPTION_ENABLED: Int = 1;
+
+"""
+An owned copy policy. `overwrite` controls destination replacement. The
+`preserve_metadata` switch preserves source readonly/permission bits;
+timestamps, identity, ownership, and extended attributes are never copied by
+this portable surface.
+"""
+open struct CopyOptions {
+    """Replace an existing regular-file destination when enabled."""
+    erg overwrite: Int,
+    """Copy source readonly/permission bits when enabled."""
+    erg preserve_metadata: Int,
+}
+
+"""
+Create a fresh copy policy with both optional behaviors disabled.
+
+The returned `CopyOptions` owns two scalar switches and no path, buffer, file
+handle, or host resource. The verb performs no filesystem I/O, allocation, or
+metadata lookup. Passing this value to `copy_file_with_options` requests
+create-new destination semantics and the portable default metadata policy,
+which does not copy readonly/permission bits.
+"""
+open verb copy_options_new() -> CopyOptions {
+    return CopyOptions {
+        overwrite: COPY_OPTION_DISABLED,
+        preserve_metadata: COPY_OPTION_DISABLED,
+    };
+}
+
+"""
+Enable destination replacement in an owned copy policy.
+
+`options` is transferred with `dat`, so the previous binding is consumed and
+cannot be reused. The returned policy preserves the metadata switch and owns
+no external resource. This builder performs no I/O or existence check;
+`copy_file_with_options` applies the replacement at destination open time and
+reports provider failure as a typed `IoError`.
+"""
+open verb copy_options_overwrite(dat options: CopyOptions) -> CopyOptions {
+    return CopyOptions {
+        overwrite: COPY_OPTION_ENABLED,
+        preserve_metadata: options.preserve_metadata,
+    };
+}
+
+"""
+Enable readonly/permission-bit preservation in an owned copy policy.
+
+`options` is consumed with `dat`; the returned policy preserves the overwrite
+switch and owns no path, buffer, handle, or allocation. The native copy
+operation applies the source permission/readonly bits only after the content
+copy succeeds. Timestamps, identity, ownership, and extended attributes are
+outside this portable policy and remain unchanged by this builder.
+"""
+open verb copy_options_preserve_metadata(dat options: CopyOptions) -> CopyOptions {
+    return CopyOptions {
+        overwrite: options.overwrite,
+        preserve_metadata: COPY_OPTION_ENABLED,
+    };
+}
 
 """
 An owned set of erg scalar switches consumed by an open operation.

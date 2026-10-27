@@ -351,7 +351,7 @@ publication. The Gate 7 file-operation validation matrix is complete.
 - [x] Add `remove_file`, `remove_dir`, and a separately guarded recursive
       removal operation; recursive deletion must never be implicit.
 - [x] Add `rename` with same-filesystem and cross-filesystem error semantics.
-- [ ] Add `copy_file` with explicit overwrite and metadata policies.
+- [x] Add `copy_file` with explicit overwrite and metadata policies.
 - [ ] Add atomic write helpers using staged file, flush, rename, and optional
       parent-directory sync ordering.
 - [ ] Add atomic replace and compare-before-publish operations where the
@@ -360,6 +360,16 @@ publication. The Gate 7 file-operation validation matrix is complete.
       considered published.
 - [ ] Add failure-injection tests for truncated writes, failed flushes,
       failed renames, stale staging files, and interrupted publication.
+
+Gate 8 copy-policy evidence (2026-10-27): `CopyOptions` separates destination
+overwrite from permission/readonly-bit preservation. `copy_file_with_options`
+uses create-new destination opening when overwrite is disabled, returns typed
+`IoError.AlreadyExists` without modifying an existing destination, and never
+copies timestamps, identity, ownership, or extended attributes. The legacy
+`copy_file` wrapper explicitly retains overwrite-enabled, metadata-disabled
+behavior. Mirrored strict fixtures cover unchanged existing destinations and
+compatibility overwrite; native runtime tests cover status classification and
+atomic create-new rejection.
 
 ## Gate 9: Links, permissions, and platform capabilities
 

@@ -45,6 +45,19 @@ struct OpenOptions {
 
 Options are built as owned values and consumed by `options_open`.
 
+```actus
+struct CopyOptions {
+    overwrite: Int,
+    preserve_metadata: Int,
+}
+```
+
+Construct a policy with `copy_options_new`, then consume it with
+`copy_options_overwrite` and/or `copy_options_preserve_metadata`. These
+builders perform no I/O. The metadata switch is intentionally limited to
+readonly/permission bits; it does not imply timestamp, identity, ownership, or
+extended-attribute preservation.
+
 ## `SeekFrom`
 
 ```actus
@@ -103,6 +116,8 @@ verb canonicalize(abs path: Path) -> Result[Path, IoError];
 verb same_file(abs left: Path, abs right: Path) -> Result[Bool, IoError];
 verb rename(abs from: Path, abs to: Path) -> Result[Int, IoError];
 verb copy_file(abs from: Path, abs to: Path) -> Result[Int, IoError];
+verb copy_file_with_options(dat options: CopyOptions, abs from: Path,
+    abs to: Path) -> Result[Int, IoError];
 verb create_dir(abs path: Path) -> Result[Int, IoError];
 verb remove_dir(abs path: Path) -> Result[Int, IoError];
 verb read_to_bytes(abs path: Path) -> Result[Buffer, IoError];
@@ -129,6 +144,14 @@ reported as `IoError.Failed` and the input path is not modified.
 `same_file` follows symbolic links and compares host identity metadata. It
 returns `Unsupported` when the target cannot provide a stable identity.
 
+`CopyOptions` contains explicit `overwrite` and `preserve_metadata` switches.
+Disabled overwrite uses create-new destination semantics and returns
+`IoError.AlreadyExists` without changing an existing destination. Enabled
+overwrite replaces the regular-file destination. Metadata preservation copies
+only readonly/permission bits; timestamps, identity, ownership, and extended
+attributes are not copied. The two-argument `copy_file` wrapper explicitly
+uses overwrite enabled and metadata preservation disabled.
+
 ## Results
 
 | Operation group | Success value | Typical failure |
@@ -141,7 +164,7 @@ returns `Unsupported` when the target cannot provide a stable identity.
 | symlink metadata | `Metadata` | `Failed` |
 | read-to-bytes | owned `Buffer` | `Failed`, `EndOfStream` |
 | read-to-string | UTF-8 `Buffer` | I/O error, `InvalidData` |
-| rename/copy/remove/dir | status or count | `Failed` |
+| rename/copy/remove/dir | status or count | `Failed`, `AlreadyExists`, `CrossDevice` |
 | atomic write | written byte count | write, flush, rename, or cleanup error |
 | same-file comparison | `Bool` | lookup failure or `Unsupported` |
 

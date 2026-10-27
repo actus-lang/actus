@@ -23,4 +23,6 @@ open enum IoError {
     Busy,
     """The source and destination are on different filesystems."""
     CrossDevice,
+    """The destination already exists and overwrite was not selected."""
+    AlreadyExists,
 }

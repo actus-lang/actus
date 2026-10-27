@@ -132,12 +132,12 @@ pub unsafe extern "C" fn actus_file_same_path(
     }
 }
 
-enum IdentityError {
+pub(super) enum IdentityError {
     Failed,
     Unsupported,
 }
 
-fn same_file_identity(
+pub(super) fn same_file_identity(
     left: &std::path::Path,
     right: &std::path::Path,
 ) -> Result<bool, IdentityError> {
@@ -233,28 +233,6 @@ pub unsafe extern "C" fn actus_file_rename_path(
         Some(Err(error)) => rename_error_status(&error),
         None => ABI_STATUS_FAILURE,
     }
-}
-
-/// Copies a file and returns the number of copied bytes, or `-1` on failure.
-///
-/// # Safety
-/// `from` and `to` must point to valid live `ActusBuffer` values.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn actus_file_copy_buffer(from: BufferHandle, to: BufferHandle) -> i32 {
-    unsafe {
-        two_path_operation_value(from, to, |source, destination| std::fs::copy(source, destination))
-    }
-}
-
-/// Copies a file between two validated borrowed `ActusPath` values.
-///
-/// # Safety
-/// Both paths must be valid immutable descriptors for this call.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn actus_file_copy_path(from: *const ActusPath, to: *const ActusPath) -> i32 {
-    unsafe { with_host_paths(from, to, |source, destination| std::fs::copy(source, destination)) }
-        .and_then(Result::ok)
-        .map_or(ABI_STATUS_FAILURE, |count| i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE))
 }
 
 /// Creates one directory at the requested path.
@@ -433,16 +411,7 @@ fn rename_error_status(error: &std::io::Error) -> i32 {
     }
 }
 
-unsafe fn two_path_operation_value<F>(from: BufferHandle, to: BufferHandle, operation: F) -> i32
-where
-    F: FnOnce(&std::path::Path, &std::path::Path) -> std::io::Result<u64>,
-{
-    let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return ABI_STATUS_FAILURE };
-    operation(&from, &to)
-        .map_or(ABI_STATUS_FAILURE, |count| i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE))
-}
-
-unsafe fn path_pair(
+pub(super) unsafe fn path_pair(
     from: BufferHandle,
     to: BufferHandle,
 ) -> Option<(std::path::PathBuf, std::path::PathBuf)> {

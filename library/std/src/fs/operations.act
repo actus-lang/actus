@@ -36,6 +36,19 @@ unsafe extern "C" verb actus_file_copy_path(
 ) -> Int;
 
 """
+Copy a regular file with explicit overwrite and metadata policy switches.
+Zero disables a switch and any non-zero scalar enables it. The bridge returns
+the copied byte count, `-2` when overwrite is disabled and the destination
+already exists, and `-1` for all other provider failures.
+"""
+unsafe extern "C" verb actus_file_copy_options_path(
+    abs from: path_module::Path,
+    abs to: path_module::Path,
+    abs overwrite: Int,
+    abs preserve_metadata: Int
+) -> Int;
+
+"""
 Resolve `path` through the host filesystem and write the canonical identity
 path into `output`. The bridge returns zero only after every component exists
 and the destination owns a validated platform path; `-1` reports a missing,
@@ -207,16 +220,68 @@ open verb rename(abs from: path_module::Path, abs to: path_module::Path) -> Resu
     return rename_status(status: erg status);
 }
 
+"""
+Translate the native copy status into the public typed result.
+
+`status` is a copied scalar and this helper performs no I/O, allocation, or
+ownership transfer. Non-negative values are successful copied-byte counts.
+`-2` preserves the explicit no-overwrite contract as
+`IoError.AlreadyExists`; `-1` represents every other provider failure.
+"""
+open verb copy_status(erg status: Int) -> Result[Int, io::IoError] {
+    return case status {
+        -2 => Err(io::IoError.AlreadyExists),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
 """Copy one regular file and return the host-reported byte count.
 
 `from` and `to` are immutable `abs` views borrowed for the call. `Ok(count)`
-is returned only when the native copy completes; source, destination,
-overwrite, and provider failures return `IoError.Failed`. No path view is
-consumed or retained and no UTF-8 conversion is performed.
+is returned only when the native copy completes. This compatibility wrapper
+explicitly permits destination overwrite and does not request permission-bit
+preservation; use `copy_file_with_options` when either policy must be changed.
+No path view is consumed or retained and no UTF-8 conversion is performed.
+Errors: provider failures return `Err(IoError.Failed)` after no partial count
+is reported. Side effects: the destination regular file is replaced.
 """
 open verb copy_file(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
-    erg status = actus_file_copy_path(from: abs from, to: abs to);
-    return fs_status(status: erg status);
+    erg options = copy_options_new();
+    erg overwrite = copy_options_overwrite(options: dat options);
+    return copy_file_with_options(
+        options: dat overwrite,
+        from: abs from,
+        to: abs to
+    );
+}
+
+"""
+Copy one regular file under an explicit `CopyOptions` policy.
+
+`options` is transferred and consumed. `overwrite` is atomic at destination
+creation time when disabled: an existing destination returns
+`IoError.AlreadyExists` and remains unchanged. `preserve_metadata` copies only
+the source readonly/permission bits; timestamps, identity, ownership, and
+extended attributes are deliberately not copied by this portable API. The
+source and path views are borrowed and no path is retained.
+Errors: an existing destination with overwrite disabled returns
+`Err(IoError.AlreadyExists)` and leaves it unchanged; other provider failures
+return typed `IoError` without reporting a partial success. Side effects are
+limited to the selected destination file.
+"""
+open verb copy_file_with_options(
+    dat options: CopyOptions,
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Result[Int, io::IoError] {
+    erg status = actus_file_copy_options_path(
+        from: abs from,
+        to: abs to,
+        overwrite: abs options.overwrite,
+        preserve_metadata: abs options.preserve_metadata
+    );
+    return copy_status(status: erg status);
 }
 
 """Create exactly one directory at `path`.
@@ -353,6 +418,7 @@ open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoE
         io::IoError.PermissionDenied => Result[Buffer, io::IoError].Err(io::IoError.PermissionDenied),
         io::IoError.Busy => Result[Buffer, io::IoError].Err(io::IoError.Busy),
         io::IoError.CrossDevice => Result[Buffer, io::IoError].Err(io::IoError.CrossDevice),
+        io::IoError.AlreadyExists => Result[Buffer, io::IoError].Err(io::IoError.AlreadyExists),
     };
 }
 

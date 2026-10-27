@@ -1,0 +1,207 @@
+import {
+    open fs,
+    open io,
+    open path,
+};
+
+verb copy_source_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 47u8);
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 99u8);
+    append(raw, 111u8);
+    append(raw, 112u8);
+    append(raw, 121u8);
+    append(raw, 45u8);
+    append(raw, 115u8);
+    append(raw, 111u8);
+    append(raw, 117u8);
+    append(raw, 114u8);
+    append(raw, 99u8);
+    append(raw, 101u8);
+    append(raw, 46u8);
+    append(raw, 98u8);
+    append(raw, 105u8);
+    append(raw, 110u8);
+    append(raw, 0u8);
+    erg result = path_from_ascii(storage: dat raw);
+    return case dat result {
+        Result.Ok(value) => value,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb copy_destination_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 47u8);
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 99u8);
+    append(raw, 111u8);
+    append(raw, 112u8);
+    append(raw, 121u8);
+    append(raw, 45u8);
+    append(raw, 100u8);
+    append(raw, 101u8);
+    append(raw, 115u8);
+    append(raw, 116u8);
+    append(raw, 46u8);
+    append(raw, 98u8);
+    append(raw, 105u8);
+    append(raw, 110u8);
+    append(raw, 0u8);
+    erg result = path_from_ascii(storage: dat raw);
+    return case dat result {
+        Result.Ok(value) => value,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb write_copy_fixture(abs path: Path, abs first: u8, abs second: u8) -> Int {
+    erg contents = Buffer[0];
+    append(contents, first);
+    append(contents, second);
+    erg written = write_file(path: abs path, contents: abs contents);
+    return case dat written {
+        Result.Ok(count) => {
+            if count == 2 {
+                return 0;
+            }
+            1;
+        },
+        Result.Err(_) => 1,
+    };
+}
+
+verb verify_rejected_copy(
+    dat copied: Result[Int, io::IoError],
+    dat unchanged: Result[Buffer, io::IoError]
+) -> Int {
+    return case dat unchanged {
+        Result.Ok(bytes) => {
+            erg preserved = bytes[0] == 68u8;
+            drop(bytes);
+            return case dat copied {
+                Result.Ok(_) => {
+                    if preserved {
+                        return 3;
+                    }
+                    4;
+                },
+                Result.Err(error) => case dat error {
+                    io::IoError.AlreadyExists => {
+                        if preserved {
+                            return 0;
+                        }
+                        6;
+                    },
+                    _ => 7,
+                },
+            };
+        },
+        Result.Err(_) => case dat copied {
+            Result.Ok(_) => 5,
+            Result.Err(_) => 8,
+        },
+    };
+}
+
+meta test
+verb copy_without_overwrite_keeps_existing_destination() -> Int {
+    erg source = copy_source_path();
+    erg destination = copy_destination_path();
+    remove_file(path: abs source);
+    remove_file(path: abs destination);
+    if write_copy_fixture(
+        path: abs source,
+        first: abs 83u8,
+        second: abs 49u8
+    ) != 0 {
+        return 1;
+    }
+    if write_copy_fixture(
+        path: abs destination,
+        first: abs 68u8,
+        second: abs 49u8
+    ) != 0 {
+        remove_file(path: abs source);
+        return 2;
+    }
+    erg options = copy_options_new();
+    erg copied = copy_file_with_options(
+        options: dat options,
+        from: abs source,
+        to: abs destination
+    );
+    erg unchanged = read_to_bytes(path: abs destination);
+    remove_file(path: abs source);
+    remove_file(path: abs destination);
+    return verify_rejected_copy(copied: dat copied, unchanged: dat unchanged);
+}
+
+meta test
+verb compatibility_copy_explicitly_overwrites() -> Int {
+    erg source = copy_source_path();
+    erg destination = copy_destination_path();
+    remove_file(path: abs source);
+    remove_file(path: abs destination);
+    if write_copy_fixture(
+        path: abs source,
+        first: abs 83u8,
+        second: abs 49u8
+    ) != 0 {
+        return 1;
+    }
+    if write_copy_fixture(
+        path: abs destination,
+        first: abs 68u8,
+        second: abs 49u8
+    ) != 0 {
+        remove_file(path: abs source);
+        return 2;
+    }
+    erg copied = copy_file(from: abs source, to: abs destination);
+    erg result = read_to_bytes(path: abs destination);
+    remove_file(path: abs source);
+    remove_file(path: abs destination);
+    return case dat result {
+        Result.Err(_) => 4,
+        Result.Ok(bytes) => {
+            erg first = bytes[0];
+            erg second = bytes[1];
+            drop(bytes);
+            return case dat copied {
+                Result.Err(_) => 3,
+                Result.Ok(count) => {
+                    if count == 2 && first == 83u8 && second == 49u8 {
+                        return 0;
+                    }
+                    5;
+                },
+            };
+        },
+    };
+}

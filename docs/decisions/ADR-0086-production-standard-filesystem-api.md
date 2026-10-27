@@ -274,8 +274,14 @@ symlink(from, to)
 
 Recursive deletion is never implicit. Rename is atomic only within the host
 filesystem; a cross-filesystem attempt returns `IoError.CrossDevice` rather
-than being silently emulated as copy-and-delete. Overwrite policy and link
-behavior remain target-documented and typed.
+than being silently emulated as copy-and-delete. Copying uses an explicit
+`CopyOptions` policy. `copy_file_with_options` rejects an existing destination
+atomically when overwrite is disabled and returns `IoError.AlreadyExists`; when
+enabled it replaces the regular-file destination. The optional metadata policy
+copies only source readonly/permission bits. Timestamps, identity, ownership,
+and extended attributes are not copied by the portable API. The compatibility
+`copy_file` operation explicitly enables overwrite and disables metadata
+preservation. Link behavior remains target-documented and typed.
 
 `create_dir` creates exactly one directory and never creates missing parents.
 `create_dir_all` creates each missing parent in order and treats already
