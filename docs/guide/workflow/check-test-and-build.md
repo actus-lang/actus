@@ -58,6 +58,28 @@ filesystem API. A normal compiler intentionally reports that a fault-bearing
 test requires `--features test-fault-injection`; this is an expected build
 boundary, not a test failure.
 
+The currently supported fault names are fixed by the compiler and runtime; they
+are not free-form labels:
+
+- `short_write`: the native write reports that fewer bytes were written;
+- `flush_failure`: flushing the staged file fails;
+- `rename_failure`: publishing the staged file fails before replacement;
+- `parent_sync_failure`: syncing the destination directory fails after the
+  file publication step;
+- `interrupted_publication`: the child process terminates during publication,
+  so the fixture can verify crash-state recovery.
+
+For example, a test may select exactly one of these values:
+
+```actus
+meta fault("short_write")
+```
+
+An unknown name, a duplicate `fault` declaration, or more than one fault on a
+test is rejected during parsing or semantic test collection. Adding another
+fault requires a compiler/runtime change and a corresponding strict fixture;
+developers must not invent new names in test files.
+
 For repository compiler work, also use the repository's Rust checks:
 
 ```sh
