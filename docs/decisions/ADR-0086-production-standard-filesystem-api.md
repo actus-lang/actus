@@ -314,6 +314,31 @@ rename. Compare-before-publish is intentionally not exposed yet because a
 check followed by rename has a TOCTOU race and the portable runtime does not
 have an atomic expected-identity exchange primitive.
 
+### Crash-recovery contract
+
+The publication point is the successful rename/replace, not the initial write
+or flush. The API makes these states explicit:
+
+1. Before rename succeeds, the active destination is not published by the
+   atomic helper. A write, short-write, flush, close, or rename failure returns
+   an error and attempts best-effort removal of the staging path.
+2. After rename succeeds, the new bytes are the published namespace entry. A
+   later parent-directory sync failure cannot roll that publication back; the
+   caller receives an error with durability marked uncertain.
+3. `write_file_atomic` provides publication atomicity but does not promise
+   crash durability. A crash before the rename may leave the old destination
+   and may leave stale staging storage.
+4. `write_file_atomic_synced` performs the parent-directory sync after rename
+   on Unix. Successful completion means the requested ordering operation
+   completed; it does not promise immunity from every storage-device or power
+   failure. Unsupported targets return `IoError.Unsupported`.
+
+The library does not scan for or silently delete stale staging files during
+startup. Applications must use a private staging namespace and define their
+own recovery scan, validation, and retention policy. Failure-injection tests
+remain a separate gate because the current portable runtime has no production
+fault-injection control surface.
+
 ### Permissions, links, and security
 
 The API exposes capability-checked operations for readonly state, permissions,

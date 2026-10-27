@@ -357,7 +357,7 @@ publication. The Gate 7 file-operation validation matrix is complete.
 - [x] Add atomic replace where the target backend can provide it.
 - [ ] Add a compare-before-publish operation backed by a target-level atomic
       compare primitive; do not emulate it with a check-then-rename sequence.
-- [ ] Define crash-recovery guarantees and the exact point at which a write is
+- [x] Define crash-recovery guarantees and the exact point at which a write is
       considered published.
 - [ ] Add failure-injection tests for truncated writes, failed flushes,
       failed renames, stale staging files, and interrupted publication.
@@ -381,8 +381,9 @@ file remains published and durability is reported as uncertain. Windows and
 other targets without directory-handle synchronization return
 `IoError.Unsupported`. The mirrored Unix fixture in
 `tests/library/fs/publication.act` verifies the full write/publish/sync/read
-path and atomic replacement. Compare-before-publish, crash-recovery
-guarantees, and failure injection remain open follow-up work. The Unix-only
+path and atomic replacement. The crash-recovery contract is recorded in
+ADR-0086 and the filesystem guide. Compare-before-publish and failure
+injection remain open follow-up work. The Unix-only
 `atomic_replace_replaces_existing_destination` fixture verifies replacement
 without a remove-then-rename gap; compare-before-publish remains open because
 the portable runtime has no atomic expected-identity exchange primitive.

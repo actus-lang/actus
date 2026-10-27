@@ -162,6 +162,23 @@ Failed publication attempts remove the staging path when possible and preserve
 the original failure. Cleanup is best-effort side effect; it must not turn a
 failed write into a successful publication.
 
+## Crash recovery
+
+The atomic publication point is the successful rename, not the initial write
+or flush. Before rename succeeds, the active destination is not published by
+the atomic helper; write, short-write, flush, close, and rename failures
+return typed errors and attempt best-effort staging cleanup. After rename
+succeeds, the new namespace entry is published even if a later parent-directory
+sync fails.
+
+`write_file_atomic` provides atomic namespace publication without a crash-
+durability promise. A crash before rename may leave the previous destination
+and stale staging storage. `write_file_atomic_synced` performs the explicit
+Unix parent-directory sync after rename; successful completion confirms that
+ordering operation, not immunity from every storage-device or power failure.
+The library does not scan or delete stale staging files implicitly. Callers
+must choose a private staging namespace and define recovery and retention.
+
 ## Hot-path boundary
 
 All operations in this page can block and can mutate external state. Keep them
