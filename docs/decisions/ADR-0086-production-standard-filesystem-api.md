@@ -272,8 +272,10 @@ hard_link(from, to)
 symlink(from, to)
 ```
 
-Recursive deletion is never implicit. Cross-device rename, overwrite policy,
-and link behavior are typed and documented.
+Recursive deletion is never implicit. Rename is atomic only within the host
+filesystem; a cross-filesystem attempt returns `IoError.CrossDevice` rather
+than being silently emulated as copy-and-delete. Overwrite policy and link
+behavior remain target-documented and typed.
 
 `create_dir` creates exactly one directory and never creates missing parents.
 `create_dir_all` creates each missing parent in order and treats already

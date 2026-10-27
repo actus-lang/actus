@@ -21,4 +21,6 @@ open enum IoError {
     PermissionDenied,
     """Another owner currently holds an exclusive advisory resource lock."""
     Busy,
+    """The source and destination are on different filesystems."""
+    CrossDevice,
 }

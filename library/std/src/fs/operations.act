@@ -124,6 +124,18 @@ open verb fs_status(erg status: Int) -> Result[Int, io::IoError] {
     };
 }
 
+"""
+Translate a rename-specific native status without collapsing cross-device
+failure into generic I/O failure. This helper performs no I/O or allocation.
+"""
+open verb rename_status(erg status: Int) -> Result[Int, io::IoError] {
+    return case status {
+        -2 => Err(io::IoError.CrossDevice),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
 """Remove one regular file at `path`.
 
 `path` is an immutable `abs` view borrowed only during the native call and is
@@ -185,13 +197,14 @@ open verb same_file(abs left: path_module::Path, abs right: path_module::Path) -
 """Rename one filesystem path from `from` to `to`.
 
 Both arguments are immutable `abs` views valid only for this call. `Ok(0)` is
-returned only after the host completes the rename; rejected, missing,
-cross-device, and other failures return `IoError.Failed`. Neither view is
+returned only after the host completes the rename. A source and destination
+on different filesystems return `Err(IoError.CrossDevice)`; missing,
+permission, and other provider failures remain typed errors. Neither view is
 consumed or retained.
 """
 open verb rename(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_rename_path(from: abs from, to: abs to);
-    return fs_status(status: erg status);
+    return rename_status(status: erg status);
 }
 
 """Copy one regular file and return the host-reported byte count.
@@ -339,6 +352,7 @@ open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoE
         io::IoError.Unsupported => Result[Buffer, io::IoError].Err(io::IoError.Unsupported),
         io::IoError.PermissionDenied => Result[Buffer, io::IoError].Err(io::IoError.PermissionDenied),
         io::IoError.Busy => Result[Buffer, io::IoError].Err(io::IoError.Busy),
+        io::IoError.CrossDevice => Result[Buffer, io::IoError].Err(io::IoError.CrossDevice),
     };
 }
 

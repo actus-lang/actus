@@ -14,6 +14,7 @@ pub(crate) const METADATA_IDENTITY_WINDOWS: i32 = 2;
 const METADATA_STATUS_NOT_FOUND: i32 = -2;
 const METADATA_STATUS_PERMISSION_DENIED: i32 = -3;
 const METADATA_STATUS_UNSUPPORTED: i32 = -4;
+const RENAME_STATUS_CROSS_DEVICE: i32 = -2;
 
 /// Writes file metadata into a caller-owned C-layout output struct.
 ///
@@ -213,9 +214,7 @@ pub unsafe extern "C" fn actus_file_remove_path(path: *const ActusPath) -> i32 {
 /// `from` and `to` must point to valid live `ActusBuffer` values.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_rename_buffer(from: BufferHandle, to: BufferHandle) -> i32 {
-    unsafe {
-        two_path_operation(from, to, |source, destination| std::fs::rename(source, destination))
-    }
+    unsafe { two_path_rename_operation(from, to) }
 }
 
 /// Renames two validated borrowed `ActusPath` values.
@@ -227,9 +226,13 @@ pub unsafe extern "C" fn actus_file_rename_path(
     from: *const ActusPath,
     to: *const ActusPath,
 ) -> i32 {
-    unsafe { with_host_paths(from, to, |source, destination| std::fs::rename(source, destination)) }
-        .and_then(Result::ok)
-        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
+    match unsafe {
+        with_host_paths(from, to, |source, destination| std::fs::rename(source, destination))
+    } {
+        Some(Ok(())) => ABI_STATUS_SUCCESS,
+        Some(Err(error)) => rename_error_status(&error),
+        None => ABI_STATUS_FAILURE,
+    }
 }
 
 /// Copies a file and returns the number of copied bytes, or `-1` on failure.
@@ -417,12 +420,17 @@ where
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
-unsafe fn two_path_operation<F>(from: BufferHandle, to: BufferHandle, operation: F) -> i32
-where
-    F: FnOnce(&std::path::Path, &std::path::Path) -> std::io::Result<()>,
-{
+unsafe fn two_path_rename_operation(from: BufferHandle, to: BufferHandle) -> i32 {
     let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return ABI_STATUS_FAILURE };
-    operation(&from, &to).map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
+    std::fs::rename(&from, &to)
+        .map_or_else(|error| rename_error_status(&error), |_| ABI_STATUS_SUCCESS)
+}
+
+fn rename_error_status(error: &std::io::Error) -> i32 {
+    match error.kind() {
+        std::io::ErrorKind::CrossesDevices => RENAME_STATUS_CROSS_DEVICE,
+        _ => ABI_STATUS_FAILURE,
+    }
 }
 
 unsafe fn two_path_operation_value<F>(from: BufferHandle, to: BufferHandle, operation: F) -> i32
@@ -447,4 +455,21 @@ unsafe fn path_pair(
         return None;
     }
     Some((host_path(unsafe { buffer_bytes(from) }), host_path(unsafe { buffer_bytes(to) })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{RENAME_STATUS_CROSS_DEVICE, rename_error_status};
+
+    #[test]
+    fn rename_preserves_cross_device_error_classification() {
+        let error = std::io::Error::from(std::io::ErrorKind::CrossesDevices);
+        assert_eq!(rename_error_status(&error), RENAME_STATUS_CROSS_DEVICE);
+    }
+
+    #[test]
+    fn rename_keeps_other_errors_generic() {
+        let error = std::io::Error::from(std::io::ErrorKind::NotFound);
+        assert_eq!(rename_error_status(&error), super::ABI_STATUS_FAILURE);
+    }
 }
