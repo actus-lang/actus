@@ -92,6 +92,15 @@ fn open_temporary_file_with_candidate(
         let path = candidate(directory, prefix)?;
         let mut options = std::fs::OpenOptions::new();
         options.read(true).write(true).create_new(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+
+            const FILE_SHARE_READ: u32 = 0x0000_0001;
+            const FILE_SHARE_WRITE: u32 = 0x0000_0002;
+            const FILE_SHARE_DELETE: u32 = 0x0000_0004;
+            options.share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
+        }
         match options.open(&path) {
             Ok(file) => return Ok((file, path)),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
