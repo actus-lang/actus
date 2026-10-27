@@ -114,6 +114,7 @@ fn copy_std_library(root: &Path) {
         ("fs/directory.act", library_file("fs/directory.act")),
         ("fs/file.act", library_file("fs/file.act")),
         ("fs/metadata.act", library_file("fs/metadata.act")),
+        ("fs/locking.act", library_file("fs/locking.act")),
         ("fs/links.act", library_file("fs/links.act")),
         ("fs/operations.act", library_file("fs/operations.act")),
         ("fs/seek.act", library_file("fs/seek.act")),
