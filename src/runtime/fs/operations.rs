@@ -305,6 +305,17 @@ pub unsafe extern "C" fn actus_file_remove_dir_path(path: *const ActusPath) -> i
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
+/// Removes a directory tree at a validated path.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_remove_dir_all_path(path: *const ActusPath) -> i32 {
+    unsafe { with_host_path(path, |value| std::fs::remove_dir_all(value)) }
+        .and_then(Result::ok)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
+}
+
 unsafe fn buffer_bytes(buffer: &super::super::types::ActusBuffer) -> &[u8] {
     if buffer.length == 0 {
         return &[];

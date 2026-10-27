@@ -348,7 +348,7 @@ publication. The Gate 7 file-operation validation matrix is complete.
 ## Gate 8: Mutation, publication, and recovery operations
 
 - [x] Add `create_dir` and an explicit `create_dir_all` for parent creation.
-- [ ] Add `remove_file`, `remove_dir`, and a separately guarded recursive
+- [x] Add `remove_file`, `remove_dir`, and a separately guarded recursive
       removal operation; recursive deletion must never be implicit.
 - [ ] Add `rename` with same-filesystem and cross-filesystem error semantics.
 - [ ] Add `copy_file` with explicit overwrite and metadata policies.

@@ -80,6 +80,16 @@ The path is borrowed for the call. The bridge returns zero on success or
 unsafe extern "C" verb actus_file_remove_dir_path(abs path: path_module::Path) -> Int;
 
 """
+Remove a directory tree through an explicit recursive native operation.
+
+The path is borrowed for one blocking call and is not retained. Zero means
+the requested tree was removed; `-1` reports a missing, protected, invalid,
+or provider-rejected target. This bridge is never called implicitly by
+`remove_dir` or temporary cleanup.
+"""
+unsafe extern "C" verb actus_file_remove_dir_all_path(abs path: path_module::Path) -> Int;
+
+"""
 Read all bytes from `handle` into the caller-owned `ins buffer`.
 
 The runtime appends into the existing allocation and retains no pointer.
@@ -232,6 +242,19 @@ implicit.
 """
 open verb remove_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_dir_path(path: abs path);
+    return fs_status(status: erg status);
+}
+
+"""
+Explicitly remove a directory tree rooted at `path`.
+
+`path` is an immutable `abs` view borrowed only during the recursive native
+operation. No caller path or handle is retained, and recursion happens only
+because this verb was called explicitly. `Ok(0)` means the tree was removed;
+`Err(IoError.Failed)` reports a rejected or failed provider operation.
+"""
+open verb remove_dir_all(abs path: path_module::Path) -> Result[Int, io::IoError] {
+    erg status = actus_file_remove_dir_all_path(path: abs path);
     return fs_status(status: erg status);
 }
 
