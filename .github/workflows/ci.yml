@@ -283,7 +283,7 @@ jobs:
 
       - name: Run coordinated publication capability fixture
         shell: bash
-        run: cargo run --bin actus -- test --file tests/library/fs/publication_coordinator.act --strict
+        run: cargo run --features test-fault-injection --bin actus -- test --file tests/library/fs/publication_coordinator.act --strict
 
   cranelift-only:
     name: Cranelift-only feature contract
