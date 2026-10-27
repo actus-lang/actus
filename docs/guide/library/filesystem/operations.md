@@ -179,6 +179,12 @@ ordering operation, not immunity from every storage-device or power failure.
 The library does not scan or delete stale staging files implicitly. Callers
 must choose a private staging namespace and define recovery and retention.
 
+The strict publication fixture covers deterministic failed-rename cleanup and
+replacement of an existing stale staging path. It does not claim to simulate
+truncated writes, provider flush faults, or process interruption; those cases
+require a dedicated test-only fault-injection seam and remain outside the
+production API.
+
 ## Hot-path boundary
 
 All operations in this page can block and can mutate external state. Keep them

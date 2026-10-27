@@ -388,6 +388,14 @@ injection remain open follow-up work. The Unix-only
 without a remove-then-rename gap; compare-before-publish remains open because
 the portable runtime has no atomic expected-identity exchange primitive.
 
+Gate 8 deterministic failure evidence (2026-10-27): the mirrored publication
+fixture now covers failed destination rename with staging cleanup and stale
+staging replacement, in addition to successful publication, parent sync, and
+atomic destination replacement. The fixture passes 5/5 in strict Unix mode.
+True truncated-write, flush-failure, and interrupted-process injection remain
+open because the production runtime intentionally exposes no fault-injection
+control surface.
+
 ## Gate 9: Links, permissions, and platform capabilities
 
 - [ ] Add read-only symlink inspection and explicit symlink creation where
