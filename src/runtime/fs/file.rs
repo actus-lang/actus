@@ -168,19 +168,19 @@ pub extern "C" fn actus_file_close(handle: i64) -> i32 {
 /// Acquires a shared advisory lock on the complete file.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_lock_shared(handle: i64) -> i32 {
-    advisory_lock(handle, false, false)
+    advisory_lock(native_lock_handle(handle), false, false)
 }
 
 /// Acquires an exclusive advisory lock on the complete file.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_lock_exclusive(handle: i64) -> i32 {
-    advisory_lock(handle, true, false)
+    advisory_lock(native_lock_handle(handle), true, false)
 }
 
 /// Attempts an exclusive advisory lock without waiting for another owner.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_file_try_lock(handle: i64) -> i32 {
-    advisory_lock(handle, true, true)
+    advisory_lock(native_lock_handle(handle), true, true)
 }
 
 /// Releases the advisory lock associated with the complete file.
@@ -207,7 +207,13 @@ pub extern "C" fn actus_file_unlock(handle: i64) -> i32 {
             event: std::ptr::null_mut(),
         };
         return if unsafe {
-            UnlockFileEx(handle as *mut std::ffi::c_void, 0, u32::MAX, u32::MAX, &mut overlapped)
+            UnlockFileEx(
+                actus_handle(i32::try_from(handle).unwrap_or(-1)) as *mut std::ffi::c_void,
+                0,
+                u32::MAX,
+                u32::MAX,
+                &mut overlapped,
+            )
         } == 0
         {
             map_lock_error()
@@ -217,6 +223,19 @@ pub extern "C" fn actus_file_unlock(handle: i64) -> i32 {
     }
     #[allow(unreachable_code)]
     FILE_STATUS_UNSUPPORTED
+}
+
+fn native_lock_handle(handle: i64) -> i64 {
+    #[cfg(unix)]
+    {
+        return handle;
+    }
+    #[cfg(windows)]
+    {
+        return actus_handle(i32::try_from(handle).unwrap_or(-1));
+    }
+    #[allow(unreachable_code)]
+    -1
 }
 
 fn advisory_lock(handle: i64, exclusive: bool, non_blocking: bool) -> i32 {

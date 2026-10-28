@@ -1,37 +1,10 @@
 use super::super::contract::{ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
 use super::super::path::ActusPath;
 use super::super::types::{ActusMetadata, BufferHandle};
+#[cfg(windows)]
+use super::identity::windows_file_identity;
 use super::path_bridge::{replace_output_path, with_host_path, with_host_paths};
 use super::{actus_handle, with_file};
-#[cfg(windows)]
-use std::os::windows::io::AsRawHandle;
-
-#[cfg(windows)]
-#[repr(C)]
-struct WindowsFileInformation {
-    attributes: u32,
-    creation_time_low: u32,
-    creation_time_high: u32,
-    last_access_time_low: u32,
-    last_access_time_high: u32,
-    last_write_time_low: u32,
-    last_write_time_high: u32,
-    volume_serial_number: u32,
-    file_size_high: u32,
-    file_size_low: u32,
-    number_of_links: u32,
-    file_index_high: u32,
-    file_index_low: u32,
-}
-
-#[cfg(windows)]
-#[link(name = "kernel32")]
-unsafe extern "system" {
-    fn GetFileInformationByHandle(
-        handle: std::os::windows::io::RawHandle,
-        information: *mut WindowsFileInformation,
-    ) -> i32;
-}
 
 pub(crate) const METADATA_VALUE_AVAILABLE: i32 = 0;
 pub(crate) const METADATA_VALUE_UNSUPPORTED: i32 = 1;
@@ -83,9 +56,15 @@ pub unsafe extern "C" fn actus_file_metadata_path(
     if output.is_null() {
         return ABI_STATUS_FAILURE;
     }
-    let result = unsafe { with_host_path(path, |native| native.metadata()) };
+    let result = unsafe {
+        with_host_path(path, |native| {
+            native.metadata().map(|metadata| (metadata, metadata_identity_for_path(native)))
+        })
+    };
     match result {
-        Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
+        Some(Ok((metadata, identity))) => unsafe {
+            write_metadata_with_identity(output, &metadata, identity)
+        },
         Some(Err(error)) => metadata_error_status(&error),
         None => ABI_STATUS_FAILURE,
     }
@@ -180,26 +159,33 @@ pub(super) fn same_file_identity(
     }
     #[cfg(windows)]
     {
-        let left_identity = windows_file_identity(left)?;
-        let right_identity = windows_file_identity(right)?;
+        let left_identity = windows_file_identity(left).map_err(|_| IdentityError::Failed)?;
+        let right_identity = windows_file_identity(right).map_err(|_| IdentityError::Failed)?;
         return Ok(left_identity == right_identity);
     }
     #[allow(unreachable_code)]
     Err(IdentityError::Unsupported)
 }
 
-#[cfg(windows)]
-fn windows_file_identity(path: &std::path::Path) -> Result<(u64, u64), IdentityError> {
-    let file = std::fs::File::open(path).map_err(|_| IdentityError::Failed)?;
-    let mut information: WindowsFileInformation = unsafe { std::mem::zeroed() };
-    let success = unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) };
-    if success == 0 {
-        return Err(IdentityError::Failed);
+fn metadata_identity_for_path(path: &std::path::Path) -> (u64, u64, i32, i32) {
+    #[cfg(windows)]
+    {
+        return windows_file_identity(path).map_or(
+            (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED),
+            |identity| {
+                (identity.0, identity.1, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_AVAILABLE)
+            },
+        );
     }
-    let volume = u64::from(information.volume_serial_number);
-    let index =
-        (u64::from(information.file_index_high) << 32) | u64::from(information.file_index_low);
-    Ok((volume, index))
+    #[cfg(unix)]
+    {
+        let Ok(metadata) = std::fs::metadata(path) else {
+            return (0, 0, METADATA_IDENTITY_NONE, METADATA_VALUE_UNAVAILABLE);
+        };
+        return metadata_identity(&metadata);
+    }
+    #[allow(unreachable_code)]
+    (0, 0, METADATA_IDENTITY_NONE, METADATA_VALUE_UNSUPPORTED)
 }
 
 /// Writes metadata for an already-open file handle into an output struct.
@@ -379,11 +365,18 @@ pub(crate) unsafe fn write_metadata(
     output: *mut ActusMetadata,
     metadata: &std::fs::Metadata,
 ) -> i32 {
+    unsafe { write_metadata_with_identity(output, metadata, metadata_identity(metadata)) }
+}
+
+unsafe fn write_metadata_with_identity(
+    output: *mut ActusMetadata,
+    metadata: &std::fs::Metadata,
+    identity: (u64, u64, i32, i32),
+) -> i32 {
     let Ok(size) = i32::try_from(metadata.len()) else { return ABI_STATUS_FAILURE };
     let modified = metadata_timestamp(metadata.modified());
     let accessed = metadata_timestamp(metadata.accessed());
     let created = metadata_timestamp(metadata.created());
-    let identity = metadata_identity(metadata);
     unsafe {
         *output = ActusMetadata {
             size,

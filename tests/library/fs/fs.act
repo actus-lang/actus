@@ -37,7 +37,7 @@ verb missing_metadata_path() -> Result[path::Path, path::PathError] {
     append(raw, 116u8);
     append(raw, 97u8);
     append(raw, 0u8);
-    return path::path_from_posix(storage: dat raw);
+    return path::path_from_ascii(storage: dat raw);
 }
 
 meta test

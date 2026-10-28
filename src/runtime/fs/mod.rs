@@ -2,6 +2,7 @@ mod buffers;
 mod copy;
 mod directory;
 mod file;
+mod identity;
 mod operations;
 mod path_bridge;
 mod path_open;
