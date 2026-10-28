@@ -218,7 +218,7 @@ pub extern "C" fn actus_file_unlock(handle: i64) -> i32 {
         {
             map_lock_error()
         } else {
-            super::locking::remove(identity, handle);
+            super::locking::remove(identity, native);
             ABI_STATUS_SUCCESS
         };
     }
