@@ -486,10 +486,16 @@ rename` as a fallback. A cooperative lock-based implementation may exist as a
 separate explicitly weaker API, but it cannot claim protection from writers
 that do not honor the same lock.
 
-The gate remains open until each supported target either supplies and invokes
-the native atomic primitive or returns `Unsupported` with capability evidence,
-and concurrent-writer fixtures prove that no stale expected identity can
-overwrite a newer publication.
+The current implementation deliberately scopes this contract to cooperating
+writers: Unix uses native device/inode identity, an exclusive coordinator
+lock, and one atomic replacement while that lock is held. Windows exposes the
+capability fixture as `Unsupported` because this runtime profile does not yet
+provide the required atomic replacement primitive. No target uses an unlocked
+check-then-rename approximation. The mirrored strict fixtures cover missing,
+unchanged, stale, and unsupported destinations; the native Unix regression
+runs two concurrent cooperating writers and proves that exactly one publishes
+while the other reports `Conflict`. A future target primitive may strengthen
+the guarantee against writers that bypass the coordinator.
 
 ## Rejected alternatives
 

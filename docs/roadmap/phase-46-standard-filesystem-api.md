@@ -443,11 +443,14 @@ unchanged.
       fall back to an unlocked check-then-rename sequence.
 - [x] Document that the coordinator protects only cooperating writers and
       that uncoordinated external writers are outside its guarantee.
-- [ ] Add Unix and Windows capability fixtures plus adversarial concurrent
+- [x] Add Unix and Windows capability fixtures plus adversarial concurrent
       writer tests for unchanged, changed, missing, and unsupported targets;
-      the current Unix fixture covers successful absent publication and stale
-      identity preservation.
-- [ ] Record identity semantics, crash ordering, rollback behavior, and
+      the mirrored fixture covers successful absent publication, unchanged
+      identity replacement, stale identity preservation, and Windows
+      `IoError.Unsupported`; the native Unix regression runs concurrent
+      absent and changed writers and requires one `Published` plus one
+      `Conflict`.
+- [x] Record identity semantics, crash ordering, rollback behavior, and
       compiler/runtime evidence before closing the gate.
 
 Gate 8.2 is not closable by reading metadata and then calling `rename` without
@@ -457,6 +460,20 @@ claim of protection from arbitrary writers that bypass the lock. A future
 target-level compare-and-publish primitive may strengthen this boundary; until
 then unsupported targets must return `IoError.Unsupported` rather than use an
 unlocked approximation.
+
+Gate 8.2 completion evidence (2026-10-28): identity uses POSIX device/inode
+metadata and is never inferred from size or timestamps. The publication point
+is the successful atomic replacement; failures before it do not publish the
+staging path, while failures after it cannot roll back the namespace change.
+The coordinator releases its lock after replacement and reports provider or
+capability failures without falling back to an unlocked sequence. The strict
+fixture covers missing, unchanged, stale, and Windows-unsupported targets;
+`tests/fs.rs::coordinator_serializes_concurrent_absent_and_changed_publishers`
+proves that two cooperating Unix writers produce exactly one publication and
+one conflict. Local evidence includes strict compilation, Clippy with
+`-D warnings`, the filesystem integration suite, and
+`./scripts/check_stdlib.sh`; cross-platform CI remains the final authority for
+Windows capability behavior.
 
 ## Gate 9: Links, permissions, and platform capabilities
 

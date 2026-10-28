@@ -2,11 +2,140 @@ use std::fs;
 #[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::thread;
+#[cfg(unix)]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::cli::run_with_args;
 use actus::runtime::{
-    actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_write,
+    ActusBuffer, ActusMetadata, ActusPath, actus_file_close, actus_file_flush,
+    actus_file_metadata_path, actus_file_open, actus_file_publish_coordinated_path,
+    actus_file_read, actus_file_write,
 };
+
+#[cfg(unix)]
+struct NativePath {
+    path: ActusPath,
+    buffer: Box<ActusBuffer>,
+    storage: Box<[u8]>,
+}
+
+#[cfg(unix)]
+fn native_path(path: &Path) -> NativePath {
+    use std::os::unix::ffi::OsStrExt;
+    let mut storage = path.as_os_str().as_bytes().to_vec();
+    storage.push(0);
+    let mut storage = storage.into_boxed_slice();
+    let length = storage.len() - 1;
+    let data = storage.as_mut_ptr();
+    let capacity = storage.len();
+    let mut buffer = Box::new(ActusBuffer { data, length: capacity, capacity });
+    let path = ActusPath {
+        storage: &mut *buffer,
+        platform: 0,
+        length: i32::try_from(length).expect("test path length fits ActusPath"),
+        capacity: i32::try_from(capacity).expect("test path capacity fits ActusPath"),
+        terminated: 1,
+    };
+    NativePath { path, buffer, storage }
+}
+
+#[cfg(unix)]
+fn empty_metadata() -> ActusMetadata {
+    ActusMetadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+        is_symlink: 0,
+        modified_seconds: 0,
+        modified_status: 0,
+        accessed_seconds: 0,
+        accessed_status: 0,
+        created_seconds: 0,
+        created_status: 0,
+        identity_primary: 0,
+        identity_secondary: 0,
+        identity_kind: 0,
+        identity_status: 0,
+    }
+}
+
+#[cfg(unix)]
+fn copy_metadata(metadata: &ActusMetadata) -> ActusMetadata {
+    ActusMetadata {
+        size: metadata.size,
+        is_file: metadata.is_file,
+        is_dir: metadata.is_dir,
+        readonly: metadata.readonly,
+        is_symlink: metadata.is_symlink,
+        modified_seconds: metadata.modified_seconds,
+        modified_status: metadata.modified_status,
+        accessed_seconds: metadata.accessed_seconds,
+        accessed_status: metadata.accessed_status,
+        created_seconds: metadata.created_seconds,
+        created_status: metadata.created_status,
+        identity_primary: metadata.identity_primary,
+        identity_secondary: metadata.identity_secondary,
+        identity_kind: metadata.identity_kind,
+        identity_status: metadata.identity_status,
+    }
+}
+
+#[cfg(unix)]
+fn concurrent_publish_statuses(root: &Path, destination_exists: bool) -> Vec<i32> {
+    let lock_path = root.join("publish.lock");
+    let destination = root.join("destination.bin");
+    let first_staging = root.join("first.stage");
+    let second_staging = root.join("second.stage");
+    fs::write(&first_staging, b"first").expect("write first staging file");
+    fs::write(&second_staging, b"second").expect("write second staging file");
+    if destination_exists {
+        fs::write(&destination, b"base").expect("write destination file");
+    }
+
+    let destination_view = native_path(&destination);
+    let mut expected = empty_metadata();
+    let metadata_status = if destination_exists {
+        unsafe { actus_file_metadata_path(&destination_view.path, &mut expected) }
+    } else {
+        expected.identity_kind = 0;
+        0
+    };
+    assert_eq!(metadata_status, 0);
+    drop(destination_view);
+
+    let spawn_writer = |staging: PathBuf, expected: ActusMetadata| {
+        let lock_path = lock_path.clone();
+        let destination = destination.clone();
+        thread::spawn(move || {
+            let lock_view = native_path(&lock_path);
+            let staging_view = native_path(&staging);
+            let destination_view = native_path(&destination);
+            let status = unsafe {
+                actus_file_publish_coordinated_path(
+                    &lock_view.path,
+                    &staging_view.path,
+                    &destination_view.path,
+                    &expected,
+                )
+            };
+            let _ = (&lock_view.buffer, &lock_view.storage);
+            let _ = (&staging_view.buffer, &staging_view.storage);
+            let _ = (&destination_view.buffer, &destination_view.storage);
+            status
+        })
+    };
+    let first = spawn_writer(first_staging, copy_metadata(&expected));
+    let second = spawn_writer(second_staging, copy_metadata(&expected));
+    let mut statuses = [
+        first.join().expect("first coordinator writer must join"),
+        second.join().expect("second coordinator writer must join"),
+    ];
+    statuses.sort_unstable();
+    statuses.to_vec()
+}
 
 fn copy_library(root: &Path, files: &[(&str, String)]) {
     for (relative, source) in files {
@@ -376,4 +505,23 @@ fn runtime_file_bridge_round_trips_and_closes_handles() {
     assert_eq!(&destination, payload);
     assert_eq!(actus_file_close(reopened), 0);
     fs::remove_file(path).expect("remove runtime fixture");
+}
+
+#[cfg(unix)]
+#[test]
+fn coordinator_serializes_concurrent_absent_and_changed_publishers() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock should be after the Unix epoch")
+        .as_nanos();
+    let absent_root = std::env::temp_dir().join(format!("actus-coordinator-absent-{nonce}"));
+    let changed_root = std::env::temp_dir().join(format!("actus-coordinator-changed-{nonce}"));
+    fs::create_dir_all(&absent_root).expect("create absent coordinator root");
+    fs::create_dir_all(&changed_root).expect("create changed coordinator root");
+
+    assert_eq!(concurrent_publish_statuses(&absent_root, false), [-3, 0]);
+    assert_eq!(concurrent_publish_statuses(&changed_root, true), [-3, 0]);
+
+    fs::remove_dir_all(absent_root).expect("remove absent coordinator root");
+    fs::remove_dir_all(changed_root).expect("remove changed coordinator root");
 }

@@ -173,6 +173,17 @@ Targets without the required locking or atomic replacement return
 `IoError.Unsupported`; the implementation never degrades to an unlocked
 metadata check followed by rename.
 
+The coordinator's identity token is target-native: POSIX uses the device and
+inode pair, while a target without a stable identity or atomic replacement
+capability reports `Unsupported`. The publication point remains the successful
+atomic replacement. A failure before replacement leaves the active destination
+unchanged and retains the staged path for the caller's cleanup policy; a
+failure after replacement cannot undo publication. The strict coordinator
+fixtures cover expected missing, unchanged, and stale destinations, plus the
+Windows unsupported capability. The native Unix regression starts two
+cooperating writers concurrently and asserts exactly one publication and one
+conflict for both an absent and an already-existing destination.
+
 ## Failure behavior
 
 A write, short count, flush, or rename failure is returned as a typed error.
