@@ -3,6 +3,7 @@ mod copy;
 mod directory;
 mod file;
 mod identity;
+mod locking;
 mod operations;
 mod path_bridge;
 mod path_open;

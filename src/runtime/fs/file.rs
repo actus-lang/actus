@@ -199,6 +199,12 @@ pub extern "C" fn actus_file_unlock(handle: i64) -> i32 {
     }
     #[cfg(windows)]
     {
+        let native = actus_handle(i32::try_from(handle).unwrap_or(-1));
+        let identity =
+            match super::identity::windows_file_identity_handle(native as *mut std::ffi::c_void) {
+                Ok(identity) => identity,
+                Err(_) => return ABI_STATUS_FAILURE,
+            };
         let mut overlapped = WindowsOverlapped {
             internal: 0,
             internal_high: 0,
@@ -207,17 +213,12 @@ pub extern "C" fn actus_file_unlock(handle: i64) -> i32 {
             event: std::ptr::null_mut(),
         };
         return if unsafe {
-            UnlockFileEx(
-                actus_handle(i32::try_from(handle).unwrap_or(-1)) as *mut std::ffi::c_void,
-                0,
-                u32::MAX,
-                u32::MAX,
-                &mut overlapped,
-            )
+            UnlockFileEx(native as *mut std::ffi::c_void, 0, u32::MAX, u32::MAX, &mut overlapped)
         } == 0
         {
             map_lock_error()
         } else {
+            super::locking::remove(identity, handle);
             ABI_STATUS_SUCCESS
         };
     }
@@ -256,35 +257,44 @@ fn advisory_lock(handle: i64, exclusive: bool, non_blocking: bool) -> i32 {
     }
     #[cfg(windows)]
     {
-        let mut flags = if exclusive { 2 } else { 0 };
-        if non_blocking {
-            flags |= 1;
-        }
-        let mut overlapped = WindowsOverlapped {
-            internal: 0,
-            internal_high: 0,
-            offset: 0,
-            offset_high: 0,
-            event: std::ptr::null_mut(),
-        };
-        return if unsafe {
-            LockFileEx(
-                handle as *mut std::ffi::c_void,
-                flags,
-                0,
-                u32::MAX,
-                u32::MAX,
-                &mut overlapped,
-            )
-        } == 0
+        return windows_advisory_lock(handle, exclusive, non_blocking);
+    }
+    #[allow(unreachable_code)]
+    FILE_STATUS_UNSUPPORTED
+}
+
+#[cfg(windows)]
+fn windows_advisory_lock(handle: i64, exclusive: bool, non_blocking: bool) -> i32 {
+    let identity = match super::identity::windows_file_identity_handle(handle as *mut _) {
+        Ok(identity) => identity,
+        Err(_) => return ABI_STATUS_FAILURE,
+    };
+    if !super::locking::register(identity, handle, exclusive) {
+        return FILE_STATUS_BUSY;
+    }
+    let mut flags = if exclusive { 2 } else { 0 };
+    if non_blocking {
+        flags |= 1;
+    }
+    let mut overlapped = WindowsOverlapped {
+        internal: 0,
+        internal_high: 0,
+        offset: 0,
+        offset_high: 0,
+        event: std::ptr::null_mut(),
+    };
+    let status =
+        if unsafe { LockFileEx(handle as *mut _, flags, 0, u32::MAX, u32::MAX, &mut overlapped) }
+            == 0
         {
             map_lock_error()
         } else {
             ABI_STATUS_SUCCESS
         };
+    if status != ABI_STATUS_SUCCESS {
+        super::locking::remove(identity, handle);
     }
-    #[allow(unreachable_code)]
-    FILE_STATUS_UNSUPPORTED
+    status
 }
 
 fn map_lock_error() -> i32 {

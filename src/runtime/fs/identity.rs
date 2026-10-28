@@ -63,10 +63,20 @@ pub(super) fn windows_file_identity(path: &std::path::Path) -> Result<(u64, u64)
     if handle.is_null() || handle == INVALID_HANDLE_VALUE {
         return Err(());
     }
-    let mut information: WindowsFileInformation = unsafe { std::mem::zeroed() };
-    let success = unsafe { GetFileInformationByHandle(handle, &mut information) };
+    let identity = windows_file_identity_handle(handle);
     let closed = unsafe { CloseHandle(handle) } != 0;
-    if success == 0 || !closed {
+    if !closed {
+        return Err(());
+    }
+    identity
+}
+
+#[cfg(windows)]
+pub(super) fn windows_file_identity_handle(
+    handle: *mut std::ffi::c_void,
+) -> Result<(u64, u64), ()> {
+    let mut information: WindowsFileInformation = unsafe { std::mem::zeroed() };
+    if unsafe { GetFileInformationByHandle(handle, &mut information) } == 0 {
         return Err(());
     }
     let volume = u64::from(information.volume_serial_number);
