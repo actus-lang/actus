@@ -150,6 +150,53 @@ fn lowers_plain_result_case_into_neutral_branches() {
 }
 
 #[test]
+fn lowers_drop_cleanup_with_case_branch_and_loop_control_flow() {
+    let source = "struct Resource { erg handle: Int, } perform Drop for Resource { verb drop(ins self: Resource) { return; } } verb produce() -> Result[Resource, Int] { return Result[Resource, Int].Ok(Resource { handle: 1, }); } verb main() -> Int { erg result = produce(); return case dat result { Result.Ok(resource) => { for erg index: u32 in 0u32 .. 2u32 { if index == 1u32 { return 0; } } 1; }, Result.Err(_) => 2, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "Drop CFG fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("Drop CFG fixture should parse");
+    let module =
+        super::super::lower_program_to_backend_module("actus_root", &program, Some("main"), None)
+            .expect("branch-aware Drop cleanup should lower without non-dominating SSA values");
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("main"))
+        .expect("main function should be present");
+    let terminal_cleanup_counts = main.blocks.iter().filter_map(|block| {
+        block.instructions.last().and_then(|instruction| {
+            matches!(instruction, BackendInstruction::Return { .. }).then(|| {
+                block
+                    .instructions
+                    .iter()
+                    .filter(|instruction| matches!(instruction, BackendInstruction::Cleanup { .. }))
+                    .count()
+            })
+        })
+    });
+    let counts = terminal_cleanup_counts.collect::<Vec<_>>();
+    assert!(counts.contains(&1));
+    assert!(counts.iter().all(|count| *count <= 1));
+}
+
+#[test]
+fn lowers_drop_cleanup_when_case_branch_falls_through() {
+    let source = "struct Resource { erg handle: Int, } perform Drop for Resource { verb drop(ins self: Resource) { return; } } verb produce() -> Result[Resource, Int] { return Result[Resource, Int].Ok(Resource { handle: 1, }); } verb main() -> Int { erg result = produce(); case dat result { Result.Ok(resource) => { }, Result.Err(_) => { }, }; return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "fallthrough Drop fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("fallthrough Drop fixture should parse");
+    let module =
+        super::super::lower_program_to_backend_module("actus_root", &program, Some("main"), None)
+            .expect("case fallthrough should retain a valid cleanup owner");
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.symbol.as_str().ends_with("main"))
+        .expect("main function should be present");
+    assert!(!main.blocks.is_empty());
+}
+
+#[test]
 fn lowers_unit_return_case_calls_as_discarded_calls() {
     let source = "verb consume() { return; } verb dispatch(erg flag: Bool) { return case flag { true => { consume(); }, _ => { }, }; }";
     let (tokens, errors) = scan(source);

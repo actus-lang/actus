@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{MetaAttribute, Program, TopLevelDecl};
+use crate::ast::{MetaAttribute, Program, TestFault, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnostic};
 use crate::lexer::{TokenKind, scan};
@@ -21,6 +21,7 @@ pub(super) struct DiscoveredTest {
     pub(super) name: String,
     pub(super) program: Program,
     pub(super) compilation_plan: Option<ModuleCompilationPlan>,
+    pub(super) fault: Option<TestFault>,
 }
 
 pub(super) struct TestCollection {
@@ -301,6 +302,10 @@ fn discover_tests(
                     name: verb.name.clone(),
                     program: program.clone(),
                     compilation_plan: compilation_plan.clone(),
+                    fault: verb.metadata.iter().find_map(|attribute| match attribute {
+                        MetaAttribute::Fault(fault) => Some(*fault),
+                        _ => None,
+                    }),
                 })
             }
             _ => None,

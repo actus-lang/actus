@@ -94,6 +94,11 @@ verb inspect_and_remove(abs path: Path) -> Int {
             IoError.EndOfStream => 15,
             IoError.InvalidInput => 16,
             IoError.InvalidData => 17,
+            IoError.Unsupported => 18,
+            IoError.PermissionDenied => 19,
+            IoError.Busy => 20,
+            IoError.CrossDevice => 21,
+            IoError.AlreadyExists => 22,
         },
         Result.Ok(value) => {
             drop(value);

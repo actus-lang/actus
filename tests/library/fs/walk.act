@@ -1,0 +1,143 @@
+"""Mirrored strict coverage for bounded recursive filesystem walking."""
+import {
+    std::fs,
+    open std::io,
+    std::path,
+};
+
+verb current_directory() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb bounded_options() -> fs::WalkOptions {
+    return fs::WalkOptions {
+        max_depth: 0u32,
+        follow_symlinks: false,
+        include_hidden: false,
+        order: fs::DirectoryOrder.Lexicographic,
+        error_policy: fs::WalkErrorPolicy.FailFast,
+    };
+}
+
+verb open_root_walker() -> Result[fs::Walker, IoError] {
+    erg root_result = current_directory();
+    return case dat root_result {
+        Result.Err(_) => Err(IoError.Failed),
+        Result.Ok(root) => {
+            erg options = bounded_options();
+            return fs::walk(path: abs root, options: abs options);
+        },
+    };
+}
+
+meta test
+verb walker_emits_root_enter_event() -> Int {
+    erg opened = open_root_walker();
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(walker) => {
+            erg event_result = fs::next_walk_event(walker: ins walker);
+            erg code = case dat event_result {
+                Result.Err(_) => 2,
+                Result.Ok(value) => case dat value {
+                    Option.None => 3,
+                    Option.Some(event) => {
+                        erg result = if event.kind == fs::WalkEventKind.EnterDirectory && event.depth == 0u32 {
+                            0;
+                        } else {
+                            4;
+                        };
+                        drop(event);
+                        result;
+                    },
+                },
+            };
+            fs::close_walker(walker: dat walker);
+            code;
+        },
+    };
+}
+
+meta test
+verb walker_emits_root_leave_event() -> Int {
+    erg opened = open_root_walker();
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(walker) => {
+            erg first = fs::next_walk_event(walker: ins walker);
+            case dat first {
+                Result.Ok(value) => case dat value {
+                    Option.Some(event) => {
+                        drop(event);
+                    },
+                    Option.None => {},
+                },
+                Result.Err(_) => {},
+            };
+            erg second = fs::next_walk_event(walker: ins walker);
+            erg code = case dat second {
+                Result.Err(_) => 2,
+                Result.Ok(value) => case dat value {
+                    Option.None => 3,
+                    Option.Some(event) => {
+                        erg result = if event.kind == fs::WalkEventKind.LeaveDirectory {
+                            0;
+                        } else {
+                            4;
+                        };
+                        drop(event);
+                        result;
+                    },
+                },
+            };
+            fs::close_walker(walker: dat walker);
+            code;
+        },
+    };
+}
+
+meta test
+verb walker_reports_end_of_stream() -> Int {
+    erg opened = open_root_walker();
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(walker) => {
+            erg first = fs::next_walk_event(walker: ins walker);
+            case dat first {
+                Result.Ok(value) => case dat value {
+                    Option.Some(event) => {
+                        drop(event);
+                    },
+                    Option.None => {},
+                },
+                Result.Err(_) => {},
+            };
+            erg second = fs::next_walk_event(walker: ins walker);
+            case dat second {
+                Result.Ok(value) => case dat value {
+                    Option.Some(event) => {
+                        drop(event);
+                    },
+                    Option.None => {},
+                },
+                Result.Err(_) => {},
+            };
+            erg end = fs::next_walk_event(walker: ins walker);
+            erg code = case dat end {
+                Result.Err(_) => 2,
+                Result.Ok(value) => case dat value {
+                    Option.None => 0,
+                    Option.Some(event) => {
+                        drop(event);
+                        3;
+                    },
+                },
+            };
+            fs::close_walker(walker: dat walker);
+            code;
+        },
+    };
+}

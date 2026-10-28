@@ -13,7 +13,23 @@ use actus::runtime::{
 #[test]
 fn null_runtime_handles_return_explicit_failure_statuses() {
     let null = ptr::null_mut();
-    let mut metadata = ActusMetadata { size: 0, is_file: 0, is_dir: 0, readonly: 0 };
+    let mut metadata = ActusMetadata {
+        size: 0,
+        is_file: 0,
+        is_dir: 0,
+        readonly: 0,
+        is_symlink: 0,
+        modified_seconds: 0,
+        modified_status: 0,
+        accessed_seconds: 0,
+        accessed_status: 0,
+        created_seconds: 0,
+        created_status: 0,
+        identity_primary: 0,
+        identity_secondary: 0,
+        identity_kind: 0,
+        identity_status: 0,
+    };
 
     unsafe {
         assert_eq!(actus_print_buffer_stdout(null), ABI_STATUS_FAILURE);

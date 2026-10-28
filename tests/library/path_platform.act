@@ -284,3 +284,33 @@ verb invalid_utf16_and_non_utf8_posix_are_distinct() -> Int {
         Result.Err(_) => 1,
     };
 }
+
+meta target("windows")
+meta test
+verb windows_reserved_name_remains_lexical() -> Int {
+    erg raw = Buffer[0];
+    append(raw, 67u8);
+    append(raw, 0u8);
+    append(raw, 79u8);
+    append(raw, 0u8);
+    append(raw, 78u8);
+    append(raw, 0u8);
+    append(raw, 0u8);
+    append(raw, 0u8);
+    erg result = path_from_windows_utf16(storage: dat raw);
+    return case dat result {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            if path.platform != PathPlatform.Windows {
+                drop(path);
+                return 2;
+            }
+            if path.length != 3 {
+                drop(path);
+                return 3;
+            }
+            drop(path);
+            0;
+        },
+    };
+}

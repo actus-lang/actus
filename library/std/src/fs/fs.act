@@ -8,11 +8,29 @@ open file;
 """Re-export typed metadata values and metadata providers."""
 open metadata;
 
+"""Re-export explicit symbolic-link inspection operations."""
+open links;
+
+"""Re-export typed readonly and permission inspection operations."""
+open permissions;
+
+"""Re-export typed advisory-locking operations."""
+open locking;
+
 """Re-export path-based filesystem operations and typed statuses."""
 open operations;
 
 """Re-export explicit open-mode configuration and constructors."""
 open options;
 
+"""Re-export staged writes and atomic publication operations."""
+open publication;
+
 """Re-export file cursor origins and seek contracts."""
 open seek;
+
+"""Re-export secure temporary-resource creation and cleanup."""
+open temporary;
+
+"""Re-export bounded recursive walking and traversal event contracts."""
+open walk;

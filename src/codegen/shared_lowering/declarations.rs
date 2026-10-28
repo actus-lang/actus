@@ -191,6 +191,13 @@ fn build_performance_metadata(
     symbols.extend(context_symbols);
     return_types.extend(context_return_types);
     nominal_types.extend(context_nominal_types);
+    let local_symbols = inputs
+        .performances
+        .iter()
+        .zip(&inputs.performance_signatures)
+        .filter(|((perform, _), _)| !perform.module_import)
+        .map(|(_, signature)| signature.symbol.as_str().to_owned())
+        .collect::<std::collections::BTreeSet<_>>();
     let imported_externals = inputs
         .performances
         .iter()
@@ -203,7 +210,11 @@ fn build_performance_metadata(
         .iter()
         .map(performance_external)
         .collect::<Result<Vec<_>, _>>()?;
-    let externals = imported_externals.into_iter().chain(context_externals).collect();
+    let externals = imported_externals
+        .into_iter()
+        .chain(context_externals)
+        .filter(|external| !local_symbols.contains(external.symbol.as_str()))
+        .collect();
     Ok((symbols, return_types, nominal_types, externals))
 }
 

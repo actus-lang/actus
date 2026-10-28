@@ -66,6 +66,47 @@ pub unsafe extern "C" fn actus_path_ends_with(
     unsafe { compare_components(path, suffix, true) }
 }
 
+#[unsafe(no_mangle)]
+/// Tests whether the final path component is a conventional dot-hidden name.
+///
+/// # Safety
+/// `path` must be null or a valid `ActusPath` with live storage.
+pub unsafe extern "C" fn actus_path_is_hidden(path: *const ActusPath) -> i32 {
+    let Ok((buffer, platform)) = (unsafe { path_units(path) }) else { return ABI_STATUS_FAILURE };
+    let width = if platform == 0 { 1 } else { 2 };
+    let bytes = unsafe { std::slice::from_raw_parts(buffer.data, path_length(path, width)) };
+    let Some((start, end)) = final_component(bytes, width, platform == 1) else { return 0 };
+    i32::from(end - start > width && read_unit(bytes, start, width) == b'.' as u16)
+}
+
+#[unsafe(no_mangle)]
+/// Tests whether the final path extension equals a borrowed extension path.
+///
+/// # Safety
+/// Both pointers must be null or valid `ActusPath` values with live storage.
+pub unsafe extern "C" fn actus_path_extension_equals(
+    path: *const ActusPath,
+    extension: *const ActusPath,
+) -> i32 {
+    let Ok((path_buffer, path_platform)) = (unsafe { path_units(path) }) else {
+        return ABI_STATUS_FAILURE;
+    };
+    let Ok((extension_buffer, extension_platform)) = (unsafe { path_units(extension) }) else {
+        return ABI_STATUS_FAILURE;
+    };
+    if path_platform != extension_platform {
+        return 0;
+    }
+    let width = if path_platform == 0 { 1 } else { 2 };
+    let bytes = unsafe { std::slice::from_raw_parts(path_buffer.data, path_length(path, width)) };
+    let extension_bytes =
+        unsafe { std::slice::from_raw_parts(extension_buffer.data, path_length(extension, width)) };
+    let Some((start, end)) = extension_range(bytes, width, path_platform == 1) else {
+        return 0;
+    };
+    i32::from(&bytes[start..end] == extension_bytes)
+}
+
 unsafe fn compare_components(path: *const ActusPath, other: *const ActusPath, ending: bool) -> i32 {
     let Ok((path_buffer, path_platform)) = (unsafe { path_units(path) }) else {
         return ABI_STATUS_FAILURE;
@@ -124,6 +165,29 @@ fn components_end_with(path: &[u8], suffix: &[u8], width: usize, windows: bool) 
             _ => return false,
         }
     }
+}
+
+fn final_component(bytes: &[u8], width: usize, windows: bool) -> Option<(usize, usize)> {
+    let mut cursor = 0;
+    let mut final_range = None;
+    while let Some(range) = next_component(bytes, &mut cursor, width, windows) {
+        final_range = Some(range);
+    }
+    final_range
+}
+
+fn extension_range(bytes: &[u8], width: usize, windows: bool) -> Option<(usize, usize)> {
+    let (start, end) = final_component(bytes, width, windows)?;
+    let mut dot = None;
+    let mut cursor = start;
+    while cursor + width <= end {
+        if read_unit(bytes, cursor, width) == b'.' as u16 {
+            dot = Some(cursor);
+        }
+        cursor += width;
+    }
+    let dot = dot?;
+    (dot > start && dot + width < end).then_some((dot + width, end))
 }
 
 fn component_count(bytes: &[u8], width: usize, windows: bool) -> usize {

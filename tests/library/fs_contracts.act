@@ -175,7 +175,8 @@ verb open_options_cover_all_modes() -> Int {
     erg truncating = options_truncate(dat appendable);
     erg creatable = options_create(dat truncating);
     erg exclusive = options_create_new(dat creatable);
-    erg result = options_open(options: dat exclusive, path: abs path);
+    erg isolated = options_close_on_exec(dat exclusive);
+    erg result = options_open(options: dat isolated, path: abs path);
     return case dat result {
         Result.Ok(_) => 1,
         Result.Err(_) => 0,

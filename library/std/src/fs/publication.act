@@ -1,0 +1,299 @@
+"""Staged filesystem writes and explicit atomic publication operations."""
+import {
+    io,
+    path as path_module,
+};
+
+"""Outcome of a coordinator-serialized compare-before-publish attempt."""
+open enum CoordinatedPublication {
+    """The expected identity matched and the staged path was published."""
+    Published,
+    """The destination identity changed or appeared since the expected snapshot."""
+    Conflict,
+}
+
+"""
+Publish `staging` to `destination` under an exclusive coordinator lock.
+
+`lock_path` names a lock file shared by every cooperating writer. `expected`
+contains the native identity snapshot returned by `metadata(destination: ...)`;
+an identity kind of `METADATA_IDENTITY_NONE` means that the destination is
+expected to be absent. The runtime takes the lock, compares the identity, and
+performs the atomic replacement before releasing the lock. A stale snapshot
+returns `Ok(CoordinatedPublication.Conflict)` and does not modify the
+destination. `Err(IoError.Busy)` reports lock contention, while
+`Err(IoError.Unsupported)` reports a target without the required locking or
+replacement capability. This is a coordinator contract: writers that bypass
+the same lock are outside its guarantee.
+"""
+unsafe extern "C" verb actus_file_publish_coordinated_path(
+    abs lock_path: path_module::Path,
+    abs staging: path_module::Path,
+    abs destination: path_module::Path,
+    abs expected: Metadata
+) -> Int;
+
+"""
+Perform compare-before-publish through the shared coordinator protocol.
+
+All path and metadata arguments are borrowed and remain caller-owned. On a
+successful publication the staging path no longer names a file because the
+atomic replacement moves it; the path value itself is not consumed. No
+check-then-rename fallback is used; unsupported
+targets return `IoError.Unsupported`. The operation may block while acquiring
+the coordinator lock and while publishing the staged file.
+"""
+open verb publish_file_coordinated(
+    abs lock_path: path_module::Path,
+    abs staging: path_module::Path,
+    abs destination: path_module::Path,
+    abs expected: Metadata
+) -> Result[CoordinatedPublication, io::IoError] {
+    erg status = actus_file_publish_coordinated_path(
+        lock_path: abs lock_path,
+        staging: abs staging,
+        destination: abs destination,
+        expected: abs expected
+    );
+    return case status {
+        -4 => Err(io::IoError.Busy),
+        -3 => Ok(CoordinatedPublication.Conflict),
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(CoordinatedPublication.Published),
+    };
+}
+
+"""
+Synchronize the parent directory of `path` after a published rename.
+
+The path is borrowed for one native call and is never retained. Zero means
+the host accepted the directory sync; `-2` means the target cannot provide
+directory synchronization and `-1` means the provider rejected the request.
+"""
+unsafe extern "C" verb actus_file_sync_parent_path(abs path: path_module::Path) -> Int;
+
+"""
+Replace an existing destination with a staged path through the target's
+atomic replacement primitive.
+
+Both paths are immutable borrowed views and neither is retained. The Unix
+backend performs one atomic same-filesystem rename that replaces the existing
+destination. Targets without an equivalent replacement primitive return
+`IoError.Unsupported`; this operation never emulates replacement as a
+remove-then-rename sequence.
+"""
+unsafe extern "C" verb actus_file_replace_atomic_path(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Int;
+
+"""
+Translate the parent-directory synchronization status into a typed result.
+
+`status` is a copied scalar. This adapter performs no I/O, allocation, or
+ownership transfer: `-2` becomes `IoError.Unsupported`, `-1` becomes
+`IoError.Failed`, and non-negative statuses remain successful.
+"""
+open verb sync_parent_status(erg status: Int) -> Result[Int, io::IoError] {
+    return case status {
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Synchronize the directory containing `path`.
+
+`path` is an immutable borrowed view and is not retained. On supported hosted
+targets this performs the blocking directory metadata sync required after a
+rename when callers need stronger crash-durability ordering. It does not sync
+file contents, publish a file, allocate storage, or mutate the path. Targets
+without a directory-sync capability return `IoError.Unsupported`.
+"""
+open verb sync_parent_directory(abs path: path_module::Path) -> Result[Int, io::IoError] {
+    erg status = actus_file_sync_parent_path(path: abs path);
+    return sync_parent_status(status: erg status);
+}
+
+"""
+Replace an existing destination with `from` atomically where the target
+provides that primitive.
+
+`from` and `to` are immutable borrowed paths and remain caller-owned. On Unix,
+the operation is a same-filesystem rename with destination replacement. The
+destination is not removed first, and no copy or hidden buffer is allocated.
+Unsupported targets return `IoError.Unsupported`; provider failures return
+`IoError.Failed` and the source remains owned by the caller.
+"""
+open verb replace_file_atomic(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Result[Int, io::IoError] {
+    erg status = actus_file_replace_atomic_path(from: abs from, to: abs to);
+    return case status {
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Create or truncate `path`, write the complete borrowed contents, flush, and
+close the file before returning.
+
+`path` and `contents` are immutable `abs` views; neither is transferred,
+retained, or replaced. The operation creates one owned `File` internally and
+closes it on every success and failure branch. `Ok(count)` is the exact byte
+count and is returned only after the count equals the complete input length
+and flush succeeds. A short write, open failure, flush failure, close failure,
+or end-of-stream condition becomes a typed `IoError`; no partial success is
+reported and no hidden result buffer is allocated.
+"""
+open verb write_file(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
+    return write_and_flush(path: abs path, contents: abs contents);
+}
+
+"""
+Write a complete file through a staging path and publish it with one rename.
+
+`path` and `contents` are immutable `abs` views. `staging` is transferred with
+`dat`, must be on the same filesystem as the final destination, and is never
+returned after this operation. The contents are fully written, length-checked,
+flushed, and closed before the rename is attempted. Only a successful rename
+publishes the staged bytes; write, short-write, flush, close, or rename failure
+returns the original typed error and invokes deterministic best-effort staging
+cleanup. The final destination is not exposed to partially written staged
+contents, and the operation performs no hidden result-buffer allocation.
+"""
+open verb write_file_atomic(
+    abs path: path_module::Path,
+    dat staging: path_module::Path,
+    abs contents: Buffer
+) -> Result[Int, io::IoError] {
+    erg written = write_and_flush(path: abs staging, contents: abs contents);
+    return case dat written {
+        Result.Err(error) => cleanup_atomic_failure(staging: dat staging, error: dat error),
+        Result.Ok(count) => {
+            erg published = rename(from: abs staging, to: abs path);
+            return case dat published {
+                Result.Ok(_) => {
+                    drop(staging);
+                    return Result[Int, io::IoError].Ok(count);
+                },
+                Result.Err(error) => cleanup_atomic_failure(staging: dat staging, error: dat error),
+            };
+        },
+    };
+}
+
+"""
+Write staged contents, publish them with rename, then synchronize the final
+file's parent directory.
+
+`path` and `contents` are immutable borrowed views. `staging` is transferred
+with `dat` and is cleaned up on every pre-publication failure. The operation
+performs complete write, flush, close, same-filesystem rename, and parent
+directory sync in that order. A successful result means the parent sync also
+completed. If the sync fails, the rename has already published the new file;
+the error is returned so the caller can report that durability is uncertain.
+No partial staged contents become visible, and cleanup never replaces the
+root write, rename, or sync error.
+"""
+open verb write_file_atomic_synced(
+    abs path: path_module::Path,
+    dat staging: path_module::Path,
+    abs contents: Buffer
+) -> Result[Int, io::IoError] {
+    erg published = write_file_atomic(
+        path: abs path,
+        staging: dat staging,
+        contents: abs contents
+    );
+    return case dat published {
+        Result.Err(error) => Err(error),
+        Result.Ok(count) => {
+            erg synced = sync_parent_directory(path: abs path);
+            return case dat synced {
+                Result.Err(error) => Err(error),
+                Result.Ok(_) => Ok(count),
+            };
+        },
+    };
+}
+
+"""
+Create or truncate a file, write all borrowed bytes, flush, and close it.
+
+`path` and `contents` are immutable `abs` views used only for the operation;
+the created `File` is an internal owner and never escapes. The function checks
+the native count against the complete input length, rejects short writes,
+flushes before reporting success, and closes the handle on every branch.
+`Ok(count)` is therefore a complete committed-to-the-provider write, while
+`Err(IoError)` reports open, write, size, flush, or close failure. No staging
+path, replacement buffer, or hidden allocation is introduced here.
+"""
+open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
+    erg opened = file_create(path: abs path);
+    return case dat opened {
+        Result.Err(error) => Result[Int, io::IoError].Err(error),
+        Result.Ok(value) => {
+            erg file: File = value;
+            erg written = file.write(buffer: abs contents);
+            return case dat written {
+                Result.Err(error) => {
+                    erg closed_on_write_error = file_close(self: ins file);
+                    return Result[Int, io::IoError].Err(error);
+                },
+                Result.Ok(count) => {
+                    erg expected_result = io::buffer_size(buffer: abs contents);
+                    return case dat expected_result {
+                        Result.Err(error) => {
+                            erg closed_on_size_error = file_close(self: ins file);
+                            return Result[Int, io::IoError].Err(error);
+                        },
+                        Result.Ok(expected) => {
+                            if count != expected {
+                                erg closed_on_size_mismatch = file_close(self: ins file);
+                                return Result[Int, io::IoError].Err(io::IoError.Failed);
+                            }
+                            erg flushed = file.flush();
+                            return case dat flushed {
+                                Result.Ok(_) => {
+                                    erg closed_after_flush = file_close(self: ins file);
+                                    return case dat closed_after_flush {
+                                        Result.Ok(_) => Result[Int, io::IoError].Ok(count),
+                                        Result.Err(error) => Result[Int, io::IoError].Err(error),
+                                    };
+                                },
+                                Result.Err(error) => {
+                                    erg closed_on_flush_error = file_close(self: ins file);
+                                    return Result[Int, io::IoError].Err(error);
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+"""
+Clean up failed atomic-publication staging storage and preserve the root error.
+
+`staging` and `error` are consumed with `dat`; the staging path is removed on
+a best-effort basis and then released, while the original write, flush, or
+rename error is returned unchanged. Cleanup failure is intentionally not
+substituted for the root failure, and this helper performs no retry, final
+destination mutation, or hidden allocation.
+"""
+open verb cleanup_atomic_failure(
+    dat staging: path_module::Path,
+    dat error: io::IoError
+) -> Result[Int, io::IoError] {
+    remove_file(path: abs staging);
+    drop(staging);
+    return Result[Int, io::IoError].Err(error);
+}

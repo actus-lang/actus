@@ -1,6 +1,7 @@
 """Minimal hosted directory enumeration contract tests."""
 import {
     open fs,
+    open io,
     open path,
 };
 
@@ -11,10 +12,13 @@ verb current_directory() -> Result[Path, PathError] {
     return path_from_ascii(storage: dat raw);
 }
 
-verb close_directory_entry(ins directory: Directory, dat value: Option[Path]) -> Int {
+verb close_directory_entry(
+    ins directory: Directory,
+    dat value: Option[DirectoryEntry]
+) -> Int {
     erg entry_code = case dat value {
         Option.None => 5,
-        Option.Some(name) => case name.length {
+        Option.Some(entry) => case entry.name.length {
             0 => 6,
             _ => 0,
         },
@@ -47,6 +51,61 @@ verb directory_iteration_returns_entry_and_closes() -> Int {
     };
 }
 
+verb verify_filtered_directory(ins directory: Directory) -> Int {
+    erg entry = next_dir_entry(directory: ins directory);
+    return case dat entry {
+        Result.Err(_) => {
+            close_dir(directory: ins directory);
+            3;
+        },
+        Result.Ok(value) => case dat value {
+            Option.None => {
+                close_dir(directory: ins directory);
+                4;
+            },
+            Option.Some(entry_value) => {
+                erg is_file = directory_entry_is_file(entry: abs entry_value);
+                drop(entry_value);
+                erg closed = close_dir(directory: ins directory);
+                case dat closed {
+                    Result.Err(_) => 5,
+                    Result.Ok(_) => case is_file {
+                        true => 0,
+                        _ => 6,
+                    },
+                };
+            },
+        },
+    };
+}
+
+meta test
+verb lexicographic_directory_iteration_is_bounded() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg filter = DirectoryFilter {
+                regular_files_only: true,
+                include_directories: false,
+                include_symlinks: false,
+                include_hidden: false,
+                extension: Option[Path].None,
+            };
+            erg selected_order = DirectoryOrder.Lexicographic;
+            erg opened = read_dir_filtered(
+                path: abs path,
+                order: erg selected_order,
+                filter: dat filter
+            );
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => verify_filtered_directory(directory: ins directory),
+            };
+        },
+    };
+}
+
 verb missing_directory_path() -> Result[Path, PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 47u8);
@@ -71,5 +130,191 @@ verb directory_iteration_rejects_missing_directory() -> Int {
                 },
             };
         },
+    };
+}
+
+verb verify_repeated_eof(ins directory: Directory) -> Int {
+    erg repeated = next_dir_entry(directory: ins directory);
+    return case dat repeated {
+        Result.Err(_) => {
+            close_dir(directory: ins directory);
+            1;
+        },
+        Result.Ok(second) => case dat second {
+            Option.None => {
+                erg closed = close_dir(directory: ins directory);
+                return case dat closed {
+                    Result.Ok(_) => 0,
+                    Result.Err(_) => 2,
+                };
+            },
+            Option.Some(entry) => {
+                drop(entry);
+                close_dir(directory: ins directory);
+                3;
+            },
+        },
+    };
+}
+
+meta test
+verb repeated_directory_eof_remains_clean() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    for erg attempt: u32 in 0u32 .. 4096u32 {
+                        erg entry = next_dir_entry(directory: ins directory);
+                        case dat entry {
+                            Result.Err(_) => {
+                                close_dir(directory: ins directory);
+                                return 3;
+                            },
+                            Result.Ok(value) => case dat value {
+                                Option.Some(item) => {
+                                    drop(item);
+                                },
+                                Option.None => {
+                                    return verify_repeated_eof(directory: ins directory);
+                                },
+                            },
+                        };
+                    }
+                    close_dir(directory: ins directory);
+                    7;
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb closed_directory_rejects_reuse() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    erg closed = close_dir(directory: ins directory);
+                    return case dat closed {
+                        Result.Err(_) => 3,
+                        Result.Ok(_) => {
+                            erg next = next_dir_entry(directory: ins directory);
+                            case dat next {
+                                Result.Ok(value) => {
+                                    case dat value {
+                                        Option.Some(entry) => {
+                                            drop(entry);
+                                        },
+                                        Option.None => {},
+                                    };
+                                    return 4;
+                                },
+                                Result.Err(_) => {},
+                            };
+                            erg closed_again = close_dir(directory: ins directory);
+                            return case dat closed_again {
+                                Result.Err(_) => 0,
+                                Result.Ok(_) => 5,
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb open_directory_then_return_early() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(_) => 0,
+            };
+        },
+    };
+}
+
+meta test
+verb directory_drop_closes_on_early_return() -> Int {
+    erg early = open_directory_then_return_early();
+    if early != 0 {
+        return early;
+    }
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 3,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 4,
+                Result.Ok(directory) => {
+                    erg closed = close_dir(directory: ins directory);
+                    case dat closed {
+                        Result.Ok(_) => 0,
+                        Result.Err(_) => 5,
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb open_directory_then_break() -> Int {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    loop {
+                        break;
+                    }
+                    0;
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb directory_drop_closes_after_loop_exit() -> Int {
+    erg result = open_directory_then_break();
+    return result;
+}
+
+verb open_directory_then_error() -> Result[Int, io::IoError] {
+    erg current = current_directory();
+    return case dat current {
+        Result.Err(_) => Err(io::IoError.InvalidInput),
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(error) => Err(error),
+                Result.Ok(_) => Err(io::IoError.Failed),
+            };
+        },
+    };
+}
+
+meta test
+verb directory_drop_closes_on_typed_error() -> Int {
+    erg result = open_directory_then_error();
+    return case dat result {
+        Result.Err(_) => 0,
+        Result.Ok(_) => 1,
     };
 }

@@ -9,7 +9,7 @@ Actus wrappers.
 
 ## `IoError`
 
-`IoError` has four variants:
+`IoError` has five variants:
 
 | Variant | Meaning |
 | --- | --- |
@@ -17,6 +17,7 @@ Actus wrappers.
 | `EndOfStream` | No more input is available. |
 | `InvalidInput` | A buffer, stream, or argument is invalid. |
 | `InvalidData` | The data or requested range is not accepted. |
+| `Unsupported` | The selected target cannot provide the requested operation. |
 
 ## Console input
 

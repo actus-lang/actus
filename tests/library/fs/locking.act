@@ -1,0 +1,126 @@
+"""Mirrored strict coverage for cross-handle advisory locking."""
+import {
+    open std::fs,
+    open std::io,
+    std::path,
+};
+
+verb current_directory() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb shared_lock_succeeds(ins file: fs::File) -> Int {
+    erg result = fs::file_lock_shared(file: ins file);
+    return case dat result {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+verb exclusive_lock_succeeds(ins file: fs::File) -> Int {
+    erg result = fs::file_lock_exclusive(file: ins file);
+    return case dat result {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+verb try_lock_reports_busy(ins file: fs::File) -> Int {
+    erg result = fs::file_try_lock(file: ins file);
+    return case dat result {
+        Result.Err(error) => case error {
+            io::IoError.Busy => 0,
+            _ => 1,
+        },
+        Result.Ok(_) => 1,
+    };
+}
+
+verb unlock_succeeds(ins file: fs::File) -> Int {
+    erg result = fs::file_unlock(file: ins file);
+    return case dat result {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+verb open_peer(abs path: path::Path) -> Result[fs::File, io::IoError] {
+    erg options = fs::options_new();
+    erg readable = fs::options_read(dat options);
+    return fs::options_open(options: dat readable, path: abs path);
+}
+
+verb exercise_locking(dat resource: fs::TemporaryFile) -> Int {
+    erg peer_result = open_peer(path: abs resource.path);
+    return case dat peer_result {
+        Result.Err(_) => {
+            fs::temporary_file_cleanup(self: ins resource);
+            return 3;
+        },
+        Result.Ok(peer) => {
+            erg shared = shared_lock_succeeds(file: ins peer);
+            erg shared_release = unlock_succeeds(file: ins peer);
+            erg exclusive = exclusive_lock_succeeds(file: ins resource.file);
+            erg attempted = try_lock_reports_busy(file: ins peer);
+            erg released = unlock_succeeds(file: ins resource.file);
+            erg closed = fs::file_close(self: ins peer);
+            if shared != 0 {
+                return 4;
+            }
+            if shared_release != 0 {
+                return 5;
+            }
+            if exclusive != 0 {
+                return 6;
+            }
+            if attempted != 0 {
+                return 7;
+            }
+            if released != 0 {
+                return 8;
+            }
+            return case dat closed {
+                Result.Err(_) => {
+                    fs::temporary_file_cleanup(self: ins resource);
+                    return 9;
+                },
+                Result.Ok(_) => {
+                    erg cleaned = fs::temporary_file_cleanup(self: ins resource);
+                    return case dat cleaned {
+                        Result.Ok(_) => 0,
+                        Result.Err(_) => 10,
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb locking_coordinates_two_handles_without_consuming_file() -> Int {
+    erg root_result = current_directory();
+    return case dat root_result {
+        Result.Err(_) => 1,
+        Result.Ok(root) => {
+            erg prefix: Buffer = Buffer[0];
+            append(prefix, 97u8);
+            append(prefix, 99u8);
+            append(prefix, 116u8);
+            append(prefix, 117u8);
+            append(prefix, 115u8);
+            append(prefix, 45u8);
+            append(prefix, 108u8);
+            append(prefix, 111u8);
+            append(prefix, 99u8);
+            append(prefix, 107u8);
+            erg created = fs::temporary_file_open(root: abs root, prefix: abs prefix);
+            return case dat created {
+                Result.Err(_) => 2,
+                Result.Ok(resource) => exercise_locking(resource: dat resource),
+            };
+        },
+    };
+}

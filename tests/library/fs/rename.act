@@ -1,0 +1,74 @@
+"""Mirrored strict coverage for same-filesystem rename semantics."""
+import {
+    open std::fs,
+    std::path,
+};
+
+verb rename_path(erg destination: u8) -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 103u8);
+    append(raw, 56u8);
+    append(raw, 45u8);
+    if destination == 0u8 {
+        append(raw, 115u8);
+        append(raw, 114u8);
+        append(raw, 99u8);
+    } else {
+        append(raw, 100u8);
+        append(raw, 115u8);
+        append(raw, 116u8);
+    }
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+meta test
+verb rename_preserves_same_filesystem_contract() -> Int {
+    erg source_kind: u8 = 0u8;
+    erg destination_kind: u8 = 1u8;
+    erg source_result = rename_path(destination: erg source_kind);
+    return case dat source_result {
+        Result.Err(_) => 1,
+        Result.Ok(source) => {
+            erg destination_result = rename_path(destination: erg destination_kind);
+            return case dat destination_result {
+                Result.Err(_) => 2,
+                Result.Ok(destination) => {
+                    erg stale_source = fs::remove_file(path: abs source);
+                    drop(stale_source);
+                    erg stale_destination = fs::remove_file(path: abs destination);
+                    drop(stale_destination);
+                    erg created = fs::file_create(path: abs source);
+                    return case dat created {
+                        Result.Err(_) => 3,
+                        Result.Ok(file) => {
+                            erg closed = fs::file_close(self: ins file);
+                            return case dat closed {
+                                Result.Err(_) => 4,
+                                Result.Ok(_) => {
+                                    erg moved = fs::rename(from: abs source, to: abs destination);
+                                    return case dat moved {
+                                        Result.Err(_) => 5,
+                                        Result.Ok(_) => {
+                                            erg removed = fs::remove_file(path: abs destination);
+                                            return case dat removed {
+                                                Result.Ok(_) => 0,
+                                                Result.Err(_) => 6,
+                                            };
+                                        },
+                                    };
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}

@@ -1,0 +1,408 @@
+"""Mirrored strict coverage for coordinator-serialized publication."""
+import {
+    open std::fs,
+    open std::io,
+    path,
+};
+
+verb coordinator_path(erg suffix: u8) -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 99u8);
+    append(raw, 111u8);
+    append(raw, 111u8);
+    append(raw, 114u8);
+    append(raw, 100u8);
+    append(raw, 45u8);
+    append(raw, suffix);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb payload(erg value: u8) -> Buffer {
+    erg output = Buffer[0];
+    append(output, value);
+    return output;
+}
+
+verb payload_pair(erg value: u8) -> Buffer {
+    erg output = payload(value: erg value);
+    append(output, value);
+    return output;
+}
+
+verb write_value(abs path: path::Path, erg value: u8) -> Int {
+    erg bytes = payload(value: erg value);
+    erg written = fs::write_file(path: abs path, contents: abs bytes);
+    return case dat written {
+        Result.Err(_) => 1,
+        Result.Ok(_) => 0,
+    };
+}
+
+verb write_pair(abs path: path::Path, erg value: u8) -> Int {
+    erg bytes = payload_pair(value: erg value);
+    erg written = fs::write_file(path: abs path, contents: abs bytes);
+    return case dat written {
+        Result.Err(_) => 1,
+        Result.Ok(_) => 0,
+    };
+}
+
+verb cleanup(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path
+) {
+    fs::remove_file(path: abs lock_path);
+    fs::remove_file(path: abs destination);
+    fs::remove_file(path: abs staging);
+}
+
+verb verify_size(abs destination: path::Path, erg expected: Int) -> Int {
+    erg inspected = fs::metadata(path: abs destination);
+    return case dat inspected {
+        Result.Err(_) => 1,
+        Result.Ok(value) => {
+            if value.size == expected {
+                return 0;
+            }
+            2;
+        },
+    };
+}
+
+verb publish_absent_case(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path
+) -> Int {
+    erg value: u8 = 65u8;
+    erg written = write_value(path: abs staging, value: erg value);
+    if written != 0 {
+        return 1;
+    }
+    erg expected = fs::metadata_absent();
+    erg published = fs::publish_file_coordinated(
+        lock_path: abs lock_path,
+        staging: abs staging,
+        destination: abs destination,
+        expected: abs expected
+    );
+    return case dat published {
+        Result.Ok(outcome) => case dat outcome {
+            CoordinatedPublication.Published => {
+                erg expected_size: Int = 1;
+                verify_size(destination: abs destination, expected: erg expected_size);
+            },
+            CoordinatedPublication.Conflict => 2,
+        },
+        _ => 2,
+    };
+}
+
+verb publish_conflict_result(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path,
+    erg expected_primary: u64,
+    erg expected_secondary: u64,
+    erg expected_kind: Int,
+    erg changed_value: u8
+) -> Int {
+    erg expected = fs::metadata_absent();
+    expected.identity_primary = expected_primary;
+    expected.identity_secondary = expected_secondary;
+    expected.identity_kind = expected_kind;
+    erg published = fs::publish_file_coordinated(
+        lock_path: abs lock_path,
+        staging: abs staging,
+        destination: abs destination,
+        expected: abs expected
+    );
+    return case dat published {
+        Result.Ok(outcome) => case dat outcome {
+            CoordinatedPublication.Published => 5,
+            CoordinatedPublication.Conflict => {
+                erg expected_size: Int = 2;
+                verify_size(destination: abs destination, expected: erg expected_size);
+            },
+        },
+        _ => 5,
+    };
+}
+
+verb conflict_case(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path
+) -> Int {
+    erg initial_value: u8 = 66u8;
+    erg initial = write_value(path: abs destination, value: erg initial_value);
+    if initial != 0 {
+        return 1;
+    }
+    erg expected_result = fs::metadata(path: abs destination);
+    return case dat expected_result {
+        Result.Err(_) => 2,
+        Result.Ok(expected) => {
+            fs::remove_file(path: abs destination);
+            erg changed_value: u8 = 67u8;
+            erg changed = write_value(path: abs staging, value: erg changed_value);
+            if changed != 0 {
+                return 3;
+            }
+            erg staged = write_pair(path: abs destination, value: erg changed_value);
+            if staged != 0 {
+                return 4;
+            }
+            erg expected_primary: u64 = expected.identity_primary;
+            erg expected_secondary: u64 = expected.identity_secondary;
+            erg expected_kind: Int = expected.identity_kind;
+            return publish_conflict_result(
+                lock_path: abs lock_path,
+                destination: abs destination,
+                staging: abs staging,
+                expected_primary: erg expected_primary,
+                expected_secondary: erg expected_secondary,
+                expected_kind: erg expected_kind,
+                changed_value: changed_value
+            );
+        },
+    };
+}
+
+verb existing_case(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path
+) -> Int {
+    erg initial_value: u8 = 69u8;
+    erg initial = write_value(path: abs destination, value: erg initial_value);
+    if initial != 0 {
+        return 1;
+    }
+    erg expected_result = fs::metadata(path: abs destination);
+    return case dat expected_result {
+        Result.Err(_) => 2,
+        Result.Ok(expected) => {
+            erg replacement_value: u8 = 70u8;
+            erg staged = write_pair(path: abs staging, value: erg replacement_value);
+            if staged != 0 {
+                return 3;
+            }
+            erg published = fs::publish_file_coordinated(
+                lock_path: abs lock_path,
+                staging: abs staging,
+                destination: abs destination,
+                expected: abs expected
+            );
+            return case dat published {
+                Result.Ok(outcome) => case dat outcome {
+                    CoordinatedPublication.Published => {
+                        erg expected_size: Int = 2;
+                        verify_size(destination: abs destination, expected: erg expected_size);
+                    },
+                    CoordinatedPublication.Conflict => 4,
+                },
+                _ => 4,
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb coordinator_publishes_when_identity_matches() -> Int {
+    erg lock_suffix: u8 = 91u8;
+    erg destination_suffix: u8 = 92u8;
+    erg staging_suffix: u8 = 93u8;
+    erg lock_result = coordinator_path(suffix: erg lock_suffix);
+    return case dat lock_result {
+        Result.Err(_) => 1,
+        Result.Ok(lock_path) => {
+            erg destination_result = coordinator_path(suffix: erg destination_suffix);
+            return case dat destination_result {
+                Result.Err(_) => 2,
+                Result.Ok(destination) => {
+                    erg staging_result = coordinator_path(suffix: erg staging_suffix);
+                    return case dat staging_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging) => {
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            erg result = publish_absent_case(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            result;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb coordinator_rejects_stale_identity() -> Int {
+    erg lock_suffix: u8 = 94u8;
+    erg destination_suffix: u8 = 95u8;
+    erg staging_suffix: u8 = 96u8;
+    erg lock_result = coordinator_path(suffix: erg lock_suffix);
+    return case dat lock_result {
+        Result.Err(_) => 1,
+        Result.Ok(lock_path) => {
+            erg destination_result = coordinator_path(suffix: erg destination_suffix);
+            return case dat destination_result {
+                Result.Err(_) => 2,
+                Result.Ok(destination) => {
+                    erg staging_result = coordinator_path(suffix: erg staging_suffix);
+                    return case dat staging_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging) => {
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            erg result = conflict_case(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            result;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb coordinator_publishes_matching_existing_identity() -> Int {
+    erg lock_suffix: u8 = 97u8;
+    erg destination_suffix: u8 = 98u8;
+    erg staging_suffix: u8 = 99u8;
+    erg lock_result = coordinator_path(suffix: erg lock_suffix);
+    return case dat lock_result {
+        Result.Err(_) => 1,
+        Result.Ok(lock_path) => {
+            erg destination_result = coordinator_path(suffix: erg destination_suffix);
+            return case dat destination_result {
+                Result.Err(_) => 2,
+                Result.Ok(destination) => {
+                    erg staging_result = coordinator_path(suffix: erg staging_suffix);
+                    return case dat staging_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging) => {
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            erg result = existing_case(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            cleanup(
+                                lock_path: abs lock_path,
+                                destination: abs destination,
+                                staging: abs staging
+                            );
+                            result;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb windows_unsupported_case(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path
+) -> Int {
+    cleanup(
+        lock_path: abs lock_path,
+        destination: abs destination,
+        staging: abs staging
+    );
+    erg value: u8 = 71u8;
+    erg written = write_value(path: abs staging, value: erg value);
+    if written != 0 {
+        return 1;
+    }
+    erg expected = fs::metadata_absent();
+    erg published = fs::publish_file_coordinated(
+        lock_path: abs lock_path,
+        staging: abs staging,
+        destination: abs destination,
+        expected: abs expected
+    );
+    cleanup(
+        lock_path: abs lock_path,
+        destination: abs destination,
+        staging: abs staging
+    );
+    return case dat published {
+        Result.Err(error) => case dat error {
+            IoError.Unsupported => 0,
+            _ => 2,
+        },
+        _ => 2,
+    };
+}
+
+meta target("windows")
+meta test
+verb coordinator_reports_windows_unsupported() -> Int {
+    erg lock_suffix: u8 = 101u8;
+    erg destination_suffix: u8 = 102u8;
+    erg staging_suffix: u8 = 103u8;
+    erg lock_result = coordinator_path(suffix: erg lock_suffix);
+    return case dat lock_result {
+        Result.Err(_) => 1,
+        Result.Ok(lock_path) => {
+            erg destination_result = coordinator_path(suffix: erg destination_suffix);
+            return case dat destination_result {
+                Result.Err(_) => 2,
+                Result.Ok(destination) => {
+                    erg staging_result = coordinator_path(suffix: erg staging_suffix);
+                    return case dat staging_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging) => windows_unsupported_case(
+                            lock_path: abs lock_path,
+                            destination: abs destination,
+                            staging: abs staging
+                        ),
+                    };
+                },
+            };
+        },
+    };
+}

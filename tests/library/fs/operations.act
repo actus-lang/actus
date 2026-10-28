@@ -46,6 +46,84 @@ verb read_many_path() -> Path {
 }
 
 meta test
+verb canonicalize_reports_missing_components() -> Int {
+    erg path = read_many_path();
+    erg stale = remove_file(path: abs path);
+    case dat stale {
+        Result.Ok(_) => {},
+        Result.Err(_) => {},
+    };
+    erg result = canonicalize(path: abs path);
+    return case dat result {
+        Result.Ok(value) => {
+            drop(value);
+            1;
+        },
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+verb canonicalize_existing_path_returns_absolute_identity() -> Int {
+    erg raw = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    erg source = path_from_ascii(storage: dat raw);
+    return case dat source {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg result = canonicalize(path: abs path);
+            return case dat result {
+                Result.Err(_) => 2,
+                Result.Ok(identity) => {
+                    erg absolute = is_absolute(self: abs identity);
+                    drop(identity);
+                    if absolute {
+                        return 0;
+                    }
+                    3;
+                },
+            };
+        },
+    };
+}
+
+verb dot_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    erg result = path_from_ascii(storage: dat raw);
+    return case dat result {
+        Result.Ok(value) => value,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+meta test
+verb same_file_compares_existing_identity() -> Int {
+    erg left = dot_path();
+    erg right = dot_path();
+    erg compared = same_file(left: abs left, right: abs right);
+    drop(left);
+    drop(right);
+    return case dat compared {
+        Result.Ok(value) => {
+            if value {
+                return 0;
+            }
+            1;
+        },
+        Result.Err(_) => 2,
+    };
+}
+
+meta test
 verb read_to_bytes_closes_each_owned_file() -> Int {
     erg path = read_many_path();
     erg stale = remove_file(path: abs path);

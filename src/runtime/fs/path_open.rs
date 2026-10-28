@@ -5,6 +5,9 @@ use super::super::path::ActusPath;
 use super::path_bridge::with_host_path;
 use super::{MODE_CREATE, handle_to_actus};
 
+#[cfg(unix)]
+const O_CLOEXEC: i32 = 0o2000000;
+
 /// Opens a validated `ActusPath` without converting it through UTF-8.
 ///
 /// # Safety
@@ -30,6 +33,7 @@ pub unsafe extern "C" fn actus_file_open_options_path(
     truncate: i32,
     create: i32,
     create_new: i32,
+    close_on_exec: i32,
 ) -> i32 {
     let handle = unsafe {
         with_host_path(path, |native| {
@@ -41,22 +45,42 @@ pub unsafe extern "C" fn actus_file_open_options_path(
                 .truncate(truncate != 0)
                 .create(create != 0)
                 .create_new(create_new != 0);
-            open_host_options(native, options)
+            open_host_options(native, options, close_on_exec != 0)
         })
     };
     handle.map_or(ABI_HANDLE_FAILURE as i32, handle_to_actus)
 }
 
 fn open_host_path(path: &Path, mode: u32) -> i64 {
+    #[cfg(actus_test_faults)]
+    if mode == MODE_CREATE
+        && super::test_faults::take_fault(super::test_faults::FAULT_STAGING_OPEN_FAILURE)
+    {
+        return ABI_HANDLE_FAILURE;
+    }
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     if mode == MODE_CREATE {
         options.write(true).create(true).truncate(true);
     }
-    open_host_options(path, options)
+    open_host_options(path, options, false)
 }
 
-fn open_host_options(path: &Path, options: std::fs::OpenOptions) -> i64 {
+fn open_host_options(path: &Path, options: std::fs::OpenOptions, close_on_exec: bool) -> i64 {
+    #[cfg(unix)]
+    let mut options = options;
+    #[cfg(unix)]
+    if close_on_exec {
+        use std::os::unix::fs::OpenOptionsExt;
+
+        options.custom_flags(O_CLOEXEC);
+    }
+    #[cfg(windows)]
+    let _ = close_on_exec;
+    #[cfg(not(any(unix, windows)))]
+    if close_on_exec {
+        return ABI_HANDLE_FAILURE;
+    }
     let Ok(file) = options.open(path) else { return ABI_HANDLE_FAILURE };
     #[cfg(unix)]
     {

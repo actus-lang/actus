@@ -1,0 +1,95 @@
+"""Mirrored durability-boundary coverage for the hosted file facade."""
+import {
+    std::fs,
+    std::path,
+};
+
+verb sync_path() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 112u8);
+    append(raw, 104u8);
+    append(raw, 97u8);
+    append(raw, 115u8);
+    append(raw, 101u8);
+    append(raw, 45u8);
+    append(raw, 52u8);
+    append(raw, 54u8);
+    append(raw, 45u8);
+    append(raw, 115u8);
+    append(raw, 121u8);
+    append(raw, 110u8);
+    append(raw, 99u8);
+    append(raw, 46u8);
+    append(raw, 116u8);
+    append(raw, 109u8);
+    append(raw, 112u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb sync_and_close(ins file: fs::File, abs path: path::Path) -> Int {
+    erg synced_data = fs::file_sync_data(self: ins file);
+    return case dat synced_data {
+        Result.Err(_) => {
+            fs::file_close(self: ins file);
+            fs::remove_file(path: abs path);
+            return 5;
+        },
+        Result.Ok(_) => {
+            erg synced_all = fs::file_sync_all(self: ins file);
+            return case dat synced_all {
+                Result.Err(_) => {
+                    fs::file_close(self: ins file);
+                    fs::remove_file(path: abs path);
+                    return 6;
+                },
+                Result.Ok(_) => {
+                    erg closed = fs::file_close(self: ins file);
+                    fs::remove_file(path: abs path);
+                    return case dat closed {
+                        Result.Err(_) => 7,
+                        Result.Ok(_) => 0,
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta test
+verb file_sync_operations_return_success() -> Int {
+    erg path_result = sync_path();
+    return case dat path_result {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg stale = fs::remove_file(path: abs path);
+            drop(stale);
+            erg created = fs::file_create(path: abs path);
+            return case dat created {
+                Result.Err(_) => 2,
+                Result.Ok(file) => {
+                    erg payload = Buffer[0];
+                    append(payload, 65u8);
+                    erg written = fs::file_write(self: ins file, buffer: abs payload);
+                    return case dat written {
+                        Result.Err(_) => 3,
+                        Result.Ok(count) => {
+                            if count != 1 {
+                                fs::file_close(self: ins file);
+                                fs::remove_file(path: abs path);
+                                return 4;
+                            }
+                            return sync_and_close(file: ins file, path: abs path);
+                        },
+                    };
+                },
+            };
+        },
+    };
+}

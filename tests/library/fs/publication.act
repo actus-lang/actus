@@ -1,0 +1,494 @@
+"""Mirrored atomic-publication coverage for the hosted filesystem facade."""
+import {
+    fs,
+    path,
+};
+
+verb publication_path(erg suffix: u8) -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 112u8);
+    append(raw, 117u8);
+    append(raw, 98u8);
+    append(raw, 45u8);
+    append(raw, suffix);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+meta test
+verb atomic_publication_replaces_staging_file() -> Int {
+    erg destination_suffix: u8 = 49u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_suffix: u8 = 50u8;
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    fs::remove_file(path: abs destination);
+                    fs::remove_file(path: abs staging);
+                    erg payload = Buffer[0];
+                    append(payload, 65u8);
+                    erg published = fs::write_file_atomic(
+                        path: abs destination,
+                        staging: dat staging,
+                        contents: abs payload
+                    );
+                    return case dat published {
+                        Result.Err(_) => {
+                            fs::remove_file(path: abs destination);
+                            3;
+                        },
+                        Result.Ok(count) => {
+                            erg loaded = fs::read_to_bytes(path: abs destination);
+                            fs::remove_file(path: abs destination);
+                            return case dat loaded {
+                                Result.Err(_) => 4,
+                                Result.Ok(bytes) => {
+                                    erg valid = count == 1 && bytes[0] == 65u8;
+                                    drop(bytes);
+                                    if valid {
+                                        return 0;
+                                    }
+                                    return 5;
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb atomic_publication_syncs_parent_directory() -> Int {
+    erg destination_suffix: u8 = 53u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_suffix: u8 = 54u8;
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    fs::remove_file(path: abs destination);
+                    fs::remove_file(path: abs staging);
+                    erg payload = Buffer[0];
+                    append(payload, 66u8);
+                    erg published = fs::write_file_atomic_synced(
+                        path: abs destination,
+                        staging: dat staging,
+                        contents: abs payload
+                    );
+                    return case dat published {
+                        Result.Err(_) => {
+                            fs::remove_file(path: abs destination);
+                            3;
+                        },
+                        Result.Ok(count) => {
+                            erg loaded = fs::read_to_bytes(path: abs destination);
+                            fs::remove_file(path: abs destination);
+                            return case dat loaded {
+                                Result.Err(_) => 4,
+                                Result.Ok(bytes) => {
+                                    erg valid = count == 1 && bytes[0] == 66u8;
+                                    drop(bytes);
+                                    if valid {
+                                        return 0;
+                                    }
+                                    5;
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb write_replace_fixture(abs path: path::Path, abs value: u8) -> Bool {
+    erg payload = Buffer[0];
+    append(payload, value);
+    erg written = fs::write_file(path: abs path, contents: abs payload);
+    return case dat written {
+        Result.Err(_) => false,
+        Result.Ok(count) => count == 1,
+    };
+}
+
+verb read_replace_fixture(abs path: path::Path) -> Int {
+    erg loaded = fs::read_to_bytes(path: abs path);
+    return case dat loaded {
+        Result.Err(_) => 6,
+        Result.Ok(bytes) => {
+            erg valid = bytes[0] == 78u8;
+            drop(bytes);
+            if valid {
+                return 0;
+            }
+            7;
+        },
+    };
+}
+
+verb cleanup_replace_fixture(abs destination: path::Path, abs staging: path::Path) {
+    fs::remove_file(path: abs destination);
+    fs::remove_file(path: abs staging);
+}
+
+meta target("unix")
+meta test
+verb atomic_replace_replaces_existing_destination() -> Int {
+    erg destination_suffix: u8 = 57u8;
+    erg staging_suffix: u8 = 58u8;
+    erg old_value: u8 = 79u8;
+    erg new_value: u8 = 78u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                    if !write_replace_fixture(path: abs destination, value: abs old_value) {
+                        cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                        return 3;
+                    }
+                    if !write_replace_fixture(path: abs staging, value: abs new_value) {
+                        cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                        return 4;
+                    }
+                    erg replaced = fs::replace_file_atomic(from: abs staging, to: abs destination);
+                    return case dat replaced {
+                        Result.Err(_) => {
+                            cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                            5;
+                        },
+                        Result.Ok(_) => {
+                            erg result = read_replace_fixture(path: abs destination);
+                            cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                            result;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb missing_parent_path(erg suffix: u8) -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 97u8);
+    append(raw, 99u8);
+    append(raw, 116u8);
+    append(raw, 117u8);
+    append(raw, 115u8);
+    append(raw, 45u8);
+    append(raw, 109u8);
+    append(raw, 105u8);
+    append(raw, 115u8);
+    append(raw, 115u8);
+    append(raw, 105u8);
+    append(raw, 110u8);
+    append(raw, 103u8);
+    append(raw, 45u8);
+    append(raw, suffix);
+    append(raw, 47u8);
+    append(raw, 102u8);
+    append(raw, 105u8);
+    append(raw, 110u8);
+    append(raw, 97u8);
+    append(raw, 108u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb verify_failed_publication(
+    abs destination: path::Path,
+    abs staging: path::Path
+) -> Int {
+    erg active = fs::read_to_bytes(path: abs destination);
+    erg leftover = fs::read_to_bytes(path: abs staging);
+    erg staging_exists: Bool = false;
+    case dat leftover {
+        Result.Ok(bytes) => {
+            staging_exists = true;
+            drop(bytes);
+        },
+        Result.Err(_) => {},
+    };
+    return case dat active {
+        Result.Ok(bytes) => {
+            drop(bytes);
+            5;
+        },
+        Result.Err(_) => {
+            if staging_exists {
+                return 6;
+            }
+            0;
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb atomic_publication_cleans_failed_rename() -> Int {
+    erg destination_suffix: u8 = 61u8;
+    erg staging_suffix: u8 = 62u8;
+    erg destination_result = missing_parent_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    erg staging_check_result = publication_path(suffix: erg staging_suffix);
+                    return case dat staging_check_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging_check) => {
+                            erg payload = Buffer[0];
+                            append(payload, 70u8);
+                            fs::remove_file(path: abs staging);
+                            erg published = fs::write_file_atomic(
+                                path: abs destination,
+                                staging: dat staging,
+                                contents: abs payload
+                            );
+                            return case dat published {
+                                Result.Ok(_) => {
+                                    drop(staging_check);
+                                    4;
+                                },
+                                Result.Err(_) => {
+                                    erg result = verify_failed_publication(destination: abs destination, staging: abs staging_check);
+                                    drop(staging_check);
+                                    result;
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta test
+verb atomic_publication_replaces_stale_staging() -> Int {
+    erg destination_suffix: u8 = 63u8;
+    erg staging_suffix: u8 = 64u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    fs::remove_file(path: abs destination);
+                    erg stale = Buffer[0];
+                    append(stale, 83u8);
+                    erg stale_write = fs::write_file(path: abs staging, contents: abs stale);
+                    return case dat stale_write {
+                        Result.Err(_) => {
+                            fs::remove_file(path: abs staging);
+                            3;
+                        },
+                        Result.Ok(_) => {
+                            erg fresh = Buffer[0];
+                            append(fresh, 78u8);
+                            erg published = fs::write_file_atomic(
+                                path: abs destination,
+                                staging: dat staging,
+                                contents: abs fresh
+                            );
+                            return case dat published {
+                                Result.Err(_) => {
+                                    fs::remove_file(path: abs destination);
+                                    4;
+                                },
+                                Result.Ok(_) => {
+                                    erg result = read_replace_fixture(path: abs destination);
+                                    fs::remove_file(path: abs destination);
+                                    result;
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+verb injected_prepublication_failure(erg destination_suffix: u8, erg staging_suffix: u8) -> Int {
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    erg staging_check_result = publication_path(suffix: erg staging_suffix);
+                    return case dat staging_check_result {
+                        Result.Err(_) => 3,
+                        Result.Ok(staging_check) => {
+                            fs::remove_file(path: abs destination);
+                            fs::remove_file(path: abs staging);
+                            erg payload = Buffer[0];
+                            append(payload, 70u8);
+                            erg published = fs::write_file_atomic(
+                                path: abs destination,
+                                staging: dat staging,
+                                contents: abs payload
+                            );
+                            return case dat published {
+                                Result.Ok(_) => {
+                                    fs::remove_file(path: abs destination);
+                                    drop(staging_check);
+                                    4;
+                                },
+                                Result.Err(_) => {
+                                    erg result = verify_failed_publication(
+                                        destination: abs destination,
+                                        staging: abs staging_check
+                                    );
+                                    drop(staging_check);
+                                    result;
+                                },
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta fault("short_write")
+meta test
+verb injected_short_write_is_rejected() -> Int {
+    erg destination_suffix: u8 = 65u8;
+    erg staging_suffix: u8 = 66u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta target("unix")
+meta fault("flush_failure")
+meta test
+verb injected_flush_failure_is_rejected() -> Int {
+    erg destination_suffix: u8 = 67u8;
+    erg staging_suffix: u8 = 68u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta target("unix")
+meta fault("rename_failure")
+meta test
+verb injected_rename_failure_is_rejected() -> Int {
+    erg destination_suffix: u8 = 69u8;
+    erg staging_suffix: u8 = 70u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta target("unix")
+meta fault("parent_sync_failure")
+meta test
+verb injected_parent_sync_failure_reports_published_file() -> Int {
+    erg destination_suffix: u8 = 71u8;
+    erg staging_suffix: u8 = 72u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    fs::remove_file(path: abs destination);
+                    fs::remove_file(path: abs staging);
+                    erg payload = Buffer[0];
+                    append(payload, 78u8);
+                    erg published = fs::write_file_atomic_synced(
+                        path: abs destination,
+                        staging: dat staging,
+                        contents: abs payload
+                    );
+                    return case dat published {
+                        Result.Ok(_) => {
+                            fs::remove_file(path: abs destination);
+                            3;
+                        },
+                        Result.Err(_) => {
+                            erg result = read_replace_fixture(path: abs destination);
+                            fs::remove_file(path: abs destination);
+                            if result == 0 {
+                                return 0;
+                            }
+                            4;
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta target("unix")
+meta fault("interrupted_publication")
+meta test
+verb interrupted_publication_is_expected_signal() -> Int {
+    erg destination_suffix: u8 = 73u8;
+    erg staging_suffix: u8 = 74u8;
+    erg destination_result = publication_path(suffix: erg destination_suffix);
+    return case dat destination_result {
+        Result.Err(_) => 1,
+        Result.Ok(destination) => {
+            erg staging_result = publication_path(suffix: erg staging_suffix);
+            return case dat staging_result {
+                Result.Err(_) => 2,
+                Result.Ok(staging) => {
+                    erg payload = Buffer[0];
+                    append(payload, 73u8);
+                    erg published = fs::write_file_atomic(
+                        path: abs destination,
+                        staging: dat staging,
+                        contents: abs payload
+                    );
+                    return case dat published {
+                        Result.Ok(_) => 3,
+                        Result.Err(_) => 4,
+                    };
+                },
+            };
+        },
+    };
+}

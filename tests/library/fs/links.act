@@ -1,0 +1,32 @@
+"""Mirrored symbolic-link inspection coverage for the hosted filesystem facade."""
+import {
+    std::fs,
+    std::path,
+};
+
+verb current_path() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+meta test
+verb link_inspection_does_not_follow_regular_directory() -> Int {
+    erg candidate = current_path();
+    return case dat candidate {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg inspected = fs::is_symlink(path: abs path);
+            return case dat inspected {
+                Result.Err(_) => 2,
+                Result.Ok(value) => {
+                    if value {
+                        return 3;
+                    }
+                    return 0;
+                },
+            };
+        },
+    };
+}

@@ -90,6 +90,51 @@ fn parses_target_and_test_metadata_together() {
 }
 
 #[test]
+fn parses_typed_publication_fault_metadata() {
+    let program = parse_source(
+        "meta fault(\"flush_failure\") meta test verb publication_test() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(verb.metadata.contains(&MetaAttribute::Fault(actus::ast::TestFault::FlushFailure)));
+    assert!(verb.metadata.contains(&MetaAttribute::Test));
+}
+
+#[test]
+fn parses_every_supported_publication_fault_name() {
+    let names = [
+        ("staging_open_failure", actus::ast::TestFault::StagingOpenFailure),
+        ("write_failure", actus::ast::TestFault::WriteFailure),
+        ("short_write", actus::ast::TestFault::ShortWrite),
+        ("flush_failure", actus::ast::TestFault::FlushFailure),
+        ("close_failure", actus::ast::TestFault::CloseFailure),
+        ("cleanup_failure", actus::ast::TestFault::CleanupFailure),
+        ("rename_failure", actus::ast::TestFault::RenameFailure),
+        ("interrupted_before_rename", actus::ast::TestFault::InterruptedBeforeRename),
+        ("parent_open_failure", actus::ast::TestFault::ParentOpenFailure),
+        ("parent_sync_failure", actus::ast::TestFault::ParentSyncFailure),
+        ("interrupted_publication", actus::ast::TestFault::InterruptedPublication),
+    ];
+    for (name, expected) in names {
+        let source = format!(
+            "meta fault(\"{name}\") meta test verb publication_test() -> Int {{ return 0; }}"
+        );
+        let program = parse_source(&source);
+        let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+        assert!(verb.metadata.contains(&MetaAttribute::Fault(expected)));
+    }
+}
+
+#[test]
+fn rejects_multiple_publication_faults_on_one_test() {
+    let (tokens, errors) = scan(
+        "meta fault(\"flush_failure\") meta fault(\"rename_failure\") meta test verb publication_test() -> Int { return 0; }",
+    );
+    assert!(errors.is_empty());
+    let error = parse(tokens).expect_err("one publication fault must be scoped per test");
+    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
+}
+
+#[test]
 fn parses_limitless_metadata_at_verb_and_file_scope() {
     let program = parse_source(
         "meta limitless(\"file\")\nmeta limitless(\"verb\") verb large() { return 0; }",

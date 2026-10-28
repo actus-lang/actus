@@ -343,7 +343,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let continuation_block =
             self.lower_block_in_scope(continuation_id, &continuation, fallthrough)?;
         self.blocks.push(continuation_block);
-        self.provider.distribute_scope_cleanup(block.span, &mut self.blocks, continuation_start)?;
+        self.distribute_scope_cleanup(block.span, continuation_start)?;
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 }

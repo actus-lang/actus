@@ -1,10 +1,12 @@
 use std::io::Read;
 
-use super::super::contract::ABI_STATUS_FAILURE;
+#[cfg(windows)]
+use super::super::contract::ABI_STATUS_SUCCESS;
+use super::super::contract::{ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
 use super::super::types::BufferHandle;
 use super::file::{
-    actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_write,
-    handle_to_actus, open_with_options,
+    actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_sync_all,
+    actus_file_sync_data, actus_file_write, handle_to_actus, open_with_options,
 };
 
 /// Opens a file from the Actus buffer representation used by external verbs.
@@ -81,8 +83,11 @@ pub unsafe extern "C" fn actus_file_read_buffer(handle: i32, buffer: BufferHandl
         unsafe { buffer.data.add(buffer.length) }
     };
     let bytes = unsafe { actus_file_read(super::file::actus_handle(handle), destination, spare) };
-    if bytes >= 0 {
+    if bytes > 0 {
         buffer.length = buffer.length.saturating_add(bytes as usize);
+    }
+    if bytes == 0 {
+        return ABI_STATUS_END_OF_STREAM;
     }
     i32::try_from(bytes).unwrap_or(ABI_STATUS_FAILURE)
 }
@@ -126,6 +131,14 @@ pub unsafe extern "C" fn actus_file_write_buffer(handle: i32, buffer: BufferHand
     if buffer.length > 0 && buffer.data.is_null() {
         return ABI_STATUS_FAILURE;
     }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_WRITE_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_SHORT_WRITE) {
+        return i32::try_from(buffer.length.saturating_sub(1)).unwrap_or(ABI_STATUS_FAILURE);
+    }
     let bytes =
         unsafe { actus_file_write(super::file::actus_handle(handle), buffer.data, buffer.length) };
     i32::try_from(bytes).unwrap_or(ABI_STATUS_FAILURE)
@@ -137,6 +150,26 @@ pub extern "C" fn actus_file_flush_buffer(handle: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn actus_file_sync_data_buffer(handle: i32) -> i32 {
+    actus_file_sync_data(super::file::actus_handle(handle))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_file_sync_all_buffer(handle: i32) -> i32 {
+    actus_file_sync_all(super::file::actus_handle(handle))
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn actus_file_close_buffer(handle: i32) -> i32 {
+    #[cfg(windows)]
+    {
+        let native = super::file::actus_handle(handle);
+        let status = actus_file_close(native);
+        if status == ABI_STATUS_SUCCESS {
+            super::file::remove_actus_handle(handle);
+        }
+        status
+    }
+    #[cfg(not(windows))]
     actus_file_close(super::file::actus_handle(handle))
 }

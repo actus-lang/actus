@@ -5,15 +5,21 @@ use std::process::Command;
 fn main() {
     println!("cargo:rerun-if-changed=src/runtime");
     println!("cargo:rustc-check-cfg=cfg(coverage)");
+    println!("cargo:rustc-check-cfg=cfg(actus_test_faults)");
 
     let output_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo must provide OUT_DIR"));
     let archive = output_dir.join("libactus_runtime.a");
     let rustc = env::var_os("RUSTC").expect("Cargo must provide RUSTC");
-    let status = Command::new(rustc)
+    let mut command = Command::new(rustc);
+    command
         .args(["--edition", "2024", "--crate-type", "staticlib"])
         .arg("--crate-name")
         .arg("actus_runtime")
-        .arg("src/runtime/mod.rs")
+        .arg("src/runtime/mod.rs");
+    if env::var_os("CARGO_FEATURE_TEST_FAULT_INJECTION").is_some() {
+        command.args(["--cfg", "actus_test_faults"]);
+    }
+    let status = command
         .arg("-o")
         .arg(&archive)
         .status()

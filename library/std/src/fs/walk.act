@@ -1,0 +1,408 @@
+"""Bounded recursive filesystem walking with explicit traversal events.
+
+This module is a separate traversal API; `read_dir` remains a one-directory
+iterator. A `Walker` owns the native traversal state and emits one owned
+`WalkEvent` at a time, so callers do not need an unbounded array of paths.
+Traversal is blocking hosted-filesystem I/O and must not be placed in inference,
+impulse forwarding, neurogenesis, or another realtime path.
+"""
+import {
+    io,
+    path as path_module,
+};
+
+"""Selects how a walker reports an entry that cannot be traversed.
+
+The policy applies to metadata, child-directory opening, and cycle failures.
+It never converts a failed entry into a successful file or directory event.
+"""
+open enum WalkErrorPolicy {
+    """Stop immediately and return the mapped `IoError` from the next call.
+
+    The walker remains owned by the caller and must still be closed or allowed
+    to reach its `Drop` performance after the error is observed.
+    """
+    FailFast,
+    """Emit one `WalkEventKind.Error` event and continue with later siblings.
+
+    The event contains the affected path and a typed error value. The walker
+    does not descend through the failed entry and does not retry it implicitly.
+    """
+    EmitError,
+}
+
+"""Classifies one streaming event from a recursive walker.
+
+For a directory, traversal is depth-first: an enter event precedes its child
+events and a leave event follows them. A root file produces one `File` event;
+a root symlink produces one `Symlink` event when links are not followed.
+"""
+open enum WalkEventKind {
+    """The walker entered a directory and may emit its children.
+
+    The event path identifies the directory and `depth` is its zero-based
+    distance from the requested root.
+    """
+    EnterDirectory,
+    """The event path is a regular file or followed non-directory target.
+
+    The event is terminal for that path; no child traversal follows it.
+    """
+    File,
+    """The event path is a symbolic link that was not followed.
+
+    This is the default link behavior and also applies to a link encountered
+    below a directory when `follow_symlinks` is false.
+    """
+    Symlink,
+    """The walker finished one directory and returned to its parent.
+
+    A directory that was entered emits exactly one matching leave event,
+    including the root directory when traversal reaches end of stream.
+    """
+    LeaveDirectory,
+    """The event contains a typed traversal error and was not descended into.
+
+    This variant is produced only under `WalkErrorPolicy.EmitError`; fail-fast
+    traversal returns the error from `next_walk_event` instead.
+    """
+    Error,
+}
+
+"""Traversal policy for one bounded recursive walker.
+
+`max_depth` is zero-based: zero emits only the requested root directory and
+its matching enter/leave events. A child is visited only when its depth is at
+most `max_depth`. `follow_symlinks` is false by default in callers; when true,
+canonical directory identities are tracked to reject cycles. `order` uses the
+same native/lexicographic contract as directory iteration independently at
+each directory level. `include_hidden` controls leading-dot names, not host
+attributes. `error_policy` selects whether failures stop the call or become
+events. The hosted implementation bounds depth, visited directories, entries,
+and entry-name size before retaining traversal state.
+"""
+open struct WalkOptions {
+    """Maximum emitted descendant depth; the root is depth zero.
+
+    `0u32` is useful for inspecting only the root lifecycle. Values above the
+    hosted profile limit are rejected as invalid input rather than truncated.
+    """
+    erg max_depth: u32,
+    """Follow symbolic links only when explicitly enabled.
+
+    Following links resolves directory identity and enables cycle detection;
+    disabling it reports links as `Symlink` without reading their targets.
+    """
+    erg follow_symlinks: Bool,
+    """Include leading-dot names when true.
+
+    The option affects names encountered in each directory and does not alter
+    metadata visibility or the treatment of a root path. The `erg` field is
+    owned by the caller's `WalkOptions` value and is read immutably by `walk`.
+    """
+    erg include_hidden: Bool,
+    """Ordering policy applied independently at every directory level.
+
+    `Native` preserves host iterator order. `Lexicographic` uses the canonical
+    platform byte/code-unit representation and is the deterministic choice.
+    """
+    erg order: DirectoryOrder,
+    """Fail-fast or emit a typed error event for traversal failures.
+
+    Permission, missing-target, unsupported, cycle, and generic failures are
+    never silently discarded. The `erg` policy is owned by the options value;
+    passing it to `walk` borrows the value and does not consume the policy.
+    """
+    erg error_policy: WalkErrorPolicy,
+}
+
+"""One owned event produced by `next_walk_event`.
+
+`path` is an owned snapshot and does not borrow the walker's internal frame.
+`depth` is zero-based relative to the requested root. `error` is meaningful
+only for `WalkEventKind.Error`; other events carry `IoError.Failed` as a
+sentinel. The event is consumed by the caller and retains no borrowed storage
+after the call returns.
+"""
+open struct WalkEvent {
+    """Owned path of the directory, file, link, or failed traversal.
+
+    The path remains valid independently of the native directory frame and is
+    released with the event according to normal Actus ownership rules.
+    """
+    erg path: path_module::Path,
+    """Zero-based depth relative to the requested root.
+
+    The root is always depth zero; descendants increment by one directory
+    level, including entries reached through a followed symbolic link.
+    """
+    erg depth: u32,
+    """Event classification for the owned path snapshot.
+
+    The kind determines whether the path represents lifecycle, data, link, or
+    error state and therefore whether a child event can follow it.
+    """
+    erg kind: WalkEventKind,
+    """Typed cause when `kind` is `Error`; otherwise a sentinel value.
+
+    Consumers must inspect `kind` before interpreting this field.
+    """
+    erg error: io::IoError,
+}
+
+"""Opaque owner for one streaming recursive traversal.
+
+The handle is a runtime token, not an operating-system descriptor and not a
+serialized application value. It owns retained directory frames and the
+cycle-detection state until explicit close, move, or automatic Drop cleanup.
+"""
+open struct Walker {
+    """Runtime token for bounded traversal state and retained directory frames.
+
+    Callers pass the owner as `ins` to advance it, transfer it as `dat` to
+    close it, and must not reuse it after that transfer.
+    """
+    erg handle: Int,
+}
+
+"""Neutral output fields written by the walker runtime bridge."""
+struct WalkEventData {
+    erg depth: i32,
+    erg kind: i32,
+    erg error: i32,
+}
+
+"""Open one bounded recursive walker without recursively changing `read_dir`.
+
+The bridge receives a validated lexical path and scalar policy values. It
+allocates only bounded native traversal state, returns a positive runtime
+token on success, and maps invalid policy, unavailable paths, and allocation
+or host failures to negative status codes. It does not expose host path or
+directory-handle types to Actus code.
+"""
+unsafe extern "C" verb actus_walker_open(
+    abs path: path_module::Path,
+    erg max_depth: Int,
+    erg follow_symlinks: Bool,
+    erg include_hidden: Bool,
+    erg order: Int,
+    erg error_policy: Int
+) -> Int;
+
+"""Fill one owned walk event and return zero, EOF, or a traversal failure.
+
+`path` is caller-owned output storage and `output` is a caller-owned scalar
+event record. The bridge copies the next event into them; `-2` means clean end
+of stream and negative failure statuses leave no successful event behind.
+"""
+unsafe extern "C" verb actus_walker_next(
+    abs handle: Int,
+    ins path: path_module::Path,
+    ins output: WalkEventData
+) -> Int;
+
+"""Release the runtime traversal token and all retained directory frames.
+
+Closing is explicit and consumes the Actus owner. A second close or an invalid
+token returns `IoError.Failed`; normal Drop cleanup uses the same runtime
+release operation as a best-effort fallback.
+"""
+unsafe extern "C" verb actus_walker_close(abs handle: Int) -> Int;
+
+verb walk_order_code(abs order: DirectoryOrder) -> Int {
+    return case order {
+        DirectoryOrder.Native => 0,
+        DirectoryOrder.Lexicographic => 1,
+    };
+}
+
+verb walk_error_policy_code(abs policy: WalkErrorPolicy) -> Int {
+    return case policy {
+        WalkErrorPolicy.FailFast => 0,
+        WalkErrorPolicy.EmitError => 1,
+    };
+}
+
+verb walk_path_placeholder() -> Result[path_module::Path, io::IoError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    erg result = path_module::path_from_ascii(storage: dat raw);
+    return case dat result {
+        Result.Err(_) => Err(io::IoError.InvalidInput),
+        Result.Ok(path) => Ok(path),
+    };
+}
+
+verb discard_walk_handle(dat handle: Int) -> Int {
+    return handle;
+}
+
+verb discard_walk_path(dat path: path_module::Path) {}
+
+"""Start a bounded recursive traversal from `path`.
+
+`path` and `options` are immutable views borrowed for this call; neither input
+is consumed or retained. On success the returned `Walker` owns the bounded
+native traversal state, including directory frames and followed-link identity
+tracking. The caller must advance it with `next_walk_event` and eventually
+transfer it to `close_walker`, or rely on `Drop` for best-effort cleanup.
+
+The operation may perform blocking metadata and directory I/O, but never reads
+file contents or publishes filesystem state. Invalid bounds or policy values
+return `IoError.InvalidInput`. A root permission failure returns
+`IoError.PermissionDenied`; other provider failures retain their mapped error
+class. No walker is returned on failure and the input views remain unchanged.
+"""
+open verb walk(abs path: path_module::Path, abs options: WalkOptions) -> Result[Walker, io::IoError] {
+    erg depth: Int = options.max_depth as Int;
+    erg follow = options.follow_symlinks;
+    erg hidden = options.include_hidden;
+    erg order = walk_order_code(order: abs options.order);
+    erg policy = walk_error_policy_code(policy: abs options.error_policy);
+    erg handle = actus_walker_open(
+        path: abs path,
+        max_depth: erg depth,
+        follow_symlinks: erg follow,
+        include_hidden: erg hidden,
+        order: erg order,
+        error_policy: erg policy
+    );
+    return case handle {
+        -1 => {
+            discard_walk_handle(handle: dat handle);
+            Err(io::IoError.Failed);
+        },
+        -2 => {
+            discard_walk_handle(handle: dat handle);
+            Err(io::IoError.PermissionDenied);
+        },
+        -3 => {
+            discard_walk_handle(handle: dat handle);
+            Err(io::IoError.InvalidInput);
+        },
+        _ => Ok(Walker {
+            handle: handle,
+        }),
+    };
+}
+
+verb walk_event_kind(abs kind: i32) -> WalkEventKind {
+    return case kind {
+        0 => WalkEventKind.EnterDirectory,
+        1 => WalkEventKind.File,
+        2 => WalkEventKind.Symlink,
+        3 => WalkEventKind.LeaveDirectory,
+        _ => WalkEventKind.Error,
+    };
+}
+
+verb walk_event_error(abs error: i32) -> io::IoError {
+    return case error {
+        1 => io::IoError.Failed,
+        2 => io::IoError.PermissionDenied,
+        4 => io::IoError.Unsupported,
+        _ => io::IoError.Failed,
+    };
+}
+
+"""Return exactly one event from a streaming traversal.
+
+`walker` is an exclusive call-scoped loan and is restored for the caller after
+the call. `Ok(Some(event))` transfers an owned path snapshot and event payload
+to the caller. `Ok(None)` is clean end of stream; it is not an error and does
+not consume the walker. `Err(error)` is returned only for fail-fast traversal
+failure, including permission failures reported as
+`IoError.PermissionDenied`.
+
+The operation advances at most one event, does not read file contents, and
+does not retain the caller's temporary path storage. Under `EmitError`, an
+entry failure is returned as an owned `WalkEvent` with `kind == Error` and the
+typed cause in `error`; traversal then continues with later siblings.
+"""
+open verb next_walk_event(ins walker: Walker) -> Result[Option[WalkEvent], io::IoError] {
+    erg path_result = walk_path_placeholder();
+    return case dat path_result {
+        Result.Err(error) => Err(error),
+        Result.Ok(path) => {
+            erg output = WalkEventData {
+                depth: 0i32,
+                kind: 4i32,
+                error: 0i32,
+            };
+            erg status = actus_walker_next(
+                handle: abs walker.handle,
+                path: ins path,
+                output: ins output
+            );
+            return case status {
+                -2 => {
+                    discard_walk_path(path: dat path);
+                    Ok(Option[WalkEvent].None);
+                },
+                -1 => {
+                    discard_walk_path(path: dat path);
+                    Err(io::IoError.Failed);
+                },
+                -3 => {
+                    discard_walk_path(path: dat path);
+                    Err(io::IoError.InvalidInput);
+                },
+                -5 => {
+                    discard_walk_path(path: dat path);
+                    Err(io::IoError.PermissionDenied);
+                },
+                -6 => {
+                    discard_walk_path(path: dat path);
+                    Err(io::IoError.Unsupported);
+                },
+                _ => Ok(Option[WalkEvent].Some(WalkEvent {
+                    path: path,
+                    depth: output.depth as u32,
+                    kind: walk_event_kind(kind: abs output.kind),
+                    error: walk_event_error(error: abs output.error),
+                })),
+            };
+        },
+    };
+}
+
+"""Close a walker explicitly and release all retained traversal state.
+
+`walker` is transferred as `dat`; the caller cannot reuse it after this call.
+Successful close returns `Ok(0)` and releases every frame and visited-identity
+record. An invalid or already-released token returns `Err(IoError.Failed)`.
+The operation performs no path or file-content I/O and does not publish state.
+
+Explicit close is the status-bearing cleanup path. Callers may rely on `Drop`
+for early returns, but `Drop` intentionally discards the native close status
+because cleanup performances cannot report an error to the caller.
+"""
+open verb close_walker(dat walker: Walker) -> Result[Int, io::IoError] {
+    erg status = actus_walker_close(handle: abs walker.handle);
+    return case status {
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""Provide best-effort automatic cleanup for abandoned walker owners.
+
+The performance runs when ownership leaves scope without an explicit close.
+It releases the native token exactly once from the Actus ownership path and
+does not replace the explicit `close_walker` status-bearing operation.
+"""
+open perform Drop for Walker {
+    """Release the owned runtime traversal token exactly once.
+
+    `self` is an `ins` loan of the Drop owner; the performance may inspect its
+    handle for cleanup but does not transfer the owner to another binding.
+    """
+    verb drop(ins self: Walker) {
+        erg owner = Walker {
+            handle: self.handle,
+        };
+        close_walker(walker: dat owner);
+        self.handle = -1;
+    }
+}

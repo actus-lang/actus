@@ -1,5 +1,5 @@
 lockfile_version = 3
 runtime = "std"
 runtime_version = "0.1.0"
-runtime_checksum = "fb99a287487ceadd"
+runtime_checksum = "6b114e2d08ad7709"
 package = []

@@ -309,6 +309,16 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
     runtime_externals::append_buffer_runtime_externals(&mut module.externals, &runtime_symbols)?;
     append_print_externals(&mut module.externals, &runtime_symbols)?;
     append_format_externals(&mut module.externals, &runtime_symbols)?;
+    remove_defined_function_externals(&mut module);
     module.validate()?;
     Ok(module)
+}
+
+fn remove_defined_function_externals(module: &mut BackendModule) {
+    module.externals.retain(|external| {
+        !module
+            .functions
+            .iter()
+            .any(|function| function.symbol.as_str() == external.symbol.as_str())
+    });
 }

@@ -1,6 +1,6 @@
 # ADR-0086: Production Standard Filesystem API
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-22
 - Scope: Hosted `std::fs`, `std::path`, native filesystem bridges, and
   applications that need bounded file and directory access
@@ -93,6 +93,14 @@ file_clone_handle(...)
 reads and short writes are reported or completed by the corresponding verb;
 they are never silently treated as complete-buffer success.
 
+`close_on_exec` is applied as part of native handle creation, not by a later
+best-effort flag mutation. POSIX targets use `O_CLOEXEC`; Windows relies on
+the standard non-inheritable handle created by `OpenOptions`. Targets without
+one of these guarantees reject a requested `close_on_exec` open with the
+typed failure surface. The option is therefore a security contract, not a
+documentation-only hint, and the platform-specific fixtures select their
+assertions with `meta target("unix")` and `meta target("windows")`.
+
 ### Directory handles and entries
 
 Directory enumeration is streaming. The API must not return an unbounded
@@ -157,19 +165,22 @@ open struct DirectoryFilter {
     erg extension: Option[Path],
 }
 
-open verb read_dir_ordered(
+open verb read_dir_filtered(
     abs path: Path,
     erg order: DirectoryOrder,
-    abs filter: DirectoryFilter
+    dat filter: DirectoryFilter
 ) -> Result[Directory, IoError];
 ```
 
 Lexicographic ordering is defined over the canonical path byte representation.
 Case sensitivity, Unicode normalization, and invalid-name behavior are part
-of the target profile. Ordering must be stable across repeated runs and both
-native backends. If a target cannot provide the requested order within its
-declared resource limits, it returns a typed error instead of silently using
-native order.
+of the target profile. The current profile is case-sensitive and performs no
+Unicode normalization. Filtering is declarative: regular-file-only mode,
+directory and symlink inclusion, leading-dot hidden-name inclusion, and an
+optional exact extension are evaluated before an entry is returned. Ordering
+must be stable across repeated runs and both native backends. If a target
+cannot provide the requested order within its declared resource limits, it
+returns a typed error instead of silently using native order.
 
 ### Metadata
 
@@ -194,6 +205,23 @@ objects; reports size, readonly state, supported timestamps, and optional
 platform identity. `metadata` may follow links; `symlink_metadata` describes
 the link itself. Missing, inaccessible, unsupported, and raced metadata are
 distinct outcomes where the target can distinguish them.
+
+The portable snapshot stores modification, access, and creation timestamps as
+signed Unix seconds. Each timestamp has a status with `Available`,
+`Unsupported`, and `Unavailable` meanings; a timestamp value is consumed only
+when its status is `Available`. Platform identity is two opaque unsigned
+components plus an identity kind: POSIX maps them to device/inode and Windows
+maps them to volume/file index. An identity status distinguishes an available
+pair from a provider that cannot expose one. The snapshot owns no host handle
+and performs no follow-up filesystem lookup.
+
+Applications that need the operation failure cause use
+`metadata_detailed(path)` or `symlink_metadata_detailed(path)`. These return a
+typed metadata error distinguishing not-found, permission-denied, unsupported,
+and generic provider failure. The compatibility metadata verbs retain the
+existing `IoError` result surface and intentionally collapse those causes.
+The recursive walker does not use that compatibility collapse: a native
+permission failure is exposed as `IoError.PermissionDenied`.
 
 ### Recursive walking
 
@@ -223,7 +251,10 @@ open verb close_walker(dat walker: Walker) -> Result[Int, IoError];
 
 The walker enforces depth limits, detects symlink cycles when links are
 followed, preserves requested ordering, and exposes an explicit policy for
-permission failures: fail-fast or return an error event. It remains streaming.
+permission failures: fail-fast or return an error event. In either policy,
+the permission classification remains `IoError.PermissionDenied` at the Actus
+boundary; it is never rewritten as generic `IoError.Failed`. It remains
+streaming.
 
 ### Mutation and publication
 
@@ -241,8 +272,21 @@ hard_link(from, to)
 symlink(from, to)
 ```
 
-Recursive deletion is never implicit. Cross-device rename, overwrite policy,
-and link behavior are typed and documented.
+Recursive deletion is never implicit. Rename is atomic only within the host
+filesystem; a cross-filesystem attempt returns `IoError.CrossDevice` rather
+than being silently emulated as copy-and-delete. Copying uses an explicit
+`CopyOptions` policy. `copy_file_with_options` rejects an existing destination
+atomically when overwrite is disabled and returns `IoError.AlreadyExists`; when
+enabled it replaces the regular-file destination. The optional metadata policy
+copies only source readonly/permission bits. Timestamps, identity, ownership,
+and extended attributes are not copied by the portable API. The compatibility
+`copy_file` operation explicitly enables overwrite and disables metadata
+preservation. Link behavior remains target-documented and typed.
+
+`create_dir` creates exactly one directory and never creates missing parents.
+`create_dir_all` creates each missing parent in order and treats already
+existing directories as success; neither operation replaces a file-shaped
+component or performs recursive deletion.
 
 For durable publication, the library provides:
 
@@ -254,9 +298,51 @@ sync_parent_directory(path)
 publish_file(staged, active)
 ```
 
-The publication sequence is staged write, flush, sync, rename/replace, and
-optional parent-directory sync. A failed publication must leave the previous
-active file valid. Staging cleanup must not hide the primary failure.
+The public `write_file_atomic_synced` helper performs staged write, flush,
+close, rename, and then `sync_parent_directory` in that order. The ordinary
+`write_file_atomic` helper stops after the rename. On Unix, parent-directory
+sync is supported; targets without directory-handle synchronization return
+`IoError.Unsupported`. A sync failure occurs after rename, so the destination
+is already published and the caller must treat durability as uncertain. A
+failed pre-publication step must leave the previous active file valid. Staging
+cleanup must not hide the primary failure.
+
+`replace_file_atomic` is exposed separately from ordinary `rename`: Unix uses
+the host replacement rename, while unsupported targets return
+`IoError.Unsupported`; the library never emulates replacement as remove then
+rename. `publish_file_coordinated` adds a stronger cooperative contract: all
+writers use one exclusive lock path, the destination's native identity is
+compared while that lock is held, and the staged file is atomically replaced
+before the lock is released. A stale identity returns `Conflict` without
+publishing. This protects only writers that use the same coordinator; an
+uncoordinated external writer remains outside the guarantee. Targets without
+the required locking or replacement capability return `IoError.Unsupported`.
+The API never falls back to an unlocked check-then-rename sequence.
+
+### Crash-recovery contract
+
+The publication point is the successful rename/replace, not the initial write
+or flush. The API makes these states explicit:
+
+1. Before rename succeeds, the active destination is not published by the
+   atomic helper. A write, short-write, flush, close, or rename failure returns
+   an error and attempts best-effort removal of the staging path.
+2. After rename succeeds, the new bytes are the published namespace entry. A
+   later parent-directory sync failure cannot roll that publication back; the
+   caller receives an error with durability marked uncertain.
+3. `write_file_atomic` provides publication atomicity but does not promise
+   crash durability. A crash before the rename may leave the old destination
+   and may leave stale staging storage.
+4. `write_file_atomic_synced` performs the parent-directory sync after rename
+   on Unix. Successful completion means the requested ordering operation
+   completed; it does not promise immunity from every storage-device or power
+   failure. Unsupported targets return `IoError.Unsupported`.
+
+The library does not scan for or silently delete stale staging files during
+startup. Applications must use a private staging namespace and define their
+own recovery scan, validation, and retention policy. Failure-injection tests
+remain a separate gate because the current portable runtime has no production
+fault-injection control surface.
 
 ### Permissions, links, and security
 
@@ -288,6 +374,11 @@ unlock(file)
 
 Temporary creation uses unique names and create-new semantics. Locking and
 sharing behavior are capability-checked, and stale-lock policy is explicit.
+The standard library exposes shared, exclusive, try-lock, and unlock verbs.
+POSIX uses `flock`; Windows uses `LockFileEx` and `UnlockFileEx`. The complete
+file range is locked, non-blocking contention returns `IoError.Busy`, and
+provider failures remain typed. Targets without an advisory-lock primitive
+return `IoError.Unsupported`; no backend reports a false lock success.
 
 ### Errors and limits
 
@@ -362,6 +453,49 @@ published generation for subsequent files, and publish after each successful
 file. It must preserve the last valid manifest after an intermediate failure
 and emit per-file plus aggregate metrics. It must never add one configuration
 entry per generated artifact or input file.
+
+### Gate 8.1 implementation boundary
+
+The compiler test runner may link a dedicated fault-enabled runtime archive
+when a test declares one typed publication fault. The ordinary runtime archive
+must not export or consult that control channel. Fault selection belongs to the
+test runner and child-process setup; the standard filesystem facade exposes no
+fault verb and application code cannot select a fault in a production build.
+
+The implementation preserves the existing Actus publication path and injects
+only at native phase boundaries: staging open, write result, flush, close,
+pre-publication cleanup, rename, pre- or post-rename interruption, parent
+directory open, and parent-directory sync. Each fault is one-shot and scoped
+to one child test process. The fixture must assert the resulting publication
+state rather than merely checking an error code. Fault names are a closed
+compiler/runtime set; they do not represent arbitrary OS errno values.
+
+### Gate 8.2 compare-before-publish boundary
+
+Compare-before-publish is a separate contract from replacement publication.
+The expected value must be an opaque token derived from the target's native
+object identity: POSIX device/inode or the Windows volume/file identifier.
+Size, timestamps, permissions, and a prior metadata snapshot are not identity
+tokens and must not be used as a substitute.
+
+The public operation will have four typed outcomes: publication succeeded,
+the expected identity did not match (`Conflict`), the target has no native
+atomic compare-and-publish primitive (`Unsupported`), or the provider failed
+(`Failed`). The implementation must never perform `metadata -> compare ->
+rename` as a fallback. A cooperative lock-based implementation may exist as a
+separate explicitly weaker API, but it cannot claim protection from writers
+that do not honor the same lock.
+
+The current implementation deliberately scopes this contract to cooperating
+writers: Unix uses native device/inode identity, an exclusive coordinator
+lock, and one atomic replacement while that lock is held. Windows exposes the
+capability fixture as `Unsupported` because this runtime profile does not yet
+provide the required atomic replacement primitive. No target uses an unlocked
+check-then-rename approximation. The mirrored strict fixtures cover missing,
+unchanged, stale, and unsupported destinations; the native Unix regression
+runs two concurrent cooperating writers and proves that exactly one publishes
+while the other reports `Conflict`. A future target primitive may strengthen
+the guarantee against writers that bypass the coordinator.
 
 ## Rejected alternatives
 

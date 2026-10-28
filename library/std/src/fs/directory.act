@@ -1,7 +1,7 @@
 """
 Streaming directory access through one owned host directory handle.
 
-The iterator returns one owned entry `Path` at a time. It does not retain the
+The iterator returns one owned `DirectoryEntry` at a time. It does not retain the
 parent path, expose a native pointer, or allocate an unbounded entry array.
 """
 import {
@@ -12,10 +12,159 @@ import {
 """Maximum raw storage reserved for one returned directory entry name."""
 open const DIRECTORY_ENTRY_BUFFER_BYTES: Int = 4096;
 
+"""
+Declarative filters for streamed directory entries.
+
+`regular_files_only` takes precedence over the other kind flags. A false
+`include_directories` or `include_symlinks` excludes that kind; hidden means a
+leading-dot final name, not a host-specific hidden attribute. `extension`,
+when present, is matched bytewise and case-sensitively against the final file
+extension.
+"""
+open struct DirectoryFilter {
+    """Keep only entries classified as regular files when true."""
+    erg regular_files_only: Bool,
+    """Keep directory entries when true unless regular-files-only is active."""
+    erg include_directories: Bool,
+    """Owned erg flag; keep symbolic-link entries when true."""
+    erg include_symlinks: Bool,
+    """Owned erg flag; keep leading-dot names when true."""
+    erg include_hidden: Bool,
+    """Optional owned extension to match against each final file extension."""
+    erg extension: Option[path_module::Path],
+}
+
 """An owned opaque directory handle backed by one host directory resource."""
 open struct Directory {
-    """Owned erg scalar token for one host directory; the owner must call `close_dir` before release."""
+    """Owned erg scalar token for one host directory; Drop provides best-effort scope cleanup."""
     erg handle: Int,
+    """Owned filtering policy applied before each entry is returned."""
+    erg filter: DirectoryFilter,
+}
+
+"""
+Select the order used by a directory iterator.
+
+`Native` preserves the provider's streaming order and makes no reproducibility
+promise. `Lexicographic` takes a bounded snapshot at open time and emits names
+in canonical byte order; it rejects directories exceeding the declared entry
+or name limits instead of allocating without a bound.
+"""
+open enum DirectoryOrder {
+    """Use the host provider's native streaming order."""
+    Native,
+    """Sort a bounded directory snapshot by canonical name bytes."""
+    Lexicographic,
+}
+
+"""Maximum entries retained by one lexicographic directory snapshot."""
+open const DIRECTORY_MAX_ORDERED_ENTRIES: Int = 4096;
+
+"""
+Classifies one streamed directory entry without exposing host-specific type
+bits or retaining a native directory pointer. `File`, `Directory`, and
+`Symlink` are provider observations; `Other` covers entries that do not have
+one of those stable portable classifications. The enum is a copied scalar
+fact owned by its containing `DirectoryEntry` value and requires no cleanup.
+"""
+open enum DirectoryEntryKind {
+    """The provider identified the entry as a regular file."""
+    File,
+    """The provider identified the entry as a directory."""
+    Directory,
+    """The provider identified the entry as a symbolic link."""
+    Symlink,
+    """The provider reported another, special, or unsupported entry kind."""
+    Other,
+}
+
+"""
+Owned facts for one directory entry.
+
+`name` is the entry name returned by the provider. `relative_path` is the
+owned path component used by the directory consumer. `kind` and `metadata`
+are copied provider facts. Every path field owns its `Buffer`; the value does
+not retain the parent `Directory`, a native directory handle, or a borrowed
+host pointer. Dropping this value releases only its owned path storage.
+"""
+open struct DirectoryEntry {
+    """Owned path storage for the provider-reported entry name."""
+    erg name: path_module::Path,
+    """Owned path storage for the entry's relative consumer path."""
+    erg relative_path: path_module::Path,
+    """Owned copied classification; no native pointer or directory handle is retained."""
+    erg kind: DirectoryEntryKind,
+    """Owned copied metadata facts; they require no native handle cleanup."""
+    erg metadata: Metadata,
+}
+
+"""
+Report whether `entry` was classified as a regular file.
+
+`entry` is an `abs` immutable view and remains owned by the caller. The
+result is `true` only for `DirectoryEntryKind.File`; the helper does not
+inspect the filesystem, follow links, allocate, mutate the entry, or retain
+any reference after returning.
+"""
+open verb directory_entry_is_file(abs entry: DirectoryEntry) -> Bool {
+    erg result: Bool = false;
+    case entry.kind {
+        DirectoryEntryKind.File => {
+            result = true;
+        },
+        _ => {},
+    };
+    return result;
+}
+
+"""
+Report whether `entry` was classified as a directory. Returns `true` only
+when its copied kind is `Directory`.
+
+`entry` is borrowed through `abs` and is neither moved nor modified. The
+boolean is derived from the copied `DirectoryEntryKind` snapshot, so the
+helper performs no filesystem I/O, allocation, link traversal, or cleanup.
+"""
+open verb directory_entry_is_dir(abs entry: DirectoryEntry) -> Bool {
+    erg result: Bool = false;
+    case entry.kind {
+        DirectoryEntryKind.Directory => {
+            result = true;
+        },
+        _ => {},
+    };
+    return result;
+}
+
+"""
+Report whether `entry` was classified as a symbolic link.
+
+The `abs` entry view remains owned by the caller. The result reflects the
+captured link-preserving classification from `next_dir_entry`; it does not
+follow the target, query the host again, allocate storage, mutate state, or
+retain a borrowed reference.
+"""
+open verb directory_entry_is_symlink(abs entry: DirectoryEntry) -> Bool {
+    erg result: Bool = false;
+    case entry.kind {
+        DirectoryEntryKind.Symlink => {
+            result = true;
+        },
+        _ => {},
+    };
+    return result;
+}
+
+"""
+Return the copied portable file-type classification for `entry`.
+
+`entry` is borrowed immutably with `abs` and remains available to the caller.
+The returned `DirectoryEntryKind` is a copied scalar value; this helper does
+not transfer path ownership, allocate, perform filesystem I/O, follow links,
+or retain any reference to the entry.
+"""
+open verb directory_entry_file_type(abs entry: DirectoryEntry) -> DirectoryEntryKind {
+    return entry.kind;
 }
 
 """
@@ -27,6 +176,19 @@ the host handle and does not retain the source path.
 unsafe extern "C" verb actus_directory_open(abs path: path_module::Path) -> Int;
 
 """
+Open one directory with an explicit ordering policy.
+
+The order code is `0` for native streaming order and `1` for bounded
+lexicographic order. The bridge returns `-1` for provider failure, `-3` when
+the bounded snapshot cannot fit its resource limits, and `-4` when the order
+is unsupported or invalid.
+"""
+unsafe extern "C" verb actus_directory_open_ordered(
+    abs path: path_module::Path,
+    erg order: Int
+) -> Int;
+
+"""
 Write the next entry name into caller-owned storage.
 
 The bridge returns zero for POSIX path storage, one for Windows UTF-16 path
@@ -35,8 +197,41 @@ the fixed destination storage is too small.
 """
 unsafe extern "C" verb actus_directory_next(abs handle: Int, ins storage: Buffer) -> Int;
 
+"""
+Write the next entry name and a copied metadata snapshot into caller-owned
+storage. The runtime uses link metadata, so a symbolic link is classified as
+`Symlink` even when its target is missing or has another type.
+"""
+unsafe extern "C" verb actus_directory_next_entry(
+    abs handle: Int,
+    ins storage: Buffer,
+    ins metadata: Metadata
+) -> Int;
+
+"""Read one initialized byte from entry storage without transferring ownership."""
+unsafe extern "C" verb actus_buffer_byte_at(abs storage: Buffer, erg index: Int) -> Int;
+
+"""Inspect whether a borrowed path has a leading-dot final name."""
+unsafe extern "C" verb actus_path_is_hidden(abs path: path_module::Path) -> Bool;
+
+"""Compare a borrowed path's final extension with an owned filter path."""
+unsafe extern "C" verb actus_path_extension_equals(
+    abs path: path_module::Path,
+    abs extension: path_module::Path
+) -> Bool;
+
 """Close one owned directory handle exactly once through the runtime bridge."""
 unsafe extern "C" verb actus_directory_close(abs handle: Int) -> Int;
+
+verb directory_filter_default() -> DirectoryFilter {
+    return DirectoryFilter {
+        regular_files_only: false,
+        include_directories: true,
+        include_symlinks: true,
+        include_hidden: true,
+        extension: Option[path_module::Path].None,
+    };
+}
 
 """
 Open a directory and return a handle owned by the resulting `Directory`.
@@ -44,8 +239,9 @@ Open a directory and return a handle owned by the resulting `Directory`.
 Inputs: `path` is an `abs` path view and is borrowed, not consumed. Returns:
 `Ok(Directory)` owns the host handle; `Err(IoError.Failed)` reports a missing,
 invalid, or inaccessible directory. Errors leave no live handle exposed.
-The operation performs no unbounded allocation; the caller must later use
-`close_dir` to release the returned resource.
+The operation performs no unbounded allocation; callers may release the
+resource explicitly with `close_dir`, while Drop provides best-effort cleanup
+on scope exit.
 """
 open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError] {
     erg handle = actus_directory_open(path: abs path);
@@ -54,70 +250,235 @@ open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError
         true => {
             erg rejected = Directory {
                 handle: handle,
+                filter: directory_filter_default(),
             };
             drop(rejected);
             Err(io::IoError.Failed);
         },
         _ => Ok(Directory {
             handle: handle,
+            filter: directory_filter_default(),
         }),
     };
 }
 
 """
-Return the next entry name as an owned `Path`.
+Open one directory with an explicit ordering policy.
+
+`path` is borrowed and the returned `Directory` owns its iterator. `Native`
+preserves provider order without retaining entries. `Lexicographic` retains at
+most `DIRECTORY_MAX_ORDERED_ENTRIES` entries and returns `InvalidInput` when a
+name or directory exceeds the bounded snapshot contract. The operation does
+not expose native pointers or allow an unbounded array.
+"""
+open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrder) -> Result[Directory, io::IoError] {
+    erg filter = directory_filter_default();
+    return read_dir_ordered_with_filter(
+        path: abs path,
+        order: erg order,
+        filter: dat filter
+    );
+}
+
+verb read_dir_ordered_with_filter(
+    abs path: path_module::Path,
+    erg order: DirectoryOrder,
+    dat filter: DirectoryFilter
+) -> Result[Directory, io::IoError] {
+    erg order_code = case order {
+        DirectoryOrder.Native => 0,
+        DirectoryOrder.Lexicographic => 1,
+    };
+    erg handle = actus_directory_open_ordered(path: abs path, order: erg order_code);
+    erg failed: Bool = handle < 0;
+    erg invalid_input: Bool = handle == -3;
+    erg unsupported: Bool = handle == -4;
+    return case failed {
+        true => {
+            erg rejected = Directory {
+                handle: handle,
+                filter: filter,
+            };
+            drop(rejected);
+            return case invalid_input {
+                true => Err(io::IoError.InvalidInput),
+                _ => case unsupported {
+                    true => Err(io::IoError.Unsupported),
+                    _ => Err(io::IoError.Failed),
+                },
+            };
+        },
+        _ => Ok(Directory {
+            handle: handle,
+            filter: filter,
+        }),
+    };
+}
+
+"""
+Open a directory with an explicit ordering policy and declarative entry filter.
+
+The filter is transferred into the returned `Directory`, so its optional
+extension path remains owned for the iterator lifetime. Entries rejected by
+the filter are consumed from the native stream and never returned to callers.
+"""
+open verb read_dir_filtered(
+    abs path: path_module::Path,
+    erg order: DirectoryOrder,
+    dat filter: DirectoryFilter
+) -> Result[Directory, io::IoError] {
+    return read_dir_ordered_with_filter(
+        path: abs path,
+        order: erg order,
+        filter: dat filter
+    );
+}
+
+verb directory_entry_matches(
+    abs entry: DirectoryEntry,
+    abs filter: DirectoryFilter
+) -> Bool {
+    if filter.regular_files_only && !directory_entry_is_file(entry: abs entry) {
+        return false;
+    }
+    if !filter.include_directories && directory_entry_is_dir(entry: abs entry) {
+        return false;
+    }
+    if !filter.include_symlinks && directory_entry_is_symlink(entry: abs entry) {
+        return false;
+    }
+    if !filter.include_hidden && actus_path_is_hidden(path: abs entry.name) {
+        return false;
+    }
+    return case filter.extension {
+        Option.None => true,
+        Option.Some(extension) => actus_path_extension_equals(path: abs entry.name, extension: abs extension),
+    };
+}
+
+verb directory_entry_status(
+    erg status: Int,
+    dat storage: Buffer,
+    dat metadata: Metadata
+) -> Result[Option[DirectoryEntry], io::IoError] {
+    if status == 0 || status == 1 {
+        return directory_entry_from_storage(
+            storage: dat storage,
+            metadata: dat metadata,
+            status: status
+        );
+    }
+    drop(storage);
+    drop(metadata);
+    return case status {
+        -2 => Ok(Option[DirectoryEntry].None),
+        -3 => Err(io::IoError.InvalidInput),
+        _ => Err(io::IoError.Failed),
+    };
+}
+
+"""
+Classify and return the next entry as an owned `DirectoryEntry`.
 
 `Ok(None)` is normal end-of-directory. Each successful call allocates only
-the returned entry path; the iterator itself remains bounded by one host
-handle and the fixed entry-name buffer. Errors are returned as typed
-`IoError` values and leave the directory owner available for explicit close.
+the two owned path values and the copied scalar metadata; the iterator itself
+remains bounded by one host handle and the fixed entry-name buffer. Metadata
+describes the directory entry itself rather than following a symbolic link.
+Errors are returned as typed `IoError` values and leave the directory owner
+available for explicit close.
 """
-open verb next_dir_entry(ins directory: Directory) -> Result[Option[path_module::Path], io::IoError] {
-    erg storage: Buffer = Buffer[4096];
-    erg status = actus_directory_next(handle: abs directory.handle, storage: ins storage);
-    return case status {
-        -1 => {
-            drop(storage);
-            Err(io::IoError.Failed);
-        },
-        -2 => {
-            drop(storage);
-            Ok(Option[path_module::Path].None);
-        },
-        -3 => {
-            drop(storage);
-            Err(io::IoError.InvalidInput);
-        },
-        0 => {
-            return directory_entry_from_storage(storage: dat storage, status: status);
-        },
-        1 => {
-            return directory_entry_from_storage(storage: dat storage, status: status);
-        },
-        _ => {
-            drop(storage);
-            Err(io::IoError.Failed);
+open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEntry], io::IoError] {
+    loop {
+        erg storage: Buffer = Buffer[4096];
+        erg metadata = metadata_default();
+        erg status = actus_directory_next_entry(
+            handle: abs directory.handle,
+            storage: ins storage,
+            metadata: ins metadata
+        );
+        erg candidate = directory_entry_status(
+            status: status,
+            storage: dat storage,
+            metadata: dat metadata
+        );
+        return case dat candidate {
+            Result.Err(error) => Err(error),
+            Result.Ok(value) => case dat value {
+                Option.None => Ok(Option[DirectoryEntry].None),
+                Option.Some(entry) => {
+                    erg keep = directory_entry_matches(
+                        entry: abs entry,
+                        filter: abs directory.filter
+                    );
+                    if keep {
+                        return Ok(Option[DirectoryEntry].Some(entry));
+                    }
+                    drop(entry);
+                    continue;
+                },
+            },
+        };
+    }
+}
+
+verb copy_entry_storage(abs source: Buffer) -> Result[Buffer, io::IoError] {
+    erg output: Buffer = Buffer[0];
+    erg length = io::buffer_size(buffer: abs source)?;
+    erg index: Int = 0;
+    loop {
+        if index >= length {
+            break;
+        }
+        erg byte = actus_buffer_byte_at(storage: abs source, index: erg index);
+        append(output, byte as u8);
+        index += 1;
+    }
+    return Ok(output);
+}
+
+verb directory_entry_kind(abs metadata: Metadata) -> DirectoryEntryKind {
+    return case metadata.is_symlink {
+        1 => DirectoryEntryKind.Symlink,
+        _ => case metadata.is_file {
+            1 => DirectoryEntryKind.File,
+            _ => case metadata.is_dir {
+                1 => DirectoryEntryKind.Directory,
+                _ => DirectoryEntryKind.Other,
+            },
         },
     };
 }
 
-verb directory_entry_from_storage(dat storage: Buffer, erg status: Int) -> Result[Option[path_module::Path], io::IoError] {
-    return case status {
-        0 => {
-            erg result = path_module::path_from_posix(storage: dat storage);
-            return case dat result {
-                Result.Err(_) => Err(io::IoError.InvalidData),
-                Result.Ok(value) => Ok(Option[path_module::Path].Some(dat value)),
-            };
-        },
-        _ => {
-            erg result = path_module::path_from_windows_utf16(storage: dat storage);
-            return case dat result {
-                Result.Err(_) => Err(io::IoError.InvalidData),
-                Result.Ok(value) => Ok(Option[path_module::Path].Some(dat value)),
-            };
-        },
+verb directory_path_result(dat result: Result[path_module::Path, path_module::PathError]) -> Result[path_module::Path, io::IoError] {
+    return case dat result {
+        Result.Err(_) => Err(io::IoError.InvalidData),
+        Result.Ok(value) => Ok(value),
     };
+}
+
+verb directory_entry_from_storage(
+    dat storage: Buffer,
+    dat metadata: Metadata,
+    erg status: Int
+) -> Result[Option[DirectoryEntry], io::IoError] {
+    erg relative_storage = copy_entry_storage(source: abs storage)?;
+    erg name_result = case status {
+        0 => path_module::path_from_posix(storage: dat storage),
+        _ => path_module::path_from_windows_utf16(storage: dat storage),
+    };
+    erg name = directory_path_result(result: dat name_result)?;
+    erg relative_result = case status {
+        0 => path_module::path_from_posix(storage: dat relative_storage),
+        _ => path_module::path_from_windows_utf16(storage: dat relative_storage),
+    };
+    erg relative_path = directory_path_result(result: dat relative_result)?;
+    erg kind = directory_entry_kind(metadata: abs metadata);
+    return Ok(Option[DirectoryEntry].Some(DirectoryEntry {
+        name: name,
+        relative_path: relative_path,
+        kind: kind,
+        metadata: metadata,
+    }));
 }
 
 """
@@ -136,4 +497,12 @@ open verb close_dir(ins directory: Directory) -> Result[Int, io::IoError] {
             Ok(status);
         },
     };
+}
+
+"""Close a live directory handle during deterministic scope cleanup."""
+open perform Drop for Directory {
+    """Close the owned Directory resource through an ins loan during best-effort early return, branch exit, and implicit scope cleanup."""
+    verb drop(ins self: Directory) {
+        close_dir(directory: ins self);
+    }
 }

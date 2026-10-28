@@ -65,7 +65,74 @@ pub enum VerbContractSectionKind {
 pub enum MetaAttribute {
     Test,
     Target(String),
+    Fault(TestFault),
     Limitless(LimitlessScope),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TestFault {
+    StagingOpenFailure,
+    WriteFailure,
+    ShortWrite,
+    FlushFailure,
+    CloseFailure,
+    CleanupFailure,
+    RenameFailure,
+    InterruptedBeforeRename,
+    ParentOpenFailure,
+    ParentSyncFailure,
+    InterruptedPublication,
+}
+
+impl TestFault {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::StagingOpenFailure => "staging_open_failure",
+            Self::WriteFailure => "write_failure",
+            Self::ShortWrite => "short_write",
+            Self::FlushFailure => "flush_failure",
+            Self::CloseFailure => "close_failure",
+            Self::CleanupFailure => "cleanup_failure",
+            Self::RenameFailure => "rename_failure",
+            Self::InterruptedBeforeRename => "interrupted_before_rename",
+            Self::ParentOpenFailure => "parent_open_failure",
+            Self::ParentSyncFailure => "parent_sync_failure",
+            Self::InterruptedPublication => "interrupted_publication",
+        }
+    }
+
+    pub const fn code(self) -> i32 {
+        match self {
+            Self::StagingOpenFailure => 1,
+            Self::WriteFailure => 2,
+            Self::ShortWrite => 3,
+            Self::FlushFailure => 4,
+            Self::CloseFailure => 5,
+            Self::CleanupFailure => 6,
+            Self::RenameFailure => 7,
+            Self::InterruptedBeforeRename => 8,
+            Self::ParentOpenFailure => 9,
+            Self::ParentSyncFailure => 10,
+            Self::InterruptedPublication => 11,
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "staging_open_failure" => Some(Self::StagingOpenFailure),
+            "write_failure" => Some(Self::WriteFailure),
+            "short_write" => Some(Self::ShortWrite),
+            "flush_failure" => Some(Self::FlushFailure),
+            "close_failure" => Some(Self::CloseFailure),
+            "cleanup_failure" => Some(Self::CleanupFailure),
+            "rename_failure" => Some(Self::RenameFailure),
+            "interrupted_before_rename" => Some(Self::InterruptedBeforeRename),
+            "parent_open_failure" => Some(Self::ParentOpenFailure),
+            "parent_sync_failure" => Some(Self::ParentSyncFailure),
+            "interrupted_publication" => Some(Self::InterruptedPublication),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

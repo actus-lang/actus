@@ -1,19 +1,44 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::ReadDir;
+use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 use super::super::contract::{ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
 use super::super::path::ActusPath;
-use super::super::types::{ActusBuffer, BufferHandle};
+use super::super::types::{ActusBuffer, ActusMetadata, BufferHandle};
+use super::operations::write_metadata;
 use super::path_bridge::with_host_path;
 
 const DIRECTORY_STATUS_BUFFER_TOO_SMALL: i32 = -3;
+const DIRECTORY_STATUS_UNSUPPORTED: i32 = -4;
+const DIRECTORY_MAX_ORDERED_ENTRIES: usize = 4096;
+const DIRECTORY_MAX_ENTRY_NAME_BYTES: usize = 4095;
 
-static DIRECTORIES: OnceLock<Mutex<HashMap<i32, ReadDir>>> = OnceLock::new();
+enum DirectoryState {
+    Native(Box<ReadDir>),
+    Lexicographic { entries: Vec<PathBuf>, next: usize },
+}
+
+impl DirectoryState {
+    fn next_path(&mut self) -> std::io::Result<Option<PathBuf>> {
+        match self {
+            Self::Native(directory) => {
+                directory.next().map(|item| item.map(|entry| entry.path())).transpose()
+            }
+            Self::Lexicographic { entries, next } => {
+                let Some(path) = entries.get(*next).cloned() else { return Ok(None) };
+                *next += 1;
+                Ok(Some(path))
+            }
+        }
+    }
+}
+
+static DIRECTORIES: OnceLock<Mutex<HashMap<i32, DirectoryState>>> = OnceLock::new();
 static NEXT_DIRECTORY: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(1);
 
-fn directories() -> &'static Mutex<HashMap<i32, ReadDir>> {
+fn directories() -> &'static Mutex<HashMap<i32, DirectoryState>> {
     DIRECTORIES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -32,7 +57,47 @@ pub unsafe extern "C" fn actus_directory_open(path: *const ActusPath) -> i32 {
         return ABI_HANDLE_FAILURE as i32;
     }
     let Ok(mut table) = directories().lock() else { return ABI_HANDLE_FAILURE as i32 };
-    table.insert(handle, directory);
+    table.insert(handle, DirectoryState::Native(Box::new(directory)));
+    handle
+}
+
+/// Opens one host directory using the requested ordering policy.
+///
+/// # Safety
+/// `path` must be a valid immutable `ActusPath` for the duration of the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_directory_open_ordered(path: *const ActusPath, order: i32) -> i32 {
+    if order == 0 {
+        return unsafe { actus_directory_open(path) };
+    }
+    if order != 1 {
+        return DIRECTORY_STATUS_UNSUPPORTED;
+    }
+    let Some(result) = (unsafe { with_host_path(path, |native| std::fs::read_dir(native)) }) else {
+        return ABI_HANDLE_FAILURE as i32;
+    };
+    let Ok(directory) = result else { return ABI_HANDLE_FAILURE as i32 };
+    let mut entries = Vec::new();
+    for item in directory {
+        if entries.len() >= DIRECTORY_MAX_ORDERED_ENTRIES {
+            return DIRECTORY_STATUS_BUFFER_TOO_SMALL;
+        }
+        let Ok(entry) = item else { return ABI_STATUS_FAILURE };
+        if entry_name_key(entry.file_name().as_os_str()).len() > DIRECTORY_MAX_ENTRY_NAME_BYTES {
+            return DIRECTORY_STATUS_BUFFER_TOO_SMALL;
+        }
+        entries.push(entry.path());
+    }
+    entries.sort_by(|left, right| {
+        entry_name_key(left.file_name().unwrap_or_default())
+            .cmp(&entry_name_key(right.file_name().unwrap_or_default()))
+    });
+    let handle = NEXT_DIRECTORY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if handle <= 0 {
+        return ABI_HANDLE_FAILURE as i32;
+    }
+    let Ok(mut table) = directories().lock() else { return ABI_HANDLE_FAILURE as i32 };
+    table.insert(handle, DirectoryState::Lexicographic { entries, next: 0 });
     handle
 }
 
@@ -48,11 +113,63 @@ pub unsafe extern "C" fn actus_directory_next(handle: i32, storage: BufferHandle
     };
     let Ok(mut table) = directories().lock() else { return ABI_STATUS_FAILURE };
     let Some(directory) = table.get_mut(&handle) else { return ABI_STATUS_FAILURE };
-    let next = directory.next();
-    let Some(entry) = next else { return ABI_STATUS_END_OF_STREAM };
-    let Ok(entry) = entry else { return ABI_STATUS_FAILURE };
-    let name = entry.file_name();
-    unsafe { write_entry_name(output, &name) }
+    let entry = match directory.next_path() {
+        Ok(Some(entry)) => entry,
+        Ok(None) => return ABI_STATUS_END_OF_STREAM,
+        Err(_) => return ABI_STATUS_FAILURE,
+    };
+    let Some(name) = entry.file_name() else { return ABI_STATUS_FAILURE };
+    unsafe { write_entry_name(output, name) }
+}
+
+/// Writes one entry name and a symlink-preserving metadata snapshot.
+///
+/// # Safety
+/// `storage` must point to a valid writable `ActusBuffer`, `metadata` must
+/// point to writable `ActusMetadata`, and `handle` must be a live token
+/// returned by `actus_directory_open`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_directory_next_entry(
+    handle: i32,
+    storage: BufferHandle,
+    metadata: *mut ActusMetadata,
+) -> i32 {
+    let Some(output) = (unsafe { writable_buffer(storage) }) else {
+        return ABI_STATUS_FAILURE;
+    };
+    if metadata.is_null() {
+        return ABI_STATUS_FAILURE;
+    }
+    let Ok(mut table) = directories().lock() else { return ABI_STATUS_FAILURE };
+    let Some(directory) = table.get_mut(&handle) else { return ABI_STATUS_FAILURE };
+    let entry = match directory.next_path() {
+        Ok(Some(entry)) => entry,
+        Ok(None) => return ABI_STATUS_END_OF_STREAM,
+        Err(_) => return ABI_STATUS_FAILURE,
+    };
+    let Ok(snapshot) = entry.symlink_metadata() else { return ABI_STATUS_FAILURE };
+    let Some(name) = entry.file_name() else { return ABI_STATUS_FAILURE };
+    let name_status = unsafe { write_entry_name(output, name) };
+    if name_status < 0 {
+        return name_status;
+    }
+    unsafe { write_metadata(metadata, &snapshot) };
+    name_status
+}
+
+fn entry_name_key(name: &std::ffi::OsStr) -> Vec<u8> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        return name.as_bytes().to_vec();
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        return name.encode_wide().flat_map(u16::to_le_bytes).collect();
+    }
+    #[allow(unreachable_code)]
+    name.to_string_lossy().as_bytes().to_vec()
 }
 
 /// Closes one directory token and releases its host iterator.
@@ -118,4 +235,220 @@ unsafe fn write_entry_name(output: &mut ActusBuffer, name: &OsStr) -> i32 {
     }
     #[allow(unreachable_code)]
     ABI_STATUS_FAILURE
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use crate::runtime::path::ActusPath;
+
+    fn empty_metadata() -> ActusMetadata {
+        ActusMetadata {
+            size: 0,
+            is_file: 0,
+            is_dir: 0,
+            readonly: 0,
+            is_symlink: 0,
+            modified_seconds: 0,
+            modified_status: 0,
+            accessed_seconds: 0,
+            accessed_status: 0,
+            created_seconds: 0,
+            created_status: 0,
+            identity_primary: 0,
+            identity_secondary: 0,
+            identity_kind: 0,
+            identity_status: 0,
+        }
+    }
+
+    fn with_native_path<T>(path: &std::path::Path, operation: impl FnOnce(&ActusPath) -> T) -> T {
+        use std::os::unix::ffi::OsStrExt;
+
+        let mut bytes = path.as_os_str().as_bytes().to_vec();
+        let length = bytes.len();
+        bytes.push(0);
+        let mut buffer = ActusBuffer {
+            data: bytes.as_mut_ptr(),
+            length: bytes.len(),
+            capacity: bytes.capacity(),
+        };
+        let descriptor = ActusPath {
+            storage: &mut buffer,
+            platform: 0,
+            length: i32::try_from(length).expect("temporary path should fit ABI"),
+            capacity: i32::try_from(length).expect("temporary path should fit ABI"),
+            terminated: 1,
+        };
+        operation(&descriptor)
+    }
+
+    #[test]
+    fn directory_next_entry_writes_file_classification() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-entry-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        let file = root.join("entry");
+        std::fs::write(&file, b"entry").expect("temporary entry should be created");
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
+        assert!(handle > 0);
+        let mut entry_bytes = vec![0u8; 4096];
+        let mut entry_buffer =
+            ActusBuffer { data: entry_bytes.as_mut_ptr(), length: 0, capacity: entry_bytes.len() };
+        let mut metadata = empty_metadata();
+        let status =
+            unsafe { actus_directory_next_entry(handle, &mut entry_buffer, &mut metadata) };
+        assert_eq!(status, 0);
+        assert_eq!(metadata.is_file, 1);
+        assert_eq!(metadata.is_dir, 0);
+        assert_eq!(metadata.is_symlink, 0);
+        assert_eq!(metadata.modified_status, 0);
+        assert_eq!(metadata.accessed_status, 0);
+        assert_eq!(metadata.identity_kind, 1);
+        assert_eq!(metadata.identity_status, 0);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(file).expect("temporary entry should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_next_entry_classifies_mixed_children_and_eof() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-mixed-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("child")).expect("child directory should be created");
+        std::fs::write(root.join("file"), b"file").expect("child file should be created");
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
+        assert!(handle > 0);
+        let mut files = 0;
+        let mut directories = 0;
+        for _ in 0..2 {
+            let mut bytes = vec![0u8; 4096];
+            let mut buffer =
+                ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+            let mut metadata = empty_metadata();
+            assert_eq!(
+                unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) },
+                0
+            );
+            files += metadata.is_file;
+            directories += metadata.is_dir;
+        }
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, -2);
+        assert_eq!(files, 1);
+        assert_eq!(directories, 1);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(root.join("file")).expect("temporary file should be removed");
+        std::fs::remove_dir(root.join("child")).expect("child directory should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_ordered_entry_uses_lexicographic_name_bytes() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-ordered-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        std::fs::write(root.join("zeta"), b"zeta").expect("zeta should be created");
+        std::fs::write(root.join("alpha"), b"alpha").expect("alpha should be created");
+        let handle =
+            with_native_path(&root, |path| unsafe { actus_directory_open_ordered(path, 1) });
+        assert!(handle > 0);
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, 0);
+        let name = String::from_utf8(bytes[..buffer.length - 1].to_vec())
+            .expect("ordered entry name should be UTF-8");
+        assert_eq!(name, "alpha");
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(root.join("zeta")).expect("zeta should be removed");
+        std::fs::remove_file(root.join("alpha")).expect("alpha should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_next_entry_returns_eof_for_empty_directory() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-empty-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
+        assert!(handle > 0);
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, -2);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_next_entry_classifies_broken_symlink() {
+        let root =
+            std::env::temp_dir().join(format!("actus-directory-link-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary directory should be created");
+        std::os::unix::fs::symlink("missing-target", root.join("link"))
+            .expect("broken symbolic link should be created");
+        let handle = with_native_path(&root, |path| unsafe { actus_directory_open(path) });
+        assert!(handle > 0);
+        let mut bytes = vec![0u8; 4096];
+        let mut buffer = ActusBuffer { data: bytes.as_mut_ptr(), length: 0, capacity: bytes.len() };
+        let mut metadata = empty_metadata();
+        assert_eq!(unsafe { actus_directory_next_entry(handle, &mut buffer, &mut metadata) }, 0);
+        assert_eq!(metadata.is_symlink, 1);
+        assert_eq!(metadata.is_file, 0);
+        assert_eq!(metadata.is_dir, 0);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        std::fs::remove_file(root.join("link")).expect("symbolic link should be removed");
+        std::fs::remove_dir(root).expect("temporary directory should be removed");
+    }
+
+    #[test]
+    fn directory_close_releases_native_token_exactly_once() {
+        let before = directories().lock().expect("directory table should lock").len();
+        let mut bytes = b".\0".to_vec();
+        let mut buffer = ActusBuffer {
+            data: bytes.as_mut_ptr(),
+            length: bytes.len(),
+            capacity: bytes.capacity(),
+        };
+        let path =
+            ActusPath { storage: &mut buffer, platform: 0, length: 1, capacity: 1, terminated: 1 };
+        let handle = unsafe { actus_directory_open(&path) };
+        assert!(handle > 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before + 1);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before);
+        assert_eq!(unsafe { actus_directory_close(handle) }, ABI_STATUS_FAILURE);
+        let mut output = ActusBuffer { data: std::ptr::null_mut(), length: 0, capacity: 0 };
+        assert_eq!(unsafe { actus_directory_next(handle, &mut output) }, ABI_STATUS_FAILURE);
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use crate::runtime::path::ActusPath;
+
+    #[test]
+    fn directory_close_releases_native_token_exactly_once() {
+        let before = directories().lock().expect("directory table should lock").len();
+        let mut units = vec![46u16, 0u16];
+        let mut buffer = ActusBuffer {
+            data: units.as_mut_ptr().cast(),
+            length: units.len() * 2,
+            capacity: units.capacity() * 2,
+        };
+        let path =
+            ActusPath { storage: &mut buffer, platform: 1, length: 1, capacity: 1, terminated: 1 };
+        let handle = unsafe { actus_directory_open(&path) };
+        assert!(handle > 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before + 1);
+        assert_eq!(unsafe { actus_directory_close(handle) }, 0);
+        assert_eq!(directories().lock().expect("directory table should lock").len(), before);
+        assert_eq!(unsafe { actus_directory_close(handle) }, ABI_STATUS_FAILURE);
+        let mut output = ActusBuffer { data: std::ptr::null_mut(), length: 0, capacity: 0 };
+        assert_eq!(unsafe { actus_directory_next(handle, &mut output) }, ABI_STATUS_FAILURE);
+    }
 }

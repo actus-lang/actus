@@ -1,4 +1,5 @@
 mod cleanup;
+mod dominance;
 mod errors;
 mod flow;
 mod instruction;
@@ -257,7 +258,7 @@ impl BackendFunction {
         validate_function_symbol(&self.symbol)?;
         validate_signature(&self.parameters, &self.return_value)?;
         let block_ids = validate_blocks(&self.blocks, self.entry)?;
-        validation::validate_instructions(&self.blocks, &block_ids)?;
+        validation::validate_instructions(self.entry, &self.parameters, &self.blocks, &block_ids)?;
         validate_cleanup_plans(&self.cleanup)?;
         Ok(())
     }

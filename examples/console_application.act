@@ -34,6 +34,21 @@ verb main() -> Int {
             IoError.InvalidData => {
                 return 5;
             },
+            IoError.Unsupported => {
+                return 6;
+            },
+            IoError.PermissionDenied => {
+                return 7;
+            },
+            IoError.Busy => {
+                return 8;
+            },
+            IoError.CrossDevice => {
+                return 9;
+            },
+            IoError.AlreadyExists => {
+                return 10;
+            },
         },
     };
 }

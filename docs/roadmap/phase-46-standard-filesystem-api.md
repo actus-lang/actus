@@ -9,166 +9,492 @@ differences, path semantics, and failure recovery. A directory API must not
 silently become an unbounded collection, a hidden allocator, or a hot-path
 filesystem dependency.
 
+## Status: temporarily deferred (2026-10-28)
+
+Phase 46 is intentionally paused while Actus metadata semantics are designed
+and implemented as a language foundation for platform selection, capability
+contracts, effects, bounded execution, and deterministic behavior. This is a
+sequencing decision, not a completion claim: the phase remains open and its
+remaining gates must not be marked complete by assumption.
+
+The filesystem work completed through Gate 8.2 is retained as the current
+checkpoint, including the typed filesystem surface, publication recovery
+contract, test-only fault injection, and the cooperating-writer
+compare-before-publish coordinator. New filesystem API expansion is deferred
+until the metadata contract is stable. Existing filesystem behavior may still
+receive narrowly scoped correctness or cross-platform fixes when required by
+validation.
+
+Phase 46 resumes after the metadata phase has a documented contract,
+compiler diagnostics, strict fixtures, and cross-platform evidence. At that
+point the remaining filesystem gates will be re-audited against the metadata
+capabilities rather than silently carried forward.
+
 ## Gate 0: Contract, scope, and capability boundary
 
-- [ ] Accept the filesystem API as a standard-library capability, separate
+- [x] Accept the filesystem API as a standard-library capability, separate
       from compiler internals and application-specific ingestion logic.
-- [ ] Define the hosted-filesystem target contract and the behavior of builds
+- [x] Define the hosted-filesystem target contract and the behavior of builds
       that do not provide a filesystem capability.
-- [ ] Define whether filesystem verbs are blocking and document that they are
+- [x] Define whether filesystem verbs are blocking and document that they are
       forbidden in inference, impulse forwarding, and other realtime hot paths.
-- [ ] Define the distinction between a lexical `Path`, an opened filesystem
+- [x] Define the distinction between a lexical `Path`, an opened filesystem
       handle, and a canonicalized filesystem location.
-- [ ] Define that filesystem paths and handles are never serialized into Actus
+- [x] Define that filesystem paths and handles are never serialized into Actus
       application state or binary persistence formats.
-- [ ] Define the platform-neutral error contract and the mapping from native
+- [x] Define the platform-neutral error contract and the mapping from native
       error classes to typed `IoError` variants.
-- [ ] Define the maximum path length, component length, directory depth, and
+- [x] Define the maximum path length, component length, directory depth, and
       entry-name size supported by each target profile.
-- [ ] Record unsupported operations explicitly instead of silently emulating
+- [x] Record unsupported operations explicitly instead of silently emulating
       them with shell commands or platform-specific source code.
-- [ ] Add an ADR covering ownership, cleanup, ordering, security, and target
+- [x] Add an ADR covering ownership, cleanup, ordering, security, and target
       capability behavior before implementation expands.
+
+Gate 0 evidence (2026-10-25): ADR-0086 is accepted and defines the hosted
+filesystem capability boundary, blocking behavior, path and handle semantics,
+serialization restrictions, typed errors, target limits, unsupported
+operations, ownership, cleanup, ordering, security, and target profiles.
 
 ## Gate 1: Canonical module and public facade
 
-- [ ] Create the canonical `library/std/src/fs/fs.act` facade.
-- [ ] Split implementation by responsibility: handles, directory iteration,
+- [x] Create the canonical `library/std/src/fs/fs.act` facade.
+- [x] Split implementation by responsibility: handles, directory iteration,
       metadata, paths, permissions, links, temporary resources, and atomic
       publication.
-- [ ] Export only intentional public declarations from the facade.
+- [x] Export only intentional public declarations from the facade.
 - [ ] Keep native extern declarations in a platform-specific implementation
       boundary; do not leak C or OS types into the public Actus API.
-- [ ] Add public documentation for every type, enum, constant, and verb.
-- [ ] Add module-visibility tests proving `import std::fs;` with qualified
+- [x] Add public documentation for every type, enum, constant, and verb.
+- [x] Add module-visibility tests proving `import std::fs;` with qualified
       `fs::...` access, and `import { open std::fs };` for intentional
       unqualified access, are the supported paths.
-- [ ] Reject direct imports of private implementation children where the
+- [x] Reject direct imports of private implementation children where the
       compiler's module rules require the canonical facade.
+
+Gate 1 evidence (2026-10-25): `library/std/src/fs/fs.act` is the canonical
+facade and `tests/library/fs/fs.act` passes strict qualified facade coverage
+for directory lifecycle and metadata access.
+
+Gate 1 implementation evidence (2026-10-25): permissions, atomic publication,
+symbolic-link inspection, and temporary resources are now isolated behind
+responsibility-specific children (`permissions.act`, `publication.act`,
+`links.act`, and `temporary.act`). The remaining facade/export audit is still
+open, so the split checkbox remains intentionally unchecked.
+
+Gate 1 visibility evidence (2026-10-25): `tests/library/fs/fs.act` now covers
+both qualified `fs::...` access and intentional unqualified access through
+`import { open std::fs };`; both forms pass strict execution.
+
+Gate 1 facade evidence (2026-10-26): responsibility-specific children are
+exported only through `library/std/src/fs/fs.act`; public declaration
+documentation is enforced by the documentation suite, and
+`tests/stdlib_visibility.rs` rejects direct resolution of `std::fs::file`.
+Native runtime symbols remain behind `src/runtime/fs`; the Actus FFI boundary
+is intentionally retained as a separate follow-up for the platform ABI gate.
+
+### Gate 1.1: Secure temporary resources
+
+- [x] Add secure temporary-file and temporary-directory creation below a
+      caller-selected workspace root.
+- [x] Use OS-provided entropy, atomic create-new/mkdir semantics, bounded
+      collision retries, and rejection of symlink workspace roots.
+- [x] Return the generated path with the owned resource and provide explicit
+      cleanup plus best-effort Drop cleanup.
+- [x] Add mirrored strict fixtures for creation, cleanup, and prefix rejection.
+
+Gate 1.1 evidence (2026-10-25): the runtime exposes secure temporary file and
+directory creation with caller-selected roots, OS entropy (`/dev/urandom` on
+Unix and `BCryptGenRandom` on Windows), atomic creation, bounded retries, and
+typed Actus cleanup wrappers. `tests/library/fs/temporary.act` covers both
+resource kinds, cleanup removal, and unsafe-prefix rejection. Adversarial
+collision/concurrency and read-only-parent matrices remain tracked in Gate 10.
 
 ## Gate 2: Typed paths and filesystem identity
 
-- [ ] Reuse the existing `Path` representation and document its encoding and
+- [x] Reuse the existing `Path` representation and document its encoding and
       platform rules.
-- [ ] Add explicit path operations for `join`, `parent`, `file_name`,
+- [x] Add explicit path operations for `join`, `parent`, `file_name`,
       `extension`, `file_stem`, `components`, and `normalize`.
-- [ ] Guarantee that every non-owning `PathComponent` view preserves a valid
+- [x] Guarantee that every non-owning `PathComponent` view preserves a valid
       source reference and that reads through `source.storage`, `offset`, and
       `length` observe the original platform representation without exposing
       backend-specific pointer details.
-- [ ] Add regression coverage for component-source byte/code-unit reads,
+- [x] Add regression coverage for component-source byte/code-unit reads,
       including extension and file-name views on POSIX and Windows paths.
-- [ ] Add a separate canonicalization operation that resolves filesystem
+- [x] Add a separate canonicalization operation that resolves filesystem
       identity and reports missing components instead of changing lexical
       paths implicitly.
-- [ ] Define absolute, relative, root, separator, dot, and dot-dot behavior
+- [x] Define absolute, relative, root, separator, dot, and dot-dot behavior
       for POSIX and Windows targets.
-- [ ] Define whether a path operation preserves or rejects embedded NUL,
+- [x] Define whether a path operation preserves or rejects embedded NUL,
       invalid UTF-8, reserved names, and platform-invalid components.
-- [ ] Add `same_file` or equivalent identity comparison where the target can
+- [x] Add `same_file` or equivalent identity comparison where the target can
       provide it, with an explicit unsupported result otherwise.
-- [ ] Add accepted and rejected tests for traversal, malformed encoding,
+- [x] Add accepted and rejected tests for traversal, malformed encoding,
       roots, separators, and platform-specific reserved names.
+
+Gate 2 lexical-path evidence (2026-10-26): `std::path::Path` owns validated
+raw POSIX bytes or target-endian Windows UTF-16 units, while component views
+retain their source path and offsets. The mirrored fixtures
+`tests/library/path_component_source.act`, `path_components.act`,
+`path_platform.act`, `path_edge_cases.act`, `path_iteration.act`, and
+`path_builders.act` cover source reads, POSIX/Windows roots and separators,
+lexical dot and dot-dot normalization, component extraction, ownership, and
+embedded-null/invalid-encoding failures. Filesystem identity resolution,
+reserved-name policy, traversal semantics, and `same_file` remain covered;
+consumer-specific symlink escape policy remains open for Gate 6 and Gate 9.
+
+Gate 2 canonicalization evidence (2026-10-26): `std::fs::canonicalize` uses
+the host filesystem resolver, returns a new owned absolute `Path`, preserves
+the lexical input, and rejects missing components. The mirrored
+`tests/library/fs/operations.act` fixture covers both an existing path and a
+missing path under strict execution.
+
+Gate 2 path-input policy evidence (2026-10-26): constructors reject embedded
+NUL units, malformed encoding, missing terminators, and inconsistent storage.
+Valid lexical names that a host may reserve are preserved by `std::path`; the
+filesystem operation owns enforcement and returns typed failure. The Windows
+fixture `windows_reserved_name_remains_lexical`, together with the existing
+embedded-NUL and invalid-UTF-16 fixtures, records this boundary.
+
+Gate 2 identity evidence (2026-10-26): `std::fs::same_file` compares POSIX
+device/inode or Windows volume/file-index identity, follows host metadata
+semantics, and returns `IoError.Unsupported` where no stable identity is
+available. The mirrored filesystem operations fixture covers equal existing
+paths.
 
 ## Gate 3: Directory handle lifecycle
 
-- [ ] Add a typed directory handle that owns one native directory resource.
-- [ ] Add `read_dir(abs path: Path) -> Result[Directory, IoError]`.
-- [ ] Add `next_dir_entry(ins directory: Directory) ->
+- [x] Add a typed directory handle that owns one native directory resource.
+- [x] Add `read_dir(abs path: Path) -> Result[Directory, IoError]`.
+- [x] Add `next_dir_entry(ins directory: Directory) ->
       Result[Option[DirectoryEntry], IoError]`.
-- [ ] Add `close_dir(dat directory: Directory) -> Result[Int, IoError]`.
-- [ ] Define end-of-directory as `Ok(Option.None)`, not as a generic failure.
-- [ ] Define behavior for repeated reads after EOF.
-- [ ] Reject reads and close operations on an already-closed or moved handle.
-- [ ] Guarantee cleanup on early return, branch exit, loop exit, and error
+- [x] Add `close_dir(ins directory: Directory) -> Result[Int, IoError]`.
+- [x] Define end-of-directory as `Ok(Option.None)`, not as a generic failure.
+- [x] Define behavior for repeated reads after EOF.
+- [x] Reject reads and close operations on an already-closed or moved handle.
+- [x] Guarantee cleanup on early return, branch exit, loop exit, and error
       paths through the Actus ownership model.
-- [ ] Define whether a dropped live handle is rejected, implicitly closed, or
+- [x] Define whether a dropped live handle is rejected, implicitly closed, or
       diagnosed; choose one policy and test it on every backend.
-- [ ] Ensure no directory handle can escape its declared ownership scope.
-- [ ] Add native leak, double-close, use-after-close, and early-return tests.
+- [x] Ensure no directory handle can escape its declared ownership scope.
+- [x] Add native leak, double-close, use-after-close, and early-return tests.
+
+Gate 3 initial lifecycle evidence (2026-10-27): `Directory` owns one opaque
+host iterator, `read_dir` opens it, `next_dir_entry` streams bounded owned
+entry paths, and `close_dir(ins directory)` invalidates the owner after
+release. The mirrored `tests/library/fs_directory.act` fixture covers valid
+opening, missing-directory rejection, entry closure, repeated EOF reads, and
+early-return Drop cleanup; closed-handle reuse is now covered. Moved-handle
+rejection is covered by the compiler-level
+`std_directory_moved_owner_is_rejected_before_codegen` regression. The native
+runtime test verifies that the directory token table returns to its prior size
+after close, rejects a second close, and rejects reads after close; the strict
+Actus fixture covers early return, branch exit, loop exit, and typed-error
+cleanup with seven strict tests passing. A Directory value may leave a scope
+only through an explicit owned transfer or return; borrowed and moved owners
+cannot be reused or escape through the semantic boundary.
+
+## Gate 3.1: Branch-aware native cleanup lowering
+
+This sub-gate is an Actus compiler prerequisite for Gate 3 cleanup and Drop
+claims. Cleanup operands must remain tied to the owner value that is live in
+the block where cleanup is emitted.
+
+- [x] Represent branch-local owner bindings with their block-local SSA values;
+      do not resolve cleanup operands from a single mutable name-to-value map.
+- [x] Lower cleanup independently for `case` branches, loop bodies, loop
+      exits, `return`, `break`, `continue`, and error paths.
+- [x] Validate before backend emission that every cleanup operand is defined in
+      the block or is supplied by a dominating predecessor/block parameter.
+- [x] Preserve exactly-once cleanup for `Buffer`, `Region`, aggregate values,
+      and user-defined `Drop` performances.
+- [x] Verify equivalent behavior in every supported native backend, including
+      Cranelift's verifier and linker path.
+- [x] Add compiler regressions for nested `case` plus loop cleanup, early
+      return, branch exit, repeated cleanup prevention, and moved owners.
+- [x] Add the mirrored standard-library regression proving `Directory`'s
+      implicit-close policy without changing its public `ins` contract.
+- [x] Record the compiler revision, backend matrix, strict fixture output, and
+      the absence of non-dominating-value verifier failures.
+
+Gate 3.1 implementation evidence (2026-10-26): cleanup lowering now snapshots
+active bindings at block entry and uses the matching snapshot for distributed
+scope cleanup and case-scope exit. This prevents the previous Cranelift
+non-dominating-value failure where one cleanup reused SSA value `29` in blocks
+whose live owners were `17` and `27`. The compiler regression and mirrored
+directory fixture pass. The backend contract now computes block dominators and
+rejects cleanup operands that are undefined, sibling-branch values, or defined
+after the cleanup in the same block; a direct regression covers the rejected
+sibling-branch case. Exactly-once cleanup is covered for Buffer, Region,
+partial aggregate fields, and user-defined Drop performances across the shared
+lowering regressions. The backend parity suite now runs 11 hosted/freestanding
+Cranelift/LLVM fixtures, including the `std::fs::read_dir` early-return Drop
+fixture; all 11 pass. Native leak and double-close coverage pass on the
+runtime bridge test. Final Gate 3.1 evidence at compiler revision `d5803f0a`:
+the Rust lib suite is 150/150, the Cranelift/LLVM backend matrix is 11/11,
+the strict directory fixture is 5/5, documentation validation is 4/4, and no
+non-dominating-value verifier or linker failure was observed.
 
 ## Gate 4: Directory entry and metadata model
 
-- [ ] Add `DirectoryEntryKind` with at least `File`, `Directory`, `Symlink`,
+- [x] Add `DirectoryEntryKind` with at least `File`, `Directory`, `Symlink`,
       and `Other` variants.
-- [ ] Add a documented `DirectoryEntry` containing the entry name, relative
+- [x] Add a documented `DirectoryEntry` containing the entry name, relative
       path component, kind, and metadata snapshot.
-- [ ] Reuse the existing `Metadata` type where its fields are sufficient;
+- [x] Reuse the existing `Metadata` type where its fields are sufficient;
       extend it only through an intentional public API change.
-- [ ] Define metadata fields for file type, byte size, readonly state,
+- [x] Define metadata fields for file type, byte size, readonly state,
       modification time, access time, creation time, and platform identity.
-- [ ] Distinguish a missing target, an inaccessible target, and an unsupported
+- [x] Distinguish a missing target, an inaccessible target, and an unsupported
       metadata field.
-- [ ] Define whether entry metadata follows symlinks or describes the link
+- [x] Define whether entry metadata follows symlinks or describes the link
       itself; expose both operations when the platform supports both.
-- [ ] Add explicit `is_file`, `is_dir`, `is_symlink`, and file-type helpers.
-- [ ] Add tests for empty directories, mixed entry kinds, broken symlinks,
-      unreadable entries, and metadata races.
+- [x] Add explicit `is_file`, `is_dir`, `is_symlink`, and file-type helpers.
+- [x] Add tests for empty directories, mixed entry kinds, and broken symlinks.
+- [ ] Add portable tests for unreadable entries and metadata races.
+
+Gate 4 entry evidence (2026-10-27): `std::fs` now exposes the documented
+`DirectoryEntryKind` and owned `DirectoryEntry` values through its canonical
+facade. `next_dir_entry` fills both owned path components and a copied
+metadata snapshot through the native runtime bridge. Classification uses
+`symlink_metadata`, so `Symlink` describes the link itself and does not depend
+on its target being present. The read-only classification helpers are exposed
+through the same facade and do not perform a second filesystem lookup. The
+native classification regression covers regular files, empty directories,
+mixed file/directory entries with EOF, and broken symlinks; the strict mirrored
+directory fixture also passes. Portable unreadable-entry and metadata-race
+coverage remains open because those conditions require a stable cross-platform
+test harness rather than host-specific permission or timing assumptions.
+Metadata now carries signed Unix-second timestamps with explicit available,
+unsupported, and unavailable statuses, plus an opaque platform identity pair;
+native and path-level strict coverage validate the available POSIX snapshot.
+The detailed metadata verbs preserve not-found, permission-denied,
+unsupported, and generic provider failures while compatibility verbs retain
+the existing `IoError` surface. Mixed-kind/error-matrix coverage remains open.
 
 ## Gate 5: Deterministic and bounded enumeration
 
-- [ ] Keep enumeration streaming; never require an `Array` containing every
+- [x] Keep enumeration streaming; never require an `Array` containing every
       directory entry.
-- [ ] Define native enumeration order as unspecified and unsuitable for
-      reproducible builds or deterministic training.
-- [ ] Add an explicit ordering policy with at least `Native` and
+- [x] Define native enumeration order as unspecified and unsuitable for
+      reproducible builds or deterministic consumers.
+- [x] Add an explicit ordering policy with at least `Native` and
       `Lexicographic` modes.
-- [ ] Define lexicographic ordering over the canonical byte representation,
-      including case sensitivity and Unicode normalization behavior.
-- [ ] Decide where sorting occurs: in the standard-library iterator with
-      documented bounded/resource behavior, or in a separate bounded consumer
-      layer. Do not hide an unbounded allocation in the basic iterator.
-- [ ] Add an optional entry filter contract for regular files, extension,
+- [x] Define lexicographic ordering over the canonical byte representation:
+      comparison is case-sensitive and performs no Unicode normalization.
+- [x] Perform sorting in the standard-library iterator through a bounded
+      snapshot; do not hide an unbounded allocation in the basic iterator.
+- [x] Add an optional entry filter contract for regular files, extension,
       hidden entries, and symlink policy without requiring function pointers.
-- [ ] Define maximum entries, maximum name length, and overflow behavior for
+- [x] Define maximum entries, maximum name length, and overflow behavior for
       bounded profiles.
-- [ ] Add tests proving identical ordering across repeated runs and both
+- [x] Add tests proving identical ordering across repeated runs and both
       native backends.
+
+Gate 5 initial evidence (2026-10-27): the basic iterator remains bounded to
+one native directory handle and one returned entry at a time; it does not
+materialize an array of entries. Native order is explicitly unspecified in
+the filesystem guide and is not a reproducible ordering contract. The ordered
+iterator provides bounded lexicographic sorting with a 4096-entry limit and
+the native regression confirms bytewise `alpha` before `zeta`. Declarative
+filtering now covers regular files, directories, symlinks, leading-dot names,
+and exact extensions without function pointers. The backend-parity fixture
+`hosted_cli_backends_preserve_bounded_lexicographic_directory_order` creates
+the same `alpha`/`zeta` entries, runs the ordered iterator twice under both
+Cranelift and LLVM, and verifies the same result each time. The parity run also
+closed a shared-lowering defect: an imported performance cleanup symbol could
+be declared as external in the module that defined it, producing a duplicate
+LLVM symbol and a link failure. Module assembly now removes external entries
+whose symbol is defined by the same lowered module.
 
 ## Gate 6: Recursive walking and traversal policy
 
-- [ ] Add a separate recursive walker rather than making `read_dir` recursive.
-- [ ] Define `WalkOptions` for maximum depth, follow-symlink behavior,
+- [x] Add a separate recursive walker rather than making `read_dir` recursive.
+- [x] Define `WalkOptions` for maximum depth, follow-symlink behavior,
       directory-first/file-first order, hidden entries, and error policy.
-- [ ] Add a streaming `next_walk_event` API with enter, file, symlink, leave,
+- [x] Add a streaming `next_walk_event` API with enter, file, symlink, leave,
       and error events where supported.
-- [ ] Detect cycles when symlinks are followed and return a typed cycle error.
-- [ ] Define behavior for permission failures: fail-fast, skip-with-event, or
+- [x] Detect cycles when symlinks are followed and return a typed cycle error.
+- [x] Define behavior for permission failures: fail-fast, skip-with-event, or
       collect-and-return; do not silently ignore them.
-- [ ] Preserve deterministic ordering at every directory level when requested.
-- [ ] Add depth, cycle, symlink, permission, and very-wide-tree tests.
+- [x] Preserve deterministic ordering at every directory level when requested.
+- [x] Add depth, cycle, symlink, permission, and very-wide-tree tests.
+
+Gate 6 implementation evidence (2026-10-27): the separate bounded
+walker API is implemented behind `std::fs::fs.act`, with depth-first streaming
+events, explicit native/lexicographic ordering, hidden-entry filtering,
+non-followed symlink events, followed-link cycle detection, and fail-fast or
+error-event policies. Native runtime coverage is 8/8 for depth, cycle,
+broken-link, symlink, very-wide-tree overflow, permission-event mapping, and
+permission fail-fast status separation; the mirrored strict fixture is 3/3.
+The public `IoError.PermissionDenied` variant preserves native permission
+classification instead of collapsing it into `IoError.Failed`. Fail-fast
+permission status uses a distinct ABI value and cannot be confused with clean
+EOF. OS-specific permission matrices (POSIX mode bits and Windows ACLs) remain
+a platform follow-up; this gate's portable contract is covered by deterministic
+runtime mapping tests.
 
 ## Gate 7: File operations and open options
 
-- [ ] Expose explicit `file_open`, `file_create`, `file_read`, `file_write`,
+- [x] Expose explicit `file_open`, `file_create`, `file_read`, `file_write`,
       `file_seek`, `file_flush`, and `file_close` contracts.
-- [ ] Complete `OpenOptions` for read, write, append, truncate, create,
+- [x] Complete `OpenOptions` for read, write, append, truncate, create,
       create-new, and close-on-exec behavior where supported.
-- [ ] Define partial read and partial write handling; never treat a short
+- [x] Define partial read and partial write handling; never treat a short
       native operation as implicit success for the complete buffer.
-- [ ] Add bounded file-copy and file-stream operations without loading an
+- [x] Add bounded file-copy and file-stream operations without loading an
       entire file into memory.
-- [ ] Add file locking or an explicit unsupported result for targets that do
+- [x] Add file locking or an explicit unsupported result for targets that do
       not provide advisory locks.
-- [ ] Add durable sync operations for data and metadata where supported.
-- [ ] Add tests for concurrent open modes, short I/O, EOF, locks, flush, and
+- [x] Add durable sync operations for data and metadata where supported.
+- [x] Add tests for concurrent open modes, short I/O, EOF, locks, flush, and
       persistence failures.
+
+Evidence (2026-10-27): `File` exposes open/create/read/write/seek/flush/close,
+with explicit short-I/O and EOF contracts. `OpenOptions` covers all seven
+scalar switches; close-on-exec is applied atomically with POSIX `O_CLOEXEC`,
+uses Windows' non-inheritable standard handle behavior, and rejects unsupported
+targets. `copy_file` and the fixed-buffer `io::copy_stream` avoid whole-file
+loading. `file_sync_data` and `file_sync_all` are exposed through the hosted
+facade, runtime bridges, and buffer ABI adapters. Strict file/operations
+fixtures and platform-selected Unix/Windows option fixtures cover the public
+contract. POSIX and Windows lock backends now cover shared, exclusive,
+non-blocking, and unlock operations; contention is `IoError.Busy` and targets
+without a backend return `IoError.Unsupported`. Mirrored strict fixtures cover
+two-handle contention, write/flush/reopen/read, EOF, cleanup, and failed
+publication. The Gate 7 file-operation validation matrix is complete.
 
 ## Gate 8: Mutation, publication, and recovery operations
 
-- [ ] Add `create_dir` and an explicit `create_dir_all` for parent creation.
-- [ ] Add `remove_file`, `remove_dir`, and a separately guarded recursive
+- [x] Add `create_dir` and an explicit `create_dir_all` for parent creation.
+- [x] Add `remove_file`, `remove_dir`, and a separately guarded recursive
       removal operation; recursive deletion must never be implicit.
-- [ ] Add `rename` with same-filesystem and cross-filesystem error semantics.
-- [ ] Add `copy_file` with explicit overwrite and metadata policies.
-- [ ] Add atomic write helpers using staged file, flush, rename, and optional
+- [x] Add `rename` with same-filesystem and cross-filesystem error semantics.
+- [x] Add `copy_file` with explicit overwrite and metadata policies.
+- [x] Add atomic write helpers using staged file, flush, rename, and optional
       parent-directory sync ordering.
-- [ ] Add atomic replace and compare-before-publish operations where the
-      target backend can provide them.
-- [ ] Define crash-recovery guarantees and the exact point at which a write is
+- [x] Add atomic replace where the target backend can provide it.
+- [ ] Add a compare-before-publish operation backed by a target-level atomic
+      compare primitive; do not emulate it with a check-then-rename sequence.
+- [x] Define crash-recovery guarantees and the exact point at which a write is
       considered published.
-- [ ] Add failure-injection tests for truncated writes, failed flushes,
+- [x] Add failure-injection tests for truncated writes, failed flushes,
       failed renames, stale staging files, and interrupted publication.
+
+Gate 8 copy-policy evidence (2026-10-27): `CopyOptions` separates destination
+overwrite from permission/readonly-bit preservation. `copy_file_with_options`
+uses create-new destination opening when overwrite is disabled, returns typed
+`IoError.AlreadyExists` without modifying an existing destination, and never
+copies timestamps, identity, ownership, or extended attributes. The legacy
+`copy_file` wrapper explicitly retains overwrite-enabled, metadata-disabled
+behavior. Mirrored strict fixtures cover unchanged existing destinations and
+compatibility overwrite; native runtime tests cover status classification and
+atomic create-new rejection.
+
+Gate 8 atomic-publication evidence (2026-10-27): `write_file_atomic` preserves
+the staged write, complete-count check, flush, close, same-filesystem rename,
+and deterministic pre-publication cleanup sequence. `sync_parent_directory`
+and `write_file_atomic_synced` add an explicit Unix parent-directory sync after
+the rename; a post-rename sync failure is returned as an error while the new
+file remains published and durability is reported as uncertain. Windows and
+other targets without directory-handle synchronization return
+`IoError.Unsupported`. The mirrored Unix fixture in
+`tests/library/fs/publication.act` verifies the full write/publish/sync/read
+path and atomic replacement. The crash-recovery contract is recorded in
+ADR-0086 and the filesystem guide. Compare-before-publish and failure
+injection remain open follow-up work. The Unix-only
+`atomic_replace_replaces_existing_destination` fixture verifies replacement
+without a remove-then-rename gap; compare-before-publish remains open because
+the portable runtime has no atomic expected-identity exchange primitive.
+
+Gate 8 deterministic failure evidence (2026-10-27): the mirrored publication
+fixture now covers failed destination rename with staging cleanup and stale
+staging replacement, in addition to successful publication, parent sync, and
+atomic destination replacement. The fixture passes 5/5 in strict Unix mode.
+Detailed fault injection is kept in the separate Gate 8.1 test-only runtime
+and does not expose a production control surface. Gate 8.1 now adds 11
+publication-phase faults across the original 10-test and additional 6-test
+mirrored fixtures; all 16 fault/publication tests pass with the dedicated
+fault-enabled compiler.
+
+## Gate 8.1: Test-only publication fault injection
+
+- [x] Add a dedicated test-runtime build profile; production runtime archives
+      must not contain fault controls.
+- [x] Add typed test metadata for one scoped publication fault per test:
+      staging open, write, short-write, flush, close, cleanup, rename,
+      pre-rename interruption, parent open, parent sync, and post-rename
+      interruption.
+- [x] Pass the selected fault from the test runner to the child process through
+      a private test ABI or equivalent scoped channel, never through a public
+      standard-library verb or mutable production global.
+- [x] Consume each injected fault deterministically at the named filesystem
+      phase and leave all non-selected phases unchanged.
+- [x] Add mirrored strict fixtures proving active-destination preservation,
+      staging cleanup, post-rename publication state, and interrupted-process
+      behavior for every fault kind.
+- [x] Prove that ordinary release builds reject or omit the test fault channel
+      and retain the existing filesystem ABI.
+
+Gate 8.1 is intentionally separate from ordinary filesystem behavior. Its
+purpose is to verify failure semantics of the existing publication contract,
+not to add operational fault switches to applications.
+
+Gate 8.1 implementation evidence (2026-10-27): the `test-fault-injection`
+compiler feature builds a separate runtime archive containing a private
+one-shot fault ABI. Typed `meta fault(...)` metadata causes the test runner to
+inject all eleven supported publication-phase faults into one child process.
+The original Unix publication fixture passes 10/10 and the additional mirrored
+fault fixture passes 6/6, including expected interruption handling. The
+ordinary release archive contains no fault symbol and rejects fault-bearing
+tests with an explicit rebuild diagnostic. The ordinary runtime path remains
+unchanged.
+
+## Gate 8.2: Compare-before-publish contract
+
+- [x] Define an opaque expected-identity token sourced from native file
+      identity, never from size or timestamps alone.
+- [x] Add typed publication outcomes for `Published`, `Conflict`,
+      `Unsupported`, and provider `Failed` states.
+- [x] Implement the cooperative coordinator boundary: compare native identity
+      while holding an exclusive lock, then use the target atomic replacement
+      primitive; unsupported targets return `IoError.Unsupported` and never
+      fall back to an unlocked check-then-rename sequence.
+- [x] Document that the coordinator protects only cooperating writers and
+      that uncoordinated external writers are outside its guarantee.
+- [x] Add Unix and Windows capability fixtures plus adversarial concurrent
+      writer tests for unchanged, changed, missing, and unsupported targets;
+      the mirrored fixture covers successful absent publication, unchanged
+      identity replacement, stale identity preservation, and Windows
+      `IoError.Unsupported`; the native Unix regression runs concurrent
+      absent and changed writers and requires one `Published` plus one
+      `Conflict`.
+- [x] Record identity semantics, crash ordering, rollback behavior, and
+      compiler/runtime evidence before closing the gate.
+
+Gate 8.2 is not closable by reading metadata and then calling `rename` without
+coordination. The implemented protocol serializes cooperating writers with a
+lock and performs atomic replacement while the lock is held. It is not a
+claim of protection from arbitrary writers that bypass the lock. A future
+target-level compare-and-publish primitive may strengthen this boundary; until
+then unsupported targets must return `IoError.Unsupported` rather than use an
+unlocked approximation.
+
+Gate 8.2 completion evidence (2026-10-28): identity uses POSIX device/inode
+metadata and is never inferred from size or timestamps. The publication point
+is the successful atomic replacement; failures before it do not publish the
+staging path, while failures after it cannot roll back the namespace change.
+The coordinator releases its lock after replacement and reports provider or
+capability failures without falling back to an unlocked sequence. The strict
+fixture covers missing, unchanged, stale, and Windows-unsupported targets;
+`tests/fs.rs::coordinator_serializes_concurrent_absent_and_changed_publishers`
+proves that two cooperating Unix writers produce exactly one publication and
+one conflict. Local evidence includes strict compilation, Clippy with
+`-D warnings`, the filesystem integration suite, and
+`./scripts/check_stdlib.sh`; cross-platform CI remains the final authority for
+Windows capability behavior.
 
 ## Gate 9: Links, permissions, and platform capabilities
 
@@ -185,17 +511,31 @@ filesystem dependency.
 - [ ] Add security tests for symlink escape, path traversal, permission
       boundaries, and race-prone check-then-open sequences.
 
+Gate 9 implementation evidence (2026-10-25): the standard filesystem exposes
+read-only `symlink_metadata` and `is_symlink` operations without following the
+link target, with mirrored strict coverage for a regular directory. Symlink
+creation, capability discovery, and the broader security matrix remain open.
+
 ## Gate 10: Temporary resources and workspace safety
 
-- [ ] Add secure temporary-file and temporary-directory creation with unique
+- [x] Add secure temporary-file and temporary-directory creation with unique
       names and create-new semantics.
-- [ ] Add explicit lifetime/cleanup policy for temporary resources.
-- [ ] Prevent predictable-name collisions and symlink substitution attacks.
-- [ ] Add optional caller-provided workspace roots and capability restrictions.
-- [ ] Ensure cleanup is attempted after failure without hiding the primary
+- [x] Add explicit lifetime/cleanup policy for temporary resources.
+- [x] Prevent predictable-name collisions and symlink substitution attacks.
+- [x] Add optional caller-provided workspace roots and capability restrictions.
+- [x] Ensure cleanup is attempted after failure without hiding the primary
       error.
-- [ ] Add tests for collisions, abnormal exit cleanup, read-only parents, and
+- [x] Add tests for collisions, abnormal exit cleanup, read-only parents, and
       concurrent creators.
+
+Gate 10 evidence (2026-10-26): runtime tests cover bounded collision retry,
+preservation of an occupied file, eight concurrent directory creators,
+non-directory and read-only workspace rejection, and symlink-root rejection.
+The application integration test
+`temporary_file_drop_removes_resource_after_early_exit` verifies that
+best-effort Drop cleanup removes an uncommitted
+temporary file after an early process exit. All six runtime security tests and
+the application regression pass.
 
 ## Gate 11: Async and background filesystem boundary
 

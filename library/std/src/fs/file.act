@@ -49,6 +49,12 @@ unsafe extern "C" verb actus_file_write_buffer(
 """Flush an owned handle through the C ABI; zero is success and `-1` is `Failed`."""
 unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
 
+"""Synchronize file contents through the hosted filesystem ABI."""
+unsafe extern "C" verb actus_file_sync_data_buffer(abs handle: Int) -> Int;
+
+"""Synchronize file contents and metadata through the hosted filesystem ABI."""
+unsafe extern "C" verb actus_file_sync_all_buffer(abs handle: Int) -> Int;
+
 """Close an owned handle exactly once through the C ABI; zero is success and `-1` is failure."""
 unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
 
@@ -59,7 +65,14 @@ unsafe extern "C" verb actus_file_seek_buffer(
     abs whence: Int
 ) -> Int;
 
-"""Consume an invalid scalar handle and return it so constructor branches join cleanly."""
+"""
+Consume a rejected native handle without exposing it as a live `File`.
+
+`handle` is transferred with `dat` and returned as the same scalar so failure
+branches can join the constructor's typed `Result` path. No filesystem call,
+allocation, or retry is performed; callers use this only for an invalid
+runtime status and must not interpret the returned value as an open handle.
+"""
 open verb discard_handle(dat handle: Int) -> Int {
     return handle;
 }
@@ -108,9 +121,15 @@ open verb file_create(abs path: path_module::Path) -> Result[File, io::IoError] 
 }
 
 """
-Read bytes from an exclusively loaned open file into an exclusively loaned
-buffer. `Ok` is the exact byte count; `Err` maps failure and end-of-stream
-statuses. The file remains owned by the caller after the loan ends.
+Read bytes from an open file into caller-owned storage.
+
+`self` and `buffer` are exclusive `ins` loans for the duration of the native
+read; ownership of both remains with the caller after return. `buffer` is
+mutated in place and no replacement buffer or hidden allocation is created.
+`Ok(count)` is the exact number of bytes transferred and may be less than the
+buffer capacity. `Err(EndOfStream)` means the provider reached EOF before
+producing more bytes; `Err(Failed)` preserves other native read failures.
+The file cursor advances by the returned count when the host accepts bytes.
 """
 open verb file_read(ins self: File, ins buffer: Buffer) -> Result[Int, io::IoError] {
     erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
@@ -122,8 +141,15 @@ open verb file_read(ins self: File, ins buffer: Buffer) -> Result[Int, io::IoErr
 }
 
 """
-Write an immutable buffer through an exclusively loaned file. `Ok` reports
-the exact byte count; `Err` reports a typed runtime failure.
+Write borrowed bytes through an open file.
+
+`self` is an exclusive `ins` loan and `buffer` is an immutable `abs` view;
+neither ownership is transferred and the input bytes are not retained. The
+operation performs one hosted write without allocating a replacement buffer.
+`Ok(count)` is the exact number of bytes accepted and may be a short write;
+callers must explicitly retry any remaining range. `Err(EndOfStream)` or
+`Err(Failed)` reports the corresponding native status and does not close the
+file.
 """
 open verb file_write(ins self: File, abs buffer: Buffer) -> Result[Int, io::IoError] {
     erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
@@ -134,7 +160,16 @@ open verb file_write(ins self: File, abs buffer: Buffer) -> Result[Int, io::IoEr
     };
 }
 
-"""Flush a file loan and return zero on success or a typed I/O failure."""
+"""
+Flush buffered file state through an exclusive file loan.
+
+`self` remains caller-owned and stays open. The hosted runtime may block while
+handing buffered bytes to the provider; no buffer is allocated or returned.
+`Ok(status)` reports the native success status, normally zero, while
+`Err(Failed)` reports a rejected or failed flush. Flush does not promise
+durable media persistence; use `file_sync_data` or `file_sync_all` for that
+explicit boundary.
+"""
 open verb file_flush(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_flush_buffer(handle: abs self.handle);
     return case status {
@@ -144,9 +179,50 @@ open verb file_flush(ins self: File) -> Result[Int, io::IoError] {
 }
 
 """
-Close an exclusively loaned file exactly once. A successful close marks the
-handle invalid so the Drop performance remains idempotent; a failed close
-leaves it live for deterministic cleanup retry.
+Synchronize file contents through an explicit durability boundary.
+
+`self` is an exclusive loan but remains owned and open by the caller; no
+handle, path, or buffer is transferred and no allocation is performed. The
+hosted operation may block while requesting content synchronization. `Ok(0)`
+or another non-negative status means the provider accepted the request;
+`Err(Failed)` reports rejection or native failure. The guarantee is limited
+to what the selected target and filesystem provider implement.
+"""
+open verb file_sync_data(ins self: File) -> Result[Int, io::IoError] {
+    erg status = actus_file_sync_data_buffer(handle: abs self.handle);
+    return case status {
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Synchronize file contents and file metadata through an explicit durability
+boundary.
+
+`self` is an exclusive loan but remains owned and open by the caller. The
+operation performs no hidden allocation and does not transfer a path, handle,
+or buffer. It may block while the selected provider synchronizes content and
+metadata. `Ok(0)` or another non-negative status means the request was
+accepted; `Err(Failed)` reports rejection or native failure. Durability is
+bounded by the target and filesystem provider's documented guarantees.
+"""
+open verb file_sync_all(ins self: File) -> Result[Int, io::IoError] {
+    erg status = actus_file_sync_all_buffer(handle: abs self.handle);
+    return case status {
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Close an open file through an exclusive loan.
+
+The native handle is released exactly once. On success, `self.handle` is set
+to the invalid sentinel so the `Drop` performance cannot close the resource a
+second time. `Ok(status)` reports the native close status, normally zero; on
+`Err(Failed)` the handle remains live so deterministic scope cleanup can
+attempt the release again. No path or data buffer is allocated or retained.
 """
 open verb file_close(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_close_buffer(handle: abs self.handle);
@@ -161,7 +237,14 @@ open verb file_close(ins self: File) -> Result[Int, io::IoError] {
 
 """Read file bytes into caller-provided storage without allocating per call."""
 open perform io::Reader for File {
-    """Read through ins loans, mutate caller storage, and return count or typed error."""
+    """
+    Adapt `File` to the public reader contract without changing ownership.
+
+    The `self` file and destination `buffer` are exclusive `ins` loans. The
+    buffer is filled in place, the exact byte count is returned on success,
+    and the file remains open for subsequent reads. No hidden allocation or
+    implicit close is introduced; native failures are returned as `IoError`.
+    """
     verb read(ins self: File, ins buffer: Buffer) -> Result[Int, io::IoError] {
         return file_read(self: ins self, buffer: ins buffer);
     }
@@ -170,20 +253,36 @@ open perform io::Reader for File {
 """Write borrowed bytes and flush a file through the Writer contract."""
 open perform io::Writer for File {
     """
-    Write an `abs` byte view through an `ins` file loan. No input buffer is
-    allocated or retained. `Result.Ok(count)` is the exact byte count;
-    `Err` reports the typed I/O failure.
+    Adapt `File` to the public writer contract.
+
+    `self` is an exclusive `ins` loan and the source buffer is an immutable
+    `abs` view. The source remains caller-owned and is never retained. The
+    result reports the exact count accepted, including a possible short
+    write; no hidden allocation or implicit close occurs.
     """
     verb write(ins self: File, abs buffer: Buffer) -> Result[Int, io::IoError] {
         return file_write(self: ins self, buffer: abs buffer);
     }
-    """Flush through an ins file loan and return zero or typed failure."""
+    """
+    Flush buffered writer state through an exclusive file loan.
+
+    The file remains open and caller-owned. The operation may block, performs
+    no hidden allocation, and returns the provider status or `IoError.Failed`.
+    It is not a substitute for the explicit durability operations.
+    """
     verb flush(ins self: File) -> Result[Int, io::IoError] {
         return file_flush(self: ins self);
     }
 }
 
-"""Translate a runtime cursor position into a typed result."""
+"""
+Translate a native cursor status into the public seek result.
+
+`status` is an owned scalar and is not a file handle. Non-negative values are
+returned unchanged as the resulting absolute byte position; `-1` becomes
+`IoError.Failed`. This helper performs no I/O, allocation, cursor mutation, or
+cleanup and only centralizes native-status mapping.
+"""
 open verb file_seek_status(erg status: Int) -> Result[Int, io::IoError] {
     return case status {
         -1 => Err(io::IoError.Failed),
@@ -192,9 +291,13 @@ open verb file_seek_status(erg status: Int) -> Result[Int, io::IoError] {
 }
 
 """
-Seek through the `ins` file loan from the beginning. The file position is
-mutated in the runtime without allocating a buffer. `Ok(position)` returns the
-new position; `Err(IoError.Failed)` reports rejection.
+Move the file cursor relative to the beginning of the file.
+
+`self` is an exclusive `ins` loan and remains open and caller-owned. `offset`
+is an immutable byte displacement; the runtime mutates only the native cursor
+and allocates no buffer. `Ok(position)` returns the resulting absolute byte
+position. `Err(Failed)` reports an invalid offset, unsupported seek, or native
+failure without transferring or closing the file.
 """
 open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 0;
@@ -207,9 +310,12 @@ open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, io::Io
 }
 
 """
-Seek through the `ins` file loan relative to its current position. The
-position mutation is allocation-free. `Ok(position)` returns the new position;
-`Err(IoError.Failed)` reports runtime rejection.
+Move the file cursor relative to its current position.
+
+`self` is an exclusive `ins` loan and remains caller-owned. `offset` is an
+immutable byte displacement, and only the native cursor is mutated; no buffer
+or path allocation occurs. `Ok(position)` returns the resulting absolute byte
+position, while `Err(Failed)` reports native rejection.
 """
 open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 1;
@@ -222,9 +328,13 @@ open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, io::
 }
 
 """
-Seek through the `ins` file loan relative to the end of the file. The runtime
-mutates only the cursor position and allocates no buffer. `Ok(position)` is the
-new position; `Err(IoError.Failed)` reports rejection.
+Move the file cursor relative to the end of the file.
+
+`self` is an exclusive `ins` loan and remains open and caller-owned. `offset`
+is an immutable byte displacement from the provider's end position. The
+runtime mutates only the cursor and performs no hidden allocation. `Ok(position)`
+returns the resulting absolute byte position; `Err(Failed)` reports native
+rejection.
 """
 open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 2;
@@ -236,9 +346,20 @@ open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, io::IoEr
     return file_seek_status(status: status);
 }
 
-"""Satisfy the positional stream contract through the host runtime."""
+"""
+Adapt `File` to the positional seeker contract through the host runtime.
+
+`self` is exclusively loaned and `from` is consumed with `dat`, making the
+selected `SeekFrom` origin explicit and preventing reuse by the caller. The
+implementation returns the new absolute byte position, leaves the file open,
+and performs no buffer allocation or implicit close.
+"""
 open perform io::Seeker for File {
-    """Seek through an ins file loan and dat cursor origin, returning a position or error."""
+    """
+    Dispatch the consumed cursor origin to the corresponding explicit seek
+    verb. Ownership of the `File` remains with the caller through the `ins`
+    loan, and native rejection is returned as `IoError.Failed`.
+    """
     verb seek(ins self: File, dat from: io::SeekFrom) -> Result[Int, io::IoError] {
         return case dat from {
             io::SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
@@ -248,23 +369,52 @@ open perform io::Seeker for File {
     }
 }
 
-"""Return metadata for this open file without transferring its handle, or typed failure."""
+"""
+Drop a metadata result that could not be produced for an open file.
+
+`output` is transferred with `dat` and immediately released; no metadata is
+exposed on failure. The helper performs no filesystem lookup and returns
+`Err(IoError.Failed)` so the provider has one typed failure path.
+"""
 open verb file_metadata_failed(dat output: Metadata) -> Result[Metadata, io::IoError] {
     drop(output);
     return Result[Metadata, io::IoError].Err(io::IoError.Failed);
 }
 
-"""Provide metadata through an ins file loan and return scalar facts or error."""
+"""
+Adapt `File` to the metadata-provider contract.
+
+The file is borrowed through an exclusive `ins` loan and remains open and
+caller-owned. Success returns an owned metadata snapshot; failure returns
+`IoError.Failed` without exposing a partial snapshot or hidden state.
+"""
 open perform MetadataProvider for File {
-    """Inspect metadata through an ins file loan and return scalar facts or failure."""
+    """
+Inspect the open file through the runtime metadata bridge. The operation does
+not transfer or close the file, allocate a buffer, or retain a reference; its
+result is either a complete `Metadata` value or a typed I/O failure.
+"""
     verb metadata(ins self: File) -> Result[Metadata, io::IoError] {
         return file_metadata(self: ins self);
     }
 }
 
-"""Close the owned operating-system resource during deterministic LIFO cleanup."""
+"""
+Close the owned operating-system resource during deterministic LIFO cleanup.
+
+The `File` owner is exclusively loaned to the cleanup performance. It invokes
+`file_close`, which invalidates a successfully released handle and leaves a
+failed handle retryable. Drop performs no data I/O or allocation; callers that
+need to observe close failure must call `file_close` explicitly.
+"""
 open perform Drop for File {
-    """Close the owned File resource through an ins loan during deterministic cleanup."""
+    """
+Release one owned `File` resource through an exclusive cleanup loan.
+
+Successful release is idempotent because `file_close` stores the invalid
+handle sentinel. Drop intentionally discards the close result; explicit
+`file_close` is the observable failure path.
+"""
     verb drop(ins self: File) {
         file_close(self: ins self);
     }

@@ -1,8 +1,23 @@
 use super::super::contract::{ABI_STATUS_FAILURE, ABI_STATUS_SUCCESS};
 use super::super::path::ActusPath;
 use super::super::types::{ActusMetadata, BufferHandle};
-use super::path_bridge::{with_host_path, with_host_paths};
+#[cfg(windows)]
+use super::identity::windows_file_identity;
+use super::path_bridge::{replace_output_path, with_host_path, with_host_paths};
 use super::{actus_handle, with_file};
+
+pub(crate) const METADATA_VALUE_AVAILABLE: i32 = 0;
+pub(crate) const METADATA_VALUE_UNSUPPORTED: i32 = 1;
+pub(crate) const METADATA_VALUE_UNAVAILABLE: i32 = 2;
+pub(crate) const METADATA_IDENTITY_NONE: i32 = 0;
+#[cfg(unix)]
+pub(crate) const METADATA_IDENTITY_POSIX: i32 = 1;
+#[cfg(windows)]
+pub(crate) const METADATA_IDENTITY_WINDOWS: i32 = 2;
+const METADATA_STATUS_NOT_FOUND: i32 = -2;
+const METADATA_STATUS_PERMISSION_DENIED: i32 = -3;
+const METADATA_STATUS_UNSUPPORTED: i32 = -4;
+const RENAME_STATUS_CROSS_DEVICE: i32 = -2;
 
 /// Writes file metadata into a caller-owned C-layout output struct.
 ///
@@ -22,8 +37,10 @@ pub unsafe extern "C" fn actus_file_metadata_buffer(
         return ABI_STATUS_FAILURE;
     }
     let bytes = unsafe { buffer_bytes(path) };
-    let Ok(metadata) = host_path(bytes).metadata() else { return ABI_STATUS_FAILURE };
-    unsafe { write_metadata(output, &metadata) }
+    match host_path(bytes).metadata() {
+        Ok(metadata) => unsafe { write_metadata(output, &metadata) },
+        Err(error) => metadata_error_status(&error),
+    }
 }
 
 /// Writes metadata for a validated borrowed `ActusPath`.
@@ -39,11 +56,136 @@ pub unsafe extern "C" fn actus_file_metadata_path(
     if output.is_null() {
         return ABI_STATUS_FAILURE;
     }
-    let result = unsafe { with_host_path(path, |native| native.metadata()) };
+    let result = unsafe {
+        with_host_path(path, |native| {
+            native.metadata().map(|metadata| (metadata, metadata_identity_for_path(native)))
+        })
+    };
+    match result {
+        Some(Ok((metadata, identity))) => unsafe {
+            write_metadata_with_identity(output, &metadata, identity)
+        },
+        Some(Err(error)) => metadata_error_status(&error),
+        None => ABI_STATUS_FAILURE,
+    }
+}
+
+/// Writes metadata for a validated path without following a symbolic link.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor and `output` must be
+/// writable for one `ActusMetadata`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_symlink_metadata_path(
+    path: *const ActusPath,
+    output: *mut ActusMetadata,
+) -> i32 {
+    if output.is_null() {
+        return ABI_STATUS_FAILURE;
+    }
+    let result = unsafe { with_host_path(path, |native| native.symlink_metadata()) };
     match result {
         Some(Ok(metadata)) => unsafe { write_metadata(output, &metadata) },
+        Some(Err(error)) => metadata_error_status(&error),
+        None => ABI_STATUS_FAILURE,
+    }
+}
+
+fn metadata_error_status(error: &std::io::Error) -> i32 {
+    match error.kind() {
+        std::io::ErrorKind::NotFound => METADATA_STATUS_NOT_FOUND,
+        std::io::ErrorKind::PermissionDenied => METADATA_STATUS_PERMISSION_DENIED,
+        std::io::ErrorKind::Unsupported => METADATA_STATUS_UNSUPPORTED,
         _ => ABI_STATUS_FAILURE,
     }
+}
+
+/// Resolves one validated path through the host filesystem and writes the
+/// resulting identity path into an owned Actus destination.
+///
+/// # Safety
+/// `path` must be a valid immutable path and `output` must be writable for
+/// the duration of this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_canonicalize_path(
+    path: *const ActusPath,
+    output: *mut ActusPath,
+) -> i32 {
+    if output.is_null() {
+        return ABI_STATUS_FAILURE;
+    }
+    let result = unsafe { with_host_path(path, |value| std::fs::canonicalize(value)) };
+    match result {
+        Some(Ok(canonical)) if unsafe { replace_output_path(output, &canonical) } => {
+            super::super::contract::ABI_STATUS_SUCCESS
+        }
+        _ => ABI_STATUS_FAILURE,
+    }
+}
+
+/// Compares two validated paths using the host's stable filesystem identity.
+///
+/// # Safety
+/// Both paths must be valid immutable descriptors for the duration of the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_same_path(
+    left: *const ActusPath,
+    right: *const ActusPath,
+) -> i32 {
+    let result = unsafe { with_host_paths(left, right, same_file_identity) };
+    match result {
+        Some(Ok(true)) => 1,
+        Some(Ok(false)) => 0,
+        Some(Err(IdentityError::Unsupported)) => -2,
+        _ => ABI_STATUS_FAILURE,
+    }
+}
+
+pub(super) enum IdentityError {
+    Failed,
+    Unsupported,
+}
+
+pub(super) fn same_file_identity(
+    left: &std::path::Path,
+    right: &std::path::Path,
+) -> Result<bool, IdentityError> {
+    #[cfg(unix)]
+    {
+        let left = std::fs::metadata(left).map_err(|_| IdentityError::Failed)?;
+        let right = std::fs::metadata(right).map_err(|_| IdentityError::Failed)?;
+        use std::os::unix::fs::MetadataExt;
+        return Ok(left.dev() == right.dev() && left.ino() == right.ino());
+    }
+    #[cfg(windows)]
+    {
+        let left_identity = windows_file_identity(left).map_err(|_| IdentityError::Failed)?;
+        let right_identity = windows_file_identity(right).map_err(|_| IdentityError::Failed)?;
+        return Ok(left_identity == right_identity);
+    }
+    #[allow(unreachable_code)]
+    Err(IdentityError::Unsupported)
+}
+
+fn metadata_identity_for_path(path: &std::path::Path) -> (u64, u64, i32, i32) {
+    #[cfg(windows)]
+    {
+        return windows_file_identity(path).map_or(
+            (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED),
+            |identity| {
+                (identity.0, identity.1, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_AVAILABLE)
+            },
+        );
+    }
+    #[cfg(unix)]
+    {
+        let Ok(metadata) = std::fs::metadata(path) else {
+            return (0, 0, METADATA_IDENTITY_NONE, METADATA_VALUE_UNAVAILABLE);
+        };
+        return metadata_identity(&metadata);
+    }
+    #[allow(unreachable_code)]
+    (0, 0, METADATA_IDENTITY_NONE, METADATA_VALUE_UNSUPPORTED)
 }
 
 /// Writes metadata for an already-open file handle into an output struct.
@@ -80,6 +222,10 @@ pub unsafe extern "C" fn actus_file_remove_buffer(path: BufferHandle) -> i32 {
 /// `path` must be a valid immutable path descriptor for this call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_remove_path(path: *const ActusPath) -> i32 {
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_CLEANUP_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
     unsafe { with_host_path(path, |value| std::fs::remove_file(value)) }
         .and_then(Result::ok)
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
@@ -91,9 +237,7 @@ pub unsafe extern "C" fn actus_file_remove_path(path: *const ActusPath) -> i32 {
 /// `from` and `to` must point to valid live `ActusBuffer` values.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_rename_buffer(from: BufferHandle, to: BufferHandle) -> i32 {
-    unsafe {
-        two_path_operation(from, to, |source, destination| std::fs::rename(source, destination))
-    }
+    unsafe { two_path_rename_operation(from, to) }
 }
 
 /// Renames two validated borrowed `ActusPath` values.
@@ -105,31 +249,31 @@ pub unsafe extern "C" fn actus_file_rename_path(
     from: *const ActusPath,
     to: *const ActusPath,
 ) -> i32 {
-    unsafe { with_host_paths(from, to, |source, destination| std::fs::rename(source, destination)) }
-        .and_then(Result::ok)
-        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
-}
-
-/// Copies a file and returns the number of copied bytes, or `-1` on failure.
-///
-/// # Safety
-/// `from` and `to` must point to valid live `ActusBuffer` values.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn actus_file_copy_buffer(from: BufferHandle, to: BufferHandle) -> i32 {
-    unsafe {
-        two_path_operation_value(from, to, |source, destination| std::fs::copy(source, destination))
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_RENAME_FAILURE) {
+        return ABI_STATUS_FAILURE;
     }
-}
-
-/// Copies a file between two validated borrowed `ActusPath` values.
-///
-/// # Safety
-/// Both paths must be valid immutable descriptors for this call.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn actus_file_copy_path(from: *const ActusPath, to: *const ActusPath) -> i32 {
-    unsafe { with_host_paths(from, to, |source, destination| std::fs::copy(source, destination)) }
-        .and_then(Result::ok)
-        .map_or(ABI_STATUS_FAILURE, |count| i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE))
+    #[cfg(actus_test_faults)]
+    if super::test_faults::has_fault(super::test_faults::FAULT_CLEANUP_FAILURE) {
+        return ABI_STATUS_FAILURE;
+    }
+    #[cfg(actus_test_faults)]
+    if super::test_faults::take_fault(super::test_faults::FAULT_INTERRUPTED_BEFORE_RENAME) {
+        std::process::abort();
+    }
+    match unsafe {
+        with_host_paths(from, to, |source, destination| std::fs::rename(source, destination))
+    } {
+        Some(Ok(())) => {
+            #[cfg(actus_test_faults)]
+            if super::test_faults::take_fault(super::test_faults::FAULT_INTERRUPTED_PUBLICATION) {
+                std::process::abort();
+            }
+            ABI_STATUS_SUCCESS
+        }
+        Some(Err(error)) => rename_error_status(&error),
+        None => ABI_STATUS_FAILURE,
+    }
 }
 
 /// Creates one directory at the requested path.
@@ -152,6 +296,17 @@ pub unsafe extern "C" fn actus_file_create_dir_path(path: *const ActusPath) -> i
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
+/// Creates a directory and all missing parents at a validated path.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_create_dir_all_path(path: *const ActusPath) -> i32 {
+    unsafe { with_host_path(path, |value| std::fs::create_dir_all(value)) }
+        .and_then(Result::ok)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
+}
+
 /// Removes one empty directory at the requested path.
 ///
 /// # Safety
@@ -168,6 +323,17 @@ pub unsafe extern "C" fn actus_file_remove_dir_buffer(path: BufferHandle) -> i32
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn actus_file_remove_dir_path(path: *const ActusPath) -> i32 {
     unsafe { with_host_path(path, |value| std::fs::remove_dir(value)) }
+        .and_then(Result::ok)
+        .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
+}
+
+/// Removes a directory tree at a validated path.
+///
+/// # Safety
+/// `path` must be a valid immutable path descriptor for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_file_remove_dir_all_path(path: *const ActusPath) -> i32 {
+    unsafe { with_host_path(path, |value| std::fs::remove_dir_all(value)) }
         .and_then(Result::ok)
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
@@ -195,17 +361,68 @@ fn host_path(bytes: &[u8]) -> std::path::PathBuf {
     std::path::PathBuf::new()
 }
 
-unsafe fn write_metadata(output: *mut ActusMetadata, metadata: &std::fs::Metadata) -> i32 {
+pub(crate) unsafe fn write_metadata(
+    output: *mut ActusMetadata,
+    metadata: &std::fs::Metadata,
+) -> i32 {
+    unsafe { write_metadata_with_identity(output, metadata, metadata_identity(metadata)) }
+}
+
+unsafe fn write_metadata_with_identity(
+    output: *mut ActusMetadata,
+    metadata: &std::fs::Metadata,
+    identity: (u64, u64, i32, i32),
+) -> i32 {
     let Ok(size) = i32::try_from(metadata.len()) else { return ABI_STATUS_FAILURE };
+    let modified = metadata_timestamp(metadata.modified());
+    let accessed = metadata_timestamp(metadata.accessed());
+    let created = metadata_timestamp(metadata.created());
     unsafe {
         *output = ActusMetadata {
             size,
             is_file: i32::from(metadata.is_file()),
             is_dir: i32::from(metadata.is_dir()),
             readonly: i32::from(metadata.permissions().readonly()),
+            is_symlink: i32::from(metadata.file_type().is_symlink()),
+            modified_seconds: modified.0,
+            modified_status: modified.1,
+            accessed_seconds: accessed.0,
+            accessed_status: accessed.1,
+            created_seconds: created.0,
+            created_status: created.1,
+            identity_primary: identity.0,
+            identity_secondary: identity.1,
+            identity_kind: identity.2,
+            identity_status: identity.3,
         };
     }
     ABI_STATUS_SUCCESS
+}
+
+fn metadata_timestamp(value: std::io::Result<std::time::SystemTime>) -> (i64, i32) {
+    let Ok(value) = value else { return (0, METADATA_VALUE_UNSUPPORTED) };
+    let Ok(duration) = value.duration_since(std::time::UNIX_EPOCH) else {
+        return (0, METADATA_VALUE_UNAVAILABLE);
+    };
+    let Ok(seconds) = i64::try_from(duration.as_secs()) else {
+        return (0, METADATA_VALUE_UNAVAILABLE);
+    };
+    (seconds, METADATA_VALUE_AVAILABLE)
+}
+
+fn metadata_identity(metadata: &std::fs::Metadata) -> (u64, u64, i32, i32) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        return (metadata.dev(), metadata.ino(), METADATA_IDENTITY_POSIX, METADATA_VALUE_AVAILABLE);
+    }
+    #[cfg(windows)]
+    {
+        let _ = metadata;
+        return (0, 0, METADATA_IDENTITY_WINDOWS, METADATA_VALUE_UNSUPPORTED);
+    }
+    #[allow(unreachable_code)]
+    (0, 0, METADATA_IDENTITY_NONE, METADATA_VALUE_UNSUPPORTED)
 }
 
 unsafe fn path_operation<F>(path: BufferHandle, operation: F) -> i32
@@ -223,24 +440,20 @@ where
         .map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
 }
 
-unsafe fn two_path_operation<F>(from: BufferHandle, to: BufferHandle, operation: F) -> i32
-where
-    F: FnOnce(&std::path::Path, &std::path::Path) -> std::io::Result<()>,
-{
+unsafe fn two_path_rename_operation(from: BufferHandle, to: BufferHandle) -> i32 {
     let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return ABI_STATUS_FAILURE };
-    operation(&from, &to).map_or(ABI_STATUS_FAILURE, |_| ABI_STATUS_SUCCESS)
+    std::fs::rename(&from, &to)
+        .map_or_else(|error| rename_error_status(&error), |_| ABI_STATUS_SUCCESS)
 }
 
-unsafe fn two_path_operation_value<F>(from: BufferHandle, to: BufferHandle, operation: F) -> i32
-where
-    F: FnOnce(&std::path::Path, &std::path::Path) -> std::io::Result<u64>,
-{
-    let Some((from, to)) = (unsafe { path_pair(from, to) }) else { return ABI_STATUS_FAILURE };
-    operation(&from, &to)
-        .map_or(ABI_STATUS_FAILURE, |count| i32::try_from(count).unwrap_or(ABI_STATUS_FAILURE))
+fn rename_error_status(error: &std::io::Error) -> i32 {
+    match error.kind() {
+        std::io::ErrorKind::CrossesDevices => RENAME_STATUS_CROSS_DEVICE,
+        _ => ABI_STATUS_FAILURE,
+    }
 }
 
-unsafe fn path_pair(
+pub(super) unsafe fn path_pair(
     from: BufferHandle,
     to: BufferHandle,
 ) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
@@ -253,4 +466,21 @@ unsafe fn path_pair(
         return None;
     }
     Some((host_path(unsafe { buffer_bytes(from) }), host_path(unsafe { buffer_bytes(to) })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{RENAME_STATUS_CROSS_DEVICE, rename_error_status};
+
+    #[test]
+    fn rename_preserves_cross_device_error_classification() {
+        let error = std::io::Error::from(std::io::ErrorKind::CrossesDevices);
+        assert_eq!(rename_error_status(&error), RENAME_STATUS_CROSS_DEVICE);
+    }
+
+    #[test]
+    fn rename_keeps_other_errors_generic() {
+        let error = std::io::Error::from(std::io::ErrorKind::NotFound);
+        assert_eq!(rename_error_status(&error), super::ABI_STATUS_FAILURE);
+    }
 }

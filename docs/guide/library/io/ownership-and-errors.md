@@ -41,6 +41,7 @@ return case dat result {
         IoError.Failed => 1,
         IoError.InvalidInput => 2,
         IoError.InvalidData => 3,
+    IoError.Unsupported => 4,
     },
 };
 ```

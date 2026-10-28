@@ -37,8 +37,11 @@ silently link the hosted implementation.
 ## `std::io`, `std::fs`, and `std::path`
 
 These existing facades expose typed ownership-aware I/O, filesystem, and path
-operations. Their public surfaces are documented in the language guide and
-their raw runtime bridges remain private.
+operations. Filesystem publication includes `metadata_absent` and the
+coordinator-serialized `publish_file_coordinated` operation, which returns
+typed `Published` or `Conflict` outcomes and rejects unsupported targets.
+Their public surfaces are documented in the language guide and their raw
+runtime bridges remain private.
 
 ## `std::region`
 

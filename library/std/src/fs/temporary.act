@@ -1,0 +1,253 @@
+"""Secure temporary files and directories with explicit cleanup ownership."""
+import {
+    io,
+    path as path_module,
+};
+
+"""Typed failures for secure temporary-resource creation and cleanup."""
+open enum TemporaryError {
+    """The host rejected the selected workspace or cleanup operation."""
+    Failed,
+    """The caller supplied an empty or unsafe temporary-name prefix."""
+    InvalidPrefix,
+    """The bounded collision retry budget was exhausted."""
+    CollisionExhausted,
+}
+
+"""
+An owned temporary file and the path created for it.
+
+`file` owns the open host handle and `path` owns the generated path bytes.
+The resource is removed only by `temporary_file_cleanup` or best-effort Drop;
+creation never silently chooses a global workspace root.
+"""
+open struct TemporaryFile {
+    """The open file handle owned by this temporary resource."""
+    erg file: File,
+    """Owns the generated path storage below the caller-selected root."""
+    erg path: path_module::Path,
+}
+
+"""An owned temporary directory created below a caller-selected root."""
+open struct TemporaryDirectory {
+    """The generated directory path owned by this resource."""
+    erg path: path_module::Path,
+}
+
+"""
+Runtime bridge for secure temporary-file creation.
+
+`root` and `prefix` are immutable borrowed views and are never retained by the
+host. `output` is an exclusively borrowed path destination whose previous
+storage is replaced only after atomic creation succeeds. A non-negative
+return is an owned file handle; `-1` is host failure, `-2` is invalid prefix,
+and `-3` means the bounded collision budget was exhausted. The bridge uses
+OS entropy and create-new semantics, so it never opens an existing path.
+"""
+unsafe extern "C" verb actus_file_open_temporary_path(
+    abs root: path_module::Path,
+    abs prefix: Buffer,
+    ins output: path_module::Path
+) -> Int;
+
+"""
+Runtime bridge for secure temporary-directory creation.
+
+`root` and `prefix` are immutable borrowed views. `output` is an exclusive
+destination for the generated path. A zero return means the directory was
+created; `-1` is a rejected workspace or host failure, `-2` is an unsafe
+prefix, and `-3` means bounded collision retries were exhausted. Creation is
+performed with atomic mkdir semantics and never follows a symlink root.
+"""
+unsafe extern "C" verb actus_directory_create_temporary_path(
+    abs root: path_module::Path,
+    abs prefix: Buffer,
+    ins output: path_module::Path
+) -> Int;
+
+"""
+Create a valid disposable output path for the runtime bridge.
+
+The bridge overwrites this owned placeholder after creation. The placeholder
+keeps the output type valid on every target, while the returned path owns the
+runtime-generated path storage. Construction failure is converted to the
+typed `TemporaryError.Failed` variant before any host resource exists.
+"""
+open verb temporary_output_path() -> Result[path_module::Path, TemporaryError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    erg created = path_module::path_from_ascii(storage: dat raw);
+    return case dat created {
+        Result.Err(_) => Result[path_module::Path, TemporaryError].Err(TemporaryError.Failed),
+        Result.Ok(path) => Result[path_module::Path, TemporaryError].Ok(path),
+    };
+}
+
+"""
+Translate private temporary-resource statuses into a typed creation error.
+
+Only documented negative statuses are special. Unknown negative statuses
+remain `Failed`, so native details never leak into the public API.
+"""
+open verb temporary_file_status(erg status: Int) -> TemporaryError {
+    return case status {
+        -2 => TemporaryError.InvalidPrefix,
+        -3 => TemporaryError.CollisionExhausted,
+        _ => TemporaryError.Failed,
+    };
+}
+
+"""
+Create a secure temporary file below `root`.
+
+The runtime obtains OS entropy, rejects symlink roots, and uses atomic
+create-new semantics. `prefix` is restricted to bounded ASCII name bytes.
+The returned `TemporaryFile` owns both the handle and generated path; no
+global workspace or predictable filename is selected implicitly. `root` and
+`prefix` are borrowed only for the call. On failure, the placeholder path is
+dropped and no file remains published. The operation may block on OS entropy
+and filesystem creation and must not be used in realtime engine paths.
+"""
+open verb temporary_file_open(abs root: path_module::Path, abs prefix: Buffer) -> Result[TemporaryFile, TemporaryError] {
+    erg output_result = temporary_output_path();
+    return case dat output_result {
+        Result.Err(error) => Result[TemporaryFile, TemporaryError].Err(error),
+        Result.Ok(output) => {
+            erg status = actus_file_open_temporary_path(
+                root: abs root,
+                prefix: abs prefix,
+                output: ins output
+            );
+            return case status {
+                -1 => {
+                    drop(output);
+                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(status: status));
+                },
+                -2 => {
+                    drop(output);
+                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(status: status));
+                },
+                -3 => {
+                    drop(output);
+                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(status: status));
+                },
+                _ => Result[TemporaryFile, TemporaryError].Ok(TemporaryFile {
+                    file: File {
+                        handle: status,
+                    },
+                    path: output,
+                }),
+            };
+        },
+    };
+}
+
+"""
+Create a secure temporary directory below `root`.
+
+The caller owns `root` and `prefix`; neither view escapes the call. The
+runtime rejects symlink roots, uses OS entropy, and creates exactly one new
+directory with atomic mkdir semantics. The returned value owns the generated
+path. A failed attempt drops the placeholder and leaves no directory behind;
+the operation is bounded by the runtime collision retry limit and may block on
+the host filesystem.
+"""
+open verb temporary_directory_open(
+    abs root: path_module::Path,
+    abs prefix: Buffer
+) -> Result[TemporaryDirectory, TemporaryError] {
+    erg output_result = temporary_output_path();
+    return case dat output_result {
+        Result.Err(error) => Result[TemporaryDirectory, TemporaryError].Err(error),
+        Result.Ok(output) => {
+            erg status = actus_directory_create_temporary_path(
+                root: abs root,
+                prefix: abs prefix,
+                output: ins output
+            );
+            return case status {
+                -1 => {
+                    drop(output);
+                    return Result[TemporaryDirectory, TemporaryError].Err(temporary_file_status(
+                        status: status
+                    ));
+                },
+                -2 => {
+                    drop(output);
+                    return Result[TemporaryDirectory, TemporaryError].Err(temporary_file_status(
+                        status: status
+                    ));
+                },
+                -3 => {
+                    drop(output);
+                    return Result[TemporaryDirectory, TemporaryError].Err(temporary_file_status(
+                        status: status
+                    ));
+                },
+                _ => Result[TemporaryDirectory, TemporaryError].Ok(TemporaryDirectory {
+                    path: output,
+                }),
+            };
+        },
+    };
+}
+
+"""
+Close and remove an owned temporary file explicitly.
+
+`self` is exclusively borrowed so the caller retains the resource binding and
+its path after the operation. Close happens before removal; a close failure
+is returned as the primary `IoError` and path removal is not attempted. When
+close succeeds, removal failure is returned instead of being silently
+discarded. Calling cleanup again is a normal host error because the path is
+already absent.
+"""
+open verb temporary_file_cleanup(ins self: TemporaryFile) -> Result[Int, io::IoError] {
+    erg closed = file_close(self: ins self.file);
+    return case dat closed {
+        Result.Err(error) => Result[Int, io::IoError].Err(error),
+        Result.Ok(_) => remove_file(path: abs self.path),
+    };
+}
+
+"""
+Remove an owned temporary directory explicitly.
+
+`self` is exclusively borrowed and the directory must be empty. The path is
+borrowed only for removal; the caller receives the typed host result and
+retains ownership for deterministic scope cleanup. Recursive deletion is
+never implicit.
+"""
+open verb temporary_directory_cleanup(ins self: TemporaryDirectory) -> Result[Int, io::IoError] {
+    return remove_dir(path: abs self.path);
+}
+
+"""
+Best-effort Drop cleanup for a temporary file left on an early exit.
+
+Drop closes the owned handle first and then attempts to remove the generated
+path. Drop cannot return an error, so explicit `temporary_file_cleanup` is
+required when cleanup failure must be observed. File close is idempotent.
+"""
+open perform Drop for TemporaryFile {
+    """Consume an `ins` loan of the owner, close the handle, and attempt path removal without masking another error."""
+    verb drop(ins self: TemporaryFile) {
+        file_close(self: ins self.file);
+        remove_file(path: abs self.path);
+    }
+}
+
+"""
+Best-effort Drop cleanup for a temporary directory left on an early exit.
+
+Drop removes only an empty directory and cannot report failure. Callers that
+need a typed cleanup result must use `temporary_directory_cleanup`; recursive
+removal is never performed.
+"""
+open perform Drop for TemporaryDirectory {
+    """Consume an `ins` loan of the owner and attempt removal without converting cleanup failure into a new throw path."""
+    verb drop(ins self: TemporaryDirectory) {
+        remove_dir(path: abs self.path);
+    }
+}

@@ -28,6 +28,17 @@ pub(super) fn set_binding_value(
     }
 }
 
+pub(super) fn snapshot_bindings(
+    provider: &SharedExpressionProvider<'_>,
+) -> BTreeMap<String, BackendValueId> {
+    let mut bindings: BTreeMap<String, BackendValueId> =
+        provider.parameters.iter().map(|(name, value)| (name.clone(), *value)).collect();
+    for scope in &provider.locals {
+        bindings.extend(scope.iter().map(|(name, value)| (name.clone(), *value)));
+    }
+    bindings
+}
+
 pub(super) fn parameter_types(
     verb: &VerbDecl,
     layouts: &impl super::super::super::BackendLayoutProvider,

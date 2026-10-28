@@ -90,6 +90,10 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         self.binding_value(name)
     }
 
+    fn snapshot_bindings(&self) -> std::collections::BTreeMap<String, BackendValueId> {
+        state::snapshot_bindings(self)
+    }
+
     fn append_parameter_writebacks(&self, instructions: &mut Vec<BackendInstruction>) {
         instructions.extend(self.scalar_loan_writebacks());
     }
@@ -122,7 +126,24 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             Some(BackendInstruction::Jump { span, .. }) if self.is_loop_exit(*span)
         );
         if !skip_scope_cleanup {
-            cleanup::emit_scope_cleanup(self, span, instructions);
+            cleanup::emit_scope_cleanup(self, span, instructions, None);
+        }
+        self.locals.pop();
+        Ok(())
+    }
+
+    fn exit_scope_with_bindings(
+        &mut self,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+        binding_values: &std::collections::BTreeMap<String, BackendValueId>,
+    ) -> Result<(), BackendContractError> {
+        let skip_scope_cleanup = matches!(
+            instructions.last(),
+            Some(BackendInstruction::Jump { .. })
+        );
+        if !skip_scope_cleanup {
+            cleanup::emit_scope_cleanup(self, span, instructions, Some(binding_values));
         }
         self.locals.pop();
         Ok(())
@@ -138,6 +159,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
         blocks: &mut Vec<super::super::BackendBlock>,
         start: usize,
+        block_bindings: &std::collections::BTreeMap<BackendBlockId, std::collections::BTreeMap<String, BackendValueId>>,
     ) -> Result<(), BackendContractError> {
         for block in blocks.iter_mut().skip(start) {
             if matches!(
@@ -145,7 +167,12 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                 Some(BackendInstruction::Return { .. })
                     | Some(BackendInstruction::Fail { .. })
             ) {
-                cleanup::emit_scope_cleanup(self, span, &mut block.instructions);
+                cleanup::emit_scope_cleanup(
+                    self,
+                    span,
+                    &mut block.instructions,
+                    block_bindings.get(&block.id),
+                );
             }
         }
         Ok(())

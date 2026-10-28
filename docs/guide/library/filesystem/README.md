@@ -30,8 +30,10 @@ hot path.
    atomic publication.
 5. [Ownership and lifecycle](lifecycle.md) — `abs`, `ins`, `dat`, and failure
    paths.
-6. [Errors and runtime](errors.md) and [runtime](runtime.md).
-7. [Usage](usage.md) and [examples](examples.md).
+6. [Temporary resources](temporary.md) — secure caller-rooted creation and
+   explicit cleanup.
+7. [Errors and runtime](errors.md) and [runtime](runtime.md).
+8. [Usage](usage.md) and [examples](examples.md).
 
 ## Main type groups
 

@@ -13,11 +13,11 @@ unsafe extern "C" verb actus_copy_buffer_reserve(
     erg capacity: Int
 ) -> Int;
 
-"""
-Translate a writer failure into the public copy result contract.
+"""Preserve one writer failure while adapting it to the copy result type.
 
-The `dat error` payload is consumed during exhaustive mapping and is not
-retained. `Err` preserves the concrete `IoError` variant for the caller.
+`error` is transferred as `dat` and consumed exactly once by the exhaustive
+match. Every variant, including `PermissionDenied`, is returned unchanged in
+`Err`; no buffer, writer, or native resource is allocated or retained.
 """
 open verb copy_write_error(dat error: IoError) -> Result[Int, IoError] {
     return case dat error {
@@ -25,14 +25,19 @@ open verb copy_write_error(dat error: IoError) -> Result[Int, IoError] {
         IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
         IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
         IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+        IoError.Unsupported => Result[Int, IoError].Err(IoError.Unsupported),
+        IoError.PermissionDenied => Result[Int, IoError].Err(IoError.PermissionDenied),
+        IoError.Busy => Result[Int, IoError].Err(IoError.Busy),
+        IoError.CrossDevice => Result[Int, IoError].Err(IoError.CrossDevice),
+        IoError.AlreadyExists => Result[Int, IoError].Err(IoError.AlreadyExists),
     };
 }
 
-"""
-Translate a reader failure into the public copy result contract.
+"""Finish a copy after one reader result.
 
-The `dat error` payload is consumed. `EndOfStream` returns the accumulated
-byte count as success; every other variant remains a typed failure.
+`error` is consumed as `dat`. `EndOfStream` is normal completion and returns
+the accumulated `total` as `Ok`; all other variants remain typed `Err` values.
+No reader or buffer ownership is retained.
 """
 open verb copy_read_error(dat error: IoError, erg total: Int) -> Result[Int, IoError] {
     return case dat error {
@@ -40,15 +45,19 @@ open verb copy_read_error(dat error: IoError, erg total: Int) -> Result[Int, IoE
         IoError.Failed => Result[Int, IoError].Err(IoError.Failed),
         IoError.InvalidInput => Result[Int, IoError].Err(IoError.InvalidInput),
         IoError.InvalidData => Result[Int, IoError].Err(IoError.InvalidData),
+        IoError.Unsupported => Result[Int, IoError].Err(IoError.Unsupported),
+        IoError.PermissionDenied => Result[Int, IoError].Err(IoError.PermissionDenied),
+        IoError.Busy => Result[Int, IoError].Err(IoError.Busy),
+        IoError.CrossDevice => Result[Int, IoError].Err(IoError.CrossDevice),
+        IoError.AlreadyExists => Result[Int, IoError].Err(IoError.AlreadyExists),
     };
 }
 
-"""
-Validate one completed writer chunk and calculate the next total.
+"""Validate one completed writer chunk and calculate the next total.
 
-The `erg` count arguments are copied scalar values. `Ok` returns the updated
-byte total only when the writer consumed the complete chunk; otherwise the
-verb returns `Err(IoError.Failed)` without retaining any input state.
+The `erg` counts are scalar working values. `Ok(total + actual)` is returned
+only when the writer consumed exactly `expected` bytes; a short or inconsistent
+write returns `Err(IoError.Failed)`. No stream or allocation is retained.
 """
 open verb copy_written_chunk(erg total: Int, erg expected: Int, erg actual: Int) -> Result[Int, IoError] {
     erg difference = actual - expected;
@@ -58,7 +67,12 @@ open verb copy_written_chunk(erg total: Int, erg expected: Int, erg actual: Int)
     };
 }
 
-"""Allocate the one reusable copy buffer and report a typed allocation failure."""
+"""Allocate the bounded reusable buffer used by `copy_stream`.
+
+The returned `Buffer` is newly owned on `Ok`. Allocation is fixed at 4096
+bytes and occurs once per copy operation; failure drops partial storage before
+returning `Err(IoError.Failed)`. This helper performs no stream I/O.
+"""
 open verb copy_scratch() -> Result[Buffer, IoError] {
     erg scratch = Buffer[0];
     erg capacity = 4096;
@@ -70,12 +84,12 @@ open verb copy_scratch() -> Result[Buffer, IoError] {
     return Result[Buffer, IoError].Ok(scratch);
 }
 
-"""
-Write one reader chunk and return the next byte total or its typed error.
+"""Write one scratch-buffer chunk and return the next byte total.
 
-The `ins writer` loan and `abs scratch` view are call-scoped; no storage is
-allocated or retained. `Ok` reports the accumulated count and `Err` preserves
-the typed writer failure.
+`writer` is an exclusive `ins` loan restored after the call; `scratch` is an
+immutable `abs` view owned by `copy_stream`. A complete write returns the new
+count, a short write returns `IoError.Failed`, and writer errors are preserved
+without allocation or retained state.
 """
 open verb copy_stream_write[W: Writer](
     ins writer: W,
@@ -85,15 +99,23 @@ open verb copy_stream_write[W: Writer](
 ) -> Result[Int, IoError] {
     erg write_result: Result[Int, IoError] = writer.write(buffer: abs scratch);
     return case dat write_result {
-        Result.Ok(written) => copy_written_chunk(total: total, expected: expected, actual: written),
+        Result.Ok(written) => copy_written_chunk(
+            total: total,
+            expected: expected,
+            actual: written
+        ),
         Result.Err(error) => copy_write_error(error: dat error),
     };
 }
 
-"""
-Copy chunks through ins reader and writer loans using one reusable allocation.
-The result is the exact count or a typed error; EndOfStream is handled as the
-successful termination condition and all scratch storage is cleaned up.
+"""Copy a bounded stream from `reader` to `writer`.
+
+Both participants are exclusive `ins` loans restored after each call. The
+operation allocates one fixed 4096-byte scratch buffer, reuses it for every
+chunk, and drops it on every return path. `Ok(count)` is the exact total after
+normal `EndOfStream`; short writes, invalid zero-length chunks, allocation
+failures, and typed reader/writer failures return `Err`. No entire input is
+loaded or retained in memory.
 """
 open verb copy_stream[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
     erg scratch = copy_scratch()?;

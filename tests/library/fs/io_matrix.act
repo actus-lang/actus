@@ -1,0 +1,150 @@
+"""Mirrored strict coverage for file I/O, EOF, flush, and failure paths."""
+import {
+    open std::fs,
+    open std::io,
+    std::path,
+};
+
+verb current_directory() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb fixture_prefix() -> Buffer {
+    erg prefix: Buffer = Buffer[0];
+    append(prefix, 97u8);
+    append(prefix, 99u8);
+    append(prefix, 116u8);
+    append(prefix, 117u8);
+    append(prefix, 115u8);
+    append(prefix, 45u8);
+    append(prefix, 105u8);
+    append(prefix, 111u8);
+    return prefix;
+}
+
+verb empty_path() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+verb read_count(ins reader: fs::File, ins destination: Buffer) -> Int {
+    erg result = fs::file_read(self: ins reader, buffer: ins destination);
+    return case dat result {
+        Result.Ok(count) => count,
+        Result.Err(_) => -1,
+    };
+}
+
+verb read_eof(ins reader: fs::File, ins destination: Buffer) -> Int {
+    erg result = fs::file_read(self: ins reader, buffer: ins destination);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(error) => case error {
+            io::IoError.EndOfStream => 0,
+            _ => 2,
+        },
+    };
+}
+
+verb inspect_eof(ins reader: fs::File) -> Int {
+    erg destination = Buffer[0];
+    erg capacity = 4;
+    reserve(buffer: ins destination, capacity: capacity);
+    erg first = read_count(reader: ins reader, destination: ins destination);
+    erg second = read_eof(reader: ins reader, destination: ins destination);
+    erg closed = fs::file_close(self: ins reader);
+    if first != 2 {
+        return 1;
+    }
+    if second != 0 {
+        return 2;
+    }
+    return case dat closed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 3,
+    };
+}
+
+verb invalid_publication() -> Int {
+    erg path_result = empty_path();
+    return case dat path_result {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg payload = Buffer[0];
+            append(payload, 88u8);
+            erg result = fs::write_and_flush(path: abs path, contents: abs payload);
+            return case dat result {
+                Result.Ok(_) => 2,
+                Result.Err(_) => 0,
+            };
+        },
+    };
+}
+
+verb write_payload(ins file: fs::File, abs payload: Buffer) -> Int {
+    erg result = fs::file_write(self: ins file, buffer: abs payload);
+    return case dat result {
+        Result.Ok(count) => count,
+        Result.Err(_) => -1,
+    };
+}
+
+verb flush_status(ins file: fs::File) -> Int {
+    erg result = fs::file_flush(self: ins file);
+    return case dat result {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+verb file_io_matrix_covers_flush_eof_and_failure() -> Int {
+    erg root_result = current_directory();
+    return case dat root_result {
+        Result.Err(_) => 1,
+        Result.Ok(root) => {
+            erg prefix = fixture_prefix();
+            erg created = fs::temporary_file_open(root: abs root, prefix: abs prefix);
+            return case dat created {
+                Result.Err(_) => 2,
+                Result.Ok(resource) => {
+                    erg payload = Buffer[0];
+                    append(payload, 65u8);
+                    append(payload, 66u8);
+                    erg written = write_payload(file: ins resource.file, payload: abs payload);
+                    erg flushed = flush_status(file: ins resource.file);
+                    if written != 2 {
+                        fs::temporary_file_cleanup(self: ins resource);
+                        return 3;
+                    }
+                    if flushed != 0 {
+                        fs::temporary_file_cleanup(self: ins resource);
+                        return 4;
+                    }
+                    erg reopened = fs::file_open(path: abs resource.path);
+                    return case dat reopened {
+                        Result.Err(_) => {
+                            fs::temporary_file_cleanup(self: ins resource);
+                            return 5;
+                        },
+                        Result.Ok(reader) => {
+                            erg inspected = inspect_eof(reader: ins reader);
+                            erg cleaned = fs::temporary_file_cleanup(self: ins resource);
+                            if inspected != 0 {
+                                return 6;
+                            }
+                            return case dat cleaned {
+                                Result.Err(_) => 7,
+                                Result.Ok(_) => invalid_publication(),
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}

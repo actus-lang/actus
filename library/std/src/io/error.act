@@ -1,5 +1,7 @@
 """
-`IoError` is the typed error domain for the standard I/O surface.
+`IoError` is the typed error domain for the standard I/O surface. Public
+operations must preserve the most specific supported variant rather than
+converting a known cause into `Failed`.
 
 Runtime bridges use signed status values at the C boundary, but callers
 receive these variants through `Result` rather than inspecting raw codes.
@@ -13,4 +15,14 @@ open enum IoError {
     InvalidInput,
     """The byte sequence cannot be interpreted under the requested encoding."""
     InvalidData,
+    """The selected target cannot provide the requested operation."""
+    Unsupported,
+    """The host rejected the operation because the caller lacks permission."""
+    PermissionDenied,
+    """Another owner currently holds an exclusive advisory resource lock."""
+    Busy,
+    """The source and destination are on different filesystems."""
+    CrossDevice,
+    """The destination already exists and overwrite was not selected."""
+    AlreadyExists,
 }
