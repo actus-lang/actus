@@ -173,15 +173,45 @@ fn shared_codegen_facade_does_not_reexport_cranelift_emission() {
 
 #[test]
 fn cranelift_dependencies_are_optional_and_defaulted() {
-    let manifest = fs::read_to_string(repository_path("Cargo.toml"))
+    let source = fs::read_to_string(repository_path("Cargo.toml"))
         .expect("Cargo manifest should be readable");
-    assert!(manifest.contains("default = [\"cranelift\"]"));
-    assert!(manifest.contains("cranelift = ["));
+    let manifest: toml::Value =
+        toml::from_str(&source).expect("Cargo manifest should be valid TOML");
+    let features = manifest
+        .get("features")
+        .and_then(toml::Value::as_table)
+        .expect("Cargo features should be a table");
+    let default_features = features
+        .get("default")
+        .and_then(toml::Value::as_array)
+        .expect("default Cargo features should be an array");
+    assert!(default_features.iter().any(|feature| feature.as_str() == Some("cranelift")));
+    let cranelift_features = features
+        .get("cranelift")
+        .and_then(toml::Value::as_array)
+        .expect("Cranelift feature should be an array");
+    let dependencies = manifest
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .expect("Cargo dependencies should be a table");
     for dependency in
         ["cranelift-codegen", "cranelift-frontend", "cranelift-module", "cranelift-object"]
     {
-        let declaration = format!("{dependency} = {{ version = \"0.136.2\", optional = true }}");
-        assert!(manifest.contains(&declaration), "{dependency} must be optional");
+        let declaration = dependencies
+            .get(dependency)
+            .and_then(toml::Value::as_table)
+            .unwrap_or_else(|| panic!("{dependency} must use a table dependency declaration"));
+        assert_eq!(
+            declaration.get("optional").and_then(toml::Value::as_bool),
+            Some(true),
+            "{dependency} must be optional"
+        );
+        assert!(
+            cranelift_features
+                .iter()
+                .any(|feature| { feature.as_str() == Some(&format!("dep:{dependency}")) }),
+            "Cranelift feature must enable {dependency}"
+        );
     }
 }
 
