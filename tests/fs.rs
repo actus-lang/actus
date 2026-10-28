@@ -8,10 +8,13 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::cli::run_with_args;
+#[cfg(unix)]
 use actus::runtime::{
-    ActusBuffer, ActusMetadata, ActusPath, actus_file_close, actus_file_flush,
-    actus_file_metadata_path, actus_file_open, actus_file_publish_coordinated_path,
-    actus_file_read, actus_file_write,
+    ActusBuffer, ActusMetadata, ActusPath, actus_file_metadata_path,
+    actus_file_publish_coordinated_path,
+};
+use actus::runtime::{
+    actus_file_close, actus_file_flush, actus_file_open, actus_file_read, actus_file_write,
 };
 
 #[cfg(unix)]
