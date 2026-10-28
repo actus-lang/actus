@@ -45,7 +45,10 @@ pub(crate) unsafe fn replace_output_path(output: *mut ActusPath, path: &Path) ->
         return false;
     }
     let Some(mut storage) = path_bytes(path) else { return false };
+    #[cfg(unix)]
     storage.push(0);
+    #[cfg(windows)]
+    storage.extend_from_slice(&0u16.to_ne_bytes());
     let handle = actus_buffer_allocate(storage.len());
     if handle.is_null() {
         return false;
@@ -58,7 +61,12 @@ pub(crate) unsafe fn replace_output_path(output: *mut ActusPath, path: &Path) ->
     }
     output.storage = handle;
     output.platform = if cfg!(windows) { 1 } else { 0 };
-    output.length = i32::try_from(storage.len() - 1).unwrap_or(-1);
+    let length = if cfg!(windows) {
+        storage.len().saturating_div(2).saturating_sub(1)
+    } else {
+        storage.len().saturating_sub(1)
+    };
+    output.length = i32::try_from(length).unwrap_or(-1);
     output.capacity = i32::try_from(storage.len()).unwrap_or(-1);
     output.terminated = 1;
     output.length >= 0 && output.capacity >= 0
