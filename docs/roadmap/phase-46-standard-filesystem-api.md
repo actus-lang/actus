@@ -9,6 +9,27 @@ differences, path semantics, and failure recovery. A directory API must not
 silently become an unbounded collection, a hidden allocator, or a hot-path
 filesystem dependency.
 
+## Status: temporarily deferred (2026-10-28)
+
+Phase 46 is intentionally paused while Actus metadata semantics are designed
+and implemented as a language foundation for platform selection, capability
+contracts, effects, bounded execution, and deterministic behavior. This is a
+sequencing decision, not a completion claim: the phase remains open and its
+remaining gates must not be marked complete by assumption.
+
+The filesystem work completed through Gate 8.2 is retained as the current
+checkpoint, including the typed filesystem surface, publication recovery
+contract, test-only fault injection, and the cooperating-writer
+compare-before-publish coordinator. New filesystem API expansion is deferred
+until the metadata contract is stable. Existing filesystem behavior may still
+receive narrowly scoped correctness or cross-platform fixes when required by
+validation.
+
+Phase 46 resumes after the metadata phase has a documented contract,
+compiler diagnostics, strict fixtures, and cross-platform evidence. At that
+point the remaining filesystem gates will be re-audited against the metadata
+capabilities rather than silently carried forward.
+
 ## Gate 0: Contract, scope, and capability boundary
 
 - [x] Accept the filesystem API as a standard-library capability, separate
