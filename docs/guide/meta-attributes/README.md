@@ -16,6 +16,10 @@ This directory documents the currently supported attributes:
 - [`meta must_use(...)`](must-use.md): requires an explicit use of a marked
   verb result.
 
+The next proposed extension is documented in [`meta effect(...)`](effect.md),
+but it is not part of the language until ADR-0091 is accepted and its compiler
+and tooling contracts are implemented.
+
 ## General rules
 
 - Metadata must use a compiler-recognized attribute name and argument shape.
