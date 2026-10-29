@@ -109,6 +109,7 @@ global workspace or predictable filename is selected implicitly. `root` and
 dropped and no file remains published. The operation may block on OS entropy
 and filesystem creation and must not be used in realtime engine paths.
 """
+meta effect("filesystem", "blocking", "entropy")
 open verb temporary_file_open(abs root: path_module::Path, abs prefix: Buffer) -> Result[TemporaryFile, TemporaryError] {
     erg output_result = temporary_output_path();
     return case dat output_result {
@@ -153,6 +154,7 @@ path. A failed attempt drops the placeholder and leaves no directory behind;
 the operation is bounded by the runtime collision retry limit and may block on
 the host filesystem.
 """
+meta effect("filesystem", "blocking", "entropy")
 open verb temporary_directory_open(
     abs root: path_module::Path,
     abs prefix: Buffer

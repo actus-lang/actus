@@ -49,7 +49,7 @@ import {
     open path,
 };
 
-meta effect("filesystem", "blocking")
+meta effect("filesystem", "blocking", "entropy")
 verb main() -> Int {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
