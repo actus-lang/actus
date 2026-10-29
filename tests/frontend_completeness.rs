@@ -237,6 +237,27 @@ fn bounded_contract_proves_ranges_and_call_budgets() {
     analyze_with_imports(&imported_source, &ModuleResolver::new(&imported.root))
         .expect("imported bounded signatures must propagate across the facade");
 
+    let recursive_import = ModuleFixture::new();
+    recursive_import.write("recursive/recursive.act", "open api;");
+    recursive_import.write(
+        "recursive/api.act",
+        "meta bounded(max_iterations: 1u32) open verb first() -> Int { second(); return 0; } meta bounded(max_iterations: 1u32) open verb second() -> Int { first(); return 0; }",
+    );
+    let recursive_source =
+        parse_source("import recursive; verb main() -> Int { recursive::first(); return 0; }")
+            .expect("recursive imported fixture should parse");
+    let recursive_error =
+        analyze_with_imports(&recursive_source, &ModuleResolver::new(&recursive_import.root))
+            .expect_err("recursive imported bodies must be proven before publication");
+    let ModuleError::Semantic(recursive_error) = recursive_error else {
+        panic!("expected imported semantic error")
+    };
+    assert!(matches!(
+        recursive_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. }
+            if required == "recursive call path"
+    ));
+
     analyze_source(
         "meta bounded(max_iterations: 0u32) verb leaf[N: Usize]() -> Int { return 0; } meta bounded(max_iterations: 0u32) verb main() -> Int { leaf[2](); return 0; }",
     )
@@ -246,6 +267,15 @@ fn bounded_contract_proves_ranges_and_call_budgets() {
         "struct File { value: Int, } role Writer { meta bounded(max_iterations: 0u32) verb write(abs self: File) -> Int; } perform Writer for File { meta bounded(max_iterations: 0u32) verb write(abs self: File) -> Int { return self.value; } } meta bounded(max_calls: 1u32, max_call_depth: 1u32) verb send(abs writer: dynamic Writer) -> Int { return writer.write(); }",
     )
     .expect("dynamic method boundaries must preserve bounded role contracts");
+
+    let dynamic_recursive_error = expect_semantic_error(
+        "struct File { value: Int, } role Writer { meta bounded(max_iterations: 0u32) verb first(abs self: File) -> Int; meta bounded(max_iterations: 0u32) verb second(abs self: File) -> Int; } perform Writer for File { meta bounded(max_iterations: 0u32) verb first(abs self: File) -> Int { return self.second(); } meta bounded(max_iterations: 0u32) verb second(abs self: File) -> Int { return self.first(); } }",
+    );
+    assert!(matches!(
+        dynamic_recursive_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. }
+            if required == "recursive call path"
+    ));
 
     let recursive_error = expect_semantic_error(
         "meta bounded(max_iterations: 1u32) verb first() -> Int { second(); return 0; } meta bounded(max_iterations: 1u32) verb second() -> Int { first(); return 0; }",

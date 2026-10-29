@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
-use crate::semantic::{SemanticModel, analyze, filter_program_for_target};
+use crate::semantic::{
+    SemanticModel, analyze, filter_program_for_target, validate_bounded_recursion,
+};
 
 use super::super::resolver::ModuleResolver;
 use super::parsing::parse_module_with_overlays;
@@ -93,6 +95,8 @@ fn analyze_imported_units(
             resolver,
             overlays,
         )?;
+        validate_bounded_recursion(module_plan.caller())
+            .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
         let expanded = module_scope_program(module_plan.caller());
         analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     }

@@ -22,6 +22,12 @@ pub(crate) use validation::{
     canonical_type_name, expression_span, is_origin_return_expression, try_type_mismatch,
 };
 
+pub(crate) fn validate_bounded_recursion(
+    program: &Program,
+) -> Result<(), super::errors::SemanticError> {
+    Analyzer::new().validate_bounded_recursion(program)
+}
+
 use super::errors::SemanticError;
 use super::model::SemanticModel;
 use crate::ast::Program;
