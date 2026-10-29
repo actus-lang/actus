@@ -65,6 +65,14 @@ test, format, and build a project.
 8. [Backends and support matrix](compiler/backends-and-support.md)
 9. [Diagnostics](compiler/diagnostics.md)
 
+### Metadata and compiler annotations
+
+1. [Meta-attribute overview](meta-attributes/README.md)
+2. [`meta test`](meta-attributes/test.md)
+3. [`meta target(...)`](meta-attributes/target.md)
+4. [`meta fault(...)`](meta-attributes/fault.md)
+5. [`meta limitless(...)`](meta-attributes/limitless.md)
+
 ### Using the standard library
 
 1. [Standard-library overview](library/README.md)
