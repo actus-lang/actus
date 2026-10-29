@@ -10,6 +10,7 @@ Report whether `path` itself is a symbolic link.
 The path is borrowed for inspection and no link target is opened or retained.
 The result is false for ordinary files and directories.
 """
+meta effect("filesystem", "blocking")
 open verb is_symlink(abs path: path_module::Path) -> Result[Bool, io::IoError] {
     erg inspected = symlink_metadata(path: abs path);
     return case dat inspected {

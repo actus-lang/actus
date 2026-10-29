@@ -203,6 +203,7 @@ close succeeds, removal failure is returned instead of being silently
 discarded. Calling cleanup again is a normal host error because the path is
 already absent.
 """
+meta effect("filesystem", "blocking")
 open verb temporary_file_cleanup(ins self: TemporaryFile) -> Result[Int, io::IoError] {
     erg closed = file_close(self: ins self.file);
     return case dat closed {
@@ -219,6 +220,7 @@ borrowed only for removal; the caller receives the typed host result and
 retains ownership for deterministic scope cleanup. Recursive deletion is
 never implicit.
 """
+meta effect("filesystem", "blocking")
 open verb temporary_directory_cleanup(ins self: TemporaryDirectory) -> Result[Int, io::IoError] {
     return remove_dir(path: abs self.path);
 }
@@ -232,6 +234,7 @@ required when cleanup failure must be observed. File close is idempotent.
 """
 open perform Drop for TemporaryFile {
     """Consume an `ins` loan of the owner, close the handle, and attempt path removal without masking another error."""
+    meta effect("filesystem", "blocking")
     verb drop(ins self: TemporaryFile) {
         file_close(self: ins self.file);
         remove_file(path: abs self.path);
@@ -247,6 +250,7 @@ removal is never performed.
 """
 open perform Drop for TemporaryDirectory {
     """Consume an `ins` loan of the owner and attempt removal without converting cleanup failure into a new throw path."""
+    meta effect("filesystem", "blocking")
     verb drop(ins self: TemporaryDirectory) {
         remove_dir(path: abs self.path);
     }

@@ -21,14 +21,15 @@ fn requires_role_and_performance_effect_contracts_to_match() {
     let valid = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return 1; } }";
     analyze_source(valid).expect("matching role and implementation effects should pass");
 
-    let mismatch = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } }";
-    let error = analyze_source(mismatch).expect_err("under-declared performance effects must fail");
-    assert!(
-        matches!(error.kind, SemanticErrorKind::RoleMethodEffectMismatch { ref role, ref method, .. } if role == "Writer" && method == "write")
-    );
-    assert_eq!(semantic_diagnostic(&error).code(), "E1122");
+    let pure = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(pure)
+        .expect("a pure implementation may satisfy an effect-bearing role contract");
 
-    let extra = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return 1; } }";
+    let bounded = "struct File { value: Int, } role Writer { meta effect(\"filesystem\", \"blocking\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(bounded)
+        .expect("an implementation may use a strict subset of the role effect contract");
+
+    let extra = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\", \"blocking\") verb write(abs self: File) -> Int { return 1; } }";
     let error = analyze_source(extra).expect_err("implementation-only effects must fail");
     assert!(matches!(
         error.kind,

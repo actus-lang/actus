@@ -33,12 +33,15 @@ may explicitly declare compatible effects, but a declaration must not erase,
 rename, or under-report a callee effect. Native declarations require the same
 explicit contract at the ABI boundary.
 
-Role methods are effect-bearing interface contracts. Every `perform`
-implementation must declare exactly the same closed effect set as its role
-method. This exact-match rule prevents a dynamic or generic role call from
-silently hiding an implementation-only effect. A role method's signature is
-therefore the effect boundary used by dynamic dispatch and generic role-bound
-calls.
+Role methods are effect-bearing interface contracts. A role method declares an
+upper bound for implementations: every `perform` implementation must declare
+a subset of the role method's closed effect set. A pure implementation may
+therefore satisfy an effect-bearing role, but an implementation may not add an
+effect that the role did not declare. The role method's signature remains the
+effect boundary used by dynamic dispatch and generic role-bound calls, while a
+direct concrete call retains the implementation signature. This prevents
+implementation-only effects from being hidden while allowing one role to have
+both hosted and in-memory implementations.
 
 Target filtering is effect-neutral: target selection may remove a declaration
 because of its target metadata, but it must never remove or rewrite effects on
@@ -54,8 +57,10 @@ these effect signatures without changing their meaning.
   declared capability or operational property.
 - Callers cannot suppress effects with aliases, generics, facades, or external
   declarations.
-- Role methods and their implementations must have identical effect sets;
-  under-declaration and implementation-only effects are both rejected.
+- A role method must declare every effect permitted to any implementation;
+  implementations may only declare subsets of that contract.
+- Dynamic and generic role calls use the role's conservative effect contract;
+  direct concrete calls use the concrete implementation's effects.
 - The compiler must reject under-declared callers deterministically.
 - Effect checking must not infer hidden allocation or filesystem behavior from
   names; only registered signatures and native contracts provide evidence.

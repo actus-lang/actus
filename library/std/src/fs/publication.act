@@ -151,6 +151,7 @@ and flush succeeds. A short write, open failure, flush failure, close failure,
 or end-of-stream condition becomes a typed `IoError`; no partial success is
 reported and no hidden result buffer is allocated.
 """
+meta effect("filesystem", "blocking")
 open verb write_file(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
     return write_and_flush(path: abs path, contents: abs contents);
 }
@@ -167,6 +168,7 @@ returns the original typed error and invokes deterministic best-effort staging
 cleanup. The final destination is not exposed to partially written staged
 contents, and the operation performs no hidden result-buffer allocation.
 """
+meta effect("filesystem", "blocking")
 open verb write_file_atomic(
     abs path: path_module::Path,
     dat staging: path_module::Path,
@@ -201,6 +203,7 @@ the error is returned so the caller can report that durability is uncertain.
 No partial staged contents become visible, and cleanup never replaces the
 root write, rename, or sync error.
 """
+meta effect("filesystem", "blocking")
 open verb write_file_atomic_synced(
     abs path: path_module::Path,
     dat staging: path_module::Path,
@@ -234,6 +237,7 @@ flushes before reporting success, and closes the handle on every branch.
 `Err(IoError)` reports open, write, size, flush, or close failure. No staging
 path, replacement buffer, or hidden allocation is introduced here.
 """
+meta effect("filesystem", "blocking")
 open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
     erg opened = file_create(path: abs path);
     return case dat opened {

@@ -118,6 +118,7 @@ Fill `output` with metadata for `path` without retaining either buffer.
 caller. The bridge returns zero on success and `-1` when the host cannot
 inspect the path; the public wrapper translates that status to `IoError`.
 """
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_metadata_path(
     abs path: path_module::Path,
     ins output: Metadata
@@ -130,6 +131,7 @@ The path view and output ownership rules match `actus_file_metadata_path`.
 The bridge returns zero on success and `-1` when the host cannot inspect the
 path itself.
 """
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_symlink_metadata_path(
     abs path: path_module::Path,
     ins output: Metadata
@@ -159,6 +161,7 @@ The handle is an opaque scalar owned by the `File` value and is not closed
 or transferred by this call. `output` is exclusively borrowed for the call.
 The bridge returns zero on success or `-1` on a host metadata failure.
 """
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_metadata_handle_buffer(
     abs handle: Int,
     ins output: Metadata
@@ -172,6 +175,7 @@ open handles satisfy this same operation through static performance dispatch.
 """
 open role MetadataProvider {
     """Inspect an ins file handle and return metadata facts or typed failure."""
+    meta effect("filesystem", "blocking")
     verb metadata(ins self: File) -> Result[Metadata, io::IoError];
 }
 
@@ -189,6 +193,7 @@ Inspect one filesystem path without transferring path ownership.
 the host could not inspect the path. The operation performs no path-string
 conversion and does not allocate an owned path representation.
 """
+meta effect("filesystem", "blocking")
 open verb metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError] {
     erg output = metadata_default();
     erg status = actus_file_metadata_path(path: abs path, output: ins output);
@@ -209,6 +214,7 @@ facts. `Err(MetadataError)` distinguishes not found, permission denied,
 unsupported, and generic provider failure. No path, handle, or allocation is
 retained after the operation.
 """
+meta effect("filesystem", "blocking")
 open verb metadata_detailed(abs path: path_module::Path) -> Result[Metadata, MetadataError] {
     erg output = metadata_default();
     erg status = actus_file_metadata_path(path: abs path, output: ins output);
@@ -224,6 +230,7 @@ Inspect an open file through an exclusively loaned handle.
 The returned metadata owns only copied scalar facts. The file handle remains
 owned by the caller, and a failed native status becomes `Err(Failed)`.
 """
+meta effect("filesystem", "blocking")
 open verb file_metadata(ins self: File) -> Result[Metadata, io::IoError] {
     erg output = metadata_default();
     erg status = actus_file_metadata_handle_buffer(handle: abs self.handle, output: ins output);
@@ -240,6 +247,7 @@ Inspect one path without following a symbolic link.
 itself is a symbolic link. The operation never creates, follows, or retains a
 link target.
 """
+meta effect("filesystem", "blocking")
 open verb symlink_metadata(abs path: path_module::Path) -> Result[Metadata, io::IoError] {
     erg output = metadata_default();
     erg status = actus_file_symlink_metadata_path(path: abs path, output: ins output);
@@ -260,6 +268,7 @@ failure distinguishes not found, permission denied, unsupported, and generic
 provider rejection. The operation performs no hidden link traversal or
 resource retention.
 """
+meta effect("filesystem", "blocking")
 open verb symlink_metadata_detailed(abs path: path_module::Path) -> Result[Metadata, MetadataError] {
     erg output = metadata_default();
     erg status = actus_file_symlink_metadata_path(path: abs path, output: ins output);

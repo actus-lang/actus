@@ -49,6 +49,7 @@ import {
     open path,
 };
 
+meta effect("filesystem", "blocking")
 verb main() -> Int {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);

@@ -7,6 +7,7 @@ repeated reads allocation-free and restores the caller's `erg` binding
 when the call returns. The result is the exact number of bytes read, or a
 typed `IoError`.
 """
+meta effect("blocking")
 open verb read(ins buffer: Buffer) -> Result[Int, IoError] {
     """
     `read` shares the canonical line reader and therefore has identical

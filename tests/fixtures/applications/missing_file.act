@@ -22,6 +22,7 @@ verb missing_path() -> Result[Path, PathError] {
     return path_from_posix(storage: dat raw);
 }
 
+meta effect("filesystem", "blocking")
 verb main() -> Int {
     erg parsed = missing_path();
     return case dat parsed {

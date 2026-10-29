@@ -156,7 +156,7 @@ impl Analyzer {
             }
             let expected = role_method_signature(required).effects;
             let found = implementation.signature().effects;
-            if !same_effects(&expected, &found) {
+            if !effects_within_role_contract(&expected, &found) {
                 return Err(role_error(
                     SemanticErrorKind::RoleMethodEffectMismatch {
                         role: perform.role_name.clone(),
@@ -288,8 +288,8 @@ impl Analyzer {
     }
 }
 
-fn same_effects(left: &[Effect], right: &[Effect]) -> bool {
-    left.len() == right.len() && left.iter().all(|effect| right.contains(effect))
+fn effects_within_role_contract(contract: &[Effect], implementation: &[Effect]) -> bool {
+    implementation.iter().all(|effect| contract.contains(effect))
 }
 
 fn is_self_type(type_name: &TypeName) -> bool {
