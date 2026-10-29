@@ -46,10 +46,11 @@ phase prematurely.
 - [x] Implement `meta realtime` with forbidden-effect, bounded-loop,
       floating-point, recursion, role-contract, formatter, LSP, and semantic
       fixture coverage.
-- [ ] Complete `meta bounded(...)` proof propagation across imported, generic,
-      dynamic, recursive, and native call boundaries; the current source-level
-      checker covers fixed control-flow, direct calls, fixed buffers, known
-      local scalar sizes, and declared I/O effects.
+- [x] Complete `meta bounded(...)` proof propagation across imported, generic,
+      dynamic, recursive, and native call boundaries. The checker covers fixed
+      control-flow, direct calls, fixed buffers, known local scalar sizes,
+      declared I/O effects, imported implementation recursion, and perform/
+      dynamic method recursion.
 
 ## Planned metadata extension backlog
 

@@ -59,17 +59,21 @@ signature. The callee's declared budgets are added to the caller's call and
 iteration budgets and are multiplied when the call occurs inside a proven
 loop.
 
-The compiler builds a local verb call graph and rejects direct and mutual
-recursive paths reachable from a bounded verb. Dynamic and native boundaries
-are treated as proof boundaries: their declared signature is required, and an
-unknown resource dimension remains an error rather than an assumed zero.
+The compiler builds a call graph for local verbs and perform implementations.
+Method edges are resolved to perform nodes, so static and dynamic method
+recursion is included in the proof. Imported implementations are checked with
+the same recursion validator before their public declarations are lowered to
+external signatures. Dynamic and native boundaries are still proof boundaries:
+their declared signature is required, and an unknown resource dimension
+remains an error rather than an assumed zero.
 
 ## Recursion and call graph
 
 Direct and mutual recursion require an explicit finite recursion contract.
 Until the recursion-bound form is implemented and checked, any recursive path
 reachable from a bounded verb is rejected. Imported, generic, dynamic, and
-external calls cannot hide an unbounded path.
+external calls cannot hide an unbounded path; imported bodies and perform
+implementations are checked before publication.
 
 An external or native declaration must explicitly provide a compatible bound
 contract before it can be called from a bounded verb. If the native boundary
