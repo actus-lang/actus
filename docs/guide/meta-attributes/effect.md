@@ -1,8 +1,10 @@
 # `meta effect(...)` (proposed)
 
 `meta effect(...)` is a proposed compiler contract for making operational
-properties of a verb visible at its declaration and call sites. It is not yet
-implemented and must not be used in Actus source.
+properties of a verb visible at its declaration and call sites. The first
+compiler slice parses the closed vocabulary, preserves it in verb signatures,
+and rejects callers that omit a callee's declared effect. The contract is not
+accepted as stable yet; use it only in dedicated development fixtures.
 
 The proposed form is:
 

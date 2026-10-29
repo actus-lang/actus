@@ -6,8 +6,8 @@ mod types;
 
 pub use builtins::builtin_enum_definitions;
 pub use callable::{
-    DispatchMode, ExternalVerbDecl, LimitlessScope, MetaAttribute, Param, TestFault, VerbContract,
-    VerbContractSection, VerbContractSectionKind, VerbDecl,
+    DispatchMode, Effect, ExternalVerbDecl, LimitlessScope, MetaAttribute, Param, TestFault,
+    VerbContract, VerbContractSection, VerbContractSectionKind, VerbDecl,
 };
 pub use data::{
     EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField,

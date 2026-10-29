@@ -77,6 +77,7 @@ fn declaration_matches_target(
         crate::ast::MetaAttribute::Fault(_) => true,
         crate::ast::MetaAttribute::Limitless(_) => true,
         crate::ast::MetaAttribute::MustUse(_) => true,
+        crate::ast::MetaAttribute::Effect(_) => true,
     })
 }
 pub(crate) use type_substitution::TypeSubstitution;

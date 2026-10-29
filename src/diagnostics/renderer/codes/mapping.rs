@@ -33,6 +33,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::MalformedVerbContract => "E0014",
         ParseErrorCode::OpenImportRequiresBlock => "E0015",
         ParseErrorCode::MustUseRequiresReturn => "E0018",
+        ParseErrorCode::UnsupportedEffect => "E0019",
     }
 }
 
@@ -161,6 +162,7 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::ExclusiveLoanAlias { .. } => "E1065",
         SemanticErrorKind::EscapingLoan { .. } => "E1082",
         SemanticErrorKind::MustUseIgnored { .. } => "E1120",
+        SemanticErrorKind::UndeclaredEffect { .. } => "E1121",
         _ => return None,
     })
 }

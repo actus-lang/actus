@@ -1,6 +1,6 @@
 use crate::ast::{
-    Argument, BuiltinType, DispatchMode, ExternalVerbDecl, GenericParam, ReturnAccess, Role,
-    VerbDecl, lookup_builtin_type,
+    Argument, BuiltinType, DispatchMode, Effect, ExternalVerbDecl, GenericParam, ReturnAccess,
+    Role, VerbDecl, lookup_builtin_type,
 };
 
 use super::super::analyzer::canonical_type_name;
@@ -15,6 +15,7 @@ pub(crate) struct VerbSignature {
     pub(crate) generic_parameters: Vec<GenericParam>,
     pub(crate) external: bool,
     pub(crate) must_use: Option<String>,
+    pub(crate) effects: Vec<Effect>,
 }
 
 pub(super) fn has_matching_named_signature(
@@ -57,6 +58,7 @@ impl VerbDecl {
                 crate::ast::MetaAttribute::MustUse(reason) => Some(reason.clone()),
                 _ => None,
             }),
+            effects: metadata_effects(&self.metadata),
         }
     }
 }
@@ -88,6 +90,17 @@ impl ExternalVerbDecl {
                 crate::ast::MetaAttribute::MustUse(reason) => Some(reason.clone()),
                 _ => None,
             }),
+            effects: metadata_effects(&self.metadata),
         }
     }
+}
+
+fn metadata_effects(metadata: &[crate::ast::MetaAttribute]) -> Vec<Effect> {
+    metadata
+        .iter()
+        .filter_map(|attribute| match attribute {
+            crate::ast::MetaAttribute::Effect(effect) => Some(*effect),
+            _ => None,
+        })
+        .collect()
 }

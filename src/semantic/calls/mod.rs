@@ -7,6 +7,7 @@ use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::{ArgumentRoleFact, ArgumentRoleSource};
 use super::state::OwnershipState;
 
+mod effects;
 mod ownership;
 mod parsing;
 mod paths;
@@ -240,6 +241,7 @@ impl Analyzer {
         span: SourceSpan,
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
+        self.validate_effects(callee, signature, span)?;
         let discarded = self.discarded_expression;
         self.discarded_expression = false;
         let parameter_indices = self.bind_arguments(callee, signature, arguments, span)?;

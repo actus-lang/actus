@@ -34,6 +34,7 @@ pub enum ParseErrorKind {
     FaultRequiresTest,
     TestMetadataRequiresVerb,
     MustUseRequiresReturn,
+    UnsupportedEffect { name: String },
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
 }
@@ -54,6 +55,7 @@ pub enum ParseErrorCode {
     FaultRequiresTest,
     TestMetadataRequiresVerb,
     MustUseRequiresReturn,
+    UnsupportedEffect,
     MalformedVerbContract,
     OpenImportRequiresBlock,
 }
@@ -179,6 +181,7 @@ impl Parser {
                 span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
             });
         }
+        self.reject_duplicate_effect_metadata(metadata)?;
         if let Some((index, target)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
             if let MetaAttribute::Target(target) = attribute { Some((index, target)) } else { None }
         }) && metadata[index + 1..]
@@ -209,6 +212,30 @@ impl Parser {
             });
         }
         self.reject_duplicate_limitless_metadata(metadata)
+    }
+
+    fn reject_duplicate_effect_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        let Some((index, effect)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
+            if let MetaAttribute::Effect(effect) = attribute { Some((index, effect)) } else { None }
+        }) else {
+            return Ok(());
+        };
+        if metadata[index + 1..]
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Effect(other) if other == effect))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata {
+                    name: format!("effect(\"{}\")", effect.name()),
+                },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
+        Ok(())
     }
 
     fn reject_duplicate_limitless_metadata(

@@ -49,6 +49,7 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
         generic_parameters: Vec::new(),
         external: false,
         must_use: None,
+        effects: Vec::new(),
     }
 }
 

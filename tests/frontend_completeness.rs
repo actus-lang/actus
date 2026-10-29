@@ -55,6 +55,24 @@ fn must_use_rejects_ignored_results_and_accepts_consumed_results() {
 }
 
 #[test]
+fn effects_are_declared_by_callers_and_rejected_when_omitted() {
+    let undeclared = expect_semantic_error(
+        "meta effect(\"filesystem\") verb load() -> Int { return 0; } verb main() -> Int { load(); return 0; }",
+    );
+    assert!(matches!(
+        undeclared.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "load" && effect == actus::ast::Effect::Filesystem
+    ));
+    assert_eq!(semantic_diagnostic(&undeclared).code(), "E1121");
+
+    analyze_source(
+        "meta effect(\"filesystem\") verb load() -> Int { return 0; } meta effect(\"filesystem\") verb main() -> Int { load(); return 0; }",
+    )
+    .expect("a caller declaring the callee effect should pass");
+}
+
+#[test]
 fn name_resolution_rules_have_positive_and_negative_fixtures() {
     analyze_source(
         "struct Point { x: Int, } verb known(erg point: Point) { } verb main() -> Int { erg point = Point { x: 1, }; known(point: point); return point.x; }",

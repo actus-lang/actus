@@ -37,6 +37,13 @@ fn preserves_must_use_metadata_idempotently() {
 }
 
 #[test]
+fn preserves_effect_metadata_idempotently() {
+    let formatted = format_source("meta effect(\"filesystem\") verb load() -> Int { return 0; }");
+    assert!(formatted.contains("meta effect(\"filesystem\")"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_bounded_for_ranges_idempotently() {
     let formatted = format_source(
         "verb main(){for erg index:u32 in 0u32..4u32 { if index == 2u32 { break; } }}",

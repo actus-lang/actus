@@ -145,6 +145,7 @@ impl Analyzer {
             generic_parameters: Vec::new(),
             external: signature.external,
             must_use: signature.must_use.clone(),
+            effects: signature.effects.clone(),
         })
     }
 }

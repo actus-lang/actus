@@ -70,6 +70,9 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::MustUseIgnored { callee, reason } => {
             format!("must-use result from `{callee}` was ignored: {reason}")
         }
+        SemanticErrorKind::UndeclaredEffect { callee, effect } => {
+            format!("call to `{callee}` requires undeclared effect `{}`", effect.name())
+        }
         _ => return None,
     })
 }

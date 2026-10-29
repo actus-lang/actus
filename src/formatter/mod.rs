@@ -290,6 +290,9 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
         crate::ast::MetaAttribute::MustUse(reason) => {
             format!("must_use(\"{}\")", escape_string(reason))
         }
+        crate::ast::MetaAttribute::Effect(effect) => {
+            format!("effect(\"{}\")", effect.name())
+        }
     }
 }
 

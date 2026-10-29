@@ -68,6 +68,42 @@ pub enum MetaAttribute {
     Fault(TestFault),
     Limitless(LimitlessScope),
     MustUse(String),
+    Effect(Effect),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Effect {
+    Blocking,
+    Filesystem,
+    Network,
+    Allocation,
+    Entropy,
+}
+
+impl Effect {
+    pub const ALL: [Self; 5] =
+        [Self::Blocking, Self::Filesystem, Self::Network, Self::Allocation, Self::Entropy];
+
+    pub fn parse(name: &str) -> Option<Self> {
+        Some(match name {
+            "blocking" => Self::Blocking,
+            "filesystem" => Self::Filesystem,
+            "network" => Self::Network,
+            "allocation" => Self::Allocation,
+            "entropy" => Self::Entropy,
+            _ => return None,
+        })
+    }
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Blocking => "blocking",
+            Self::Filesystem => "filesystem",
+            Self::Network => "network",
+            Self::Allocation => "allocation",
+            Self::Entropy => "entropy",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

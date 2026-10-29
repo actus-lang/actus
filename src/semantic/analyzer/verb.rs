@@ -19,6 +19,14 @@ impl Analyzer {
     }
 
     fn configure_return_state(&mut self, verb: &VerbDecl) {
+        self.current_effects = verb
+            .metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::Effect(effect) => Some(*effect),
+                _ => None,
+            })
+            .collect();
         self.current_return_access =
             verb.return_type.as_ref().map(|return_type| return_type.access);
         self.current_return_type = verb

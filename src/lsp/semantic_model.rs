@@ -360,6 +360,7 @@ fn declarations(
                 MetaAttribute::Fault(_) => true,
                 MetaAttribute::Limitless(_) => true,
                 MetaAttribute::MustUse(_) => true,
+                MetaAttribute::Effect(_) => true,
             });
             let limitless = if program.file_metadata.contains(&crate::ast::LimitlessScope::File) {
                 Some("file")

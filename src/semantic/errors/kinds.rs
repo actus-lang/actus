@@ -82,6 +82,10 @@ pub enum SemanticErrorKind {
         callee: String,
         reason: String,
     },
+    UndeclaredEffect {
+        callee: String,
+        effect: crate::ast::Effect,
+    },
     InvalidOwnerInitializer {
         name: String,
     },

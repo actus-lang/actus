@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BuiltinType, EnumDef, ReturnAccess, RoleDecl, StructDef};
+use crate::ast::{BuiltinType, Effect, EnumDef, ReturnAccess, RoleDecl, StructDef};
 use crate::lexer::SourceSpan;
 
 use super::super::model::{Origin, SemanticModel};
@@ -70,6 +70,7 @@ pub(crate) struct Analyzer {
     pub(crate) case_result_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) type_registry: super::super::types::TypeRegistry,
     pub(crate) discarded_expression: bool,
+    pub(crate) current_effects: Vec<Effect>,
 }
 
 impl Analyzer {

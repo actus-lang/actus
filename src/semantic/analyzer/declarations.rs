@@ -144,5 +144,6 @@ fn equivalent_signature(left: &VerbSignature, right: &VerbSignature) -> bool {
         && left.return_type_name == right.return_type_name
         && left.return_access == right.return_access
         && left.must_use == right.must_use
+        && left.effects == right.effects
         && left.generic_parameters == right.generic_parameters
 }
