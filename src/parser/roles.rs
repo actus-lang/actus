@@ -23,8 +23,18 @@ impl Parser {
             };
             let doc = doc.or_else(|| self.take_doc_string_group());
             self.reject_duplicate_metadata(&metadata)?;
-            self.reject_non_effect_role_metadata(&metadata)?;
-            methods.push(self.parse_role_method(doc, metadata)?);
+            self.reject_unsupported_role_metadata(&metadata)?;
+            let method = self.parse_role_method(doc, metadata.clone())?;
+            if metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::MustUse(_)))
+                && method.return_type.is_none()
+            {
+                return Err(ParseError {
+                    code: super::ParseErrorCode::MustUseRequiresReturn,
+                    kind: super::ParseErrorKind::MustUseRequiresReturn,
+                    span: method.span,
+                });
+            }
+            methods.push(method);
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(RoleDecl { is_open, doc, name, methods, span: SourceSpan::new(start, end) })
@@ -89,11 +99,13 @@ impl Parser {
         })
     }
 
-    fn reject_non_effect_role_metadata(
+    fn reject_unsupported_role_metadata(
         &self,
         metadata: &[MetaAttribute],
     ) -> Result<(), ParseError> {
-        if metadata.iter().all(|attribute| matches!(attribute, MetaAttribute::Effect(_))) {
+        if metadata.iter().all(|attribute| {
+            matches!(attribute, MetaAttribute::Effect(_) | MetaAttribute::MustUse(_))
+        }) {
             return Ok(());
         }
         Err(ParseError {

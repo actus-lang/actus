@@ -18,7 +18,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let state = self.snapshot_binding_states();
         self.validate_guard_access(guard)?;
-        self.visit_expression(guard)?;
+        self.visit_consumed_expression(guard)?;
         let found = self.expression_type_name(guard).unwrap_or_else(|| "unknown".to_owned());
         if found != "Bool" {
             self.restore_binding_states(&state);

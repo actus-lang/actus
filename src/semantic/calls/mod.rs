@@ -267,7 +267,10 @@ impl Analyzer {
                 .insert(self.expression_cache_key(span), return_type.clone());
         }
         self.discarded_expression = discarded;
-        if discarded && let Some(reason) = &signature.must_use {
+        if discarded
+            && !self.expression_value_consumed
+            && let Some(reason) = &signature.must_use
+        {
             return Err(SemanticError {
                 kind: SemanticErrorKind::MustUseIgnored {
                     callee: callee.to_owned(),

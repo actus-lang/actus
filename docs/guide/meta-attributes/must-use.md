@@ -18,8 +18,15 @@ write_frame(frame: abs frame);
 ```
 
 The result is consumed when it is returned, assigned to a binding, passed as
-an argument, or otherwise used by an expression. `must_use` does not insert
-runtime code, change ownership roles, or make a result implicitly copied.
+an argument, used by an operator, or explicitly propagated with `?`.
+Parentheses alone do not consume it. Each nested statement is checked
+independently, so a call inside a conditional block cannot bypass the
+contract. `must_use` does not insert runtime code, change ownership roles, or
+make a result implicitly copied.
+
+Role methods may carry the same metadata. Every `perform` implementation must
+repeat the exact `must_use` contract declared by the role method. Dynamic and
+generic role dispatch preserve the contract at the call site.
 
 ## Contract
 
@@ -32,7 +39,13 @@ runtime code, change ownership roles, or make a result implicitly copied.
 - The diagnostic is a semantic error at the ignored call site.
 - The reason is documentation for the caller; it is not executable code.
 - Formatter and LSP output preserve the metadata and its reason.
+- Operator operands, `?`, field/index receivers, and dispatch receivers count
+  as value-consuming contexts; grouping alone does not.
+- Role implementations must preserve the declaration contract and report
+  `E1123` when they add or omit `must_use`.
 
-The attribute is intentionally narrow in its first implementation: it checks
-discarded direct call expressions. Broader expression and method-dispatch
-coverage must be added only with corresponding ownership and semantic fixtures.
+The compiler checks direct calls, method and role dispatch, imported and
+external signatures, generic substitutions, nested expression contexts, and
+role implementation parity. It does not infer `must_use` from arbitrary
+user-defined conventions; the declaration is the explicit source of the
+contract.

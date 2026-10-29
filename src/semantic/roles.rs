@@ -167,6 +167,19 @@ impl Analyzer {
                     implementation.span,
                 ));
             }
+            let expected = role_method_signature(required).must_use;
+            let found = implementation.signature().must_use;
+            if expected != found {
+                return Err(role_error(
+                    SemanticErrorKind::RoleMethodMustUseMismatch {
+                        role: perform.role_name.clone(),
+                        method: required.name.clone(),
+                        expected,
+                        found,
+                    },
+                    implementation.span,
+                ));
+            }
         }
         Ok(())
     }

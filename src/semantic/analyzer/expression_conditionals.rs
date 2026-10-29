@@ -9,7 +9,7 @@ impl Analyzer {
         let Expr::If { condition, then_branch, else_branch, .. } = expression else {
             unreachable!("conditional visitor received a non-conditional expression")
         };
-        self.visit_expression(condition)?;
+        self.visit_consumed_expression(condition)?;
         let condition_type =
             self.expression_type_name(condition).unwrap_or_else(|| "unknown".to_owned());
         if condition_type != "Bool" {
@@ -26,7 +26,7 @@ impl Analyzer {
         if let Some(else_branch) = else_branch {
             match else_branch {
                 IfBranch::Block(block) => self.visit_block(block)?,
-                IfBranch::ElseIf(expression) => self.visit_expression(expression)?,
+                IfBranch::ElseIf(expression) => self.visit_consumed_expression(expression)?,
             }
         }
         let else_state = self.snapshot_binding_prefix(binding_count);

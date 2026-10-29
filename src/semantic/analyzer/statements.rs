@@ -458,9 +458,13 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let previous = self.discarded_expression;
+        let previous_consumed = self.expression_value_consumed;
         self.discarded_expression = true;
-        self.visit_expression(expression)?;
+        self.expression_value_consumed = false;
+        let result = self.visit_expression(expression);
         self.discarded_expression = previous;
+        self.expression_value_consumed = previous_consumed;
+        result?;
         if matches!(expression, Expr::Try { .. }) {
             self.plan_return_unwind(span);
         }

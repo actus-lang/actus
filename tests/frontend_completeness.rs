@@ -55,6 +55,35 @@ fn must_use_rejects_ignored_results_and_accepts_consumed_results() {
 }
 
 #[test]
+fn must_use_tracks_expression_consumption_without_leaking_across_statements() {
+    analyze_source(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { return status() + 1; }",
+    )
+    .expect("a must-use result consumed by an operator should pass");
+
+    let grouped = expect_semantic_error(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { (status()); return 0; }",
+    );
+    assert!(matches!(
+        grouped.kind,
+        SemanticErrorKind::MustUseIgnored { ref callee, .. } if callee == "status"
+    ));
+
+    let nested_statement = expect_semantic_error(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { if true { status(); } return 0; }",
+    );
+    assert!(matches!(
+        nested_statement.kind,
+        SemanticErrorKind::MustUseIgnored { ref callee, .. } if callee == "status"
+    ));
+
+    analyze_source(
+        "enum Failure { Failed, } meta must_use(\"check the status\") verb status() -> Result[Int, Failure] { return Ok(0); } verb main() -> Result[Int, Failure] { status()?; return Ok(0); }",
+    )
+    .expect("the try operator should explicitly handle a must-use result");
+}
+
+#[test]
 fn effects_are_declared_by_callers_and_rejected_when_omitted() {
     let undeclared = expect_semantic_error(
         "meta effect(\"filesystem\") verb load() -> Int { return 0; } verb main() -> Int { load(); return 0; }",

@@ -70,6 +70,7 @@ pub(crate) struct Analyzer {
     pub(crate) case_result_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) type_registry: super::super::types::TypeRegistry,
     pub(crate) discarded_expression: bool,
+    pub(crate) expression_value_consumed: bool,
     pub(crate) current_effects: Vec<Effect>,
 }
 

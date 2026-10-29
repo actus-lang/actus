@@ -24,3 +24,16 @@ fn must_use_requires_a_return_value() {
     assert_eq!(parse_diagnostic(&error).code(), "E0018");
     assert!(matches!(error.kind, ParseErrorKind::MustUseRequiresReturn));
 }
+
+#[test]
+fn parses_must_use_metadata_on_role_methods() {
+    let program = parse_source(
+        "role Writer { meta must_use(\"inspect the write result\") verb write(abs self: Int) -> Int; }",
+    );
+    let TopLevelDecl::Role(role) = &program.declarations[0] else { panic!("expected role") };
+    assert!(
+        role.methods[0]
+            .metadata
+            .contains(&MetaAttribute::MustUse("inspect the write result".to_owned()))
+    );
+}

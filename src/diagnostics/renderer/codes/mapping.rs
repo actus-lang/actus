@@ -163,6 +163,7 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::EscapingLoan { .. } => "E1082",
         SemanticErrorKind::MustUseIgnored { .. } => "E1120",
         SemanticErrorKind::UndeclaredEffect { .. } => "E1121",
+        SemanticErrorKind::RoleMethodMustUseMismatch { .. } => "E1123",
         _ => return None,
     })
 }

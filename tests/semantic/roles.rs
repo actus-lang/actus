@@ -38,6 +38,30 @@ fn requires_role_and_performance_effect_contracts_to_match() {
 }
 
 #[test]
+fn requires_role_and_performance_must_use_contracts_to_match() {
+    let valid = "struct File { value: Int, } role Writer { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int; } perform Writer for File { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int { return 1; } } verb main() -> Int { erg file = File { value: 1, }; abs view = ref file; return view.write(); }";
+    analyze_source(valid).expect("matching role and implementation must-use contracts should pass");
+
+    let missing = "struct File { value: Int, } role Writer { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } }";
+    let error =
+        analyze_source(missing).expect_err("missing implementation must-use contract must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodMustUseMismatch { ref role, ref method, .. }
+            if role == "Writer" && method == "write"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1123");
+
+    let extra = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int { return 1; } }";
+    let error = analyze_source(extra).expect_err("implementation-only must-use contract must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodMustUseMismatch { ref role, ref method, .. }
+            if role == "Writer" && method == "write"
+    ));
+}
+
+#[test]
 fn accepts_zero_sized_structs_and_marker_roles() {
     analyze_source(
         "struct Marker { } role MarkerRole { } perform MarkerRole for Marker { } verb main() -> Int { return 0; }",
