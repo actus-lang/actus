@@ -294,6 +294,7 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
         crate::ast::MetaAttribute::Effect(effect) => {
             format!("effect(\"{}\")", effect.name())
         }
+        crate::ast::MetaAttribute::Deterministic => "deterministic".to_owned(),
     }
 }
 

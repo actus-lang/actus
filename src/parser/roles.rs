@@ -104,7 +104,10 @@ impl Parser {
         metadata: &[MetaAttribute],
     ) -> Result<(), ParseError> {
         if metadata.iter().all(|attribute| {
-            matches!(attribute, MetaAttribute::Effect(_) | MetaAttribute::MustUse(_))
+            matches!(
+                attribute,
+                MetaAttribute::Effect(_) | MetaAttribute::MustUse(_) | MetaAttribute::Deterministic
+            )
         }) {
             return Ok(());
         }

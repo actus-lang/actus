@@ -15,10 +15,11 @@ This directory documents the currently supported attributes:
   to source-size conformance limits.
 - [`meta must_use(...)`](must-use.md): requires an explicit use of a marked
   verb result.
+- [`meta deterministic`](deterministic.md): rejects filesystem, network, and
+  entropy effects from deterministic verbs.
 
-The next proposed extension is documented in [`meta effect(...)`](effect.md).
-Its first compiler slice exists, but the contract is not stable until ADR-0091
-is accepted and the remaining compiler and tooling fixtures are complete.
+[`meta effect(...)`](effect.md) declares compiler-checked execution effects
+such as blocking, filesystem, network, allocation, and entropy.
 
 ## General rules
 

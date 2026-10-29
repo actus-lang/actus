@@ -1,4 +1,5 @@
 mod declaration;
+mod deterministic;
 mod dispatch;
 mod effect;
 mod fault;

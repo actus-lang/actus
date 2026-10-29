@@ -73,6 +73,9 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::UndeclaredEffect { callee, effect } => {
             format!("call to `{callee}` requires undeclared effect `{}`", effect.name())
         }
+        SemanticErrorKind::NondeterministicCall { callee, effect } => {
+            format!("deterministic code cannot call `{callee}` with effect `{}`", effect.name())
+        }
         SemanticErrorKind::RoleMethodMustUseMismatch { role, method, .. } => {
             format!("role method `{role}::{method}` must preserve its must-use contract")
         }

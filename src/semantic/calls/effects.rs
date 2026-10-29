@@ -12,6 +12,15 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         for effect in &signature.effects {
+            if self.current_deterministic && effect.is_nondeterministic() {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::NondeterministicCall {
+                        callee: callee.to_owned(),
+                        effect: *effect,
+                    },
+                    span,
+                });
+            }
             if !self.current_effects.contains(effect) {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::UndeclaredEffect {

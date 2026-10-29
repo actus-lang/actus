@@ -61,6 +61,10 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
                 _ => None,
             })
             .collect::<Vec<Effect>>(),
+        deterministic: method
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Deterministic)),
     }
 }
 

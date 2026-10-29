@@ -37,3 +37,14 @@ fn parses_must_use_metadata_on_role_methods() {
             .contains(&MetaAttribute::MustUse("inspect the write result".to_owned()))
     );
 }
+
+#[test]
+fn parses_deterministic_metadata_and_rejects_duplicates() {
+    let program = parse_source("meta deterministic verb stable() -> Int { return 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(verb.metadata.contains(&MetaAttribute::Deterministic));
+
+    let error =
+        parse_error("meta deterministic meta deterministic verb stable() -> Int { return 0; }");
+    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
+}

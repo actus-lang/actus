@@ -72,6 +72,7 @@ pub(crate) struct Analyzer {
     pub(crate) discarded_expression: bool,
     pub(crate) expression_value_consumed: bool,
     pub(crate) current_effects: Vec<Effect>,
+    pub(crate) current_deterministic: bool,
 }
 
 impl Analyzer {

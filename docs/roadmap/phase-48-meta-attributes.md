@@ -13,6 +13,8 @@ phase prematurely.
 - `meta fault(...)`
 - `meta limitless(...)`
 - `meta must_use(...)`
+- `meta effect(...)`
+- `meta deterministic`
 - parser, semantic validation, formatter, LSP, test-runner, and diagnostics
   boundaries shared by those attributes
 
@@ -35,6 +37,9 @@ phase prematurely.
       limitations before adding new metadata ideas.
 - [x] Implement `meta must_use(...)` with its focused ADR, guide, diagnostics,
       formatter/LSP coverage, imported-signature propagation, and semantic
+      fixtures.
+- [x] Implement `meta deterministic` with an explicit forbidden-effect
+      contract, stable diagnostics, formatter/LSP coverage, and semantic
       fixtures.
 
 ## Planned metadata extension backlog

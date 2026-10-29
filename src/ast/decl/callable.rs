@@ -69,6 +69,7 @@ pub enum MetaAttribute {
     Limitless(LimitlessScope),
     MustUse(String),
     Effect(Effect),
+    Deterministic,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -103,6 +104,10 @@ impl Effect {
             Self::Allocation => "allocation",
             Self::Entropy => "entropy",
         }
+    }
+
+    pub const fn is_nondeterministic(self) -> bool {
+        matches!(self, Self::Filesystem | Self::Network | Self::Entropy)
     }
 }
 

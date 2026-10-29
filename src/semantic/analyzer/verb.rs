@@ -27,6 +27,10 @@ impl Analyzer {
                 _ => None,
             })
             .collect();
+        self.current_deterministic = verb
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Deterministic));
         self.current_return_access =
             verb.return_type.as_ref().map(|return_type| return_type.access);
         self.current_return_type = verb

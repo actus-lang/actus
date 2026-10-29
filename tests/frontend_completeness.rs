@@ -102,6 +102,27 @@ fn effects_are_declared_by_callers_and_rejected_when_omitted() {
 }
 
 #[test]
+fn deterministic_verbs_reject_nondeterministic_effects() {
+    for effect in ["filesystem", "network", "entropy"] {
+        let source = format!(
+            "meta effect(\"{effect}\") verb source() -> Int {{ return 0; }} meta deterministic verb stable() -> Int {{ source(); return 0; }}"
+        );
+        let error = expect_semantic_error(&source);
+        assert!(matches!(
+            error.kind,
+            SemanticErrorKind::NondeterministicCall { ref callee, effect: found }
+                if callee == "source" && found.name() == effect
+        ));
+        assert_eq!(semantic_diagnostic(&error).code(), "E1124");
+    }
+
+    analyze_source(
+        "meta effect(\"allocation\") verb allocate_resource() -> Int { return 0; } meta effect(\"allocation\") meta deterministic verb stable() -> Int { allocate_resource(); return 0; }",
+    )
+    .expect("allocation alone does not make a result nondeterministic");
+}
+
+#[test]
 fn effects_propagate_through_transitive_and_external_calls() {
     let transitive = expect_semantic_error(
         "meta effect(\"filesystem\") verb leaf() -> Int { return 0; } meta effect(\"filesystem\") verb middle() -> Int { leaf(); return 0; } verb root() -> Int { middle(); return 0; }",

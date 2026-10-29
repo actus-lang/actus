@@ -86,6 +86,10 @@ pub enum SemanticErrorKind {
         callee: String,
         effect: crate::ast::Effect,
     },
+    NondeterministicCall {
+        callee: String,
+        effect: crate::ast::Effect,
+    },
     InvalidOwnerInitializer {
         name: String,
     },

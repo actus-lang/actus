@@ -13,6 +13,7 @@ impl Parser {
             "limitless" => self.parse_limitless_metadata(),
             "must_use" => self.parse_must_use_metadata(),
             "effect" => self.parse_effect_metadata(),
+            "deterministic" => self.parse_deterministic_metadata(),
             name => Err(ParseError {
                 code: ParseErrorCode::UnknownMetadata,
                 kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },
