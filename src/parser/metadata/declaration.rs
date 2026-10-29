@@ -1,0 +1,89 @@
+use super::super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
+use crate::ast::{MetaAttribute, TopLevelDecl};
+use crate::lexer::{SourceSpan, TokenKind};
+
+impl Parser {
+    pub(in crate::parser) fn parse_metadata_declaration(
+        &mut self,
+        metadata: Vec<MetaAttribute>,
+        doc: Option<String>,
+    ) -> Result<TopLevelDecl, ParseError> {
+        self.validate_metadata_target(&metadata)?;
+        if self.check_simple(&TokenKind::Verb) {
+            let verb = self.parse_verb_with_metadata(false, metadata.clone(), doc)?;
+            ensure_must_use_return(&metadata, verb.return_type.is_some(), verb.span)?;
+            return Ok(TopLevelDecl::Verb(verb));
+        }
+        if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
+            let verb = self.parse_external_verb(
+                self.check_simple(&TokenKind::Unsafe),
+                false,
+                metadata,
+                doc,
+            )?;
+            ensure_must_use_return(&verb.metadata, verb.return_type.is_some(), verb.span)?;
+            return Ok(TopLevelDecl::ExternalVerb(verb));
+        }
+        Err(ParseError {
+            code: ParseErrorCode::MetadataTargetNotAllowed,
+            kind: ParseErrorKind::MetadataTargetNotAllowed,
+            span: self.metadata_span(),
+        })
+    }
+
+    fn validate_metadata_target(&self, metadata: &[MetaAttribute]) -> Result<(), ParseError> {
+        let span = self.metadata_span();
+        if has_fault(metadata) && !has_test(metadata) {
+            return Err(ParseError {
+                code: ParseErrorCode::FaultRequiresTest,
+                kind: ParseErrorKind::FaultRequiresTest,
+                span,
+            });
+        }
+        if has_test_or_fault(metadata)
+            && (self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::TestMetadataRequiresVerb,
+                kind: ParseErrorKind::TestMetadataRequiresVerb,
+                span,
+            });
+        }
+        Ok(())
+    }
+
+    fn metadata_span(&self) -> SourceSpan {
+        self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0))
+    }
+}
+
+fn has_test(metadata: &[MetaAttribute]) -> bool {
+    metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Test))
+}
+
+fn has_fault(metadata: &[MetaAttribute]) -> bool {
+    metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Fault(_)))
+}
+
+fn has_test_or_fault(metadata: &[MetaAttribute]) -> bool {
+    metadata
+        .iter()
+        .any(|attribute| matches!(attribute, MetaAttribute::Test | MetaAttribute::Fault(_)))
+}
+
+fn ensure_must_use_return(
+    metadata: &[MetaAttribute],
+    has_return: bool,
+    span: SourceSpan,
+) -> Result<(), ParseError> {
+    if metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::MustUse(_)))
+        && !has_return
+    {
+        return Err(ParseError {
+            code: ParseErrorCode::MustUseRequiresReturn,
+            kind: ParseErrorKind::MustUseRequiresReturn,
+            span,
+        });
+    }
+    Ok(())
+}

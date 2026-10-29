@@ -1,6 +1,6 @@
 # ADR-0089: Meta-attribute contract and extension model
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-28
 - Scope: Actus metadata syntax, semantic validation, tooling, test runner,
   target selection, and source conformance
@@ -84,6 +84,12 @@ The extension program does not change Actus's central contract. In particular,
 an attribute must not make ownership implicit, bypass cleanup, introduce
 unbounded work, conceal native effects, or turn a backend optimization hint
 into a semantic guarantee.
+
+The compatibility review for the current registry was completed after adding
+`meta must_use`: existing metadata behavior remains compatible, the new
+attribute has a focused contract in ADR-0090, and parser, semantic, formatter,
+LSP, diagnostic, and imported-signature fixtures pass without changing the
+ownership or ABI rules of existing programs.
 
 ## Invariants
 

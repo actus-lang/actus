@@ -22,7 +22,7 @@ phase prematurely.
       consumer.
 - [x] Link each attribute to a focused handbook document under
       `docs/guide/meta-attributes/`.
-- [ ] Accept ADR-0089 after implementation and compatibility review.
+- [x] Accept ADR-0089 after implementation and compatibility review.
 - [x] Add the first parser negative fixture for test-only fault metadata.
 - [x] Add the remaining parser and semantic negative fixtures for malformed,
       duplicate, and misplaced metadata.
@@ -92,7 +92,7 @@ last. The phase remains open for adding and refining metadata proposals.
 
 ## Validation evidence
 
-Recorded on 2026-10-29 at commit `a30da53`.
+Recorded on 2026-10-29 at commit `7b5cd1f8`.
 
 - Actus package: `0.1.0`.
 - Rust toolchain: `rustc 1.98.0 (88d9e12ae 2026-08-18)` and
@@ -110,12 +110,11 @@ Recorded on 2026-10-29 at commit `a30da53`.
   production code-generation parity, and the complete supported fault fixture
   registry.
 
-Known limitations remain explicit: this phase validates the four existing
-metadata attributes only. New attributes still require a separately reviewed
-design, implementation, fixtures, and documentation. ADR-0089 remains
-`Proposed` until that compatibility review is completed. The local platform
-matrix uses target-contract fixtures; native behavior on each release target
-is additionally established by the corresponding CI jobs.
+Known limitations remain explicit: this phase validates the current metadata
+registry only. New attributes still require a separately reviewed design,
+implementation, fixtures, and documentation. The local platform matrix uses
+target-contract fixtures; native behavior on each release target is
+additionally established by the corresponding CI jobs.
 
 ## Completion standard
 

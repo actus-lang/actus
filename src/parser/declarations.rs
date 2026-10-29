@@ -153,78 +153,6 @@ impl Parser {
         Ok(())
     }
 
-    pub(super) fn parse_metadata_declaration(
-        &mut self,
-        metadata: Vec<crate::ast::MetaAttribute>,
-        doc: Option<String>,
-    ) -> Result<TopLevelDecl, ParseError> {
-        if metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Fault(_)))
-            && !metadata
-                .iter()
-                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Test))
-        {
-            return Err(ParseError {
-                code: ParseErrorCode::FaultRequiresTest,
-                kind: ParseErrorKind::FaultRequiresTest,
-                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
-            });
-        }
-        if metadata.iter().any(|attribute| {
-            matches!(
-                attribute,
-                crate::ast::MetaAttribute::Test | crate::ast::MetaAttribute::Fault(_)
-            )
-        }) && (self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern))
-        {
-            return Err(ParseError {
-                code: ParseErrorCode::TestMetadataRequiresVerb,
-                kind: ParseErrorKind::TestMetadataRequiresVerb,
-                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
-            });
-        }
-        if self.check_simple(&TokenKind::Verb) {
-            let verb = self.parse_verb_with_metadata(false, metadata.clone(), doc)?;
-            if metadata
-                .iter()
-                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::MustUse(_)))
-                && verb.return_type.is_none()
-            {
-                return Err(ParseError {
-                    code: ParseErrorCode::MustUseRequiresReturn,
-                    kind: ParseErrorKind::MustUseRequiresReturn,
-                    span: verb.span,
-                });
-            }
-            return Ok(TopLevelDecl::Verb(verb));
-        }
-        if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
-            let verb = self.parse_external_verb(
-                self.check_simple(&TokenKind::Unsafe),
-                false,
-                metadata,
-                doc,
-            )?;
-            if verb
-                .metadata
-                .iter()
-                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::MustUse(_)))
-                && verb.return_type.is_none()
-            {
-                return Err(ParseError {
-                    code: ParseErrorCode::MustUseRequiresReturn,
-                    kind: ParseErrorKind::MustUseRequiresReturn,
-                    span: verb.span,
-                });
-            }
-            return Ok(TopLevelDecl::ExternalVerb(verb));
-        }
-        Err(ParseError {
-            code: ParseErrorCode::MetadataTargetNotAllowed,
-            kind: ParseErrorKind::MetadataTargetNotAllowed,
-            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
-        })
-    }
-
     fn parse_external_declaration(
         &mut self,
         unsafe_boundary: bool,
@@ -430,7 +358,7 @@ impl Parser {
         })
     }
 
-    fn parse_external_verb(
+    pub(super) fn parse_external_verb(
         &mut self,
         unsafe_boundary: bool,
         is_open: bool,

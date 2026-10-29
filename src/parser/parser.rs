@@ -264,7 +264,7 @@ impl Parser {
         }
     }
 
-    fn parse_verb_with_metadata(
+    pub(super) fn parse_verb_with_metadata(
         &mut self,
         is_open: bool,
         metadata: Vec<MetaAttribute>,
