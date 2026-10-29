@@ -65,6 +65,13 @@ these effect signatures without changing their meaning.
 - Effect checking must not infer hidden allocation or filesystem behavior from
   names; only registered signatures and native contracts provide evidence.
 
+The standard logical-region boundary follows the same rule. Opening a region
+or remapping its resident window has an explicit `allocation` contract because
+the hosted runtime creates replacement resident storage. Checked reads,
+writes, publication, cancellation, lifecycle close, metadata inspection, and
+pinning remain effect-free because they operate on already-owned bounded
+storage and do not perform external I/O or allocate replacement storage.
+
 ## Required implementation evidence
 
 Before acceptance, the implementation must include positive and negative

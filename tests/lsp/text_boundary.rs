@@ -16,6 +16,7 @@ fn lsp_resolves_the_public_utf8_boundary_from_the_standard_runtime() {
     .expect("write manifest");
     let source = concat!(
         "import { open std::string };\n",
+        "meta effect(\"allocation\")\n",
         "verb main() -> Int {\n",
         "erg storage = Buffer[0];\n",
         "erg result = utf8_from_buffer(storage: dat storage);\n",
@@ -102,6 +103,7 @@ fn lsp_exposes_the_public_region_surface_to_editor_clients() {
     .expect("write manifest");
     let source = concat!(
         "import { open std::region };\n",
+        "meta effect(\"allocation\")\n",
         "verb main() -> Int {\n",
         "erg backing: Buffer = Buffer[4];\n",
         "erg length: u64 = 1u64;\n",

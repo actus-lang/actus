@@ -84,6 +84,7 @@ fn build_and_run_with_backend(
 fn aggregate_region_lifecycle_builds_and_runs_through_llvm_cli() {
     let root = std::env::temp_dir().join(format!("actus-llvm-region-{}", std::process::id()));
     let source = r#"import { open std::region };
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
     erg logical_length: u64 = 1u64;
@@ -115,6 +116,7 @@ verb main() -> Int {
 #[test]
 fn aggregate_region_lifecycle_has_matching_hosted_backend_results() {
     let source = r#"import { open std::region };
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
     erg logical_length: u64 = 1u64;
@@ -195,6 +197,7 @@ verb verify_layout() -> Int {
     return 0;
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg layout_status: Int = verify_layout();
     if layout_status != 0 { return layout_status; }
@@ -225,6 +228,7 @@ fn aggregate_region_object_emission_exposes_runtime_bridges() {
         &root,
         r#"import { open std::region };
 
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
     erg logical_length: u64 = 1u64;
@@ -265,6 +269,7 @@ pack Frame {
     }
 }
 
+meta effect("allocation")
 verb open_and_close(dat backing: Buffer) -> Int {
     erg logical_length: u64 = 1u64;
     erg window_start: u64 = 0u64;
@@ -287,6 +292,7 @@ verb open_and_close(dat backing: Buffer) -> Int {
     };
 }
 
+meta effect("allocation")
 verb main() -> Int {
     if size_of[u32]() != 4u64 || align_of[u32]() != 4u64 { return 1; }
     if size_of[Array[u8, 16]]() != 16u64 || align_of[Array[u8, 16]]() != 1u64 { return 2; }
@@ -336,6 +342,7 @@ verb copy_bulk(ins region: Region[u8], abs source: Buffer) -> Int {
     };
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[131072];
     erg logical_length: u64 = 131072u64;
@@ -384,6 +391,7 @@ verb reject_write(ins region: Region[Array[u8, 16]]) -> Int {
     };
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
     erg logical_length: u64 = 1u64;
@@ -425,6 +433,7 @@ verb reject_read(ins region: Region[Array[u8, 16]]) -> Int {
     };
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
     erg logical_length: u64 = 1u64;
@@ -474,6 +483,7 @@ verb reject_bulk(ins region: Region[u8]) -> Int {
     };
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[131073];
     erg logical_length: u64 = 131073u64;

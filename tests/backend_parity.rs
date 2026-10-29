@@ -8,7 +8,7 @@ use std::process::Command;
 use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol, RelocationTarget};
 
 const BACKENDS: [&str; 2] = ["cranelift", "llvm"];
-const SOURCE: &str = "import { open std::region }; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
+const SOURCE: &str = "import { open std::region }; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } meta effect(\"allocation\") verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
 
 fn fixture_root(name: &str, backend: &str) -> PathBuf {
     std::env::temp_dir()

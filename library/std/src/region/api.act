@@ -7,6 +7,7 @@ exposes only checked operations. The operations do not perform filesystem I/O
 or allocate on the read, write, publish, cancel, or close paths.
 """
 """Private bridge that creates a region and consumes the supplied backing buffer."""
+meta effect("allocation")
 unsafe extern "C" verb actus_region_open[T](
     dat backing: Buffer,
     erg element_stride: u64,
@@ -56,6 +57,7 @@ unsafe extern "C" verb actus_region_cancel[T](ins region: Region[T]) -> Result[I
 unsafe extern "C" verb actus_region_close[T](ins region: Region[T]) -> Result[Int, RegionError];
 
 """Private bridge that replaces a clean resident window without external I/O."""
+meta effect("allocation")
 unsafe extern "C" verb actus_region_remap[T](
     ins region: Region[T],
     dat backing: Buffer,
@@ -89,9 +91,10 @@ Open a bounded logical region backed by caller-provided storage.
 `backing` is transferred with `dat` and is retained by the runtime only after
 validation succeeds. The logical length may exceed resident storage, while
 `window_start` and `window_count` identify the resident window. `T` must be a
-fully sized primitive, array, pack, or struct type. No filesystem operation is
-performed by this call.
+fully sized primitive, array, pack, or struct type. The runtime allocates the
+bounded resident and published copies; no filesystem operation is performed.
 """
+meta effect("allocation")
 open verb region_open[T](
     dat backing: Buffer,
     erg logical_length: u64,
@@ -236,9 +239,11 @@ Replace the resident window using caller-owned memory.
 The backing buffer is consumed by the operation. The requested window must be
 valid, the buffer must contain exactly `window_count * size_of[T]()` bytes, and
 the current window must be clean. No filesystem, device, provider, or implicit
-page operation is performed. A successful remap advances the generation;
+page operation is performed. The runtime allocates replacement resident and
+published copies before committing the new window. A successful remap advances the generation;
 failure preserves the current descriptor and resident bytes.
 """
+meta effect("allocation")
 open verb region_remap[T](
     ins region: Region[T],
     dat backing: Buffer,

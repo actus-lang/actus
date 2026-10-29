@@ -86,7 +86,7 @@ open verb inspect(erg value: u8) -> Int {
 
 #[test]
 fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
-    let source = "import { open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
+    let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
     let (root, input, output) = project("generic-region-object", source);
     fs::write(
         root.join("Actus.toml"),
@@ -111,7 +111,7 @@ fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
 
 #[test]
 fn generic_region_lowers_an_imported_packed_element_type() {
-    let source = "import { open feature, open std::region }; verb main() -> Int { erg backing: Buffer = Buffer[64]; erg logical_length: u64 = 1048576u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[64]; erg index: u64 = 0u64; erg read_result = region_read(region: abs region, index: erg index, destination: ins destination); region_close(region: ins region); return case dat read_result { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
+    let source = "import { open feature, open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[64]; erg logical_length: u64 = 1048576u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[64]; erg index: u64 = 0u64; erg read_result = region_read(region: abs region, index: erg index, destination: ins destination); region_close(region: ins region); return case dat read_result { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
     let (root, input, output) = project("generic-region-imported-pack", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
     fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
@@ -165,6 +165,7 @@ verb forward_packed_region(dat region: Region[Minicolumn]) -> Region[Minicolumn]
     return region;
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[64];
     erg logical_length: u64 = 1048576u64;
@@ -248,6 +249,7 @@ verb forward_region[T](dat region: Region[T]) -> Region[T] {
     return region;
 }
 
+meta effect("allocation")
 verb open_forward[T](dat backing: Buffer) -> Result[Region[T], RegionError] {
     erg logical_length: u64 = 1u64;
     erg window_start: u64 = 0u64;
@@ -260,6 +262,7 @@ verb open_forward[T](dat backing: Buffer) -> Result[Region[T], RegionError] {
     );
 }
 
+meta effect("allocation")
 verb check_array() -> Int {
     erg backing: Buffer = Buffer[4];
     erg opened = open_forward[Array[u16, 2]](backing: dat backing);
@@ -283,6 +286,7 @@ verb check_array() -> Int {
     };
 }
 
+meta effect("allocation")
 verb check_struct() -> Int {
     erg backing: Buffer = Buffer[8];
     erg opened = open_forward[Pair](backing: dat backing);
@@ -306,6 +310,7 @@ verb check_struct() -> Int {
     };
 }
 
+meta effect("allocation")
 verb check_byte_array() -> Int {
     erg backing: Buffer = Buffer[16];
     erg opened = open_forward[Array[u8, 16]](backing: dat backing);
@@ -329,6 +334,7 @@ verb check_byte_array() -> Int {
     };
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg array_status: Int = check_array();
     if array_status != 0 { return array_status; }
