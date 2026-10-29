@@ -158,6 +158,17 @@ impl Parser {
         metadata: Vec<crate::ast::MetaAttribute>,
         doc: Option<String>,
     ) -> Result<TopLevelDecl, ParseError> {
+        if metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Fault(_)))
+            && !metadata
+                .iter()
+                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Test))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::FaultRequiresTest,
+                kind: ParseErrorKind::FaultRequiresTest,
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
         if self.check_simple(&TokenKind::Verb) {
             return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
         }

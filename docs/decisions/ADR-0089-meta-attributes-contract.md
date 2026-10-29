@@ -58,6 +58,7 @@ No attribute is accepted merely because the parser can store its name.
 
 - Metadata has no implicit runtime representation.
 - Test-only metadata cannot enter normal production behavior.
+- `meta fault(...)` must be paired with `meta test` on the same declaration.
 - Target metadata cannot hide an unsupported target contract.
 - Fault injection is disabled outside its explicit test configuration.
 - Limit exceptions never disable language or runtime safety validation.

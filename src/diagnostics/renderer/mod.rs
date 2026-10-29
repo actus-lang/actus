@@ -153,6 +153,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::DuplicateMetadata { name } => {
             format!("duplicate metadata attribute `{name}`")
         }
+        ParseErrorKind::FaultRequiresTest => {
+            "fault metadata requires `meta test` on the same declaration".to_owned()
+        }
         ParseErrorKind::MalformedVerbContract { reason } => {
             format!("malformed verb contract: {reason}")
         }

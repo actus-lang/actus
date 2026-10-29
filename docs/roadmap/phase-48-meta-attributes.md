@@ -19,8 +19,9 @@ new attributes are proposed. It does not introduce a new attribute by itself.
 - [ ] Link each attribute to a focused handbook document under
       `docs/guide/meta-attributes/`.
 - [ ] Accept ADR-0089 after implementation and compatibility review.
-- [ ] Add parser and semantic negative fixtures for malformed, duplicate, and
-      misplaced metadata.
+- [x] Add the first parser negative fixture for test-only fault metadata.
+- [ ] Add the remaining parser and semantic negative fixtures for malformed,
+      duplicate, and misplaced metadata.
 - [ ] Add formatter and LSP fixtures that preserve metadata boundaries.
 - [ ] Verify test-only metadata is unavailable in ordinary production paths.
 - [ ] Verify target metadata on Unix, POSIX, and Windows target contracts.

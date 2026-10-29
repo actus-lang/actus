@@ -135,6 +135,16 @@ fn rejects_multiple_publication_faults_on_one_test() {
 }
 
 #[test]
+fn rejects_fault_metadata_without_a_test_declaration() {
+    let (tokens, errors) =
+        scan("meta fault(\"flush_failure\") verb publication_boundary() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let error = parse(tokens).expect_err("fault metadata must be test-only");
+    assert_eq!(error.code, ParseErrorCode::FaultRequiresTest);
+    assert!(matches!(error.kind, ParseErrorKind::FaultRequiresTest));
+}
+
+#[test]
 fn parses_limitless_metadata_at_verb_and_file_scope() {
     let program = parse_source(
         "meta limitless(\"file\")\nmeta limitless(\"verb\") verb large() { return 0; }",
@@ -226,6 +236,19 @@ fn rejects_conflicting_target_metadata() {
         ParseErrorKind::ConflictingTargetPlatforms { first, second }
             if first == "unix" && second == "windows"
     ));
+}
+
+#[test]
+fn rejects_duplicate_test_and_target_metadata() {
+    for source in [
+        "meta test meta test verb main() { return 0; }",
+        "meta target(\"unix\") meta target(\"unix\") verb main() { return 0; }",
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        let error = parse(tokens).expect_err("duplicate metadata should be rejected");
+        assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
+    }
 }
 
 #[test]

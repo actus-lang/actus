@@ -32,6 +32,7 @@ pub enum ParseErrorKind {
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope { name: String },
     DuplicateMetadata { name: String },
+    FaultRequiresTest,
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
 }
@@ -49,6 +50,7 @@ pub enum ParseErrorCode {
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope,
     DuplicateMetadata,
+    FaultRequiresTest,
     MalformedVerbContract,
     OpenImportRequiresBlock,
 }
@@ -154,6 +156,26 @@ impl Parser {
     }
 
     fn reject_duplicate_metadata(&self, metadata: &[MetaAttribute]) -> Result<(), ParseError> {
+        if metadata.iter().filter(|attribute| matches!(attribute, MetaAttribute::Test)).count() > 1
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata { name: "test".to_owned() },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
+        if let Some((index, target)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
+            if let MetaAttribute::Target(target) = attribute { Some((index, target)) } else { None }
+        }) && metadata[index + 1..]
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Target(other) if other == target))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata { name: format!("target(\"{target}\")") },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
         let Some((index, fault)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
             if let MetaAttribute::Fault(fault) = attribute { Some((index, fault)) } else { None }
         }) else {
