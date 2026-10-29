@@ -85,6 +85,20 @@ pub enum TestFault {
 }
 
 impl TestFault {
+    pub const ALL: [Self; 11] = [
+        Self::StagingOpenFailure,
+        Self::WriteFailure,
+        Self::ShortWrite,
+        Self::FlushFailure,
+        Self::CloseFailure,
+        Self::CleanupFailure,
+        Self::RenameFailure,
+        Self::InterruptedBeforeRename,
+        Self::ParentOpenFailure,
+        Self::ParentSyncFailure,
+        Self::InterruptedPublication,
+    ];
+
     pub const fn name(self) -> &'static str {
         match self {
             Self::StagingOpenFailure => "staging_open_failure",
