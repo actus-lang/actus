@@ -134,6 +134,12 @@ impl Formatter<'_> {
 
     pub(super) fn external_verb(&mut self, verb: &crate::ast::ExternalVerbDecl) {
         self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
+        for metadata in &verb.metadata {
+            self.line_indent();
+            self.output.push_str("meta ");
+            self.output.push_str(&meta_name(metadata));
+            self.output.push('\n');
+        }
         if verb.is_open {
             self.output.push_str("open ");
         }

@@ -19,6 +19,15 @@ fn formats_nested_blocks_and_calls() {
 }
 
 #[test]
+fn preserves_metadata_on_external_verbs_idempotently() {
+    let formatted =
+        format_source("meta target(\"unix\") extern \"C\" verb native_boundary() -> Int;");
+    assert!(formatted.contains("meta target(\"unix\")"));
+    assert!(formatted.contains("extern \"C\" verb native_boundary()"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_bounded_for_ranges_idempotently() {
     let formatted = format_source(
         "verb main(){for erg index:u32 in 0u32..4u32 { if index == 2u32 { break; } }}",
