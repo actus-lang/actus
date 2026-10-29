@@ -23,7 +23,7 @@ new attributes are proposed. It does not introduce a new attribute by itself.
 - [ ] Add the remaining parser and semantic negative fixtures for malformed,
       duplicate, and misplaced metadata.
 - [x] Add formatter and LSP fixtures that preserve metadata boundaries.
-- [ ] Verify test-only metadata is unavailable in ordinary production paths.
+- [x] Verify test-only metadata is unavailable in ordinary production paths.
 - [x] Verify target metadata on Unix, POSIX, and Windows target contracts.
 - [ ] Verify every supported fault with a strict fixture and no invented names.
 - [ ] Audit `limitless` exceptions against the source-limit policy.

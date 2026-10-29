@@ -55,6 +55,28 @@ fn native_backend_accepts_externalized_build_settings() {
 }
 
 #[test]
+fn test_only_metadata_does_not_change_native_artifact_emission() {
+    let sources = [
+        "verb main() -> Int { return 42; }",
+        "meta test meta fault(\"short_write\") verb main() -> Int { return 42; }",
+    ];
+    let mut objects = Vec::new();
+    for source in sources {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        let program = parse(tokens).expect("metadata fixture should parse");
+        let object = emit_program_object_with_configuration(
+            &program,
+            "main",
+            &NativeBackendConfiguration::default().with_no_float_ir_verification(),
+        )
+        .expect("test-only metadata should not affect native emission");
+        objects.push(object);
+    }
+    assert_eq!(objects[0], objects[1]);
+}
+
+#[test]
 fn test_zero_float_verification_inspects_generated_integer_ir() {
     let (tokens, errors) =
         scan("verb main() -> Int { erg value: u32 = 1u32; return value + 1u32; }");
