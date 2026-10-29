@@ -86,7 +86,7 @@ fn std_directory_entry_types_are_public_through_the_facade() {
 #[test]
 fn std_fs_walk_event_error_uses_canonical_io_error() {
     let source = parse_source(
-        "import { fs, path }; verb main() -> Int { erg raw: Buffer = Buffer[0]; append(raw, 46u8); append(raw, 0u8); erg path = path::path_from_ascii(storage: dat raw); return case dat path { Result.Err(_) => 1, Result.Ok(value) => { erg options = fs::WalkOptions { max_depth: 0u32, follow_symlinks: false, include_hidden: false, order: fs::DirectoryOrder.Lexicographic, error_policy: fs::WalkErrorPolicy.FailFast, }; erg opened = fs::walk(path: abs value, options: abs options); return case dat opened { Result.Err(_) => 2, Result.Ok(walker) => { erg event = fs::next_walk_event(walker: ins walker); fs::close_walker(walker: dat walker); drop(event); return 0; }, }; }, }; }",
+        "import { fs, path }; meta effect(\"filesystem\", \"blocking\") verb main() -> Int { erg raw: Buffer = Buffer[0]; append(raw, 46u8); append(raw, 0u8); erg path = path::path_from_ascii(storage: dat raw); return case dat path { Result.Err(_) => 1, Result.Ok(value) => { erg options = fs::WalkOptions { max_depth: 0u32, follow_symlinks: false, include_hidden: false, order: fs::DirectoryOrder.Lexicographic, error_policy: fs::WalkErrorPolicy.FailFast, }; erg opened = fs::walk(path: abs value, options: abs options); return case dat opened { Result.Err(_) => 2, Result.Ok(walker) => { erg event = fs::next_walk_event(walker: ins walker); fs::close_walker(walker: dat walker); drop(event); return 0; }, }; }, }; }",
     );
     analyze_with_imports(&source, &std_resolver())
         .expect("qualified std::fs walker errors should use one canonical IoError type");
@@ -104,7 +104,7 @@ fn std_fs_walk_event_type_preserves_nested_io_scope() {
 #[test]
 fn std_fs_next_walk_event_preserves_nested_io_scope() {
     let source = parse_source(
-        "import { fs, path }; verb inspect() -> Int { erg walker = fs::Walker { handle: 1, }; erg event = fs::next_walk_event(walker: ins walker); return case dat event { Result.Err(_) => 0, Result.Ok(value) => { drop(value); 1; }, }; } verb main() -> Int { return 0; }",
+        "import { fs, path }; meta effect(\"filesystem\", \"blocking\") verb inspect() -> Int { erg walker = fs::Walker { handle: 1, }; erg event = fs::next_walk_event(walker: ins walker); return case dat event { Result.Err(_) => 0, Result.Ok(value) => { drop(value); 1; }, }; } verb main() -> Int { return 0; }",
     );
     analyze_with_imports(&source, &std_resolver())
         .expect("next_walk_event should preserve nested std::io declarations");

@@ -293,6 +293,7 @@ rename error is returned unchanged. Cleanup failure is intentionally not
 substituted for the root failure, and this helper performs no retry, final
 destination mutation, or hidden allocation.
 """
+meta effect("filesystem", "blocking")
 open verb cleanup_atomic_failure(
     dat staging: path_module::Path,
     dat error: io::IoError

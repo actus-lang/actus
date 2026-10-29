@@ -157,6 +157,7 @@ never retained. `Ok(0)` means the host removed the file. Missing, protected,
 directory, and otherwise rejected targets are reported as `IoError.Failed` by
 this compatibility bridge; no partial deletion is reported as success.
 """
+meta effect("filesystem", "blocking")
 open verb remove_file(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_path(path: abs path);
     return fs_status(status: erg status);
@@ -177,6 +178,7 @@ symbolic links, requires every component to exist, and returns a newly owned
 canonical `Path`. The input is an immutable `abs` view and is never modified
 or retained. Partial output is dropped on failure.
 """
+meta effect("filesystem", "blocking")
 open verb canonicalize(abs path: path_module::Path) -> Result[path_module::Path, io::IoError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
@@ -198,6 +200,7 @@ both targets must exist. `Ok(true)` means equal identity; `Ok(false)` means
 different existing identities. Host lookup failure returns `IoError.Failed`
 and missing stable identity returns `IoError.Unsupported`. No path is retained.
 """
+meta effect("filesystem", "blocking")
 open verb same_file(abs left: path_module::Path, abs right: path_module::Path) -> Result[Bool, io::IoError] {
     erg status = actus_file_same_path(left: abs left, right: abs right);
     return case status {
@@ -216,6 +219,7 @@ on different filesystems return `Err(IoError.CrossDevice)`; missing,
 permission, and other provider failures remain typed errors. Neither view is
 consumed or retained.
 """
+meta effect("filesystem", "blocking")
 open verb rename(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_rename_path(from: abs from, to: abs to);
     return rename_status(status: erg status);
@@ -247,6 +251,7 @@ No path view is consumed or retained and no UTF-8 conversion is performed.
 Errors: provider failures return `Err(IoError.Failed)` after no partial count
 is reported. Side effects: the destination regular file is replaced.
 """
+meta effect("filesystem", "blocking")
 open verb copy_file(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
     erg options = copy_options_new();
     erg overwrite = copy_options_overwrite(options: dat options);
@@ -271,6 +276,7 @@ Errors: an existing destination with overwrite disabled returns
 return typed `IoError` without reporting a partial success. Side effects are
 limited to the selected destination file.
 """
+meta effect("filesystem", "blocking")
 open verb copy_file_with_options(
     dat options: CopyOptions,
     abs from: path_module::Path,
@@ -292,6 +298,7 @@ retained. `Ok(0)` means the directory was created. Existing, invalid,
 parent-missing, protected, and inaccessible targets return `IoError.Failed`;
 missing parents are never created implicitly.
 """
+meta effect("filesystem", "blocking")
 open verb create_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_create_dir_path(path: abs path);
     return fs_status(status: erg status);
@@ -307,6 +314,7 @@ chain exists; `Err(IoError.Failed)` reports a missing permission, file-shaped
 component, invalid path, or provider failure without deleting or replacing
 anything.
 """
+meta effect("filesystem", "blocking")
 open verb create_dir_all(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_create_dir_all_path(path: abs path);
     return fs_status(status: erg status);
@@ -319,6 +327,7 @@ the host removed the directory. Missing, non-empty, protected, file-shaped,
 and inaccessible targets return `IoError.Failed`; recursive deletion is never
 implicit.
 """
+meta effect("filesystem", "blocking")
 open verb remove_dir(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_dir_path(path: abs path);
     return fs_status(status: erg status);
@@ -332,6 +341,7 @@ operation. No caller path or handle is retained, and recursion happens only
 because this verb was called explicitly. `Ok(0)` means the tree was removed;
 `Err(IoError.Failed)` reports a rejected or failed provider operation.
 """
+meta effect("filesystem", "blocking")
 open verb remove_dir_all(abs path: path_module::Path) -> Result[Int, io::IoError] {
     erg status = actus_file_remove_dir_all_path(path: abs path);
     return fs_status(status: erg status);
