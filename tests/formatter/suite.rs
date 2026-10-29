@@ -38,8 +38,9 @@ fn preserves_must_use_metadata_idempotently() {
 
 #[test]
 fn preserves_effect_metadata_idempotently() {
-    let formatted = format_source("meta effect(\"filesystem\") verb load() -> Int { return 0; }");
-    assert!(formatted.contains("meta effect(\"filesystem\")"));
+    let formatted =
+        format_source("meta effect(\"filesystem\", \"blocking\") verb load() -> Int { return 0; }");
+    assert!(formatted.contains("meta effect(\"filesystem\", \"blocking\")"));
     assert_eq!(format_source(&formatted), formatted);
 }
 

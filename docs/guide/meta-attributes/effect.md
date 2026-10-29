@@ -5,12 +5,23 @@ properties of a verb visible at its declaration and call sites. The compiler
 parses the closed vocabulary, preserves it in verb signatures, and rejects
 callers that omit a callee's declared effect.
 
-The form is:
+The canonical form groups all effects declared by one verb:
+
+```actus
+meta effect("filesystem", "blocking")
+open verb load_manifest(abs path: Path) -> Result[Manifest, IoError] { ... }
+```
+
+The one-effect form remains valid for compatibility:
 
 ```actus
 meta effect("filesystem")
-open verb load_manifest(abs path: Path) -> Result[Manifest, IoError] { ... }
 ```
+
+The compiler stores each name as a separate effect in the verb signature.
+Grouping is syntax only: duplicate detection, effect propagation, and caller
+requirements remain unchanged. The formatter emits adjacent effect metadata in
+the grouped canonical form.
 
 The supported vocabulary is deliberately closed:
 
