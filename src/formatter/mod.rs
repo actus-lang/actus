@@ -287,7 +287,14 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
             };
             format!("limitless(\"{scope}\")")
         }
+        crate::ast::MetaAttribute::MustUse(reason) => {
+            format!("must_use(\"{}\")", escape_string(reason))
+        }
     }
+}
+
+fn escape_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
 }
 
 pub(super) fn role_name(role: &Role) -> &'static str {

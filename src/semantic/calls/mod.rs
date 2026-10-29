@@ -240,6 +240,8 @@ impl Analyzer {
         span: SourceSpan,
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
+        let discarded = self.discarded_expression;
+        self.discarded_expression = false;
         let parameter_indices = self.bind_arguments(callee, signature, arguments, span)?;
         let resolved_arguments =
             self.resolve_argument_roles(callee, arguments, &parameter_indices, signature, span);
@@ -261,6 +263,16 @@ impl Analyzer {
         if let Some(return_type) = &signature.return_type_name {
             self.inferred_expression_types
                 .insert(self.expression_cache_key(span), return_type.clone());
+        }
+        self.discarded_expression = discarded;
+        if discarded && let Some(reason) = &signature.must_use {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MustUseIgnored {
+                    callee: callee.to_owned(),
+                    reason: reason.clone(),
+                },
+                span,
+            });
         }
         Ok(())
     }

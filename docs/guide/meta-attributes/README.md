@@ -13,6 +13,8 @@ This directory documents the currently supported attributes:
   test fixture;
 - [`meta limitless(...)`](limitless.md): records a narrowly scoped exception
   to source-size conformance limits.
+- [`meta must_use(...)`](must-use.md): requires an explicit use of a marked
+  verb result.
 
 ## General rules
 

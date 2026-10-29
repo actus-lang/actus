@@ -1,6 +1,4 @@
-use crate::ast::{
-    DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, TestFault, VerbDecl,
-};
+use crate::ast::{DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, VerbDecl};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
 
@@ -12,6 +10,7 @@ mod declarations;
 mod enums;
 mod expressions;
 mod generics;
+mod metadata;
 mod packs;
 mod roles;
 mod serialization;
@@ -34,6 +33,7 @@ pub enum ParseErrorKind {
     DuplicateMetadata { name: String },
     FaultRequiresTest,
     TestMetadataRequiresVerb,
+    MustUseRequiresReturn,
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
 }
@@ -53,6 +53,7 @@ pub enum ParseErrorCode {
     DuplicateMetadata,
     FaultRequiresTest,
     TestMetadataRequiresVerb,
+    MustUseRequiresReturn,
     MalformedVerbContract,
     OpenImportRequiresBlock,
 }
@@ -163,6 +164,18 @@ impl Parser {
             return Err(ParseError {
                 code: ParseErrorCode::DuplicateMetadata,
                 kind: ParseErrorKind::DuplicateMetadata { name: "test".to_owned() },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
+        if metadata
+            .iter()
+            .filter(|attribute| matches!(attribute, MetaAttribute::MustUse(_)))
+            .count()
+            > 1
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata { name: "must_use".to_owned() },
                 span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
             });
         }
@@ -290,109 +303,6 @@ impl Parser {
         let ty = self.parse_type_name()?;
         let span = SourceSpan::new(start, ty.span.end);
         Ok(Some(crate::ast::ReturnType { access, ty, span }))
-    }
-
-    fn parse_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_keyword(TokenKind::Meta, "`meta`")?;
-        let attribute = self.take_identifier("metadata name")?;
-        match identifier_text(&attribute.kind).as_str() {
-            "test" => {
-                let _ = self.match_simple(TokenKind::Semicolon);
-                Ok(vec![MetaAttribute::Test])
-            }
-            "target" => self.parse_target_metadata(),
-            "fault" => self.parse_fault_metadata(),
-            "limitless" => self.parse_limitless_metadata(),
-            name => Err(ParseError {
-                code: ParseErrorCode::UnknownMetadata,
-                kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },
-                span: attribute.span,
-            }),
-        }
-    }
-
-    fn parse_fault_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_simple(TokenKind::LeftParen, "`(` after `fault`")?;
-        let fault_token = self.advance_required("fault name string")?;
-        let fault = match fault_token.kind {
-            TokenKind::StringLiteral(name) => TestFault::parse(&name).ok_or(ParseError {
-                code: ParseErrorCode::UnknownMetadata,
-                kind: ParseErrorKind::UnknownMetadata { name },
-                span: fault_token.span,
-            })?,
-            found => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "a publication fault name string".to_owned(),
-                        found,
-                    },
-                    span: fault_token.span,
-                });
-            }
-        };
-        self.expect_simple(TokenKind::RightParen, "`)` after fault name")?;
-        let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Fault(fault)])
-    }
-
-    fn parse_limitless_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_simple(TokenKind::LeftParen, "`(` after `limitless`")?;
-        let scope_token = self.advance_required("limitless scope string")?;
-        let scope = match scope_token.kind {
-            TokenKind::StringLiteral(scope) => match scope.as_str() {
-                "verb" => LimitlessScope::Verb,
-                "file" => LimitlessScope::File,
-                _ => {
-                    return Err(ParseError {
-                        code: ParseErrorCode::UnsupportedLimitlessScope,
-                        kind: ParseErrorKind::UnsupportedLimitlessScope { name: scope },
-                        span: scope_token.span,
-                    });
-                }
-            },
-            found => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "`verb` or `file` scope string".to_owned(),
-                        found,
-                    },
-                    span: scope_token.span,
-                });
-            }
-        };
-        self.expect_simple(TokenKind::RightParen, "`)` after limitless scope")?;
-        let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Limitless(scope)])
-    }
-
-    fn parse_target_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_simple(TokenKind::LeftParen, "`(` after `target`")?;
-        let selector_token = self.advance_required("target platform string")?;
-        let selector = match selector_token.kind {
-            TokenKind::StringLiteral(selector) => selector,
-            found => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "a target platform string".to_owned(),
-                        found,
-                    },
-                    span: selector_token.span,
-                });
-            }
-        };
-        if !matches!(selector.as_str(), "unix" | "posix" | "windows") {
-            return Err(ParseError {
-                code: ParseErrorCode::UnsupportedTargetPlatform,
-                kind: ParseErrorKind::UnsupportedTargetPlatform { name: selector },
-                span: selector_token.span,
-            });
-        }
-        self.expect_simple(TokenKind::RightParen, "`)` after target platform")?;
-        let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Target(selector)])
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {

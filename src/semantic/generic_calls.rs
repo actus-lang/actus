@@ -144,6 +144,7 @@ impl Analyzer {
             return_access: signature.return_access,
             generic_parameters: Vec::new(),
             external: signature.external,
+            must_use: signature.must_use.clone(),
         })
     }
 }

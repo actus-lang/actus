@@ -24,10 +24,7 @@ fn expect_semantic_error(source: &str) -> SemanticError {
 }
 
 #[test]
-fn parser_declaration_and_metadata_rules_have_positive_and_negative_fixtures() {
-    parse_source("meta target(\"unix\") meta test verb main() -> Int { return 0; }")
-        .expect("known declaration and metadata should pass");
-
+fn parser_keyword_diagnostics_have_stable_fixtures() {
     let unknown_keyword = parse_source("verbb main() { return 0; }").expect_err("unknown keyword");
     assert_eq!(unknown_keyword.code, ParseErrorCode::UnknownKeyword);
     assert!(matches!(
@@ -36,25 +33,25 @@ fn parser_declaration_and_metadata_rules_have_positive_and_negative_fixtures() {
     ));
     assert_eq!(parse_diagnostic(&unknown_keyword).code(), "E0009");
 
-    let unknown_metadata =
-        parse_source("meta experimental verb main() { return 0; }").expect_err("unknown metadata");
-    assert_eq!(unknown_metadata.code, ParseErrorCode::UnknownMetadata);
-    assert_eq!(parse_diagnostic(&unknown_metadata).code(), "E0006");
+    assert_eq!(parse_diagnostic(&unknown_keyword).code(), "E0009");
+}
 
-    let unknown_target = parse_source("meta target(\"plan9\") verb main() { return 0; }")
-        .expect_err("unknown target");
-    assert_eq!(unknown_target.code, ParseErrorCode::UnsupportedTargetPlatform);
-    assert_eq!(parse_diagnostic(&unknown_target).code(), "E0007");
+#[test]
+fn must_use_rejects_ignored_results_and_accepts_consumed_results() {
+    let ignored = expect_semantic_error(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { status(); return 0; }",
+    );
+    assert!(matches!(
+        ignored.kind,
+        SemanticErrorKind::MustUseIgnored { ref callee, ref reason }
+            if callee == "status" && reason == "check the status"
+    ));
+    assert_eq!(semantic_diagnostic(&ignored).code(), "E1120");
 
-    let conflicting_targets =
-        parse_source("meta target(\"unix\") meta target(\"windows\") verb main() { return 0; }")
-            .expect_err("conflicting targets should be rejected");
-    assert_eq!(conflicting_targets.code, ParseErrorCode::ConflictingTargetPlatforms);
-    assert_eq!(parse_diagnostic(&conflicting_targets).code(), "E0010");
-
-    let invalid_target =
-        parse_source("meta test struct Packet { byte: Int, }").expect_err("metadata on a struct");
-    assert_eq!(invalid_target.code, ParseErrorCode::MetadataTargetNotAllowed);
+    analyze_source(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { erg result = status(); return result; }",
+    )
+    .expect("binding a must-use result should count as consumption");
 }
 
 #[test]

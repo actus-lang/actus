@@ -28,6 +28,15 @@ fn preserves_metadata_on_external_verbs_idempotently() {
 }
 
 #[test]
+fn preserves_must_use_metadata_idempotently() {
+    let formatted = format_source(
+        "meta must_use(\"check the result before continuing\") verb status() -> Int { return 0; }",
+    );
+    assert!(formatted.contains("meta must_use(\"check the result before continuing\")"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_bounded_for_ranges_idempotently() {
     let formatted = format_source(
         "verb main(){for erg index:u32 in 0u32..4u32 { if index == 2u32 { break; } }}",

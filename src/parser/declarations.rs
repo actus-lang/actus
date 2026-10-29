@@ -183,15 +183,40 @@ impl Parser {
             });
         }
         if self.check_simple(&TokenKind::Verb) {
-            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
+            let verb = self.parse_verb_with_metadata(false, metadata.clone(), doc)?;
+            if metadata
+                .iter()
+                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::MustUse(_)))
+                && verb.return_type.is_none()
+            {
+                return Err(ParseError {
+                    code: ParseErrorCode::MustUseRequiresReturn,
+                    kind: ParseErrorKind::MustUseRequiresReturn,
+                    span: verb.span,
+                });
+            }
+            return Ok(TopLevelDecl::Verb(verb));
         }
         if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
+            let verb = self.parse_external_verb(
                 self.check_simple(&TokenKind::Unsafe),
                 false,
                 metadata,
                 doc,
-            )?));
+            )?;
+            if verb
+                .metadata
+                .iter()
+                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::MustUse(_)))
+                && verb.return_type.is_none()
+            {
+                return Err(ParseError {
+                    code: ParseErrorCode::MustUseRequiresReturn,
+                    kind: ParseErrorKind::MustUseRequiresReturn,
+                    span: verb.span,
+                });
+            }
+            return Ok(TopLevelDecl::ExternalVerb(verb));
         }
         Err(ParseError {
             code: ParseErrorCode::MetadataTargetNotAllowed,
@@ -481,5 +506,6 @@ fn target_selector(attribute: &crate::ast::MetaAttribute) -> Option<&str> {
         crate::ast::MetaAttribute::Test => None,
         crate::ast::MetaAttribute::Fault(_) => None,
         crate::ast::MetaAttribute::Limitless(_) => None,
+        crate::ast::MetaAttribute::MustUse(_) => None,
     }
 }

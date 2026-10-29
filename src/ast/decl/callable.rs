@@ -67,6 +67,7 @@ pub enum MetaAttribute {
     Target(String),
     Fault(TestFault),
     Limitless(LimitlessScope),
+    MustUse(String),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

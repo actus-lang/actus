@@ -69,6 +69,7 @@ pub(crate) struct Analyzer {
     pub(crate) inferred_expression_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) case_result_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) type_registry: super::super::types::TypeRegistry,
+    pub(crate) discarded_expression: bool,
 }
 
 impl Analyzer {

@@ -12,6 +12,7 @@ phase prematurely.
 - `meta target(...)`
 - `meta fault(...)`
 - `meta limitless(...)`
+- `meta must_use(...)`
 - parser, semantic validation, formatter, LSP, test-runner, and diagnostics
   boundaries shared by those attributes
 
@@ -32,6 +33,9 @@ phase prematurely.
 - [x] Audit `limitless` exceptions against the source-limit policy.
 - [x] Record compiler version, platform matrix, strict checks, and unresolved
       limitations before adding new metadata ideas.
+- [x] Implement `meta must_use(...)` with its focused ADR, guide, diagnostics,
+      formatter/LSP coverage, imported-signature propagation, and semantic
+      fixtures.
 
 ## Planned metadata extension backlog
 

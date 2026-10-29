@@ -38,6 +38,7 @@ The current registry is:
 | `meta target("...")` | target filtering | selects `unix`, `posix`, or `windows` declarations |
 | `meta fault("...")` | strict test runner/runtime | enables one named test-only fault |
 | `meta limitless("...")` | conformance policy | scopes a reviewed source-limit exception to a verb or file |
+| `meta must_use("...")` | semantic analyzer | rejects a discarded marked verb result |
 
 Metadata is processed before code generation. It may control discovery or
 selection, but it cannot bypass parsing, semantic analysis, ownership checks,

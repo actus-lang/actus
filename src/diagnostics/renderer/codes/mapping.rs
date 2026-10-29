@@ -32,6 +32,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::TestMetadataRequiresVerb => "E0017",
         ParseErrorCode::MalformedVerbContract => "E0014",
         ParseErrorCode::OpenImportRequiresBlock => "E0015",
+        ParseErrorCode::MustUseRequiresReturn => "E0018",
     }
 }
 
@@ -159,6 +160,7 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::SuspendedAccess { .. } => "E1064",
         SemanticErrorKind::ExclusiveLoanAlias { .. } => "E1065",
         SemanticErrorKind::EscapingLoan { .. } => "E1082",
+        SemanticErrorKind::MustUseIgnored { .. } => "E1120",
         _ => return None,
     })
 }

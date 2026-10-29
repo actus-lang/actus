@@ -14,6 +14,7 @@ pub(crate) struct VerbSignature {
     pub(crate) return_access: Option<ReturnAccess>,
     pub(crate) generic_parameters: Vec<GenericParam>,
     pub(crate) external: bool,
+    pub(crate) must_use: Option<String>,
 }
 
 pub(super) fn has_matching_named_signature(
@@ -52,6 +53,10 @@ impl VerbDecl {
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
             generic_parameters: self.generic_parameters.clone(),
             external: false,
+            must_use: self.metadata.iter().find_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::MustUse(reason) => Some(reason.clone()),
+                _ => None,
+            }),
         }
     }
 }
@@ -79,6 +84,10 @@ impl ExternalVerbDecl {
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
             generic_parameters: self.generic_parameters.clone(),
             external: true,
+            must_use: self.metadata.iter().find_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::MustUse(reason) => Some(reason.clone()),
+                _ => None,
+            }),
         }
     }
 }

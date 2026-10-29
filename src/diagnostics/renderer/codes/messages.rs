@@ -67,6 +67,9 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidAbsReturnOrigin { reason } => {
             format!("invalid abs return origin: {reason}")
         }
+        SemanticErrorKind::MustUseIgnored { callee, reason } => {
+            format!("must-use result from `{callee}` was ignored: {reason}")
+        }
         _ => return None,
     })
 }

@@ -78,6 +78,10 @@ pub enum SemanticErrorKind {
     EscapingLoan {
         name: String,
     },
+    MustUseIgnored {
+        callee: String,
+        reason: String,
+    },
     InvalidOwnerInitializer {
         name: String,
     },

@@ -159,6 +159,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::TestMetadataRequiresVerb => {
             "test metadata can only be attached to an ordinary verb".to_owned()
         }
+        ParseErrorKind::MustUseRequiresReturn => {
+            "must-use metadata can only be attached to a verb with a return value".to_owned()
+        }
         ParseErrorKind::MalformedVerbContract { reason } => {
             format!("malformed verb contract: {reason}")
         }
