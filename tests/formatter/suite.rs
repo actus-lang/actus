@@ -59,6 +59,17 @@ fn preserves_realtime_metadata_idempotently() {
 }
 
 #[test]
+fn preserves_bounded_metadata_idempotently() {
+    let formatted = format_source(
+        "meta bounded(max_iterations: 1024u32, max_call_depth: 16u32, max_stack_bytes: 4096u64) verb process() -> Int { return 0; }",
+    );
+    assert!(formatted.contains(
+        "meta bounded(max_iterations: 1024u32, max_call_depth: 16u32, max_stack_bytes: 4096u64)"
+    ));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_role_method_effect_metadata_idempotently() {
     let formatted =
         format_source("role Writer { meta effect(\"filesystem\") verb write(abs self: Int); }");

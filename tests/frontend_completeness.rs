@@ -165,6 +165,57 @@ fn realtime_role_contract_is_preserved_by_implementations() {
 }
 
 #[test]
+fn bounded_contract_proves_ranges_and_call_budgets() {
+    analyze_source(
+        "verb leaf() -> Int { return 0; } meta bounded(max_iterations: 4u32, max_calls: 4u32, max_call_depth: 1u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { leaf(); } return 0; }",
+    )
+    .expect("the exact bounded range and call budget should pass");
+
+    let range_error = expect_semantic_error(
+        "meta bounded(max_iterations: 3u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { } return 0; }",
+    );
+    assert!(matches!(
+        range_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref dimension, .. } if dimension == "max_iterations"
+    ));
+    assert_eq!(semantic_diagnostic(&range_error).code(), "E1130");
+
+    let depth_error = expect_semantic_error(
+        "verb leaf() -> Int { return 0; } meta bounded(max_call_depth: 0u32) verb main() -> Int { leaf(); return 0; }",
+    );
+    assert!(matches!(
+        depth_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref dimension, .. } if dimension == "max_call_depth"
+    ));
+
+    analyze_source(
+        "meta bounded(max_allocations: 1u32, max_allocation_bytes: 4u64) verb main() -> Buffer { return Buffer[4]; }",
+    )
+    .expect("a fixed buffer allocation should satisfy its resource budget");
+
+    let allocation_error = expect_semantic_error(
+        "meta bounded(max_allocations: 0u32) verb main() -> Buffer { return Buffer[4]; }",
+    );
+    assert!(matches!(
+        allocation_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref dimension, .. } if dimension == "max_allocations"
+    ));
+
+    analyze_source(
+        "meta bounded(max_stack_bytes: 4u64) verb main() -> Int { erg value: u32 = 0u32; return value; }",
+    )
+    .expect("a known scalar local should satisfy its stack budget");
+
+    let loop_error = expect_semantic_error(
+        "meta bounded(max_iterations: 4u32) verb main() -> Int { loop { break; } return 0; }",
+    );
+    assert!(matches!(
+        loop_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. } if required == "an unbounded path"
+    ));
+}
+
+#[test]
 fn effects_propagate_through_transitive_and_external_calls() {
     let transitive = expect_semantic_error(
         "meta effect(\"filesystem\") verb leaf() -> Int { return 0; } meta effect(\"filesystem\") verb middle() -> Int { leaf(); return 0; } verb root() -> Int { middle(); return 0; }",

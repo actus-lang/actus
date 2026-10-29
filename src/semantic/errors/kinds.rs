@@ -97,6 +97,11 @@ pub enum SemanticErrorKind {
     RealtimeUnboundedLoop,
     RealtimeFloatingPoint,
     RealtimeUnboundedRecursion,
+    BoundedBudgetExceeded {
+        dimension: String,
+        limit: u64,
+        required: String,
+    },
     InvalidOwnerInitializer {
         name: String,
     },

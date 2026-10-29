@@ -15,6 +15,8 @@ phase prematurely.
 - `meta must_use(...)`
 - `meta effect(...)`
 - `meta deterministic`
+- `meta bounded(...)` with explicit iteration, call, allocation, stack, and I/O
+  budgets
 - parser, semantic validation, formatter, LSP, test-runner, and diagnostics
   boundaries shared by those attributes
 
@@ -44,6 +46,10 @@ phase prematurely.
 - [x] Implement `meta realtime` with forbidden-effect, bounded-loop,
       floating-point, recursion, role-contract, formatter, LSP, and semantic
       fixture coverage.
+- [ ] Complete `meta bounded(...)` proof propagation across imported, generic,
+      dynamic, recursive, and native call boundaries; the current source-level
+      checker covers fixed control-flow, direct calls, fixed buffers, known
+      local scalar sizes, and declared I/O effects.
 
 ## Planned metadata extension backlog
 

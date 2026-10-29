@@ -18,6 +18,7 @@ pub(crate) struct VerbSignature {
     pub(crate) effects: Vec<Effect>,
     pub(crate) deterministic: bool,
     pub(crate) realtime: bool,
+    pub(crate) bounded: Option<crate::ast::BoundedContract>,
 }
 
 pub(super) fn has_matching_named_signature(
@@ -63,6 +64,7 @@ impl VerbDecl {
             effects: metadata_effects(&self.metadata),
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
+            bounded: metadata_bounded(&self.metadata),
         }
     }
 }
@@ -97,6 +99,7 @@ impl ExternalVerbDecl {
             effects: metadata_effects(&self.metadata),
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
+            bounded: metadata_bounded(&self.metadata),
         }
     }
 }
@@ -117,4 +120,11 @@ fn metadata_is_deterministic(metadata: &[crate::ast::MetaAttribute]) -> bool {
 
 fn metadata_is_realtime(metadata: &[crate::ast::MetaAttribute]) -> bool {
     metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Realtime))
+}
+
+fn metadata_bounded(metadata: &[crate::ast::MetaAttribute]) -> Option<crate::ast::BoundedContract> {
+    metadata.iter().find_map(|attribute| match attribute {
+        crate::ast::MetaAttribute::Bounded(contract) => Some(contract.clone()),
+        _ => None,
+    })
 }

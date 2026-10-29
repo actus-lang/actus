@@ -34,6 +34,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::OpenImportRequiresBlock => "E0015",
         ParseErrorCode::MustUseRequiresReturn => "E0018",
         ParseErrorCode::UnsupportedEffect => "E0019",
+        ParseErrorCode::InvalidBoundedLimit => "E0020",
     }
 }
 
@@ -168,6 +169,7 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::RealtimeUnboundedLoop => "E1126",
         SemanticErrorKind::RealtimeFloatingPoint => "E1127",
         SemanticErrorKind::RealtimeUnboundedRecursion => "E1129",
+        SemanticErrorKind::BoundedBudgetExceeded { .. } => "E1130",
         SemanticErrorKind::RoleMethodMustUseMismatch { .. } => "E1123",
         _ => return None,
     })

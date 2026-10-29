@@ -148,6 +148,7 @@ impl Analyzer {
             effects: signature.effects.clone(),
             deterministic: signature.deterministic,
             realtime: signature.realtime,
+            bounded: signature.bounded.clone(),
         })
     }
 }

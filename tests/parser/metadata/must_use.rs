@@ -1,5 +1,5 @@
 use super::{parse_error, parse_source};
-use actus::ast::{MetaAttribute, TopLevelDecl};
+use actus::ast::{BoundedContract, MetaAttribute, TopLevelDecl};
 use actus::diagnostics::parse_diagnostic;
 use actus::parser::{ParseErrorCode, ParseErrorKind};
 
@@ -64,4 +64,28 @@ fn parses_realtime_metadata_on_role_methods() {
     let program = parse_source("role Clock { meta realtime verb tick(abs self: Int) -> Int; }");
     let TopLevelDecl::Role(role) = &program.declarations[0] else { panic!("expected role") };
     assert!(role.methods[0].metadata.contains(&MetaAttribute::Realtime));
+}
+
+#[test]
+fn parses_bounded_metadata_and_rejects_invalid_limits() {
+    let program = parse_source(
+        "meta bounded(max_iterations: 1024u32, max_call_depth: 16u32, max_stack_bytes: 4096u64) verb process() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(verb.metadata.contains(&MetaAttribute::Bounded(BoundedContract {
+        max_iterations: Some(1024),
+        max_call_depth: Some(16),
+        max_calls: None,
+        max_allocations: None,
+        max_allocation_bytes: None,
+        max_stack_bytes: Some(4096),
+        max_io_bytes: None,
+    })));
+
+    let duplicate = parse_error(
+        "meta bounded(max_iterations: 4u32) meta bounded(max_iterations: 8u32) verb process() -> Int { return 0; }",
+    );
+    assert_eq!(duplicate.code, ParseErrorCode::DuplicateMetadata);
+
+    parse_source("meta bounded(max_allocations: 0u32) verb process() -> Int { return 0; }");
 }

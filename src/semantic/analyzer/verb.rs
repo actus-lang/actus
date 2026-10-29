@@ -14,6 +14,7 @@ impl Analyzer {
         self.enter_scope(verb.body.span);
         self.bind_parameters(&verb.params)?;
         self.visit_block(&verb.body)?;
+        self.validate_bounded_contract(verb)?;
         self.validate_missing_return(verb)?;
         self.leave_scope();
         Ok(())

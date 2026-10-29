@@ -69,6 +69,10 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
             .metadata
             .iter()
             .any(|attribute| matches!(attribute, MetaAttribute::Realtime)),
+        bounded: method.metadata.iter().find_map(|attribute| match attribute {
+            MetaAttribute::Bounded(contract) => Some(contract.clone()),
+            _ => None,
+        }),
     }
 }
 

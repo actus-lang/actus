@@ -53,7 +53,7 @@ impl Parser {
         Ok(())
     }
 
-    fn metadata_span(&self) -> SourceSpan {
+    pub(super) fn metadata_span(&self) -> SourceSpan {
         self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0))
     }
 }

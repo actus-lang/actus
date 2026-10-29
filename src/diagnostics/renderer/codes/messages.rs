@@ -88,6 +88,9 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::RealtimeUnboundedRecursion => {
             "realtime code cannot recursively call itself without a static bound".to_owned()
         }
+        SemanticErrorKind::BoundedBudgetExceeded { dimension, limit, required } => {
+            format!("bounded contract for `{dimension}` allows {limit}, but the body requires {required}")
+        }
         SemanticErrorKind::RoleMethodMustUseMismatch { role, method, .. } => {
             format!("role method `{role}::{method}` must preserve its must-use contract")
         }

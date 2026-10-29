@@ -296,7 +296,34 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
         }
         crate::ast::MetaAttribute::Deterministic => "deterministic".to_owned(),
         crate::ast::MetaAttribute::Realtime => "realtime".to_owned(),
+        crate::ast::MetaAttribute::Bounded(contract) => format_bounded_metadata(contract),
     }
+}
+
+fn format_bounded_metadata(contract: &crate::ast::BoundedContract) -> String {
+    let mut fields = Vec::new();
+    if let Some(value) = contract.max_iterations {
+        fields.push(format!("max_iterations: {value}u32"));
+    }
+    if let Some(value) = contract.max_call_depth {
+        fields.push(format!("max_call_depth: {value}u32"));
+    }
+    if let Some(value) = contract.max_calls {
+        fields.push(format!("max_calls: {value}u32"));
+    }
+    if let Some(value) = contract.max_allocations {
+        fields.push(format!("max_allocations: {value}u32"));
+    }
+    if let Some(value) = contract.max_allocation_bytes {
+        fields.push(format!("max_allocation_bytes: {value}u64"));
+    }
+    if let Some(value) = contract.max_stack_bytes {
+        fields.push(format!("max_stack_bytes: {value}u64"));
+    }
+    if let Some(value) = contract.max_io_bytes {
+        fields.push(format!("max_io_bytes: {value}u64"));
+    }
+    format!("bounded({})", fields.join(", "))
 }
 
 fn escape_string(value: &str) -> String {

@@ -71,6 +71,30 @@ pub enum MetaAttribute {
     Effect(Effect),
     Deterministic,
     Realtime,
+    Bounded(BoundedContract),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BoundedContract {
+    pub max_iterations: Option<u32>,
+    pub max_call_depth: Option<u32>,
+    pub max_calls: Option<u32>,
+    pub max_allocations: Option<u32>,
+    pub max_allocation_bytes: Option<u64>,
+    pub max_stack_bytes: Option<u64>,
+    pub max_io_bytes: Option<u64>,
+}
+
+impl BoundedContract {
+    pub fn is_empty(&self) -> bool {
+        self.max_iterations.is_none()
+            && self.max_call_depth.is_none()
+            && self.max_calls.is_none()
+            && self.max_allocations.is_none()
+            && self.max_allocation_bytes.is_none()
+            && self.max_stack_bytes.is_none()
+            && self.max_io_bytes.is_none()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]

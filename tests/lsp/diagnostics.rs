@@ -95,6 +95,20 @@ fn lsp_accepts_realtime_contracts() {
 }
 
 #[test]
+fn lsp_reports_bounded_contract_diagnostics() {
+    let uri = "file:///tmp/actus-lsp-bounded-metadata.act";
+    let source = "meta bounded(max_iterations: 2u32) verb bounded() -> Int { for erg index: u32 in 0u32..4u32 { } return 0; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"code\":\"E1130\""), "bounded diagnostic missing: {stdout}");
+}
+
+#[test]
 fn lsp_accepts_statement_conditionals_and_type_directed_integer_indexing() {
     let uri = "file:///tmp/actus-lsp-ergonomics.act";
     let source = "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); erg index: u32 = 0; loop { if index >= 1 { break; } values[index] = 41; index += 1; } return values[0] + 1; }";

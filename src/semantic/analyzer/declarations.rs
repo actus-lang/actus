@@ -147,5 +147,6 @@ fn equivalent_signature(left: &VerbSignature, right: &VerbSignature) -> bool {
         && left.effects == right.effects
         && left.deterministic == right.deterministic
         && left.realtime == right.realtime
+        && left.bounded == right.bounded
         && left.generic_parameters == right.generic_parameters
 }
