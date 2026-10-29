@@ -34,6 +34,38 @@ fn filters_non_matching_target_declarations_before_semantic_analysis() {
 }
 
 #[test]
+fn filters_all_supported_metadata_platform_families_deterministically() {
+    let source = concat!(
+        "meta target(\"unix\") verb unix_only() -> Int { return 1; }\n",
+        "meta target(\"posix\") verb posix_only() -> Int { return 2; }\n",
+        "meta target(\"windows\") verb windows_only() -> Int { return 3; }\n",
+    );
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("supported target metadata should parse");
+
+    let cases = [
+        ("x86_64-unknown-linux-gnu", ["unix_only", "posix_only"]),
+        ("x86_64-apple-darwin", ["unix_only", "posix_only"]),
+        ("x86_64-pc-windows-msvc", ["windows_only", ""]),
+    ];
+    for (triple, expected) in cases {
+        let target = TargetSpec::parse(triple).expect("fixture target should parse");
+        let filtered = filter_program_for_target(&program, &target);
+        let names = filtered
+            .declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                actus::ast::TopLevelDecl::Verb(verb) => Some(verb.name.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let expected = expected.into_iter().filter(|name| !name.is_empty()).collect::<Vec<_>>();
+        assert_eq!(names, expected, "unexpected declarations for target {triple}");
+    }
+}
+
+#[test]
 fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
     let linux = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("Linux target should parse");
     let macos = TargetSpec::parse("x86_64-apple-darwin").expect("macOS target should parse");
