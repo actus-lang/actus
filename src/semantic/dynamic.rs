@@ -65,6 +65,10 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
             .metadata
             .iter()
             .any(|attribute| matches!(attribute, MetaAttribute::Deterministic)),
+        realtime: method
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Realtime)),
     }
 }
 

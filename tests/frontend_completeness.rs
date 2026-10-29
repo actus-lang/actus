@@ -123,6 +123,48 @@ fn deterministic_verbs_reject_nondeterministic_effects() {
 }
 
 #[test]
+fn realtime_verbs_reject_effects_unbounded_loops_and_floating_point() {
+    for effect in ["blocking", "clock", "filesystem", "network", "allocation", "entropy"] {
+        let source = format!(
+            "meta effect(\"{effect}\") verb source() -> Int {{ return 0; }} meta realtime verb tick() -> Int {{ source(); return 0; }}"
+        );
+        let error = expect_semantic_error(&source);
+        assert!(matches!(
+            error.kind,
+            SemanticErrorKind::RealtimeEffect { ref callee, effect: found }
+                if callee == "source" && found.name() == effect
+        ));
+        assert_eq!(semantic_diagnostic(&error).code(), "E1125");
+    }
+
+    let loop_error =
+        expect_semantic_error("meta realtime verb tick() -> Int { loop { break; } return 0; }");
+    assert!(matches!(loop_error.kind, SemanticErrorKind::RealtimeUnboundedLoop));
+    assert_eq!(semantic_diagnostic(&loop_error).code(), "E1126");
+
+    let float_error = expect_semantic_error("meta realtime verb tick() -> f32 { return 1.0f32; }");
+    assert!(matches!(float_error.kind, SemanticErrorKind::RealtimeFloatingPoint));
+    assert_eq!(semantic_diagnostic(&float_error).code(), "E1127");
+
+    analyze_source(
+        "meta realtime verb tick() -> Int { for erg index: u32 in 0u32..4u32 { if index == 2u32 { break; } } return 0; }",
+    )
+    .expect("bounded range loops are valid in realtime code");
+}
+
+#[test]
+fn realtime_role_contract_is_preserved_by_implementations() {
+    let error = expect_semantic_error(
+        "role Tick { meta realtime verb tick(abs self: Self) -> Int; } struct Clock { value: Int, } perform Tick for Clock { verb tick(abs self: Clock) -> Int { return self.value; } }",
+    );
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodRealtimeMismatch { ref method, .. } if method == "tick"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1128");
+}
+
+#[test]
 fn effects_propagate_through_transitive_and_external_calls() {
     let transitive = expect_semantic_error(
         "meta effect(\"filesystem\") verb leaf() -> Int { return 0; } meta effect(\"filesystem\") verb middle() -> Int { leaf(); return 0; } verb root() -> Int { middle(); return 0; }",

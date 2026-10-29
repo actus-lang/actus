@@ -76,8 +76,23 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::NondeterministicCall { callee, effect } => {
             format!("deterministic code cannot call `{callee}` with effect `{}`", effect.name())
         }
+        SemanticErrorKind::RealtimeEffect { callee, effect } => {
+            format!("realtime code cannot call `{callee}` with effect `{}`", effect.name())
+        }
+        SemanticErrorKind::RealtimeUnboundedLoop => {
+            "realtime code cannot contain an unbounded `loop`; use a statically bounded range or array loop".to_owned()
+        }
+        SemanticErrorKind::RealtimeFloatingPoint => {
+            "realtime code cannot use floating-point literals or operations".to_owned()
+        }
+        SemanticErrorKind::RealtimeUnboundedRecursion => {
+            "realtime code cannot recursively call itself without a static bound".to_owned()
+        }
         SemanticErrorKind::RoleMethodMustUseMismatch { role, method, .. } => {
             format!("role method `{role}::{method}` must preserve its must-use contract")
+        }
+        SemanticErrorKind::RoleMethodRealtimeMismatch { role, method } => {
+            format!("role method `{role}::{method}` must preserve its realtime contract")
         }
         _ => return None,
     })

@@ -90,6 +90,13 @@ pub enum SemanticErrorKind {
         callee: String,
         effect: crate::ast::Effect,
     },
+    RealtimeEffect {
+        callee: String,
+        effect: crate::ast::Effect,
+    },
+    RealtimeUnboundedLoop,
+    RealtimeFloatingPoint,
+    RealtimeUnboundedRecursion,
     InvalidOwnerInitializer {
         name: String,
     },
@@ -141,6 +148,10 @@ pub enum SemanticErrorKind {
         method: String,
         expected: Vec<crate::ast::Effect>,
         found: Vec<crate::ast::Effect>,
+    },
+    RoleMethodRealtimeMismatch {
+        role: String,
+        method: String,
     },
     RoleMethodMustUseMismatch {
         role: String,

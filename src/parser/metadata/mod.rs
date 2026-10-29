@@ -5,6 +5,7 @@ mod effect;
 mod fault;
 mod limitless;
 mod must_use;
+mod realtime;
 mod syntax;
 mod target;
 mod test;

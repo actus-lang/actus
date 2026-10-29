@@ -295,6 +295,7 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
             format!("effect(\"{}\")", effect.name())
         }
         crate::ast::MetaAttribute::Deterministic => "deterministic".to_owned(),
+        crate::ast::MetaAttribute::Realtime => "realtime".to_owned(),
     }
 }
 

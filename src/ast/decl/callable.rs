@@ -70,6 +70,7 @@ pub enum MetaAttribute {
     MustUse(String),
     Effect(Effect),
     Deterministic,
+    Realtime,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]

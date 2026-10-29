@@ -1,7 +1,7 @@
 use crate::ast::{BinaryOp, Block, Expr, Place, Role, Stmt};
 use crate::lexer::SourceSpan;
 
-use super::super::errors::SemanticError;
+use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
 use super::is_origin_return_expression;
 
@@ -16,6 +16,19 @@ impl Analyzer {
     fn visit_statement(&mut self, statement: &Stmt) -> Result<(), SemanticError> {
         match statement {
             Stmt::OwnerDecl { role, name, ty, initializer, span } => {
+                if self.current_realtime
+                    && ty.as_ref().is_some_and(|name| {
+                        name == "f32"
+                            || name == "f64"
+                            || name.contains("[f32")
+                            || name.contains("[f64")
+                    })
+                {
+                    return Err(SemanticError {
+                        kind: SemanticErrorKind::RealtimeFloatingPoint,
+                        span: *span,
+                    });
+                }
                 self.visit_owner_decl(role, name, ty.as_deref(), initializer, *span)
             }
             Stmt::Assignment { target, value, span } => {

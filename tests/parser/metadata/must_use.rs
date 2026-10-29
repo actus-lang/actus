@@ -48,3 +48,20 @@ fn parses_deterministic_metadata_and_rejects_duplicates() {
         parse_error("meta deterministic meta deterministic verb stable() -> Int { return 0; }");
     assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
 }
+
+#[test]
+fn parses_realtime_metadata_and_rejects_duplicates() {
+    let program = parse_source("meta realtime verb tick() -> Int { return 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(verb.metadata.contains(&MetaAttribute::Realtime));
+
+    let error = parse_error("meta realtime meta realtime verb tick() -> Int { return 0; }");
+    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
+}
+
+#[test]
+fn parses_realtime_metadata_on_role_methods() {
+    let program = parse_source("role Clock { meta realtime verb tick(abs self: Int) -> Int; }");
+    let TopLevelDecl::Role(role) = &program.declarations[0] else { panic!("expected role") };
+    assert!(role.methods[0].metadata.contains(&MetaAttribute::Realtime));
+}

@@ -167,6 +167,7 @@ impl Analyzer {
                     implementation.span,
                 ));
             }
+            self.validate_realtime_method(required, implementation, &perform.role_name)?;
             let expected = role_method_signature(required).must_use;
             let found = implementation.signature().must_use;
             if expected != found {
@@ -180,6 +181,24 @@ impl Analyzer {
                     implementation.span,
                 ));
             }
+        }
+        Ok(())
+    }
+
+    fn validate_realtime_method(
+        &self,
+        required: &crate::ast::RoleMethod,
+        implementation: &crate::ast::VerbDecl,
+        role: &str,
+    ) -> Result<(), SemanticError> {
+        if role_method_signature(required).realtime && !implementation.signature().realtime {
+            return Err(role_error(
+                SemanticErrorKind::RoleMethodRealtimeMismatch {
+                    role: role.to_owned(),
+                    method: required.name.clone(),
+                },
+                implementation.span,
+            ));
         }
         Ok(())
     }

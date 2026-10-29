@@ -17,6 +17,8 @@ This directory documents the currently supported attributes:
   verb result.
 - [`meta deterministic`](deterministic.md): rejects filesystem, network, and
   entropy effects from deterministic verbs.
+- [`meta realtime`](realtime.md): rejects host-dependent effects, unbounded
+  loops, and floating-point operations in latency-sensitive verbs.
 
 [`meta effect(...)`](effect.md) declares compiler-checked execution effects
 such as blocking, filesystem, network, allocation, and entropy.

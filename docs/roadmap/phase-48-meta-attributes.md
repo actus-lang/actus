@@ -41,6 +41,9 @@ phase prematurely.
 - [x] Implement `meta deterministic` with an explicit forbidden-effect
       contract, stable diagnostics, formatter/LSP coverage, and semantic
       fixtures.
+- [x] Implement `meta realtime` with forbidden-effect, bounded-loop,
+      floating-point, recursion, role-contract, formatter, LSP, and semantic
+      fixture coverage.
 
 ## Planned metadata extension backlog
 

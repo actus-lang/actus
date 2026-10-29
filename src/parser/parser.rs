@@ -185,6 +185,7 @@ impl Parser {
             });
         }
         self.reject_duplicate_deterministic_metadata(metadata)?;
+        self.reject_duplicate_realtime_metadata(metadata)?;
         self.reject_duplicate_effect_metadata(metadata)?;
         if let Some((index, target)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
             if let MetaAttribute::Target(target) = attribute { Some((index, target)) } else { None }
@@ -233,6 +234,22 @@ impl Parser {
         Err(ParseError {
             code: ParseErrorCode::DuplicateMetadata,
             kind: ParseErrorKind::DuplicateMetadata { name: "deterministic".to_owned() },
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        })
+    }
+
+    fn reject_duplicate_realtime_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        if metadata.iter().filter(|attribute| matches!(attribute, MetaAttribute::Realtime)).count()
+            <= 1
+        {
+            return Ok(());
+        }
+        Err(ParseError {
+            code: ParseErrorCode::DuplicateMetadata,
+            kind: ParseErrorKind::DuplicateMetadata { name: "realtime".to_owned() },
             span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
         })
     }

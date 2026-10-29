@@ -85,12 +85,20 @@ impl Analyzer {
                 Ok(())
             }
             Expr::FloatLiteral { value, suffix, span } => {
+                self.reject_realtime_float(*span)?;
                 self.validate_typed_float_literal(value, suffix.as_deref(), *span)?;
                 self.record_literal_fact("float", value, suffix, *span);
                 Ok(())
             }
             Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+
+    fn reject_realtime_float(&self, span: SourceSpan) -> Result<(), SemanticError> {
+        if self.current_realtime {
+            return Err(SemanticError { kind: SemanticErrorKind::RealtimeFloatingPoint, span });
+        }
+        Ok(())
     }
 
     fn visit_bool_literal(&mut self, value: bool, span: SourceSpan) -> Result<(), SemanticError> {

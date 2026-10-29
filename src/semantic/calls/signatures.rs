@@ -17,6 +17,7 @@ pub(crate) struct VerbSignature {
     pub(crate) must_use: Option<String>,
     pub(crate) effects: Vec<Effect>,
     pub(crate) deterministic: bool,
+    pub(crate) realtime: bool,
 }
 
 pub(super) fn has_matching_named_signature(
@@ -61,6 +62,7 @@ impl VerbDecl {
             }),
             effects: metadata_effects(&self.metadata),
             deterministic: metadata_is_deterministic(&self.metadata),
+            realtime: metadata_is_realtime(&self.metadata),
         }
     }
 }
@@ -94,6 +96,7 @@ impl ExternalVerbDecl {
             }),
             effects: metadata_effects(&self.metadata),
             deterministic: metadata_is_deterministic(&self.metadata),
+            realtime: metadata_is_realtime(&self.metadata),
         }
     }
 }
@@ -110,4 +113,8 @@ fn metadata_effects(metadata: &[crate::ast::MetaAttribute]) -> Vec<Effect> {
 
 fn metadata_is_deterministic(metadata: &[crate::ast::MetaAttribute]) -> bool {
     metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Deterministic))
+}
+
+fn metadata_is_realtime(metadata: &[crate::ast::MetaAttribute]) -> bool {
+    metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Realtime))
 }

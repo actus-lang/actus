@@ -72,6 +72,11 @@ writes, publication, cancellation, lifecycle close, metadata inspection, and
 pinning remain effect-free because they operate on already-owned bounded
 storage and do not perform external I/O or allocate replacement storage.
 
+`meta realtime` consumes these signatures as a stricter context contract. It
+does not redefine effects or authorize them; it rejects every effectful call
+from a realtime verb, including allocation, and separately rejects unbounded
+loops and floating-point operations.
+
 ## Required implementation evidence
 
 Before acceptance, the implementation must include positive and negative

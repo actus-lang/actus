@@ -147,6 +147,7 @@ impl Analyzer {
             must_use: signature.must_use.clone(),
             effects: signature.effects.clone(),
             deterministic: signature.deterministic,
+            realtime: signature.realtime,
         })
     }
 }

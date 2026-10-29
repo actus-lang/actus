@@ -52,6 +52,13 @@ fn preserves_deterministic_metadata_idempotently() {
 }
 
 #[test]
+fn preserves_realtime_metadata_idempotently() {
+    let formatted = format_source("meta realtime verb tick() -> Int { return 0; }");
+    assert!(formatted.contains("meta realtime"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_role_method_effect_metadata_idempotently() {
     let formatted =
         format_source("role Writer { meta effect(\"filesystem\") verb write(abs self: Int); }");

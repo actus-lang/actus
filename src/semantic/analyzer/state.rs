@@ -73,6 +73,8 @@ pub(crate) struct Analyzer {
     pub(crate) expression_value_consumed: bool,
     pub(crate) current_effects: Vec<Effect>,
     pub(crate) current_deterministic: bool,
+    pub(crate) current_realtime: bool,
+    pub(crate) current_verb_name: Option<String>,
 }
 
 impl Analyzer {
