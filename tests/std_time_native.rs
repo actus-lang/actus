@@ -17,7 +17,7 @@ fn hosted_std_time_bridge_builds_and_runs() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::time }; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); erg elapsed: u64 = finished - started; if finished >= started && elapsed >= 0u64 { return 0; } return 1; }",
+        "import { open std::time }; meta effect(\"clock\") verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); erg elapsed: u64 = finished - started; if finished >= started && elapsed >= 0u64 { return 0; } return 1; }",
     )
     .expect("fixture source should be written");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -79,7 +79,7 @@ fn typed_instant_and_duration_api_builds_and_runs() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::time }; verb main() -> Int { erg started: Instant = now(); erg finished: Instant = now(); erg raw_nanos: u64 = 42u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start_ticks: u64 = instant_ticks(abs started); erg finish_ticks: u64 = instant_ticks(abs finished); erg span_nanos: u64 = duration_as_nanos(abs span); erg sleep_result = sleep(duration: abs span); return case dat sleep_result { Result.Ok(_) => if finish_ticks >= start_ticks && span_nanos == 42u64 { 0 } else { 1 }, Result.Err(_) => 2, }; }",
+        "import { open std::time }; meta effect(\"clock\", \"blocking\") verb main() -> Int { erg started: Instant = now(); erg finished: Instant = now(); erg raw_nanos: u64 = 42u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start_ticks: u64 = instant_ticks(abs started); erg finish_ticks: u64 = instant_ticks(abs finished); erg span_nanos: u64 = duration_as_nanos(abs span); erg sleep_result = sleep(duration: abs span); return case dat sleep_result { Result.Ok(_) => if finish_ticks >= start_ticks && span_nanos == 42u64 { 0 } else { 1 }, Result.Err(_) => 2, }; }",
     )
     .expect("fixture source should be written");
 
@@ -117,7 +117,7 @@ fn monotonic_deadline_api_builds_and_runs() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::time }; verb main() -> Int { erg raw_nanos: u64 = 1000000000u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start: Instant = now(); erg candidate = deadline_after(start: abs start, duration: abs span); return case dat candidate { Result.Ok(deadline) => if expired(deadline: abs deadline) { 1 } else { 0 }, Result.Err(_) => 2, }; }",
+        "import { open std::time }; meta effect(\"clock\") verb main() -> Int { erg raw_nanos: u64 = 1000000000u64; erg span: Duration = duration_nanos(nanos: erg raw_nanos); erg start: Instant = now(); erg candidate = deadline_after(start: abs start, duration: abs span); return case dat candidate { Result.Ok(deadline) => if expired(deadline: abs deadline) { 1 } else { 0 }, Result.Err(_) => 2, }; }",
     )
     .expect("fixture source should be written");
 
@@ -224,7 +224,7 @@ fn unsigned_elapsed_underflow_is_rejected_before_native_execution() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::time }; verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); return (started - finished) as Int; }",
+        "import { open std::time }; meta effect(\"clock\") verb main() -> Int { erg started: u64 = monotonic_nanos(); erg finished: u64 = monotonic_nanos(); return (started - finished) as Int; }",
     )
     .expect("fixture source should be written");
 
@@ -340,7 +340,7 @@ fn zero_duration_busy_wait_delay_runs_natively() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::time }; verb main() -> Int { erg zero: Duration = Duration { nanos: 0u64, }; erg result = delay(duration: abs zero); return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, }; }",
+        "import { open std::time }; meta effect(\"clock\", \"blocking\") verb main() -> Int { erg zero: Duration = Duration { nanos: 0u64, }; erg result = delay(duration: abs zero); return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, }; }",
     )
     .expect("fixture source should be written");
 

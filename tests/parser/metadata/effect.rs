@@ -28,7 +28,7 @@ fn parses_multiple_effects_in_one_metadata_declaration() {
 
 #[test]
 fn rejects_unknown_effect_names_with_a_stable_diagnostic() {
-    let error = parse_error("meta effect(\"clock\") verb operation() -> Int { return 0; }");
+    let error = parse_error("meta effect(\"unknown\") verb operation() -> Int { return 0; }");
     assert_eq!(error.code, ParseErrorCode::UnsupportedEffect);
     assert_eq!(parse_diagnostic(&error).code(), "E0019");
 }

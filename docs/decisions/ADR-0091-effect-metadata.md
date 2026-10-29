@@ -23,7 +23,7 @@ verb load_manifest(abs path: Path) -> Result[Manifest, IoError] { ... }
 ```
 
 The accepted effect vocabulary is intentionally closed and compiler-registered:
-`blocking`, `filesystem`, `network`,
+`blocking`, `clock`, `filesystem`, `network`,
 `allocation`, and `entropy`. An unknown effect name is a compile-time error;
 there is no user-defined escape hatch and no wildcard effect.
 

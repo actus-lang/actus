@@ -28,6 +28,7 @@ verb unwrap_deadline(erg candidate: Result[Deadline, TimeError]) -> Deadline {
     };
 }
 
+meta effect("clock")
 verb main() -> Int {
     erg started: Instant = now();
     erg one_millisecond: u64 = 1u64;

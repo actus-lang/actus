@@ -75,6 +75,7 @@ pub enum MetaAttribute {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Effect {
     Blocking,
+    Clock,
     Filesystem,
     Network,
     Allocation,
@@ -82,12 +83,19 @@ pub enum Effect {
 }
 
 impl Effect {
-    pub const ALL: [Self; 5] =
-        [Self::Blocking, Self::Filesystem, Self::Network, Self::Allocation, Self::Entropy];
+    pub const ALL: [Self; 6] = [
+        Self::Blocking,
+        Self::Clock,
+        Self::Filesystem,
+        Self::Network,
+        Self::Allocation,
+        Self::Entropy,
+    ];
 
     pub fn parse(name: &str) -> Option<Self> {
         Some(match name {
             "blocking" => Self::Blocking,
+            "clock" => Self::Clock,
             "filesystem" => Self::Filesystem,
             "network" => Self::Network,
             "allocation" => Self::Allocation,
@@ -99,6 +107,7 @@ impl Effect {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Blocking => "blocking",
+            Self::Clock => "clock",
             Self::Filesystem => "filesystem",
             Self::Network => "network",
             Self::Allocation => "allocation",
@@ -107,7 +116,7 @@ impl Effect {
     }
 
     pub const fn is_nondeterministic(self) -> bool {
-        matches!(self, Self::Filesystem | Self::Network | Self::Entropy)
+        matches!(self, Self::Clock | Self::Filesystem | Self::Network | Self::Entropy)
     }
 }
 
