@@ -224,6 +224,29 @@ fn bounded_contract_proves_ranges_and_call_budgets() {
     )
     .expect("a native boundary with an explicit bound should be callable");
 
+    let imported = ModuleFixture::new();
+    imported.write("effects/effects.act", "open api;");
+    imported.write(
+        "effects/api.act",
+        "meta bounded(max_iterations: 1u32) open verb leaf() -> Int { return 0; }",
+    );
+    let imported_source = parse_source(
+        "import effects; meta bounded(max_iterations: 1u32) verb main() -> Int { effects::leaf(); return 0; }",
+    )
+    .expect("imported bounded fixture should parse");
+    analyze_with_imports(&imported_source, &ModuleResolver::new(&imported.root))
+        .expect("imported bounded signatures must propagate across the facade");
+
+    analyze_source(
+        "meta bounded(max_iterations: 0u32) verb leaf[N: Usize]() -> Int { return 0; } meta bounded(max_iterations: 0u32) verb main() -> Int { leaf[2](); return 0; }",
+    )
+    .expect("generic specializations must preserve bounded contracts");
+
+    analyze_source(
+        "struct File { value: Int, } role Writer { meta bounded(max_iterations: 0u32) verb write(abs self: File) -> Int; } perform Writer for File { meta bounded(max_iterations: 0u32) verb write(abs self: File) -> Int { return self.value; } } meta bounded(max_calls: 1u32, max_call_depth: 1u32) verb send(abs writer: dynamic Writer) -> Int { return writer.write(); }",
+    )
+    .expect("dynamic method boundaries must preserve bounded role contracts");
+
     let recursive_error = expect_semantic_error(
         "meta bounded(max_iterations: 1u32) verb first() -> Int { second(); return 0; } meta bounded(max_iterations: 1u32) verb second() -> Int { first(); return 0; }",
     );

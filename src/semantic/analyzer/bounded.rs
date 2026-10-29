@@ -164,9 +164,9 @@ impl Analyzer {
             Expr::Call { callee, arguments, .. } => {
                 call_cost(self, callee, arguments_cost(self, arguments)?)
             }
-            Expr::MethodCall { receiver, arguments, .. } => call_cost(
+            Expr::MethodCall { receiver, method, arguments, .. } => call_cost(
                 self,
-                "<method>",
+                method,
                 self.bounded_expr_cost(receiver)?.sequence(arguments_cost(self, arguments)?),
             ),
             Expr::If { condition, then_branch, else_branch, .. } => {

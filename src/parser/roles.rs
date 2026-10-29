@@ -110,6 +110,7 @@ impl Parser {
                     | MetaAttribute::MustUse(_)
                     | MetaAttribute::Deterministic
                     | MetaAttribute::Realtime
+                    | MetaAttribute::Bounded(_)
             )
         }) {
             return Ok(());
