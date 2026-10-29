@@ -265,6 +265,30 @@ fn rejects_duplicate_test_and_target_metadata() {
 }
 
 #[test]
+fn rejects_malformed_metadata_arguments_and_file_scope_placement() {
+    for source in [
+        "meta target(unix) verb main() { return 0; }",
+        "meta fault(flush_failure) meta test verb main() { return 0; }",
+        "meta limitless(verb) verb main() { return 0; }",
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        let error = parse(tokens).expect_err("metadata arguments must be explicit strings");
+        assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
+    }
+
+    for source in [
+        "verb first() { return 0; } meta limitless(\"file\")",
+        "meta limitless(\"file\") meta limitless(\"file\")",
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        let error = parse(tokens).expect_err("file metadata placement must be rejected");
+        assert_eq!(error.code, ParseErrorCode::MetadataFileScopeNotAllowed);
+    }
+}
+
+#[test]
 fn rejects_unknown_metadata_attributes() {
     let (tokens, errors) = scan("meta experimental verb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
