@@ -14,9 +14,9 @@ new attributes are proposed. It does not introduce a new attribute by itself.
 
 ## Work plan
 
-- [ ] Inventory every existing metadata form, argument, placement rule, and
+- [x] Inventory every existing metadata form, argument, placement rule, and
       consumer.
-- [ ] Link each attribute to a focused handbook document under
+- [x] Link each attribute to a focused handbook document under
       `docs/guide/meta-attributes/`.
 - [ ] Accept ADR-0089 after implementation and compatibility review.
 - [x] Add the first parser negative fixture for test-only fault metadata.
