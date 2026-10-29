@@ -17,6 +17,12 @@ Metadata is not a runtime annotation system. Each attribute must have an
 explicit compiler contract and must not silently alter ownership, ABI, binary
 layout, or runtime safety.
 
+Future metadata extensions must strengthen Actus's existing language values:
+ownership must remain visible and checked, execution must remain bounded where
+claimed, deterministic behavior must remain explicit, and native/ABI safety
+must not be weakened. Metadata is not permission to hide I/O, allocation,
+cleanup, platform dependencies, or generated control flow.
+
 ## Decision
 
 Every metadata attribute has a registered name, argument grammar, valid
@@ -53,6 +59,30 @@ A proposed attribute must define:
 10. security, ownership, ABI, and performance consequences.
 
 No attribute is accepted merely because the parser can store its name.
+
+## Future extension policy
+
+The planned extension order is:
+
+1. safety and semantic contracts (`must_use`, effects, realtime, bounded, and
+   deterministic behavior);
+2. platform and native contracts (capabilities, restricted `repr`, volatile
+   access, zero-on-drop, and stack limits);
+3. ergonomics and compatibility (`derive`, deprecation, and explicit
+   preconditions/postconditions);
+4. backend optimization hints (unrolling, hot/cold placement, and SIMD).
+
+This ordering is a planning decision, not acceptance of those attributes. Each
+attribute requires a separate implementation review and its own focused
+documentation and regression fixtures when development begins. No speculative
+attribute is part of the language until its contract is accepted and its
+compiler, tooling, ownership, determinism, and cross-target behavior are
+validated.
+
+The extension program does not change Actus's central contract. In particular,
+an attribute must not make ownership implicit, bypass cleanup, introduce
+unbounded work, conceal native effects, or turn a backend optimization hint
+into a semantic guarantee.
 
 ## Invariants
 
