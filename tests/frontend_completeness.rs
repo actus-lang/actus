@@ -167,7 +167,7 @@ fn realtime_role_contract_is_preserved_by_implementations() {
 #[test]
 fn bounded_contract_proves_ranges_and_call_budgets() {
     analyze_source(
-        "verb leaf() -> Int { return 0; } meta bounded(max_iterations: 4u32, max_calls: 4u32, max_call_depth: 1u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { leaf(); } return 0; }",
+        "meta bounded(max_iterations: 0u32) verb leaf() -> Int { return 0; } meta bounded(max_iterations: 4u32, max_calls: 4u32, max_call_depth: 1u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { leaf(); } return 0; }",
     )
     .expect("the exact bounded range and call budget should pass");
 
@@ -181,7 +181,7 @@ fn bounded_contract_proves_ranges_and_call_budgets() {
     assert_eq!(semantic_diagnostic(&range_error).code(), "E1130");
 
     let depth_error = expect_semantic_error(
-        "verb leaf() -> Int { return 0; } meta bounded(max_call_depth: 0u32) verb main() -> Int { leaf(); return 0; }",
+        "meta bounded(max_iterations: 0u32) verb leaf() -> Int { return 0; } meta bounded(max_call_depth: 0u32) verb main() -> Int { leaf(); return 0; }",
     );
     assert!(matches!(
         depth_error.kind,
@@ -205,6 +205,32 @@ fn bounded_contract_proves_ranges_and_call_budgets() {
         "meta bounded(max_stack_bytes: 4u64) verb main() -> Int { erg value: u32 = 0u32; return value; }",
     )
     .expect("a known scalar local should satisfy its stack budget");
+
+    let missing_callee_bound = expect_semantic_error(
+        "verb leaf() -> Int { return 0; } meta bounded(max_calls: 1u32) verb main() -> Int { leaf(); return 0; }",
+    );
+    assert!(matches!(
+        missing_callee_bound.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. } if required.contains("leaf")
+    ));
+
+    analyze_source(
+        "meta bounded(max_iterations: 2u32) verb leaf() -> Int { for erg index: u32 in 0u32..2u32 { } return 0; } meta bounded(max_iterations: 2u32) verb main() -> Int { leaf(); return 0; }",
+    )
+    .expect("a bounded callee contract should propagate to its caller");
+
+    analyze_source(
+        "meta bounded(max_iterations: 0u32) unsafe extern \"C\" verb host() -> Int; meta bounded(max_calls: 1u32) verb main() -> Int { host(); return 0; }",
+    )
+    .expect("a native boundary with an explicit bound should be callable");
+
+    let recursive_error = expect_semantic_error(
+        "meta bounded(max_iterations: 1u32) verb first() -> Int { second(); return 0; } meta bounded(max_iterations: 1u32) verb second() -> Int { first(); return 0; }",
+    );
+    assert!(matches!(
+        recursive_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. } if required == "recursive call path"
+    ));
 
     let loop_error = expect_semantic_error(
         "meta bounded(max_iterations: 4u32) verb main() -> Int { loop { break; } return 0; }",

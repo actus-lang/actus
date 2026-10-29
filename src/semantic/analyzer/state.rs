@@ -74,6 +74,7 @@ pub(crate) struct Analyzer {
     pub(crate) current_effects: Vec<Effect>,
     pub(crate) current_deterministic: bool,
     pub(crate) current_realtime: bool,
+    pub(crate) current_bounded: Option<crate::ast::BoundedContract>,
     pub(crate) current_verb_name: Option<String>,
 }
 

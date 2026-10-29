@@ -47,6 +47,12 @@ declared filesystem/network calls. Unknown allocation, layout, or I/O size is
 rejected rather than guessed. Native and imported boundaries must expose enough
 metadata for the selected budget to remain provable.
 
+Bounded signatures propagate through qualified imports, generic
+specializations, dynamic role methods, and native declarations. A bounded
+caller cannot call a callee without a bounded signature. Direct and mutual
+recursive paths reachable from a bounded verb are rejected until a finite
+recursion contract exists.
+
 `bounded` and `realtime` are independent. `bounded` concerns explicit resource
 budgets;
 it does not remove `blocking`, filesystem, network, allocation, clock, entropy,

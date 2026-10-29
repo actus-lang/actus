@@ -40,6 +40,7 @@ impl Analyzer {
                 });
             }
         }
+        self.validate_bounded_call(callee, signature, span)?;
         if self.current_realtime
             && signature.return_type_name.as_ref().is_some_and(type_contains_float)
         {
@@ -52,6 +53,37 @@ impl Analyzer {
             });
         }
         Ok(())
+    }
+
+    fn validate_bounded_call(
+        &self,
+        callee: &str,
+        signature: &VerbSignature,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if self.current_bounded.is_some() && signature.bounded.is_none() {
+            return Err(bounded_error(
+                "max_iterations",
+                0,
+                &format!("callee `{callee}` must declare a bounded contract"),
+                span,
+            ));
+        }
+        if self.current_bounded.is_some() && self.current_verb_name.as_deref() == Some(callee) {
+            return Err(bounded_error("max_call_depth", 0, "recursive call path", span));
+        }
+        Ok(())
+    }
+}
+
+fn bounded_error(dimension: &str, limit: u64, required: &str, span: SourceSpan) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::BoundedBudgetExceeded {
+            dimension: dimension.to_owned(),
+            limit,
+            required: required.to_owned(),
+        },
+        span,
     }
 }
 

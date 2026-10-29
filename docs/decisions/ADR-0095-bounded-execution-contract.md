@@ -50,6 +50,20 @@ and declared filesystem/network calls. Unknown allocation, layout, or I/O size
 is rejected rather than guessed. A runtime-dependent range endpoint is not
 treated as a proof of a finite bound merely because it is an integer.
 
+## Interprocedural boundary
+
+Bounded signatures propagate through qualified imports, generic
+specializations, dynamic role methods, and native declarations. A bounded
+caller cannot invoke a callee without an explicit compatible bounded
+signature. The callee's declared budgets are added to the caller's call and
+iteration budgets and are multiplied when the call occurs inside a proven
+loop.
+
+The compiler builds a local verb call graph and rejects direct and mutual
+recursive paths reachable from a bounded verb. Dynamic and native boundaries
+are treated as proof boundaries: their declared signature is required, and an
+unknown resource dimension remains an error rather than an assumed zero.
+
 ## Recursion and call graph
 
 Direct and mutual recursion require an explicit finite recursion contract.

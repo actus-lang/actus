@@ -37,6 +37,10 @@ impl Analyzer {
             .metadata
             .iter()
             .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Realtime));
+        self.current_bounded = verb.metadata.iter().find_map(|attribute| match attribute {
+            crate::ast::MetaAttribute::Bounded(contract) => Some(contract.clone()),
+            _ => None,
+        });
         self.current_verb_name = Some(verb.name.clone());
         self.current_return_access =
             verb.return_type.as_ref().map(|return_type| return_type.access);

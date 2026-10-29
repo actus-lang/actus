@@ -285,7 +285,7 @@ fn arguments_cost(
 }
 
 fn call_cost(analyzer: &Analyzer, callee: &str, arguments: Cost) -> Cost {
-    let Some(signature) = analyzer.signatures.get(callee) else {
+    let Some(signature) = signature_for_call(analyzer, callee) else {
         return Cost {
             calls: arguments.calls.saturating_add(1),
             call_depth: arguments.call_depth.saturating_add(1),
@@ -296,19 +296,57 @@ fn call_cost(analyzer: &Analyzer, callee: &str, arguments: Cost) -> Cost {
     let io = signature.effects.iter().any(|effect| {
         matches!(effect, crate::ast::Effect::Filesystem | crate::ast::Effect::Network)
     });
+    let bounded = signature.bounded.as_ref();
     Cost {
-        iterations: arguments.iterations,
-        calls: arguments.calls.saturating_add(1),
-        call_depth: arguments.call_depth.saturating_add(1),
+        iterations: add_known(
+            arguments.iterations,
+            bounded.and_then(|value| value.max_iterations.map(u64::from)),
+        ),
+        calls: arguments
+            .calls
+            .saturating_add(1)
+            .saturating_add(bounded.and_then(|value| value.max_calls).map_or(0, u64::from)),
+        call_depth: arguments.call_depth.saturating_add(1).max(
+            bounded.and_then(|value| value.max_call_depth).map_or(0, u64::from).saturating_add(1),
+        ),
         allocations: if allocation {
-            arguments.allocations.map(|value| value.saturating_add(1))
+            add_known(
+                arguments.allocations,
+                bounded.and_then(|value| value.max_allocations.map(u64::from)),
+            )
         } else {
             arguments.allocations
         },
-        allocation_bytes: allocation.then_some(None).flatten().or(arguments.allocation_bytes),
-        io_bytes: io.then_some(None).flatten().or(arguments.io_bytes),
-        stack_bytes: arguments.stack_bytes,
+        allocation_bytes: if allocation {
+            add_known(
+                arguments.allocation_bytes,
+                bounded.and_then(|value| value.max_allocation_bytes),
+            )
+        } else {
+            arguments.allocation_bytes
+        },
+        io_bytes: if io {
+            add_known(arguments.io_bytes, bounded.and_then(|value| value.max_io_bytes))
+        } else {
+            arguments.io_bytes
+        },
+        stack_bytes: add_known(
+            arguments.stack_bytes,
+            bounded.and_then(|value| value.max_stack_bytes),
+        ),
     }
+}
+
+fn signature_for_call<'a>(
+    analyzer: &'a Analyzer,
+    callee: &str,
+) -> Option<&'a super::super::calls::VerbSignature> {
+    analyzer.signatures.get(callee).or_else(|| {
+        let suffix = format!("::{callee}");
+        let mut matches = analyzer.signatures.iter().filter(|(name, _)| name.ends_with(&suffix));
+        let (name, _) = matches.next()?;
+        matches.next().is_none().then(|| &analyzer.signatures[name])
+    })
 }
 
 fn validate_limit(
