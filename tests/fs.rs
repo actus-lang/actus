@@ -315,7 +315,7 @@ fn std_fs_api_builds_with_reader_writer_and_drop_contracts() {
     let data_path = root.join("roundtrip.bin");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg payload = Buffer[0]; append(payload, 65); append(payload, 66); erg created_result = file_create(path: abs path); case dat created_result {{ Result.Ok(created) => {{ erg file: File = created; file.write(buffer: abs payload); file.flush(); }}, Result.Err(_) => {{ return Result[Int, IoError].Ok(0); }}, }}; erg reopened_result = file_open(path: abs path); case dat reopened_result {{ Result.Ok(reopened) => {{ erg file: File = reopened; erg destination = Buffer[128]; erg read_result = file.read(buffer: ins destination); return case dat read_result {{ Result.Ok(count) => Result[Int, IoError].Ok(count), Result.Err(_) => Result[Int, IoError].Ok(0), }}; }}, Result.Err(_) => {{ return Result[Int, IoError].Ok(0); }}, }}; return Result[Int, IoError].Ok(0); }} verb main() -> Int {{ round_trip(); return 0; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg payload = Buffer[0]; append(payload, 65); append(payload, 66); erg created_result = file_create(path: abs path); case dat created_result {{ Result.Ok(created) => {{ erg file: File = created; file.write(buffer: abs payload); file.flush(); }}, Result.Err(_) => {{ return Result[Int, IoError].Ok(0); }}, }}; erg reopened_result = file_open(path: abs path); case dat reopened_result {{ Result.Ok(reopened) => {{ erg file: File = reopened; erg destination = Buffer[128]; erg read_result = file.read(buffer: ins destination); return case dat read_result {{ Result.Ok(count) => Result[Int, IoError].Ok(count), Result.Err(_) => Result[Int, IoError].Ok(0), }}; }}, Result.Err(_) => {{ return Result[Int, IoError].Ok(0); }}, }}; return Result[Int, IoError].Ok(0); }} meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ round_trip(); return 0; }}"
     );
     let input = source_root.join("main.act");
     fs::write(&input, prepare_source(&source)).expect("write Actus fixture");
@@ -345,7 +345,7 @@ fn std_fs_seek_reads_from_start_after_writing() {
     let data_path = root.join("seek.bin");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb seek_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg payload = Buffer[0]; append(payload, 65); append(payload, 66); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs payload); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg origin = SeekFrom.Start(0); erg moved = file.seek(from: dat origin); case dat moved {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg destination = Buffer[0]; erg capacity = 2; reserve(buffer: ins destination, capacity: capacity); erg result = file.read(buffer: ins destination); case dat result {{ Result.Ok(count) => {{ return Result[Int, IoError].Ok(count); }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Result[Int, IoError].Err(IoError.Failed); }} verb main() -> Int {{ erg result = seek_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 99, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb seek_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg payload = Buffer[0]; append(payload, 65); append(payload, 66); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs payload); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg origin = SeekFrom.Start(0); erg moved = file.seek(from: dat origin); case dat moved {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg destination = Buffer[0]; erg capacity = 2; reserve(buffer: ins destination, capacity: capacity); erg result = file.read(buffer: ins destination); case dat result {{ Result.Ok(count) => {{ return Result[Int, IoError].Ok(count); }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Result[Int, IoError].Err(IoError.Failed); }} meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg result = seek_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 99, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
@@ -359,7 +359,7 @@ fn std_fs_open_options_append_preserves_existing_bytes() {
     let data_path = root.join("append.bin");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb append_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg first = Buffer[0]; append(first, 65); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs first); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg empty = options_new(); erg writable = options_write(dat empty); erg appendable = options_append(dat writable); erg opened = options_open(options: dat appendable, path: abs path); case dat opened {{ Result.Ok(value) => {{ erg file: File = value; erg second = Buffer[0]; append(second, 66); erg written = file.write(buffer: abs second); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Ok(2); }} verb main() -> Int {{ erg result = append_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 1, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb append_round_trip() -> Result[Int, IoError] {{ erg path = Buffer[0]; {path} erg first = Buffer[0]; append(first, 65); erg created = file_create(path: abs path); case dat created {{ Result.Ok(value) => {{ erg file: File = value; erg written = file.write(buffer: abs first); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; erg empty = options_new(); erg writable = options_write(dat empty); erg appendable = options_append(dat writable); erg opened = options_open(options: dat appendable, path: abs path); case dat opened {{ Result.Ok(value) => {{ erg file: File = value; erg second = Buffer[0]; append(second, 66); erg written = file.write(buffer: abs second); case dat written {{ Result.Ok(_) => 0, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; }}, Result.Err(error) => {{ return Result[Int, IoError].Err(error); }}, }}; return Ok(2); }} meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg result = append_round_trip(); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 1, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
@@ -375,7 +375,7 @@ fn std_fs_metadata_reports_file_size_and_kind() {
     fs::write(&data_path, b"AB").expect("write metadata fixture");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb main() -> Int {{ erg path = Buffer[0]; {path} erg result = metadata(path: abs path); return case dat result {{ Result.Ok(value) => {{ erg info: Metadata = value; return case info.size {{ 2 => case info.is_file {{ 1 => case info.is_dir {{ 0 => 0, _ => 1, }}, _ => 1, }}, _ => 1, }}; }}, Result.Err(_) => 2, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg path = Buffer[0]; {path} erg result = metadata(path: abs path); return case dat result {{ Result.Ok(value) => {{ erg info: Metadata = value; return case info.size {{ 2 => case info.is_file {{ 1 => case info.is_dir {{ 0 => 0, _ => 1, }}, _ => 1, }}, _ => 1, }}; }}, Result.Err(_) => 2, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
@@ -395,7 +395,7 @@ fn std_fs_rename_and_remove_file_execute_natively() {
     fs::create_dir_all(&root).expect("create rename fixture");
     fs::write(&source_path, b"A").expect("write rename source");
     let rename_source = format!(
-        "import io; import fs; verb main() -> Int {{ erg renamed = Buffer[0]; {renamed_literal} erg source = Buffer[0]; {source_literal} erg moved = rename(from: abs source, to: abs renamed); return case dat moved {{ Result.Ok(_) => 0, Result.Err(_) => 1, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg renamed = Buffer[0]; {renamed_literal} erg source = Buffer[0]; {source_literal} erg moved = rename(from: abs source, to: abs renamed); return case dat moved {{ Result.Ok(_) => 0, Result.Err(_) => 1, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &rename_source);
     build_and_run(&input, &output);
@@ -403,7 +403,7 @@ fn std_fs_rename_and_remove_file_execute_natively() {
     assert!(renamed_path.exists());
 
     let remove_source = format!(
-        "import io; import fs; verb main() -> Int {{ erg renamed = Buffer[0]; {renamed_literal} erg removed = remove_file(path: abs renamed); return case dat removed {{ Result.Ok(_) => 0, Result.Err(_) => 1, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg renamed = Buffer[0]; {renamed_literal} erg removed = remove_file(path: abs renamed); return case dat removed {{ Result.Ok(_) => 0, Result.Err(_) => 1, }}; }}"
     );
     fs::write(&input, prepare_source(&remove_source)).expect("write remove fixture");
     build_and_run(&input, &output);
@@ -417,7 +417,7 @@ fn std_fs_one_shot_write_and_read_to_string_execute_natively() {
     let data_path = root.join("one-shot.bin");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; append(contents, 88); append(contents, 89); erg written = write_file(path: abs path, contents: abs contents); return case dat written {{ Result.Ok(_) => {{ erg loaded = read_to_string(path: abs path); return case dat loaded {{ Result.Ok(_) => 0, Result.Err(_) => 2, }}; }}, Result.Err(_) => 1, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; append(contents, 88); append(contents, 89); erg written = write_file(path: abs path, contents: abs contents); return case dat written {{ Result.Ok(_) => {{ erg loaded = read_to_string(path: abs path); return case dat loaded {{ Result.Ok(_) => 0, Result.Err(_) => 2, }}; }}, Result.Err(_) => 1, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
@@ -433,7 +433,7 @@ fn std_fs_atomic_write_publishes_after_staging_flush() {
     let data_literal = path_literal_for(&data_path, "data");
     let staging_literal = path_literal_for(&staging_path, "staging");
     let source = format!(
-        "import io; import fs; verb main() -> Int {{ erg data_raw = Buffer[0]; {data_literal} erg staging_raw = Buffer[0]; {staging_literal} erg contents = Buffer[0]; append(contents, 65); append(contents, 66); erg result = write_file_atomic(path: abs data, staging: dat staging, contents: abs contents); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 2, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg data_raw = Buffer[0]; {data_literal} erg staging_raw = Buffer[0]; {staging_literal} erg contents = Buffer[0]; append(contents, 65); append(contents, 66); erg result = write_file_atomic(path: abs data, staging: dat staging, contents: abs contents); return case dat result {{ Result.Ok(count) => case count {{ 2 => 0, _ => 1, }}, Result.Err(_) => 2, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
@@ -451,7 +451,7 @@ fn std_fs_atomic_write_removes_staging_after_failed_publication() {
     let data_literal = path_literal_for(&data_path, "data");
     let staging_literal = path_literal_for(&staging_path, "staging");
     let source = format!(
-        "import io; import fs; verb main() -> Int {{ erg data_raw = Buffer[0]; {data_literal} erg staging_raw = Buffer[0]; {staging_literal} erg contents = Buffer[0]; append(contents, 65); erg result = write_file_atomic(path: abs data, staging: dat staging, contents: abs contents); return case dat result {{ Result.Ok(_) => 1, Result.Err(_) => 0, }}; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg data_raw = Buffer[0]; {data_literal} erg staging_raw = Buffer[0]; {staging_literal} erg contents = Buffer[0]; append(contents, 65); erg result = write_file_atomic(path: abs data, staging: dat staging, contents: abs contents); return case dat result {{ Result.Ok(_) => 1, Result.Err(_) => 0, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
@@ -466,7 +466,7 @@ fn std_fs_round_trips_a_large_position_independent_payload() {
     let data_path = root.join("large.brain");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb fill(ins buffer: Buffer) {{ erg index: u32 = 0u32; loop {{ if index >= 4096u32 {{ break; }} append(buffer, 65u8); index += 1u32; }} }} verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; erg capacity: Int = 4116; reserve(buffer: ins contents, capacity: erg capacity); fill(buffer: ins contents); erg written = write_file(path: abs path, contents: abs contents); return case dat written {{ Result.Ok(count) => case count {{ 4096 => 0, _ => 1, }}, Result.Err(_) => 2, }}; }}"
+        "import io; import fs; verb fill(ins buffer: Buffer) {{ erg index: u32 = 0u32; loop {{ if index >= 4096u32 {{ break; }} append(buffer, 65u8); index += 1u32; }} }} meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; erg capacity: Int = 4116; reserve(buffer: ins contents, capacity: erg capacity); fill(buffer: ins contents); erg written = write_file(path: abs path, contents: abs contents); return case dat written {{ Result.Ok(count) => case count {{ 4096 => 0, _ => 1, }}, Result.Err(_) => 2, }}; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
@@ -480,7 +480,7 @@ fn std_fs_read_to_bytes_and_rejects_invalid_utf8() {
     let data_path = root.join("bytes.bin");
     let path = path_literal(&data_path);
     let source = format!(
-        "import io; import fs; verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; append(contents, 255); write_file(path: abs path, contents: abs contents); erg bytes = read_to_bytes(path: abs path); case dat bytes {{ Result.Ok(_) => {{ erg text = read_to_string(path: abs path); return case dat text {{ Result.Err(_) => 0, Result.Ok(_) => 1, }}; }}, Result.Err(_) => {{ return 1; }}, }}; return 1; }}"
+        "import io; import fs; meta effect(\"filesystem\", \"blocking\") verb main() -> Int {{ erg path = Buffer[0]; {path} erg contents = Buffer[0]; append(contents, 255); write_file(path: abs path, contents: abs contents); erg bytes = read_to_bytes(path: abs path); case dat bytes {{ Result.Ok(_) => {{ erg text = read_to_string(path: abs path); return case dat text {{ Result.Err(_) => 0, Result.Ok(_) => 1, }}; }}, Result.Err(_) => {{ return 1; }}, }}; return 1; }}"
     );
     let (input, output) = write_fixture(&root, "main.act", &source);
     build_and_run(&input, &output);
