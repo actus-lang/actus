@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
-use crate::ast::{Param, PerformDecl, RoleDecl, RoleMethod, TopLevelDecl, TypeName};
+use crate::ast::{Effect, Param, PerformDecl, RoleDecl, RoleMethod, TopLevelDecl, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
+use super::dynamic::role_method_signature;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
@@ -153,6 +154,19 @@ impl Analyzer {
                     implementation.span,
                 ));
             }
+            let expected = role_method_signature(required).effects;
+            let found = implementation.signature().effects;
+            if !same_effects(&expected, &found) {
+                return Err(role_error(
+                    SemanticErrorKind::RoleMethodEffectMismatch {
+                        role: perform.role_name.clone(),
+                        method: required.name.clone(),
+                        expected,
+                        found,
+                    },
+                    implementation.span,
+                ));
+            }
         }
         Ok(())
     }
@@ -259,6 +273,10 @@ impl Analyzer {
                 .zip(&right.arguments)
                 .all(|(left, right)| self.imported_type_names_match(left, right))
     }
+}
+
+fn same_effects(left: &[Effect], right: &[Effect]) -> bool {
+    left.len() == right.len() && left.iter().all(|effect| right.contains(effect))
 }
 
 fn is_self_type(type_name: &TypeName) -> bool {

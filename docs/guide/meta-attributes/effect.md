@@ -1,19 +1,18 @@
-# `meta effect(...)` (proposed)
+# `meta effect(...)`
 
-`meta effect(...)` is a proposed compiler contract for making operational
-properties of a verb visible at its declaration and call sites. The first
-compiler slice parses the closed vocabulary, preserves it in verb signatures,
-and rejects callers that omit a callee's declared effect. The contract is not
-accepted as stable yet; use it only in dedicated development fixtures.
+`meta effect(...)` is a compiler contract for making operational
+properties of a verb visible at its declaration and call sites. The compiler
+parses the closed vocabulary, preserves it in verb signatures, and rejects
+callers that omit a callee's declared effect.
 
-The proposed form is:
+The form is:
 
 ```actus
 meta effect("filesystem")
-verb load_manifest(abs path: Path) -> Result[Manifest, IoError] { ... }
+open verb load_manifest(abs path: Path) -> Result[Manifest, IoError] { ... }
 ```
 
-The initial candidate vocabulary is deliberately closed:
+The supported vocabulary is deliberately closed:
 
 - `blocking`
 - `filesystem`
@@ -21,8 +20,8 @@ The initial candidate vocabulary is deliberately closed:
 - `allocation`
 - `entropy`
 
-The final vocabulary and propagation rules are not accepted yet. The compiler
-must reject unknown names rather than treating them as documentation-only
+The vocabulary and propagation rules are compiler contracts. The compiler must
+reject unknown names rather than treating them as documentation-only
 annotations.
 
 ## Intended contract
@@ -37,6 +36,37 @@ or imply that an operation is safe in a realtime or bounded context. A later
 restricted-context attribute may consume these contracts, but that policy must
 be specified separately.
 
-The feature is ready for implementation only after its ADR is accepted and the
-call-graph, recursion, dispatch, target, diagnostic, formatter, and LSP rules
-are covered by strict fixtures.
+## Role and dynamic-dispatch contracts
+
+Role methods may declare effects:
+
+```actus
+role Writer {
+    meta effect("filesystem")
+    verb write(abs self: File) -> Int;
+}
+
+perform Writer for File {
+    meta effect("filesystem")
+    verb write(abs self: File) -> Int { return 0; }
+}
+```
+
+The role method and every implementation must carry exactly the same effect
+set. An implementation may not omit a role effect or add an effect that the
+role interface does not expose, because either case would make a dynamic or
+generic call graph unsound. Dynamic and generic role-bound calls therefore use
+the role method's declared effects when checking their caller.
+
+External ABI declarations use the same rule as ordinary verbs:
+
+```actus
+meta effect("network")
+extern "C" verb host_call() -> Int;
+```
+
+The caller must explicitly declare `network`; the metadata does not authorize
+the native operation or insert a runtime guard.
+
+The contract is compile-time only. It does not authorize an operation, alter
+ownership, or by itself make a verb safe for a realtime or bounded context.

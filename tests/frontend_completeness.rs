@@ -73,6 +73,67 @@ fn effects_are_declared_by_callers_and_rejected_when_omitted() {
 }
 
 #[test]
+fn effects_propagate_through_transitive_and_external_calls() {
+    let transitive = expect_semantic_error(
+        "meta effect(\"filesystem\") verb leaf() -> Int { return 0; } meta effect(\"filesystem\") verb middle() -> Int { leaf(); return 0; } verb root() -> Int { middle(); return 0; }",
+    );
+    assert!(matches!(
+        transitive.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "middle" && effect == actus::ast::Effect::Filesystem
+    ));
+
+    let external = expect_semantic_error(
+        "meta effect(\"network\") extern \"C\" verb host() -> Int; verb main() -> Int { host(); return 0; }",
+    );
+    assert!(matches!(
+        external.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "host" && effect == actus::ast::Effect::Network
+    ));
+
+    analyze_source(
+        "meta effect(\"network\") extern \"C\" verb host() -> Int; meta effect(\"network\") verb main() -> Int { host(); return 0; }",
+    )
+    .expect("external effect contracts must be declarable at the caller");
+}
+
+#[test]
+fn recursive_effect_calls_require_the_declared_contract_on_the_recursive_verb() {
+    analyze_source(
+        "meta effect(\"filesystem\") verb walk() -> Int { if 1 == 1 { return walk(); } return 0; } meta effect(\"filesystem\") verb main() -> Int { return walk(); }",
+    )
+    .expect("a recursive call may use the effect declared by its own verb");
+}
+
+#[test]
+fn imported_facades_preserve_effectful_public_signatures() {
+    let fixture = ModuleFixture::new();
+    fixture.write("effects/effects.act", "open api;");
+    fixture.write(
+        "effects/api.act",
+        "meta effect(\"filesystem\") open verb load() -> Int { return 0; }",
+    );
+    let missing = parse_source("import effects; verb main() -> Int { effects::load(); return 0; }")
+        .expect("imported effect fixture should parse");
+    let error = analyze_with_imports(&missing, &ModuleResolver::new(&fixture.root))
+        .expect_err("imported effects must not be erased by a facade");
+    let ModuleError::Semantic(error) = error else { panic!("expected semantic error") };
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "effects::load" && effect == actus::ast::Effect::Filesystem
+    ));
+
+    let declared = parse_source(
+        "import effects; meta effect(\"filesystem\") verb main() -> Int { effects::load(); return 0; }",
+    )
+    .expect("declared imported effect fixture should parse");
+    analyze_with_imports(&declared, &ModuleResolver::new(&fixture.root))
+        .expect("declared imported effect should pass");
+}
+
+#[test]
 fn name_resolution_rules_have_positive_and_negative_fixtures() {
     analyze_source(
         "struct Point { x: Int, } verb known(erg point: Point) { } verb main() -> Int { erg point = Point { x: 1, }; known(point: point); return point.x; }",

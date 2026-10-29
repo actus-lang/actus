@@ -1,3 +1,4 @@
+use actus::diagnostics::semantic_diagnostic;
 use actus::lexer::scan;
 use actus::parser::parse;
 use actus::semantic::{ArgumentRoleSource, SemanticErrorKind, SemanticModel, analyze};
@@ -13,6 +14,27 @@ const VALID_WRITER: &str = "struct File { value: Int, } role Writer { verb write
 #[test]
 fn validates_a_performance_against_its_role_contract() {
     analyze_source(VALID_WRITER).expect("matching role performance should pass");
+}
+
+#[test]
+fn requires_role_and_performance_effect_contracts_to_match() {
+    let valid = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(valid).expect("matching role and implementation effects should pass");
+
+    let mismatch = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } }";
+    let error = analyze_source(mismatch).expect_err("under-declared performance effects must fail");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::RoleMethodEffectMismatch { ref role, ref method, .. } if role == "Writer" && method == "write")
+    );
+    assert_eq!(semantic_diagnostic(&error).code(), "E1122");
+
+    let extra = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return 1; } }";
+    let error = analyze_source(extra).expect_err("implementation-only effects must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodEffectMismatch { role, method, .. }
+            if role == "Writer" && method == "write"
+    ));
 }
 
 #[test]

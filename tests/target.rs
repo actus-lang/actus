@@ -34,6 +34,24 @@ fn filters_non_matching_target_declarations_before_semantic_analysis() {
 }
 
 #[test]
+fn target_filtering_preserves_effect_contracts() {
+    let source = "meta effect(\"filesystem\") verb load() -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("effect metadata should parse");
+    let target = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("target should parse");
+    let filtered = filter_program_for_target(&program, &target);
+    let actus::ast::TopLevelDecl::Verb(verb) = &filtered.declarations[0] else {
+        panic!("expected effectful verb")
+    };
+    assert_eq!(
+        verb.metadata,
+        vec![actus::ast::MetaAttribute::Effect(actus::ast::Effect::Filesystem)]
+    );
+    analyze(&filtered).expect("target filtering must not erase effect metadata");
+}
+
+#[test]
 fn filters_all_supported_metadata_platform_families_deterministically() {
     let source = concat!(
         "meta target(\"unix\") verb unix_only() -> Int { return 1; }\n",

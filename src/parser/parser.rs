@@ -160,7 +160,10 @@ impl Parser {
         Ok(Program { file_metadata, declarations })
     }
 
-    fn reject_duplicate_metadata(&self, metadata: &[MetaAttribute]) -> Result<(), ParseError> {
+    pub(in crate::parser) fn reject_duplicate_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
         if metadata.iter().filter(|attribute| matches!(attribute, MetaAttribute::Test)).count() > 1
         {
             return Err(ParseError {

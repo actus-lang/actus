@@ -196,6 +196,23 @@ fn resolves_static_reader_method_calls_through_a_generic_bound() {
 }
 
 #[test]
+fn generic_role_bound_calls_preserve_effects() {
+    let source = "struct Input { state: Int, } role Reader { meta effect(\"filesystem\") verb read(abs self: Input); } perform Reader for Input { meta effect(\"filesystem\") verb read(abs self: Input) { } } struct Adapter[Source: Reader] { erg source: Source, } verb refill[Source: Reader](ins adapter: Adapter[Source]) { adapter.source.read(); }";
+    let error = analyze_source(source).expect_err("generic callers must declare role effects");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "read" && effect == actus::ast::Effect::Filesystem
+    ));
+
+    let declared = source.replace(
+        "verb refill[Source: Reader]",
+        "meta effect(\"filesystem\") verb refill[Source: Reader]",
+    );
+    analyze_source(&declared).expect("declared generic role effect should pass");
+}
+
+#[test]
 fn rejects_non_reader_type_in_generic_stream_adapter() {
     let error = analyze_source(
         "struct Input { state: Int, } struct Other { state: Int, } role Reader { verb read(abs self: Input, ins buffer: Buffer); } struct Adapter[Source: Reader] { erg source: Source, erg buffer: Buffer, } verb main(erg adapter: Adapter[Other]) { }",

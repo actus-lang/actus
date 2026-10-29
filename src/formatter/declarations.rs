@@ -62,6 +62,12 @@ impl Formatter<'_> {
                 self.emit_comments_before(method.span.start);
             }
             self.documentation(method.doc.as_deref());
+            for metadata in &method.metadata {
+                self.line_indent();
+                self.output.push_str("meta ");
+                self.output.push_str(&meta_name(metadata));
+                self.output.push('\n');
+            }
             self.line_indent();
             self.output.push_str("verb ");
             self.output.push_str(&method.name);
@@ -429,58 +435,6 @@ impl Formatter<'_> {
         self.documentation(sibling.doc.as_deref());
         self.output.push_str("open ");
         self.output.push_str(&sibling.name);
-        self.output.push(';');
-    }
-
-    pub(super) fn import(&mut self, import: &crate::ast::ImportDecl) {
-        self.output.push_str("import ");
-        if import.is_open {
-            self.output.push_str("open ");
-        }
-        self.output.push_str(&import.path);
-        if !import.selected.is_empty() {
-            self.output.push_str(" {");
-            for (index, name) in import.selected.iter().enumerate() {
-                if index > 0 {
-                    self.output.push_str(", ");
-                }
-                self.output.push_str(name);
-            }
-            self.output.push('}');
-        }
-        if let Some(alias) = &import.alias {
-            self.output.push_str(" as ");
-            self.output.push_str(alias);
-        }
-        self.output.push(';');
-    }
-
-    pub(super) fn import_group(&mut self, declarations: &[crate::ast::TopLevelDecl]) {
-        self.output.push_str("import {\n");
-        for declaration in declarations {
-            let crate::ast::TopLevelDecl::Import(import) = declaration else { continue };
-            self.output.push_str("    ");
-            if import.is_open {
-                self.output.push_str("open ");
-            }
-            self.output.push_str(&import.path);
-            if !import.selected.is_empty() {
-                self.output.push_str(" {");
-                for (index, name) in import.selected.iter().enumerate() {
-                    if index > 0 {
-                        self.output.push_str(", ");
-                    }
-                    self.output.push_str(name);
-                }
-                self.output.push('}');
-            }
-            if let Some(alias) = &import.alias {
-                self.output.push_str(" as ");
-                self.output.push_str(alias);
-            }
-            self.output.push_str(",\n");
-        }
-        self.output.push('}');
         self.output.push(';');
     }
 }

@@ -1,6 +1,6 @@
 # ADR-0091: Explicit effect metadata
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-29
 - Scope: `meta effect(...)`, effect declarations, call-graph propagation,
   diagnostics, tooling, and target-specific effect policy
@@ -13,7 +13,7 @@ by individual APIs and review. A compiler-recognized effect contract can make
 the boundary checkable without hiding ownership, adding runtime reflection, or
 turning a performance hint into a safety guarantee.
 
-## Proposed decision
+## Decision
 
 Introduce a declaration-level form:
 
@@ -22,8 +22,8 @@ meta effect("filesystem")
 verb load_manifest(abs path: Path) -> Result[Manifest, IoError] { ... }
 ```
 
-The first accepted effect vocabulary is intentionally closed and compiler
-registered. Initial candidates are `blocking`, `filesystem`, `network`,
+The accepted effect vocabulary is intentionally closed and compiler-registered:
+`blocking`, `filesystem`, `network`,
 `allocation`, and `entropy`. An unknown effect name is a compile-time error;
 there is no user-defined escape hatch and no wildcard effect.
 
@@ -33,10 +33,18 @@ may explicitly declare compatible effects, but a declaration must not erase,
 rename, or under-report a callee effect. Native declarations require the same
 explicit contract at the ABI boundary.
 
-This ADR remains Proposed until the propagation model, recursive-call rules,
-generic substitution, dynamic dispatch, target filtering, and diagnostics have
-dedicated fixtures and a reviewed policy for restricted contexts such as
-`meta realtime`.
+Role methods are effect-bearing interface contracts. Every `perform`
+implementation must declare exactly the same closed effect set as its role
+method. This exact-match rule prevents a dynamic or generic role call from
+silently hiding an implementation-only effect. A role method's signature is
+therefore the effect boundary used by dynamic dispatch and generic role-bound
+calls.
+
+Target filtering is effect-neutral: target selection may remove a declaration
+because of its target metadata, but it must never remove or rewrite effects on
+a declaration that remains. The accepted contract does not define a restricted
+context such as `meta realtime`; a future restricted-context ADR may consume
+these effect signatures without changing their meaning.
 
 ## Safety invariants
 
@@ -46,6 +54,8 @@ dedicated fixtures and a reviewed policy for restricted contexts such as
   declared capability or operational property.
 - Callers cannot suppress effects with aliases, generics, facades, or external
   declarations.
+- Role methods and their implementations must have identical effect sets;
+  under-declaration and implementation-only effects are both rejected.
 - The compiler must reject under-declared callers deterministically.
 - Effect checking must not infer hidden allocation or filesystem behavior from
   names; only registered signatures and native contracts provide evidence.

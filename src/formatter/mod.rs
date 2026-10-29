@@ -4,6 +4,7 @@ use crate::lexer::SourceSpan;
 mod declaration_widths;
 mod declarations;
 mod expressions;
+mod imports;
 mod statements;
 
 pub fn format_program(program: &Program) -> String {

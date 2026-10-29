@@ -200,6 +200,7 @@ fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::DuplicateRoleMethod { .. } => "E1057",
         SemanticErrorKind::MissingRoleMethod { .. } => "E1058",
         SemanticErrorKind::RoleMethodMismatch { .. } => "E1059",
+        SemanticErrorKind::RoleMethodEffectMismatch { .. } => "E1122",
         SemanticErrorKind::InvalidRoleReceiver { .. } => "E1060",
         _ => return None,
     })

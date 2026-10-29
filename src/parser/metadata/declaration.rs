@@ -9,15 +9,16 @@ impl Parser {
         doc: Option<String>,
     ) -> Result<TopLevelDecl, ParseError> {
         self.validate_metadata_target(&metadata)?;
+        let is_open = self.match_simple(TokenKind::Open);
         if self.check_simple(&TokenKind::Verb) {
-            let verb = self.parse_verb_with_metadata(false, metadata.clone(), doc)?;
+            let verb = self.parse_verb_with_metadata(is_open, metadata.clone(), doc)?;
             ensure_must_use_return(&metadata, verb.return_type.is_some(), verb.span)?;
             return Ok(TopLevelDecl::Verb(verb));
         }
         if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
             let verb = self.parse_external_verb(
                 self.check_simple(&TokenKind::Unsafe),
-                false,
+                is_open,
                 metadata,
                 doc,
             )?;

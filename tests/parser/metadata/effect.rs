@@ -34,3 +34,11 @@ fn rejects_non_string_effect_arguments() {
     let error = parse_error("meta effect(filesystem) verb operation() -> Int { return 0; }");
     assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
 }
+
+#[test]
+fn preserves_open_visibility_for_effectful_verbs() {
+    let program = parse_source("meta effect(\"filesystem\") open verb load() -> Int { return 0; }");
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert!(verb.is_open);
+    assert!(verb.metadata.contains(&MetaAttribute::Effect(Effect::Filesystem)));
+}

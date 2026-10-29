@@ -132,6 +132,12 @@ pub enum SemanticErrorKind {
         role: String,
         method: String,
     },
+    RoleMethodEffectMismatch {
+        role: String,
+        method: String,
+        expected: Vec<crate::ast::Effect>,
+        found: Vec<crate::ast::Effect>,
+    },
     InvalidRoleReceiver {
         role: String,
         method: String,
