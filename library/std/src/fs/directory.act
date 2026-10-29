@@ -243,6 +243,7 @@ The operation performs no unbounded allocation; callers may release the
 resource explicitly with `close_dir`, while Drop provides best-effort cleanup
 on scope exit.
 """
+meta effect("filesystem", "blocking")
 open verb read_dir(abs path: path_module::Path) -> Result[Directory, io::IoError] {
     erg handle = actus_directory_open(path: abs path);
     erg failed: Bool = handle == -1;
@@ -271,6 +272,7 @@ most `DIRECTORY_MAX_ORDERED_ENTRIES` entries and returns `InvalidInput` when a
 name or directory exceeds the bounded snapshot contract. The operation does
 not expose native pointers or allow an unbounded array.
 """
+meta effect("filesystem", "blocking")
 open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrder) -> Result[Directory, io::IoError] {
     erg filter = directory_filter_default();
     return read_dir_ordered_with_filter(
@@ -280,6 +282,7 @@ open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrde
     );
 }
 
+meta effect("filesystem", "blocking")
 verb read_dir_ordered_with_filter(
     abs path: path_module::Path,
     erg order: DirectoryOrder,
@@ -322,6 +325,7 @@ The filter is transferred into the returned `Directory`, so its optional
 extension path remains owned for the iterator lifetime. Entries rejected by
 the filter are consumed from the native stream and never returned to callers.
 """
+meta effect("filesystem", "blocking")
 open verb read_dir_filtered(
     abs path: path_module::Path,
     erg order: DirectoryOrder,
@@ -387,6 +391,7 @@ describes the directory entry itself rather than following a symbolic link.
 Errors are returned as typed `IoError` values and leave the directory owner
 available for explicit close.
 """
+meta effect("filesystem", "blocking")
 open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEntry], io::IoError] {
     loop {
         erg storage: Buffer = Buffer[4096];
@@ -488,6 +493,7 @@ The input directory is borrowed through `ins`, not copied or consumed.
 Returns `Ok(0)` on successful release or `Err(IoError.Failed)` when the host
 handle is already invalid or cannot be released. No allocation is performed.
 """
+meta effect("filesystem", "blocking")
 open verb close_dir(ins directory: Directory) -> Result[Int, io::IoError] {
     erg status = actus_directory_close(handle: abs directory.handle);
     return case status {
@@ -502,6 +508,7 @@ open verb close_dir(ins directory: Directory) -> Result[Int, io::IoError] {
 """Close a live directory handle during deterministic scope cleanup."""
 open perform Drop for Directory {
     """Close the owned Directory resource through an ins loan during best-effort early return, branch exit, and implicit scope cleanup."""
+    meta effect("filesystem", "blocking")
     verb drop(ins self: Directory) {
         close_dir(directory: ins self);
     }
