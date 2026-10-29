@@ -156,6 +156,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::FaultRequiresTest => {
             "fault metadata requires `meta test` on the same declaration".to_owned()
         }
+        ParseErrorKind::TestMetadataRequiresVerb => {
+            "test metadata can only be attached to an ordinary verb".to_owned()
+        }
         ParseErrorKind::MalformedVerbContract { reason } => {
             format!("malformed verb contract: {reason}")
         }

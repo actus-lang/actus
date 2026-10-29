@@ -169,6 +169,19 @@ impl Parser {
                 span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
             });
         }
+        if metadata.iter().any(|attribute| {
+            matches!(
+                attribute,
+                crate::ast::MetaAttribute::Test | crate::ast::MetaAttribute::Fault(_)
+            )
+        }) && (self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::TestMetadataRequiresVerb,
+                kind: ParseErrorKind::TestMetadataRequiresVerb,
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
         if self.check_simple(&TokenKind::Verb) {
             return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
         }

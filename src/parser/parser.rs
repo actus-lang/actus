@@ -33,6 +33,7 @@ pub enum ParseErrorKind {
     UnsupportedLimitlessScope { name: String },
     DuplicateMetadata { name: String },
     FaultRequiresTest,
+    TestMetadataRequiresVerb,
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
 }
@@ -51,6 +52,7 @@ pub enum ParseErrorCode {
     UnsupportedLimitlessScope,
     DuplicateMetadata,
     FaultRequiresTest,
+    TestMetadataRequiresVerb,
     MalformedVerbContract,
     OpenImportRequiresBlock,
 }

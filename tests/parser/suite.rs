@@ -145,6 +145,19 @@ fn rejects_fault_metadata_without_a_test_declaration() {
 }
 
 #[test]
+fn rejects_test_metadata_on_external_verbs() {
+    for source in [
+        "meta test extern \"C\" verb native_test() -> Int;",
+        "meta fault(\"flush_failure\") meta test unsafe extern \"C\" verb native_test() -> Int;",
+    ] {
+        let (tokens, errors) = scan(source);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        let error = parse(tokens).expect_err("test metadata must require an ordinary verb");
+        assert_eq!(error.code, ParseErrorCode::TestMetadataRequiresVerb);
+    }
+}
+
+#[test]
 fn parses_limitless_metadata_at_verb_and_file_scope() {
     let program = parse_source(
         "meta limitless(\"file\")\nmeta limitless(\"verb\") verb large() { return 0; }",
