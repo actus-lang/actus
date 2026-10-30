@@ -84,3 +84,26 @@ pub(super) fn windows_file_identity_handle(
         (u64::from(information.file_index_high) << 32) | u64::from(information.file_index_low);
     Ok((volume, index))
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::windows_file_identity;
+
+    #[test]
+    fn windows_identity_is_stable_for_one_path_and_distinct_for_two_files() {
+        let root = std::env::temp_dir().join(format!("actus-identity-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary identity directory");
+        let first = root.join("first");
+        let second = root.join("second");
+        std::fs::write(&first, b"first").expect("first file");
+        std::fs::write(&second, b"second").expect("second file");
+
+        let first_identity = windows_file_identity(&first).expect("first identity");
+        assert_eq!(windows_file_identity(&first).expect("stable first identity"), first_identity);
+        assert_ne!(first_identity, windows_file_identity(&second).expect("second identity"));
+
+        let _ = std::fs::remove_file(first);
+        let _ = std::fs::remove_file(second);
+        let _ = std::fs::remove_dir(root);
+    }
+}

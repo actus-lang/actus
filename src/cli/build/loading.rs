@@ -93,8 +93,20 @@ pub(super) fn validate_strict_plan(
     input: &str,
     source: &str,
     plan: &ModuleCompilationPlan,
+    target: &crate::target::TargetSpec,
 ) -> bool {
-    if !validate_strict_program(input, source, plan.caller()) {
+    let caller = match crate::semantic::filter_program_for_target_checked(plan.caller(), target) {
+        Ok(program) => program,
+        Err(error) => {
+            report_diagnostic(
+                Path::new(input),
+                source,
+                crate::diagnostics::semantic_diagnostic(&error),
+            );
+            return false;
+        }
+    };
+    if !validate_strict_program(input, source, &caller) {
         return false;
     }
     let object_plan = match plan.object_plan() {
@@ -105,7 +117,19 @@ pub(super) fn validate_strict_plan(
         }
     };
     for unit in object_plan.units() {
-        if let Err(error) = crate::semantic::analyze(unit.program()) {
+        let targeted =
+            match crate::semantic::filter_program_for_target_checked(unit.program(), target) {
+                Ok(program) => program,
+                Err(error) => {
+                    report_diagnostic(
+                        Path::new(input),
+                        source,
+                        crate::diagnostics::semantic_diagnostic(&error),
+                    );
+                    return false;
+                }
+            };
+        if let Err(error) = crate::semantic::analyze(&targeted) {
             report_diagnostic(
                 Path::new(input),
                 source,

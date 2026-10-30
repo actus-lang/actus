@@ -20,6 +20,24 @@ impl Formatter<'_> {
                 self.output.push_str(")\n");
                 continue;
             }
+            if let crate::ast::MetaAttribute::Capability(capability) = metadata[index] {
+                self.line_indent();
+                self.output.push_str("meta capability(\"");
+                self.output.push_str(capability.name());
+                self.output.push('"');
+                index += 1;
+                while index < metadata.len() {
+                    let crate::ast::MetaAttribute::Capability(capability) = metadata[index] else {
+                        break;
+                    };
+                    self.output.push_str(", \"");
+                    self.output.push_str(capability.name());
+                    self.output.push('"');
+                    index += 1;
+                }
+                self.output.push_str(")\n");
+                continue;
+            }
             self.line_indent();
             self.output.push_str("meta ");
             self.output.push_str(&meta_name(&metadata[index]));

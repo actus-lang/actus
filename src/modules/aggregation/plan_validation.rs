@@ -5,7 +5,7 @@ use crate::ast::TopLevelDecl;
 use super::collision::{ExternalContract, external_contract};
 use super::types::ModuleError;
 use super::unit::ModuleUnit;
-use super::validation::export_identity;
+use super::validation::{export_identity, target_scopes_are_disjoint, target_selector};
 
 pub(super) fn validate_symbol_collisions(
     local_declarations: &[TopLevelDecl],
@@ -26,7 +26,7 @@ pub(super) fn validate_symbol_collisions(
 fn record_symbols(
     module: &str,
     declarations: &[TopLevelDecl],
-    symbols: &mut HashMap<(String, String), SymbolRecord>,
+    symbols: &mut HashMap<(String, String), Vec<SymbolRecord>>,
 ) -> Result<(), ModuleError> {
     for declaration in declarations {
         let Some((kind, name)) = export_identity(declaration) else { continue };
@@ -36,9 +36,16 @@ fn record_symbols(
             external_contract: external_contract(declaration),
             declaration: declaration.clone(),
         };
-        if let Some(first) = symbols.get(&key)
-            && first.module != module
-        {
+        let records = symbols.entry(key).or_default();
+        for first in records.iter() {
+            if first.module == module
+                || target_scopes_are_disjoint(
+                    target_selector(&first.declaration),
+                    target_selector(&record.declaration),
+                )
+            {
+                continue;
+            }
             if first.declaration == *declaration {
                 continue;
             }
@@ -57,7 +64,7 @@ fn record_symbols(
                 second_module: module.to_owned(),
             });
         }
-        symbols.insert(key, record);
+        records.push(record);
     }
     Ok(())
 }

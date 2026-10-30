@@ -47,9 +47,11 @@ fn preserves_effect_metadata_idempotently() {
 #[test]
 fn preserves_capability_metadata_idempotently() {
     let formatted = format_source(
-        "meta capability(\"windows.file_identity\") extern \"C\" verb native_boundary() -> Int;",
+        "meta capability(\"windows.file_identity\", \"windows.replace_file\") extern \"C\" verb native_boundary() -> Int;",
     );
-    assert!(formatted.contains("meta capability(\"windows.file_identity\")"));
+    assert!(
+        formatted.contains("meta capability(\"windows.file_identity\", \"windows.replace_file\")")
+    );
     assert_eq!(format_source(&formatted), formatted);
 }
 

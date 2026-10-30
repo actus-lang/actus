@@ -231,7 +231,7 @@ fn collect_root_imports(
     units: &mut Vec<ModuleUnit>,
     local_declarations: &mut Vec<TopLevelDecl>,
     caller_declarations: &mut Vec<TopLevelDecl>,
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
     friend_modules: &HashSet<String>,
 ) -> Result<(), ModuleError> {
     for declaration in &program.declarations {
@@ -282,7 +282,7 @@ fn collect_unit(
     imported_paths: &mut HashSet<String>,
     units: &mut Vec<ModuleUnit>,
     caller_declarations: &mut Vec<TopLevelDecl>,
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
     namespace: Option<&str>,
     open_import: bool,
     selected: &[String],
@@ -330,7 +330,7 @@ fn append_unit_declarations(
     unit: &ModuleUnit,
     module_path: &str,
     caller_declarations: &mut Vec<TopLevelDecl>,
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
     namespace: Option<&str>,
     friend: bool,
     open_import: bool,
@@ -364,7 +364,7 @@ fn append_friend_unit_declarations(
     unit: &ModuleUnit,
     module_path: &str,
     caller_declarations: &mut Vec<TopLevelDecl>,
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
     namespace: Option<&str>,
     open_import: bool,
     selected: &[String],
@@ -407,7 +407,7 @@ fn append_public_unit_declarations(
     unit: &ModuleUnit,
     module_path: &str,
     caller_declarations: &mut Vec<TopLevelDecl>,
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
     namespace: Option<&str>,
     open_import: bool,
     selected: &[String],
@@ -441,7 +441,7 @@ fn collect_imported_units(
     imported_paths: &mut HashSet<String>,
     units: &mut Vec<ModuleUnit>,
     caller_declarations: &mut Vec<TopLevelDecl>,
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
     friend_modules: &HashSet<String>,
 ) -> Result<(), ModuleError> {
     for declaration in &unit.implementation().declarations {

@@ -42,3 +42,18 @@ fn preserves_capability_metadata_on_open_verbs() {
     assert!(verb.is_open);
     assert!(verb.metadata.contains(&MetaAttribute::Capability(Capability::WindowsFileIdentity,)));
 }
+
+#[test]
+fn parses_grouped_capability_metadata() {
+    let program = parse_source(
+        "meta capability(\"windows.file_identity\", \"windows.replace_file\") verb inspect() -> Int { return 0; }",
+    );
+    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
+    assert_eq!(
+        verb.metadata,
+        vec![
+            MetaAttribute::Capability(Capability::WindowsFileIdentity),
+            MetaAttribute::Capability(Capability::WindowsReplaceFile),
+        ]
+    );
+}

@@ -26,6 +26,17 @@ destination. `Err(IoError.Busy)` reports lock contention, while
 replacement capability. This is a coordinator contract: writers that bypass
 the same lock are outside its guarantee.
 """
+meta target("unix")
+meta capability("unix.rename_atomic")
+unsafe extern "C" verb actus_file_publish_coordinated_path(
+    abs lock_path: path_module::Path,
+    abs staging: path_module::Path,
+    abs destination: path_module::Path,
+    abs expected: Metadata
+) -> Int;
+
+meta target("windows")
+meta capability("windows.file_identity", "windows.replace_file")
 unsafe extern "C" verb actus_file_publish_coordinated_path(
     abs lock_path: path_module::Path,
     abs staging: path_module::Path,
@@ -43,6 +54,41 @@ check-then-rename fallback is used; unsupported
 targets return `IoError.Unsupported`. The operation may block while acquiring
 the coordinator lock and while publishing the staged file.
 """
+meta target("unix")
+meta capability("unix.rename_atomic")
+open verb publish_file_coordinated(
+    abs lock_path: path_module::Path,
+    abs staging: path_module::Path,
+    abs destination: path_module::Path,
+    abs expected: Metadata
+) -> Result[CoordinatedPublication, io::IoError] {
+    erg status = actus_file_publish_coordinated_path(
+        lock_path: abs lock_path,
+        staging: abs staging,
+        destination: abs destination,
+        expected: abs expected
+    );
+    return case status {
+        -4 => Err(io::IoError.Busy),
+        -3 => Ok(CoordinatedPublication.Conflict),
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(CoordinatedPublication.Published),
+    };
+}
+
+"""
+Perform compare-before-publish through the shared coordinator protocol on
+Windows using native file identity and replacement primitives.
+
+All path and metadata arguments are borrowed and remain caller-owned. On a
+successful publication the staging path no longer names a file because the
+atomic replacement moves it; the path value itself is not consumed. The
+operation may block while acquiring the coordinator lock and publishing the
+staged file, and unsupported provider failures remain typed.
+"""
+meta target("windows")
+meta capability("windows.file_identity", "windows.replace_file")
 open verb publish_file_coordinated(
     abs lock_path: path_module::Path,
     abs staging: path_module::Path,
@@ -83,6 +129,15 @@ destination. Targets without an equivalent replacement primitive return
 `IoError.Unsupported`; this operation never emulates replacement as a
 remove-then-rename sequence.
 """
+meta target("unix")
+meta capability("unix.rename_atomic")
+unsafe extern "C" verb actus_file_replace_atomic_path(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Int;
+
+meta target("windows")
+meta capability("windows.replace_file")
 unsafe extern "C" verb actus_file_replace_atomic_path(
     abs from: path_module::Path,
     abs to: path_module::Path
@@ -127,6 +182,32 @@ destination is not removed first, and no copy or hidden buffer is allocated.
 Unsupported targets return `IoError.Unsupported`; provider failures return
 `IoError.Failed` and the source remains owned by the caller.
 """
+meta target("unix")
+meta capability("unix.rename_atomic")
+open verb replace_file_atomic(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Result[Int, io::IoError] {
+    erg status = actus_file_replace_atomic_path(from: abs from, to: abs to);
+    return case status {
+        -2 => Err(io::IoError.Unsupported),
+        -1 => Err(io::IoError.Failed),
+        _ => Ok(status),
+    };
+}
+
+"""
+Replace an existing destination with the source path atomically through the
+Windows native replacement contract.
+
+The source and destination are immutable borrowed paths and remain
+caller-owned. The operation does not remove the destination first, copy bytes
+in Actus, or retain a path. Provider failure is returned as
+IoError.Failed, and an unsupported native operation is returned as
+IoError.Unsupported.
+"""
+meta target("windows")
+meta capability("windows.replace_file")
 open verb replace_file_atomic(
     abs from: path_module::Path,
     abs to: path_module::Path

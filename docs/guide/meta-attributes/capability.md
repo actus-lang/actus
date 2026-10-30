@@ -1,12 +1,20 @@
 # `meta capability(...)`
 
-`meta capability("name")` declares a typed requirement for a platform
-primitive. The registry is closed and target-aware. It is not a documentation
-string and it does not grant a verb permission to perform an operation.
+`meta capability("name", ...)` declares one or more typed requirements for
+platform primitives. The registry is closed and target-aware. It is not a
+documentation string and it does not grant a verb permission to perform an
+operation.
 
 ```actus
 meta capability("posix.cloexec")
 open verb open_secure(...) -> Result[File, IoError] { ... }
+```
+
+Distinct requirements may be grouped in one declaration:
+
+```actus
+meta capability("windows.file_identity", "windows.replace_file")
+open verb publish(...) -> Result[Int, IoError] { ... }
 ```
 
 ## Supported names
@@ -25,8 +33,9 @@ The implementation must still validate paths, ownership, failure ordering, and
 the relevant publication contract separately.
 
 Unknown names are compile-time errors. The same capability cannot be repeated
-on one declaration. Distinct capabilities use separate metadata declarations;
-the formatter preserves that explicit boundary.
+on one declaration. The one-name form remains valid, while grouped names are
+preferred when one boundary requires multiple primitives. The formatter
+preserves capability order.
 
 ## Registry scope and extension policy
 

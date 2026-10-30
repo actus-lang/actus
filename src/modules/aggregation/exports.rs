@@ -8,7 +8,9 @@ use crate::parser::parse;
 
 use super::super::resolver::ModuleResolver;
 use super::types::{ExportedSymbol, ModuleError, ModuleExports};
-use super::validation::{export_identity, validate_open_siblings};
+use super::validation::{
+    export_identity, target_scopes_are_disjoint, target_selector, validate_open_siblings,
+};
 
 pub fn exports_module(
     resolver: &ModuleResolver,
@@ -144,11 +146,11 @@ fn append_exports(
     let mut incoming_names = HashSet::new();
     for symbol in incoming.symbols {
         let identity = (symbol.kind.clone(), symbol.name.clone());
-        if target
-            .symbols
-            .iter()
-            .any(|existing| (existing.kind.clone(), existing.name.clone()) == identity)
-            || !incoming_names.insert(identity)
+        let incoming_identity = (identity.0.clone(), identity.1.clone(), symbol.target.clone());
+        if target.symbols.iter().any(|existing| {
+            (existing.kind.clone(), existing.name.clone()) == identity
+                && !target_scopes_are_disjoint(existing.target.as_deref(), symbol.target.as_deref())
+        }) || !incoming_names.insert(incoming_identity)
         {
             return Err(ModuleError::SymbolCollision {
                 symbol: format!("{} `{}`", symbol.kind, symbol.name),
@@ -199,7 +201,12 @@ fn collect_open_sibling_exports(
         if let Some((kind, name)) = export_identity(declaration)
             && declaration_is_open(declaration)
         {
-            symbols.push(ExportedSymbol { kind: kind.to_owned(), name, source: path.clone() });
+            symbols.push(ExportedSymbol {
+                kind: kind.to_owned(),
+                name,
+                source: path.clone(),
+                target: target_selector(declaration).map(str::to_owned),
+            });
         }
         if let TopLevelDecl::OpenSibling(open) = declaration {
             collect_open_sibling_exports(&open.name, parsed, visited, symbols);

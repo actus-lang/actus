@@ -61,7 +61,7 @@ fn build_file_with_report(
             return 1;
         }
     };
-    if mode.is_strict() && !validate_strict_plan(input, &source, &plan) {
+    if mode.is_strict() && !validate_strict_plan(input, &source, &plan, configuration.target()) {
         return 1;
     }
     let Some(fallback_symbol) = first_defined_verb(&caller) else {

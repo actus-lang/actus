@@ -34,11 +34,69 @@ fn replace_atomic(from: &std::path::Path, to: &std::path::Path) -> std::io::Resu
     }
     #[cfg(windows)]
     {
-        let _ = (from, to);
-        return Err(std::io::Error::from(std::io::ErrorKind::Unsupported));
+        return windows_replace_atomic(from, to);
     }
     #[allow(unreachable_code)]
     Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+}
+
+#[cfg(windows)]
+const REPLACEFILE_WRITE_THROUGH: u32 = 1;
+
+#[cfg(windows)]
+const MOVEFILE_REPLACE_EXISTING: u32 = 1;
+
+#[cfg(windows)]
+const MOVEFILE_WRITE_THROUGH: u32 = 8;
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn ReplaceFileW(
+        replaced_file_name: *const u16,
+        replacement_file_name: *const u16,
+        backup_file_name: *const u16,
+        replace_flags: u32,
+        exclude: *mut std::ffi::c_void,
+        reserved: *mut std::ffi::c_void,
+    ) -> i32;
+    fn MoveFileExW(existing_file_name: *const u16, new_file_name: *const u16, flags: u32) -> i32;
+}
+
+#[cfg(windows)]
+fn windows_replace_atomic(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let source = from.as_os_str().encode_wide().chain(std::iter::once(0)).collect::<Vec<_>>();
+    let destination = to.as_os_str().encode_wide().chain(std::iter::once(0)).collect::<Vec<_>>();
+
+    let replaced = unsafe {
+        ReplaceFileW(
+            destination.as_ptr(),
+            source.as_ptr(),
+            std::ptr::null(),
+            REPLACEFILE_WRITE_THROUGH,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    if replaced != 0 {
+        return Ok(());
+    }
+
+    let error = std::io::Error::last_os_error();
+    if error.raw_os_error() != Some(2) {
+        return Err(error);
+    }
+
+    let moved = unsafe {
+        MoveFileExW(
+            source.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if moved != 0 { Ok(()) } else { Err(std::io::Error::last_os_error()) }
 }
 
 /// Synchronizes the directory containing a validated path.
@@ -99,13 +157,19 @@ pub unsafe extern "C" fn actus_file_publish_coordinated_path(
         };
     }
     let expected = unsafe { &*expected };
-    let comparison = unsafe { with_host_path(destination, |path| path.metadata()) };
-    let identity_matches = match compare_expected_identity(expected, comparison) {
-        Ok(value) => value,
-        Err(status) => {
+    let identity_result =
+        unsafe { with_host_path(destination, |path| compare_expected_identity(expected, path)) };
+    let identity_matches = match identity_result {
+        Some(Ok(value)) => value,
+        Some(Err(status)) => {
             let _ = super::file::actus_file_unlock(i64::from(lock));
             let _ = super::file::actus_file_close(i64::from(lock));
             return status;
+        }
+        None => {
+            let _ = super::file::actus_file_unlock(i64::from(lock));
+            let _ = super::file::actus_file_close(i64::from(lock));
+            return ABI_STATUS_FAILURE;
         }
     };
     if !identity_matches {
@@ -131,25 +195,18 @@ pub unsafe extern "C" fn actus_file_publish_coordinated_path(
 
 fn compare_expected_identity(
     expected: &ActusMetadata,
-    current: Option<std::io::Result<std::fs::Metadata>>,
+    path: &std::path::Path,
 ) -> Result<bool, i32> {
+    let current = path.metadata();
     if expected.identity_kind == 0 {
         return match current {
-            Some(Ok(_)) => Ok(false),
-            Some(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
-            Some(Err(error)) if error.kind() == std::io::ErrorKind::Unsupported => {
+            Ok(_) => Ok(false),
+            Err(error) if error.kind() == std::io::ErrorKind::Unsupported => {
                 Err(PUBLICATION_STATUS_UNSUPPORTED)
             }
-            Some(Err(_)) | None => Err(ABI_STATUS_FAILURE),
+            Err(_) => Err(ABI_STATUS_FAILURE),
         };
     }
-    #[cfg(windows)]
-    if expected.identity_kind == 2 {
-        return Err(PUBLICATION_STATUS_UNSUPPORTED);
-    }
-    let Some(current) = current else {
-        return Err(ABI_STATUS_FAILURE);
-    };
     let current = match current {
         Ok(value) => value,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
@@ -158,21 +215,27 @@ fn compare_expected_identity(
         }
         Err(_) => return Err(ABI_STATUS_FAILURE),
     };
-    let current_identity = native_identity(&current);
+    let current_identity = native_identity(path, &current);
     Ok(current_identity
         == Some((expected.identity_primary, expected.identity_secondary, expected.identity_kind)))
 }
 
-fn native_identity(metadata: &std::fs::Metadata) -> Option<(u64, u64, i32)> {
+fn native_identity(
+    path: &std::path::Path,
+    metadata: &std::fs::Metadata,
+) -> Option<(u64, u64, i32)> {
     #[cfg(unix)]
     {
+        let _ = path;
         use std::os::unix::fs::MetadataExt;
         return Some((metadata.dev(), metadata.ino(), 1));
     }
     #[cfg(windows)]
     {
         let _ = metadata;
-        return None;
+        return super::identity::windows_file_identity(path)
+            .ok()
+            .map(|(primary, secondary)| (primary, secondary, 2));
     }
     #[allow(unreachable_code)]
     None
@@ -213,5 +276,29 @@ mod tests {
             sync_parent_directory(path).expect_err("Windows directory sync is unsupported").kind(),
             std::io::ErrorKind::Unsupported
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn replace_atomic_publishes_when_destination_exists_or_is_absent() {
+        let root = std::env::temp_dir().join(format!("actus-publication-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("temporary publication directory");
+        let destination = root.join("destination");
+        let staging = root.join("staging");
+        std::fs::write(&destination, b"old").expect("destination write");
+        std::fs::write(&staging, b"new").expect("staging write");
+        super::replace_atomic(&staging, &destination).expect("existing destination replacement");
+        assert_eq!(std::fs::read(&destination).expect("replacement read"), b"new");
+
+        let absent_destination = root.join("absent-destination");
+        let second_staging = root.join("second-staging");
+        std::fs::write(&second_staging, b"fresh").expect("second staging write");
+        super::replace_atomic(&second_staging, &absent_destination)
+            .expect("absent destination publication");
+        assert_eq!(std::fs::read(&absent_destination).expect("publication read"), b"fresh");
+
+        let _ = std::fs::remove_file(destination);
+        let _ = std::fs::remove_file(absent_destination);
+        let _ = std::fs::remove_dir(root);
     }
 }

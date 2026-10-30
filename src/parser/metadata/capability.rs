@@ -37,24 +37,34 @@ impl Parser {
 
     pub(super) fn parse_capability_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
         self.expect_simple(TokenKind::LeftParen, "`(` after `capability`")?;
-        let token = self.advance_required("capability name string")?;
-        let name = match token.kind {
-            TokenKind::StringLiteral(name) => name,
-            found => {
-                return Err(super::syntax::unexpected_metadata_token(
-                    "a capability name string",
-                    found,
-                    token.span,
-                ));
+        let mut attributes = Vec::new();
+        loop {
+            let token = self.advance_required("capability name string")?;
+            let name = match token.kind {
+                TokenKind::StringLiteral(name) => name,
+                found => {
+                    return Err(super::syntax::unexpected_metadata_token(
+                        "a capability name string",
+                        found,
+                        token.span,
+                    ));
+                }
+            };
+            let capability = Capability::parse(&name).ok_or(ParseError {
+                code: ParseErrorCode::UnsupportedCapability,
+                kind: ParseErrorKind::UnsupportedCapability { name },
+                span: token.span,
+            })?;
+            attributes.push(MetaAttribute::Capability(capability));
+            if !self.match_simple(TokenKind::Comma) {
+                break;
             }
-        };
-        let capability = Capability::parse(&name).ok_or(ParseError {
-            code: ParseErrorCode::UnsupportedCapability,
-            kind: ParseErrorKind::UnsupportedCapability { name },
-            span: token.span,
-        })?;
-        self.expect_simple(TokenKind::RightParen, "`)` after capability name")?;
+            if self.check_simple(&TokenKind::RightParen) {
+                break;
+            }
+        }
+        self.expect_simple(TokenKind::RightParen, "`)` after capability names")?;
         let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Capability(capability)])
+        Ok(attributes)
     }
 }
