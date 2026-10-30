@@ -45,7 +45,24 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
-    ownership_argument_message(kind).or_else(|| ownership_state_message(kind))
+    capability_message(kind)
+        .or_else(|| ownership_argument_message(kind))
+        .or_else(|| ownership_state_message(kind))
+}
+
+fn capability_message(kind: &SemanticErrorKind) -> Option<String> {
+    Some(match kind {
+        SemanticErrorKind::UndeclaredCapability { callee, capability } => {
+            format!("call to `{callee}` requires undeclared capability `{}`", capability.name())
+        }
+        SemanticErrorKind::UnsupportedCapability { capability, target } => {
+            format!("capability `{capability}` is not available for target `{target}`")
+        }
+        SemanticErrorKind::RoleMethodCapabilityMismatch { role, method, .. } => {
+            format!("role method `{role}::{method}` must preserve its capability contract")
+        }
+        _ => return None,
+    })
 }
 
 fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {

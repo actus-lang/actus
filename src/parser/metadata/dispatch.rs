@@ -16,6 +16,7 @@ impl Parser {
             "deterministic" => self.parse_deterministic_metadata(),
             "realtime" => self.parse_realtime_metadata(),
             "bounded" => self.parse_bounded_metadata(),
+            "capability" => self.parse_capability_metadata(),
             name => Err(ParseError {
                 code: ParseErrorCode::UnknownMetadata,
                 kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },

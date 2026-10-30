@@ -39,6 +39,21 @@ fn requires_role_and_performance_effect_contracts_to_match() {
 }
 
 #[test]
+fn requires_role_and_performance_capability_contracts_to_match() {
+    let valid = "struct File { value: Int, } role Writer { meta capability(\"posix.cloexec\") verb write(abs self: File) -> Int; } perform Writer for File { meta capability(\"posix.cloexec\") verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(valid).expect("matching role and implementation capabilities should pass");
+
+    let extra = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { meta capability(\"posix.cloexec\") verb write(abs self: File) -> Int { return 1; } }";
+    let error = analyze_source(extra).expect_err("implementation-only capabilities must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodCapabilityMismatch { ref role, ref method, .. }
+            if role == "Writer" && method == "write"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1133");
+}
+
+#[test]
 fn requires_role_and_performance_must_use_contracts_to_match() {
     let valid = "struct File { value: Int, } role Writer { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int; } perform Writer for File { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int { return 1; } } verb main() -> Int { erg file = File { value: 1, }; abs view = ref file; return view.write(); }";
     analyze_source(valid).expect("matching role and implementation must-use contracts should pass");

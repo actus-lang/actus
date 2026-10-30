@@ -51,7 +51,16 @@ fn build_file_with_report(
     if !validate_source_limits(Path::new(input), &source, mode, configuration) {
         return 1;
     }
-    let caller = crate::semantic::filter_program_for_target(plan.caller(), configuration.target());
+    let caller = match crate::semantic::filter_program_for_target_checked(
+        plan.caller(),
+        configuration.target(),
+    ) {
+        Ok(caller) => caller,
+        Err(error) => {
+            eprintln!("error: semantic analysis failed: {error:?}");
+            return 1;
+        }
+    };
     if mode.is_strict() && !validate_strict_plan(input, &source, &plan) {
         return 1;
     }

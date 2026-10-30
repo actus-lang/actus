@@ -285,6 +285,18 @@ impl TargetSpec {
         }
     }
 
+    pub fn supports_capability(&self, capability: crate::ast::Capability) -> bool {
+        match capability {
+            crate::ast::Capability::PosixCloexec | crate::ast::Capability::UnixRenameAtomic => {
+                self.matches_platform("posix")
+            }
+            crate::ast::Capability::WindowsFileIdentity
+            | crate::ast::Capability::WindowsReplaceFile => {
+                self.triple.operating_system == OperatingSystem::Windows
+            }
+        }
+    }
+
     pub const fn linker_flavor(&self) -> LinkerFlavor {
         self.linker_flavor
     }

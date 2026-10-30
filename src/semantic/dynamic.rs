@@ -1,6 +1,6 @@
 use crate::ast::{
-    DispatchMode, Effect, MetaAttribute, Param, Program, Role, RoleMethod, TopLevelDecl,
-    lookup_builtin_type,
+    Capability, DispatchMode, Effect, MetaAttribute, Param, Program, Role, RoleMethod,
+    TopLevelDecl, lookup_builtin_type,
 };
 
 use super::analyzer::Analyzer;
@@ -61,6 +61,14 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
                 _ => None,
             })
             .collect::<Vec<Effect>>(),
+        capabilities: method
+            .metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                MetaAttribute::Capability(capability) => Some(*capability),
+                _ => None,
+            })
+            .collect::<Vec<Capability>>(),
         deterministic: method
             .metadata
             .iter()

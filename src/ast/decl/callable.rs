@@ -72,6 +72,7 @@ pub enum MetaAttribute {
     Deterministic,
     Realtime,
     Bounded(BoundedContract),
+    Capability(Capability),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -142,6 +143,42 @@ impl Effect {
 
     pub const fn is_nondeterministic(self) -> bool {
         matches!(self, Self::Clock | Self::Filesystem | Self::Network | Self::Entropy)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Capability {
+    PosixCloexec,
+    UnixRenameAtomic,
+    WindowsFileIdentity,
+    WindowsReplaceFile,
+}
+
+impl Capability {
+    pub const ALL: [Self; 4] = [
+        Self::PosixCloexec,
+        Self::UnixRenameAtomic,
+        Self::WindowsFileIdentity,
+        Self::WindowsReplaceFile,
+    ];
+
+    pub fn parse(name: &str) -> Option<Self> {
+        Some(match name {
+            "posix.cloexec" => Self::PosixCloexec,
+            "unix.rename_atomic" => Self::UnixRenameAtomic,
+            "windows.file_identity" => Self::WindowsFileIdentity,
+            "windows.replace_file" => Self::WindowsReplaceFile,
+            _ => return None,
+        })
+    }
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::PosixCloexec => "posix.cloexec",
+            Self::UnixRenameAtomic => "unix.rename_atomic",
+            Self::WindowsFileIdentity => "windows.file_identity",
+            Self::WindowsReplaceFile => "windows.replace_file",
+        }
     }
 }
 

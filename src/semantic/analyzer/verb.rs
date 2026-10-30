@@ -29,6 +29,14 @@ impl Analyzer {
                 _ => None,
             })
             .collect();
+        self.current_capabilities = verb
+            .metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::Capability(capability) => Some(*capability),
+                _ => None,
+            })
+            .collect();
         self.current_deterministic = verb
             .metadata
             .iter()

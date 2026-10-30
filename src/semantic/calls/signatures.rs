@@ -1,6 +1,6 @@
 use crate::ast::{
-    Argument, BuiltinType, DispatchMode, Effect, ExternalVerbDecl, GenericParam, ReturnAccess,
-    Role, VerbDecl, lookup_builtin_type,
+    Argument, BuiltinType, Capability, DispatchMode, Effect, ExternalVerbDecl, GenericParam,
+    ReturnAccess, Role, VerbDecl, lookup_builtin_type,
 };
 
 use super::super::analyzer::canonical_type_name;
@@ -16,6 +16,7 @@ pub(crate) struct VerbSignature {
     pub(crate) external: bool,
     pub(crate) must_use: Option<String>,
     pub(crate) effects: Vec<Effect>,
+    pub(crate) capabilities: Vec<Capability>,
     pub(crate) deterministic: bool,
     pub(crate) realtime: bool,
     pub(crate) bounded: Option<crate::ast::BoundedContract>,
@@ -62,6 +63,7 @@ impl VerbDecl {
                 _ => None,
             }),
             effects: metadata_effects(&self.metadata),
+            capabilities: metadata_capabilities(&self.metadata),
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
             bounded: metadata_bounded(&self.metadata),
@@ -97,6 +99,7 @@ impl ExternalVerbDecl {
                 _ => None,
             }),
             effects: metadata_effects(&self.metadata),
+            capabilities: metadata_capabilities(&self.metadata),
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
             bounded: metadata_bounded(&self.metadata),
@@ -109,6 +112,16 @@ fn metadata_effects(metadata: &[crate::ast::MetaAttribute]) -> Vec<Effect> {
         .iter()
         .filter_map(|attribute| match attribute {
             crate::ast::MetaAttribute::Effect(effect) => Some(*effect),
+            _ => None,
+        })
+        .collect()
+}
+
+fn metadata_capabilities(metadata: &[crate::ast::MetaAttribute]) -> Vec<Capability> {
+    metadata
+        .iter()
+        .filter_map(|attribute| match attribute {
+            crate::ast::MetaAttribute::Capability(capability) => Some(*capability),
             _ => None,
         })
         .collect()

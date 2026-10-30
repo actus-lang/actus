@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 use crate::semantic::{
-    SemanticModel, analyze, filter_program_for_target, validate_bounded_recursion,
+    SemanticModel, analyze, filter_program_for_target_checked, validate_bounded_recursion,
 };
 
 use super::super::resolver::ModuleResolver;
@@ -42,7 +42,8 @@ pub fn analyze_module_with_overlays_for_target(
 ) -> Result<SemanticModel, ModuleError> {
     let program = parse_module_with_overlays(resolver, module_path, overlays)?;
     let program = resolve_module_imports_with_overlays(&program, resolver, overlays, module_path)?;
-    let program = filter_program_for_target(&program, target);
+    let program = filter_program_for_target_checked(&program, target)
+        .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
@@ -64,7 +65,8 @@ pub fn analyze_with_imports_for_target(
     let plan = build_compilation_plan(program, resolver)?;
     analyze_imported_units(&plan, resolver, &HashMap::new())?;
     let expanded = plan.caller().clone();
-    let filtered = filter_program_for_target(&expanded, target);
+    let filtered = filter_program_for_target_checked(&expanded, target)
+        .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     analyze(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
@@ -77,7 +79,8 @@ pub fn analyze_with_imports_with_overlays_for_target(
     let plan = super::plan::build_compilation_plan_with_overlays(program, resolver, overlays)?;
     analyze_imported_units(&plan, resolver, overlays)?;
     let expanded = plan.caller().clone();
-    let filtered = filter_program_for_target(&expanded, target);
+    let filtered = filter_program_for_target_checked(&expanded, target)
+        .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     analyze(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 

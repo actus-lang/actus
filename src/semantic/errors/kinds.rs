@@ -86,6 +86,14 @@ pub enum SemanticErrorKind {
         callee: String,
         effect: crate::ast::Effect,
     },
+    UndeclaredCapability {
+        callee: String,
+        capability: crate::ast::Capability,
+    },
+    UnsupportedCapability {
+        capability: String,
+        target: String,
+    },
     NondeterministicCall {
         callee: String,
         effect: crate::ast::Effect,
@@ -153,6 +161,12 @@ pub enum SemanticErrorKind {
         method: String,
         expected: Vec<crate::ast::Effect>,
         found: Vec<crate::ast::Effect>,
+    },
+    RoleMethodCapabilityMismatch {
+        role: String,
+        method: String,
+        expected: Vec<crate::ast::Capability>,
+        found: Vec<crate::ast::Capability>,
     },
     RoleMethodRealtimeMismatch {
         role: String,

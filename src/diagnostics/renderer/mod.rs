@@ -138,6 +138,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::UnsupportedTargetPlatform { name } => {
             format!("unsupported target platform `{name}`")
         }
+        ParseErrorKind::UnsupportedCapability { name } => {
+            format!("unsupported capability `{name}`")
+        }
         ParseErrorKind::ConflictingTargetPlatforms { first, second } => {
             format!("conflicting target platforms `{first}` and `{second}`")
         }

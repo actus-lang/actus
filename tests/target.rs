@@ -1,6 +1,6 @@
 use actus::lexer::scan;
 use actus::parser::parse;
-use actus::semantic::{analyze, filter_program_for_target};
+use actus::semantic::{analyze, filter_program_for_target, filter_program_for_target_checked};
 use actus::target::TargetSpec;
 
 #[cfg(unix)]
@@ -111,6 +111,48 @@ fn target_contracts_select_platform_behavior_without_host_cfg_branches() {
     assert!(windows_msvc.matches_platform("windows"));
     assert!(windows_gnu.matches_platform("windows"));
     assert!(!freestanding.matches_platform("unix"));
+}
+
+#[test]
+fn capability_matrix_is_target_specific_and_closed() {
+    let linux = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("Linux target should parse");
+    let windows = TargetSpec::parse("x86_64-pc-windows-msvc").expect("Windows target should parse");
+    let embedded =
+        TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
+    assert!(linux.supports_capability(actus::ast::Capability::PosixCloexec));
+    assert!(linux.supports_capability(actus::ast::Capability::UnixRenameAtomic));
+    assert!(!linux.supports_capability(actus::ast::Capability::WindowsFileIdentity));
+    assert!(windows.supports_capability(actus::ast::Capability::WindowsFileIdentity));
+    assert!(windows.supports_capability(actus::ast::Capability::WindowsReplaceFile));
+    assert!(!embedded.supports_capability(actus::ast::Capability::PosixCloexec));
+}
+
+#[test]
+fn unsupported_active_capability_is_a_compile_time_error() {
+    let source = "meta capability(\"windows.file_identity\") verb inspect() -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("capability metadata should parse");
+    let linux = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("Linux target should parse");
+    let error = filter_program_for_target_checked(&program, &linux)
+        .expect_err("Windows capability must be rejected on Linux");
+    assert!(matches!(
+        error.kind,
+        actus::semantic::SemanticErrorKind::UnsupportedCapability { ref capability, .. }
+            if capability == "windows.file_identity"
+    ));
+    assert_eq!(actus::diagnostics::semantic_diagnostic(&error).code(), "E1132");
+}
+
+#[test]
+fn inactive_target_capability_is_not_checked_for_other_targets() {
+    let source = "meta target(\"windows\") meta capability(\"windows.file_identity\") verb inspect() -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("target capability metadata should parse");
+    let linux = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("Linux target should parse");
+    filter_program_for_target_checked(&program, &linux)
+        .expect("inactive target declarations should be filtered before capability checks");
 }
 
 #[test]

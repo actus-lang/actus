@@ -6,7 +6,8 @@ use crate::ast::{
 };
 use crate::lexer::SourceSpan;
 use crate::semantic::{
-    AccessState, CleanupAction, OwnershipState, SemanticModel, analyze, filter_program_for_target,
+    AccessState, CleanupAction, OwnershipState, SemanticModel, analyze,
+    filter_program_for_target_checked,
 };
 use crate::target::{EntryContract, TargetSpec};
 
@@ -37,7 +38,9 @@ pub(super) fn query(
     if cancellation.is_some_and(CancellationToken::checkpoint) {
         return json!({"state":"partial","reason":"canceled","facts":[]});
     }
-    let target_program = filter_program_for_target(&program, target);
+    let Ok(target_program) = filter_program_for_target_checked(&program, target) else {
+        return json!({"state":"invalid","facts":[]});
+    };
     let Ok(model) = analyze(&target_program) else { return json!({"state":"invalid","facts":[]}) };
     if cancellation.is_some_and(CancellationToken::checkpoint) {
         return json!({"state":"partial","reason":"canceled","facts":[]});
@@ -364,6 +367,7 @@ fn declarations(
                 MetaAttribute::Deterministic => true,
                 MetaAttribute::Realtime => true,
                 MetaAttribute::Bounded(_) => true,
+                MetaAttribute::Capability(_) => true,
             });
             let limitless = if program.file_metadata.contains(&crate::ast::LimitlessScope::File) {
                 Some("file")

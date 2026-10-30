@@ -35,6 +35,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::MustUseRequiresReturn => "E0018",
         ParseErrorCode::UnsupportedEffect => "E0019",
         ParseErrorCode::InvalidBoundedLimit => "E0020",
+        ParseErrorCode::UnsupportedCapability => "E0021",
     }
 }
 
@@ -164,6 +165,8 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::EscapingLoan { .. } => "E1082",
         SemanticErrorKind::MustUseIgnored { .. } => "E1120",
         SemanticErrorKind::UndeclaredEffect { .. } => "E1121",
+        SemanticErrorKind::UndeclaredCapability { .. } => "E1131",
+        SemanticErrorKind::UnsupportedCapability { .. } => "E1132",
         SemanticErrorKind::NondeterministicCall { .. } => "E1124",
         SemanticErrorKind::RealtimeEffect { .. } => "E1125",
         SemanticErrorKind::RealtimeUnboundedLoop => "E1126",
@@ -209,6 +212,7 @@ fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::MissingRoleMethod { .. } => "E1058",
         SemanticErrorKind::RoleMethodMismatch { .. } => "E1059",
         SemanticErrorKind::RoleMethodEffectMismatch { .. } => "E1122",
+        SemanticErrorKind::RoleMethodCapabilityMismatch { .. } => "E1133",
         SemanticErrorKind::RoleMethodRealtimeMismatch { .. } => "E1128",
         SemanticErrorKind::InvalidRoleReceiver { .. } => "E1060",
         _ => return None,

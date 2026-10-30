@@ -51,6 +51,10 @@ phase prematurely.
       control-flow, direct calls, fixed buffers, known local scalar sizes,
       declared I/O effects, imported implementation recursion, and perform/
       dynamic method recursion.
+- [x] Implement `meta capability(...)` with a closed registry, target-specific
+      availability checks, caller propagation across local/imported/generic/
+      dynamic/native boundaries, role-contract validation, formatter/LSP
+      preservation, and Unix/Windows/freestanding fixtures.
 
 ## Planned metadata extension backlog
 
@@ -75,8 +79,9 @@ advance.
 
 ### Platform and native contracts
 
-1. `meta capability(...)` — declare typed, target-specific platform
-   capabilities and reject unavailable capabilities before code generation.
+1. `meta capability(...)` — implemented as ADR-0096 and documented in the
+   capability guide; future capability names still require their own registry
+   and target evidence.
 2. `meta repr("C")` — provide a restricted, explicitly checked ABI/layout
    contract for native interoperability.
 3. `meta volatile` — define explicit hardware-observable access semantics only

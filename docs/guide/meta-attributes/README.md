@@ -25,6 +25,9 @@ This directory documents the currently supported attributes:
 [`meta effect(...)`](effect.md) declares compiler-checked execution effects
 such as blocking, filesystem, network, allocation, and entropy.
 
+[`meta capability(...)`](capability.md) declares a closed, target-checked
+platform capability and propagates that requirement across call boundaries.
+
 ## General rules
 
 - Metadata must use a compiler-recognized attribute name and argument shape.

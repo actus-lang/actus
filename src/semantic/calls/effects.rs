@@ -40,6 +40,7 @@ impl Analyzer {
                 });
             }
         }
+        self.validate_capabilities(callee, signature, span)?;
         self.validate_bounded_call(callee, signature, span)?;
         if self.current_realtime
             && signature.return_type_name.as_ref().is_some_and(type_contains_float)
@@ -71,6 +72,26 @@ impl Analyzer {
         }
         if self.current_bounded.is_some() && self.current_verb_name.as_deref() == Some(callee) {
             return Err(bounded_error("max_call_depth", 0, "recursive call path", span));
+        }
+        Ok(())
+    }
+
+    fn validate_capabilities(
+        &self,
+        callee: &str,
+        signature: &VerbSignature,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        for capability in &signature.capabilities {
+            if !self.current_capabilities.contains(capability) {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::UndeclaredCapability {
+                        callee: callee.to_owned(),
+                        capability: *capability,
+                    },
+                    span,
+                });
+            }
         }
         Ok(())
     }

@@ -9,7 +9,7 @@ use crate::modules::{
     ModuleCompilationPlan, ModuleResolver, build_test_compilation_plan, parse_module,
 };
 use crate::parser::parse;
-use crate::semantic::filter_program_for_target;
+use crate::semantic::filter_program_for_target_checked;
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::TestOptions;
@@ -82,7 +82,10 @@ fn collect_file_tests(
         return Ok(CollectedFile { tests: Vec::new(), filtered: 0 });
     };
     let declared = test_count(&program);
-    let program = filter_program_for_target(&program, configuration.target());
+    let program =
+        filter_program_for_target_checked(&program, configuration.target()).map_err(|error| {
+            format!("{}: {}", path.display(), render_diagnostic("", &semantic_diagnostic(&error)))
+        })?;
     let filtered = declared.saturating_sub(test_count(&program));
     validate_semantics(path, &source, &program, options.mode)?;
     let module =

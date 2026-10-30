@@ -67,6 +67,25 @@ fn lsp_accepts_effect_contracts_without_erasing_metadata() {
 }
 
 #[test]
+fn lsp_preserves_capability_contracts_and_reports_unavailable_targets() {
+    let valid_uri = "file:///tmp/actus-lsp-capability-valid.act";
+    let invalid_uri = "file:///tmp/actus-lsp-capability-invalid.act";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"version":1,"text":"meta capability(\"posix.cloexec\") verb open_secure() -> Int { return 0; }"}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":invalid_uri,"version":1,"text":"meta capability(\"windows.file_identity\") verb inspect() -> Int { return 0; }"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "valid capability was rejected: {stdout}");
+    assert!(
+        stdout.contains("\"code\":\"E1132\""),
+        "capability target diagnostic missing: {stdout}"
+    );
+}
+
+#[test]
 fn lsp_accepts_deterministic_contracts() {
     let uri = "file:///tmp/actus-lsp-deterministic-metadata.act";
     let source = "meta deterministic verb stable() -> Int { return 0; }\n";

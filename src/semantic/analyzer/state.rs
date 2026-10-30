@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BuiltinType, Effect, EnumDef, ReturnAccess, RoleDecl, StructDef};
+use crate::ast::{BuiltinType, Capability, Effect, EnumDef, ReturnAccess, RoleDecl, StructDef};
 use crate::lexer::SourceSpan;
 
 use super::super::model::{Origin, SemanticModel};
@@ -72,6 +72,7 @@ pub(crate) struct Analyzer {
     pub(crate) discarded_expression: bool,
     pub(crate) expression_value_consumed: bool,
     pub(crate) current_effects: Vec<Effect>,
+    pub(crate) current_capabilities: Vec<Capability>,
     pub(crate) current_deterministic: bool,
     pub(crate) current_realtime: bool,
     pub(crate) current_bounded: Option<crate::ast::BoundedContract>,

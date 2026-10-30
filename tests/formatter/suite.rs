@@ -45,6 +45,15 @@ fn preserves_effect_metadata_idempotently() {
 }
 
 #[test]
+fn preserves_capability_metadata_idempotently() {
+    let formatted = format_source(
+        "meta capability(\"windows.file_identity\") extern \"C\" verb native_boundary() -> Int;",
+    );
+    assert!(formatted.contains("meta capability(\"windows.file_identity\")"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_deterministic_metadata_idempotently() {
     let formatted = format_source("meta deterministic verb stable() -> Int { return 0; }");
     assert!(formatted.contains("meta deterministic"));

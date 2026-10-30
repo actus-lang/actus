@@ -146,6 +146,7 @@ impl Analyzer {
             external: signature.external,
             must_use: signature.must_use.clone(),
             effects: signature.effects.clone(),
+            capabilities: signature.capabilities.clone(),
             deterministic: signature.deterministic,
             realtime: signature.realtime,
             bounded: signature.bounded.clone(),

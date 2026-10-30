@@ -44,7 +44,7 @@ pub(crate) fn find_hover(
         });
     }
     let (name, name_span) = identifier_at(&tokens, offset)?;
-    let program = crate::semantic::filter_program_for_target(&parse(tokens.clone()).ok()?, target);
+    let program = target_program(&tokens, target)?;
     if crate::ast::primitive_type(&name).is_some() {
         return Some(super::HoverInfo {
             contents: format!("```actus\ntype {name}\n```"),
@@ -76,6 +76,10 @@ pub(crate) fn find_hover(
         contents: format_markdown(&info, source, name_span.start),
         range: range(source, name_span),
     })
+}
+
+fn target_program(tokens: &[Token], target: &TargetSpec) -> Option<Program> {
+    crate::semantic::filter_program_for_target_checked(&parse(tokens.to_vec()).ok()?, target).ok()
 }
 
 fn semantic_argument_role_info(program: &Program, offset: usize) -> Option<(String, SourceSpan)> {
@@ -411,10 +415,11 @@ fn imported_info(
                 continue;
             }
             let module_source = super::super::module_scope::source_for_path(path, overlays)?;
-            let module_program = crate::semantic::filter_program_for_target(
+            let module_program = crate::semantic::filter_program_for_target_checked(
                 &parse(crate::lexer::scan(&module_source).0).ok()?,
                 target,
-            );
+            )
+            .ok()?;
             if let Some(declaration) = module_program
                 .declarations
                 .iter()

@@ -4,7 +4,7 @@ use crate::diagnostics::{
 use crate::lexer::scan;
 use crate::modules::{ModuleError, ModuleResolver, parse_module, resolve_imports};
 use crate::parser::parse;
-use crate::semantic::filter_program_for_target;
+use crate::semantic::filter_program_for_target_checked;
 use std::fs;
 
 use super::conformance::{ConformanceMode, parse_strict_option, validate_source_limits};
@@ -140,7 +140,13 @@ fn analyze_check_program(
     mode: ConformanceMode,
     program: crate::ast::Program,
 ) -> i32 {
-    let program = filter_program_for_target(&program, configuration.target());
+    let program = match filter_program_for_target_checked(&program, configuration.target()) {
+        Ok(program) => program,
+        Err(error) => {
+            report_diagnostic(input, source, semantic_diagnostic(&error));
+            return 1;
+        }
+    };
     match crate::semantic::analyze(&program) {
         Ok(_) => {
             if mode.is_strict() {
@@ -177,7 +183,13 @@ fn check_module(
         Ok(program) => program,
         Err(error) => return report_module_error(module_path, error),
     };
-    let program = filter_program_for_target(&program, configuration.target());
+    let program = match filter_program_for_target_checked(&program, configuration.target()) {
+        Ok(program) => program,
+        Err(error) => {
+            report_diagnostic(input_path, "", semantic_diagnostic(&error));
+            return 1;
+        }
+    };
     match crate::semantic::analyze(&program) {
         Ok(_) => {
             if mode.is_strict() {

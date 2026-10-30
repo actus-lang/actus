@@ -35,6 +35,7 @@ pub enum ParseErrorKind {
     TestMetadataRequiresVerb,
     MustUseRequiresReturn,
     UnsupportedEffect { name: String },
+    UnsupportedCapability { name: String },
     InvalidBoundedLimit { reason: String },
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
@@ -57,6 +58,7 @@ pub enum ParseErrorCode {
     TestMetadataRequiresVerb,
     MustUseRequiresReturn,
     UnsupportedEffect,
+    UnsupportedCapability,
     InvalidBoundedLimit,
     MalformedVerbContract,
     OpenImportRequiresBlock,
@@ -166,30 +168,12 @@ impl Parser {
         &self,
         metadata: &[MetaAttribute],
     ) -> Result<(), ParseError> {
-        if metadata.iter().filter(|attribute| matches!(attribute, MetaAttribute::Test)).count() > 1
-        {
-            return Err(ParseError {
-                code: ParseErrorCode::DuplicateMetadata,
-                kind: ParseErrorKind::DuplicateMetadata { name: "test".to_owned() },
-                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
-            });
-        }
-        if metadata
-            .iter()
-            .filter(|attribute| matches!(attribute, MetaAttribute::MustUse(_)))
-            .count()
-            > 1
-        {
-            return Err(ParseError {
-                code: ParseErrorCode::DuplicateMetadata,
-                kind: ParseErrorKind::DuplicateMetadata { name: "must_use".to_owned() },
-                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
-            });
-        }
+        self.reject_duplicate_basic_metadata(metadata)?;
         self.reject_duplicate_deterministic_metadata(metadata)?;
         self.reject_duplicate_realtime_metadata(metadata)?;
         self.reject_duplicate_bounded_metadata(metadata)?;
         self.reject_duplicate_effect_metadata(metadata)?;
+        self.reject_duplicate_capability_metadata(metadata)?;
         if let Some((index, target)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
             if let MetaAttribute::Target(target) = attribute { Some((index, target)) } else { None }
         }) && metadata[index + 1..]
@@ -220,6 +204,33 @@ impl Parser {
             });
         }
         self.reject_duplicate_limitless_metadata(metadata)
+    }
+
+    fn reject_duplicate_basic_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        let duplicate =
+            if metadata.iter().filter(|attribute| matches!(attribute, MetaAttribute::Test)).count()
+                > 1
+            {
+                Some("test")
+            } else if metadata
+                .iter()
+                .filter(|attribute| matches!(attribute, MetaAttribute::MustUse(_)))
+                .count()
+                > 1
+            {
+                Some("must_use")
+            } else {
+                None
+            };
+        let Some(name) = duplicate else { return Ok(()) };
+        Err(ParseError {
+            code: ParseErrorCode::DuplicateMetadata,
+            kind: ParseErrorKind::DuplicateMetadata { name: name.to_owned() },
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        })
     }
 
     fn reject_duplicate_deterministic_metadata(

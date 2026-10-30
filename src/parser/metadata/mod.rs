@@ -1,4 +1,5 @@
 mod bounded;
+mod capability;
 mod declaration;
 mod deterministic;
 mod dispatch;

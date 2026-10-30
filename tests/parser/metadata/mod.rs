@@ -14,6 +14,7 @@ fn parse_error(source: &str) -> ParseError {
     parse(tokens).expect_err("source should be rejected")
 }
 
+mod capability;
 mod effect;
 mod fault;
 mod limitless;
