@@ -36,6 +36,7 @@ verb payload_pair(erg value: u8) -> Buffer {
     return output;
 }
 
+meta effect("filesystem", "blocking")
 verb write_value(abs path: path::Path, erg value: u8) -> Int {
     erg bytes = payload(value: erg value);
     erg written = fs::write_file(path: abs path, contents: abs bytes);
@@ -45,6 +46,7 @@ verb write_value(abs path: path::Path, erg value: u8) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb write_pair(abs path: path::Path, erg value: u8) -> Int {
     erg bytes = payload_pair(value: erg value);
     erg written = fs::write_file(path: abs path, contents: abs bytes);
@@ -54,6 +56,7 @@ verb write_pair(abs path: path::Path, erg value: u8) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb cleanup(
     abs lock_path: path::Path,
     abs destination: path::Path,
@@ -64,6 +67,7 @@ verb cleanup(
     fs::remove_file(path: abs staging);
 }
 
+meta effect("filesystem", "blocking")
 verb verify_size(abs destination: path::Path, erg expected: Int) -> Int {
     erg inspected = fs::metadata(path: abs destination);
     return case dat inspected {
@@ -77,6 +81,8 @@ verb verify_size(abs destination: path::Path, erg expected: Int) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb publish_absent_case(
     abs lock_path: path::Path,
     abs destination: path::Path,
@@ -106,6 +112,8 @@ verb publish_absent_case(
     };
 }
 
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb publish_conflict_result(
     abs lock_path: path::Path,
     abs destination: path::Path,
@@ -137,6 +145,8 @@ verb publish_conflict_result(
     };
 }
 
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb conflict_case(
     abs lock_path: path::Path,
     abs destination: path::Path,
@@ -177,6 +187,8 @@ verb conflict_case(
     };
 }
 
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb existing_case(
     abs lock_path: path::Path,
     abs destination: path::Path,
@@ -216,8 +228,10 @@ verb existing_case(
     };
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb coordinator_publishes_when_identity_matches() -> Int {
     erg lock_suffix: u8 = 91u8;
     erg destination_suffix: u8 = 92u8;
@@ -258,8 +272,10 @@ verb coordinator_publishes_when_identity_matches() -> Int {
     };
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb coordinator_rejects_stale_identity() -> Int {
     erg lock_suffix: u8 = 94u8;
     erg destination_suffix: u8 = 95u8;
@@ -300,8 +316,10 @@ verb coordinator_rejects_stale_identity() -> Int {
     };
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb coordinator_publishes_matching_existing_identity() -> Int {
     erg lock_suffix: u8 = 97u8;
     erg destination_suffix: u8 = 98u8;
@@ -342,6 +360,9 @@ verb coordinator_publishes_matching_existing_identity() -> Int {
     };
 }
 
+meta target("windows")
+meta effect("filesystem", "blocking")
+meta capability("windows.file_identity", "windows.replace_file")
 verb windows_unsupported_case(
     abs lock_path: path::Path,
     abs destination: path::Path,
@@ -378,8 +399,10 @@ verb windows_unsupported_case(
     };
 }
 
-meta target("windows")
 meta test
+meta target("windows")
+meta effect("filesystem", "blocking")
+meta capability("windows.file_identity", "windows.replace_file")
 verb coordinator_reports_windows_unsupported() -> Int {
     erg lock_suffix: u8 = 101u8;
     erg destination_suffix: u8 = 102u8;

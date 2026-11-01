@@ -29,6 +29,7 @@ verb rename_path(erg destination: u8) -> Result[path::Path, path::PathError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb rename_preserves_same_filesystem_contract() -> Int {
     erg source_kind: u8 = 0u8;
     erg destination_kind: u8 = 1u8;

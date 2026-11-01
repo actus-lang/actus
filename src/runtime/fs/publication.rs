@@ -201,6 +201,7 @@ fn compare_expected_identity(
     if expected.identity_kind == 0 {
         return match current {
             Ok(_) => Ok(false),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
             Err(error) if error.kind() == std::io::ErrorKind::Unsupported => {
                 Err(PUBLICATION_STATUS_UNSUPPORTED)
             }
@@ -259,13 +260,39 @@ fn sync_parent_directory(path: &std::path::Path) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::sync_parent_directory;
+    use super::{compare_expected_identity, sync_parent_directory};
+    use crate::runtime::types::ActusMetadata;
 
     #[cfg(unix)]
     #[test]
     fn sync_parent_directory_accepts_existing_parent() {
         let path = std::env::temp_dir().join("actus-publication-test");
         sync_parent_directory(&path).expect("temporary directory should be syncable");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn absent_identity_matches_a_missing_destination() {
+        let path =
+            std::env::temp_dir().join(format!("actus-publication-absent-{}", std::process::id()));
+        let expected = ActusMetadata {
+            size: 0,
+            is_file: 0,
+            is_dir: 0,
+            readonly: 0,
+            is_symlink: 0,
+            modified_seconds: 0,
+            modified_status: 2,
+            accessed_seconds: 0,
+            accessed_status: 2,
+            created_seconds: 0,
+            created_status: 2,
+            identity_primary: 0,
+            identity_secondary: 0,
+            identity_kind: 0,
+            identity_status: 2,
+        };
+        assert_eq!(compare_expected_identity(&expected, &path), Ok(true));
     }
 
     #[cfg(windows)]

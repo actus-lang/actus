@@ -12,6 +12,7 @@ verb current_directory() -> Result[Path, PathError] {
     return path_from_ascii(storage: dat raw);
 }
 
+meta effect("filesystem", "blocking")
 verb close_directory_entry(
     ins directory: Directory,
     dat value: Option[DirectoryEntry]
@@ -31,6 +32,7 @@ verb close_directory_entry(
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb directory_iteration_returns_entry_and_closes() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -51,6 +53,7 @@ verb directory_iteration_returns_entry_and_closes() -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb verify_filtered_directory(ins directory: Directory) -> Int {
     erg entry = next_dir_entry(directory: ins directory);
     return case dat entry {
@@ -80,6 +83,7 @@ verb verify_filtered_directory(ins directory: Directory) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb lexicographic_directory_iteration_is_bounded() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -116,6 +120,7 @@ verb missing_directory_path() -> Result[Path, PathError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb directory_iteration_rejects_missing_directory() -> Int {
     erg path = missing_directory_path();
     return case dat path {
@@ -133,6 +138,7 @@ verb directory_iteration_rejects_missing_directory() -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb verify_repeated_eof(ins directory: Directory) -> Int {
     erg repeated = next_dir_entry(directory: ins directory);
     return case dat repeated {
@@ -158,6 +164,7 @@ verb verify_repeated_eof(ins directory: Directory) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb repeated_directory_eof_remains_clean() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -193,6 +200,7 @@ verb repeated_directory_eof_remains_clean() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb closed_directory_rejects_reuse() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -232,6 +240,7 @@ verb closed_directory_rejects_reuse() -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb open_directory_then_return_early() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -247,6 +256,7 @@ verb open_directory_then_return_early() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb directory_drop_closes_on_early_return() -> Int {
     erg early = open_directory_then_return_early();
     if early != 0 {
@@ -271,6 +281,7 @@ verb directory_drop_closes_on_early_return() -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb open_directory_then_break() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -291,11 +302,13 @@ verb open_directory_then_break() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb directory_drop_closes_after_loop_exit() -> Int {
     erg result = open_directory_then_break();
     return result;
 }
 
+meta effect("filesystem", "blocking")
 verb open_directory_then_error() -> Result[Int, io::IoError] {
     erg current = current_directory();
     return case dat current {
@@ -311,6 +324,7 @@ verb open_directory_then_error() -> Result[Int, io::IoError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb directory_drop_closes_on_typed_error() -> Int {
     erg result = open_directory_then_error();
     return case dat result {

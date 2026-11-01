@@ -49,6 +49,8 @@ verb file_path() -> Path {
 }
 
 meta test
+meta effect("filesystem", "blocking")
+meta capability("filesystem.create_exclusive")
 verb create_new_rejects_existing_file() -> Int {
     erg path = file_path();
     erg stale = remove_file(path: abs path);
