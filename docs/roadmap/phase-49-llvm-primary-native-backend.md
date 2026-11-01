@@ -29,7 +29,7 @@ runtime, serialization, and zero-float contracts.
 - [x] Inventory every LLVM-only path and classify it as complete, partial,
       unsupported, or untested.
 - [x] Inventory all shared lowering operations and map each to an LLVM emitter.
-- [ ] Record the supported LLVM version, installation contract, linker policy,
+- [x] Record the supported LLVM version, installation contract, linker policy,
       target matrix, and clean-checkout setup.
 - [x] Capture the focused LLVM-only baseline before changing the default.
 - [ ] Capture complete baseline results for LLVM-only, Cranelift-only, and
@@ -65,6 +65,32 @@ These results are inventory evidence, not completion evidence. The remaining
 intentional incomplete paths with either full implementations or stable,
 source-spanned diagnostics.
 
+#### 49.1 configuration baseline evidence
+
+The first complete local comparison produced these results:
+
+| Configuration | Command | Result | Classification |
+| --- | --- | --- | --- |
+| LLVM-only | `cargo test --no-default-features --features llvm --all-targets -- --test-threads=1` | `89 passed; 14 failed` | Open implementation baseline |
+| Cranelift-only | `cargo test --no-default-features --features cranelift --all-targets -- --test-threads=1` | exit 0; no failing suites | Compatibility baseline |
+| All features | `cargo test --all-targets --all-features -- --test-threads=1` | exit 0; no failing suites | Combined-feature baseline |
+
+The LLVM-only failures are not collapsed into one generic failure. They are
+currently classified as:
+
+- generated serialization, CRC32, and fixed-frame fixtures whose LLVM module
+  calls runtime bridges with an `i32` argument where the declared bridge
+  signature requires `i64`;
+- generated serialization migration/validation and invalid-input fixtures
+  blocked by the same module-verification failure; and
+- checked buffer-index, integer-cast, and packed-field overflow fixtures whose
+  LLVM-generated executable does not yet produce the required native trap or
+  exit status.
+
+The complete-baseline checkbox remains open until these LLVM failures are
+implemented or rejected at the correct shared/native boundary with stable
+diagnostics. No default-backend change is permitted before that point.
+
 #### 49.1 shared-operation mapping
 
 The shared lowering contract currently exposes 37 `BackendInstruction`
@@ -93,6 +119,31 @@ This mapping closes the inventory/documentation part of 49.1. It does not
 close implementation acceptance: the remaining checks still require complete
 operation coverage, target-specific validation, and stable diagnostics for
 unsupported paths.
+
+#### 49.1 toolchain and target evidence
+
+The repository and CI configuration agree on the following setup:
+
+- LLVM binding: `llvm-sys 231.0.0` with strict versioning;
+- supported LLVM installation line: LLVM 23.x;
+- discovery: `llvm-config` or `LLVM_SYS_231_PREFIX`;
+- hosted Unix linker path: the configured native linker and LLVM 23 runtime;
+- hosted Windows linker path: MSVC environment with LLVM `lld-link.exe`, the
+  Windows SDK, and the checked static dependency set;
+- freestanding ARM32 path: LLVM 23 plus `clang`, `arm-none-eabi-ld`,
+  `arm-none-eabi-gcc`, `arm-none-eabi-objdump`, explicit startup/provider
+  contracts, and the Thumb target profile;
+- documented target matrix: hosted Linux, hosted Apple, hosted Windows,
+  freestanding UEFI/object, and freestanding Cortex-M;
+- clean-checkout validation: pinned GitHub Actions checkout, explicit LLVM
+  installation, target toolchain verification, compilation, tests, standard
+  library checks, and dependency validation.
+
+The authoritative operational instructions remain in
+`docs/guide/compiler/backends-and-support.md`; CI setup is defined in
+`.github/workflows/ci.yml` and the release workflow. This evidence closes the
+toolchain-policy inventory item, but does not claim that every target/backend
+combination is executable or that LLVM is ready to become the default.
 
 ### 49.2 — Complete shared-contract lowering
 
