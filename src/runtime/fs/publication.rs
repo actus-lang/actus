@@ -260,7 +260,10 @@ fn sync_parent_directory(path: &std::path::Path) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{compare_expected_identity, sync_parent_directory};
+    #[cfg(unix)]
+    use super::compare_expected_identity;
+    use super::sync_parent_directory;
+    #[cfg(unix)]
     use crate::runtime::types::ActusMetadata;
 
     #[cfg(unix)]
