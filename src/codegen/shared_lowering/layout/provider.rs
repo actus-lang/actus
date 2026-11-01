@@ -189,6 +189,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             });
         }
         let definition = self.structs.get(type_name.name.as_str())?;
+        let packed = definition.repr().is_some_and(|repr| repr.is_packed());
         let substitution = (!definition.generic_parameters.is_empty())
             .then(|| {
                 crate::semantic::TypeSubstitution::for_type(
@@ -206,7 +207,8 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
                 .as_ref()
                 .map_or_else(|| field.ty.clone(), |substitution| substitution.apply(&field.ty));
             let layout = self.field_storage_layout(&field.role, &field_type)?;
-            offset = Self::align_up(offset, layout.alignment)?;
+            let field_alignment = if packed { 1 } else { layout.alignment };
+            offset = Self::align_up(offset, field_alignment)?;
             if field.name == field_name {
                 return Some(BackendFieldLayout {
                     offset,

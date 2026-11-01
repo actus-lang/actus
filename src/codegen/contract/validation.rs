@@ -306,7 +306,7 @@ fn validate_aggregate_construct(
     let mut previous_end = 0u32;
     for field in fields {
         field.layout.validate()?;
-        if field.offset % field.layout.alignment != 0
+        if field.offset % field.layout.alignment != 0 && layout.alignment != 1
             || field.offset > layout.size
             || field.layout.size > layout.size - field.offset
             || field.offset < previous_end
@@ -330,7 +330,7 @@ fn validate_aggregate_field_load(
     let unsupported_type =
         matches!(ty, super::BackendValueType::Unit | super::BackendValueType::Float { .. });
     if unsupported_type
-        || !offset.is_multiple_of(field_layout.alignment)
+        || (!offset.is_multiple_of(field_layout.alignment) && aggregate_layout.alignment != 1)
         || offset > aggregate_layout.size
         || field_layout.size > aggregate_layout.size - offset
     {
@@ -350,7 +350,7 @@ fn validate_aggregate_field_store(
     let unsupported_type =
         matches!(ty, super::BackendValueType::Unit | super::BackendValueType::Float { .. });
     if unsupported_type
-        || !offset.is_multiple_of(field_layout.alignment)
+        || (!offset.is_multiple_of(field_layout.alignment) && aggregate_layout.alignment != 1)
         || offset > aggregate_layout.size
         || field_layout.size > aggregate_layout.size - offset
     {

@@ -44,6 +44,7 @@ impl CAbiType {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CAbiAggregate {
     pub name: String,
+    pub packed: bool,
     pub layout: CAbiLayout,
     pub fields: Vec<CAbiAggregateField>,
 }

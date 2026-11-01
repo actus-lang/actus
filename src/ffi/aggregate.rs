@@ -1,6 +1,6 @@
 use crate::ast::{
-    BuiltinType, EnumPayload, PrimitiveType, Program, Repr, StructFieldRole, TopLevelDecl,
-    TypeName, lookup_builtin_type, primitive_type,
+    BuiltinType, EnumPayload, PrimitiveType, Program, StructFieldRole, TopLevelDecl, TypeName,
+    lookup_builtin_type, primitive_type,
 };
 
 use super::{CAbiAggregate, CAbiAggregateField, CAbiError, CAbiLayout, CAbiTarget, CAbiType};
@@ -33,7 +33,7 @@ fn map_type_in_program_with_visiting(
         if !type_name.arguments.is_empty() || !definition.generic_parameters.is_empty() {
             return Err(CAbiError::GenericAggregate { name: type_name.name.clone() });
         }
-        if definition.repr() != Some(Repr::C) {
+        if !definition.repr().is_some_and(|repr| repr.is_c()) {
             return Err(CAbiError::AggregateRequiresReprC { name: type_name.name.clone() });
         }
         return map_struct(target, program, definition, visiting);
@@ -47,7 +47,7 @@ fn map_type_in_program_with_visiting(
         if !type_name.arguments.is_empty() || !definition.generic_parameters.is_empty() {
             return Err(CAbiError::GenericAggregate { name: type_name.name.clone() });
         }
-        if definition.repr() != Some(Repr::C) {
+        if !definition.repr().is_some_and(|repr| repr.is_c()) {
             return Err(CAbiError::AggregateRequiresReprC { name: type_name.name.clone() });
         }
         if definition.variants.iter().any(|variant| !matches!(variant.payload, EnumPayload::Unit)) {
@@ -131,6 +131,7 @@ fn map_struct(
         return Err(CAbiError::AggregateLayoutOverflow { name: definition.name.clone() });
     }
     visiting.push(definition.name.clone());
+    let packed = definition.repr().is_some_and(|repr| repr.is_packed());
     let mut offset = 0u32;
     let mut alignment = 1u32;
     let mut fields = Vec::new();
@@ -151,10 +152,11 @@ fn map_struct(
                 ty: field.ty.canonical_key(),
             });
         }
-        offset = align_up(offset, field_layout.alignment)
+        let field_alignment = if packed { 1 } else { field_layout.alignment };
+        offset = align_up(offset, field_alignment)
             .and_then(|value| value.checked_add(field_layout.size))
             .ok_or_else(|| CAbiError::AggregateLayoutOverflow { name: definition.name.clone() })?;
-        alignment = alignment.max(field_layout.alignment);
+        alignment = alignment.max(field_alignment);
         fields.push(CAbiAggregateField {
             name: field.name.clone(),
             offset: offset - field_layout.size,
@@ -165,6 +167,7 @@ fn map_struct(
     visiting.pop();
     Ok(CAbiType::Aggregate(CAbiAggregate {
         name: definition.name.clone(),
+        packed,
         layout: CAbiLayout { size: align_up(offset, alignment).unwrap_or(0), alignment },
         fields,
     }))

@@ -1,5 +1,5 @@
 use crate::ast::{
-    EnumDef, EnumPayload, PrimitiveType, Repr, StructDef, StructFieldRole, TypeName, primitive_type,
+    EnumDef, EnumPayload, PrimitiveType, StructDef, StructFieldRole, TypeName, primitive_type,
 };
 
 use super::analyzer::Analyzer;
@@ -8,12 +8,12 @@ use super::errors::{SemanticError, SemanticErrorKind};
 impl Analyzer {
     pub(super) fn validate_repr_declarations(&self) -> Result<(), SemanticError> {
         for definition in self.struct_types.values() {
-            if definition.repr() == Some(Repr::C) {
+            if definition.repr().is_some_and(|repr| repr.is_c() || repr.is_packed()) {
                 self.validate_repr_struct(definition)?;
             }
         }
         for definition in self.enum_types.values() {
-            if definition.repr() == Some(Repr::C) {
+            if definition.repr().is_some_and(|repr| repr.is_c() || repr.is_packed()) {
                 self.validate_repr_enum(definition)?;
             }
         }
@@ -51,6 +51,13 @@ impl Analyzer {
     }
 
     fn validate_repr_enum(&self, definition: &EnumDef) -> Result<(), SemanticError> {
+        if definition.repr().is_some_and(|repr| repr.is_packed()) {
+            return Err(repr_error_at(
+                &definition.name,
+                "packed representation is supported only for structs",
+                definition.span,
+            ));
+        }
         if !definition.generic_parameters.is_empty() {
             return Err(repr_error_at(
                 &definition.name,
@@ -157,7 +164,9 @@ impl Analyzer {
         structure: &StructDef,
         visiting: &mut Vec<String>,
     ) -> Result<(), SemanticError> {
-        if structure.repr() != Some(Repr::C) || !type_name.arguments.is_empty() {
+        if !structure.repr().is_some_and(|repr| repr.is_c() || repr.is_packed())
+            || !type_name.arguments.is_empty()
+        {
             return Err(repr_error_at(
                 declaration,
                 format!(
@@ -189,7 +198,7 @@ impl Analyzer {
         type_name: &TypeName,
         enumeration: &EnumDef,
     ) -> Result<(), SemanticError> {
-        if enumeration.repr() != Some(Repr::C) || !type_name.arguments.is_empty() {
+        if !enumeration.repr().is_some_and(|repr| repr.is_c()) || !type_name.arguments.is_empty() {
             return Err(repr_error_at(
                 declaration,
                 format!(

@@ -1,9 +1,10 @@
-# `meta repr(C)`
+# `meta repr(C)` and `meta repr(packed)`
 
-`meta repr(C)` is a closed, compiler-defined ABI declaration for a concrete
-value type. It tells Actus that the type is intentionally usable as a C-style
-native aggregate. The declaration is an assertion with checks; it is not a
-request to bypass ownership, cleanup, or layout validation.
+`meta repr(C)` and `meta repr(packed)` are closed, compiler-defined layout
+contracts for concrete value types. `repr(C)` makes a type intentionally usable
+as a C-style native aggregate. `repr(packed)` removes inter-field padding and
+sets aggregate alignment to one byte. Both declarations are assertions with
+checks; neither bypasses ownership, cleanup, or layout validation.
 
 ```actus
 meta repr(C)
@@ -17,15 +18,30 @@ enum Axis {
     X,
     Y,
 }
+
+meta repr(C, packed)
+struct WireHeader {
+    tag: u8,
+    length: u32,
+}
+
+meta repr(C)
+meta repr(packed)
+struct SeparateSpelling {
+    tag: u8,
+    length: u32,
+}
 ```
 
 ## Syntax and placement
 
-The representation name is a bare compiler-defined identifier. Quoted names,
-`packed`, `Rust`, arbitrary strings, and other future names are not silently
-accepted. `repr(C)` may be attached only to a `struct` or `enum`; it is
-rejected on verbs, external verbs, packs, roles, performances, and file
-metadata. A declaration may contain at most one representation attribute.
+Representation names are bare compiler-defined identifiers. Quoted names,
+arbitrary strings, and unknown names are rejected. The supported spellings are
+`repr(C)`, `repr(packed)`, and the grouped form `repr(C, packed)`. Separate
+`repr(C)` and `repr(packed)` attributes are also combined on the same
+declaration; repeating either component is rejected. The metadata may be
+attached only to a `struct` or `enum`; it is rejected on verbs, external verbs,
+packs, roles, performances, and file metadata.
 
 ## The checked contract
 
@@ -41,16 +57,26 @@ metadata. A declaration may contain at most one representation attribute.
   `Int`, `Bool`, `f32`, `f64`, and positive concrete arrays of those values are
   supported; the native target contract still determines the C consumer's
   exact scalar spelling;
-- nested structs and unit enums must themselves declare `meta repr(C)`;
+- nested structs and unit enums must themselves declare the representation
+  contract required by the containing layout; packed enums are not supported;
 - strings, buffers, maps, regions, packs, opaque handles, ownership-qualified
   references, generic applications, recursive layouts, and other opaque values
   are rejected;
 - enums must contain unit variants only. Payload enums require a separate
   tagged-union ABI contract and are not inferred from `repr(C)`.
 
-There is no implicit packing. Padding remains part of the compiler-checked
-layout, and `repr(C)` does not change ownership, cleanup, serialization,
-effects, capabilities, determinism, realtime rules, or source limits.
+For `repr(C)`, field order and the existing neutral layout engine determine
+alignment, padding, size, and offsets. For `repr(packed)`, fields are laid out
+in declaration order with one-byte field alignment and the aggregate alignment
+is one; trailing padding is not added. A field keeps its logical type and
+natural size, so an integer or floating-point field may begin at an unaligned
+byte offset. Native backends lower such accesses with an explicit one-byte
+alignment contract rather than assuming natural alignment.
+
+`repr(packed)` does not change ownership, cleanup, serialization, effects,
+capabilities, determinism, realtime rules, or source limits. It also does not
+make a type a bit-field container: fields remain byte-sized typed values, not
+arbitrary-width bit ranges.
 
 ## Native boundary
 
@@ -77,9 +103,11 @@ The mapper is descriptive and checked; it does not generate an unsafe native
 call by itself. The caller must still provide the correct declaration,
 ownership roles, external boundary, and target-specific native implementation.
 
-`repr(packed)`, volatile access, explicit alignment overrides, tagged unions,
-and target-specific layout overrides are separate contracts. They are not
-aliases for `repr(C)` and require their own safety and ABI specification.
+`repr(packed)` may be combined with `repr(C)` when the packed type crosses a C
+boundary. The program-aware FFI mapper reports the packed flag and exact field
+offsets; the foreign declaration must use a matching packed C layout contract.
+Packed enums, volatile access, explicit alignment overrides, tagged unions, and
+target-specific layout overrides remain separate contracts.
 
 ## Diagnostics and compatibility
 

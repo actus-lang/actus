@@ -224,15 +224,19 @@ impl Parser {
                 > 1
             {
                 Some("must_use")
-            } else if metadata
-                .iter()
-                .filter(|attribute| matches!(attribute, MetaAttribute::Repr(_)))
-                .count()
-                > 1
-            {
-                Some("repr")
             } else {
-                None
+                let mut repr = crate::ast::Repr::new(false, false);
+                let mut duplicate = false;
+                for attribute in metadata {
+                    let MetaAttribute::Repr(current) = attribute else { continue };
+                    if (current.is_c() && repr.is_c()) || (current.is_packed() && repr.is_packed())
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                    repr = repr.combine(*current);
+                }
+                duplicate.then_some("repr")
             };
         let Some(name) = duplicate else { return Ok(()) };
         Err(ParseError {

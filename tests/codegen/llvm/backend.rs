@@ -123,6 +123,26 @@ fn llvm_consumes_shared_array_pack_bit_fields() {
     assert!(llvm_ir.contains("packed.field.updated"));
 }
 
+#[cfg(feature = "cranelift")]
+#[test]
+fn both_backends_consume_repr_packed_unaligned_fields() {
+    let source = "meta repr(C, packed) struct Wire { prefix: u8, value: u32, } verb main() -> Int { erg wire: Wire = Wire { prefix: 1u8, value: 42u32, }; wire.value = 43u32; return wire.value as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "repr(packed) fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("repr(packed) fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("repr(packed) fields should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume repr(packed) fields");
+    assert!(llvm_ir.contains("align 1"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let object_bytes =
+        emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+            .expect("Cranelift should consume repr(packed) fields");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "main"));
+}
+
 #[test]
 fn both_backends_emit_user_defined_drop_performance_calls() {
     let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect() { erg value: Counter = Counter { value: 7, }; return; }";

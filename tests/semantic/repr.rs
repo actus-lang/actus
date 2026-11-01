@@ -21,6 +21,23 @@ fn accepts_concrete_c_structs_and_unit_enums() {
 }
 
 #[test]
+fn accepts_packed_structs_in_grouped_and_separate_forms() {
+    analyze_source(
+        "meta repr(C, packed) struct Grouped { prefix: u8, value: u32, } meta repr(C) meta repr(packed) struct Separate { prefix: u8, value: u32, }",
+    )
+    .expect("packed concrete structs should analyze");
+}
+
+#[test]
+fn rejects_packed_enums() {
+    let error = analyze_source("meta repr(packed) enum Axis { Horizontal, Vertical, }")
+        .expect_err("packed enum layout must not be inferred");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("only for structs"))
+    );
+}
+
+#[test]
 fn rejects_ownership_fields_in_c_structs() {
     let error = analyze_source("meta repr(C) struct Resource { erg handle: Int, }")
         .expect_err("ownership-qualified fields must not cross a C ABI");

@@ -57,8 +57,11 @@ phase prematurely.
       preservation, and Unix/Windows/freestanding fixtures.
 - [x] Implement `meta repr(C)` as a restricted concrete value-type ABI
       contract with parser, semantic, formatter, LSP, and negative-fixture
-      coverage. Payload enums, generic types, ownership-qualified fields,
-      opaque aggregates, and packed layouts remain rejected.
+      coverage. Payload enums, generic types, ownership-qualified fields, and
+      opaque aggregates remain rejected.
+- [x] Extend `meta repr` with `packed` composition in grouped and separate
+      forms, checked unpadded layout, safe unaligned backend access, packed C
+      ABI mapping, and parser/semantic/native fixtures.
 
 ## Planned metadata extension backlog
 
@@ -86,8 +89,8 @@ advance.
 1. `meta capability(...)` — implemented as ADR-0096 and documented in the
    capability guide; future capability names still require their own registry
    and target evidence.
-2. `meta repr(C)` — provide a restricted, explicitly checked ABI/layout
-   contract for native interoperability.
+2. `meta repr(C)` and `meta repr(packed)` — provide restricted, explicitly
+   checked ABI/layout contracts for native interoperability.
 3. `meta volatile` — define explicit hardware-observable access semantics only
    after the native memory-access contract is specified.
 4. `meta zero_on_drop` — guarantee secret-material clearing across ownership

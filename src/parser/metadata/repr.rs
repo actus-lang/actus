@@ -5,17 +5,35 @@ use crate::lexer::TokenKind;
 impl Parser {
     pub(super) fn parse_repr_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
         self.expect_simple(TokenKind::LeftParen, "`(` after `repr`")?;
-        let token = self.take_identifier("representation name")?;
-        let name = super::super::identifier_text(&token.kind);
-        if name != "C" {
-            return Err(ParseError {
-                code: ParseErrorCode::UnsupportedRepresentation,
-                kind: ParseErrorKind::UnsupportedRepresentation { name },
-                span: token.span,
-            });
+        let mut c = false;
+        let mut packed = false;
+        loop {
+            let token = self.take_identifier("representation name")?;
+            let name = super::super::identifier_text(&token.kind);
+            match name.as_str() {
+                "C" if !c => c = true,
+                "packed" if !packed => packed = true,
+                "C" | "packed" => {
+                    return Err(ParseError {
+                        code: ParseErrorCode::DuplicateMetadata,
+                        kind: ParseErrorKind::DuplicateMetadata { name: "repr".to_owned() },
+                        span: token.span,
+                    });
+                }
+                _ => {
+                    return Err(ParseError {
+                        code: ParseErrorCode::UnsupportedRepresentation,
+                        kind: ParseErrorKind::UnsupportedRepresentation { name },
+                        span: token.span,
+                    });
+                }
+            }
+            if !self.match_simple(TokenKind::Comma) {
+                break;
+            }
         }
-        self.expect_simple(TokenKind::RightParen, "`)` after representation name")?;
+        self.expect_simple(TokenKind::RightParen, "`)` after representation names")?;
         let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Repr(Repr::C)])
+        Ok(vec![MetaAttribute::Repr(Repr::new(c, packed))])
     }
 }

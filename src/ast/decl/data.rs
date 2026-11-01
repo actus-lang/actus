@@ -75,19 +75,25 @@ pub struct PackDecl {
 
 impl StructDef {
     pub fn repr(&self) -> Option<Repr> {
-        self.metadata.iter().find_map(|attribute| match attribute {
-            MetaAttribute::Repr(repr) => Some(*repr),
-            _ => None,
-        })
+        self.metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                MetaAttribute::Repr(repr) => Some(*repr),
+                _ => None,
+            })
+            .reduce(Repr::combine)
     }
 }
 
 impl EnumDef {
     pub fn repr(&self) -> Option<Repr> {
-        self.metadata.iter().find_map(|attribute| match attribute {
-            MetaAttribute::Repr(repr) => Some(*repr),
-            _ => None,
-        })
+        self.metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                MetaAttribute::Repr(repr) => Some(*repr),
+                _ => None,
+            })
+            .reduce(Repr::combine)
     }
 }
 

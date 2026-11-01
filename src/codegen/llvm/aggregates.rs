@@ -143,7 +143,7 @@ fn initialize_aggregate_field(
             LLVMBuildMemMove(
                 builder,
                 destination,
-                field.layout.alignment,
+                aggregate_field_alignment(field.offset, field.layout.alignment),
                 value,
                 field.layout.alignment,
                 size,
@@ -154,9 +154,13 @@ fn initialize_aggregate_field(
         }
     } else {
         let value = coerce_scalar_value(context, builder, value, field.ty)?;
-        if unsafe { LLVMBuildStore(builder, value, destination) }.is_null() {
+        let store = unsafe { LLVMBuildStore(builder, value, destination) };
+        if store.is_null() {
             return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
         }
+        unsafe {
+            LLVMSetAlignment(store, aggregate_field_alignment(field.offset, field.layout.alignment))
+        };
     }
     Ok(())
 }
@@ -204,7 +208,8 @@ pub(super) fn emit_aggregate_field_load(
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    let BackendInstruction::AggregateFieldLoad { result, base, offset, ty, .. } = instruction
+    let BackendInstruction::AggregateFieldLoad { result, base, offset, field_layout, ty, .. } =
+        instruction
     else {
         return Err(BackendEmitError("LLVM aggregate field load expected".to_owned()));
     };
@@ -230,6 +235,9 @@ pub(super) fn emit_aggregate_field_load(
         if value.is_null() {
             return Err(BackendEmitError("LLVM failed to load aggregate field".to_owned()));
         }
+        unsafe {
+            LLVMSetAlignment(value, aggregate_field_alignment(*offset, field_layout.alignment))
+        };
         values.insert(*result, value);
     }
     Ok(false)
@@ -241,7 +249,8 @@ pub(super) fn emit_aggregate_field_store(
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    let BackendInstruction::AggregateFieldStore { base, offset, value, ty, .. } = instruction
+    let BackendInstruction::AggregateFieldStore { base, offset, field_layout, value, ty, .. } =
+        instruction
     else {
         return Err(BackendEmitError("LLVM aggregate field store expected".to_owned()));
     };
@@ -257,9 +266,13 @@ pub(super) fn emit_aggregate_field_store(
         BackendValueType::Enum { layout } => layout.layout,
         _ => {
             let value = coerce_scalar_value(context, builder, value, *ty)?;
-            if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
+            let store = unsafe { LLVMBuildStore(builder, value, address) };
+            if store.is_null() {
                 return Err(BackendEmitError("LLVM failed to store aggregate field".to_owned()));
             }
+            unsafe {
+                LLVMSetAlignment(store, aggregate_field_alignment(*offset, field_layout.alignment))
+            };
             return Ok(false);
         }
     };
@@ -271,7 +284,7 @@ pub(super) fn emit_aggregate_field_store(
             LLVMBuildMemMove(
                 builder,
                 address,
-                copy_layout.alignment,
+                aggregate_field_alignment(*offset, copy_layout.alignment),
                 value,
                 copy_layout.alignment,
                 size,
@@ -283,6 +296,14 @@ pub(super) fn emit_aggregate_field_store(
     }
     let _ = ty;
     Ok(false)
+}
+
+fn aggregate_field_alignment(offset: u32, natural_alignment: u32) -> u32 {
+    if natural_alignment > 1 && !offset.is_multiple_of(natural_alignment) {
+        1
+    } else {
+        natural_alignment
+    }
 }
 
 fn coerce_scalar_value(

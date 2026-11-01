@@ -260,3 +260,23 @@ fn maps_all_checked_repr_c_scalars_arrays_and_target_sized_values() {
     assert_eq!(aggregate.fields[4].layout, CAbiLayout { size: 4, alignment: 2 });
     assert_eq!(aggregate.layout, CAbiLayout { size: 24, alignment: 4 });
 }
+
+#[test]
+fn maps_repr_c_packed_fields_without_padding() {
+    let program = parse_program(
+        "meta repr(C, packed) struct Wire { prefix: u8, value: u32, tail: u16, } verb inspect(erg wire: Wire) -> Int { return 0; }",
+    );
+    let actus::ast::TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected ordinary verb")
+    };
+    let signature =
+        c_abi_signature_in_program(&program, verb).expect("packed repr(C) aggregate should map");
+    let CAbiType::Aggregate(aggregate) = &signature.parameters[0].ty else {
+        panic!("expected aggregate parameter")
+    };
+    assert!(aggregate.packed);
+    assert_eq!(aggregate.layout, CAbiLayout { size: 7, alignment: 1 });
+    assert_eq!(aggregate.fields[0].offset, 0);
+    assert_eq!(aggregate.fields[1].offset, 1);
+    assert_eq!(aggregate.fields[2].offset, 5);
+}

@@ -15,9 +15,12 @@ struct as a C aggregate would make ownership and layout implicit.
 
 ## Decision
 
-Actus supports the closed metadata form `meta repr(C)`. The representation name
-is a bare compiler-defined identifier, not a user string. The attribute is
-valid only on concrete `struct` and unit-variant `enum` declarations.
+Actus supports the closed metadata forms `meta repr(C)`,
+`meta repr(packed)`, and the grouped spelling `meta repr(C, packed)`. The
+representation names are bare compiler-defined identifiers, not user strings.
+Separate `repr(C)` and `repr(packed)` attributes are combined component-wise;
+repeating a component is rejected. `repr(packed)` is valid only for concrete
+structs. `repr(C)` remains valid for concrete structs and unit-variant enums.
 
 The compiler validates the complete declaration before code generation:
 
@@ -30,12 +33,18 @@ The compiler validates the complete declaration before code generation:
 5. enum payloads, opaque values, packs, handles, and ownership-qualified
    references are rejected;
 6. field order and the existing neutral layout engine define padding,
-   alignment, size, and offsets; no packing is inferred.
+   alignment, size, and offsets; no packing is inferred for `repr(C)`;
+7. `repr(packed)` gives every field one-byte alignment, removes inter-field and
+   trailing padding, and lowers unaligned field access with an explicit
+   one-byte memory alignment contract;
+8. packed enums and payload/tagged-union representations are rejected until a
+   separate enum ABI contract exists.
 
-`repr(C)` does not grant native access, change ownership, alter cleanup,
-serialize a value, or weaken unsafe-boundary checks. `repr(packed)`, volatile
-access, explicit alignment, and tagged-union layouts are separate future
-contracts and are not accepted spellings of this attribute.
+Neither representation grants native access, changes ownership, alters
+cleanup, serializes a value, or weakens unsafe-boundary checks. A packed C
+aggregate is still an explicit FFI contract: the foreign side must use a
+matching packed layout. Packed access is byte-aligned at the backend boundary;
+it is not implemented through an assumed naturally aligned pointer.
 
 ## Alternatives considered
 
@@ -43,8 +52,8 @@ contracts and are not accepted spellings of this attribute.
   makes opaque or generic state cross native boundaries accidentally.
 - Accept `repr("C")`: rejected because representation names form a closed
   compiler vocabulary and should not look like arbitrary runtime strings.
-- Add `repr(packed)` at the same time: rejected because unaligned access and
-  target-specific ABI rules require a separate safety contract.
+- Infer packing from field order or target ABI: rejected because padding must be
+  an explicit, auditable declaration choice.
 - Use a parser-only marker: rejected because a marker without semantic layout
   validation would provide false ABI confidence.
 
@@ -70,6 +79,9 @@ for an explicit `CAbiTarget`, and preserves Actus ownership at the boundary:
   `Bool`, `Usize`, and positive concrete arrays receive target-aware layouts;
 - unannotated, generic, recursive, opaque, ownership-bearing, or unsupported
   fields fail before native lowering.
+- packed aggregates report `packed: true`, one-byte aggregate alignment, and
+  exact unpadded field offsets; the mapper does not silently invent a foreign
+  compiler's packing pragma.
 
 The convenience program-aware API uses the repository's 64-bit target model.
 Callers targeting another pointer width must use the explicit target API. The

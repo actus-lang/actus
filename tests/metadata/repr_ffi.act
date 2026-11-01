@@ -113,3 +113,52 @@ verb repr_c_ffi_enum_and_scalar_values_are_stable() -> Int {
     }
     return 1;
 }
+
+meta repr(C, packed)
+struct PackedWire {
+    prefix: u8,
+    value: u32,
+    tail: u16,
+}
+
+meta repr(C)
+meta repr(packed)
+struct SeparatePackedWire {
+    prefix: u8,
+    value: u32,
+    tail: u16,
+}
+
+meta test
+verb repr_packed_removes_padding_and_preserves_access() -> Int {
+    erg value = PackedWire {
+        prefix: 1u8,
+        value: 287454020u32,
+        tail: 21862u16,
+    };
+    if size_of[PackedWire]() != 7u64 {
+        return 1;
+    }
+    if align_of[PackedWire]() != 1u64 {
+        return 2;
+    }
+    if value.value != 287454020u32 {
+        return 3;
+    }
+    value.value = 2864434397u32;
+    if value.value != 2864434397u32 {
+        return 4;
+    }
+    return 0;
+}
+
+meta test
+verb repr_packed_separate_metadata_has_same_contract() -> Int {
+    if size_of[SeparatePackedWire]() != 7u64 {
+        return 1;
+    }
+    if align_of[SeparatePackedWire]() != 1u64 {
+        return 2;
+    }
+    return 0;
+}

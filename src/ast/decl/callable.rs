@@ -77,15 +77,38 @@ pub enum MetaAttribute {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum Repr {
-    C,
+pub struct Repr {
+    c: bool,
+    packed: bool,
 }
 
 impl Repr {
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::C => "C",
+    pub const C: Self = Self { c: true, packed: false };
+    pub const PACKED: Self = Self { c: false, packed: true };
+
+    pub const fn new(c: bool, packed: bool) -> Self {
+        Self { c, packed }
+    }
+
+    pub const fn is_c(self) -> bool {
+        self.c
+    }
+
+    pub const fn is_packed(self) -> bool {
+        self.packed
+    }
+
+    pub fn name(self) -> String {
+        match (self.c, self.packed) {
+            (true, true) => "C, packed".to_owned(),
+            (true, false) => "C".to_owned(),
+            (false, true) => "packed".to_owned(),
+            (false, false) => String::new(),
         }
+    }
+
+    pub const fn combine(self, other: Self) -> Self {
+        Self { c: self.c || other.c, packed: self.packed || other.packed }
     }
 }
 
