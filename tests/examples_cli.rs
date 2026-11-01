@@ -1,10 +1,41 @@
-#[cfg(unix)]
+#[cfg(any(unix, feature = "llvm"))]
 use std::fs;
 
-#[cfg(unix)]
+#[cfg(any(unix, feature = "llvm"))]
 use actus::cli::run_with_args;
 #[cfg(unix)]
 use object::{Object, ObjectSymbol};
+
+#[cfg(feature = "llvm")]
+#[test]
+fn hello_example_builds_and_executes_with_llvm_on_hosted_targets() {
+    let source = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/hello.act");
+    let output = std::env::temp_dir().join(format!(
+        "actus-hello-llvm-{}{}",
+        std::process::id(),
+        std::env::consts::EXE_SUFFIX
+    ));
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            source.display().to_string(),
+            "--strict".to_owned(),
+            "--backend".to_owned(),
+            "llvm".to_owned(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let status = std::process::Command::new(&output)
+        .status()
+        .expect("LLVM hosted hello executable should run");
+    assert_eq!(status.code(), Some(42));
+    let _ = fs::remove_file(output);
+}
 
 #[cfg(unix)]
 fn has_main_symbol(object_file: &object::File<'_>) -> bool {
