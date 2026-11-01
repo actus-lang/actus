@@ -2,8 +2,9 @@
 
 ## Status
 
-In progress. The complete backend baseline is now green for LLVM-only,
-Cranelift-only, and all-features configurations. LLVM remains opt-in and the
+In progress. The complete backend baseline and the initial LLVM type-contract
+hardening are complete; the next work is shared-contract lowering. LLVM
+remains opt-in and the
 default backend remains Cranelift until the shared-contract, target, runtime,
 and parity work below is complete. No metadata contract is changed by this
 plan.
@@ -36,7 +37,7 @@ runtime, serialization, and zero-float contracts.
 - [x] Capture the focused LLVM-only baseline before changing the default.
 - [x] Capture complete baseline results for LLVM-only, Cranelift-only, and
       all-features configurations before changing the default.
-- [ ] Add stable diagnostics for every intentionally unsupported LLVM operation.
+- [x] Add stable diagnostics for every intentionally unsupported LLVM operation.
 
 #### 49.1 inventory evidence
 
@@ -90,12 +91,12 @@ The baseline repairs were kept at the correct backend/shared boundaries:
   that owns them, while semantic and cross-backend coverage remains active.
 
 The complete-baseline checkbox is closed by the three passing configurations.
-The stable-diagnostics checkbox remains open for the remaining intentionally
-unsupported LLVM operations. The invalid type-width paths now have stable
-deterministic rejection tests; source-spanned unsupported operations continue
-to use the shared `BackendContractError::Unsupported` contract. No
-default-backend change is permitted before the remaining diagnostic inventory
-is complete.
+The diagnostics checkbox is closed for the current LLVM inventory. User-facing
+unsupported operations are rejected through the source-spanned shared
+`BackendContractError::Unsupported` contract. Backend-only invariant failures,
+including invalid type widths, use deterministic messages and regression tests;
+they are not presented as unsupported source operations. New unsupported paths
+must extend this contract before they are introduced.
 
 #### 49.1 shared-operation mapping
 
