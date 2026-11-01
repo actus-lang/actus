@@ -157,7 +157,7 @@ combination is executable or that LLVM is ready to become the default.
       traps, typed failures, and checked casts.
 - [x] Complete aggregate, array, pack, enum, tagged-union, transparent,
       packed, and explicitly aligned layout lowering.
-- [ ] Complete ownership transfer, borrowed views, exclusive loans, cleanup,
+- [x] Complete ownership transfer, borrowed views, exclusive loans, cleanup,
       early return, failure, and branch-join lowering.
 - [ ] Complete generic specialization, imported modules, dynamic dispatch,
       native boundaries, and recursive call handling.
@@ -185,6 +185,17 @@ pointer memory copies, and niche/regular enum failure layouts. The complete
 55 tests after the integer-width addition. The fixtures exercise the shared
 contract before LLVM emission; the backend does not introduce a parallel
 layout or ownership model.
+
+#### 49.2 ownership and cleanup evidence
+
+The shared codegen integration target covers `dat` and `abs` payload bindings,
+scalar and aggregate borrowed views, `ins` parameters and exclusive loans,
+move roles, explicit and scope cleanup, nested-scope cleanup, early returns,
+typed failures, loop unwind cleanup, and branch-merge ownership state. The
+LLVM backend suite additionally verifies end-borrow boundaries, runtime cleanup
+bridges, cleanup ordering parity, and return-slot failures. The combined
+`cargo test --features llvm --test codegen -- --test-threads=1` run passed
+66 tests in the shared codegen target, while the LLVM backend suite passed 55.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
