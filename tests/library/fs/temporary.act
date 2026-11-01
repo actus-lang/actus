@@ -50,6 +50,8 @@ verb directory_prefix() -> Buffer {
 }
 
 meta test
+meta effect("filesystem", "blocking", "entropy")
+meta capability("filesystem.create_exclusive")
 verb secure_temporary_file_is_created_and_cleaned() -> Int {
     erg root_result = current_directory();
     return case dat root_result {
@@ -88,6 +90,7 @@ verb secure_temporary_file_is_created_and_cleaned() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking", "entropy")
 verb secure_temporary_directory_is_created_and_cleaned() -> Int {
     erg root_result = current_directory();
     return case dat root_result {
@@ -126,6 +129,8 @@ verb secure_temporary_directory_is_created_and_cleaned() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking", "entropy")
+meta capability("filesystem.create_exclusive")
 verb temporary_prefix_is_validated() -> Int {
     erg root_result = current_directory();
     return case dat root_result {

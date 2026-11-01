@@ -150,6 +150,16 @@ fn test_compilation_plan(
     configuration: &CompilerConfiguration,
 ) -> Result<crate::modules::ModuleCompilationPlan, String> {
     let mut program = test_program(&test.program, &test.name);
+    let test_contract = test_verb(test)?
+        .metadata
+        .iter()
+        .filter_map(|attribute| match attribute {
+            crate::ast::MetaAttribute::Effect(_) | crate::ast::MetaAttribute::Capability(_) => {
+                Some(attribute.clone())
+            }
+            _ => None,
+        })
+        .collect();
     if program
         .declarations
         .iter()
@@ -170,7 +180,7 @@ fn test_compilation_plan(
             program.declarations.push(test_fault_declaration());
         }
     }
-    program.declarations.push(test_main(&test.name, test.fault));
+    program.declarations.push(test_main(&test.name, test.fault, test_contract));
     if let Some(plan) = &test.compilation_plan {
         return Ok(plan.with_caller_program(program));
     }
@@ -297,7 +307,11 @@ fn test_fault_declaration() -> TopLevelDecl {
     })
 }
 
-fn test_main(name: &str, fault: Option<TestFault>) -> TopLevelDecl {
+fn test_main(
+    name: &str,
+    fault: Option<TestFault>,
+    metadata: Vec<crate::ast::MetaAttribute>,
+) -> TopLevelDecl {
     let span = SourceSpan::new(0, 0);
     let mut statements = Vec::new();
     if let Some(fault) = fault {
@@ -328,7 +342,7 @@ fn test_main(name: &str, fault: Option<TestFault>) -> TopLevelDecl {
         is_open: false,
         doc: None,
         contract: None,
-        metadata: Vec::new(),
+        metadata,
         name: "main".to_owned(),
         generic_parameters: Vec::new(),
         params: Vec::new(),

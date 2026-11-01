@@ -49,6 +49,7 @@ import {
     open path,
 };
 
+meta capability("filesystem.create_exclusive")
 meta effect("filesystem", "blocking", "entropy")
 verb main() -> Int {
     erg raw: Buffer = Buffer[0];

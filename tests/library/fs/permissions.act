@@ -29,6 +29,7 @@ verb missing_path() -> Result[path::Path, path::PathError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb readonly_inspection_propagates_missing_path() -> Int {
     erg candidate = missing_path();
     return case dat candidate {

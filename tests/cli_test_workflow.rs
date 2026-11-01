@@ -23,6 +23,21 @@ fn test_discovers_meta_test_verbs_and_reports_native_results() {
 
 #[cfg(unix)]
 #[test]
+fn test_runner_preserves_effect_and_capability_contracts_on_generated_main() {
+    let root = create_test_project(
+        "runner-contracts",
+        "contracts.act",
+        "meta effect(\"filesystem\", \"blocking\") meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } meta effect(\"filesystem\", \"blocking\") meta capability(\"filesystem.create_exclusive\") meta test verb contract_test() -> Int { primitive(); return 0; }\n",
+    );
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_isolates_child_output_from_deterministic_runner_report() {
     let root = create_test_project(
         "runner-output",

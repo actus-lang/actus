@@ -31,6 +31,7 @@ verb empty_path() -> Result[path::Path, path::PathError] {
     return path::path_from_ascii(storage: dat raw);
 }
 
+meta effect("filesystem", "blocking")
 verb read_count(ins reader: fs::File, ins destination: Buffer) -> Int {
     erg result = fs::file_read(self: ins reader, buffer: ins destination);
     return case dat result {
@@ -39,6 +40,7 @@ verb read_count(ins reader: fs::File, ins destination: Buffer) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb read_eof(ins reader: fs::File, ins destination: Buffer) -> Int {
     erg result = fs::file_read(self: ins reader, buffer: ins destination);
     return case dat result {
@@ -50,6 +52,7 @@ verb read_eof(ins reader: fs::File, ins destination: Buffer) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb inspect_eof(ins reader: fs::File) -> Int {
     erg destination = Buffer[0];
     erg capacity = 4;
@@ -69,6 +72,7 @@ verb inspect_eof(ins reader: fs::File) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb invalid_publication() -> Int {
     erg path_result = empty_path();
     return case dat path_result {
@@ -85,6 +89,7 @@ verb invalid_publication() -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb write_payload(ins file: fs::File, abs payload: Buffer) -> Int {
     erg result = fs::file_write(self: ins file, buffer: abs payload);
     return case dat result {
@@ -93,6 +98,7 @@ verb write_payload(ins file: fs::File, abs payload: Buffer) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb flush_status(ins file: fs::File) -> Int {
     erg result = fs::file_flush(self: ins file);
     return case dat result {
@@ -102,6 +108,8 @@ verb flush_status(ins file: fs::File) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking", "entropy")
+meta capability("filesystem.create_exclusive")
 verb file_io_matrix_covers_flush_eof_and_failure() -> Int {
     erg root_result = current_directory();
     return case dat root_result {

@@ -12,6 +12,7 @@ verb current_directory() -> Result[path::Path, path::PathError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb opened_filesystem_facade_reports_directory_metadata() -> Int {
     erg current = current_directory();
     return case dat current {
