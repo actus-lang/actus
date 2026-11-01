@@ -239,6 +239,18 @@ is covered by the LLVM backend suite.
 - [ ] Keep filesystem, clock, allocation, and other hosted services explicit;
       never inherit them into freestanding targets.
 
+#### 49.3 current LLVM ABI evidence
+
+The LLVM runtime-bridge suite now verifies `repr(C)` aggregate boundaries in
+addition to scalar, pointer, buffer, filesystem, clock, process, locking,
+directory, and region bridges. An aggregate parameter is emitted as an
+aligned pointer according to the existing caller/callee ABI contract. An
+aggregate returned by an unsafe external declaration uses the existing
+caller-provided return slot: the external declaration returns `void`, writes
+into the aligned slot, and the caller copies the declared aggregate layout
+back into its destination. These tests do not introduce a second FFI layout
+or silently reinterpret a C declaration.
+
 ### 49.4 — Backend parity and regression hardening
 
 - [ ] Run the shared semantic and negative fixture matrix through both

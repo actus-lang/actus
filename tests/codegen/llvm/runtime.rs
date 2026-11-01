@@ -394,3 +394,21 @@ fn llvm_lowers_the_ordered_directory_open_bridge_with_a_order_argument() {
     assert!(ir.contains("declare i32 @actus_directory_open_ordered(ptr align 8, i32)"));
     assert!(ir.contains("call i32 @actus_directory_open_ordered(ptr %0, i32 %1)"));
 }
+
+#[test]
+fn llvm_lowers_repr_c_external_aggregate_parameters_without_erasing_the_layout() {
+    let ir = emit_source_runtime_bridge(
+        "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; verb call(erg point: Point) -> Int { return inspect(point: erg point); }",
+    );
+    assert!(ir.contains("declare i32 @inspect(ptr align 4)"), "{ir}");
+    assert!(ir.contains("call i32 @inspect(ptr %0)"), "{ir}");
+}
+
+#[test]
+fn llvm_lowers_repr_c_external_aggregate_returns_through_the_declared_return_abi() {
+    let ir = emit_source_runtime_bridge(
+        "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb make() -> Point; verb call() -> Point { return make(); }",
+    );
+    assert!(ir.contains("declare void @make(ptr align 4)"), "{ir}");
+    assert!(ir.contains("call void @make(ptr %slot0)"), "{ir}");
+}
