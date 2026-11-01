@@ -238,3 +238,30 @@ fn llvm_lowers_the_buffer_utf8_validation_bridge_as_a_signed_status() {
     assert!(ir.contains("declare i32 @actus_buffer_validate_utf8(ptr align 8)"));
     assert!(ir.contains("call i32 @actus_buffer_validate_utf8(ptr %0)"));
 }
+
+#[test]
+fn llvm_lowers_the_filesystem_remove_path_bridge_with_a_borrowed_pointer() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_remove_path(abs path: Buffer) -> Int; verb call(abs path: Buffer) -> Int { return actus_file_remove_path(path: abs path); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_remove_path(ptr align 8)"));
+    assert!(ir.contains("call i32 @actus_file_remove_path(ptr %0)"));
+}
+
+#[test]
+fn llvm_lowers_the_filesystem_parent_sync_bridge_with_a_status_return() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_sync_parent_path(abs path: Buffer) -> Int; verb call(abs path: Buffer) -> Int { return actus_file_sync_parent_path(path: abs path); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_sync_parent_path(ptr align 8)"));
+    assert!(ir.contains("call i32 @actus_file_sync_parent_path(ptr %0)"));
+}
+
+#[test]
+fn llvm_lowers_the_directory_close_bridge_with_a_scalar_handle() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_directory_close(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_directory_close(handle: abs handle); }",
+    );
+    assert!(ir.contains("declare i32 @actus_directory_close(i32)"));
+    assert!(ir.contains("call i32 @actus_directory_close(i32 %0)"));
+}
