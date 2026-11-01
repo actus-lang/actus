@@ -26,14 +26,44 @@ runtime, serialization, and zero-float contracts.
 
 ### 49.1 — LLVM implementation inventory and baseline
 
-- [ ] Inventory every LLVM-only path and classify it as complete, partial,
+- [x] Inventory every LLVM-only path and classify it as complete, partial,
       unsupported, or untested.
 - [ ] Inventory all shared lowering operations and map each to an LLVM emitter.
 - [ ] Record the supported LLVM version, installation contract, linker policy,
       target matrix, and clean-checkout setup.
-- [ ] Capture baseline results for LLVM-only, Cranelift-only, and all-features
-      configurations before changing the default.
+- [x] Capture the focused LLVM-only baseline before changing the default.
+- [ ] Capture complete baseline results for LLVM-only, Cranelift-only, and
+      all-features configurations before changing the default.
 - [ ] Add stable diagnostics for every intentionally unsupported LLVM operation.
+
+#### 49.1 inventory evidence
+
+The initial inventory identifies 32 LLVM implementation files under
+`src/codegen/llvm/`, grouped by responsibility:
+
+| Responsibility | LLVM-owned paths | Initial classification |
+| --- | --- | --- |
+| Module and emission boundary | `mod.rs`, `context.rs`, `module.rs`, `declarations.rs`, `emission.rs`, `object.rs`, `instruction.rs`, `verification.rs` | Implemented boundary; end-to-end acceptance remains open |
+| Values and scalar operations | `values.rs`, `scalar.rs`, `scalar_loan.rs`, `literals.rs`, `float.rs`, `integer/mod.rs`, `integer/cast.rs`, `integer/ops.rs` | Implemented coverage; `values.rs:33` contains an explicit incomplete type-lowering error |
+| Control flow and calls | `branches.rs`, `control_flow.rs`, `guards.rs`, `failures.rs`, `calls.rs`, `returns.rs` | Implemented focused coverage; full shared-operation mapping remains open |
+| Aggregate and layout lowering | `aggregates.rs`, `arrays.rs`, `arena.rs`, `enums.rs`, `memory.rs`, `packed/mod.rs`, `packed/wide.rs` | Implemented focused coverage; full ABI and target matrix remains open |
+| Cleanup and ownership bridges | `cleanup.rs`, `cleanup/bridge.rs`, `cleanup/bridge/address.rs` | Implemented focused coverage; complete ownership-path audit remains open |
+
+The compiler integration surface is feature-gated through `Cargo.toml`,
+`src/codegen/mod.rs`, `src/cli/build/llvm_emission.rs`, and the LLVM-specific
+test target `tests/codegen/llvm/backend.rs`. The current policy is:
+
+- LLVM feature: `llvm-sys 231.0.0` with strict versioning;
+- default feature: `cranelift`;
+- LLVM-only focused backend suite: `34 passed, 0 failed`;
+- LLVM-only library suite: `148 passed, 0 failed`;
+- explicit incomplete path: `src/codegen/llvm/values.rs:33`, which returns
+  `LLVM type lowering is not implemented` for an unsupported type path.
+
+These results are inventory evidence, not completion evidence. The remaining
+49.1 checks must classify every shared lowering operation, run the complete
+backend configurations, and replace intentional incomplete paths with either
+full implementations or stable, source-spanned diagnostics.
 
 ### 49.2 — Complete shared-contract lowering
 
