@@ -71,7 +71,7 @@ fn emit_source_runtime_bridge(source: &str) -> String {
     emit_module(&module).expect("runtime bridge fixture should lower through LLVM")
 }
 
-fn run_llvm_region_fixture(name: &str, source: &str) -> i32 {
+fn run_llvm_executable_fixture(name: &str, source: &str) -> i32 {
     let root =
         std::env::temp_dir().join(format!("actus-llvm-region-{name}-{}", std::process::id()));
     let source_root = root.join("src");
@@ -151,6 +151,25 @@ fn llvm_lowers_the_filesystem_close_bridge_with_its_status_contract() {
     assert!(ir.contains("declare i32 @actus_file_close_buffer(i32)"));
     assert!(ir.contains("call i32 @actus_file_close_buffer(i32 %0)"));
     assert!(ir.contains("ret i32 %call1"));
+}
+
+#[test]
+fn llvm_preserves_the_external_c_scalar_abi_matrix() {
+    for (actus_type, llvm_type) in [
+        ("Bool", "i1"),
+        ("u8", "i8"),
+        ("u16", "i16"),
+        ("Int", "i32"),
+        ("u64", "i64"),
+        ("Buffer", "ptr"),
+    ] {
+        let source = format!(
+            "unsafe extern \"C\" verb bridge() -> {actus_type}; verb call() -> {actus_type} {{ return bridge(); }}"
+        );
+        let ir = emit_source_runtime_bridge(&source);
+        assert!(ir.contains(&format!("declare {llvm_type} @bridge()")), "{ir}");
+        assert!(ir.contains(&format!("call {llvm_type} @bridge()")), "{ir}");
+    }
 }
 
 #[test]
@@ -242,13 +261,25 @@ fn llvm_lowers_the_stdout_buffer_bridge_through_a_borrowed_pointer() {
 #[test]
 fn llvm_executes_the_region_open_and_close_bridge_contract() {
     let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }";
-    assert_eq!(run_llvm_region_fixture("open-close", source), 0);
+    assert_eq!(run_llvm_executable_fixture("open-close", source), 0);
 }
 
 #[test]
 fn llvm_preserves_the_region_bounds_failure_contract() {
     let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }";
-    assert_eq!(run_llvm_region_fixture("bounds-failure", source), 0);
+    assert_eq!(run_llvm_executable_fixture("bounds-failure", source), 0);
+}
+
+#[test]
+fn llvm_preserves_representative_runtime_failure_statuses() {
+    let source = "unsafe extern \"C\" verb actus_file_close_buffer(abs handle: Int) -> Int; unsafe extern \"C\" verb actus_process_arg(ins buffer: Buffer, erg index: Int) -> Int; unsafe extern \"C\" verb actus_path_validate_storage(abs storage: Buffer, erg unit_width: Int) -> Int; unsafe extern \"C\" verb actus_buffer_byte_at(abs buffer: Buffer, erg index: Int) -> Int; unsafe extern \"C\" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int; verb main() -> Int { erg handle: Int = -1; erg index: Int = -1; erg unit_width: Int = 1; erg byte_index: Int = 0; erg empty: Buffer = Buffer[0]; erg invalid: Buffer = Buffer[0]; append(invalid, 255u8); erg valid: Buffer = Buffer[0]; append(valid, 65u8); erg close_status = actus_file_close_buffer(handle: abs handle); erg process_status = actus_process_arg(buffer: ins empty, index: erg index); erg path_status = actus_path_validate_storage(storage: abs empty, unit_width: erg unit_width); erg empty_byte_status = actus_buffer_byte_at(buffer: abs empty, index: erg unit_width); erg invalid_utf8_status = actus_buffer_validate_utf8(buffer: abs invalid); erg invalid_byte = actus_buffer_byte_at(buffer: abs invalid, index: erg byte_index); erg valid_utf8_status = actus_buffer_validate_utf8(buffer: abs valid); erg valid_byte = actus_buffer_byte_at(buffer: abs valid, index: erg byte_index); drop(empty); drop(invalid); drop(valid); if close_status != -1 { return 1; } if process_status != -3 { return 2; } if path_status != -4 { return 3; } if empty_byte_status != -2 { return 4; } if invalid_utf8_status != -1 { return 5; } if invalid_byte != 255 { return 6; } if valid_utf8_status != 0 { return 7; } if valid_byte != 65 { return 8; } return 0; }";
+    assert_eq!(run_llvm_executable_fixture("runtime-failure-statuses", source), 0);
+}
+
+#[test]
+fn llvm_executes_checked_representation_layouts() {
+    let source = "meta repr(C, packed) struct Wire { prefix: u8, value: u32, } meta repr(transparent) struct UserId { value: u64, } meta repr(C, align(8u32)) struct Aligned { value: u8, } meta repr(C) enum Message { Byte { value: u8, }, Pair { code: u16, value: u32, }, Empty, } verb main() -> Int { erg wire: Wire = Wire { prefix: 1u8, value: 40u32, }; erg id: UserId = UserId { value: 2u64, }; erg aligned: Aligned = Aligned { value: 0u8, }; erg message = Message.Pair(code: 0u16, value: 0u32); wire.value = 41u32; id.value = 1u64; aligned.value = 0u8; return case dat message { Message.Pair { code: code_value, value: value_value } => wire.value as Int + id.value as Int + aligned.value as Int + code_value as Int + value_value as Int, _ => 1, }; }";
+    assert_eq!(run_llvm_executable_fixture("checked-representations", source), 42);
 }
 
 #[test]

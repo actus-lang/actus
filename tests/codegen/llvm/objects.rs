@@ -619,6 +619,50 @@ fn links_and_runs_a_host_object_through_the_shared_linker() {
     remove_fixture(&root, [&manifest, &shim_source, &shim_object, &llvm_object, &executable]);
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn links_and_runs_a_repr_c_aggregate_external_provider_through_llvm() {
+    use std::process::Command;
+
+    let root =
+        std::env::temp_dir().join(format!("actus-llvm-aggregate-ffi-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("aggregate FFI fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(&manifest, "[package]\nname = \"llvm_aggregate_ffi_fixture\"\nversion = \"0.1.0\"\n")
+        .expect("aggregate FFI manifest should be written");
+    let source = "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; unsafe extern \"C\" verb make() -> Point; verb main() -> Int { erg point: Point = Point { x: 40i32, y: 2i32, }; erg output = make(); erg observed = inspect(point: erg output); return observed; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "aggregate FFI fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("aggregate FFI fixture should parse");
+    let module = lower_scalar_program("llvm_aggregate_ffi", &program, Some("main"))
+        .expect("aggregate FFI fixture should lower");
+    let llvm_object = root.join("module.o");
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    emit_object(&module, &target, &llvm_object).expect("LLVM aggregate object should emit");
+
+    let shim_source = root.join("provider.c");
+    fs::write(
+        &shim_source,
+        "#include <stdint.h>\nint32_t inspect(const void *raw) { const int32_t *point = raw; return point[0] + point[1]; }\nvoid make(void *raw) { int32_t *point = raw; point[0] = 40; point[1] = 2; }\n",
+    )
+    .expect("aggregate FFI provider should be written");
+    let shim_object = root.join("provider.o");
+    run_native_command(
+        Command::new("cc").args(["-c"]).arg(&shim_source).arg("-o").arg(&shim_object),
+    );
+
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("aggregate FFI configuration should load");
+    let executable = root.join("aggregate-ffi");
+    let objects: [&Path; 2] = [llvm_object.as_path(), shim_object.as_path()];
+    link_objects(&objects, &executable, &configuration)
+        .expect("LLVM aggregate provider should link");
+    let status =
+        Command::new(&executable).status().expect("LLVM aggregate provider executable should run");
+    assert_eq!(status.code(), Some(42));
+    fs::remove_dir_all(&root).expect("remove aggregate FFI fixture");
+}
+
 #[cfg(all(target_os = "linux", feature = "cranelift"))]
 #[test]
 fn compares_llvm_and_cranelift_on_niche_option_none_fixture() {

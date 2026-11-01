@@ -241,6 +241,24 @@ is covered by the LLVM backend suite.
 
 #### 49.3 current LLVM ABI evidence
 
+The current audit compares every `unsafe extern "C" verb` declared by the
+standard library with the native runtime's exported C providers, including
+parameter arity. The only permitted arity difference is the one caller-owned
+return slot required by the established aggregate `sret` ABI. It also lowers
+all hosted standard-library facades through strict LLVM object emission with
+no-float verification enabled. Representative failure statuses execute
+through LLVM, including invalid handles, invalid process indexes, invalid path
+storage, empty-buffer bounds, malformed UTF-8 rejection, and valid-byte
+preservation. A hosted C-provider fixture links and executes both a `repr(C)`
+aggregate parameter and an aggregate return through the LLVM-produced object,
+proving the pointer and `sret` ABIs at a real C boundary rather than only in
+generated IR text. A hosted executable fixture also constructs, mutates, and
+observes packed, transparent, explicitly aligned, and payload-enum values
+through LLVM, so these checked representations are exercised at runtime.
+The CI matrix now invokes the LLVM bridge suite explicitly on Ubuntu, macOS,
+and Windows; target-specific native-provider fixtures remain guarded by their
+actual host contract instead of being treated as portable evidence.
+
 The LLVM runtime-bridge suite now verifies `repr(C)` aggregate boundaries in
 addition to scalar, pointer, buffer, filesystem, clock, process, locking,
 directory, and region bridges. An aggregate parameter is emitted as an

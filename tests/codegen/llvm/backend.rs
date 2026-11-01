@@ -44,6 +44,7 @@ use std::fs;
 #[cfg(target_os = "linux")]
 use std::path::{Path, PathBuf};
 
+mod bridge_contracts;
 mod contracts;
 mod ir;
 mod objects;
