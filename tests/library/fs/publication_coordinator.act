@@ -404,7 +404,7 @@ verb windows_publish_case(
         destination: abs destination,
         staging: abs staging
     );
-    result;
+    return result;
 }
 
 meta test
