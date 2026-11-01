@@ -1,21 +1,59 @@
 use crate::ast::{
-    BuiltinType, ExternalVerbDecl, ForeignAbi, ReturnAccess, ReturnType, Role, VerbDecl,
+    BuiltinType, ExternalVerbDecl, ForeignAbi, Program, ReturnAccess, ReturnType, Role, VerbDecl,
     lookup_builtin_type,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[path = "aggregate.rs"]
+mod aggregate;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CAbiType {
     Int32,
+    Integer { signed: bool, width: u8 },
+    Float { width: u8 },
+    Bool,
+    Usize,
     OpaquePointer,
+    Array { element: Box<CAbiType>, length: u32, layout: CAbiLayout },
+    Aggregate(CAbiAggregate),
+    Enum { name: String, layout: CAbiLayout },
 }
 
 impl CAbiType {
-    pub const fn c_name(self) -> &'static str {
+    pub fn c_name(&self) -> String {
         match self {
-            Self::Int32 => "int32_t",
-            Self::OpaquePointer => "void*",
+            Self::Int32 => "int32_t".to_owned(),
+            Self::Integer { signed, width } => {
+                format!("{}int{width}_t", if *signed { "" } else { "u" })
+            }
+            Self::Float { width: 32 } => "float".to_owned(),
+            Self::Float { width: 64 } => "double".to_owned(),
+            Self::Float { width } => format!("float{width}_t"),
+            Self::Bool => "uint8_t".to_owned(),
+            Self::Usize => "uintptr_t".to_owned(),
+            Self::OpaquePointer => "void*".to_owned(),
+            Self::Array { element, length, .. } => {
+                format!("{}[{length}]", element.c_name())
+            }
+            Self::Aggregate(aggregate) => format!("struct {}", aggregate.name),
+            Self::Enum { name, .. } => format!("enum {name}"),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CAbiAggregate {
+    pub name: String,
+    pub layout: CAbiLayout,
+    pub fields: Vec<CAbiAggregateField>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CAbiAggregateField {
+    pub name: String,
+    pub offset: u32,
+    pub layout: CAbiLayout,
+    pub ty: CAbiType,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -30,6 +68,13 @@ pub enum CAbiReturnOwnership {
     Value,
     Borrowed,
     OwnedResource,
+    CallerAllocated,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CAbiParameterPassing {
+    Direct,
+    Pointer,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,8 +92,8 @@ impl CallingConvention {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CAbiLayout {
-    pub size: u8,
-    pub alignment: u8,
+    pub size: u32,
+    pub alignment: u32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -64,11 +109,27 @@ impl CAbiTarget {
         }
     }
 
-    pub const fn layout(self, ty: CAbiType) -> CAbiLayout {
+    pub fn layout(self, ty: CAbiType) -> CAbiLayout {
         match ty {
             CAbiType::Int32 => CAbiLayout { size: 4, alignment: 4 },
-            CAbiType::OpaquePointer => {
-                CAbiLayout { size: self.pointer_width, alignment: self.pointer_width }
+            CAbiType::Integer { width, .. } if width.is_multiple_of(8) => {
+                let size = u32::from(width / 8);
+                CAbiLayout { size, alignment: size.min(u32::from(self.pointer_width)) }
+            }
+            CAbiType::Float { width } if width.is_multiple_of(8) => {
+                let size = u32::from(width / 8);
+                CAbiLayout { size, alignment: size.min(u32::from(self.pointer_width)) }
+            }
+            CAbiType::Bool => CAbiLayout { size: 1, alignment: 1 },
+            CAbiType::Usize | CAbiType::OpaquePointer => CAbiLayout {
+                size: u32::from(self.pointer_width),
+                alignment: u32::from(self.pointer_width),
+            },
+            CAbiType::Array { layout, .. }
+            | CAbiType::Aggregate(CAbiAggregate { layout, .. })
+            | CAbiType::Enum { layout, .. } => layout,
+            CAbiType::Integer { .. } | CAbiType::Float { .. } => {
+                unreachable!("non-byte-aligned C ABI scalar")
             }
         }
     }
@@ -79,6 +140,7 @@ pub struct CAbiParameter {
     pub name: String,
     pub ty: CAbiType,
     pub ownership: CAbiOwnership,
+    pub passing: CAbiParameterPassing,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -97,6 +159,12 @@ pub enum CAbiError {
     InvalidOwnership { parameter: String, role: String, ty: String },
     InvalidReturnOwnership { access: String, ty: String },
     UnsupportedType { name: String },
+    AggregateRequiresReprC { name: String },
+    AggregateFieldRole { aggregate: String, field: String, role: String },
+    AggregateFieldType { aggregate: String, field: String, ty: String },
+    AggregateLayoutOverflow { name: String },
+    GenericAggregate { name: String },
+    TargetDependentType { name: String },
 }
 
 impl std::fmt::Display for CAbiError {
@@ -120,6 +188,30 @@ impl std::fmt::Display for CAbiError {
             Self::UnsupportedType { name } => {
                 write!(formatter, "type `{name}` has no C ABI mapping")
             }
+            Self::AggregateRequiresReprC { name } => {
+                write!(formatter, "aggregate `{name}` requires `meta repr(C)` for C ABI use")
+            }
+            Self::AggregateFieldRole { aggregate, field, role } => {
+                write!(
+                    formatter,
+                    "C ABI aggregate `{aggregate}` field `{field}` cannot use role `{role}`"
+                )
+            }
+            Self::AggregateFieldType { aggregate, field, ty } => {
+                write!(
+                    formatter,
+                    "C ABI aggregate `{aggregate}` field `{field}` has unsupported type `{ty}`"
+                )
+            }
+            Self::AggregateLayoutOverflow { name } => {
+                write!(formatter, "C ABI aggregate `{name}` layout exceeds the supported size")
+            }
+            Self::GenericAggregate { name } => {
+                write!(formatter, "generic aggregate `{name}` cannot cross a C ABI")
+            }
+            Self::TargetDependentType { name } => {
+                write!(formatter, "type `{name}` requires an explicit C ABI target")
+            }
         }
     }
 }
@@ -142,6 +234,61 @@ pub fn c_abi_external_signature(
     signature_parts(&declaration.name, &declaration.params, declaration.return_type.as_ref())
 }
 
+pub fn c_abi_signature_in_program(
+    program: &Program,
+    verb: &VerbDecl,
+) -> Result<CAbiSignature, CAbiError> {
+    signature_parts_with_program(
+        CAbiTarget::new(8).expect("64-bit target"),
+        program,
+        &verb.name,
+        &verb.params,
+        verb.return_type.as_ref(),
+    )
+}
+
+pub fn c_abi_signature_in_program_for_target(
+    target: CAbiTarget,
+    program: &Program,
+    verb: &VerbDecl,
+) -> Result<CAbiSignature, CAbiError> {
+    signature_parts_with_program(
+        target,
+        program,
+        &verb.name,
+        &verb.params,
+        verb.return_type.as_ref(),
+    )
+}
+
+pub fn c_abi_external_signature_in_program(
+    program: &Program,
+    declaration: &ExternalVerbDecl,
+) -> Result<CAbiSignature, CAbiError> {
+    c_abi_external_signature_in_program_for_target(
+        CAbiTarget::new(8).expect("64-bit target"),
+        program,
+        declaration,
+    )
+}
+
+pub fn c_abi_external_signature_in_program_for_target(
+    target: CAbiTarget,
+    program: &Program,
+    declaration: &ExternalVerbDecl,
+) -> Result<CAbiSignature, CAbiError> {
+    if !declaration.unsafe_boundary && !declaration.module_import {
+        return Err(CAbiError::MissingUnsafeBoundary { verb: declaration.name.clone() });
+    }
+    signature_parts_with_program(
+        target,
+        program,
+        &declaration.name,
+        &declaration.params,
+        declaration.return_type.as_ref(),
+    )
+}
+
 fn signature_parts(
     name: &str,
     params: &[crate::ast::Param],
@@ -153,9 +300,10 @@ fn signature_parts(
         .iter()
         .map(|parameter| {
             let ty = map_type(&parameter.ty.name)?;
-            validate_parameter_ownership(parameter, ty)?;
+            validate_parameter_ownership(parameter, &ty)?;
             Ok(CAbiParameter {
                 name: parameter.name.clone(),
+                passing: passing_for(&ty),
                 ty,
                 ownership: map_ownership(&parameter.role),
             })
@@ -166,6 +314,38 @@ fn signature_parts(
         parameters,
         return_type: map_type(&return_type.ty.name)?,
         return_ownership: return_ownership(return_type)?,
+        calling_convention: CallingConvention::C,
+    })
+}
+
+fn signature_parts_with_program(
+    target: CAbiTarget,
+    program: &Program,
+    name: &str,
+    params: &[crate::ast::Param],
+    return_type: Option<&ReturnType>,
+) -> Result<CAbiSignature, CAbiError> {
+    let return_type =
+        return_type.ok_or_else(|| CAbiError::MissingReturnType { verb: name.to_owned() })?;
+    let parameters = params
+        .iter()
+        .map(|parameter| {
+            let ty = aggregate::map_type_in_program(target, program, &parameter.ty)?;
+            validate_parameter_ownership(parameter, &ty)?;
+            Ok(CAbiParameter {
+                name: parameter.name.clone(),
+                passing: passing_for(&ty),
+                ty,
+                ownership: map_ownership(&parameter.role),
+            })
+        })
+        .collect::<Result<Vec<_>, CAbiError>>()?;
+    let mapped_return = aggregate::map_type_in_program(target, program, &return_type.ty)?;
+    Ok(CAbiSignature {
+        name: name.to_owned(),
+        parameters,
+        return_ownership: return_ownership_for(&mapped_return, return_type)?,
+        return_type: mapped_return,
         calling_convention: CallingConvention::C,
     })
 }
@@ -182,9 +362,11 @@ fn map_type(name: &str) -> Result<CAbiType, CAbiError> {
 
 fn validate_parameter_ownership(
     parameter: &crate::ast::Param,
-    ty: CAbiType,
+    ty: &CAbiType,
 ) -> Result<(), CAbiError> {
-    if matches!(parameter.role, Role::Abs | Role::Dat) && ty != CAbiType::OpaquePointer {
+    if matches!(parameter.role, Role::Abs | Role::Dat)
+        && !matches!(ty, CAbiType::OpaquePointer | CAbiType::Aggregate(_))
+    {
         return Err(CAbiError::InvalidOwnership {
             parameter: parameter.name.clone(),
             role: role_name(&parameter.role).to_owned(),
@@ -192,6 +374,20 @@ fn validate_parameter_ownership(
         });
     }
     Ok(())
+}
+
+fn passing_for(ty: &CAbiType) -> CAbiParameterPassing {
+    match ty {
+        CAbiType::Int32
+        | CAbiType::Integer { .. }
+        | CAbiType::Float { .. }
+        | CAbiType::Bool
+        | CAbiType::Usize
+        | CAbiType::Enum { .. } => CAbiParameterPassing::Direct,
+        CAbiType::OpaquePointer | CAbiType::Array { .. } | CAbiType::Aggregate(_) => {
+            CAbiParameterPassing::Pointer
+        }
+    }
 }
 
 fn role_name(role: &Role) -> &'static str {
@@ -214,7 +410,17 @@ fn map_ownership(role: &Role) -> CAbiOwnership {
 
 fn return_ownership(return_type: &ReturnType) -> Result<CAbiReturnOwnership, CAbiError> {
     let mapped = map_type(&return_type.ty.name)?;
-    if return_type.access == ReturnAccess::Abs && mapped != CAbiType::OpaquePointer {
+    return_ownership_for(&mapped, return_type)
+}
+
+fn return_ownership_for(
+    mapped: &CAbiType,
+    return_type: &ReturnType,
+) -> Result<CAbiReturnOwnership, CAbiError> {
+    if return_type.access == ReturnAccess::Abs && *mapped != CAbiType::OpaquePointer {
+        if matches!(mapped, CAbiType::Aggregate(_)) {
+            return Ok(CAbiReturnOwnership::Borrowed);
+        }
         return Err(CAbiError::InvalidReturnOwnership {
             access: "abs".to_owned(),
             ty: return_type.ty.name.clone(),
@@ -222,7 +428,9 @@ fn return_ownership(return_type: &ReturnType) -> Result<CAbiReturnOwnership, CAb
     }
     match (return_type.access, mapped) {
         (ReturnAccess::Owned, CAbiType::OpaquePointer) => Ok(CAbiReturnOwnership::OwnedResource),
-        (ReturnAccess::Abs, CAbiType::OpaquePointer) => Ok(CAbiReturnOwnership::Borrowed),
+        (ReturnAccess::Abs, CAbiType::OpaquePointer)
+        | (ReturnAccess::Abs, CAbiType::Aggregate(_)) => Ok(CAbiReturnOwnership::Borrowed),
+        (ReturnAccess::Owned, CAbiType::Aggregate(_)) => Ok(CAbiReturnOwnership::CallerAllocated),
         (ReturnAccess::Owned, _) => Ok(CAbiReturnOwnership::Value),
         (ReturnAccess::Abs, _) => unreachable!("scalar abs returns are rejected above"),
     }

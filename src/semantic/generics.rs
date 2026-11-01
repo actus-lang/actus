@@ -235,6 +235,9 @@ impl Analyzer {
                 Ok(())
             };
         }
+        if type_name.name == "Bool" && type_name.arguments.is_empty() {
+            return Ok(());
+        }
         if type_name.name == "Array" {
             let [element, capacity] = type_name.arguments.as_slice() else {
                 return Err(invalid());

@@ -1,0 +1,115 @@
+"""Executable coverage for checked repr(C) values at a native boundary."""
+meta repr(C)
+struct WirePoint {
+    x: i64,
+    y: f32,
+    valid: Bool,
+    word: Usize,
+    bytes: Array[u16, 2],
+}
+
+meta repr(C)
+struct WireSegment {
+    start: WirePoint,
+    end: WirePoint,
+}
+
+meta repr(C)
+enum WireAxis {
+    Horizontal,
+    Vertical,
+}
+
+unsafe extern "C" verb inspect_wire(abs value: WireSegment) -> Int;
+
+meta test
+verb repr_c_ffi_value_contract_is_executable() -> Int {
+    erg segment = WireSegment {
+        start: WirePoint {
+            x: 3i64,
+            y: 5.0f32,
+            valid: true,
+            word: 7u64 as Usize,
+            bytes: Array[u16, 2](),
+        },
+        end: WirePoint {
+            x: 17i64,
+            y: 19.0f32,
+            valid: true,
+            word: 23u64 as Usize,
+            bytes: Array[u16, 2](),
+        },
+    };
+    erg axis = WireAxis.Horizontal;
+    erg score = case dat axis {
+        WireAxis.Horizontal => segment.start.x + segment.end.x,
+        WireAxis.Vertical => segment.start.word as i64,
+    };
+    if score == 20i64 {
+        return 0;
+    }
+    return 1;
+}
+
+meta test
+verb repr_c_ffi_layout_is_explicit_and_bounded() -> Int {
+    if size_of[WirePoint]() != 32u64 {
+        return 1;
+    }
+    if align_of[WirePoint]() != 8u64 {
+        return 2;
+    }
+    if size_of[WireSegment]() != 64u64 {
+        return 3;
+    }
+    if align_of[WireSegment]() != 8u64 {
+        return 4;
+    }
+    if size_of[Array[u16, 2]]() != 4u64 {
+        return 5;
+    }
+    return 0;
+}
+
+meta test
+verb repr_c_ffi_fixed_array_mutation_is_in_place() -> Int {
+    erg point = WirePoint {
+        x: 41i64,
+        y: 2.5f32,
+        valid: false,
+        word: 3u64 as Usize,
+        bytes: Array[u16, 2](),
+    };
+    point.bytes[0u32] = 43u16;
+    point.bytes[1u32] = 47u16;
+    if point.bytes[0u32] != 43u16 {
+        return 1;
+    }
+    if point.bytes[1u32] != 47u16 {
+        return 2;
+    }
+    if point.valid {
+        return 3;
+    }
+    return 0;
+}
+
+meta test
+verb repr_c_ffi_enum_and_scalar_values_are_stable() -> Int {
+    erg point = WirePoint {
+        x: 59i64,
+        y: 61.0f32,
+        valid: true,
+        word: 67u64 as Usize,
+        bytes: Array[u16, 2](),
+    };
+    erg axis = WireAxis.Vertical;
+    erg selected = case dat axis {
+        WireAxis.Horizontal => point.x as Int,
+        WireAxis.Vertical => point.word as Int,
+    };
+    if selected == 67 {
+        return 0;
+    }
+    return 1;
+}

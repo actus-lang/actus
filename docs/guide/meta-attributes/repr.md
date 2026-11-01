@@ -61,6 +61,22 @@ generation. Native declarations must still be `unsafe extern "C"` where the
 foreign boundary requires it, and their ownership roles remain visible at each
 parameter and return position.
 
+The program-aware FFI mapper exposes this checked contract through
+`c_abi_signature_in_program` and
+`c_abi_external_signature_in_program`. A checked aggregate parameter is
+represented as an explicit pointer plus its Actus ownership contract; it is
+never silently copied into an opaque value. An owned aggregate result uses a
+caller-allocated return contract, while an `abs` aggregate result is a
+borrowed view. Fixed-width integers, `Bool`, `f32`, `f64`, `Usize`, and
+positive concrete arrays are mapped with target-specific size, alignment, and
+padding. Use the `_for_target` variants when the ABI target is not the
+default 64-bit target. A type without an explicit `repr(C)` contract is
+rejected before native lowering.
+
+The mapper is descriptive and checked; it does not generate an unsafe native
+call by itself. The caller must still provide the correct declaration,
+ownership roles, external boundary, and target-specific native implementation.
+
 `repr(packed)`, volatile access, explicit alignment overrides, tagged unions,
 and target-specific layout overrides are separate contracts. They are not
 aliases for `repr(C)` and require their own safety and ABI specification.

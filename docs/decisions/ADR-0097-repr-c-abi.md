@@ -56,6 +56,26 @@ stable diagnostic. Existing declarations remain unchanged because the feature
 is opt-in. The cost is that native interoperability requires deliberate type
 design and explicit nested annotations.
 
+### FFI aggregate mapping
+
+The program-aware FFI mapper is part of the same checked contract. It resolves
+only concrete declarations with `repr(C)`, computes field offsets and padding
+for an explicit `CAbiTarget`, and preserves Actus ownership at the boundary:
+
+- aggregate parameters are pointer-passed and retain their declared ownership;
+- owned aggregate returns use a caller-allocated return contract;
+- borrowed aggregate returns remain borrowed and are never converted to an
+  owned native value;
+- fixed-width integers, floating-point scalars already accepted by `repr(C)`,
+  `Bool`, `Usize`, and positive concrete arrays receive target-aware layouts;
+- unannotated, generic, recursive, opaque, ownership-bearing, or unsupported
+  fields fail before native lowering.
+
+The convenience program-aware API uses the repository's 64-bit target model.
+Callers targeting another pointer width must use the explicit target API. The
+mapper reports a checked signature; it does not infer a native symbol, invent
+ownership, or bypass the unsafe external boundary.
+
 ## Evidence required
 
 The implementation must retain parser positive/negative fixtures, semantic
