@@ -81,6 +81,7 @@ verb verify_size(abs destination: path::Path, erg expected: Int) -> Int {
     };
 }
 
+meta target("unix")
 meta effect("filesystem", "blocking")
 meta capability("unix.rename_atomic")
 verb publish_absent_case(
@@ -112,6 +113,7 @@ verb publish_absent_case(
     };
 }
 
+meta target("unix")
 meta effect("filesystem", "blocking")
 meta capability("unix.rename_atomic")
 verb publish_conflict_result(
@@ -145,6 +147,7 @@ verb publish_conflict_result(
     };
 }
 
+meta target("unix")
 meta effect("filesystem", "blocking")
 meta capability("unix.rename_atomic")
 verb conflict_case(
@@ -187,6 +190,7 @@ verb conflict_case(
     };
 }
 
+meta target("unix")
 meta effect("filesystem", "blocking")
 meta capability("unix.rename_atomic")
 verb existing_case(
