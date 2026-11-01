@@ -155,7 +155,7 @@ combination is executable or that LLVM is ready to become the default.
 
 - [x] Prove LLVM coverage for scalar values, calls, returns, branches, loops,
       traps, typed failures, and checked casts.
-- [ ] Complete aggregate, array, pack, enum, tagged-union, transparent,
+- [x] Complete aggregate, array, pack, enum, tagged-union, transparent,
       packed, and explicitly aligned layout lowering.
 - [ ] Complete ownership transfer, borrowed views, exclusive loans, cleanup,
       early return, failure, and branch-join lowering.
@@ -174,6 +174,17 @@ shift guards, typed failures, and native trap terminators. The full
 54 tests; the all-features LLVM-filtered run passed 16 focused tests, including
 the width and rejection regressions. No backend-specific semantic lowering was
 added to close this checkbox.
+
+#### 49.2 aggregate/layout evidence
+
+The same suite covers direct and indirect aggregate ABI, aggregate field load
+and store, arrays, packed bit fields, `repr(C)` payload enums, transparent
+representations, packed representations, explicit alignment, return slots,
+pointer memory copies, and niche/regular enum failure layouts. The complete
+`cargo test --features llvm --test llvm_backend -- --test-threads=1` run passed
+55 tests after the integer-width addition. The fixtures exercise the shared
+contract before LLVM emission; the backend does not introduce a parallel
+layout or ownership model.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
