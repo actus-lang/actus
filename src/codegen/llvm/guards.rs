@@ -59,7 +59,7 @@ pub(super) fn emit_trap_if_zero(
     Ok(false)
 }
 
-fn emit_llvm_trap(
+pub(super) fn emit_llvm_trap(
     context: llvm_sys::prelude::LLVMContextRef,
     function: LLVMValueRef,
     builder: LLVMBuilderRef,

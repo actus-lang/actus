@@ -29,6 +29,10 @@ pub(super) fn emit_objects_llvm(
     modules
         .into_iter()
         .map(|lowered| {
+            crate::codegen::reject_float_ir(
+                &lowered.module,
+                configuration.native_backend().verifies_no_float_ir(),
+            )?;
             llvm_object(
                 &lowered.object_name,
                 &lowered.module,

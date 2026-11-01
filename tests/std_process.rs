@@ -95,6 +95,7 @@ fn assert_process_arguments(backend: &str) {
 }
 
 #[test]
+#[cfg(feature = "cranelift")]
 fn std_process_native_arguments_work_on_cranelift() {
     assert_process_arguments("cranelift");
 }

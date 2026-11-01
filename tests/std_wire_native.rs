@@ -55,7 +55,7 @@ fn unused_wire_modules_are_absent_from_native_object_set() {
     let _ = fs::remove_dir_all(root);
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), feature = "cranelift"))]
 #[test]
 fn freestanding_wire_types_emit_without_host_runtime_imports() {
     let root = std::env::temp_dir().join(format!("actus-wire-freestanding-{}", std::process::id()));

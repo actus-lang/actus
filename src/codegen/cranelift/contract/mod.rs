@@ -17,7 +17,7 @@ use super::integer_ops::{
 };
 use super::native::BackendEmitError;
 use super::object::create_module;
-use crate::codegen::{BackendInstruction, BackendModule};
+use crate::codegen::BackendModule;
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
@@ -30,38 +30,11 @@ pub fn emit_contract_module_object(
     target: &TargetSpec,
 ) -> Result<Vec<u8>, BackendEmitError> {
     backend_module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
-    reject_float_ir(backend_module, configuration)?;
+    crate::codegen::reject_float_ir(backend_module, configuration.verifies_no_float_ir())?;
     let mut module = create_module(configuration, target)?;
     let declarations = declarations::declare_functions(&mut module, backend_module)?;
     for function in &backend_module.functions {
         functions::define_function(&mut module, function, &declarations)?;
     }
     module.finish().emit().map_err(|error| BackendEmitError(error.to_string()))
-}
-
-fn reject_float_ir(
-    backend_module: &BackendModule,
-    configuration: &NativeBackendConfiguration,
-) -> Result<(), BackendEmitError> {
-    if !configuration.verifies_no_float_ir() {
-        return Ok(());
-    }
-    for function in &backend_module.functions {
-        if function.blocks.iter().any(|block| {
-            block.instructions.iter().any(|instruction| {
-                matches!(
-                    instruction,
-                    BackendInstruction::FloatConstant { .. }
-                        | BackendInstruction::FloatCompare { .. }
-                        | BackendInstruction::FloatCast { .. }
-                )
-            })
-        }) {
-            return Err(BackendEmitError(format!(
-                "native function `{}` contains floating-point IR instructions: shared float instruction",
-                function.symbol.as_str()
-            )));
-        }
-    }
-    Ok(())
 }

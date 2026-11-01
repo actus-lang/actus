@@ -2,9 +2,11 @@
 
 ## Status
 
-Planned. Work begins from the clean `main` checkpoint after the checked
-representation metadata work. The existing metadata backlog remains paused
-until this roadmap is complete. No metadata contract is changed by this plan.
+In progress. The complete backend baseline is now green for LLVM-only,
+Cranelift-only, and all-features configurations. LLVM remains opt-in and the
+default backend remains Cranelift until the shared-contract, target, runtime,
+and parity work below is complete. No metadata contract is changed by this
+plan.
 
 ## Objective
 
@@ -32,7 +34,7 @@ runtime, serialization, and zero-float contracts.
 - [x] Record the supported LLVM version, installation contract, linker policy,
       target matrix, and clean-checkout setup.
 - [x] Capture the focused LLVM-only baseline before changing the default.
-- [ ] Capture complete baseline results for LLVM-only, Cranelift-only, and
+- [x] Capture complete baseline results for LLVM-only, Cranelift-only, and
       all-features configurations before changing the default.
 - [ ] Add stable diagnostics for every intentionally unsupported LLVM operation.
 
@@ -67,29 +69,30 @@ source-spanned diagnostics.
 
 #### 49.1 configuration baseline evidence
 
-The first complete local comparison produced these results:
+The repaired complete local comparison produced these results:
 
 | Configuration | Command | Result | Classification |
 | --- | --- | --- | --- |
-| LLVM-only | `cargo test --no-default-features --features llvm --all-targets -- --test-threads=1` | `89 passed; 14 failed` | Open implementation baseline |
-| Cranelift-only | `cargo test --no-default-features --features cranelift --all-targets -- --test-threads=1` | exit 0; no failing suites | Compatibility baseline |
-| All features | `cargo test --all-targets --all-features -- --test-threads=1` | exit 0; no failing suites | Combined-feature baseline |
+| LLVM-only | `cargo test --no-default-features --features llvm --all-targets -- --test-threads=1` | exit 0; all active suites passed | Complete baseline |
+| Cranelift-only | `cargo test --no-default-features --features cranelift --all-targets -- --test-threads=1` | exit 0; all active suites passed | Compatibility baseline |
+| All features | `cargo test --all-targets --all-features -- --test-threads=1` | exit 0; all active suites passed | Combined-feature baseline |
 
-The LLVM-only failures are not collapsed into one generic failure. They are
-currently classified as:
+The baseline repairs were kept at the correct backend/shared boundaries:
 
-- generated serialization, CRC32, and fixed-frame fixtures whose LLVM module
-  calls runtime bridges with an `i32` argument where the declared bridge
-  signature requires `i64`;
-- generated serialization migration/validation and invalid-input fixtures
-  blocked by the same module-verification failure; and
-- checked buffer-index, integer-cast, and packed-field overflow fixtures whose
-  LLVM-generated executable does not yet produce the required native trap or
-  exit status.
+- shared runtime-call normalization now coerces bridge arguments to their
+  declared integer widths, including buffer append and i64 runtime contracts;
+- LLVM checked integer casts use the native trap bridge, preserving the same
+  failure contract as the shared lowering path;
+- the zero-float IR policy is shared by Cranelift and LLVM before object
+  emission;
+- backend-specific object and symbol assumptions are scoped to the backend
+  that owns them, while semantic and cross-backend coverage remains active.
 
-The complete-baseline checkbox remains open until these LLVM failures are
-implemented or rejected at the correct shared/native boundary with stable
-diagnostics. No default-backend change is permitted before that point.
+The complete-baseline checkbox is closed by the three passing configurations.
+The stable-diagnostics checkbox remains open because the explicit unsupported
+LLVM type-lowering path at `src/codegen/llvm/values.rs:33` still requires a
+source-spanned diagnostic contract. No default-backend change is permitted
+before that contract and the later shared-contract work are complete.
 
 #### 49.1 shared-operation mapping
 

@@ -26,6 +26,7 @@ pub use body::{
     BackendBodyProvider, BackendExpressionProvider, lower_verb_body,
     lower_verb_body_with_expressions,
 };
+pub(crate) use contract::reject_float_ir;
 pub use contract::{
     BackendAbiError, BackendAggregateField, BackendBlock, BackendBlockId, BackendBlockParameter,
     BackendCaseMode, BackendCleanupAction, BackendCleanupArgument, BackendCleanupBridge,

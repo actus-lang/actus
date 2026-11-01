@@ -102,6 +102,7 @@ verb main() -> Int {
 
 #[cfg(unix)]
 fn run_pack_fixture(name: &str, source: &str, expected: i32) {
+    #[cfg(feature = "cranelift")]
     run_pack_fixture_with_backend(name, source, expected, "cranelift");
     #[cfg(feature = "llvm")]
     run_pack_fixture_with_backend(name, source, expected, "llvm");

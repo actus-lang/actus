@@ -1,10 +1,10 @@
-#[cfg(unix)]
+#[cfg(all(unix, feature = "cranelift"))]
 use std::fs;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "cranelift"))]
 use actus::cli::run_with_args;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "cranelift"))]
 #[test]
 fn executes_width_qualified_integer_float_and_void_abi_paths() {
     let root = std::env::temp_dir().join(format!("actus-primitive-types-{}", std::process::id()));
