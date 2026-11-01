@@ -289,6 +289,7 @@ impl Formatter<'_> {
 
     pub(super) fn struct_definition(&mut self, definition: &crate::ast::StructDef) {
         self.documentation(definition.doc.as_deref());
+        self.metadata(&definition.metadata);
         if definition.is_open {
             self.output.push_str("open ");
         }
@@ -326,6 +327,7 @@ impl Formatter<'_> {
 
     pub(super) fn enum_definition(&mut self, definition: &crate::ast::EnumDef) {
         self.documentation(definition.doc.as_deref());
+        self.metadata(&definition.metadata);
         if definition.is_open {
             self.output.push_str("open ");
         }
@@ -388,6 +390,7 @@ impl Formatter<'_> {
 
     pub(super) fn pack_definition(&mut self, definition: &crate::ast::PackDecl) {
         self.documentation(definition.doc.as_deref());
+        self.metadata(&definition.metadata);
         self.line_indent();
         if definition.is_open {
             self.output.push_str("open ");

@@ -36,6 +36,7 @@ pub enum ParseErrorKind {
     MustUseRequiresReturn,
     UnsupportedEffect { name: String },
     UnsupportedCapability { name: String },
+    UnsupportedRepresentation { name: String },
     InvalidBoundedLimit { reason: String },
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
@@ -59,6 +60,7 @@ pub enum ParseErrorCode {
     MustUseRequiresReturn,
     UnsupportedEffect,
     UnsupportedCapability,
+    UnsupportedRepresentation,
     InvalidBoundedLimit,
     MalformedVerbContract,
     OpenImportRequiresBlock,
@@ -222,6 +224,13 @@ impl Parser {
                 > 1
             {
                 Some("must_use")
+            } else if metadata
+                .iter()
+                .filter(|attribute| matches!(attribute, MetaAttribute::Repr(_)))
+                .count()
+                > 1
+            {
+                Some("repr")
             } else {
                 None
             };

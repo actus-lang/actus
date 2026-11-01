@@ -2,6 +2,7 @@ use crate::ast::expr::Expr;
 use crate::lexer::SourceSpan;
 
 use super::super::types::{PrimitiveType, primitive_type};
+use super::callable::{MetaAttribute, Repr};
 use super::types::{GenericParam, Role, TypeName};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -10,6 +11,7 @@ pub struct EnumDef {
     pub doc: Option<String>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
+    pub metadata: Vec<MetaAttribute>,
     pub variants: Vec<EnumVariant>,
     pub span: SourceSpan,
 }
@@ -43,6 +45,7 @@ pub struct StructDef {
     pub doc: Option<String>,
     pub name: String,
     pub generic_parameters: Vec<GenericParam>,
+    pub metadata: Vec<MetaAttribute>,
     pub fields: Vec<StructField>,
     pub span: SourceSpan,
 }
@@ -64,9 +67,28 @@ pub struct PackDecl {
     pub storage_name: String,
     pub storage_doc: Option<String>,
     pub storage: PackStorage,
+    pub metadata: Vec<MetaAttribute>,
     pub endianness: LayoutEndianness,
     pub fields: Vec<PackField>,
     pub span: SourceSpan,
+}
+
+impl StructDef {
+    pub fn repr(&self) -> Option<Repr> {
+        self.metadata.iter().find_map(|attribute| match attribute {
+            MetaAttribute::Repr(repr) => Some(*repr),
+            _ => None,
+        })
+    }
+}
+
+impl EnumDef {
+    pub fn repr(&self) -> Option<Repr> {
+        self.metadata.iter().find_map(|attribute| match attribute {
+            MetaAttribute::Repr(repr) => Some(*repr),
+            _ => None,
+        })
+    }
 }
 
 impl PackDecl {

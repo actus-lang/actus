@@ -36,6 +36,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::UnsupportedEffect => "E0019",
         ParseErrorCode::InvalidBoundedLimit => "E0020",
         ParseErrorCode::UnsupportedCapability => "E0021",
+        ParseErrorCode::UnsupportedRepresentation => "E0022",
     }
 }
 
@@ -74,6 +75,7 @@ fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::InvalidStructFieldRole { .. } => "E1094",
         SemanticErrorKind::FrozenStructField { .. } => "E1095",
         SemanticErrorKind::SelfAssignment { .. } => "E1096",
+        SemanticErrorKind::InvalidReprC { .. } => "E1134",
         _ => return None,
     })
 }

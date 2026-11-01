@@ -1,0 +1,234 @@
+use crate::ast::{
+    EnumDef, EnumPayload, PrimitiveType, Repr, StructDef, StructFieldRole, TypeName, primitive_type,
+};
+
+use super::analyzer::Analyzer;
+use super::errors::{SemanticError, SemanticErrorKind};
+
+impl Analyzer {
+    pub(super) fn validate_repr_declarations(&self) -> Result<(), SemanticError> {
+        for definition in self.struct_types.values() {
+            if definition.repr() == Some(Repr::C) {
+                self.validate_repr_struct(definition)?;
+            }
+        }
+        for definition in self.enum_types.values() {
+            if definition.repr() == Some(Repr::C) {
+                self.validate_repr_enum(definition)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_repr_struct(&self, definition: &StructDef) -> Result<(), SemanticError> {
+        if !definition.generic_parameters.is_empty() {
+            return Err(repr_error_at(
+                &definition.name,
+                "generic structs cannot declare a concrete C ABI representation",
+                definition.span,
+            ));
+        }
+        for field in &definition.fields {
+            if !matches!(field.role, StructFieldRole::Value) {
+                return Err(repr_error_at(
+                    &definition.name,
+                    format!(
+                        "field `{}` uses ownership role `{}`; repr(C) fields must be value fields",
+                        field.name,
+                        field_role_name(&field.role)
+                    ),
+                    field.span,
+                ));
+            }
+            self.validate_repr_field_type(
+                &definition.name,
+                &field.name,
+                &field.ty,
+                &mut Vec::new(),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn validate_repr_enum(&self, definition: &EnumDef) -> Result<(), SemanticError> {
+        if !definition.generic_parameters.is_empty() {
+            return Err(repr_error_at(
+                &definition.name,
+                "generic enums cannot declare a concrete C ABI representation",
+                definition.span,
+            ));
+        }
+        for variant in &definition.variants {
+            if !matches!(variant.payload, EnumPayload::Unit) {
+                return Err(repr_error_at(
+                    &definition.name,
+                    format!(
+                        "variant `{}` has a payload; repr(C) currently supports unit enums only",
+                        variant.name
+                    ),
+                    variant.span,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_repr_field_type(
+        &self,
+        declaration: &str,
+        field: &str,
+        type_name: &TypeName,
+        visiting: &mut Vec<String>,
+    ) -> Result<(), SemanticError> {
+        if type_name.reference_role.is_some() {
+            return Err(repr_error_at(
+                declaration,
+                format!("field `{field}` has an ownership-qualified type reference"),
+                type_name.span,
+            ));
+        }
+        if let Some(primitive) = primitive_type(&type_name.name) {
+            let supported = match primitive {
+                PrimitiveType::Integer { width, .. } => width.is_multiple_of(8),
+                PrimitiveType::Float { .. } => true,
+                PrimitiveType::Void => false,
+            };
+            if supported {
+                return Ok(());
+            }
+        }
+        if matches!(type_name.name.as_str(), "Int" | "Bool") && type_name.arguments.is_empty() {
+            return Ok(());
+        }
+        if type_name.name == "Array" {
+            return self.validate_repr_array(declaration, field, type_name, visiting);
+        }
+        if let Some(structure) = self.struct_types.get(&type_name.name) {
+            return self.validate_repr_struct_field(
+                declaration,
+                field,
+                type_name,
+                structure,
+                visiting,
+            );
+        }
+        if let Some(enum_definition) = self.enum_types.get(&type_name.name) {
+            return self.validate_repr_enum_field(declaration, field, type_name, enum_definition);
+        }
+        Err(repr_error_at(
+            declaration,
+            format!("field `{field}` uses unsupported C ABI type `{}`", type_name.canonical_key()),
+            type_name.span,
+        ))
+    }
+
+    fn validate_repr_array(
+        &self,
+        declaration: &str,
+        field: &str,
+        type_name: &TypeName,
+        visiting: &mut Vec<String>,
+    ) -> Result<(), SemanticError> {
+        let [element, capacity] = type_name.arguments.as_slice() else {
+            return Err(repr_error_at(
+                declaration,
+                format!("field `{field}` has malformed `Array` type"),
+                type_name.span,
+            ));
+        };
+        if !capacity.arguments.is_empty()
+            || capacity.reference_role.is_some()
+            || capacity.name.parse::<u32>().ok().is_none_or(|value| value == 0)
+        {
+            return Err(repr_error_at(
+                declaration,
+                format!("field `{field}` must use a positive concrete array capacity"),
+                capacity.span,
+            ));
+        }
+        self.validate_repr_field_type(declaration, field, element, visiting)
+    }
+
+    fn validate_repr_struct_field(
+        &self,
+        declaration: &str,
+        field: &str,
+        type_name: &TypeName,
+        structure: &StructDef,
+        visiting: &mut Vec<String>,
+    ) -> Result<(), SemanticError> {
+        if structure.repr() != Some(Repr::C) || !type_name.arguments.is_empty() {
+            return Err(repr_error_at(
+                declaration,
+                format!(
+                    "field `{field}` uses `{}` without a concrete repr(C) contract",
+                    type_name.canonical_key()
+                ),
+                type_name.span,
+            ));
+        }
+        if visiting.iter().any(|name| name == &type_name.name) {
+            return Err(repr_error_at(
+                declaration,
+                format!("field `{field}` creates a recursive C layout"),
+                type_name.span,
+            ));
+        }
+        visiting.push(type_name.name.clone());
+        for nested in &structure.fields {
+            self.validate_repr_field_type(&structure.name, &nested.name, &nested.ty, visiting)?;
+        }
+        visiting.pop();
+        Ok(())
+    }
+
+    fn validate_repr_enum_field(
+        &self,
+        declaration: &str,
+        field: &str,
+        type_name: &TypeName,
+        enumeration: &EnumDef,
+    ) -> Result<(), SemanticError> {
+        if enumeration.repr() != Some(Repr::C) || !type_name.arguments.is_empty() {
+            return Err(repr_error_at(
+                declaration,
+                format!(
+                    "field `{field}` uses `{}` without a concrete repr(C) contract",
+                    type_name.canonical_key()
+                ),
+                type_name.span,
+            ));
+        }
+        if enumeration.variants.iter().all(|variant| matches!(variant.payload, EnumPayload::Unit)) {
+            return Ok(());
+        }
+        Err(repr_error_at(
+            declaration,
+            format!("field `{field}` uses a payload enum in a C layout"),
+            type_name.span,
+        ))
+    }
+}
+
+fn repr_error_at(
+    declaration: &str,
+    reason: impl Into<String>,
+    span: crate::lexer::SourceSpan,
+) -> SemanticError {
+    SemanticError {
+        kind: SemanticErrorKind::InvalidReprC {
+            declaration: declaration.to_owned(),
+            reason: reason.into(),
+        },
+        span,
+    }
+}
+
+fn field_role_name(role: &StructFieldRole) -> &'static str {
+    match role {
+        StructFieldRole::Value => "value",
+        StructFieldRole::Erg => "erg",
+        StructFieldRole::Abs => "abs",
+        StructFieldRole::Ins => "ins",
+    }
+}

@@ -8,6 +8,7 @@ mod fault;
 mod limitless;
 mod must_use;
 mod realtime;
+mod repr;
 mod syntax;
 mod target;
 mod test;

@@ -55,6 +55,10 @@ phase prematurely.
       availability checks, caller propagation across local/imported/generic/
       dynamic/native boundaries, role-contract validation, formatter/LSP
       preservation, and Unix/Windows/freestanding fixtures.
+- [x] Implement `meta repr(C)` as a restricted concrete value-type ABI
+      contract with parser, semantic, formatter, LSP, and negative-fixture
+      coverage. Payload enums, generic types, ownership-qualified fields,
+      opaque aggregates, and packed layouts remain rejected.
 
 ## Planned metadata extension backlog
 
@@ -82,7 +86,7 @@ advance.
 1. `meta capability(...)` — implemented as ADR-0096 and documented in the
    capability guide; future capability names still require their own registry
    and target evidence.
-2. `meta repr("C")` — provide a restricted, explicitly checked ABI/layout
+2. `meta repr(C)` — provide a restricted, explicitly checked ABI/layout
    contract for native interoperability.
 3. `meta volatile` — define explicit hardware-observable access semantics only
    after the native memory-access contract is specified.

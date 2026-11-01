@@ -73,6 +73,20 @@ pub enum MetaAttribute {
     Realtime,
     Bounded(BoundedContract),
     Capability(Capability),
+    Repr(Repr),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Repr {
+    C,
+}
+
+impl Repr {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::C => "C",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

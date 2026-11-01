@@ -104,6 +104,7 @@ fn same_struct_definition(left: &StructDef, right: &StructDef) -> bool {
         && left.doc == right.doc
         && left.name == right.name
         && left.generic_parameters == right.generic_parameters
+        && left.metadata == right.metadata
         && left.fields.len() == right.fields.len()
         && left.fields.iter().zip(&right.fields).all(|(left, right)| {
             left.doc == right.doc

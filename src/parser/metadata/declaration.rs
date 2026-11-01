@@ -10,10 +10,31 @@ impl Parser {
     ) -> Result<TopLevelDecl, ParseError> {
         self.validate_metadata_target(&metadata)?;
         let is_open = self.match_simple(TokenKind::Open);
+        if metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Repr(_)))
+            && !(self.check_simple(&TokenKind::Struct) || self.check_simple(&TokenKind::Enum))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::MetadataTargetNotAllowed,
+                kind: ParseErrorKind::MetadataTargetNotAllowed,
+                span: self.metadata_span(),
+            });
+        }
         if self.check_simple(&TokenKind::Verb) {
             let verb = self.parse_verb_with_metadata(is_open, metadata.clone(), doc)?;
             ensure_must_use_return(&metadata, verb.return_type.is_some(), verb.span)?;
             return Ok(TopLevelDecl::Verb(verb));
+        }
+        if self.check_simple(&TokenKind::Struct) {
+            ensure_repr_type_metadata(&metadata, self.metadata_span())?;
+            return Ok(TopLevelDecl::Struct(
+                self.parse_struct_def_with_metadata(is_open, metadata, doc)?,
+            ));
+        }
+        if self.check_simple(&TokenKind::Enum) {
+            ensure_repr_type_metadata(&metadata, self.metadata_span())?;
+            return Ok(TopLevelDecl::Enum(
+                self.parse_enum_def_with_metadata(is_open, metadata, doc)?,
+            ));
         }
         if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
             let verb = self.parse_external_verb(
@@ -56,6 +77,20 @@ impl Parser {
     pub(super) fn metadata_span(&self) -> SourceSpan {
         self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0))
     }
+}
+
+fn ensure_repr_type_metadata(
+    metadata: &[MetaAttribute],
+    span: SourceSpan,
+) -> Result<(), ParseError> {
+    if metadata.iter().all(|attribute| matches!(attribute, MetaAttribute::Repr(_))) {
+        return Ok(());
+    }
+    Err(ParseError {
+        code: ParseErrorCode::MetadataTargetNotAllowed,
+        kind: ParseErrorKind::MetadataTargetNotAllowed,
+        span,
+    })
 }
 
 fn has_test(metadata: &[MetaAttribute]) -> bool {

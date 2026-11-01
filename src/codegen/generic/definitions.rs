@@ -35,6 +35,7 @@ pub(crate) fn specialized_structs(
                 doc: definition.doc.clone(),
                 name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
+                metadata: definition.metadata.clone(),
                 fields,
                 span: definition.span,
             })
@@ -66,6 +67,7 @@ pub(crate) fn specialized_enums(
                 doc: definition.doc.clone(),
                 name: instance.canonical_key.clone(),
                 generic_parameters: Vec::new(),
+                metadata: definition.metadata.clone(),
                 variants,
                 span: definition.span,
             })
