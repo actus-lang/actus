@@ -134,3 +134,30 @@ fn llvm_lowers_the_process_count_bridge_as_a_scalar_status() {
     assert!(ir.contains("call i32 @actus_process_arg_count()"));
     assert!(ir.contains("ret i32 %call0"));
 }
+
+#[test]
+fn llvm_lowers_the_stdin_eof_bridge_as_a_signed_status() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_read_byte() -> Int; verb call() -> Int { return actus_read_byte(); }",
+    );
+    assert!(ir.contains("declare i32 @actus_read_byte()"));
+    assert!(ir.contains("call i32 @actus_read_byte()"));
+}
+
+#[test]
+fn llvm_lowers_the_stdout_flush_bridge_as_a_signed_status() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_flush_stdout() -> Int; verb call() -> Int { return actus_flush_stdout(); }",
+    );
+    assert!(ir.contains("declare i32 @actus_flush_stdout()"));
+    assert!(ir.contains("call i32 @actus_flush_stdout()"));
+}
+
+#[test]
+fn llvm_lowers_the_stdout_buffer_bridge_through_a_borrowed_pointer() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int; verb call(abs buffer: Buffer) -> Int { return actus_write_buffer_stdout(buffer: abs buffer); }",
+    );
+    assert!(ir.contains("declare i32 @actus_write_buffer_stdout(ptr align 8)"), "{ir}");
+    assert!(ir.contains("call i32 @actus_write_buffer_stdout(ptr %0)"), "{ir}");
+}
