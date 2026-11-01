@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn emits_a_freestanding_llvm_object_without_host_runtime_imports() {
-    let source = "verb main() -> Int { return 41; }";
+    let source = "verb main() -> Int { erg value: u32 = 41u32; return value as Int; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "freestanding fixture should lex: {errors:?}");
     let program = parse(tokens).expect("freestanding fixture should parse");
