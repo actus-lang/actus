@@ -4,6 +4,7 @@
 mod aggregate_assignment;
 mod constructors;
 mod declarations;
+mod enum_payload;
 mod expression;
 mod functions;
 mod layout;

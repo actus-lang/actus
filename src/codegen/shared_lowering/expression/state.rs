@@ -76,6 +76,26 @@ pub(super) fn enum_payload_types(
         .collect()
 }
 
+pub(super) fn copy_value_metadata(
+    provider: &mut SharedExpressionProvider<'_>,
+    source: BackendValueId,
+    target: BackendValueId,
+) {
+    if let Some(type_name) = provider.nominal_type(source).cloned() {
+        provider.remember_nominal_type(target, type_name);
+    }
+    let payloads = provider
+        .enum_payload_types
+        .iter()
+        .filter_map(|((value, discriminant), ty)| {
+            (*value == source).then_some((*discriminant, *ty))
+        })
+        .collect::<Vec<_>>();
+    for (discriminant, ty) in payloads {
+        provider.remember_enum_payload(target, discriminant, ty);
+    }
+}
+
 pub(super) fn coerce_owner_value(
     provider: &mut SharedExpressionProvider<'_>,
     value: BackendValueId,

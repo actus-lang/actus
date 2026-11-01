@@ -112,7 +112,7 @@ impl Analyzer {
         }) {
             return Err(repr_error_at(
                 &definition.name,
-                "packed and transparent representations are supported only for structs",
+                "packed, transparent, and explicit alignment representations are supported only for structs",
                 definition.span,
             ));
         }
@@ -124,16 +124,40 @@ impl Analyzer {
             ));
         }
         for variant in &definition.variants {
-            if !matches!(variant.payload, EnumPayload::Unit) {
-                return Err(repr_error_at(
-                    &definition.name,
-                    format!(
-                        "variant `{}` has a payload; repr(C) currently supports unit enums only",
-                        variant.name
-                    ),
-                    variant.span,
-                ));
+            self.validate_repr_enum_payload(definition, variant)?;
+        }
+        Ok(())
+    }
+
+    fn validate_repr_enum_payload(
+        &self,
+        definition: &EnumDef,
+        variant: &crate::ast::EnumVariant,
+    ) -> Result<(), SemanticError> {
+        let fields: Vec<(String, &TypeName, crate::lexer::SourceSpan)> = match &variant.payload {
+            EnumPayload::Unit => return Ok(()),
+            EnumPayload::Tuple(types) => types
+                .iter()
+                .enumerate()
+                .map(|(index, ty)| (index.to_string(), ty, ty.span))
+                .collect(),
+            EnumPayload::Struct(fields) => {
+                fields.iter().map(|field| (field.name.clone(), &field.ty, field.span)).collect()
             }
+        };
+        for (field, type_name, span) in fields {
+            self.validate_repr_field_type(&definition.name, &field, type_name, &mut Vec::new())
+                .map_err(|error| match error.kind {
+                    SemanticErrorKind::InvalidReprC { .. } => repr_error_at(
+                        &definition.name,
+                        format!(
+                            "variant `{}` field `{field}` has an invalid payload type",
+                            variant.name
+                        ),
+                        span,
+                    ),
+                    _ => error,
+                })?;
         }
         Ok(())
     }
@@ -267,14 +291,10 @@ impl Analyzer {
                 type_name.span,
             ));
         }
-        if enumeration.variants.iter().all(|variant| matches!(variant.payload, EnumPayload::Unit)) {
-            return Ok(());
+        for variant in &enumeration.variants {
+            self.validate_repr_enum_payload(enumeration, variant)?;
         }
-        Err(repr_error_at(
-            declaration,
-            format!("field `{field}` uses a payload enum in a C layout"),
-            type_name.span,
-        ))
+        Ok(())
     }
 }
 

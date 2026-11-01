@@ -100,18 +100,15 @@ fn rejects_ownership_fields_in_c_structs() {
 }
 
 #[test]
-fn rejects_generic_c_structs_and_payload_enums() {
+fn rejects_generic_c_structs_and_accepts_payload_enums() {
     let generic = analyze_source("meta repr(C) struct Box[T] { value: T, }")
         .expect_err("generic C layouts must be rejected");
     assert!(
         matches!(generic.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("generic"))
     );
 
-    let payload = analyze_source("meta repr(C) enum Message { Data(i32), }")
-        .expect_err("payload enums require a tagged-union contract");
-    assert!(
-        matches!(payload.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("payload"))
-    );
+    analyze_source("meta repr(C) enum Message { Data(i32), Empty, }")
+        .expect("payload enums with fixed value fields should analyze");
 }
 
 #[test]

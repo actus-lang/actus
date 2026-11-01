@@ -214,12 +214,19 @@ impl<'a> SharedExpressionProvider<'a> {
     ) -> Option<(u32, bool)> {
         self.layouts.enum_variant(type_name, variant)
     }
-    pub(super) fn enum_variant_payload_type(
+    pub(super) fn enum_variant_payload_fields(
         &self,
         type_name: &crate::ast::TypeName,
         variant: &str,
-    ) -> Option<BackendValueType> {
-        self.layouts.enum_variant_payload_type(type_name, variant)
+    ) -> Option<Vec<super::super::BackendEnumPayloadField>> {
+        self.layouts.enum_variant_payload_fields(type_name, variant)
+    }
+
+    pub(super) fn backend_value_type(
+        &self,
+        type_name: &crate::ast::TypeName,
+    ) -> Option<super::super::BackendValueType> {
+        super::support::backend_value_type(self.layouts, type_name)
     }
     pub(super) fn enum_variant_for_layout(
         &self,

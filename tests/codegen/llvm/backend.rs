@@ -183,6 +183,26 @@ fn both_backends_consume_repr_explicit_alignment() {
     assert!(has_symbol(&object, "main"));
 }
 
+#[cfg(feature = "cranelift")]
+#[test]
+fn both_backends_consume_repr_c_payload_enum() {
+    let source = "meta repr(C) enum Message { Byte { value: u8, }, Pair { code: u16, value: u32, }, Empty, } verb main() -> Int { erg message = Message.Pair(code: 7u16, value: 11u32); return case dat message { Message.Pair { code: code_value, value: value_value } => code_value as Int + value_value as Int, _ => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "repr(C) payload fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("repr(C) payload fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("repr(C) payload enum should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume repr(C) payload enum");
+    assert!(llvm_ir.contains("define"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let object_bytes =
+        emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+            .expect("Cranelift should consume repr(C) payload enum");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "main"));
+}
+
 #[test]
 fn both_backends_emit_user_defined_drop_performance_calls() {
     let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect() { erg value: Counter = Counter { value: 7, }; return; }";
@@ -492,6 +512,7 @@ fn emits_neutral_enum_payload_binding_with_ownership_mode() {
                     subject: BackendValueId(0),
                     layout: enum_layout,
                     payload_type: integer,
+                    payload_offset: 0,
                     mode: BackendCaseMode::Dat,
                     span: actus::lexer::SourceSpan::new(0, 1),
                 },

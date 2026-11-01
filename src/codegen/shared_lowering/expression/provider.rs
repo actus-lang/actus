@@ -61,19 +61,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     }
 
     fn copy_value_metadata(&mut self, source: BackendValueId, target: BackendValueId) {
-        if let Some(type_name) = self.nominal_type(source).cloned() {
-            self.remember_nominal_type(target, type_name);
-        }
-        let payloads = self
-            .enum_payload_types
-            .iter()
-            .filter_map(|((value, discriminant), ty)| {
-                (*value == source).then_some((*discriminant, *ty))
-            })
-            .collect::<Vec<_>>();
-        for (discriminant, ty) in payloads {
-            self.remember_enum_payload(target, discriminant, ty);
-        }
+        state::copy_value_metadata(self, source, target);
     }
 
     fn allocate_value(&mut self, ty: BackendValueType) -> BackendValueId {
@@ -388,6 +376,16 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     ) -> Result<BackendValueId, BackendContractError> {
         let return_type = self.return_types.get(&self.verb_name).copied().flatten();
         state::coerce_value_to_type(self, value, return_type, span, instructions)
+    }
+
+    fn coerce_value_to_type(
+        &mut self,
+        value: BackendValueId,
+        target: Option<BackendValueType>,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        state::coerce_value_to_type(self, value, target, span, instructions)
     }
 
     fn lower_enum_variant_condition_value(

@@ -3,6 +3,8 @@ use crate::ast::{
     lookup_builtin_type,
 };
 
+#[path = "abi_errors.rs"]
+mod abi_errors;
 #[path = "aggregate.rs"]
 mod aggregate;
 
@@ -17,6 +19,7 @@ pub enum CAbiType {
     Array { element: Box<CAbiType>, length: u32, layout: CAbiLayout },
     Aggregate(CAbiAggregate),
     Enum { name: String, layout: CAbiLayout },
+    TaggedUnion(CAbiTaggedUnion),
 }
 
 impl CAbiType {
@@ -37,6 +40,7 @@ impl CAbiType {
             }
             Self::Aggregate(aggregate) => format!("struct {}", aggregate.name),
             Self::Enum { name, .. } => format!("enum {name}"),
+            Self::TaggedUnion(union) => format!("struct {}", union.name),
         }
     }
 }
@@ -55,6 +59,23 @@ pub struct CAbiAggregateField {
     pub offset: u32,
     pub layout: CAbiLayout,
     pub ty: CAbiType,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CAbiTaggedUnion {
+    pub name: String,
+    pub tag: CAbiLayout,
+    pub payload_offset: u32,
+    pub payload: Option<CAbiLayout>,
+    pub layout: CAbiLayout,
+    pub variants: Vec<CAbiTaggedUnionVariant>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CAbiTaggedUnionVariant {
+    pub name: String,
+    pub discriminant: u32,
+    pub payload: Option<CAbiAggregate>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -129,6 +150,7 @@ impl CAbiTarget {
             CAbiType::Array { layout, .. }
             | CAbiType::Aggregate(CAbiAggregate { layout, .. })
             | CAbiType::Enum { layout, .. } => layout,
+            CAbiType::TaggedUnion(union) => union.layout,
             CAbiType::Integer { .. } | CAbiType::Float { .. } => {
                 unreachable!("non-byte-aligned C ABI scalar")
             }
@@ -171,113 +193,6 @@ pub enum CAbiError {
     GenericAggregate { name: String },
     TargetDependentType { name: String },
 }
-
-impl std::fmt::Display for CAbiError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MissingReturnType { .. }
-            | Self::MissingUnsafeBoundary { .. }
-            | Self::InvalidOwnership { .. }
-            | Self::InvalidReturnOwnership { .. }
-            | Self::UnsupportedType { .. }
-            | Self::AggregateRequiresReprC { .. } => self.fmt_primary(formatter),
-            Self::TransparentCombinedRepresentation { .. }
-            | Self::TransparentRequiresOneField { .. }
-            | Self::TransparentFieldRole { .. }
-            | Self::TransparentFieldType { .. } => self.fmt_transparent(formatter),
-            Self::AggregateFieldRole { .. }
-            | Self::AggregateFieldType { .. }
-            | Self::AggregateLayoutOverflow { .. }
-            | Self::GenericAggregate { .. }
-            | Self::TargetDependentType { .. } => self.fmt_aggregate(formatter),
-        }
-    }
-}
-
-impl CAbiError {
-    fn fmt_primary(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MissingReturnType { verb } => {
-                write!(formatter, "C ABI export `{verb}` requires an explicit return type")
-            }
-            Self::MissingUnsafeBoundary { verb } => {
-                write!(formatter, "external C verb `{verb}` requires an explicit `unsafe` boundary")
-            }
-            Self::InvalidOwnership { parameter, role, ty } => {
-                write!(
-                    formatter,
-                    "C ABI parameter `{parameter}` cannot use role `{role}` with type `{ty}`"
-                )
-            }
-            Self::InvalidReturnOwnership { access, ty } => {
-                write!(formatter, "C ABI return cannot use access `{access}` with type `{ty}")
-            }
-            Self::UnsupportedType { name } => {
-                write!(formatter, "type `{name}` has no C ABI mapping")
-            }
-            Self::AggregateRequiresReprC { name } => {
-                write!(formatter, "aggregate `{name}` requires `meta repr(C)` for C ABI use")
-            }
-            _ => unreachable!("primary C ABI error formatter received another variant"),
-        }
-    }
-
-    fn fmt_transparent(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::TransparentCombinedRepresentation { name } => {
-                write!(
-                    formatter,
-                    "transparent aggregate `{name}` cannot combine C or packed representation"
-                )
-            }
-            Self::TransparentRequiresOneField { name } => {
-                write!(formatter, "transparent aggregate `{name}` requires exactly one field")
-            }
-            Self::TransparentFieldRole { aggregate, field, role } => {
-                write!(
-                    formatter,
-                    "transparent aggregate `{aggregate}` field `{field}` cannot use role `{role}`"
-                )
-            }
-            Self::TransparentFieldType { aggregate, field, ty } => {
-                write!(
-                    formatter,
-                    "transparent aggregate `{aggregate}` field `{field}` has unsupported type `{ty}`"
-                )
-            }
-            _ => unreachable!("transparent C ABI error formatter received another variant"),
-        }
-    }
-
-    fn fmt_aggregate(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::AggregateFieldRole { aggregate, field, role } => {
-                write!(
-                    formatter,
-                    "C ABI aggregate `{aggregate}` field `{field}` cannot use role `{role}`"
-                )
-            }
-            Self::AggregateFieldType { aggregate, field, ty } => {
-                write!(
-                    formatter,
-                    "C ABI aggregate `{aggregate}` field `{field}` has unsupported type `{ty}`"
-                )
-            }
-            Self::AggregateLayoutOverflow { name } => {
-                write!(formatter, "C ABI aggregate `{name}` layout exceeds the supported size")
-            }
-            Self::GenericAggregate { name } => {
-                write!(formatter, "generic aggregate `{name}` cannot cross a C ABI")
-            }
-            Self::TargetDependentType { name } => {
-                write!(formatter, "type `{name}` requires an explicit C ABI target")
-            }
-            _ => unreachable!("aggregate C ABI error formatter received another variant"),
-        }
-    }
-}
-
-impl std::error::Error for CAbiError {}
 
 pub fn c_abi_signature(verb: &VerbDecl) -> Result<CAbiSignature, CAbiError> {
     signature_parts(&verb.name, &verb.params, verb.return_type.as_ref())
@@ -426,7 +341,10 @@ fn validate_parameter_ownership(
     ty: &CAbiType,
 ) -> Result<(), CAbiError> {
     if matches!(parameter.role, Role::Abs | Role::Dat)
-        && !matches!(ty, CAbiType::OpaquePointer | CAbiType::Aggregate(_))
+        && !matches!(
+            ty,
+            CAbiType::OpaquePointer | CAbiType::Aggregate(_) | CAbiType::TaggedUnion(_)
+        )
     {
         return Err(CAbiError::InvalidOwnership {
             parameter: parameter.name.clone(),
@@ -445,9 +363,10 @@ fn passing_for(ty: &CAbiType) -> CAbiParameterPassing {
         | CAbiType::Bool
         | CAbiType::Usize
         | CAbiType::Enum { .. } => CAbiParameterPassing::Direct,
-        CAbiType::OpaquePointer | CAbiType::Array { .. } | CAbiType::Aggregate(_) => {
-            CAbiParameterPassing::Pointer
-        }
+        CAbiType::OpaquePointer
+        | CAbiType::Array { .. }
+        | CAbiType::Aggregate(_)
+        | CAbiType::TaggedUnion(_) => CAbiParameterPassing::Pointer,
     }
 }
 
@@ -490,8 +409,12 @@ fn return_ownership_for(
     match (return_type.access, mapped) {
         (ReturnAccess::Owned, CAbiType::OpaquePointer) => Ok(CAbiReturnOwnership::OwnedResource),
         (ReturnAccess::Abs, CAbiType::OpaquePointer)
-        | (ReturnAccess::Abs, CAbiType::Aggregate(_)) => Ok(CAbiReturnOwnership::Borrowed),
-        (ReturnAccess::Owned, CAbiType::Aggregate(_)) => Ok(CAbiReturnOwnership::CallerAllocated),
+        | (ReturnAccess::Abs, CAbiType::Aggregate(_))
+        | (ReturnAccess::Abs, CAbiType::TaggedUnion(_)) => Ok(CAbiReturnOwnership::Borrowed),
+        (ReturnAccess::Owned, CAbiType::Aggregate(_))
+        | (ReturnAccess::Owned, CAbiType::TaggedUnion(_)) => {
+            Ok(CAbiReturnOwnership::CallerAllocated)
+        }
         (ReturnAccess::Owned, _) => Ok(CAbiReturnOwnership::Value),
         (ReturnAccess::Abs, _) => unreachable!("scalar abs returns are rejected above"),
     }

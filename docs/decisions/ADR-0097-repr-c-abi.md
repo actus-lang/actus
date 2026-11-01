@@ -22,8 +22,8 @@ representation names are bare compiler-defined
 identifiers, not user strings. Separate `repr(C)` and `repr(packed)` attributes
 are combined component-wise; repeating a component is rejected. Transparent is
 not composable with C, packed, or align. `repr(packed)`, `repr(align(N))`, and
-`repr(transparent)` are valid only for concrete structs. `repr(C)` remains valid for concrete structs
-and unit-variant enums.
+`repr(transparent)` are valid only for concrete structs. `repr(C)` remains
+valid for concrete structs, unit-variant enums, and fixed-layout payload enums.
 
 The compiler validates the complete declaration before code generation:
 
@@ -40,8 +40,10 @@ The compiler validates the complete declaration before code generation:
 7. `repr(packed)` gives every field one-byte alignment, removes inter-field and
    trailing padding, and lowers unaligned field access with an explicit
    one-byte memory alignment contract;
-8. packed enums and payload/tagged-union representations are rejected until a
-   separate enum ABI contract exists.
+8. payload enums use a separate tagged-union layout under `repr(C)`: a `u32`
+   discriminant at offset zero, a naturally aligned payload union, declaration-
+   order discriminants, maximum variant payload size/alignment, and final size
+   rounding to aggregate alignment. Unit variants carry no payload.
 9. `repr(align(N))` requires a positive power-of-two `u32` literal, raises the
    minimum aggregate alignment without lowering natural alignment, and rounds
    the final size to that alignment. It cannot be combined with packed or
@@ -59,6 +61,8 @@ matching packed layout. Packed access is byte-aligned at the backend boundary;
 it is not implemented through an assumed naturally aligned pointer.
 Transparent representation likewise does not grant native access; it only
 asserts that the wrapper is ABI-equivalent to its one checked value field.
+Payload enum mapping is represented as a C-compatible tagged struct rather than
+as a C `enum`; C enum constants cannot carry variant payload storage.
 
 ## Alternatives considered
 
@@ -99,6 +103,9 @@ for an explicit `CAbiTarget`, and preserves Actus ownership at the boundary:
 - transparent aggregates resolve directly to the mapped type of their one
   value field, preserving direct scalar/array passing and avoiding an implicit
   aggregate pointer layer.
+- payload enums map to a checked `CAbiTaggedUnion` with tag layout, payload
+  offset, maximum payload layout, and per-variant discriminants and fields;
+  they use aggregate pointer passing and caller-allocated owned returns.
 - explicitly aligned C aggregates report their checked minimum alignment and
   trailing size padding; alignment-only representations remain internal layout
   contracts and are not accepted as FFI aggregates.

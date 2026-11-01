@@ -65,6 +65,9 @@ phase prematurely.
 - [x] Add explicit `repr(align(N))` for concrete structs with grouped and
       separate composition, power-of-two validation, minimum-alignment and
       trailing-size guarantees, FFI gating, and regression coverage.
+- [x] Add the explicit `repr(C)` payload-enum tagged-union contract with
+      fixed `u32` discriminants, bounded payload layout, C ABI mapping, and
+      semantic/FFI regression coverage.
 
 ## Planned metadata extension backlog
 
@@ -92,7 +95,8 @@ advance.
 1. `meta capability(...)` — implemented as ADR-0096 and documented in the
    capability guide; future capability names still require their own registry
    and target evidence.
-2. `meta repr(C)`, `meta repr(packed)`, and `meta repr(transparent)` — provide
+2. `meta repr(C)`, `meta repr(packed)`, `meta repr(align(N))`, and
+   `meta repr(transparent)` — provide
    restricted, explicitly checked ABI/layout contracts for native
    interoperability. Transparent wrappers require one value field and map to
    that field's layout and native ABI type.

@@ -20,6 +20,13 @@ enum WireAxis {
     Vertical,
 }
 
+meta repr(C)
+enum WireMessage {
+    Byte { value: u8 },
+    Pair { code: u16, value: u32 },
+    Empty,
+}
+
 unsafe extern "C" verb inspect_wire(abs value: WireSegment) -> Int;
 
 meta test
@@ -46,6 +53,19 @@ verb repr_c_ffi_value_contract_is_executable() -> Int {
         WireAxis.Vertical => segment.start.word as i64,
     };
     if score == 20i64 {
+        return 0;
+    }
+    return 1;
+}
+
+meta test
+verb repr_c_payload_enum_is_bounded_and_executable() -> Int {
+    erg message = WireMessage.Pair(code: 7u16, value: 11u32);
+    erg score = case dat message {
+        WireMessage.Pair { code: code_value, value: value_value } => code_value as Int + value_value as Int,
+        _ => 0,
+    };
+    if score == 18 {
         return 0;
     }
     return 1;

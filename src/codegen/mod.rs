@@ -55,8 +55,9 @@ pub(crate) use shared_lowering::lower_program_to_backend_module_for_target_with_
 pub use shared_lowering::lower_scalar_program;
 pub(crate) use signature::lower_verb_with_expressions_as;
 pub use signature::{
-    BackendFieldLayout, BackendLayoutProvider, BackendPackedFieldLayout, BackendSignature,
-    lower_verb, lower_verb_signature, lower_verb_with_cleanup, lower_verb_with_expressions,
+    BackendEnumPayloadField, BackendFieldLayout, BackendLayoutProvider, BackendPackedFieldLayout,
+    BackendSignature, lower_verb, lower_verb_signature, lower_verb_with_cleanup,
+    lower_verb_with_expressions,
 };
 pub(crate) use signature::{lower_parameter, lower_return};
 pub use symbols::{BackendSymbolBindings, SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};

@@ -342,3 +342,25 @@ fn maps_repr_c_explicit_alignment_into_the_aggregate_layout() {
     assert_eq!(aggregate.layout, CAbiLayout { size: 8, alignment: 8 });
     assert_eq!(aggregate.fields[0].offset, 0);
 }
+
+#[test]
+fn maps_repr_c_payload_enum_as_a_checked_tagged_union() {
+    let program = parse_program(
+        "meta repr(C) enum Message { Byte(u8), Pair { code: u16, value: u32, }, Empty, } verb inspect(erg message: Message) -> Int { return 0; }",
+    );
+    let actus::ast::TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected ordinary verb")
+    };
+    let signature = c_abi_signature_in_program(&program, verb)
+        .expect("payload enum should map to a tagged union");
+    let CAbiType::TaggedUnion(union) = &signature.parameters[0].ty else {
+        panic!("expected tagged-union parameter")
+    };
+    assert_eq!(union.tag, CAbiLayout { size: 4, alignment: 4 });
+    assert_eq!(union.payload_offset, 4);
+    assert_eq!(union.layout, CAbiLayout { size: 12, alignment: 4 });
+    assert_eq!(union.variants[0].discriminant, 0);
+    assert_eq!(union.variants[1].discriminant, 1);
+    assert_eq!(union.variants[2].discriminant, 2);
+    assert_eq!(signature.parameters[0].passing, CAbiParameterPassing::Pointer);
+}

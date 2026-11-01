@@ -97,6 +97,23 @@ For `repr(align(N))` specifically:
 - a type crossing the native FFI boundary must also declare `repr(C)`;
 - explicit alignment does not grant native access or make unsupported fields ABI-safe.
 
+For payload enums, `repr(C)` selects the explicit tagged-union contract:
+
+- the discriminant is a compiler-defined `u32` at offset zero;
+- the payload union begins after the discriminant at the next valid payload
+  alignment boundary;
+- each variant receives a stable zero-based discriminant in declaration order;
+- the payload storage is large enough for the largest variant and uses the
+  greatest payload alignment; the final type size is rounded to the aggregate
+  alignment;
+- unit variants have no payload, while tuple payload fields are named by their
+  zero-based position and struct payload fields retain their declared names;
+- payload fields must satisfy the same fixed-layout, value-role, nested
+  representation, recursion, and generic checks as C structs;
+- the native mapping is a C-compatible struct containing a `uint32_t` tag and
+  a union-shaped payload. It is not emitted as a C `enum`, because C enums
+  cannot carry payload bytes.
+
 `repr(transparent)` is a separate wrapper contract:
 
 - the declaration must be a concrete struct with exactly one field;
@@ -156,7 +173,8 @@ ownership roles, external boundary, and target-specific native implementation.
 `repr(packed)` may be combined with `repr(C)` when the packed type crosses a C
 boundary. The program-aware FFI mapper reports the packed flag and exact field
 offsets; the foreign declaration must use a matching packed C layout contract.
-Transparent wrappers are mapped directly to the underlying ABI type and do not
+Payload enums are mapped as checked tagged unions and are passed using the same
+aggregate pointer contract as C structs. Transparent wrappers are mapped directly to the underlying ABI type and do not
 produce an aggregate pointer layer. Explicit alignment is reported in the
 checked aggregate layout and requires `repr(C)` for FFI mapping. Packed enums,
 volatile access, tagged unions, and target-specific layout overrides remain

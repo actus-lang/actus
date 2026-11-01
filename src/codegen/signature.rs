@@ -30,11 +30,11 @@ pub trait BackendLayoutProvider {
         None
     }
 
-    fn enum_variant_payload_type(
+    fn enum_variant_payload_fields(
         &self,
         _type_name: &TypeName,
         _variant: &str,
-    ) -> Option<BackendValueType> {
+    ) -> Option<Vec<BackendEnumPayloadField>> {
         None
     }
 
@@ -57,6 +57,14 @@ pub struct BackendFieldLayout {
     pub layout: BackendLayout,
     pub ty: TypeName,
     pub indirect: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BackendEnumPayloadField {
+    pub name: String,
+    pub offset: u32,
+    pub layout: BackendLayout,
+    pub ty: TypeName,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
