@@ -211,3 +211,30 @@ fn llvm_preserves_the_region_bounds_failure_contract() {
     let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }";
     assert_eq!(run_llvm_region_fixture("bounds-failure", source), 0);
 }
+
+#[test]
+fn llvm_lowers_the_buffer_length_bridge_through_a_borrowed_pointer() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_buffer_length(abs buffer: Buffer) -> Int; verb call(abs buffer: Buffer) -> Int { return actus_buffer_length(buffer: abs buffer); }",
+    );
+    assert!(ir.contains("declare i32 @actus_buffer_length(ptr align 8)"));
+    assert!(ir.contains("call i32 @actus_buffer_length(ptr %0)"));
+}
+
+#[test]
+fn llvm_lowers_the_buffer_byte_access_bridge_with_a_signed_index() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_buffer_byte_at(abs buffer: Buffer, erg index: Int) -> Int; verb call(abs buffer: Buffer, erg index: Int) -> Int { return actus_buffer_byte_at(buffer: abs buffer, index: erg index); }",
+    );
+    assert!(ir.contains("declare i32 @actus_buffer_byte_at(ptr align 8, i32)"));
+    assert!(ir.contains("call i32 @actus_buffer_byte_at(ptr %0, i32 %1)"));
+}
+
+#[test]
+fn llvm_lowers_the_buffer_utf8_validation_bridge_as_a_signed_status() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int; verb call(abs buffer: Buffer) -> Int { return actus_buffer_validate_utf8(buffer: abs buffer); }",
+    );
+    assert!(ir.contains("declare i32 @actus_buffer_validate_utf8(ptr align 8)"));
+    assert!(ir.contains("call i32 @actus_buffer_validate_utf8(ptr %0)"));
+}
