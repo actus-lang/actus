@@ -1,0 +1,55 @@
+"""Executable coverage for the checked repr(C) value-type contract."""
+meta repr(C)
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+meta repr(C)
+struct Segment {
+    start: Point,
+    end: Point,
+}
+
+meta repr(C)
+enum Axis {
+    X,
+    Y,
+}
+
+meta test
+verb repr_c_struct_and_unit_enum_execute() -> Int {
+    erg segment = Segment {
+        start: Point {
+            x: 3i32,
+            y: 5i32,
+        },
+        end: Point {
+            x: 7i32,
+            y: 11i32,
+        },
+    };
+    erg axis = Axis.X;
+    erg selected = case dat axis {
+        Axis.X => segment.start.x + segment.end.x,
+        Axis.Y => segment.start.y + segment.end.y,
+    };
+    if selected == 10i32 {
+        return 0;
+    }
+    return 1;
+}
+
+meta test
+verb repr_c_contract_keeps_field_values_explicit() -> Int {
+    erg point = Point {
+        x: 17i32,
+        y: 25i32,
+    };
+    if point.x == 17i32 {
+        if point.y == 25i32 {
+            return 0;
+        }
+    }
+    return 1;
+}

@@ -46,36 +46,16 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         Some((index as u32, matches!(definition.payload, EnumPayload::Unit)))
     }
 
-    fn enum_variant_payload_type(
+    fn enum_variant_payload_fields(
         &self,
         type_name: &TypeName,
         variant: &str,
-    ) -> Option<super::super::BackendValueType> {
+    ) -> Option<Vec<super::super::BackendEnumPayloadField>> {
         let normalized = self.normalize_type_name(type_name);
-        let type_name = &normalized;
-        let definition = self.enums.get(type_name.name.as_str())?;
-        let variant = definition.variants.iter().find(|candidate| candidate.name == variant)?;
-        let substitution = (!definition.generic_parameters.is_empty())
-            .then(|| {
-                crate::semantic::TypeSubstitution::for_type(
-                    &definition.name,
-                    &definition.generic_parameters,
-                    &type_name.arguments,
-                    definition.span,
-                )
-                .ok()
-            })
-            .flatten();
-        let payload = match &variant.payload {
-            EnumPayload::Tuple(items) if items.len() == 1 => substitution
-                .as_ref()
-                .map_or_else(|| items[0].clone(), |s| s.apply(&items[0])),
-            EnumPayload::Struct(items) if items.len() == 1 => substitution
-                .as_ref()
-                .map_or_else(|| items[0].ty.clone(), |s| s.apply(&items[0].ty)),
-            _ => return None,
-        };
-        super::support::backend_value_type(self, &payload)
+        if let Some(fields) = builtin_enum_payload_fields(self, &normalized, variant) {
+            return fields;
+        }
+        named_enum_payload_fields(self, &normalized, variant)
     }
 
     fn enum_variant_for_layout(
@@ -167,28 +147,13 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     fn field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
         let normalized = self.normalize_type_name(type_name);
         let type_name = &normalized;
-        if let Some(pack) = self.packs.get(type_name.name.as_str()) {
-            if field_name == "storage" {
-                let storage = pack.storage.type_name().clone();
-                let layout = self.type_layout(&storage, &mut Vec::new())?;
-                return Some(BackendFieldLayout { offset: 0, layout, ty: storage, indirect: false });
-            }
-            let field = pack.fields.iter().find(|field| field.name == field_name)?;
-            if field.ty.name != "Array" || field.ty.arguments.len() != 2 {
-                return None;
-            }
-            if !field.offset.is_multiple_of(8) {
-                return None;
-            }
-            let layout = self.type_layout(&field.ty, &mut Vec::new())?;
-            return Some(BackendFieldLayout {
-                offset: u32::from(field.offset / 8),
-                layout,
-                ty: field.ty.clone(),
-                indirect: false,
-            });
+        if self.packs.contains_key(type_name.name.as_str()) {
+            return self.pack_field_for(type_name, field_name);
         }
         let definition = self.structs.get(type_name.name.as_str())?;
+        let packed = definition
+            .repr()
+            .is_some_and(|repr| repr.is_packed() || repr.is_transparent());
         let substitution = (!definition.generic_parameters.is_empty())
             .then(|| {
                 crate::semantic::TypeSubstitution::for_type(
@@ -206,7 +171,8 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
                 .as_ref()
                 .map_or_else(|| field.ty.clone(), |substitution| substitution.apply(&field.ty));
             let layout = self.field_storage_layout(&field.role, &field_type)?;
-            offset = Self::align_up(offset, layout.alignment)?;
+            let field_alignment = if packed { 1 } else { layout.alignment };
+            offset = Self::align_up(offset, field_alignment)?;
             if field.name == field_name {
                 return Some(BackendFieldLayout {
                     offset,
@@ -219,9 +185,105 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         }
         None
     }
+
+}
+
+fn builtin_enum_payload_fields(
+    layouts: &ProgramLayouts<'_>,
+    type_name: &TypeName,
+    variant: &str,
+) -> Option<Option<Vec<super::super::BackendEnumPayloadField>>> {
+    let index = match type_name.name.as_str() {
+        "Option" if type_name.arguments.len() == 1 => match variant {
+            "None" => return Some(Some(Vec::new())),
+            "Some" => 0,
+            _ => return Some(None),
+        },
+        "Result" if type_name.arguments.len() == 2 => match variant {
+            "Ok" => 0,
+            "Err" => 1,
+            _ => return Some(None),
+        },
+        _ => return None,
+    };
+    let ty = type_name.arguments[index].clone();
+    let layout = layouts.type_layout(&ty, &mut Vec::new())?;
+    Some(Some(vec![super::super::BackendEnumPayloadField {
+        name: "0".to_owned(),
+        offset: 0,
+        layout,
+        ty,
+    }]))
+}
+
+fn named_enum_payload_fields(
+    layouts: &ProgramLayouts<'_>,
+    type_name: &TypeName,
+    variant: &str,
+) -> Option<Vec<super::super::BackendEnumPayloadField>> {
+    let definition = layouts.enums.get(type_name.name.as_str())?;
+    let variant = definition.variants.iter().find(|candidate| candidate.name == variant)?;
+    let substitution = (!definition.generic_parameters.is_empty())
+        .then(|| {
+            crate::semantic::TypeSubstitution::for_type(
+                &definition.name,
+                &definition.generic_parameters,
+                &type_name.arguments,
+                definition.span,
+            )
+            .ok()
+        })
+        .flatten();
+    let fields = match &variant.payload {
+        EnumPayload::Unit => return Some(Vec::new()),
+        EnumPayload::Tuple(types) => types
+            .iter()
+            .enumerate()
+            .map(|(index, ty)| (index.to_string(), ty.clone()))
+            .collect::<Vec<_>>(),
+        EnumPayload::Struct(fields) => fields
+            .iter()
+            .map(|field| (field.name.clone(), field.ty.clone()))
+            .collect::<Vec<_>>(),
+    };
+    let mut offset = 0u32;
+    let mut result = Vec::new();
+    for (name, ty) in fields {
+        let ty = substitution
+            .as_ref()
+            .map_or_else(|| ty.clone(), |substitution| substitution.apply(&ty));
+        let layout = layouts.type_layout(&ty, &mut Vec::new())?;
+        offset = ProgramLayouts::align_up(offset, layout.alignment)?;
+        result.push(super::super::BackendEnumPayloadField { name, offset, layout, ty });
+        offset = offset.checked_add(layout.size)?;
+    }
+    Some(result)
 }
 
 impl ProgramLayouts<'_> {
+    fn pack_field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
+        let pack = self.packs.get(type_name.name.as_str())?;
+        if field_name == "storage" {
+            let storage = pack.storage.type_name().clone();
+            let layout = self.type_layout(&storage, &mut Vec::new())?;
+            return Some(BackendFieldLayout { offset: 0, layout, ty: storage, indirect: false });
+        }
+        let field = pack.fields.iter().find(|field| field.name == field_name)?;
+        if field.ty.name != "Array"
+            || field.ty.arguments.len() != 2
+            || !field.offset.is_multiple_of(8)
+        {
+            return None;
+        }
+        let layout = self.type_layout(&field.ty, &mut Vec::new())?;
+        Some(BackendFieldLayout {
+            offset: u32::from(field.offset / 8),
+            layout,
+            ty: field.ty.clone(),
+            indirect: false,
+        })
+    }
+
     fn result_layout(
         &self,
         type_name: &TypeName,

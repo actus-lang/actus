@@ -9,6 +9,15 @@ impl Parser {
         is_open: bool,
         doc: Option<String>,
     ) -> Result<StructDef, ParseError> {
+        self.parse_struct_def_with_metadata(is_open, Vec::new(), doc)
+    }
+
+    pub(super) fn parse_struct_def_with_metadata(
+        &mut self,
+        is_open: bool,
+        metadata: Vec<crate::ast::MetaAttribute>,
+        doc: Option<String>,
+    ) -> Result<StructDef, ParseError> {
         let start = self.expect_keyword(TokenKind::Struct, "`struct`")?.span.start;
         let name_token = self.take_identifier("struct name")?;
         let name = identifier_text(&name_token.kind);
@@ -21,6 +30,7 @@ impl Parser {
             doc,
             name,
             generic_parameters,
+            metadata,
             fields,
             span: SourceSpan::new(start, end),
         })

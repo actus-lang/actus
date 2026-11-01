@@ -56,6 +56,17 @@ fn preserves_capability_metadata_idempotently() {
 }
 
 #[test]
+fn preserves_repr_metadata_on_value_types_idempotently() {
+    let formatted = format_source(
+        "meta repr(C) struct Point { x: i32, y: i32, } meta repr(C) enum Axis { X, Y, } meta repr(transparent) struct UserId { value: u64, } meta repr(C, align(8u32)) struct Aligned { value: u8, }",
+    );
+    assert!(formatted.contains("meta repr(C)"));
+    assert!(formatted.contains("meta repr(transparent)"));
+    assert!(formatted.contains("meta repr(C, align(8u32))"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_deterministic_metadata_idempotently() {
     let formatted = format_source("meta deterministic verb stable() -> Int { return 0; }");
     assert!(formatted.contains("meta deterministic"));

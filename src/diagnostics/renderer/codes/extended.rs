@@ -218,6 +218,9 @@ fn struct_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::DuplicatePackName { name } => {
             format!("duplicate pack declaration `{name}`")
         }
+        SemanticErrorKind::InvalidReprC { declaration, reason } => {
+            format!("invalid `repr(C)` declaration `{declaration}`: {reason}")
+        }
         _ => return None,
     };
     Some(message)

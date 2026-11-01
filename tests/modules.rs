@@ -8,6 +8,7 @@ mod compilation_unit;
 mod facade;
 #[path = "modules/identity.rs"]
 mod identity;
+#[cfg(feature = "cranelift")]
 #[path = "modules/imports.rs"]
 mod imports;
 #[path = "modules/plan.rs"]

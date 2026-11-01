@@ -6,6 +6,15 @@ The extension backlog below is intentionally recorded here so that future
 metadata work can be executed in a deliberate order without closing this
 phase prematurely.
 
+## Current execution status
+
+Metadata extension work is temporarily paused until the LLVM backend is fully
+implemented and promoted to the primary native backend. The completed metadata
+contracts remain unchanged and this phase stays open. After the LLVM backend
+implementation, validation, and backend-specific CI work are complete, return
+here and continue the remaining metadata backlog, beginning with the next
+accepted contract.
+
 ## Scope
 
 - `meta test`
@@ -55,6 +64,19 @@ phase prematurely.
       availability checks, caller propagation across local/imported/generic/
       dynamic/native boundaries, role-contract validation, formatter/LSP
       preservation, and Unix/Windows/freestanding fixtures.
+- [x] Implement `meta repr(C)` as a restricted concrete value-type ABI
+      contract with parser, semantic, formatter, LSP, and negative-fixture
+      coverage. Payload enums, generic types, ownership-qualified fields, and
+      opaque aggregates remain rejected.
+- [x] Extend `meta repr` with `packed` composition in grouped and separate
+      forms, checked unpadded layout, safe unaligned backend access, packed C
+      ABI mapping, and parser/semantic/native fixtures.
+- [x] Add explicit `repr(align(N))` for concrete structs with grouped and
+      separate composition, power-of-two validation, minimum-alignment and
+      trailing-size guarantees, FFI gating, and regression coverage.
+- [x] Add the explicit `repr(C)` payload-enum tagged-union contract with
+      fixed `u32` discriminants, bounded payload layout, C ABI mapping, and
+      semantic/FFI regression coverage.
 
 ## Planned metadata extension backlog
 
@@ -82,8 +104,11 @@ advance.
 1. `meta capability(...)` — implemented as ADR-0096 and documented in the
    capability guide; future capability names still require their own registry
    and target evidence.
-2. `meta repr("C")` — provide a restricted, explicitly checked ABI/layout
-   contract for native interoperability.
+2. `meta repr(C)`, `meta repr(packed)`, `meta repr(align(N))`, and
+   `meta repr(transparent)` — provide
+   restricted, explicitly checked ABI/layout contracts for native
+   interoperability. Transparent wrappers require one value field and map to
+   that field's layout and native ABI type.
 3. `meta volatile` — define explicit hardware-observable access semantics only
    after the native memory-access contract is specified.
 4. `meta zero_on_drop` — guarantee secret-material clearing across ownership

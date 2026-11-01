@@ -13,6 +13,7 @@ fn serialization_error_definition() -> EnumDef {
         doc: Some("Errors returned by generated fixed-frame serialization operations.".to_owned()),
         name: "SerializationError".to_owned(),
         generic_parameters: Vec::new(),
+        metadata: Vec::new(),
         variants: [
             "BufferTooSmall",
             "InvalidVersion",
@@ -38,6 +39,7 @@ fn option_definition() -> EnumDef {
         doc: None,
         name: "Option".to_owned(),
         generic_parameters: vec![generic_parameter("T")],
+        metadata: Vec::new(),
         variants: vec![
             EnumVariant {
                 doc: None,
@@ -62,6 +64,7 @@ fn result_definition() -> EnumDef {
         doc: None,
         name: "Result".to_owned(),
         generic_parameters: vec![generic_parameter("T"), generic_parameter("E")],
+        metadata: Vec::new(),
         variants: vec![
             EnumVariant {
                 doc: None,

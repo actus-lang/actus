@@ -262,6 +262,16 @@ pub trait BackendExpressionProvider {
         Ok(value)
     }
 
+    fn coerce_value_to_type(
+        &mut self,
+        value: BackendValueId,
+        _target: Option<BackendValueType>,
+        _span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        Ok(value)
+    }
+
     fn lower_enum_variant_condition_value(
         &mut self,
         _subject: BackendValueId,

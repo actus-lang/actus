@@ -122,6 +122,7 @@ pub enum BackendInstruction {
         subject: super::BackendValueId,
         layout: super::BackendEnumLayout,
         payload_type: BackendValueType,
+        payload_offset: u32,
         mode: super::BackendCaseMode,
         span: SourceSpan,
     },

@@ -29,6 +29,7 @@ pub(crate) fn append_builtin_serialization_error(program: &mut Program) {
         doc: Some(GENERATED_DOC.to_owned()),
         name: "SerializationError".to_owned(),
         generic_parameters: Vec::<GenericParam>::new(),
+        metadata: Vec::new(),
         variants,
         span,
     }));

@@ -239,6 +239,10 @@ pub enum SemanticErrorKind {
         field: String,
         role: String,
     },
+    InvalidReprC {
+        declaration: String,
+        reason: String,
+    },
     FrozenStructField {
         struct_name: String,
         field: String,

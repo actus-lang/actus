@@ -23,6 +23,7 @@ impl Parser {
             storage_name,
             storage_doc,
             storage: classify_storage(storage),
+            metadata: Vec::new(),
             endianness,
             fields,
             span: SourceSpan::new(start, end),

@@ -36,6 +36,7 @@ pub enum ParseErrorKind {
     MustUseRequiresReturn,
     UnsupportedEffect { name: String },
     UnsupportedCapability { name: String },
+    UnsupportedRepresentation { name: String },
     InvalidBoundedLimit { reason: String },
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
@@ -59,6 +60,7 @@ pub enum ParseErrorCode {
     MustUseRequiresReturn,
     UnsupportedEffect,
     UnsupportedCapability,
+    UnsupportedRepresentation,
     InvalidBoundedLimit,
     MalformedVerbContract,
     OpenImportRequiresBlock,
@@ -223,7 +225,21 @@ impl Parser {
             {
                 Some("must_use")
             } else {
-                None
+                let mut repr = crate::ast::Repr::new(false, false);
+                let mut duplicate = false;
+                for attribute in metadata {
+                    let MetaAttribute::Repr(current) = attribute else { continue };
+                    if (current.is_c() && repr.is_c())
+                        || (current.is_packed() && repr.is_packed())
+                        || (current.is_transparent() && repr.is_transparent())
+                        || (current.alignment().is_some() && repr.alignment().is_some())
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                    repr = repr.combine(*current);
+                }
+                duplicate.then_some("repr")
             };
         let Some(name) = duplicate else { return Ok(()) };
         Err(ParseError {

@@ -26,9 +26,9 @@ runtime representation or execution behavior.
 Metadata appears before the declaration it describes:
 
 ```act
-meta repr(C), packed
+meta repr(C, packed)
 struct Packet {
-    erg header: Header,
+    header: Header,
     payload: U8,
 }
 ```
@@ -81,16 +81,18 @@ The initial layout metadata is:
 
 ```act
 meta repr(C)
+meta repr(C, packed)
 meta repr(transparent)
-meta packed
 meta align(16)
 ```
 
 `repr(C)` and `repr(transparent)` define explicit layout contracts.
-`packed` may create unaligned fields and therefore must not silently make
-ordinary safe field access unsound. Packed access requires an approved
-unaligned operation or an explicit unsafe boundary. Alignment values must be
-valid for the target and must satisfy the compiler's alignment constraints.
+`repr(packed)` is an explicit struct layout contract: it removes inter-field
+and trailing padding, sets aggregate alignment to one byte, and makes the
+compiler lower unaligned field access with an explicit one-byte alignment
+contract. It does not alter ownership or require an unsafe source-level
+boundary. Alignment values must be valid for the target and must satisfy the
+compiler's alignment constraints.
 
 ### Linkage and ABI
 

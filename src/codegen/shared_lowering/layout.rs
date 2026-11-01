@@ -165,6 +165,13 @@ impl<'program> ProgramLayouts<'program> {
             return None;
         }
         let definition = self.structs.get(name)?;
+        if definition.repr().is_some_and(|repr| repr.is_transparent()) {
+            let field = definition.fields.first()?;
+            let layout = self.field_storage_layout(&field.role, &field.ty)?;
+            return (definition.fields.len() == 1).then_some(layout);
+        }
+        let packed = definition.repr().is_some_and(|repr| repr.is_packed());
+        let explicit_alignment = definition.repr().and_then(|repr| repr.alignment()).unwrap_or(1);
         visiting.push(name.to_owned());
         let mut size = 0u32;
         let mut alignment = 1u32;
@@ -175,11 +182,13 @@ impl<'program> ProgramLayouts<'program> {
             } else {
                 self.type_layout(&field.ty, visiting)?
             };
-            size = Self::align_up(size, field_layout.alignment)?;
+            let field_alignment = if packed { 1 } else { field_layout.alignment };
+            size = Self::align_up(size, field_alignment)?;
             size = size.checked_add(field_layout.size)?;
-            alignment = alignment.max(field_layout.alignment);
+            alignment = alignment.max(field_alignment);
         }
         visiting.pop();
+        alignment = alignment.max(explicit_alignment);
         Some(BackendLayout { size: Self::align_up(size, alignment)?, alignment })
     }
 

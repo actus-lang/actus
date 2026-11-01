@@ -25,6 +25,7 @@ mod pattern_moves;
 mod pattern_support;
 mod patterns;
 mod print_validation;
+mod repr;
 mod roles;
 mod scopes;
 mod serialization;
@@ -123,6 +124,7 @@ fn declaration_matches_target(
         crate::ast::MetaAttribute::Realtime => true,
         crate::ast::MetaAttribute::Bounded(_) => true,
         crate::ast::MetaAttribute::Capability(_) => true,
+        crate::ast::MetaAttribute::Repr(_) => true,
     })
 }
 pub(crate) use type_substitution::TypeSubstitution;

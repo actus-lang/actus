@@ -141,11 +141,14 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::UnsupportedCapability { name } => {
             format!("unsupported capability `{name}`")
         }
+        ParseErrorKind::UnsupportedRepresentation { name } => {
+            format!("unsupported representation `{name}`")
+        }
         ParseErrorKind::ConflictingTargetPlatforms { first, second } => {
             format!("conflicting target platforms `{first}` and `{second}`")
         }
         ParseErrorKind::MetadataTargetNotAllowed => {
-            "metadata can only be attached to verbs or external verbs".to_owned()
+            "this metadata cannot be attached to the selected declaration".to_owned()
         }
         ParseErrorKind::MetadataFileScopeNotAllowed => {
             "file-scoped limitless metadata must appear once at the start of the file".to_owned()

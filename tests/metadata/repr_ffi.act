@@ -1,0 +1,240 @@
+"""Executable coverage for checked repr(C) values at a native boundary."""
+meta repr(C)
+struct WirePoint {
+    x: i64,
+    y: f32,
+    valid: Bool,
+    word: Usize,
+    bytes: Array[u16, 2],
+}
+
+meta repr(C)
+struct WireSegment {
+    start: WirePoint,
+    end: WirePoint,
+}
+
+meta repr(C)
+enum WireAxis {
+    Horizontal,
+    Vertical,
+}
+
+meta repr(C)
+enum WireMessage {
+    Byte { value: u8 },
+    Pair { code: u16, value: u32 },
+    Empty,
+}
+
+unsafe extern "C" verb inspect_wire(abs value: WireSegment) -> Int;
+
+meta test
+verb repr_c_ffi_value_contract_is_executable() -> Int {
+    erg segment = WireSegment {
+        start: WirePoint {
+            x: 3i64,
+            y: 5.0f32,
+            valid: true,
+            word: 7u64 as Usize,
+            bytes: Array[u16, 2](),
+        },
+        end: WirePoint {
+            x: 17i64,
+            y: 19.0f32,
+            valid: true,
+            word: 23u64 as Usize,
+            bytes: Array[u16, 2](),
+        },
+    };
+    erg axis = WireAxis.Horizontal;
+    erg score = case dat axis {
+        WireAxis.Horizontal => segment.start.x + segment.end.x,
+        WireAxis.Vertical => segment.start.word as i64,
+    };
+    if score == 20i64 {
+        return 0;
+    }
+    return 1;
+}
+
+meta test
+verb repr_c_payload_enum_is_bounded_and_executable() -> Int {
+    erg message = WireMessage.Pair(code: 7u16, value: 11u32);
+    erg score = case dat message {
+        WireMessage.Pair { code: code_value, value: value_value } => code_value as Int + value_value as Int,
+        _ => 0,
+    };
+    if score == 18 {
+        return 0;
+    }
+    return 1;
+}
+
+meta test
+verb repr_c_ffi_layout_is_explicit_and_bounded() -> Int {
+    if size_of[WirePoint]() != 32u64 {
+        return 1;
+    }
+    if align_of[WirePoint]() != 8u64 {
+        return 2;
+    }
+    if size_of[WireSegment]() != 64u64 {
+        return 3;
+    }
+    if align_of[WireSegment]() != 8u64 {
+        return 4;
+    }
+    if size_of[Array[u16, 2]]() != 4u64 {
+        return 5;
+    }
+    return 0;
+}
+
+meta test
+verb repr_c_ffi_fixed_array_mutation_is_in_place() -> Int {
+    erg point = WirePoint {
+        x: 41i64,
+        y: 2.5f32,
+        valid: false,
+        word: 3u64 as Usize,
+        bytes: Array[u16, 2](),
+    };
+    point.bytes[0u32] = 43u16;
+    point.bytes[1u32] = 47u16;
+    if point.bytes[0u32] != 43u16 {
+        return 1;
+    }
+    if point.bytes[1u32] != 47u16 {
+        return 2;
+    }
+    if point.valid {
+        return 3;
+    }
+    return 0;
+}
+
+meta test
+verb repr_c_ffi_enum_and_scalar_values_are_stable() -> Int {
+    erg point = WirePoint {
+        x: 59i64,
+        y: 61.0f32,
+        valid: true,
+        word: 67u64 as Usize,
+        bytes: Array[u16, 2](),
+    };
+    erg axis = WireAxis.Vertical;
+    erg selected = case dat axis {
+        WireAxis.Horizontal => point.x as Int,
+        WireAxis.Vertical => point.word as Int,
+    };
+    if selected == 67 {
+        return 0;
+    }
+    return 1;
+}
+
+meta repr(C, packed)
+struct PackedWire {
+    prefix: u8,
+    value: u32,
+    tail: u16,
+}
+
+meta repr(C)
+meta repr(packed)
+struct SeparatePackedWire {
+    prefix: u8,
+    value: u32,
+    tail: u16,
+}
+
+meta test
+verb repr_packed_removes_padding_and_preserves_access() -> Int {
+    erg value = PackedWire {
+        prefix: 1u8,
+        value: 287454020u32,
+        tail: 21862u16,
+    };
+    if size_of[PackedWire]() != 7u64 {
+        return 1;
+    }
+    if align_of[PackedWire]() != 1u64 {
+        return 2;
+    }
+    if value.value != 287454020u32 {
+        return 3;
+    }
+    value.value = 2864434397u32;
+    if value.value != 2864434397u32 {
+        return 4;
+    }
+    return 0;
+}
+
+meta test
+verb repr_packed_separate_metadata_has_same_contract() -> Int {
+    if size_of[SeparatePackedWire]() != 7u64 {
+        return 1;
+    }
+    if align_of[SeparatePackedWire]() != 1u64 {
+        return 2;
+    }
+    return 0;
+}
+
+meta repr(transparent)
+struct UserId {
+    value: u64,
+}
+
+meta repr(transparent)
+struct RequestId {
+    value: UserId,
+}
+
+meta test
+verb repr_transparent_preserves_value_layout_and_nesting() -> Int {
+    erg request = RequestId {
+        value: UserId {
+            value: 42u64,
+        },
+    };
+    if size_of[UserId]() != size_of[u64]() {
+        return 1;
+    }
+    if align_of[UserId]() != align_of[u64]() {
+        return 2;
+    }
+    if size_of[RequestId]() != size_of[UserId]() {
+        return 3;
+    }
+    if request.value.value != 42u64 {
+        return 4;
+    }
+    request.value.value = 43u64;
+    if request.value.value != 43u64 {
+        return 5;
+    }
+    return 0;
+}
+
+meta repr(C, align(8u32))
+struct AlignedByte {
+    value: u8,
+}
+
+meta test
+verb repr_explicit_alignment_is_minimum_and_checked() -> Int {
+    erg value = AlignedByte { value: 7u8, };
+    if size_of[AlignedByte]() != 8u64 {
+        return 1;
+    }
+    if align_of[AlignedByte]() != 8u64 {
+        return 2;
+    }
+    if value.value != 7u8 {
+        return 3;
+    }
+    return 0;
+}

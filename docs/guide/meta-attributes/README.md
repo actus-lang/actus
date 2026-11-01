@@ -28,6 +28,10 @@ such as blocking, filesystem, network, allocation, and entropy.
 [`meta capability(...)`](capability.md) declares a closed, target-checked
 platform capability and propagates that requirement across call boundaries.
 
+[`meta repr(C)`, `meta repr(packed)`, `meta repr(align(...))`, and
+`meta repr(transparent)`](repr.md) declare restricted, compiler-checked ABI
+and layout representations for concrete value types.
+
 ## General rules
 
 - Metadata must use a compiler-recognized attribute name and argument shape.

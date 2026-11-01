@@ -181,11 +181,18 @@ pub(super) fn lower_payload(
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
-    let (result, subject, layout, payload_type) = match instruction {
-        BackendInstruction::EnumPayload { result, subject, layout, payload_type, .. }
-        | BackendInstruction::EnumPayloadBinding {
-            result, subject, layout, payload_type, ..
-        } => (result, subject, layout, payload_type),
+    let (result, subject, layout, payload_type, payload_offset) = match instruction {
+        BackendInstruction::EnumPayload { result, subject, layout, payload_type, .. } => {
+            (result, subject, layout, payload_type, 0)
+        }
+        BackendInstruction::EnumPayloadBinding {
+            result,
+            subject,
+            layout,
+            payload_type,
+            payload_offset,
+            ..
+        } => (result, subject, layout, payload_type, *payload_offset),
         _ => {
             return Err(BackendEmitError("Cranelift enum payload instruction expected".to_owned()));
         }
@@ -198,26 +205,41 @@ pub(super) fn lower_payload(
         return Ok(());
     }
     let subject = enum_storage_pointer(builder, module.isa().pointer_type(), *subject, values)?;
+    let offset = layout.payload_offset.checked_add(payload_offset).ok_or_else(|| {
+        BackendEmitError("Cranelift enum payload field offset overflow".to_owned())
+    })?;
+    let payload = lower_payload_value(module, builder, subject, *payload_type, offset)?;
+    values.insert(*result, payload);
+    Ok(())
+}
+
+fn lower_payload_value(
+    module: &ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    subject: cranelift_codegen::ir::Value,
+    payload_type: BackendValueType,
+    offset: u32,
+) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let payload = match payload_type {
         BackendValueType::Bool | BackendValueType::Integer { .. } => {
-            let ty = scalar_type(*payload_type)?;
-            builder.ins().load(ty, MemFlagsData::new(), subject, layout.payload_offset as i32)
+            let ty = scalar_type(payload_type)?;
+            builder.ins().load(ty, MemFlagsData::new(), subject, offset as i32)
         }
         BackendValueType::Pointer => builder.ins().load(
             module.isa().pointer_type(),
             MemFlagsData::new(),
             subject,
-            layout.payload_offset as i32,
+            offset as i32,
         ),
         BackendValueType::NichePointerOption { .. } => subject,
         BackendValueType::Region { .. } => builder.ins().load(
             module.isa().pointer_type(),
             MemFlagsData::new(),
             subject,
-            layout.payload_offset as i32,
+            offset as i32,
         ),
         BackendValueType::Aggregate { .. } | BackendValueType::Enum { .. } => {
-            builder.ins().iadd_imm_s(subject, i64::from(layout.payload_offset))
+            builder.ins().iadd_imm_s(subject, i64::from(offset))
         }
         _ => {
             return Err(BackendEmitError(
@@ -225,8 +247,7 @@ pub(super) fn lower_payload(
             ));
         }
     };
-    values.insert(*result, payload);
-    Ok(())
+    Ok(payload)
 }
 
 fn enum_storage_pointer(

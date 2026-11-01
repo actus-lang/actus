@@ -12,9 +12,9 @@ pub use decl::{
     BoundedContract, Capability, ConstantDecl, DispatchMode, Effect, EnumDef, EnumField,
     EnumPayload, EnumVariant, ExternalVerbDecl, GenericParam, GenericParamKind, ImportDecl,
     LayoutEndianness, LimitlessScope, MetaAttribute, OpenSiblingDecl, PackDecl, PackField,
-    PackStorage, Param, PerformDecl, Program, ReturnAccess, ReturnType, Role, RoleDecl, RoleMethod,
-    SerializeDecl, SerializeSection, StructDef, StructField, StructFieldRole, TestFault,
-    TopLevelDecl, TypeIdentity, TypeName, VerbContract, VerbContractSection,
+    PackStorage, Param, PerformDecl, Program, Repr, ReturnAccess, ReturnType, Role, RoleDecl,
+    RoleMethod, SerializeDecl, SerializeSection, StructDef, StructField, StructFieldRole,
+    TestFault, TopLevelDecl, TypeIdentity, TypeName, VerbContract, VerbContractSection,
     VerbContractSectionKind, VerbDecl, builtin_enum_definitions,
 };
 pub use expr::{

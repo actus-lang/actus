@@ -11,6 +11,15 @@ impl Parser {
         is_open: bool,
         doc: Option<String>,
     ) -> Result<EnumDef, ParseError> {
+        self.parse_enum_def_with_metadata(is_open, Vec::new(), doc)
+    }
+
+    pub(super) fn parse_enum_def_with_metadata(
+        &mut self,
+        is_open: bool,
+        metadata: Vec<crate::ast::MetaAttribute>,
+        doc: Option<String>,
+    ) -> Result<EnumDef, ParseError> {
         let start = self.expect_keyword(TokenKind::Enum, "`enum`")?.span.start;
         let name_token = self.take_identifier("enum name")?;
         let name = identifier_text(&name_token.kind);
@@ -26,6 +35,7 @@ impl Parser {
             doc,
             name,
             generic_parameters,
+            metadata,
             variants,
             span: SourceSpan::new(start, end),
         })

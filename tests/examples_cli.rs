@@ -183,7 +183,7 @@ fn arena_tree_example_builds_and_executes_with_llvm() {
     let _ = fs::remove_file(output);
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "cranelift"))]
 #[test]
 fn generics_showcase_builds_and_executes_with_cranelift() {
     let root = std::env::temp_dir().join(format!("actus-generics-example-{}", std::process::id()));

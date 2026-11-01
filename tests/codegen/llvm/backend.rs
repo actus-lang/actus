@@ -123,6 +123,86 @@ fn llvm_consumes_shared_array_pack_bit_fields() {
     assert!(llvm_ir.contains("packed.field.updated"));
 }
 
+#[cfg(feature = "cranelift")]
+#[test]
+fn both_backends_consume_repr_packed_unaligned_fields() {
+    let source = "meta repr(C, packed) struct Wire { prefix: u8, value: u32, } verb main() -> Int { erg wire: Wire = Wire { prefix: 1u8, value: 42u32, }; wire.value = 43u32; return wire.value as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "repr(packed) fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("repr(packed) fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("repr(packed) fields should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume repr(packed) fields");
+    assert!(llvm_ir.contains("align 1"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let object_bytes =
+        emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+            .expect("Cranelift should consume repr(packed) fields");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "main"));
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn both_backends_consume_repr_transparent_field_access() {
+    let source = "meta repr(transparent) struct UserId { value: u64, } verb main() -> Int { erg id: UserId = UserId { value: 41u64, }; id.value = 42u64; return id.value as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "repr(transparent) fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("repr(transparent) fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("transparent fields should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume transparent fields");
+    assert!(llvm_ir.contains("define"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let object_bytes =
+        emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+            .expect("Cranelift should consume transparent fields");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "main"));
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn both_backends_consume_repr_explicit_alignment() {
+    let source = "meta repr(C, align(8u32)) struct Aligned { value: u8, } verb main() -> Int { erg value: Aligned = Aligned { value: 7u8, }; return value.value as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "repr(align) fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("repr(align) fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("repr(align) should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume repr(align)");
+    assert!(llvm_ir.contains("define"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let object_bytes =
+        emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+            .expect("Cranelift should consume repr(align)");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "main"));
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn both_backends_consume_repr_c_payload_enum() {
+    let source = "meta repr(C) enum Message { Byte { value: u8, }, Pair { code: u16, value: u32, }, Empty, } verb main() -> Int { erg message = Message.Pair(code: 7u16, value: 11u32); return case dat message { Message.Pair { code: code_value, value: value_value } => code_value as Int + value_value as Int, _ => 0, }; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "repr(C) payload fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("repr(C) payload fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("repr(C) payload enum should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume repr(C) payload enum");
+    assert!(llvm_ir.contains("define"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let object_bytes =
+        emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+            .expect("Cranelift should consume repr(C) payload enum");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "main"));
+}
+
 #[test]
 fn both_backends_emit_user_defined_drop_performance_calls() {
     let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect() { erg value: Counter = Counter { value: 7, }; return; }";
@@ -432,6 +512,7 @@ fn emits_neutral_enum_payload_binding_with_ownership_mode() {
                     subject: BackendValueId(0),
                     layout: enum_layout,
                     payload_type: integer,
+                    payload_offset: 0,
                     mode: BackendCaseMode::Dat,
                     span: actus::lexer::SourceSpan::new(0, 1),
                 },

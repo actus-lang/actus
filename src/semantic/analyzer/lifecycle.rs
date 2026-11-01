@@ -81,6 +81,7 @@ impl Analyzer {
         self.validate_pack_declarations(program)?;
         self.validate_serialization_declarations(program)?;
         self.register_structs(program)?;
+        self.validate_repr_declarations()?;
         self.validate_role_declarations()?;
         self.validate_performances(program)?;
         self.validate_recursive_types()?;

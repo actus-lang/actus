@@ -300,6 +300,7 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
         crate::ast::MetaAttribute::Capability(capability) => {
             format!("capability(\"{}\")", capability.name())
         }
+        crate::ast::MetaAttribute::Repr(repr) => format!("repr({})", repr.name()),
     }
 }
 

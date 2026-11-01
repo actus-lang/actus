@@ -43,11 +43,18 @@ pub(super) fn emit_enum_payload(
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    let (result, subject, layout, payload_type) = match instruction {
-        BackendInstruction::EnumPayload { result, subject, layout, payload_type, .. }
-        | BackendInstruction::EnumPayloadBinding {
-            result, subject, layout, payload_type, ..
-        } => (result, subject, layout, payload_type),
+    let (result, subject, layout, payload_type, payload_offset) = match instruction {
+        BackendInstruction::EnumPayload { result, subject, layout, payload_type, .. } => {
+            (result, subject, layout, payload_type, 0)
+        }
+        BackendInstruction::EnumPayloadBinding {
+            result,
+            subject,
+            layout,
+            payload_type,
+            payload_offset,
+            ..
+        } => (result, subject, layout, payload_type, *payload_offset),
         _ => return Err(BackendEmitError("LLVM enum payload instruction expected".to_owned())),
     };
     if layout.niche_pointer {
@@ -58,7 +65,11 @@ pub(super) fn emit_enum_payload(
         return Ok(false);
     }
     let temporary = enum_temporary(context, builder, *subject, *layout, values)?;
-    let address = enum_field_address(context, builder, temporary, layout.payload_offset)?;
+    let offset = layout
+        .payload_offset
+        .checked_add(payload_offset)
+        .ok_or_else(|| BackendEmitError("LLVM enum payload field offset overflow".to_owned()))?;
+    let address = enum_field_address(context, builder, temporary, offset)?;
     let llvm_type = super::values::llvm_type(context, *payload_type)?;
     let value = if matches!(
         payload_type,
