@@ -1,4 +1,6 @@
 use super::*;
+use std::fs;
+use std::process::Command;
 
 fn emit_runtime_status_bridge(
     external_name: &str,
@@ -67,6 +69,42 @@ fn emit_source_runtime_bridge(source: &str) -> String {
     let module = lower_scalar_program("runtime_test", &program, Some("call"))
         .expect("runtime bridge fixture should lower through the shared contract");
     emit_module(&module).expect("runtime bridge fixture should lower through LLVM")
+}
+
+fn run_llvm_region_fixture(name: &str, source: &str) -> i32 {
+    let root =
+        std::env::temp_dir().join(format!("actus-llvm-region-{name}-{}", std::process::id()));
+    let source_root = root.join("src");
+    let input = source_root.join("main.act");
+    let output = root.join("region-fixture");
+    fs::create_dir_all(&source_root).expect("Region fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"llvm_region_bridge_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nbackend = \"llvm\"\nverify_no_float_ir = true\n",
+    )
+    .expect("Region fixture manifest should be written");
+    fs::write(&input, source).expect("Region fixture source should be written");
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            input.to_str().expect("Region fixture input should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("Region fixture output should be valid UTF-8"),
+        ])
+        .output()
+        .expect("LLVM Region fixture build should start");
+    assert!(
+        build.status.success(),
+        "LLVM Region fixture build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let status = Command::new(&output).status().expect("LLVM Region fixture should run");
+    let code = status.code().expect("Region fixture should return an exit code");
+    let _ = fs::remove_dir_all(root);
+    code
 }
 
 #[test]
@@ -160,4 +198,16 @@ fn llvm_lowers_the_stdout_buffer_bridge_through_a_borrowed_pointer() {
     );
     assert!(ir.contains("declare i32 @actus_write_buffer_stdout(ptr align 8)"), "{ir}");
     assert!(ir.contains("call i32 @actus_write_buffer_stdout(ptr %0)"), "{ir}");
+}
+
+#[test]
+fn llvm_executes_the_region_open_and_close_bridge_contract() {
+    let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }";
+    assert_eq!(run_llvm_region_fixture("open-close", source), 0);
+}
+
+#[test]
+fn llvm_preserves_the_region_bounds_failure_contract() {
+    let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }";
+    assert_eq!(run_llvm_region_fixture("bounds-failure", source), 0);
 }
