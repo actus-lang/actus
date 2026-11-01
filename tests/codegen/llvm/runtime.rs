@@ -301,3 +301,23 @@ fn llvm_lowers_the_unlock_bridge_with_a_scalar_status_return() {
     assert!(ir.contains("declare i32 @actus_file_unlock(i32)"));
     assert!(ir.contains("call i32 @actus_file_unlock(i32 %0)"));
 }
+
+#[test]
+fn llvm_lowers_the_open_options_bridge_with_all_flag_arguments() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_open_options_path(abs path: Buffer, abs read: Int, abs write: Int, abs append: Int, abs truncate: Int, abs create: Int, abs create_new: Int, abs close_on_exec: Int) -> Int; verb call(abs path: Buffer, erg flag: Int) -> Int { return actus_file_open_options_path(path: abs path, read: abs flag, write: abs flag, append: abs flag, truncate: abs flag, create: abs flag, create_new: abs flag, close_on_exec: abs flag); }",
+    );
+    assert!(ir.contains(
+        "declare i32 @actus_file_open_options_path(ptr align 8, i32, i32, i32, i32, i32, i32, i32)"
+    ));
+    assert!(ir.contains("call i32 @actus_file_open_options_path(ptr %0, i32 %1, i32 %1, i32 %1, i32 %1, i32 %1, i32 %1, i32 %1)"));
+}
+
+#[test]
+fn llvm_lowers_the_ordered_directory_open_bridge_with_a_order_argument() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_directory_open_ordered(abs path: Buffer, erg order: Int) -> Int; verb call(abs path: Buffer, erg order: Int) -> Int { return actus_directory_open_ordered(path: abs path, order: erg order); }",
+    );
+    assert!(ir.contains("declare i32 @actus_directory_open_ordered(ptr align 8, i32)"));
+    assert!(ir.contains("call i32 @actus_directory_open_ordered(ptr %0, i32 %1)"));
+}
