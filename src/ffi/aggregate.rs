@@ -33,7 +33,11 @@ fn map_type_in_program_with_visiting(
         if !type_name.arguments.is_empty() || !definition.generic_parameters.is_empty() {
             return Err(CAbiError::GenericAggregate { name: type_name.name.clone() });
         }
-        if !definition.repr().is_some_and(|repr| repr.is_c()) {
+        let repr = definition.repr();
+        if repr.is_some_and(|repr| repr.is_transparent()) {
+            return map_transparent_struct(target, program, definition, visiting);
+        }
+        if !repr.is_some_and(|repr| repr.is_c()) {
             return Err(CAbiError::AggregateRequiresReprC { name: type_name.name.clone() });
         }
         return map_struct(target, program, definition, visiting);
@@ -63,6 +67,41 @@ fn map_type_in_program_with_visiting(
         });
     }
     Err(CAbiError::UnsupportedType { name: type_name.name.clone() })
+}
+
+fn map_transparent_struct(
+    target: CAbiTarget,
+    program: &Program,
+    definition: &crate::ast::StructDef,
+    visiting: &mut Vec<String>,
+) -> Result<CAbiType, CAbiError> {
+    if visiting.iter().any(|name| name == &definition.name) {
+        return Err(CAbiError::AggregateLayoutOverflow { name: definition.name.clone() });
+    }
+    if definition.repr().is_some_and(|repr| repr.is_c() || repr.is_packed()) {
+        return Err(CAbiError::TransparentCombinedRepresentation { name: definition.name.clone() });
+    }
+    let [field] = definition.fields.as_slice() else {
+        return Err(CAbiError::TransparentRequiresOneField { name: definition.name.clone() });
+    };
+    if !matches!(field.role, StructFieldRole::Value) {
+        return Err(CAbiError::TransparentFieldRole {
+            aggregate: definition.name.clone(),
+            field: field.name.clone(),
+            role: format!("{:?}", field.role).to_lowercase(),
+        });
+    }
+    visiting.push(definition.name.clone());
+    let mapped = map_type_in_program_with_visiting(target, program, &field.ty, visiting)?;
+    visiting.pop();
+    if matches!(mapped, CAbiType::OpaquePointer) {
+        return Err(CAbiError::TransparentFieldType {
+            aggregate: definition.name.clone(),
+            field: field.name.clone(),
+            ty: field.ty.canonical_key(),
+        });
+    }
+    Ok(mapped)
 }
 
 fn map_scalar_type(type_name: &TypeName) -> Option<Result<CAbiType, CAbiError>> {

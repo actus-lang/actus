@@ -1,10 +1,12 @@
-# `meta repr(C)` and `meta repr(packed)`
+# `meta repr(C)`, `meta repr(packed)`, and `meta repr(transparent)`
 
-`meta repr(C)` and `meta repr(packed)` are closed, compiler-defined layout
-contracts for concrete value types. `repr(C)` makes a type intentionally usable
-as a C-style native aggregate. `repr(packed)` removes inter-field padding and
-sets aggregate alignment to one byte. Both declarations are assertions with
-checks; neither bypasses ownership, cleanup, or layout validation.
+These are closed, compiler-defined layout contracts for concrete value types.
+`repr(C)` makes a type intentionally usable as a C-style native aggregate.
+`repr(packed)` removes inter-field padding and sets aggregate alignment to one
+byte. `repr(transparent)` makes a one-field wrapper use exactly the underlying
+field's layout and C ABI type while preserving a distinct Actus source type.
+All three declarations are assertions with checks; none bypasses ownership,
+cleanup, or layout validation.
 
 ```actus
 meta repr(C)
@@ -31,21 +33,27 @@ struct SeparateSpelling {
     tag: u8,
     length: u32,
 }
+
+meta repr(transparent)
+struct UserId {
+    value: u64,
+}
 ```
 
 ## Syntax and placement
 
 Representation names are bare compiler-defined identifiers. Quoted names,
 arbitrary strings, and unknown names are rejected. The supported spellings are
-`repr(C)`, `repr(packed)`, and the grouped form `repr(C, packed)`. Separate
-`repr(C)` and `repr(packed)` attributes are also combined on the same
-declaration; repeating either component is rejected. The metadata may be
-attached only to a `struct` or `enum`; it is rejected on verbs, external verbs,
-packs, roles, performances, and file metadata.
+`repr(C)`, `repr(packed)`, `repr(transparent)`, and the grouped form
+`repr(C, packed)`. Separate `repr(C)` and `repr(packed)` attributes are also
+combined on the same declaration; repeating any component is rejected.
+`repr(transparent)` is intentionally not composable with `C` or `packed`.
+The metadata may be attached only to a `struct` or `enum`; it is rejected on
+verbs, external verbs, packs, roles, performances, and file metadata.
 
 ## The checked contract
 
-`repr(C)` is accepted only for a concrete declaration:
+`repr(C)` and `repr(packed)` are accepted only for a concrete declaration:
 
 - generic structs and enums are rejected because their layout depends on an
   unresolved type or const parameter;
@@ -64,6 +72,19 @@ packs, roles, performances, and file metadata.
   are rejected;
 - enums must contain unit variants only. Payload enums require a separate
   tagged-union ABI contract and are not inferred from `repr(C)`.
+
+`repr(transparent)` is a separate wrapper contract:
+
+- the declaration must be a concrete struct with exactly one field;
+- the field must be an ordinary value field, not `erg`, `abs`, or `ins`;
+- the field type must satisfy the same checked fixed-layout rules as a nested
+  representation contract, including explicit representation on nested
+  aggregates;
+- `repr(transparent)` cannot be combined with `repr(C)` or `repr(packed)`;
+- the wrapper has the field's size and alignment, and field access remains at
+  offset zero; nested transparent wrappers are resolved recursively;
+- transparent enums, generic wrappers, opaque values, recursive layouts, and
+  ownership-qualified references are rejected.
 
 For `repr(C)`, field order and the existing neutral layout engine determine
 alignment, padding, size, and offsets. For `repr(packed)`, fields are laid out
@@ -89,15 +110,18 @@ parameter and return position.
 
 The program-aware FFI mapper exposes this checked contract through
 `c_abi_signature_in_program` and
-`c_abi_external_signature_in_program`. A checked aggregate parameter is
+`c_abi_external_signature_in_program`. A checked C aggregate parameter is
 represented as an explicit pointer plus its Actus ownership contract; it is
 never silently copied into an opaque value. An owned aggregate result uses a
 caller-allocated return contract, while an `abs` aggregate result is a
-borrowed view. Fixed-width integers, `Bool`, `f32`, `f64`, `Usize`, and
-positive concrete arrays are mapped with target-specific size, alignment, and
-padding. Use the `_for_target` variants when the ABI target is not the
-default 64-bit target. A type without an explicit `repr(C)` contract is
-rejected before native lowering.
+borrowed view. Transparent wrappers are different: the mapper recursively
+resolves the single field and exposes the underlying C ABI scalar, array, or
+checked aggregate type directly. This prevents a nominal wrapper from
+introducing an accidental ABI layer. Fixed-width integers, `Bool`, `f32`,
+`f64`, `Usize`, and positive concrete arrays are mapped with target-specific
+size, alignment, and padding. Use the `_for_target` variants when the ABI
+target is not the default 64-bit target. A type without an explicit
+representation contract is rejected before native lowering.
 
 The mapper is descriptive and checked; it does not generate an unsafe native
 call by itself. The caller must still provide the correct declaration,
@@ -106,8 +130,10 @@ ownership roles, external boundary, and target-specific native implementation.
 `repr(packed)` may be combined with `repr(C)` when the packed type crosses a C
 boundary. The program-aware FFI mapper reports the packed flag and exact field
 offsets; the foreign declaration must use a matching packed C layout contract.
-Packed enums, volatile access, explicit alignment overrides, tagged unions, and
-target-specific layout overrides remain separate contracts.
+Transparent wrappers are mapped directly to the underlying ABI type and do not
+produce an aggregate pointer layer. Packed enums, volatile access, explicit
+alignment overrides, tagged unions, and target-specific layout overrides remain
+separate contracts.
 
 ## Diagnostics and compatibility
 

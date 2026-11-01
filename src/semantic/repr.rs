@@ -8,12 +8,18 @@ use super::errors::{SemanticError, SemanticErrorKind};
 impl Analyzer {
     pub(super) fn validate_repr_declarations(&self) -> Result<(), SemanticError> {
         for definition in self.struct_types.values() {
-            if definition.repr().is_some_and(|repr| repr.is_c() || repr.is_packed()) {
+            if definition
+                .repr()
+                .is_some_and(|repr| repr.is_c() || repr.is_packed() || repr.is_transparent())
+            {
                 self.validate_repr_struct(definition)?;
             }
         }
         for definition in self.enum_types.values() {
-            if definition.repr().is_some_and(|repr| repr.is_c() || repr.is_packed()) {
+            if definition
+                .repr()
+                .is_some_and(|repr| repr.is_c() || repr.is_packed() || repr.is_transparent())
+            {
                 self.validate_repr_enum(definition)?;
             }
         }
@@ -21,10 +27,27 @@ impl Analyzer {
     }
 
     fn validate_repr_struct(&self, definition: &StructDef) -> Result<(), SemanticError> {
+        let repr = definition.repr().unwrap_or(crate::ast::Repr::C);
+        if repr.is_transparent() {
+            if repr.is_c() || repr.is_packed() {
+                return Err(repr_error_at(
+                    &definition.name,
+                    "transparent representation cannot be combined with C or packed representation",
+                    definition.span,
+                ));
+            }
+            if definition.fields.len() != 1 {
+                return Err(repr_error_at(
+                    &definition.name,
+                    "transparent representation requires exactly one field",
+                    definition.span,
+                ));
+            }
+        }
         if !definition.generic_parameters.is_empty() {
             return Err(repr_error_at(
                 &definition.name,
-                "generic structs cannot declare a concrete C ABI representation",
+                "generic structs cannot declare a concrete native representation",
                 definition.span,
             ));
         }
@@ -33,7 +56,7 @@ impl Analyzer {
                 return Err(repr_error_at(
                     &definition.name,
                     format!(
-                        "field `{}` uses ownership role `{}`; repr(C) fields must be value fields",
+                        "field `{}` uses ownership role `{}`; represented fields must be value fields",
                         field.name,
                         field_role_name(&field.role)
                     ),
@@ -51,10 +74,10 @@ impl Analyzer {
     }
 
     fn validate_repr_enum(&self, definition: &EnumDef) -> Result<(), SemanticError> {
-        if definition.repr().is_some_and(|repr| repr.is_packed()) {
+        if definition.repr().is_some_and(|repr| repr.is_packed() || repr.is_transparent()) {
             return Err(repr_error_at(
                 &definition.name,
-                "packed representation is supported only for structs",
+                "packed and transparent representations are supported only for structs",
                 definition.span,
             ));
         }
@@ -164,13 +187,15 @@ impl Analyzer {
         structure: &StructDef,
         visiting: &mut Vec<String>,
     ) -> Result<(), SemanticError> {
-        if !structure.repr().is_some_and(|repr| repr.is_c() || repr.is_packed())
+        if !structure
+            .repr()
+            .is_some_and(|repr| repr.is_c() || repr.is_packed() || repr.is_transparent())
             || !type_name.arguments.is_empty()
         {
             return Err(repr_error_at(
                 declaration,
                 format!(
-                    "field `{field}` uses `{}` without a concrete repr(C) contract",
+                    "field `{field}` uses `{}` without a concrete representation contract",
                     type_name.canonical_key()
                 ),
                 type_name.span,

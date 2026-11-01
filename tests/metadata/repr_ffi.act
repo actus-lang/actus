@@ -162,3 +162,39 @@ verb repr_packed_separate_metadata_has_same_contract() -> Int {
     }
     return 0;
 }
+
+meta repr(transparent)
+struct UserId {
+    value: u64,
+}
+
+meta repr(transparent)
+struct RequestId {
+    value: UserId,
+}
+
+meta test
+verb repr_transparent_preserves_value_layout_and_nesting() -> Int {
+    erg request = RequestId {
+        value: UserId {
+            value: 42u64,
+        },
+    };
+    if size_of[UserId]() != size_of[u64]() {
+        return 1;
+    }
+    if align_of[UserId]() != align_of[u64]() {
+        return 2;
+    }
+    if size_of[RequestId]() != size_of[UserId]() {
+        return 3;
+    }
+    if request.value.value != 42u64 {
+        return 4;
+    }
+    request.value.value = 43u64;
+    if request.value.value != 43u64 {
+        return 5;
+    }
+    return 0;
+}

@@ -143,6 +143,26 @@ fn both_backends_consume_repr_packed_unaligned_fields() {
     assert!(has_symbol(&object, "main"));
 }
 
+#[cfg(feature = "cranelift")]
+#[test]
+fn both_backends_consume_repr_transparent_field_access() {
+    let source = "meta repr(transparent) struct UserId { value: u64, } verb main() -> Int { erg id: UserId = UserId { value: 41u64, }; id.value = 42u64; return id.value as Int; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "repr(transparent) fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("repr(transparent) fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("main"))
+        .expect("transparent fields should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should consume transparent fields");
+    assert!(llvm_ir.contains("define"));
+
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let object_bytes =
+        emit_contract_module_object(&module, &NativeBackendConfiguration::default(), &target)
+            .expect("Cranelift should consume transparent fields");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "main"));
+}
+
 #[test]
 fn both_backends_emit_user_defined_drop_performance_calls() {
     let source = "struct Counter { value: Int, } perform Drop for Counter { verb drop(ins self: Counter) { return; } } verb inspect() { erg value: Counter = Counter { value: 7, }; return; }";

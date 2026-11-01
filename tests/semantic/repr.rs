@@ -29,6 +29,41 @@ fn accepts_packed_structs_in_grouped_and_separate_forms() {
 }
 
 #[test]
+fn accepts_single_field_transparent_structs() {
+    analyze_source("meta repr(transparent) struct UserId { value: u64, }")
+        .expect("single-field transparent structs should analyze");
+}
+
+#[test]
+fn rejects_invalid_transparent_contracts() {
+    let fields = analyze_source("meta repr(transparent) struct Pair { left: u32, right: u32, }")
+        .expect_err("transparent structs must contain exactly one field");
+    assert!(
+        matches!(fields.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("exactly one field"))
+    );
+
+    let enum_error = analyze_source("meta repr(transparent) enum UserId { Value, }")
+        .expect_err("transparent enums must not be inferred");
+    assert!(
+        matches!(enum_error.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("only for structs"))
+    );
+
+    let combined = analyze_source("meta repr(C, transparent) struct UserId { value: u64, }")
+        .expect_err("transparent must not be combined with repr(C)");
+    assert!(
+        matches!(combined.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("cannot be combined"))
+    );
+}
+
+#[test]
+fn accepts_transparent_wrappers_inside_checked_structs() {
+    analyze_source(
+        "meta repr(transparent) struct UserId { value: u64, } meta repr(C) struct Request { user: UserId, }",
+    )
+    .expect("transparent wrappers should provide a checked nested layout");
+}
+
+#[test]
 fn rejects_packed_enums() {
     let error = analyze_source("meta repr(packed) enum Axis { Horizontal, Vertical, }")
         .expect_err("packed enum layout must not be inferred");
@@ -67,6 +102,6 @@ fn nested_aggregate_requires_its_own_c_contract() {
         analyze_source("struct Inner { value: i32, } meta repr(C) struct Outer { inner: Inner, }")
             .expect_err("nested non-C aggregate must not cross a C ABI");
     assert!(
-        matches!(error.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("repr(C) contract"))
+        matches!(error.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("representation contract"))
     );
 }

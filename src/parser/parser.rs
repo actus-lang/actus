@@ -229,7 +229,9 @@ impl Parser {
                 let mut duplicate = false;
                 for attribute in metadata {
                     let MetaAttribute::Repr(current) = attribute else { continue };
-                    if (current.is_c() && repr.is_c()) || (current.is_packed() && repr.is_packed())
+                    if (current.is_c() && repr.is_c())
+                        || (current.is_packed() && repr.is_packed())
+                        || (current.is_transparent() && repr.is_transparent())
                     {
                         duplicate = true;
                         break;

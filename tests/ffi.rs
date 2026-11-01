@@ -280,3 +280,48 @@ fn maps_repr_c_packed_fields_without_padding() {
     assert_eq!(aggregate.fields[1].offset, 1);
     assert_eq!(aggregate.fields[2].offset, 5);
 }
+
+#[test]
+fn maps_repr_transparent_as_the_underlying_c_abi_value() {
+    let program = parse_program(
+        "meta repr(transparent) struct UserId { value: u64, } verb inspect(erg id: UserId) -> UserId { return id; }",
+    );
+    let actus::ast::TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected ordinary verb")
+    };
+    let signature = c_abi_signature_in_program(&program, verb)
+        .expect("transparent aggregate should map to its underlying value");
+    assert_eq!(signature.parameters[0].ty, CAbiType::Integer { signed: false, width: 64 });
+    assert_eq!(signature.parameters[0].passing, CAbiParameterPassing::Direct);
+    assert_eq!(signature.return_type, CAbiType::Integer { signed: false, width: 64 });
+    assert_eq!(signature.return_ownership, CAbiReturnOwnership::Value);
+}
+
+#[test]
+fn maps_nested_transparent_ffi_values_without_an_extra_aggregate_layer() {
+    let program = parse_program(
+        "meta repr(transparent) struct UserId { value: u64, } meta repr(transparent) struct RequestId { value: UserId, } verb inspect(erg id: RequestId) -> Int { return 0; }",
+    );
+    let actus::ast::TopLevelDecl::Verb(verb) = &program.declarations[2] else {
+        panic!("expected ordinary verb")
+    };
+    let signature = c_abi_signature_in_program(&program, verb)
+        .expect("nested transparent aggregate should map recursively");
+    assert_eq!(signature.parameters[0].ty, CAbiType::Integer { signed: false, width: 64 });
+    assert_eq!(signature.parameters[0].passing, CAbiParameterPassing::Direct);
+}
+
+#[test]
+fn rejects_combined_transparent_ffi_representation_before_mapping() {
+    let program = parse_program(
+        "meta repr(C, transparent) struct UserId { value: u64, } verb inspect(erg id: UserId) -> Int { return 0; }",
+    );
+    let actus::ast::TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected ordinary verb")
+    };
+    let error = c_abi_signature_in_program(&program, verb)
+        .expect_err("combined transparent representations must be rejected");
+    assert!(
+        matches!(error, CAbiError::TransparentCombinedRepresentation { name } if name == "UserId")
+    );
+}

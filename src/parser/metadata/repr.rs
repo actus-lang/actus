@@ -7,13 +7,15 @@ impl Parser {
         self.expect_simple(TokenKind::LeftParen, "`(` after `repr`")?;
         let mut c = false;
         let mut packed = false;
+        let mut transparent = false;
         loop {
             let token = self.take_identifier("representation name")?;
             let name = super::super::identifier_text(&token.kind);
             match name.as_str() {
                 "C" if !c => c = true,
                 "packed" if !packed => packed = true,
-                "C" | "packed" => {
+                "transparent" if !transparent => transparent = true,
+                "C" | "packed" | "transparent" => {
                     return Err(ParseError {
                         code: ParseErrorCode::DuplicateMetadata,
                         kind: ParseErrorKind::DuplicateMetadata { name: "repr".to_owned() },
@@ -34,6 +36,6 @@ impl Parser {
         }
         self.expect_simple(TokenKind::RightParen, "`)` after representation names")?;
         let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Repr(Repr::new(c, packed))])
+        Ok(vec![MetaAttribute::Repr(Repr::from_flags(c, packed, transparent))])
     }
 }

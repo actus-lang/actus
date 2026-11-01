@@ -89,8 +89,10 @@ advance.
 1. `meta capability(...)` — implemented as ADR-0096 and documented in the
    capability guide; future capability names still require their own registry
    and target evidence.
-2. `meta repr(C)` and `meta repr(packed)` — provide restricted, explicitly
-   checked ABI/layout contracts for native interoperability.
+2. `meta repr(C)`, `meta repr(packed)`, and `meta repr(transparent)` — provide
+   restricted, explicitly checked ABI/layout contracts for native
+   interoperability. Transparent wrappers require one value field and map to
+   that field's layout and native ABI type.
 3. `meta volatile` — define explicit hardware-observable access semantics only
    after the native memory-access contract is specified.
 4. `meta zero_on_drop` — guarantee secret-material clearing across ownership

@@ -165,6 +165,11 @@ impl<'program> ProgramLayouts<'program> {
             return None;
         }
         let definition = self.structs.get(name)?;
+        if definition.repr().is_some_and(|repr| repr.is_transparent()) {
+            let field = definition.fields.first()?;
+            let layout = self.field_storage_layout(&field.role, &field.ty)?;
+            return (definition.fields.len() == 1).then_some(layout);
+        }
         let packed = definition.repr().is_some_and(|repr| repr.is_packed());
         visiting.push(name.to_owned());
         let mut size = 0u32;

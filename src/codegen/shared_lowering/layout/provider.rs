@@ -167,29 +167,13 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     fn field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
         let normalized = self.normalize_type_name(type_name);
         let type_name = &normalized;
-        if let Some(pack) = self.packs.get(type_name.name.as_str()) {
-            if field_name == "storage" {
-                let storage = pack.storage.type_name().clone();
-                let layout = self.type_layout(&storage, &mut Vec::new())?;
-                return Some(BackendFieldLayout { offset: 0, layout, ty: storage, indirect: false });
-            }
-            let field = pack.fields.iter().find(|field| field.name == field_name)?;
-            if field.ty.name != "Array" || field.ty.arguments.len() != 2 {
-                return None;
-            }
-            if !field.offset.is_multiple_of(8) {
-                return None;
-            }
-            let layout = self.type_layout(&field.ty, &mut Vec::new())?;
-            return Some(BackendFieldLayout {
-                offset: u32::from(field.offset / 8),
-                layout,
-                ty: field.ty.clone(),
-                indirect: false,
-            });
+        if self.packs.contains_key(type_name.name.as_str()) {
+            return self.pack_field_for(type_name, field_name);
         }
         let definition = self.structs.get(type_name.name.as_str())?;
-        let packed = definition.repr().is_some_and(|repr| repr.is_packed());
+        let packed = definition
+            .repr()
+            .is_some_and(|repr| repr.is_packed() || repr.is_transparent());
         let substitution = (!definition.generic_parameters.is_empty())
             .then(|| {
                 crate::semantic::TypeSubstitution::for_type(
@@ -221,9 +205,33 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         }
         None
     }
+
 }
 
 impl ProgramLayouts<'_> {
+    fn pack_field_for(&self, type_name: &TypeName, field_name: &str) -> Option<BackendFieldLayout> {
+        let pack = self.packs.get(type_name.name.as_str())?;
+        if field_name == "storage" {
+            let storage = pack.storage.type_name().clone();
+            let layout = self.type_layout(&storage, &mut Vec::new())?;
+            return Some(BackendFieldLayout { offset: 0, layout, ty: storage, indirect: false });
+        }
+        let field = pack.fields.iter().find(|field| field.name == field_name)?;
+        if field.ty.name != "Array"
+            || field.ty.arguments.len() != 2
+            || !field.offset.is_multiple_of(8)
+        {
+            return None;
+        }
+        let layout = self.type_layout(&field.ty, &mut Vec::new())?;
+        Some(BackendFieldLayout {
+            offset: u32::from(field.offset / 8),
+            layout,
+            ty: field.ty.clone(),
+            indirect: false,
+        })
+    }
+
     fn result_layout(
         &self,
         type_name: &TypeName,

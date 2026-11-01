@@ -80,14 +80,24 @@ pub enum MetaAttribute {
 pub struct Repr {
     c: bool,
     packed: bool,
+    transparent: bool,
 }
 
 impl Repr {
-    pub const C: Self = Self { c: true, packed: false };
-    pub const PACKED: Self = Self { c: false, packed: true };
+    pub const C: Self = Self { c: true, packed: false, transparent: false };
+    pub const PACKED: Self = Self { c: false, packed: true, transparent: false };
+    pub const TRANSPARENT: Self = Self { c: false, packed: false, transparent: true };
 
     pub const fn new(c: bool, packed: bool) -> Self {
-        Self { c, packed }
+        Self::from_flags(c, packed, false)
+    }
+
+    pub const fn from_flags(c: bool, packed: bool, transparent: bool) -> Self {
+        Self { c, packed, transparent }
+    }
+
+    pub const fn transparent() -> Self {
+        Self::TRANSPARENT
     }
 
     pub const fn is_c(self) -> bool {
@@ -98,17 +108,30 @@ impl Repr {
         self.packed
     }
 
+    pub const fn is_transparent(self) -> bool {
+        self.transparent
+    }
+
     pub fn name(self) -> String {
-        match (self.c, self.packed) {
-            (true, true) => "C, packed".to_owned(),
-            (true, false) => "C".to_owned(),
-            (false, true) => "packed".to_owned(),
-            (false, false) => String::new(),
+        let mut names = Vec::new();
+        if self.c {
+            names.push("C");
         }
+        if self.packed {
+            names.push("packed");
+        }
+        if self.transparent {
+            names.push("transparent");
+        }
+        names.join(", ")
     }
 
     pub const fn combine(self, other: Self) -> Self {
-        Self { c: self.c || other.c, packed: self.packed || other.packed }
+        Self {
+            c: self.c || other.c,
+            packed: self.packed || other.packed,
+            transparent: self.transparent || other.transparent,
+        }
     }
 }
 

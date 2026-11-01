@@ -161,6 +161,10 @@ pub enum CAbiError {
     InvalidReturnOwnership { access: String, ty: String },
     UnsupportedType { name: String },
     AggregateRequiresReprC { name: String },
+    TransparentCombinedRepresentation { name: String },
+    TransparentRequiresOneField { name: String },
+    TransparentFieldRole { aggregate: String, field: String, role: String },
+    TransparentFieldType { aggregate: String, field: String, ty: String },
     AggregateFieldRole { aggregate: String, field: String, role: String },
     AggregateFieldType { aggregate: String, field: String, ty: String },
     AggregateLayoutOverflow { name: String },
@@ -170,6 +174,28 @@ pub enum CAbiError {
 
 impl std::fmt::Display for CAbiError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingReturnType { .. }
+            | Self::MissingUnsafeBoundary { .. }
+            | Self::InvalidOwnership { .. }
+            | Self::InvalidReturnOwnership { .. }
+            | Self::UnsupportedType { .. }
+            | Self::AggregateRequiresReprC { .. } => self.fmt_primary(formatter),
+            Self::TransparentCombinedRepresentation { .. }
+            | Self::TransparentRequiresOneField { .. }
+            | Self::TransparentFieldRole { .. }
+            | Self::TransparentFieldType { .. } => self.fmt_transparent(formatter),
+            Self::AggregateFieldRole { .. }
+            | Self::AggregateFieldType { .. }
+            | Self::AggregateLayoutOverflow { .. }
+            | Self::GenericAggregate { .. }
+            | Self::TargetDependentType { .. } => self.fmt_aggregate(formatter),
+        }
+    }
+}
+
+impl CAbiError {
+    fn fmt_primary(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MissingReturnType { verb } => {
                 write!(formatter, "C ABI export `{verb}` requires an explicit return type")
@@ -192,6 +218,39 @@ impl std::fmt::Display for CAbiError {
             Self::AggregateRequiresReprC { name } => {
                 write!(formatter, "aggregate `{name}` requires `meta repr(C)` for C ABI use")
             }
+            _ => unreachable!("primary C ABI error formatter received another variant"),
+        }
+    }
+
+    fn fmt_transparent(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TransparentCombinedRepresentation { name } => {
+                write!(
+                    formatter,
+                    "transparent aggregate `{name}` cannot combine C or packed representation"
+                )
+            }
+            Self::TransparentRequiresOneField { name } => {
+                write!(formatter, "transparent aggregate `{name}` requires exactly one field")
+            }
+            Self::TransparentFieldRole { aggregate, field, role } => {
+                write!(
+                    formatter,
+                    "transparent aggregate `{aggregate}` field `{field}` cannot use role `{role}`"
+                )
+            }
+            Self::TransparentFieldType { aggregate, field, ty } => {
+                write!(
+                    formatter,
+                    "transparent aggregate `{aggregate}` field `{field}` has unsupported type `{ty}`"
+                )
+            }
+            _ => unreachable!("transparent C ABI error formatter received another variant"),
+        }
+    }
+
+    fn fmt_aggregate(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
             Self::AggregateFieldRole { aggregate, field, role } => {
                 write!(
                     formatter,
@@ -213,6 +272,7 @@ impl std::fmt::Display for CAbiError {
             Self::TargetDependentType { name } => {
                 write!(formatter, "type `{name}` requires an explicit C ABI target")
             }
+            _ => unreachable!("aggregate C ABI error formatter received another variant"),
         }
     }
 }

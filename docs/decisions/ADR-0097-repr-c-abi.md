@@ -1,4 +1,4 @@
-# ADR-0097: Explicit checked C representation
+# ADR-0097: Explicit checked native representations
 
 - Status: Proposed
 - Date: 2026-11-01
@@ -7,20 +7,22 @@
 
 ## Context
 
-Actus needs a way to identify a value type that is intentionally compatible
-with a C-style native aggregate. An ordinary Actus struct is not automatically
-a foreign ABI contract: it may contain ownership roles, opaque runtime values,
-generic parameters, or nested types whose layout is not fixed. Treating every
-struct as a C aggregate would make ownership and layout implicit.
+Actus needs explicit contracts for value layouts that cross native boundaries.
+An ordinary Actus struct is not automatically a foreign ABI contract: it may
+contain ownership roles, opaque runtime values, generic parameters, or nested
+types whose layout is not fixed. Treating every struct as a native aggregate
+would make ownership and layout implicit.
 
 ## Decision
 
 Actus supports the closed metadata forms `meta repr(C)`,
-`meta repr(packed)`, and the grouped spelling `meta repr(C, packed)`. The
-representation names are bare compiler-defined identifiers, not user strings.
-Separate `repr(C)` and `repr(packed)` attributes are combined component-wise;
-repeating a component is rejected. `repr(packed)` is valid only for concrete
-structs. `repr(C)` remains valid for concrete structs and unit-variant enums.
+`meta repr(packed)`, `meta repr(transparent)`, and the grouped spelling
+`meta repr(C, packed)`. The representation names are bare compiler-defined
+identifiers, not user strings. Separate `repr(C)` and `repr(packed)` attributes
+are combined component-wise; repeating a component is rejected. Transparent is
+not composable with C or packed. `repr(packed)` and `repr(transparent)` are
+valid only for concrete structs. `repr(C)` remains valid for concrete structs
+and unit-variant enums.
 
 The compiler validates the complete declaration before code generation:
 
@@ -39,12 +41,19 @@ The compiler validates the complete declaration before code generation:
    one-byte memory alignment contract;
 8. packed enums and payload/tagged-union representations are rejected until a
    separate enum ABI contract exists.
+9. `repr(transparent)` requires exactly one ordinary value field, uses that
+   field's size and alignment at offset zero, and recursively resolves nested
+   transparent wrappers. It is rejected for enums, generic declarations,
+   ownership-qualified fields, opaque values, recursive layouts, and any
+   combination with C or packed representation.
 
 Neither representation grants native access, changes ownership, alters
 cleanup, serializes a value, or weakens unsafe-boundary checks. A packed C
 aggregate is still an explicit FFI contract: the foreign side must use a
 matching packed layout. Packed access is byte-aligned at the backend boundary;
 it is not implemented through an assumed naturally aligned pointer.
+Transparent representation likewise does not grant native access; it only
+asserts that the wrapper is ABI-equivalent to its one checked value field.
 
 ## Alternatives considered
 
@@ -82,6 +91,9 @@ for an explicit `CAbiTarget`, and preserves Actus ownership at the boundary:
 - packed aggregates report `packed: true`, one-byte aggregate alignment, and
   exact unpadded field offsets; the mapper does not silently invent a foreign
   compiler's packing pragma.
+- transparent aggregates resolve directly to the mapped type of their one
+  value field, preserving direct scalar/array passing and avoiding an implicit
+  aggregate pointer layer.
 
 The convenience program-aware API uses the repository's 64-bit target model.
 Callers targeting another pointer width must use the explicit target API. The

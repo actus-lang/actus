@@ -30,6 +30,15 @@ fn parses_grouped_and_separate_representation_modifiers() {
 }
 
 #[test]
+fn parses_transparent_representation() {
+    let program = parse_source("meta repr(transparent) struct UserId { value: u64, }");
+    let TopLevelDecl::Struct(structure) = &program.declarations[0] else {
+        panic!("expected struct")
+    };
+    assert_eq!(structure.metadata, vec![MetaAttribute::Repr(Repr::TRANSPARENT)]);
+}
+
+#[test]
 fn rejects_string_representation_names() {
     let error = parse_error("meta repr(\"C\") struct Point { x: i32, }");
     assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
@@ -41,6 +50,12 @@ fn rejects_duplicate_representation_modifiers() {
     let error = parse_error("meta repr(C, C) struct Point { x: i32, }");
     assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
     assert_eq!(parse_diagnostic(&error).code(), "E0013");
+}
+
+#[test]
+fn rejects_duplicate_transparent_representation_modifiers() {
+    let error = parse_error("meta repr(transparent, transparent) struct UserId { value: u64, }");
+    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
 }
 
 #[test]
