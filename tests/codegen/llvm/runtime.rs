@@ -265,3 +265,39 @@ fn llvm_lowers_the_directory_close_bridge_with_a_scalar_handle() {
     assert!(ir.contains("declare i32 @actus_directory_close(i32)"));
     assert!(ir.contains("call i32 @actus_directory_close(i32 %0)"));
 }
+
+#[test]
+fn llvm_lowers_the_atomic_replace_bridge_with_two_borrowed_paths() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_replace_atomic_path(abs from: Buffer, abs to: Buffer) -> Int; verb call(abs from: Buffer, abs to: Buffer) -> Int { return actus_file_replace_atomic_path(from: abs from, to: abs to); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_replace_atomic_path(ptr align 8, ptr align 8)"));
+    assert!(ir.contains("call i32 @actus_file_replace_atomic_path(ptr %0, ptr %1)"));
+}
+
+#[test]
+fn llvm_lowers_the_shared_lock_bridge_with_a_scalar_handle() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_lock_shared(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_lock_shared(handle: abs handle); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_lock_shared(i32)"));
+    assert!(ir.contains("call i32 @actus_file_lock_shared(i32 %0)"));
+}
+
+#[test]
+fn llvm_lowers_the_try_lock_busy_status_bridge_without_coercion() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_try_lock(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_try_lock(handle: abs handle); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_try_lock(i32)"));
+    assert!(ir.contains("call i32 @actus_file_try_lock(i32 %0)"));
+}
+
+#[test]
+fn llvm_lowers_the_unlock_bridge_with_a_scalar_status_return() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_unlock(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_unlock(handle: abs handle); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_unlock(i32)"));
+    assert!(ir.contains("call i32 @actus_file_unlock(i32 %0)"));
+}
