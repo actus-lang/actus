@@ -389,12 +389,7 @@ verb windows_publish_case(
         destination: abs destination,
         expected: abs expected
     );
-    cleanup(
-        lock_path: abs lock_path,
-        destination: abs destination,
-        staging: abs staging
-    );
-    return case dat published {
+    erg result = case dat published {
         Result.Ok(outcome) => case dat outcome {
             CoordinatedPublication.Published => {
                 erg expected_size: Int = 1;
@@ -404,6 +399,12 @@ verb windows_publish_case(
         },
         Result.Err(_) => 3,
     };
+    cleanup(
+        lock_path: abs lock_path,
+        destination: abs destination,
+        staging: abs staging
+    );
+    result;
 }
 
 meta test
