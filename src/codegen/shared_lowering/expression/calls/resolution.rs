@@ -8,6 +8,9 @@ pub(super) fn callee_for(
     callee: &str,
     span: SourceSpan,
 ) -> Result<SymbolIdentity, BackendContractError> {
+    if callee == provider.verb_name {
+        return Ok(provider.current_symbol.clone());
+    }
     provider
         .external_symbols
         .get(callee)

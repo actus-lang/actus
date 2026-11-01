@@ -7,8 +7,8 @@ use super::performance;
 use super::support::unsupported;
 use super::{
     BackendBlockId, BackendContractError, BackendLayoutProvider, BackendPassingMode,
-    BackendSymbolBindings, BackendValueType, SymbolIdentity, lower_verb_with_expressions,
-    lower_verb_with_expressions_as,
+    BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind,
+    lower_verb_with_expressions, lower_verb_with_expressions_as,
 };
 
 pub(crate) fn lower_shared_verb(
@@ -28,9 +28,11 @@ pub(crate) fn lower_shared_verb(
     external_symbols: &BTreeMap<String, SymbolIdentity>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<super::BackendFunction, BackendContractError> {
+    let function_symbol = symbol_for_verb(namespace, verb, entry_name)?;
     let mut provider = SharedExpressionProvider::new(
         namespace,
         verb,
+        function_symbol.clone(),
         layouts,
         return_types,
         return_nominal_types,
@@ -46,8 +48,7 @@ pub(crate) fn lower_shared_verb(
     );
     let mut function = match entry_name.filter(|name| *name == verb.name) {
         Some(_) => lower_verb_with_expressions_as(
-            SymbolIdentity::entry(&verb.name)
-                .map_err(|error| unsupported(verb.span, error.to_string()))?,
+            function_symbol,
             verb,
             layouts,
             &mut provider,
@@ -65,6 +66,18 @@ pub(crate) fn lower_shared_verb(
     assign_cleanup_and_performance(&mut function, verb, cleanup_plans, &provider);
     function.validate()?;
     Ok(function)
+}
+
+fn symbol_for_verb(
+    namespace: &str,
+    verb: &VerbDecl,
+    entry_name: Option<&str>,
+) -> Result<SymbolIdentity, BackendContractError> {
+    match entry_name.filter(|name| *name == verb.name) {
+        Some(_) => SymbolIdentity::entry(&verb.name),
+        None => SymbolIdentity::new(namespace, SymbolKind::Verb, &verb.name),
+    }
+    .map_err(|error| unsupported(verb.span, error.to_string()))
 }
 
 fn assign_cleanup_and_performance(

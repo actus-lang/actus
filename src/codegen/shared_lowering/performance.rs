@@ -155,6 +155,7 @@ fn lower_shared_performance<L: BackendLayoutProvider>(
     let mut provider = SharedExpressionProvider::new(
         context.namespace,
         method,
+        symbol.clone(),
         context.layouts,
         &context.declarations.return_types,
         &context.declarations.return_nominal_types,

@@ -87,6 +87,18 @@ fn llvm_rejects_invalid_integer_width_with_stable_error() {
     );
 }
 
+#[test]
+fn llvm_emits_recursive_direct_call() {
+    let source = "verb countdown(erg value: Int) -> Int { if value == 0 { return 0; } erg next: Int = value - 1; return countdown(value: erg next); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "recursive fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("recursive fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("countdown"))
+        .expect("recursive call should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should emit recursive calls");
+    assert!(llvm_ir.contains("call i32 @countdown"));
+}
+
 fn has_symbol<'data>(object: &object::File<'data>, expected: &str) -> bool {
     object
         .symbols()
@@ -121,6 +133,23 @@ fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
         .expect("Cranelift should consume the shared module");
     let object = object::File::parse(cranelift_bytes.as_slice()).expect("object should parse");
     assert!(has_symbol(&object, "main"));
+}
+
+#[cfg(feature = "cranelift")]
+#[test]
+fn cranelift_emits_recursive_direct_call() {
+    let source = "verb countdown(erg value: Int) -> Int { if value == 0 { return 0; } erg next: Int = value - 1; return countdown(value: erg next); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "recursive fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("recursive fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("countdown"))
+        .expect("recursive call should lower through the shared contract");
+    let target = actus::target::TargetSpec::host().expect("host target should parse");
+    let configuration = NativeBackendConfiguration::default();
+    let object_bytes = emit_contract_module_object(&module, &configuration, &target)
+        .expect("Cranelift should emit recursive calls");
+    let object = object::File::parse(object_bytes.as_slice()).expect("object should parse");
+    assert!(has_symbol(&object, "countdown"));
 }
 
 #[cfg(feature = "cranelift")]

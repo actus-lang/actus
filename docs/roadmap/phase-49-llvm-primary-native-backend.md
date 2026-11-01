@@ -159,7 +159,7 @@ combination is executable or that LLVM is ready to become the default.
       packed, and explicitly aligned layout lowering.
 - [x] Complete ownership transfer, borrowed views, exclusive loans, cleanup,
       early return, failure, and branch-join lowering.
-- [ ] Complete generic specialization, imported modules, dynamic dispatch,
+- [x] Complete generic specialization, imported modules, dynamic dispatch,
       native boundaries, and recursive call handling.
 - [ ] Verify LLVM module signatures and layouts before object emission.
 
@@ -171,7 +171,7 @@ constants, direct and external calls, scalar and unit returns, typed branches
 and jump edge arguments, fixed-array iteration, checked casts, division and
 shift guards, typed failures, and native trap terminators. The full
 `cargo test --features llvm --test llvm_backend -- --test-threads=1` run passed
-54 tests; the all-features LLVM-filtered run passed 16 focused tests, including
+56 tests; the all-features LLVM-filtered run passed 16 focused tests, including
 the width and rejection regressions. No backend-specific semantic lowering was
 added to close this checkbox.
 
@@ -182,7 +182,7 @@ and store, arrays, packed bit fields, `repr(C)` payload enums, transparent
 representations, packed representations, explicit alignment, return slots,
 pointer memory copies, and niche/regular enum failure layouts. The complete
 `cargo test --features llvm --test llvm_backend -- --test-threads=1` run passed
-55 tests after the integer-width addition. The fixtures exercise the shared
+56 tests after the integer-width and recursion additions. The fixtures exercise the shared
 contract before LLVM emission; the backend does not introduce a parallel
 layout or ownership model.
 
@@ -194,8 +194,19 @@ move roles, explicit and scope cleanup, nested-scope cleanup, early returns,
 typed failures, loop unwind cleanup, and branch-merge ownership state. The
 LLVM backend suite additionally verifies end-borrow boundaries, runtime cleanup
 bridges, cleanup ordering parity, and return-slot failures. The combined
-`cargo test --features llvm --test codegen -- --test-threads=1` run passed
-66 tests in the shared codegen target, while the LLVM backend suite passed 55.
+`cargo test --all-features --test codegen -- --test-threads=1` run passed
+106 tests in the shared codegen target, while the LLVM backend suite passed 56.
+
+#### 49.2 call-boundary evidence
+
+Generic specialization, qualified imported calls, dynamic role dispatch, and
+native/external boundaries are covered by the shared codegen, backend-parity,
+native, and LLVM backend suites. Direct recursion is additionally covered by
+`llvm_emits_recursive_direct_call`. The shared call resolver preserves the
+currently lowered function symbol for self-calls, including hosted entry verbs,
+so LLVM and Cranelift consume the same symbol contract without backend-specific
+aliases. The LLVM backend suite passed 56 tests and the all-features shared
+codegen target passed 106 tests after this coverage was added.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
