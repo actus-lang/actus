@@ -171,7 +171,7 @@ constants, direct and external calls, scalar and unit returns, typed branches
 and jump edge arguments, fixed-array iteration, checked casts, division and
 shift guards, typed failures, and native trap terminators. The full
 `cargo test --features llvm --test llvm_backend -- --test-threads=1` run passed
-56 tests; the all-features LLVM-filtered run passed 16 focused tests, including
+58 tests; the all-features LLVM-filtered run passed 16 focused tests, including
 the width and rejection regressions. No backend-specific semantic lowering was
 added to close this checkbox.
 
@@ -182,7 +182,7 @@ and store, arrays, packed bit fields, `repr(C)` payload enums, transparent
 representations, packed representations, explicit alignment, return slots,
 pointer memory copies, and niche/regular enum failure layouts. The complete
 `cargo test --features llvm --test llvm_backend -- --test-threads=1` run passed
-56 tests after the integer-width and recursion additions. The fixtures exercise the shared
+58 tests after the integer-width, recursion, and zero-float policy additions. The fixtures exercise the shared
 contract before LLVM emission; the backend does not introduce a parallel
 layout or ownership model.
 
@@ -195,7 +195,7 @@ typed failures, loop unwind cleanup, and branch-merge ownership state. The
 LLVM backend suite additionally verifies end-borrow boundaries, runtime cleanup
 bridges, cleanup ordering parity, and return-slot failures. The combined
 `cargo test --all-features --test codegen -- --test-threads=1` run passed
-106 tests in the shared codegen target, while the LLVM backend suite passed 56.
+106 tests in the shared codegen target, while the LLVM backend suite passed 58.
 
 #### 49.2 call-boundary evidence
 
@@ -205,7 +205,7 @@ native, and LLVM backend suites. Direct recursion is additionally covered by
 `llvm_emits_recursive_direct_call`. The shared call resolver preserves the
 currently lowered function symbol for self-calls, including hosted entry verbs,
 so LLVM and Cranelift consume the same symbol contract without backend-specific
-aliases. The LLVM backend suite passed 56 tests and the all-features shared
+aliases. The LLVM backend suite passed 58 tests and the all-features shared
 codegen target passed 106 tests after this coverage was added.
 
 #### 49.2 module verification evidence
@@ -217,8 +217,16 @@ layout, aggregate layout, enum layout, and cleanup descriptor. After lowering,
 `LLVMVerifyModule()` validates the generated LLVM module before any object or
 object-buffer emission is attempted. The LLVM object, aggregate ABI, packed,
 transparent, explicit-alignment, enum, return-slot, and external-boundary
-fixtures all pass in the 57-test LLVM backend suite and the full all-targets,
+fixtures all pass in the 58-test LLVM backend suite and the full all-targets,
 all-features test run.
+
+The LLVM object path also accepts the target configuration's zero-float policy.
+When `verify_no_float_ir` is enabled, LLVM IR is audited after lowering and
+module verification but before object emission. The audit rejects floating-point
+type and instruction tokens and known soft-float helper symbols; the
+policy-disabled path remains available for hosted programs whose contract
+explicitly permits floating-point operations. The soft-float-helper regression
+is covered by the LLVM backend suite.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
