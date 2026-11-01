@@ -16,8 +16,11 @@ boundary.
 The initial registry is deliberately small and explicit:
 
 - `posix.cloexec`;
+- `filesystem.create_exclusive`;
+- `posix.create_exclusive`;
 - `unix.rename_atomic`;
 - `windows.file_identity`;
+- `windows.create_new`;
 - `windows.replace_file`.
 
 This registry is intentionally extensible. The following capabilities are
@@ -28,14 +31,12 @@ their native implementation, target contract, diagnostics, and tests exist:
 | --- | --- | --- |
 | `posix.openat` | Require descriptor-relative path resolution rooted at an opened directory descriptor. | hosted POSIX targets |
 | `posix.no_follow` | Require kernel-enforced no-follow path resolution for the operation. | hosted POSIX targets with the required open primitive |
-| `posix.create_exclusive` | Require kernel-atomic create-new semantics that fail when the destination exists. | hosted POSIX targets |
 | `posix.rename_noreplace` | Require a native no-replace rename primitive; it must not be emulated by `check -> rename`. | hosted Unix targets that expose it |
 | `posix.fsync` | Require durable file-content synchronization before publication is acknowledged. | hosted POSIX targets |
 | `posix.directory_fsync` | Require durable directory-entry synchronization after publication or removal. | hosted POSIX targets that support it |
 | `posix.file_identity` | Require native device/inode identity retrieval for an opened object. | hosted POSIX targets |
 | `unix.link_atomic` | Require an atomic hard-link operation for a publication protocol. | hosted non-Windows Unix targets |
 | `unix.symlink` | Require native symbolic-link creation with the platform's documented path semantics. | hosted non-Windows Unix targets |
-| `windows.create_new` | Require Windows create-new disposition with no overwrite of an existing destination. | Windows targets |
 | `windows.no_follow` | Require Windows reparse-point-safe path opening for the operation. | Windows targets with the required native flags |
 | `windows.handle_inheritance` | Require explicit inheritance control at handle creation, not a later best-effort update. | Windows targets |
 | `windows.flush_file_buffers` | Require native file-buffer flushing before the operation reports durable progress. | Windows targets |
@@ -54,10 +55,14 @@ not interchangeable: a capability is added only when the target-specific
 primitive proves the declared contract.
 
 The entries have distinct contracts: `posix.cloexec` requires close-on-exec to
-be established during POSIX open; `unix.rename_atomic` requires the host's
-same-filesystem atomic rename but does not imply no-replace or identity
-comparison; `windows.file_identity` requires a native identity query for an
-opened handle; and `windows.replace_file` requires the Windows atomic replace
+be established during POSIX open; `filesystem.create_exclusive` requires the
+portable public create-new contract, implemented by the target's native
+exclusive-create primitive; `posix.create_exclusive` requires the POSIX
+kernel's create-new/open-exclusive disposition; `unix.rename_atomic` requires
+the host's same-filesystem atomic rename but does not imply no-replace or
+identity comparison; `windows.file_identity` requires a native identity query
+for an opened handle; `windows.create_new` requires the Windows create-new
+disposition; and `windows.replace_file` requires the Windows atomic replace
 primitive without claiming expected-identity matching. These are requirements
 for native boundaries, not blanket permissions for every filesystem operation.
 

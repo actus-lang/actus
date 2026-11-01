@@ -120,6 +120,24 @@ fn capabilities_are_declared_by_callers_and_propagate_through_calls() {
 }
 
 #[test]
+fn create_exclusive_capabilities_are_declared_by_callers() {
+    let undeclared = expect_semantic_error(
+        "meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } verb main() -> Int { primitive(); return 0; }",
+    );
+    assert!(matches!(
+        undeclared.kind,
+        SemanticErrorKind::UndeclaredCapability { ref callee, capability }
+            if callee == "primitive" && capability == actus::ast::Capability::FilesystemCreateExclusive
+    ));
+    assert_eq!(semantic_diagnostic(&undeclared).code(), "E1131");
+
+    analyze_source(
+        "meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } meta capability(\"filesystem.create_exclusive\") verb main() -> Int { primitive(); return 0; }",
+    )
+    .expect("a caller declaring create-exclusive capability should pass");
+}
+
+#[test]
 fn deterministic_verbs_reject_nondeterministic_effects() {
     for effect in ["filesystem", "network", "entropy"] {
         let source = format!(

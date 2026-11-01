@@ -148,25 +148,34 @@ impl Effect {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Capability {
+    FilesystemCreateExclusive,
     PosixCloexec,
+    PosixCreateExclusive,
     UnixRenameAtomic,
     WindowsFileIdentity,
+    WindowsCreateNew,
     WindowsReplaceFile,
 }
 
 impl Capability {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 7] = [
+        Self::FilesystemCreateExclusive,
         Self::PosixCloexec,
+        Self::PosixCreateExclusive,
         Self::UnixRenameAtomic,
         Self::WindowsFileIdentity,
+        Self::WindowsCreateNew,
         Self::WindowsReplaceFile,
     ];
 
     pub fn parse(name: &str) -> Option<Self> {
         Some(match name {
+            "filesystem.create_exclusive" => Self::FilesystemCreateExclusive,
             "posix.cloexec" => Self::PosixCloexec,
+            "posix.create_exclusive" => Self::PosixCreateExclusive,
             "unix.rename_atomic" => Self::UnixRenameAtomic,
             "windows.file_identity" => Self::WindowsFileIdentity,
+            "windows.create_new" => Self::WindowsCreateNew,
             "windows.replace_file" => Self::WindowsReplaceFile,
             _ => return None,
         })
@@ -174,9 +183,12 @@ impl Capability {
 
     pub const fn name(self) -> &'static str {
         match self {
+            Self::FilesystemCreateExclusive => "filesystem.create_exclusive",
             Self::PosixCloexec => "posix.cloexec",
+            Self::PosixCreateExclusive => "posix.create_exclusive",
             Self::UnixRenameAtomic => "unix.rename_atomic",
             Self::WindowsFileIdentity => "windows.file_identity",
+            Self::WindowsCreateNew => "windows.create_new",
             Self::WindowsReplaceFile => "windows.replace_file",
         }
     }

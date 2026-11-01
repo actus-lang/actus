@@ -120,11 +120,17 @@ fn capability_matrix_is_target_specific_and_closed() {
     let embedded =
         TargetSpec::parse("thumbv7em-none-eabihf").expect("embedded target should parse");
     assert!(linux.supports_capability(actus::ast::Capability::PosixCloexec));
+    assert!(linux.supports_capability(actus::ast::Capability::FilesystemCreateExclusive));
+    assert!(linux.supports_capability(actus::ast::Capability::PosixCreateExclusive));
     assert!(linux.supports_capability(actus::ast::Capability::UnixRenameAtomic));
     assert!(!linux.supports_capability(actus::ast::Capability::WindowsFileIdentity));
+    assert!(!linux.supports_capability(actus::ast::Capability::WindowsCreateNew));
     assert!(windows.supports_capability(actus::ast::Capability::WindowsFileIdentity));
+    assert!(windows.supports_capability(actus::ast::Capability::FilesystemCreateExclusive));
+    assert!(windows.supports_capability(actus::ast::Capability::WindowsCreateNew));
     assert!(windows.supports_capability(actus::ast::Capability::WindowsReplaceFile));
     assert!(!embedded.supports_capability(actus::ast::Capability::PosixCloexec));
+    assert!(!embedded.supports_capability(actus::ast::Capability::PosixCreateExclusive));
 }
 
 #[test]
