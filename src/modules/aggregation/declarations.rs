@@ -4,14 +4,14 @@ use crate::ast::{ExternalVerbDecl, ForeignAbi, TopLevelDecl};
 
 use super::collision::external_contract;
 use super::unit::ModuleUnit;
-use super::validation::export_identity;
+use super::validation::{export_identity, target_scopes_are_disjoint, target_selector};
 
 pub(super) fn append_internal_declarations(
     target: &mut Vec<TopLevelDecl>,
     unit: &ModuleUnit,
     module_path: &str,
     namespace: Option<&str>,
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
 ) {
     for declaration in &unit.implementation().declarations {
         if matches!(declaration, TopLevelDecl::OpenSibling(_) | TopLevelDecl::Import(_)) {
@@ -29,6 +29,7 @@ pub(super) fn append_internal_declarations(
             module_path.to_owned(),
             format!("internal:{kind}:{name}"),
             namespace.unwrap_or_default().to_owned(),
+            target_selector(declaration).map(str::to_owned),
         );
         if appended_symbols.insert(key) {
             target.push(caller_declaration(
@@ -54,7 +55,7 @@ pub(super) fn append_public_declarations(
     module_path: &str,
     namespace: Option<&str>,
     selected: &[String],
-    appended_symbols: &mut HashSet<(String, String, String)>,
+    appended_symbols: &mut HashSet<(String, String, String, Option<String>)>,
 ) {
     for declaration in &unit.implementation().declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
@@ -66,7 +67,7 @@ pub(super) fn append_public_declarations(
             .clone()
             .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
             .unwrap_or_else(|| import.path.clone());
-        let key = (module_path.to_owned(), format!("import:{binding}"), String::new());
+        let key = (module_path.to_owned(), format!("import:{binding}"), String::new(), None);
         if appended_symbols.insert(key) {
             let mut imported = import.clone();
             imported.path = qualify_import_path(module_path, &import.path);
@@ -86,6 +87,7 @@ pub(super) fn append_public_declarations(
             module_path.to_owned(),
             format!("{kind}:{name}"),
             symbol_namespace.unwrap_or_default(),
+            target_selector(declaration).map(str::to_owned),
         );
         if !appended_symbols.insert(key) {
             continue;
@@ -124,6 +126,7 @@ fn has_compatible_external_declaration(
         let Some((kind, name)) = export_identity(declaration) else { return false };
         kind == candidate_kind
             && name == candidate_name
+            && !target_scopes_are_disjoint(target_selector(declaration), target_selector(candidate))
             && external_contract(declaration).as_ref() == Some(&candidate_contract)
     })
 }

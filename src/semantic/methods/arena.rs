@@ -28,7 +28,7 @@ impl Analyzer {
         arguments: &[crate::ast::Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.visit_expression(receiver)?;
+        self.visit_consumed_expression(receiver)?;
         if arguments.len() != 1 {
             return Err(SemanticError {
                 kind: SemanticErrorKind::WrongArgumentCount { callee: "place".to_owned() },
@@ -36,7 +36,7 @@ impl Analyzer {
             });
         }
         let argument = &arguments[0].expression;
-        self.visit_expression(argument)?;
+        self.visit_consumed_expression(argument)?;
         let source_arenas = self.arena_provenances(argument);
         if source_arenas.iter().any(|source_arena| *source_arena != arena_id) {
             return Err(SemanticError {

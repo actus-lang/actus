@@ -1,7 +1,7 @@
 use actus::ast::{
-    EnumPayload, Expr, LayoutEndianness, LimitlessScope, MetaAttribute, PackStorage, Pattern,
-    PrimitiveType, ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl,
-    VerbContractSectionKind, primitive_type,
+    EnumPayload, Expr, LayoutEndianness, MetaAttribute, PackStorage, Pattern, PrimitiveType,
+    ReturnAccess, Role, SerializeSection, Stmt, TopLevelDecl, VerbContractSectionKind,
+    primitive_type,
 };
 use actus::lexer::scan;
 use actus::parser::{ParseErrorCode, ParseErrorKind, parse};
@@ -72,79 +72,6 @@ fn parses_typed_named_constants_with_source_spans() {
 }
 
 #[test]
-fn parses_target_metadata_into_the_verb_ast() {
-    let program = parse_source("meta target(\"unix\") verb platform_action() { return 0; }");
-    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
-    assert_eq!(verb.metadata, vec![MetaAttribute::Target("unix".to_owned())]);
-}
-
-#[test]
-fn parses_target_and_test_metadata_together() {
-    let program = parse_source(
-        "meta target(\"windows\") meta test verb platform_test() -> Int { return 0; }",
-    );
-    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
-    assert_eq!(verb.metadata.len(), 2);
-    assert!(verb.metadata.contains(&MetaAttribute::Target("windows".to_owned())));
-    assert!(verb.metadata.contains(&MetaAttribute::Test));
-}
-
-#[test]
-fn parses_typed_publication_fault_metadata() {
-    let program = parse_source(
-        "meta fault(\"flush_failure\") meta test verb publication_test() -> Int { return 0; }",
-    );
-    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
-    assert!(verb.metadata.contains(&MetaAttribute::Fault(actus::ast::TestFault::FlushFailure)));
-    assert!(verb.metadata.contains(&MetaAttribute::Test));
-}
-
-#[test]
-fn parses_every_supported_publication_fault_name() {
-    let names = [
-        ("staging_open_failure", actus::ast::TestFault::StagingOpenFailure),
-        ("write_failure", actus::ast::TestFault::WriteFailure),
-        ("short_write", actus::ast::TestFault::ShortWrite),
-        ("flush_failure", actus::ast::TestFault::FlushFailure),
-        ("close_failure", actus::ast::TestFault::CloseFailure),
-        ("cleanup_failure", actus::ast::TestFault::CleanupFailure),
-        ("rename_failure", actus::ast::TestFault::RenameFailure),
-        ("interrupted_before_rename", actus::ast::TestFault::InterruptedBeforeRename),
-        ("parent_open_failure", actus::ast::TestFault::ParentOpenFailure),
-        ("parent_sync_failure", actus::ast::TestFault::ParentSyncFailure),
-        ("interrupted_publication", actus::ast::TestFault::InterruptedPublication),
-    ];
-    for (name, expected) in names {
-        let source = format!(
-            "meta fault(\"{name}\") meta test verb publication_test() -> Int {{ return 0; }}"
-        );
-        let program = parse_source(&source);
-        let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
-        assert!(verb.metadata.contains(&MetaAttribute::Fault(expected)));
-    }
-}
-
-#[test]
-fn rejects_multiple_publication_faults_on_one_test() {
-    let (tokens, errors) = scan(
-        "meta fault(\"flush_failure\") meta fault(\"rename_failure\") meta test verb publication_test() -> Int { return 0; }",
-    );
-    assert!(errors.is_empty());
-    let error = parse(tokens).expect_err("one publication fault must be scoped per test");
-    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
-}
-
-#[test]
-fn parses_limitless_metadata_at_verb_and_file_scope() {
-    let program = parse_source(
-        "meta limitless(\"file\")\nmeta limitless(\"verb\") verb large() { return 0; }",
-    );
-    assert_eq!(program.file_metadata, vec![LimitlessScope::File]);
-    let TopLevelDecl::Verb(verb) = &program.declarations[0] else { panic!("expected verb") };
-    assert_eq!(verb.metadata, vec![MetaAttribute::Limitless(LimitlessScope::Verb)]);
-}
-
-#[test]
 fn parses_if_else_and_nested_else_if_expressions() {
     let program = parse_source(
         "verb choose(erg ready: Bool) { if ready { return 1; } else if ready { return 2; } else { return 3; } }",
@@ -186,61 +113,6 @@ fn preserves_a_semicolon_terminated_final_expression_value() {
 }
 
 #[test]
-fn rejects_unsupported_limitless_scope() {
-    let (tokens, errors) = scan("meta limitless(\"project\") verb main() { return 0; }");
-    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let error = parse(tokens).expect_err("unsupported limitless scope should be rejected");
-    assert_eq!(error.code, ParseErrorCode::UnsupportedLimitlessScope);
-}
-
-#[test]
-fn rejects_duplicate_limitless_directives() {
-    let (tokens, errors) =
-        scan("meta limitless(\"verb\") meta limitless(\"verb\") verb main() { return 0; }");
-    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let error = parse(tokens).expect_err("duplicate limitless metadata should be rejected");
-    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
-}
-
-#[test]
-fn rejects_unknown_target_metadata() {
-    let (tokens, errors) = scan("meta target(\"plan9\") verb main() { return 0; }");
-    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let error = parse(tokens).expect_err("unknown target should be rejected");
-    assert_eq!(error.code, ParseErrorCode::UnsupportedTargetPlatform);
-    assert!(matches!(
-        error.kind,
-        ParseErrorKind::UnsupportedTargetPlatform { name } if name == "plan9"
-    ));
-}
-
-#[test]
-fn rejects_conflicting_target_metadata() {
-    let (tokens, errors) =
-        scan("meta target(\"unix\") meta target(\"windows\") verb main() { return 0; }");
-    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let error = parse(tokens).expect_err("conflicting targets should be rejected");
-    assert_eq!(error.code, ParseErrorCode::ConflictingTargetPlatforms);
-    assert!(matches!(
-        error.kind,
-        ParseErrorKind::ConflictingTargetPlatforms { first, second }
-            if first == "unix" && second == "windows"
-    ));
-}
-
-#[test]
-fn rejects_unknown_metadata_attributes() {
-    let (tokens, errors) = scan("meta experimental verb main() { return 0; }");
-    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let error = parse(tokens).expect_err("unknown metadata must be rejected");
-    assert_eq!(error.code, ParseErrorCode::UnknownMetadata);
-    assert!(matches!(
-        error.kind,
-        ParseErrorKind::UnknownMetadata { name } if name == "experimental"
-    ));
-}
-
-#[test]
 fn rejects_unknown_top_level_keywords_with_a_stable_code() {
     let (tokens, errors) = scan("verbb main() { return 0; }");
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
@@ -250,15 +122,6 @@ fn rejects_unknown_top_level_keywords_with_a_stable_code() {
         error.kind,
         ParseErrorKind::UnknownKeyword { name } if name == "verbb"
     ));
-}
-
-#[test]
-fn rejects_metadata_attached_to_a_non_verb_declaration() {
-    let (tokens, errors) = scan("meta test struct Packet { payload: Buffer, }");
-    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let error = parse(tokens).expect_err("metadata must reject invalid declaration targets");
-    assert_eq!(error.code, ParseErrorCode::MetadataTargetNotAllowed);
-    assert!(matches!(error.kind, ParseErrorKind::MetadataTargetNotAllowed));
 }
 
 #[test]

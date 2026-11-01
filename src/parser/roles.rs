@@ -1,4 +1,4 @@
-use crate::ast::{PerformDecl, RoleDecl, RoleMethod};
+use crate::ast::{MetaAttribute, PerformDecl, RoleDecl, RoleMethod};
 use crate::lexer::{SourceSpan, TokenKind};
 
 use super::{ParseError, Parser, identifier_text};
@@ -16,13 +16,35 @@ impl Parser {
         let mut methods = Vec::new();
         while !self.check_simple(&TokenKind::RightBrace) {
             let doc = self.take_doc_string_group();
-            methods.push(self.parse_role_method(doc)?);
+            let metadata = if self.check_simple(&TokenKind::Meta) {
+                self.parse_metadata_group()?
+            } else {
+                Vec::new()
+            };
+            let doc = doc.or_else(|| self.take_doc_string_group());
+            self.reject_duplicate_metadata(&metadata)?;
+            self.reject_unsupported_role_metadata(&metadata)?;
+            let method = self.parse_role_method(doc, metadata.clone())?;
+            if metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::MustUse(_)))
+                && method.return_type.is_none()
+            {
+                return Err(ParseError {
+                    code: super::ParseErrorCode::MustUseRequiresReturn,
+                    kind: super::ParseErrorKind::MustUseRequiresReturn,
+                    span: method.span,
+                });
+            }
+            methods.push(method);
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(RoleDecl { is_open, doc, name, methods, span: SourceSpan::new(start, end) })
     }
 
-    fn parse_role_method(&mut self, doc: Option<String>) -> Result<RoleMethod, ParseError> {
+    fn parse_role_method(
+        &mut self,
+        doc: Option<String>,
+        metadata: Vec<MetaAttribute>,
+    ) -> Result<RoleMethod, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
         let name_token = self.take_callable_name("role method name")?;
         let name = identifier_text(&name_token.kind);
@@ -31,7 +53,14 @@ impl Parser {
         self.expect_simple(TokenKind::RightParen, "`)`")?;
         let return_type = self.parse_return_type()?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(RoleMethod { doc, name, params, return_type, span: SourceSpan::new(start, end) })
+        Ok(RoleMethod {
+            doc,
+            metadata,
+            name,
+            params,
+            return_type,
+            span: SourceSpan::new(start, end),
+        })
     }
 
     pub(super) fn parse_perform_decl(
@@ -48,7 +77,14 @@ impl Parser {
         let mut methods = Vec::new();
         while !self.check_simple(&TokenKind::RightBrace) {
             let method_doc = self.take_doc_string_group();
-            methods.push(self.parse_verb_with_metadata(false, Vec::new(), method_doc)?);
+            let metadata = if self.check_simple(&TokenKind::Meta) {
+                self.parse_metadata_group()?
+            } else {
+                Vec::new()
+            };
+            let method_doc = method_doc.or_else(|| self.take_doc_string_group());
+            self.reject_duplicate_metadata(&metadata)?;
+            methods.push(self.parse_verb_with_metadata(false, metadata, method_doc)?);
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
         Ok(PerformDecl {
@@ -60,6 +96,30 @@ impl Parser {
             target,
             methods,
             span: SourceSpan::new(start, end),
+        })
+    }
+
+    fn reject_unsupported_role_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        if metadata.iter().all(|attribute| {
+            matches!(
+                attribute,
+                MetaAttribute::Effect(_)
+                    | MetaAttribute::MustUse(_)
+                    | MetaAttribute::Deterministic
+                    | MetaAttribute::Realtime
+                    | MetaAttribute::Bounded(_)
+                    | MetaAttribute::Capability(_)
+            )
+        }) {
+            return Ok(());
+        }
+        Err(ParseError {
+            code: super::ParseErrorCode::MetadataTargetNotAllowed,
+            kind: super::ParseErrorKind::MetadataTargetNotAllowed,
+            span: self.peek().map_or(SourceSpan::new(0, 0), |token| token.span),
         })
     }
 }

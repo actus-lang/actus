@@ -68,9 +68,12 @@ pub(super) fn generic_inputs(
     let mut combined_program =
         crate::ast::Program { file_metadata: Vec::new(), declarations: Vec::new() };
     for unit in object_plan.units() {
-        let expansion_program = crate::codegen::normalize_program(
-            &crate::semantic::filter_program_for_target(unit.program(), configuration.target()),
-        );
+        let targeted = crate::semantic::filter_program_for_target_checked(
+            unit.program(),
+            configuration.target(),
+        )
+        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
+        let expansion_program = crate::codegen::normalize_program(&targeted);
         combined_program.declarations.extend(expansion_program.declarations.clone());
         let generic_instances = crate::semantic::analyze(&expansion_program)
             .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
@@ -148,10 +151,12 @@ fn lower_unit_module(
     context: &SharedLoweringContext<'_>,
 ) -> Result<LoweredSharedModule, BackendEmitError> {
     let unit = &object_plan.units()[index];
-    let targeted = crate::codegen::normalize_program(&crate::semantic::filter_program_for_target(
+    let targeted_program = crate::semantic::filter_program_for_target_checked(
         unit.program(),
         context.configuration.target(),
-    ));
+    )
+    .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
+    let targeted = crate::codegen::normalize_program(&targeted_program);
     let program = crate::codegen::specialize_program(&targeted, context.generic_instances)?;
     let performance_context = (index != 0).then(|| {
         (object_plan.units()[0].namespace().symbol_prefix(), object_plan.units()[0].program())

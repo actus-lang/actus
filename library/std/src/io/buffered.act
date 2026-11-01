@@ -56,6 +56,7 @@ Refill a reader's existing buffer from its statically selected source.
 The `ins reader` loan is non-escaping and covers the complete call. The
 result reports the exact byte count or a typed I/O error.
 """
+meta effect("filesystem", "blocking")
 open verb refill[Source: Reader](ins reader: BufferedReader[Source]) -> Result[Int, IoError] {
     return reader.source.read(buffer: ins reader.buffer);
 }
@@ -167,6 +168,7 @@ that buffer becomes full, it is flushed through the selected target before
 more source bytes are accepted. The target is never called for a partial
 buffer merely because this verb returns; typed errors are propagated to the caller.
 """
+meta effect("filesystem", "blocking")
 open verb buffered_write[Target: Writer](
     ins writer: BufferedWriter[Target],
     abs input: Buffer
@@ -200,6 +202,7 @@ The `ins writer` loan is returned unchanged on success. `Ok(0)` means no
 flush was needed; `Err(IoError)` reports buffer inspection or target-write
 failure. The helper performs no allocation.
 """
+meta effect("filesystem", "blocking")
 open verb flush_buffer_if_full[Target: Writer](ins writer: BufferedWriter[Target]) -> Result[Int, IoError] {
     erg full = buffered_storage_is_full(buffer: abs writer.buffer)?;
     return case full {
@@ -269,6 +272,7 @@ Flush the pending bytes through the selected writer target.
 successful flush clears only the logical length; the backing allocation is
 retained for the next write.
 """
+meta effect("filesystem", "blocking")
 open verb flush_buffer[Target: Writer](ins writer: BufferedWriter[Target]) -> Result[Int, IoError] {
     erg pending = actus_buffer_length(buffer: abs writer.buffer);
     case pending {

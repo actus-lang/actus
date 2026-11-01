@@ -6,6 +6,12 @@ use super::Analyzer;
 
 impl Analyzer {
     pub(super) fn visit_loop(&mut self, block: &Block) -> Result<(), SemanticError> {
+        if self.current_realtime {
+            return Err(SemanticError {
+                kind: super::super::errors::SemanticErrorKind::RealtimeUnboundedLoop,
+                span: block.span,
+            });
+        }
         self.enter_scope(block.span);
         self.loop_boundaries.push(self.scopes.len() - 1);
         self.visit_block(block)?;

@@ -530,6 +530,24 @@ fn resolves_qualified_struct_type_from_a_dependency_alias() {
 }
 
 #[test]
+fn target_filtering_applies_before_analyzing_imported_platform_declarations() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "platform/platform.act",
+        "meta target(\"unix\") open verb value() -> Int { return 1; }\n\
+         meta target(\"windows\") open verb value() -> Int { return 2; }",
+    );
+    let program = parse_source("import platform; verb main() -> Int { return 0; }");
+
+    analyze_with_imports_for_target(
+        &program,
+        &ModuleResolver::new(&fixture.root),
+        &actus::target::TargetSpec::host().expect("host target"),
+    )
+    .expect("target filtering must remove inactive imported declarations before analysis");
+}
+
+#[test]
 fn resolves_qualified_std_path_types_from_the_project_configuration() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/path_components.act");
     let source = fs::read_to_string(&path).expect("read path fixture");

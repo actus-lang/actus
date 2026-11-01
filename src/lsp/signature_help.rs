@@ -104,7 +104,9 @@ fn find_signatures(source: &str, name: &str, target: &TargetSpec) -> Option<Vec<
     if let Some(signatures) = intrinsic_signatures(name) {
         return Some(signatures);
     }
-    let program = crate::semantic::filter_program_for_target(&parse(scan(source).0).ok()?, target);
+    let program =
+        crate::semantic::filter_program_for_target_checked(&parse(scan(source).0).ok()?, target)
+            .ok()?;
     program.declarations.iter().find_map(|declaration| match declaration {
         TopLevelDecl::Verb(verb) if verb.name == name => Some(vec![callable_signature(
             &verb.name,

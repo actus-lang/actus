@@ -7,6 +7,9 @@ use actus::conformance::{
     source_limit_diagnostics, source_paths, validate_source_exception_manifest,
 };
 use actus::diagnostics::{DiagnosticPhase, DiagnosticSeverity};
+use actus::lexer::scan;
+use actus::parser::parse;
+use actus::semantic::{SemanticErrorKind, analyze};
 
 fn lines(count: usize) -> String {
     (0..count).map(|index| format!("line_{index}\n")).collect()
@@ -121,6 +124,16 @@ fn file_limitless_metadata_skips_file_and_function_diagnostics() {
     source.push_str(&lines(301));
     source.push_str("\"\"\"\nverb large() { return; }\n");
     assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn limitless_metadata_does_not_disable_semantic_validation() {
+    let source = "meta limitless(\"file\")\nverb main() -> Int { return \"wrong\"; }\n";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("limitless source should parse");
+    let error = analyze(&program).expect_err("limitless must not suppress semantic errors");
+    assert!(matches!(error.kind, SemanticErrorKind::ReturnTypeMismatch { .. }));
 }
 
 #[test]

@@ -24,10 +24,7 @@ fn expect_semantic_error(source: &str) -> SemanticError {
 }
 
 #[test]
-fn parser_declaration_and_metadata_rules_have_positive_and_negative_fixtures() {
-    parse_source("meta target(\"unix\") meta test verb main() -> Int { return 0; }")
-        .expect("known declaration and metadata should pass");
-
+fn parser_keyword_diagnostics_have_stable_fixtures() {
     let unknown_keyword = parse_source("verbb main() { return 0; }").expect_err("unknown keyword");
     assert_eq!(unknown_keyword.code, ParseErrorCode::UnknownKeyword);
     assert!(matches!(
@@ -36,25 +33,362 @@ fn parser_declaration_and_metadata_rules_have_positive_and_negative_fixtures() {
     ));
     assert_eq!(parse_diagnostic(&unknown_keyword).code(), "E0009");
 
-    let unknown_metadata =
-        parse_source("meta experimental verb main() { return 0; }").expect_err("unknown metadata");
-    assert_eq!(unknown_metadata.code, ParseErrorCode::UnknownMetadata);
-    assert_eq!(parse_diagnostic(&unknown_metadata).code(), "E0006");
+    assert_eq!(parse_diagnostic(&unknown_keyword).code(), "E0009");
+}
 
-    let unknown_target = parse_source("meta target(\"plan9\") verb main() { return 0; }")
-        .expect_err("unknown target");
-    assert_eq!(unknown_target.code, ParseErrorCode::UnsupportedTargetPlatform);
-    assert_eq!(parse_diagnostic(&unknown_target).code(), "E0007");
+#[test]
+fn must_use_rejects_ignored_results_and_accepts_consumed_results() {
+    let ignored = expect_semantic_error(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { status(); return 0; }",
+    );
+    assert!(matches!(
+        ignored.kind,
+        SemanticErrorKind::MustUseIgnored { ref callee, ref reason }
+            if callee == "status" && reason == "check the status"
+    ));
+    assert_eq!(semantic_diagnostic(&ignored).code(), "E1120");
 
-    let conflicting_targets =
-        parse_source("meta target(\"unix\") meta target(\"windows\") verb main() { return 0; }")
-            .expect_err("conflicting targets should be rejected");
-    assert_eq!(conflicting_targets.code, ParseErrorCode::ConflictingTargetPlatforms);
-    assert_eq!(parse_diagnostic(&conflicting_targets).code(), "E0010");
+    analyze_source(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { erg result = status(); return result; }",
+    )
+    .expect("binding a must-use result should count as consumption");
+}
 
-    let invalid_target =
-        parse_source("meta test struct Packet { byte: Int, }").expect_err("metadata on a struct");
-    assert_eq!(invalid_target.code, ParseErrorCode::MetadataTargetNotAllowed);
+#[test]
+fn must_use_tracks_expression_consumption_without_leaking_across_statements() {
+    analyze_source(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { return status() + 1; }",
+    )
+    .expect("a must-use result consumed by an operator should pass");
+
+    let grouped = expect_semantic_error(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { (status()); return 0; }",
+    );
+    assert!(matches!(
+        grouped.kind,
+        SemanticErrorKind::MustUseIgnored { ref callee, .. } if callee == "status"
+    ));
+
+    let nested_statement = expect_semantic_error(
+        "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { if true { status(); } return 0; }",
+    );
+    assert!(matches!(
+        nested_statement.kind,
+        SemanticErrorKind::MustUseIgnored { ref callee, .. } if callee == "status"
+    ));
+
+    analyze_source(
+        "enum Failure { Failed, } meta must_use(\"check the status\") verb status() -> Result[Int, Failure] { return Ok(0); } verb main() -> Result[Int, Failure] { status()?; return Ok(0); }",
+    )
+    .expect("the try operator should explicitly handle a must-use result");
+}
+
+#[test]
+fn effects_are_declared_by_callers_and_rejected_when_omitted() {
+    let undeclared = expect_semantic_error(
+        "meta effect(\"filesystem\") verb load() -> Int { return 0; } verb main() -> Int { load(); return 0; }",
+    );
+    assert!(matches!(
+        undeclared.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "load" && effect == actus::ast::Effect::Filesystem
+    ));
+    assert_eq!(semantic_diagnostic(&undeclared).code(), "E1121");
+
+    analyze_source(
+        "meta effect(\"filesystem\") verb load() -> Int { return 0; } meta effect(\"filesystem\") verb main() -> Int { load(); return 0; }",
+    )
+    .expect("a caller declaring the callee effect should pass");
+}
+
+#[test]
+fn capabilities_are_declared_by_callers_and_propagate_through_calls() {
+    let undeclared = expect_semantic_error(
+        "meta capability(\"posix.cloexec\") verb primitive() -> Int { return 0; } verb main() -> Int { primitive(); return 0; }",
+    );
+    assert!(matches!(
+        undeclared.kind,
+        SemanticErrorKind::UndeclaredCapability { ref callee, capability }
+            if callee == "primitive" && capability == actus::ast::Capability::PosixCloexec
+    ));
+    assert_eq!(semantic_diagnostic(&undeclared).code(), "E1131");
+
+    analyze_source(
+        "meta capability(\"posix.cloexec\") verb primitive() -> Int { return 0; } meta capability(\"posix.cloexec\") verb main() -> Int { primitive(); return 0; }",
+    )
+    .expect("a caller declaring the callee capability should pass");
+}
+
+#[test]
+fn create_exclusive_capabilities_are_declared_by_callers() {
+    let undeclared = expect_semantic_error(
+        "meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } verb main() -> Int { primitive(); return 0; }",
+    );
+    assert!(matches!(
+        undeclared.kind,
+        SemanticErrorKind::UndeclaredCapability { ref callee, capability }
+            if callee == "primitive" && capability == actus::ast::Capability::FilesystemCreateExclusive
+    ));
+    assert_eq!(semantic_diagnostic(&undeclared).code(), "E1131");
+
+    analyze_source(
+        "meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } meta capability(\"filesystem.create_exclusive\") verb main() -> Int { primitive(); return 0; }",
+    )
+    .expect("a caller declaring create-exclusive capability should pass");
+}
+
+#[test]
+fn deterministic_verbs_reject_nondeterministic_effects() {
+    for effect in ["filesystem", "network", "entropy"] {
+        let source = format!(
+            "meta effect(\"{effect}\") verb source() -> Int {{ return 0; }} meta deterministic verb stable() -> Int {{ source(); return 0; }}"
+        );
+        let error = expect_semantic_error(&source);
+        assert!(matches!(
+            error.kind,
+            SemanticErrorKind::NondeterministicCall { ref callee, effect: found }
+                if callee == "source" && found.name() == effect
+        ));
+        assert_eq!(semantic_diagnostic(&error).code(), "E1124");
+    }
+
+    analyze_source(
+        "meta effect(\"allocation\") verb allocate_resource() -> Int { return 0; } meta effect(\"allocation\") meta deterministic verb stable() -> Int { allocate_resource(); return 0; }",
+    )
+    .expect("allocation alone does not make a result nondeterministic");
+}
+
+#[test]
+fn realtime_verbs_reject_effects_unbounded_loops_and_floating_point() {
+    for effect in ["blocking", "clock", "filesystem", "network", "allocation", "entropy"] {
+        let source = format!(
+            "meta effect(\"{effect}\") verb source() -> Int {{ return 0; }} meta realtime verb tick() -> Int {{ source(); return 0; }}"
+        );
+        let error = expect_semantic_error(&source);
+        assert!(matches!(
+            error.kind,
+            SemanticErrorKind::RealtimeEffect { ref callee, effect: found }
+                if callee == "source" && found.name() == effect
+        ));
+        assert_eq!(semantic_diagnostic(&error).code(), "E1125");
+    }
+
+    let loop_error =
+        expect_semantic_error("meta realtime verb tick() -> Int { loop { break; } return 0; }");
+    assert!(matches!(loop_error.kind, SemanticErrorKind::RealtimeUnboundedLoop));
+    assert_eq!(semantic_diagnostic(&loop_error).code(), "E1126");
+
+    let float_error = expect_semantic_error("meta realtime verb tick() -> f32 { return 1.0f32; }");
+    assert!(matches!(float_error.kind, SemanticErrorKind::RealtimeFloatingPoint));
+    assert_eq!(semantic_diagnostic(&float_error).code(), "E1127");
+
+    analyze_source(
+        "meta realtime verb tick() -> Int { for erg index: u32 in 0u32..4u32 { if index == 2u32 { break; } } return 0; }",
+    )
+    .expect("bounded range loops are valid in realtime code");
+}
+
+#[test]
+fn realtime_role_contract_is_preserved_by_implementations() {
+    let error = expect_semantic_error(
+        "role Tick { meta realtime verb tick(abs self: Self) -> Int; } struct Clock { value: Int, } perform Tick for Clock { verb tick(abs self: Clock) -> Int { return self.value; } }",
+    );
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodRealtimeMismatch { ref method, .. } if method == "tick"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1128");
+}
+
+#[test]
+fn bounded_contract_proves_ranges_and_call_budgets() {
+    analyze_source(
+        "meta bounded(max_iterations: 0u32) verb leaf() -> Int { return 0; } meta bounded(max_iterations: 4u32, max_calls: 4u32, max_call_depth: 1u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { leaf(); } return 0; }",
+    )
+    .expect("the exact bounded range and call budget should pass");
+
+    let range_error = expect_semantic_error(
+        "meta bounded(max_iterations: 3u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { } return 0; }",
+    );
+    assert!(matches!(
+        range_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref dimension, .. } if dimension == "max_iterations"
+    ));
+    assert_eq!(semantic_diagnostic(&range_error).code(), "E1130");
+
+    let depth_error = expect_semantic_error(
+        "meta bounded(max_iterations: 0u32) verb leaf() -> Int { return 0; } meta bounded(max_call_depth: 0u32) verb main() -> Int { leaf(); return 0; }",
+    );
+    assert!(matches!(
+        depth_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref dimension, .. } if dimension == "max_call_depth"
+    ));
+
+    analyze_source(
+        "meta bounded(max_allocations: 1u32, max_allocation_bytes: 4u64) verb main() -> Buffer { return Buffer[4]; }",
+    )
+    .expect("a fixed buffer allocation should satisfy its resource budget");
+
+    let allocation_error = expect_semantic_error(
+        "meta bounded(max_allocations: 0u32) verb main() -> Buffer { return Buffer[4]; }",
+    );
+    assert!(matches!(
+        allocation_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref dimension, .. } if dimension == "max_allocations"
+    ));
+
+    analyze_source(
+        "meta bounded(max_stack_bytes: 4u64) verb main() -> Int { erg value: u32 = 0u32; return value; }",
+    )
+    .expect("a known scalar local should satisfy its stack budget");
+
+    let missing_callee_bound = expect_semantic_error(
+        "verb leaf() -> Int { return 0; } meta bounded(max_calls: 1u32) verb main() -> Int { leaf(); return 0; }",
+    );
+    assert!(matches!(
+        missing_callee_bound.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. } if required.contains("leaf")
+    ));
+
+    analyze_source(
+        "meta bounded(max_iterations: 2u32) verb leaf() -> Int { for erg index: u32 in 0u32..2u32 { } return 0; } meta bounded(max_iterations: 2u32) verb main() -> Int { leaf(); return 0; }",
+    )
+    .expect("a bounded callee contract should propagate to its caller");
+
+    analyze_source(
+        "meta bounded(max_iterations: 0u32) unsafe extern \"C\" verb host() -> Int; meta bounded(max_calls: 1u32) verb main() -> Int { host(); return 0; }",
+    )
+    .expect("a native boundary with an explicit bound should be callable");
+
+    let imported = ModuleFixture::new();
+    imported.write("effects/effects.act", "open api;");
+    imported.write(
+        "effects/api.act",
+        "meta bounded(max_iterations: 1u32) open verb leaf() -> Int { return 0; }",
+    );
+    let imported_source = parse_source(
+        "import effects; meta bounded(max_iterations: 1u32) verb main() -> Int { effects::leaf(); return 0; }",
+    )
+    .expect("imported bounded fixture should parse");
+    analyze_with_imports(&imported_source, &ModuleResolver::new(&imported.root))
+        .expect("imported bounded signatures must propagate across the facade");
+
+    let recursive_import = ModuleFixture::new();
+    recursive_import.write("recursive/recursive.act", "open api;");
+    recursive_import.write(
+        "recursive/api.act",
+        "meta bounded(max_iterations: 1u32) open verb first() -> Int { second(); return 0; } meta bounded(max_iterations: 1u32) open verb second() -> Int { first(); return 0; }",
+    );
+    let recursive_source =
+        parse_source("import recursive; verb main() -> Int { recursive::first(); return 0; }")
+            .expect("recursive imported fixture should parse");
+    let recursive_error =
+        analyze_with_imports(&recursive_source, &ModuleResolver::new(&recursive_import.root))
+            .expect_err("recursive imported bodies must be proven before publication");
+    let ModuleError::Semantic(recursive_error) = recursive_error else {
+        panic!("expected imported semantic error")
+    };
+    assert!(matches!(
+        recursive_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. }
+            if required == "recursive call path"
+    ));
+
+    analyze_source(
+        "meta bounded(max_iterations: 0u32) verb leaf[N: Usize]() -> Int { return 0; } meta bounded(max_iterations: 0u32) verb main() -> Int { leaf[2](); return 0; }",
+    )
+    .expect("generic specializations must preserve bounded contracts");
+
+    analyze_source(
+        "struct File { value: Int, } role Writer { meta bounded(max_iterations: 0u32) verb write(abs self: File) -> Int; } perform Writer for File { meta bounded(max_iterations: 0u32) verb write(abs self: File) -> Int { return self.value; } } meta bounded(max_calls: 1u32, max_call_depth: 1u32) verb send(abs writer: dynamic Writer) -> Int { return writer.write(); }",
+    )
+    .expect("dynamic method boundaries must preserve bounded role contracts");
+
+    let dynamic_recursive_error = expect_semantic_error(
+        "struct File { value: Int, } role Writer { meta bounded(max_iterations: 0u32) verb first(abs self: File) -> Int; meta bounded(max_iterations: 0u32) verb second(abs self: File) -> Int; } perform Writer for File { meta bounded(max_iterations: 0u32) verb first(abs self: File) -> Int { return self.second(); } meta bounded(max_iterations: 0u32) verb second(abs self: File) -> Int { return self.first(); } }",
+    );
+    assert!(matches!(
+        dynamic_recursive_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. }
+            if required == "recursive call path"
+    ));
+
+    let recursive_error = expect_semantic_error(
+        "meta bounded(max_iterations: 1u32) verb first() -> Int { second(); return 0; } meta bounded(max_iterations: 1u32) verb second() -> Int { first(); return 0; }",
+    );
+    assert!(matches!(
+        recursive_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. } if required == "recursive call path"
+    ));
+
+    let loop_error = expect_semantic_error(
+        "meta bounded(max_iterations: 4u32) verb main() -> Int { loop { break; } return 0; }",
+    );
+    assert!(matches!(
+        loop_error.kind,
+        SemanticErrorKind::BoundedBudgetExceeded { ref required, .. } if required == "an unbounded path"
+    ));
+}
+
+#[test]
+fn effects_propagate_through_transitive_and_external_calls() {
+    let transitive = expect_semantic_error(
+        "meta effect(\"filesystem\") verb leaf() -> Int { return 0; } meta effect(\"filesystem\") verb middle() -> Int { leaf(); return 0; } verb root() -> Int { middle(); return 0; }",
+    );
+    assert!(matches!(
+        transitive.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "middle" && effect == actus::ast::Effect::Filesystem
+    ));
+
+    let external = expect_semantic_error(
+        "meta effect(\"network\") extern \"C\" verb host() -> Int; verb main() -> Int { host(); return 0; }",
+    );
+    assert!(matches!(
+        external.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "host" && effect == actus::ast::Effect::Network
+    ));
+
+    analyze_source(
+        "meta effect(\"network\") extern \"C\" verb host() -> Int; meta effect(\"network\") verb main() -> Int { host(); return 0; }",
+    )
+    .expect("external effect contracts must be declarable at the caller");
+}
+
+#[test]
+fn recursive_effect_calls_require_the_declared_contract_on_the_recursive_verb() {
+    analyze_source(
+        "meta effect(\"filesystem\") verb walk() -> Int { if 1 == 1 { return walk(); } return 0; } meta effect(\"filesystem\") verb main() -> Int { return walk(); }",
+    )
+    .expect("a recursive call may use the effect declared by its own verb");
+}
+
+#[test]
+fn imported_facades_preserve_effectful_public_signatures() {
+    let fixture = ModuleFixture::new();
+    fixture.write("effects/effects.act", "open api;");
+    fixture.write(
+        "effects/api.act",
+        "meta effect(\"filesystem\") open verb load() -> Int { return 0; }",
+    );
+    let missing = parse_source("import effects; verb main() -> Int { effects::load(); return 0; }")
+        .expect("imported effect fixture should parse");
+    let error = analyze_with_imports(&missing, &ModuleResolver::new(&fixture.root))
+        .expect_err("imported effects must not be erased by a facade");
+    let ModuleError::Semantic(error) = error else { panic!("expected semantic error") };
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "effects::load" && effect == actus::ast::Effect::Filesystem
+    ));
+
+    let declared = parse_source(
+        "import effects; meta effect(\"filesystem\") verb main() -> Int { effects::load(); return 0; }",
+    )
+    .expect("declared imported effect fixture should parse");
+    analyze_with_imports(&declared, &ModuleResolver::new(&fixture.root))
+        .expect("declared imported effect should pass");
 }
 
 #[test]

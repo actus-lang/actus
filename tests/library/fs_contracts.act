@@ -25,6 +25,7 @@ verb empty_path() -> Path {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb metadata_rejects_empty_path() -> Int {
     erg path = empty_path();
     erg result = metadata(path: abs path);
@@ -35,6 +36,7 @@ verb metadata_rejects_empty_path() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb file_open_and_create_reject_empty_path() -> Int {
     erg path = empty_path();
     erg opened = file_open(path: abs path);
@@ -52,6 +54,7 @@ verb file_open_and_create_reject_empty_path() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb path_operations_reject_empty_paths() -> Int {
     erg path = empty_path();
     erg removed = remove_file(path: abs path);
@@ -90,6 +93,7 @@ verb path_operations_reject_empty_paths() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb read_to_bytes_propagates_empty_path_error() -> Int {
     erg path = empty_path();
     erg bytes = read_to_bytes(path: abs path);
@@ -102,6 +106,7 @@ verb read_to_bytes_propagates_empty_path_error() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb read_to_string_propagates_empty_path_error() -> Int {
     erg path = empty_path();
     erg text = read_to_string(path: abs path);
@@ -155,6 +160,7 @@ verb missing_parent_path() -> Path {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb write_file_propagates_empty_path_error() -> Int {
     erg path = missing_parent_path();
     erg contents = Buffer[0];
@@ -166,6 +172,7 @@ verb write_file_propagates_empty_path_error() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb open_options_cover_all_modes() -> Int {
     erg path = empty_path();
     erg empty = options_new();
@@ -215,6 +222,7 @@ verb round_trip_copy_path() -> Path {
     return make_posix(raw: dat raw_copy_path);
 }
 
+meta effect("filesystem", "blocking")
 verb write_round_trip_file(abs path: Path) -> Int {
     remove_file(path: abs path);
     erg contents = Buffer[0];
@@ -252,6 +260,7 @@ verb write_round_trip_file(abs path: Path) -> Int {
     return 0;
 }
 
+meta effect("filesystem", "blocking")
 verb verify_round_trip_reads(abs path: Path) -> Int {
     erg bytes = read_to_bytes(path: abs path);
     erg text = read_to_string(path: abs path);
@@ -270,6 +279,7 @@ verb verify_round_trip_reads(abs path: Path) -> Int {
     return 0;
 }
 
+meta effect("filesystem", "blocking")
 verb copy_round_trip_file(abs path: Path, abs copy_path: Path) -> Int {
     erg copied = copy_file(from: abs path, to: abs copy_path);
     case dat copied {
@@ -293,6 +303,7 @@ verb copy_round_trip_file(abs path: Path, abs copy_path: Path) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
     erg path = round_trip_file_path();
     erg copy_path = round_trip_copy_path();

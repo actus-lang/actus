@@ -1,5 +1,6 @@
 use crate::ast::{
-    DispatchMode, Param, Program, Role, RoleMethod, TopLevelDecl, lookup_builtin_type,
+    Capability, DispatchMode, Effect, MetaAttribute, Param, Program, Role, RoleMethod,
+    TopLevelDecl, lookup_builtin_type,
 };
 
 use super::analyzer::Analyzer;
@@ -48,6 +49,38 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
         return_access: method.return_type.as_ref().map(|return_type| return_type.access),
         generic_parameters: Vec::new(),
         external: false,
+        must_use: method.metadata.iter().find_map(|attribute| match attribute {
+            MetaAttribute::MustUse(reason) => Some(reason.clone()),
+            _ => None,
+        }),
+        effects: method
+            .metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                MetaAttribute::Effect(effect) => Some(*effect),
+                _ => None,
+            })
+            .collect::<Vec<Effect>>(),
+        capabilities: method
+            .metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                MetaAttribute::Capability(capability) => Some(*capability),
+                _ => None,
+            })
+            .collect::<Vec<Capability>>(),
+        deterministic: method
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Deterministic)),
+        realtime: method
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Realtime)),
+        bounded: method.metadata.iter().find_map(|attribute| match attribute {
+            MetaAttribute::Bounded(contract) => Some(contract.clone()),
+            _ => None,
+        }),
     }
 }
 

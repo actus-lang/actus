@@ -69,6 +69,7 @@ verb directory_path() -> Path {
     return make_posix(raw: dat raw);
 }
 
+meta effect("filesystem", "blocking")
 verb prepare_file(abs path: Path) -> Int {
     erg stale = remove_file(path: abs path);
     case dat stale {
@@ -105,6 +106,7 @@ verb verify_owned_buffer(dat output: Buffer) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb read_bytes_buffer(abs path: Path) -> Int {
     erg loaded = read_to_bytes(path: abs path);
     case dat loaded {
@@ -119,6 +121,7 @@ verb read_bytes_buffer(abs path: Path) -> Int {
     return 1;
 }
 
+meta effect("filesystem", "blocking")
 verb read_text_buffer(abs path: Path) -> Int {
     erg loaded = read_to_string(path: abs path);
     case dat loaded {
@@ -134,6 +137,7 @@ verb read_text_buffer(abs path: Path) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb read_helpers_return_owned_buffers() -> Int {
     erg path = file_path();
     erg prepared = prepare_file(path: abs path);
@@ -164,6 +168,7 @@ verb read_helpers_return_owned_buffers() -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb write_invalid_file(abs path: Path) -> Int {
     erg stale = remove_file(path: abs path);
     case dat stale {
@@ -182,6 +187,7 @@ verb write_invalid_file(abs path: Path) -> Int {
     return 0;
 }
 
+meta effect("filesystem", "blocking")
 verb read_invalid_file(abs path: Path) -> Int {
     erg loaded = read_to_string(path: abs path);
     erg removed = remove_file(path: abs path);
@@ -207,6 +213,7 @@ verb read_invalid_file(abs path: Path) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb invalid_text_returns_typed_error() -> Int {
     erg path = file_path();
     erg prepared = write_invalid_file(path: abs path);
@@ -240,6 +247,7 @@ verb directory_child_path() -> Path {
     return make_posix(raw: dat child_raw);
 }
 
+meta effect("filesystem", "blocking")
 verb create_directory_fixture(abs directory: Path) -> Int {
     erg stale = remove_dir(path: abs directory);
     case dat stale {
@@ -263,6 +271,7 @@ verb create_directory_fixture(abs directory: Path) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb remove_nonempty_directory(abs directory: Path, abs child_name: Path) -> Int {
     erg directory_for_child = directory_path();
     erg child_result = join(self: dat directory_for_child, other: abs child_name);
@@ -302,6 +311,7 @@ verb remove_nonempty_directory(abs directory: Path, abs child_name: Path) -> Int
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb directory_metadata_and_nonempty_remove_are_typed() -> Int {
     erg directory = directory_path();
     erg created = create_directory_fixture(directory: abs directory);

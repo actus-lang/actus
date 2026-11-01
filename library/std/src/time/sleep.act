@@ -23,6 +23,7 @@ provider accepted the sleep request; `Err(TimeError.ProviderUnavailable)`
 means the selected runtime cannot provide scheduler-aware sleeping. The
 operation may block and does not promise an exact wake-up instant.
 """
+meta effect("clock", "blocking")
 open verb sleep(abs duration: Duration) -> Result[Int, TimeError] {
     erg nanos: u64 = duration.nanos;
     erg status = actus_sleep_nanos(nanos: erg nanos);

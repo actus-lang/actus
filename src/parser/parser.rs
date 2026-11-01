@@ -1,6 +1,4 @@
-use crate::ast::{
-    DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, TestFault, VerbDecl,
-};
+use crate::ast::{DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, VerbDecl};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
 
@@ -12,6 +10,7 @@ mod declarations;
 mod enums;
 mod expressions;
 mod generics;
+mod metadata;
 mod packs;
 mod roles;
 mod serialization;
@@ -32,6 +31,12 @@ pub enum ParseErrorKind {
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope { name: String },
     DuplicateMetadata { name: String },
+    FaultRequiresTest,
+    TestMetadataRequiresVerb,
+    MustUseRequiresReturn,
+    UnsupportedEffect { name: String },
+    UnsupportedCapability { name: String },
+    InvalidBoundedLimit { reason: String },
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
 }
@@ -49,6 +54,12 @@ pub enum ParseErrorCode {
     MetadataFileScopeNotAllowed,
     UnsupportedLimitlessScope,
     DuplicateMetadata,
+    FaultRequiresTest,
+    TestMetadataRequiresVerb,
+    MustUseRequiresReturn,
+    UnsupportedEffect,
+    UnsupportedCapability,
+    InvalidBoundedLimit,
     MalformedVerbContract,
     OpenImportRequiresBlock,
 }
@@ -153,7 +164,28 @@ impl Parser {
         Ok(Program { file_metadata, declarations })
     }
 
-    fn reject_duplicate_metadata(&self, metadata: &[MetaAttribute]) -> Result<(), ParseError> {
+    pub(in crate::parser) fn reject_duplicate_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        self.reject_duplicate_basic_metadata(metadata)?;
+        self.reject_duplicate_deterministic_metadata(metadata)?;
+        self.reject_duplicate_realtime_metadata(metadata)?;
+        self.reject_duplicate_bounded_metadata(metadata)?;
+        self.reject_duplicate_effect_metadata(metadata)?;
+        self.reject_duplicate_capability_metadata(metadata)?;
+        if let Some((index, target)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
+            if let MetaAttribute::Target(target) = attribute { Some((index, target)) } else { None }
+        }) && metadata[index + 1..]
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Target(other) if other == target))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata { name: format!("target(\"{target}\")") },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
         let Some((index, fault)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
             if let MetaAttribute::Fault(fault) = attribute { Some((index, fault)) } else { None }
         }) else {
@@ -172,6 +204,111 @@ impl Parser {
             });
         }
         self.reject_duplicate_limitless_metadata(metadata)
+    }
+
+    fn reject_duplicate_basic_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        let duplicate =
+            if metadata.iter().filter(|attribute| matches!(attribute, MetaAttribute::Test)).count()
+                > 1
+            {
+                Some("test")
+            } else if metadata
+                .iter()
+                .filter(|attribute| matches!(attribute, MetaAttribute::MustUse(_)))
+                .count()
+                > 1
+            {
+                Some("must_use")
+            } else {
+                None
+            };
+        let Some(name) = duplicate else { return Ok(()) };
+        Err(ParseError {
+            code: ParseErrorCode::DuplicateMetadata,
+            kind: ParseErrorKind::DuplicateMetadata { name: name.to_owned() },
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        })
+    }
+
+    fn reject_duplicate_deterministic_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        if metadata
+            .iter()
+            .filter(|attribute| matches!(attribute, MetaAttribute::Deterministic))
+            .count()
+            <= 1
+        {
+            return Ok(());
+        }
+        Err(ParseError {
+            code: ParseErrorCode::DuplicateMetadata,
+            kind: ParseErrorKind::DuplicateMetadata { name: "deterministic".to_owned() },
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        })
+    }
+
+    fn reject_duplicate_realtime_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        if metadata.iter().filter(|attribute| matches!(attribute, MetaAttribute::Realtime)).count()
+            <= 1
+        {
+            return Ok(());
+        }
+        Err(ParseError {
+            code: ParseErrorCode::DuplicateMetadata,
+            kind: ParseErrorKind::DuplicateMetadata { name: "realtime".to_owned() },
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        })
+    }
+
+    fn reject_duplicate_bounded_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        if metadata
+            .iter()
+            .filter(|attribute| matches!(attribute, MetaAttribute::Bounded(_)))
+            .count()
+            <= 1
+        {
+            return Ok(());
+        }
+        Err(ParseError {
+            code: ParseErrorCode::DuplicateMetadata,
+            kind: ParseErrorKind::DuplicateMetadata { name: "bounded".to_owned() },
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        })
+    }
+
+    fn reject_duplicate_effect_metadata(
+        &self,
+        metadata: &[MetaAttribute],
+    ) -> Result<(), ParseError> {
+        let Some((index, effect)) = metadata.iter().enumerate().find_map(|(index, attribute)| {
+            if let MetaAttribute::Effect(effect) = attribute { Some((index, effect)) } else { None }
+        }) else {
+            return Ok(());
+        };
+        if metadata[index + 1..]
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Effect(other) if other == effect))
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::DuplicateMetadata,
+                kind: ParseErrorKind::DuplicateMetadata {
+                    name: format!("effect(\"{}\")", effect.name()),
+                },
+                span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+            });
+        }
+        Ok(())
     }
 
     fn reject_duplicate_limitless_metadata(
@@ -227,7 +364,7 @@ impl Parser {
         }
     }
 
-    fn parse_verb_with_metadata(
+    pub(super) fn parse_verb_with_metadata(
         &mut self,
         is_open: bool,
         metadata: Vec<MetaAttribute>,
@@ -266,109 +403,6 @@ impl Parser {
         let ty = self.parse_type_name()?;
         let span = SourceSpan::new(start, ty.span.end);
         Ok(Some(crate::ast::ReturnType { access, ty, span }))
-    }
-
-    fn parse_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_keyword(TokenKind::Meta, "`meta`")?;
-        let attribute = self.take_identifier("metadata name")?;
-        match identifier_text(&attribute.kind).as_str() {
-            "test" => {
-                let _ = self.match_simple(TokenKind::Semicolon);
-                Ok(vec![MetaAttribute::Test])
-            }
-            "target" => self.parse_target_metadata(),
-            "fault" => self.parse_fault_metadata(),
-            "limitless" => self.parse_limitless_metadata(),
-            name => Err(ParseError {
-                code: ParseErrorCode::UnknownMetadata,
-                kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },
-                span: attribute.span,
-            }),
-        }
-    }
-
-    fn parse_fault_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_simple(TokenKind::LeftParen, "`(` after `fault`")?;
-        let fault_token = self.advance_required("fault name string")?;
-        let fault = match fault_token.kind {
-            TokenKind::StringLiteral(name) => TestFault::parse(&name).ok_or(ParseError {
-                code: ParseErrorCode::UnknownMetadata,
-                kind: ParseErrorKind::UnknownMetadata { name },
-                span: fault_token.span,
-            })?,
-            found => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "a publication fault name string".to_owned(),
-                        found,
-                    },
-                    span: fault_token.span,
-                });
-            }
-        };
-        self.expect_simple(TokenKind::RightParen, "`)` after fault name")?;
-        let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Fault(fault)])
-    }
-
-    fn parse_limitless_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_simple(TokenKind::LeftParen, "`(` after `limitless`")?;
-        let scope_token = self.advance_required("limitless scope string")?;
-        let scope = match scope_token.kind {
-            TokenKind::StringLiteral(scope) => match scope.as_str() {
-                "verb" => LimitlessScope::Verb,
-                "file" => LimitlessScope::File,
-                _ => {
-                    return Err(ParseError {
-                        code: ParseErrorCode::UnsupportedLimitlessScope,
-                        kind: ParseErrorKind::UnsupportedLimitlessScope { name: scope },
-                        span: scope_token.span,
-                    });
-                }
-            },
-            found => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "`verb` or `file` scope string".to_owned(),
-                        found,
-                    },
-                    span: scope_token.span,
-                });
-            }
-        };
-        self.expect_simple(TokenKind::RightParen, "`)` after limitless scope")?;
-        let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Limitless(scope)])
-    }
-
-    fn parse_target_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
-        self.expect_simple(TokenKind::LeftParen, "`(` after `target`")?;
-        let selector_token = self.advance_required("target platform string")?;
-        let selector = match selector_token.kind {
-            TokenKind::StringLiteral(selector) => selector,
-            found => {
-                return Err(ParseError {
-                    code: ParseErrorCode::UnexpectedToken,
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: "a target platform string".to_owned(),
-                        found,
-                    },
-                    span: selector_token.span,
-                });
-            }
-        };
-        if !matches!(selector.as_str(), "unix" | "posix" | "windows") {
-            return Err(ParseError {
-                code: ParseErrorCode::UnsupportedTargetPlatform,
-                kind: ParseErrorKind::UnsupportedTargetPlatform { name: selector },
-                span: selector_token.span,
-            });
-        }
-        self.expect_simple(TokenKind::RightParen, "`)` after target platform")?;
-        let _ = self.match_simple(TokenKind::Semicolon);
-        Ok(vec![MetaAttribute::Target(selector)])
     }
 
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {

@@ -23,6 +23,7 @@ Capture the current instant from the active monotonic provider.
 Returns a typed `Instant` with no allocation and no wall-clock semantics. The
 selected runtime must provide a monotonic clock for this operation to exist.
 """
+meta effect("clock")
 open verb now() -> Instant {
     return Instant {
         ticks: monotonic_nanos(),
@@ -63,6 +64,7 @@ The earlier instant is borrowed and remains owned by the caller. The result is
 typed and uses the same provider domain as `now()`; ordering failure is
 reported as `TimeError.NegativeDuration`.
 """
+meta effect("clock")
 open verb elapsed_since(abs earlier: Instant) -> Result[Duration, TimeError] {
     erg current: Instant = now();
     return duration_since(later: abs current, earlier: abs earlier);

@@ -40,7 +40,7 @@ fn sensor_telemetry_example_builds_and_executes() {
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
 fn file_utility_example_builds_with_llvm() {
-    let root = std::env::temp_dir().join(format!("actus-file-utility-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("actus-file-utility-llvm-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create file utility working directory");
     let output = root.join("file-utility-llvm");
     let source =
@@ -60,7 +60,8 @@ fn file_utility_example_builds_with_llvm() {
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
 fn file_utility_example_builds_with_cranelift() {
-    let root = std::env::temp_dir().join(format!("actus-file-utility-{}", std::process::id()));
+    let root =
+        std::env::temp_dir().join(format!("actus-file-utility-cranelift-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create file utility working directory");
     let output = root.join("file-utility-cranelift");
     let source =

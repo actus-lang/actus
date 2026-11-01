@@ -3,6 +3,7 @@ import {
 };
 
 meta test
+meta effect("filesystem", "blocking")
 verb copy_transfers_cursor_streams() -> Int {
     erg input_bytes = Buffer[0];
     append(input_bytes, 65);
@@ -37,6 +38,7 @@ verb copy_transfers_cursor_streams() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb buffered_reader_refills_cursor_storage() -> Int {
     erg input_bytes = Buffer[0];
     append(input_bytes, 65);
@@ -54,6 +56,7 @@ verb buffered_reader_refills_cursor_storage() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb buffered_writer_flushes_cursor_storage() -> Int {
     erg output_bytes = Buffer[0];
     erg target = cursor(dat output_bytes);
@@ -168,6 +171,7 @@ verb buffer_utilities_preserve_reusable_storage() -> Int {
 }
 
 meta test
+meta effect("blocking")
 verb stdin_eof_is_typed() -> Int {
     erg result = read_byte();
     return case dat result {
@@ -179,6 +183,7 @@ verb stdin_eof_is_typed() -> Int {
     };
 }
 
+meta effect("blocking")
 verb emit_standard_output(abs text: Buffer) -> Int {
     erg value = 0;
     erg integer = print_int(value: value);
@@ -202,6 +207,7 @@ verb emit_standard_output(abs text: Buffer) -> Int {
     };
 }
 
+meta effect("blocking")
 verb emit_error_output(abs text: Buffer) -> Int {
     erg value = 0;
     erg integer = eprint_int(value: value);
@@ -225,6 +231,7 @@ verb emit_error_output(abs text: Buffer) -> Int {
     };
 }
 
+meta effect("blocking")
 verb emit_buffer_output(abs text: Buffer) -> Int {
     erg written = write(buffer: abs text);
     erg flushed = flush();
@@ -241,6 +248,7 @@ verb emit_buffer_output(abs text: Buffer) -> Int {
 }
 
 meta test
+meta effect("blocking")
 verb output_wrappers_return_typed_status() -> Int {
     erg text = Buffer[0];
     erg standard = emit_standard_output(text: abs text);

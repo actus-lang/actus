@@ -8,6 +8,7 @@ return typed results.
 """
 import std::region;
 
+meta effect("allocation")
 verb open_example() -> Result[region::Region[Array[u16, 2]], region::RegionError] {
     erg backing: Buffer = Buffer[4];
     erg logical_length: u64 = 4u64;
@@ -91,6 +92,7 @@ verb cancel_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     };
 }
 
+meta effect("allocation")
 verb remap_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     erg replacement: Buffer = Buffer[4];
     erg replacement_start: u64 = 2u64;
@@ -107,6 +109,7 @@ verb remap_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     };
 }
 
+meta effect("allocation")
 verb main() -> Int {
     erg opened = open_example();
     return case dat opened {

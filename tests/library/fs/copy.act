@@ -80,6 +80,7 @@ verb copy_destination_path() -> Path {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb write_copy_fixture(abs path: Path, abs first: u8, abs second: u8) -> Int {
     erg contents = Buffer[0];
     append(contents, first);
@@ -130,6 +131,7 @@ verb verify_rejected_copy(
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb copy_without_overwrite_keeps_existing_destination() -> Int {
     erg source = copy_source_path();
     erg destination = copy_destination_path();
@@ -163,6 +165,7 @@ verb copy_without_overwrite_keeps_existing_destination() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb compatibility_copy_explicitly_overwrites() -> Int {
     erg source = copy_source_path();
     erg destination = copy_destination_path();

@@ -25,6 +25,7 @@ not retained or copied. The bridge performs no path allocation. The result is
 a new owned `File`, or `-1` on native failure; the facade maps failure to
 `IoError.Failed`.
 """
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_open_path(
     abs path: path_module::Path,
     abs mode: Int
@@ -34,6 +35,7 @@ unsafe extern "C" verb actus_file_open_path(
 Read into the existing `ins` buffer. Non-negative values are byte counts;
 `-1` is `Failed` and `-2` is `EndOfStream`. The runtime retains no buffer.
 """
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int;
 
 """
@@ -41,24 +43,30 @@ Write the logical bytes of an `abs` buffer. Non-negative values are byte
 counts; `-1` is `Failed` and `-2` is `EndOfStream`.
 """
 """The C ABI returns a byte count, `-1` for failure, or `-2` for EOF."""
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_write_buffer(
     abs handle: Int,
     abs buffer: Buffer
 ) -> Int;
 
 """Flush an owned handle through the C ABI; zero is success and `-1` is `Failed`."""
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_flush_buffer(abs handle: Int) -> Int;
 
 """Synchronize file contents through the hosted filesystem ABI."""
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_sync_data_buffer(abs handle: Int) -> Int;
 
 """Synchronize file contents and metadata through the hosted filesystem ABI."""
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_sync_all_buffer(abs handle: Int) -> Int;
 
 """Close an owned handle exactly once through the C ABI; zero is success and `-1` is failure."""
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
 
 """Move a file cursor through the C ABI and return its resulting absolute byte position or failure."""
+meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_seek_buffer(
     abs handle: Int,
     abs offset: Int,
@@ -85,6 +93,7 @@ in the returned resource. `Ok(File)` transfers ownership of the new host
 handle to the caller, while `Err(IoError.Failed)` reports that the path could
 not be opened. The `File` Drop performance closes a successful handle once.
 """
+meta effect("filesystem", "blocking")
 open verb file_open(abs path: path_module::Path) -> Result[File, io::IoError] {
     erg mode = 0;
     erg handle = actus_file_open_path(path: abs path, mode: abs mode);
@@ -106,6 +115,7 @@ Create or truncate a filesystem path for writing.
 the caller ownership of the new host handle; `Err(IoError.Failed)` means the
 host rejected creation or truncation. No path buffer is retained by `File`.
 """
+meta effect("filesystem", "blocking")
 open verb file_create(abs path: path_module::Path) -> Result[File, io::IoError] {
     erg mode = 1;
     erg handle = actus_file_open_path(path: abs path, mode: abs mode);
@@ -131,6 +141,7 @@ buffer capacity. `Err(EndOfStream)` means the provider reached EOF before
 producing more bytes; `Err(Failed)` preserves other native read failures.
 The file cursor advances by the returned count when the host accepts bytes.
 """
+meta effect("filesystem", "blocking")
 open verb file_read(ins self: File, ins buffer: Buffer) -> Result[Int, io::IoError] {
     erg status = actus_file_read_buffer(handle: abs self.handle, buffer: ins buffer);
     return case status {
@@ -151,6 +162,7 @@ callers must explicitly retry any remaining range. `Err(EndOfStream)` or
 `Err(Failed)` reports the corresponding native status and does not close the
 file.
 """
+meta effect("filesystem", "blocking")
 open verb file_write(ins self: File, abs buffer: Buffer) -> Result[Int, io::IoError] {
     erg status = actus_file_write_buffer(handle: abs self.handle, buffer: abs buffer);
     return case status {
@@ -170,6 +182,7 @@ handing buffered bytes to the provider; no buffer is allocated or returned.
 durable media persistence; use `file_sync_data` or `file_sync_all` for that
 explicit boundary.
 """
+meta effect("filesystem", "blocking")
 open verb file_flush(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_flush_buffer(handle: abs self.handle);
     return case status {
@@ -188,6 +201,7 @@ or another non-negative status means the provider accepted the request;
 `Err(Failed)` reports rejection or native failure. The guarantee is limited
 to what the selected target and filesystem provider implement.
 """
+meta effect("filesystem", "blocking")
 open verb file_sync_data(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_sync_data_buffer(handle: abs self.handle);
     return case status {
@@ -207,6 +221,7 @@ metadata. `Ok(0)` or another non-negative status means the request was
 accepted; `Err(Failed)` reports rejection or native failure. Durability is
 bounded by the target and filesystem provider's documented guarantees.
 """
+meta effect("filesystem", "blocking")
 open verb file_sync_all(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_sync_all_buffer(handle: abs self.handle);
     return case status {
@@ -224,6 +239,7 @@ second time. `Ok(status)` reports the native close status, normally zero; on
 `Err(Failed)` the handle remains live so deterministic scope cleanup can
 attempt the release again. No path or data buffer is allocated or retained.
 """
+meta effect("filesystem", "blocking")
 open verb file_close(ins self: File) -> Result[Int, io::IoError] {
     erg status = actus_file_close_buffer(handle: abs self.handle);
     return case status {
@@ -245,6 +261,7 @@ open perform io::Reader for File {
     and the file remains open for subsequent reads. No hidden allocation or
     implicit close is introduced; native failures are returned as `IoError`.
     """
+    meta effect("filesystem", "blocking")
     verb read(ins self: File, ins buffer: Buffer) -> Result[Int, io::IoError] {
         return file_read(self: ins self, buffer: ins buffer);
     }
@@ -260,6 +277,7 @@ open perform io::Writer for File {
     result reports the exact count accepted, including a possible short
     write; no hidden allocation or implicit close occurs.
     """
+    meta effect("filesystem", "blocking")
     verb write(ins self: File, abs buffer: Buffer) -> Result[Int, io::IoError] {
         return file_write(self: ins self, buffer: abs buffer);
     }
@@ -270,6 +288,7 @@ open perform io::Writer for File {
     no hidden allocation, and returns the provider status or `IoError.Failed`.
     It is not a substitute for the explicit durability operations.
     """
+    meta effect("filesystem", "blocking")
     verb flush(ins self: File) -> Result[Int, io::IoError] {
         return file_flush(self: ins self);
     }
@@ -299,6 +318,7 @@ and allocates no buffer. `Ok(position)` returns the resulting absolute byte
 position. `Err(Failed)` reports an invalid offset, unsupported seek, or native
 failure without transferring or closing the file.
 """
+meta effect("filesystem", "blocking")
 open verb file_seek_start(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 0;
     erg status = actus_file_seek_buffer(
@@ -317,6 +337,7 @@ immutable byte displacement, and only the native cursor is mutated; no buffer
 or path allocation occurs. `Ok(position)` returns the resulting absolute byte
 position, while `Err(Failed)` reports native rejection.
 """
+meta effect("filesystem", "blocking")
 open verb file_seek_current(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 1;
     erg status = actus_file_seek_buffer(
@@ -336,6 +357,7 @@ runtime mutates only the cursor and performs no hidden allocation. `Ok(position)
 returns the resulting absolute byte position; `Err(Failed)` reports native
 rejection.
 """
+meta effect("filesystem", "blocking")
 open verb file_seek_end(ins self: File, abs offset: Int) -> Result[Int, io::IoError] {
     erg origin = 2;
     erg status = actus_file_seek_buffer(
@@ -360,6 +382,7 @@ open perform io::Seeker for File {
     verb. Ownership of the `File` remains with the caller through the `ins`
     loan, and native rejection is returned as `IoError.Failed`.
     """
+    meta effect("filesystem", "blocking")
     verb seek(ins self: File, dat from: io::SeekFrom) -> Result[Int, io::IoError] {
         return case dat from {
             io::SeekFrom.Start(offset) => file_seek_start(self: ins self, offset: abs offset),
@@ -394,6 +417,7 @@ Inspect the open file through the runtime metadata bridge. The operation does
 not transfer or close the file, allocate a buffer, or retain a reference; its
 result is either a complete `Metadata` value or a typed I/O failure.
 """
+    meta effect("filesystem", "blocking")
     verb metadata(ins self: File) -> Result[Metadata, io::IoError] {
         return file_metadata(self: ins self);
     }
@@ -415,6 +439,7 @@ Successful release is idempotent because `file_close` stores the invalid
 handle sentinel. Drop intentionally discards the close result; explicit
 `file_close` is the observable failure path.
 """
+    meta effect("filesystem", "blocking")
     verb drop(ins self: File) {
         file_close(self: ins self);
     }

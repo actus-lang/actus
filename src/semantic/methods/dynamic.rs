@@ -15,7 +15,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let method = self.dynamic_method(role_name, method_name, span)?;
         self.validate_dynamic_receiver(receiver, &method, method_name, span)?;
-        self.visit_expression(receiver)?;
+        self.visit_consumed_expression(receiver)?;
         let signature = super::super::dynamic::role_method_signature(&method);
         let mut parameters = signature.params;
         let mut dispatch = signature.dynamic_params;

@@ -129,6 +129,7 @@ Arm an owned timer from the current monotonic provider time.
 Created, canceled, expired, and completed transitions are validated; deadline
 overflow returns `TimeError.Overflow` without changing the timer state.
 """
+meta effect("clock")
 open verb timer_arm(ins timer: Timer, abs delay: Duration) -> Result[Int, TimeError] {
     erg start: Instant = now();
     return timer_arm_at(
@@ -176,6 +177,7 @@ Poll an owned timer using the current monotonic provider.
 The operation mutates only lifecycle/deadline fields through `ins`. It emits
 one `TimerPoll.Fired` event at most per call and never invokes callbacks.
 """
+meta effect("clock")
 open verb timer_poll(ins timer: Timer) -> Result[TimerPoll, TimeError] {
     erg current: Instant = now();
     return timer_poll_at(timer: ins timer, instant: abs current);

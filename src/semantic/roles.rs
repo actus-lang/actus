@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
-use crate::ast::{Param, PerformDecl, RoleDecl, RoleMethod, TopLevelDecl, TypeName};
+use crate::ast::{Effect, Param, PerformDecl, RoleDecl, RoleMethod, TopLevelDecl, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
+use super::dynamic::role_method_signature;
 use super::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
@@ -153,6 +154,74 @@ impl Analyzer {
                     implementation.span,
                 ));
             }
+            let expected = role_method_signature(required).effects;
+            let found = implementation.signature().effects;
+            if !effects_within_role_contract(&expected, &found) {
+                return Err(role_error(
+                    SemanticErrorKind::RoleMethodEffectMismatch {
+                        role: perform.role_name.clone(),
+                        method: required.name.clone(),
+                        expected,
+                        found,
+                    },
+                    implementation.span,
+                ));
+            }
+            self.validate_capability_method(required, implementation, &perform.role_name)?;
+            self.validate_realtime_method(required, implementation, &perform.role_name)?;
+            let expected = role_method_signature(required).must_use;
+            let found = implementation.signature().must_use;
+            if expected != found {
+                return Err(role_error(
+                    SemanticErrorKind::RoleMethodMustUseMismatch {
+                        role: perform.role_name.clone(),
+                        method: required.name.clone(),
+                        expected,
+                        found,
+                    },
+                    implementation.span,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_capability_method(
+        &self,
+        required: &RoleMethod,
+        implementation: &crate::ast::VerbDecl,
+        role: &str,
+    ) -> Result<(), SemanticError> {
+        let expected = role_method_signature(required).capabilities;
+        let found = implementation.signature().capabilities;
+        if capabilities_within_role_contract(&expected, &found) {
+            return Ok(());
+        }
+        Err(role_error(
+            SemanticErrorKind::RoleMethodCapabilityMismatch {
+                role: role.to_owned(),
+                method: required.name.clone(),
+                expected,
+                found,
+            },
+            implementation.span,
+        ))
+    }
+
+    fn validate_realtime_method(
+        &self,
+        required: &crate::ast::RoleMethod,
+        implementation: &crate::ast::VerbDecl,
+        role: &str,
+    ) -> Result<(), SemanticError> {
+        if role_method_signature(required).realtime && !implementation.signature().realtime {
+            return Err(role_error(
+                SemanticErrorKind::RoleMethodRealtimeMismatch {
+                    role: role.to_owned(),
+                    method: required.name.clone(),
+                },
+                implementation.span,
+            ));
         }
         Ok(())
     }
@@ -259,6 +328,17 @@ impl Analyzer {
                 .zip(&right.arguments)
                 .all(|(left, right)| self.imported_type_names_match(left, right))
     }
+}
+
+fn effects_within_role_contract(contract: &[Effect], implementation: &[Effect]) -> bool {
+    implementation.iter().all(|effect| contract.contains(effect))
+}
+
+fn capabilities_within_role_contract(
+    contract: &[crate::ast::Capability],
+    implementation: &[crate::ast::Capability],
+) -> bool {
+    implementation.iter().all(|capability| contract.contains(capability))
 }
 
 fn is_self_type(type_name: &TypeName) -> bool {

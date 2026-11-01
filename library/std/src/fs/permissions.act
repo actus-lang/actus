@@ -11,6 +11,7 @@ Inspect readonly state without exposing host permission structures.
 blocking on hosted targets, allocates no filesystem handle, and returns a
 typed error when the target cannot be inspected.
 """
+meta effect("filesystem", "blocking")
 open verb is_readonly(abs path: path_module::Path) -> Result[Bool, io::IoError] {
     erg inspected = metadata(path: abs path);
     return case dat inspected {

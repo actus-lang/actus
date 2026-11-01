@@ -45,7 +45,24 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn ownership_call_message(kind: &SemanticErrorKind) -> Option<String> {
-    ownership_argument_message(kind).or_else(|| ownership_state_message(kind))
+    capability_message(kind)
+        .or_else(|| ownership_argument_message(kind))
+        .or_else(|| ownership_state_message(kind))
+}
+
+fn capability_message(kind: &SemanticErrorKind) -> Option<String> {
+    Some(match kind {
+        SemanticErrorKind::UndeclaredCapability { callee, capability } => {
+            format!("call to `{callee}` requires undeclared capability `{}`", capability.name())
+        }
+        SemanticErrorKind::UnsupportedCapability { capability, target } => {
+            format!("capability `{capability}` is not available for target `{target}`")
+        }
+        SemanticErrorKind::RoleMethodCapabilityMismatch { role, method, .. } => {
+            format!("role method `{role}::{method}` must preserve its capability contract")
+        }
+        _ => return None,
+    })
 }
 
 fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
@@ -66,6 +83,36 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::InvalidAbsReturnOrigin { reason } => {
             format!("invalid abs return origin: {reason}")
+        }
+        SemanticErrorKind::MustUseIgnored { callee, reason } => {
+            format!("must-use result from `{callee}` was ignored: {reason}")
+        }
+        SemanticErrorKind::UndeclaredEffect { callee, effect } => {
+            format!("call to `{callee}` requires undeclared effect `{}`", effect.name())
+        }
+        SemanticErrorKind::NondeterministicCall { callee, effect } => {
+            format!("deterministic code cannot call `{callee}` with effect `{}`", effect.name())
+        }
+        SemanticErrorKind::RealtimeEffect { callee, effect } => {
+            format!("realtime code cannot call `{callee}` with effect `{}`", effect.name())
+        }
+        SemanticErrorKind::RealtimeUnboundedLoop => {
+            "realtime code cannot contain an unbounded `loop`; use a statically bounded range or array loop".to_owned()
+        }
+        SemanticErrorKind::RealtimeFloatingPoint => {
+            "realtime code cannot use floating-point literals or operations".to_owned()
+        }
+        SemanticErrorKind::RealtimeUnboundedRecursion => {
+            "realtime code cannot recursively call itself without a static bound".to_owned()
+        }
+        SemanticErrorKind::BoundedBudgetExceeded { dimension, limit, required } => {
+            format!("bounded contract for `{dimension}` allows {limit}, but the body requires {required}")
+        }
+        SemanticErrorKind::RoleMethodMustUseMismatch { role, method, .. } => {
+            format!("role method `{role}::{method}` must preserve its must-use contract")
+        }
+        SemanticErrorKind::RoleMethodRealtimeMismatch { role, method } => {
+            format!("role method `{role}::{method}` must preserve its realtime contract")
         }
         _ => return None,
     })

@@ -22,6 +22,7 @@ verb bounded_options() -> fs::WalkOptions {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb open_root_walker() -> Result[fs::Walker, IoError] {
     erg root_result = current_directory();
     return case dat root_result {
@@ -34,6 +35,7 @@ verb open_root_walker() -> Result[fs::Walker, IoError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb walker_emits_root_enter_event() -> Int {
     erg opened = open_root_walker();
     return case dat opened {
@@ -62,6 +64,7 @@ verb walker_emits_root_enter_event() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb walker_emits_root_leave_event() -> Int {
     erg opened = open_root_walker();
     return case dat opened {
@@ -100,6 +103,7 @@ verb walker_emits_root_leave_event() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb walker_reports_end_of_stream() -> Int {
     erg opened = open_root_walker();
     return case dat opened {

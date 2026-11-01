@@ -1,6 +1,6 @@
 use crate::lexer::SourceSpan;
 
-use super::callable::{ExternalVerbDecl, Param, VerbDecl};
+use super::callable::{ExternalVerbDecl, MetaAttribute, Param, VerbDecl};
 use super::data::{EnumDef, PackDecl, SerializeDecl, StructDef};
 use super::types::{ReturnType, TypeName};
 
@@ -64,6 +64,7 @@ pub struct RoleDecl {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleMethod {
     pub doc: Option<String>,
+    pub metadata: Vec<MetaAttribute>,
     pub name: String,
     pub params: Vec<Param>,
     pub return_type: Option<ReturnType>,

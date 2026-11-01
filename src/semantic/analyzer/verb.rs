@@ -9,16 +9,47 @@ impl Analyzer {
         self.next_expression_scope += 1;
         self.current_expression_scope = self.next_expression_scope;
         self.configure_return_state(verb);
+        self.validate_realtime_signature(verb)?;
         self.initialize_origin_parameter_map(&verb.params);
         self.enter_scope(verb.body.span);
         self.bind_parameters(&verb.params)?;
         self.visit_block(&verb.body)?;
+        self.validate_bounded_contract(verb)?;
         self.validate_missing_return(verb)?;
         self.leave_scope();
         Ok(())
     }
 
     fn configure_return_state(&mut self, verb: &VerbDecl) {
+        self.current_effects = verb
+            .metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::Effect(effect) => Some(*effect),
+                _ => None,
+            })
+            .collect();
+        self.current_capabilities = verb
+            .metadata
+            .iter()
+            .filter_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::Capability(capability) => Some(*capability),
+                _ => None,
+            })
+            .collect();
+        self.current_deterministic = verb
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Deterministic));
+        self.current_realtime = verb
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Realtime));
+        self.current_bounded = verb.metadata.iter().find_map(|attribute| match attribute {
+            crate::ast::MetaAttribute::Bounded(contract) => Some(contract.clone()),
+            _ => None,
+        });
+        self.current_verb_name = Some(verb.name.clone());
         self.current_return_access =
             verb.return_type.as_ref().map(|return_type| return_type.access);
         self.current_return_type = verb
@@ -37,6 +68,29 @@ impl Analyzer {
                         .get("Result")
                         .is_some_and(|definition| definition.span.start == 0)
             });
+    }
+
+    pub(super) fn validate_realtime_signature(&self, verb: &VerbDecl) -> Result<(), SemanticError> {
+        if !self.current_realtime {
+            return Ok(());
+        }
+        if let Some(parameter) =
+            verb.params.iter().find(|parameter| type_contains_float(&parameter.ty))
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::RealtimeFloatingPoint,
+                span: parameter.span,
+            });
+        }
+        if let Some(return_type) = &verb.return_type
+            && type_contains_float(&return_type.ty)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::RealtimeFloatingPoint,
+                span: return_type.span,
+            });
+        }
+        Ok(())
     }
 
     fn bind_parameters(&mut self, parameters: &[crate::ast::Param]) -> Result<(), SemanticError> {
@@ -74,4 +128,9 @@ impl Analyzer {
         }
         Ok(())
     }
+}
+
+fn type_contains_float(type_name: &crate::ast::TypeName) -> bool {
+    matches!(type_name.name.as_str(), "f32" | "f64")
+        || type_name.arguments.iter().any(type_contains_float)
 }

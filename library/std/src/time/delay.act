@@ -12,6 +12,7 @@ Private busy-wait helper for one already-created monotonic deadline.
 The helper owns no timer resource; it repeatedly reads the provider until the
 deadline is reached. It is kept private so the public API remains `delay`.
 """
+meta effect("clock", "blocking")
 verb wait_until(abs deadline: Deadline) -> Result[Int, TimeError] {
     loop {
         if expired(deadline: abs deadline) {
@@ -28,6 +29,7 @@ Returns `Ok(0)` after the deadline is reached or propagates a typed provider
 or overflow error. This operation may monopolize the current execution core;
 callers needing scheduler cooperation must use `sleep` instead.
 """
+meta effect("clock", "blocking")
 open verb delay(abs duration: Duration) -> Result[Int, TimeError] {
     erg deadline_result = deadline_from_now(duration: abs duration);
     return case dat deadline_result {

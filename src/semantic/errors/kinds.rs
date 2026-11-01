@@ -78,6 +78,38 @@ pub enum SemanticErrorKind {
     EscapingLoan {
         name: String,
     },
+    MustUseIgnored {
+        callee: String,
+        reason: String,
+    },
+    UndeclaredEffect {
+        callee: String,
+        effect: crate::ast::Effect,
+    },
+    UndeclaredCapability {
+        callee: String,
+        capability: crate::ast::Capability,
+    },
+    UnsupportedCapability {
+        capability: String,
+        target: String,
+    },
+    NondeterministicCall {
+        callee: String,
+        effect: crate::ast::Effect,
+    },
+    RealtimeEffect {
+        callee: String,
+        effect: crate::ast::Effect,
+    },
+    RealtimeUnboundedLoop,
+    RealtimeFloatingPoint,
+    RealtimeUnboundedRecursion,
+    BoundedBudgetExceeded {
+        dimension: String,
+        limit: u64,
+        required: String,
+    },
     InvalidOwnerInitializer {
         name: String,
     },
@@ -123,6 +155,28 @@ pub enum SemanticErrorKind {
     RoleMethodMismatch {
         role: String,
         method: String,
+    },
+    RoleMethodEffectMismatch {
+        role: String,
+        method: String,
+        expected: Vec<crate::ast::Effect>,
+        found: Vec<crate::ast::Effect>,
+    },
+    RoleMethodCapabilityMismatch {
+        role: String,
+        method: String,
+        expected: Vec<crate::ast::Capability>,
+        found: Vec<crate::ast::Capability>,
+    },
+    RoleMethodRealtimeMismatch {
+        role: String,
+        method: String,
+    },
+    RoleMethodMustUseMismatch {
+        role: String,
+        method: String,
+        expected: Option<String>,
+        found: Option<String>,
     },
     InvalidRoleReceiver {
         role: String,

@@ -18,6 +18,7 @@ verb make_posix(dat raw: Buffer) -> Path {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb write_file_payload(ins file: File) -> Int {
     erg payload = Buffer[0];
     append(payload, 65);
@@ -44,6 +45,7 @@ verb write_file_payload(ins file: File) -> Int {
     return 0;
 }
 
+meta effect("filesystem", "blocking")
 verb rewind_and_read(ins file: File) -> Int {
     erg origin = SeekFrom.Start(0);
     erg moved = file.seek(from: dat origin);
@@ -82,6 +84,7 @@ verb rewind_and_read(ins file: File) -> Int {
     return 0;
 }
 
+meta effect("filesystem", "blocking")
 verb verify_file_positions(ins file: File) -> Int {
     erg current_offset = 0;
     erg current = file_seek_current(self: ins file, offset: abs current_offset);
@@ -119,6 +122,7 @@ verb verify_file_positions(ins file: File) -> Int {
     return 0;
 }
 
+meta effect("filesystem", "blocking")
 verb exercise_file(dat file: File, abs path: Path) -> Int {
     erg written = write_file_payload(file: ins file);
     case written {
@@ -199,6 +203,7 @@ verb handle_directory_path() -> Path {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb file_handle_methods_and_seeker_origins() -> Int {
     erg path = handle_file_path();
     erg cleanup = remove_file(path: abs path);
@@ -214,6 +219,7 @@ verb file_handle_methods_and_seeker_origins() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb options_and_directory_operations_succeed() -> Int {
     erg directory = handle_directory_path();
     erg removed = remove_dir(path: abs directory);

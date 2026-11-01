@@ -46,6 +46,7 @@ verb read_many_path() -> Path {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb canonicalize_reports_missing_components() -> Int {
     erg path = read_many_path();
     erg stale = remove_file(path: abs path);
@@ -64,6 +65,7 @@ verb canonicalize_reports_missing_components() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb canonicalize_existing_path_returns_absolute_identity() -> Int {
     erg raw = Buffer[0];
     append(raw, 46u8);
@@ -106,6 +108,7 @@ verb dot_path() -> Path {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb same_file_compares_existing_identity() -> Int {
     erg left = dot_path();
     erg right = dot_path();
@@ -124,6 +127,7 @@ verb same_file_compares_existing_identity() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb read_to_bytes_closes_each_owned_file() -> Int {
     erg path = read_many_path();
     erg stale = remove_file(path: abs path);

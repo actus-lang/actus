@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BuiltinType, EnumDef, ReturnAccess, RoleDecl, StructDef};
+use crate::ast::{BuiltinType, Capability, Effect, EnumDef, ReturnAccess, RoleDecl, StructDef};
 use crate::lexer::SourceSpan;
 
 use super::super::model::{Origin, SemanticModel};
@@ -69,6 +69,14 @@ pub(crate) struct Analyzer {
     pub(crate) inferred_expression_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) case_result_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) type_registry: super::super::types::TypeRegistry,
+    pub(crate) discarded_expression: bool,
+    pub(crate) expression_value_consumed: bool,
+    pub(crate) current_effects: Vec<Effect>,
+    pub(crate) current_capabilities: Vec<Capability>,
+    pub(crate) current_deterministic: bool,
+    pub(crate) current_realtime: bool,
+    pub(crate) current_bounded: Option<crate::ast::BoundedContract>,
+    pub(crate) current_verb_name: Option<String>,
 }
 
 impl Analyzer {

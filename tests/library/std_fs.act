@@ -21,6 +21,7 @@ verb empty_path() -> Path {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb empty_path_is_rejected_by_file_open() -> Int {
     erg path = empty_path();
     erg result = file_open(path: abs path);

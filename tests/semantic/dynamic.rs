@@ -38,6 +38,23 @@ fn accepts_dynamic_abs_parameter_for_a_performed_type() {
 }
 
 #[test]
+fn dynamic_role_calls_propagate_the_role_effect_contract() {
+    let source = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return self.value; } } verb send(abs writer: dynamic Writer) -> Int { return writer.write(); }";
+    let error = analyze_source(source).expect_err("dynamic callers must declare role effects");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "write" && effect == actus::ast::Effect::Filesystem
+    ));
+
+    let declared = source.replace(
+        "verb send(abs writer: dynamic Writer)",
+        "meta effect(\"filesystem\") verb send(abs writer: dynamic Writer)",
+    );
+    analyze_source(&declared).expect("declared dynamic effect should pass");
+}
+
+#[test]
 fn rejects_dynamic_parameter_without_abs_role() {
     let error = analyze_source("verb send(erg writer: dynamic Writer) { }")
         .expect_err("dynamic roles must be borrowed");

@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::ast::{ImportDecl, Program, TopLevelDecl};
+use crate::ast::{ImportDecl, MetaAttribute, Program, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
 use super::super::resolver::ResolvedChildModule;
 use super::types::{DuplicateDeclaration, ModuleError, ModuleLocation};
+
+type DeclarationLocation = (ModuleLocation, Option<String>);
 
 pub(super) fn validate_import_bindings(program: &Program) -> Result<(), ModuleError> {
     let mut bindings = HashMap::new();
@@ -39,7 +41,7 @@ fn import_binding(import: &ImportDecl) -> String {
 pub(super) fn check_declaration_name(
     declaration: &TopLevelDecl,
     path: &Path,
-    locations: &mut HashMap<(String, String), ModuleLocation>,
+    locations: &mut HashMap<(String, String), Vec<DeclarationLocation>>,
 ) -> Result<(), ModuleError> {
     let (kind, name, span) = match declaration {
         TopLevelDecl::Perform(perform) => {
@@ -52,15 +54,40 @@ pub(super) fn check_declaration_name(
     };
     let key = (kind.clone(), name.clone());
     let location = ModuleLocation { path: path.to_owned(), span };
-    if let Some(first) = locations.insert(key, location.clone()) {
+    let target = target_selector(declaration).map(str::to_owned);
+    let entries = locations.entry(key).or_default();
+    if let Some((first, _)) = entries.iter().find(|(_, first_target)| {
+        !target_scopes_are_disjoint(first_target.as_deref(), target.as_deref())
+    }) {
         return Err(ModuleError::DuplicateDeclaration(Box::new(DuplicateDeclaration {
             kind,
             name,
-            first,
+            first: first.clone(),
             second: location,
         })));
     }
+    entries.push((location, target));
     Ok(())
+}
+
+pub(super) fn target_selector(declaration: &TopLevelDecl) -> Option<&str> {
+    let metadata = match declaration {
+        TopLevelDecl::Verb(value) => &value.metadata,
+        TopLevelDecl::ExternalVerb(value) => &value.metadata,
+        _ => return None,
+    };
+    metadata.iter().find_map(|attribute| match attribute {
+        MetaAttribute::Target(target) => Some(target.as_str()),
+        _ => None,
+    })
+}
+
+pub(super) fn target_scopes_are_disjoint(first: Option<&str>, second: Option<&str>) -> bool {
+    let (Some(first), Some(second)) = (first, second) else { return false };
+    if first == second {
+        return false;
+    }
+    matches!((first, second), ("windows", "unix" | "posix") | ("unix" | "posix", "windows"))
 }
 
 fn performance_identity(perform: &crate::ast::PerformDecl) -> String {

@@ -153,29 +153,6 @@ impl Parser {
         Ok(())
     }
 
-    pub(super) fn parse_metadata_declaration(
-        &mut self,
-        metadata: Vec<crate::ast::MetaAttribute>,
-        doc: Option<String>,
-    ) -> Result<TopLevelDecl, ParseError> {
-        if self.check_simple(&TokenKind::Verb) {
-            return Ok(TopLevelDecl::Verb(self.parse_verb_with_metadata(false, metadata, doc)?));
-        }
-        if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
-            return Ok(TopLevelDecl::ExternalVerb(self.parse_external_verb(
-                self.check_simple(&TokenKind::Unsafe),
-                false,
-                metadata,
-                doc,
-            )?));
-        }
-        Err(ParseError {
-            code: ParseErrorCode::MetadataTargetNotAllowed,
-            kind: ParseErrorKind::MetadataTargetNotAllowed,
-            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
-        })
-    }
-
     fn parse_external_declaration(
         &mut self,
         unsafe_boundary: bool,
@@ -381,7 +358,7 @@ impl Parser {
         })
     }
 
-    fn parse_external_verb(
+    pub(super) fn parse_external_verb(
         &mut self,
         unsafe_boundary: bool,
         is_open: bool,
@@ -457,5 +434,11 @@ fn target_selector(attribute: &crate::ast::MetaAttribute) -> Option<&str> {
         crate::ast::MetaAttribute::Test => None,
         crate::ast::MetaAttribute::Fault(_) => None,
         crate::ast::MetaAttribute::Limitless(_) => None,
+        crate::ast::MetaAttribute::MustUse(_) => None,
+        crate::ast::MetaAttribute::Effect(_) => None,
+        crate::ast::MetaAttribute::Deterministic => None,
+        crate::ast::MetaAttribute::Realtime => None,
+        crate::ast::MetaAttribute::Bounded(_) => None,
+        crate::ast::MetaAttribute::Capability(_) => None,
     }
 }

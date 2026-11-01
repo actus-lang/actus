@@ -1,6 +1,51 @@
 use super::{Formatter, declaration_widths::parameter_width, meta_name, role_name};
 
 impl Formatter<'_> {
+    fn metadata(&mut self, metadata: &[crate::ast::MetaAttribute]) {
+        let mut index = 0;
+        while index < metadata.len() {
+            if let crate::ast::MetaAttribute::Effect(effect) = metadata[index] {
+                self.line_indent();
+                self.output.push_str("meta effect(\"");
+                self.output.push_str(effect.name());
+                self.output.push('"');
+                index += 1;
+                while index < metadata.len() {
+                    let crate::ast::MetaAttribute::Effect(effect) = metadata[index] else { break };
+                    self.output.push_str(", \"");
+                    self.output.push_str(effect.name());
+                    self.output.push('"');
+                    index += 1;
+                }
+                self.output.push_str(")\n");
+                continue;
+            }
+            if let crate::ast::MetaAttribute::Capability(capability) = metadata[index] {
+                self.line_indent();
+                self.output.push_str("meta capability(\"");
+                self.output.push_str(capability.name());
+                self.output.push('"');
+                index += 1;
+                while index < metadata.len() {
+                    let crate::ast::MetaAttribute::Capability(capability) = metadata[index] else {
+                        break;
+                    };
+                    self.output.push_str(", \"");
+                    self.output.push_str(capability.name());
+                    self.output.push('"');
+                    index += 1;
+                }
+                self.output.push_str(")\n");
+                continue;
+            }
+            self.line_indent();
+            self.output.push_str("meta ");
+            self.output.push_str(&meta_name(&metadata[index]));
+            self.output.push('\n');
+            index += 1;
+        }
+    }
+
     pub(super) fn serialize_definition(&mut self, definition: &crate::ast::SerializeDecl) {
         self.documentation(definition.doc.as_deref());
         if definition.is_open {
@@ -62,6 +107,7 @@ impl Formatter<'_> {
                 self.emit_comments_before(method.span.start);
             }
             self.documentation(method.doc.as_deref());
+            self.metadata(&method.metadata);
             self.line_indent();
             self.output.push_str("verb ");
             self.output.push_str(&method.name);
@@ -111,12 +157,7 @@ impl Formatter<'_> {
 
     pub(super) fn verb(&mut self, verb: &crate::ast::VerbDecl) {
         self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
-        for metadata in &verb.metadata {
-            self.line_indent();
-            self.output.push_str("meta ");
-            self.output.push_str(&meta_name(metadata));
-            self.output.push('\n');
-        }
+        self.metadata(&verb.metadata);
         if self.indent > 0 {
             self.line_indent();
         }
@@ -134,6 +175,7 @@ impl Formatter<'_> {
 
     pub(super) fn external_verb(&mut self, verb: &crate::ast::ExternalVerbDecl) {
         self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
+        self.metadata(&verb.metadata);
         if verb.is_open {
             self.output.push_str("open ");
         }
@@ -423,58 +465,6 @@ impl Formatter<'_> {
         self.documentation(sibling.doc.as_deref());
         self.output.push_str("open ");
         self.output.push_str(&sibling.name);
-        self.output.push(';');
-    }
-
-    pub(super) fn import(&mut self, import: &crate::ast::ImportDecl) {
-        self.output.push_str("import ");
-        if import.is_open {
-            self.output.push_str("open ");
-        }
-        self.output.push_str(&import.path);
-        if !import.selected.is_empty() {
-            self.output.push_str(" {");
-            for (index, name) in import.selected.iter().enumerate() {
-                if index > 0 {
-                    self.output.push_str(", ");
-                }
-                self.output.push_str(name);
-            }
-            self.output.push('}');
-        }
-        if let Some(alias) = &import.alias {
-            self.output.push_str(" as ");
-            self.output.push_str(alias);
-        }
-        self.output.push(';');
-    }
-
-    pub(super) fn import_group(&mut self, declarations: &[crate::ast::TopLevelDecl]) {
-        self.output.push_str("import {\n");
-        for declaration in declarations {
-            let crate::ast::TopLevelDecl::Import(import) = declaration else { continue };
-            self.output.push_str("    ");
-            if import.is_open {
-                self.output.push_str("open ");
-            }
-            self.output.push_str(&import.path);
-            if !import.selected.is_empty() {
-                self.output.push_str(" {");
-                for (index, name) in import.selected.iter().enumerate() {
-                    if index > 0 {
-                        self.output.push_str(", ");
-                    }
-                    self.output.push_str(name);
-                }
-                self.output.push('}');
-            }
-            if let Some(alias) = &import.alias {
-                self.output.push_str(" as ");
-                self.output.push_str(alias);
-            }
-            self.output.push_str(",\n");
-        }
-        self.output.push('}');
         self.output.push(';');
     }
 }

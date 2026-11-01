@@ -79,6 +79,7 @@ pub struct ExportedSymbol {
     pub kind: String,
     pub name: String,
     pub source: PathBuf,
+    pub target: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
