@@ -153,7 +153,7 @@ combination is executable or that LLVM is ready to become the default.
 
 ### 49.2 — Complete shared-contract lowering
 
-- [ ] Prove LLVM coverage for scalar values, calls, returns, branches, loops,
+- [x] Prove LLVM coverage for scalar values, calls, returns, branches, loops,
       traps, typed failures, and checked casts.
 - [ ] Complete aggregate, array, pack, enum, tagged-union, transparent,
       packed, and explicitly aligned layout lowering.
@@ -162,6 +162,18 @@ combination is executable or that LLVM is ready to become the default.
 - [ ] Complete generic specialization, imported modules, dynamic dispatch,
       native boundaries, and recursive call handling.
 - [ ] Verify LLVM module signatures and layouts before object emission.
+
+#### 49.2 scalar/control-flow evidence
+
+The LLVM backend suite contains direct coverage for the complete scalar and
+control-flow contract. The relevant evidence includes integer widths and
+constants, direct and external calls, scalar and unit returns, typed branches
+and jump edge arguments, fixed-array iteration, checked casts, division and
+shift guards, typed failures, and native trap terminators. The full
+`cargo test --features llvm --test llvm_backend -- --test-threads=1` run passed
+54 tests; the all-features LLVM-filtered run passed 16 focused tests, including
+the width and rejection regressions. No backend-specific semantic lowering was
+added to close this checkbox.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
