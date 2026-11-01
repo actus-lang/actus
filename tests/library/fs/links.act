@@ -12,6 +12,7 @@ verb current_path() -> Result[path::Path, path::PathError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb link_inspection_does_not_follow_regular_directory() -> Int {
     erg candidate = current_path();
     return case dat candidate {

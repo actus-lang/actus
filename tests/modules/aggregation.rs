@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use actus::modules::{ModuleError, ModuleResolver, analyze_module, parse_module};
+use actus::semantic::{analyze, filter_program_for_target_checked};
+use actus::target::TargetSpec;
 
 struct Fixture {
     root: PathBuf,
@@ -59,6 +61,29 @@ fn aggregates_open_child_implementation_into_parent_scope() {
 
     assert_eq!(program.declarations.len(), 5);
     analyze_module(&resolver, "aie").expect("parent should resolve child declarations internally");
+}
+
+#[test]
+fn preserves_target_disjoint_alternatives_until_target_filtering() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "demo/demo.act",
+        "meta target(\"unix\") open verb platform_value() -> Int { return 41; }",
+    );
+    fixture.write(
+        "demo/windows.act",
+        "meta target(\"windows\") open verb platform_value() -> Int { return 99; }",
+    );
+
+    let resolver = ModuleResolver::new(&fixture.root);
+    let program = parse_module(&resolver, "demo")
+        .expect("target-disjoint declarations should survive module aggregation");
+    assert_eq!(program.declarations.len(), 2);
+
+    let target = TargetSpec::parse("x86_64-unknown-linux-gnu").expect("Linux target");
+    let filtered = filter_program_for_target_checked(&program, &target)
+        .expect("inactive target declaration should be removed before semantic analysis");
+    analyze(&filtered).expect("active target declaration should analyze");
 }
 
 #[test]

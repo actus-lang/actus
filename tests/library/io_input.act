@@ -3,6 +3,7 @@ import {
 };
 
 meta test
+meta effect("blocking")
 verb stdin_line_and_stream_reads_report_typed_eof() -> Int {
     erg line_buffer = Buffer[0];
     erg line_result = read_line(buffer: ins line_buffer);

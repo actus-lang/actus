@@ -9,7 +9,7 @@ use crate::diagnostics::{
 use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::modules::{ModuleError, ModuleResolver};
 use crate::parser::{ParseError, ParseErrorKind, parse};
-use crate::semantic::{analyze, filter_program_for_target};
+use crate::semantic::{analyze, filter_program_for_target_checked};
 use crate::target::TargetSpec;
 
 use super::position::{LineIndex, LspRange};
@@ -76,7 +76,10 @@ fn collect_diagnostics(
         sort_diagnostics(&mut diagnostics);
         return diagnostics;
     }
-    let program = filter_program_for_target(&program, target);
+    let program = match filter_program_for_target_checked(&program, target) {
+        Ok(program) => program,
+        Err(error) => return vec![semantic_diagnostic(&error)],
+    };
     if let Err(error) = analyze(&program) {
         return vec![semantic_diagnostic(&error)];
     }

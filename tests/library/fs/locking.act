@@ -47,12 +47,14 @@ verb unlock_succeeds(ins file: fs::File) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb open_peer(abs path: path::Path) -> Result[fs::File, io::IoError] {
     erg options = fs::options_new();
     erg readable = fs::options_read(dat options);
     return fs::options_open(options: dat readable, path: abs path);
 }
 
+meta effect("filesystem", "blocking")
 verb exercise_locking(dat resource: fs::TemporaryFile) -> Int {
     erg peer_result = open_peer(path: abs resource.path);
     return case dat peer_result {
@@ -100,6 +102,8 @@ verb exercise_locking(dat resource: fs::TemporaryFile) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking", "entropy")
+meta capability("filesystem.create_exclusive")
 verb locking_coordinates_two_handles_without_consuming_file() -> Int {
     erg root_result = current_directory();
     return case dat root_result {

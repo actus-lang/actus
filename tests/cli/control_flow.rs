@@ -1,10 +1,16 @@
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 use super::*;
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+static NEXT_VALUE_IF_FIXTURE: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 fn run_shared_value_if_fixture(backend: &str, source: &str) -> i32 {
-    let root =
-        std::env::temp_dir().join(format!("actus-cli-value-if-{backend}-{}", std::process::id()));
+    let fixture_id = NEXT_VALUE_IF_FIXTURE.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir()
+        .join(format!("actus-cli-value-if-{backend}-{}-{fixture_id}", std::process::id()));
     let input = root.join("main.act");
     let output = root.join("main.bin");
     fs::create_dir_all(&root).expect("create value-if fixture directory");

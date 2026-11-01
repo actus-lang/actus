@@ -39,6 +39,7 @@ Create a deadline relative to the current monotonic instant.
 The duration is borrowed. The active provider supplies the start instant and
 overflow is returned as `TimeError.Overflow` rather than wrapped.
 """
+meta effect("clock")
 open verb deadline_from_now(abs duration: Duration) -> Result[Deadline, TimeError] {
     erg start: Instant = now();
     return deadline_after(start: abs start, duration: abs duration);
@@ -50,6 +51,7 @@ Report whether the current monotonic instant has reached the deadline.
 The deadline is borrowed and remains unchanged. The operation is a provider
 read and has no allocation; it returns `true` at or after expiration.
 """
+meta effect("clock")
 open verb expired(abs deadline: Deadline) -> Bool {
     erg current: Instant = now();
     return current.ticks >= deadline.expires_at;
@@ -62,6 +64,7 @@ An expired deadline returns `Ok(Duration(0))`. An active deadline returns the
 non-negative provider-domain difference. The deadline is borrowed and no
 allocation occurs; provider failures follow the active runtime contract.
 """
+meta effect("clock")
 open verb remaining(abs deadline: Deadline) -> Result[Duration, TimeError] {
     erg current: Instant = now();
     if current.ticks >= deadline.expires_at {

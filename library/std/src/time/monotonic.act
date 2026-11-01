@@ -21,6 +21,7 @@ calendar meaning. The call does not allocate and exposes no platform type or
 raw pointer. A runtime/provider failure is handled by the selected runtime's
 documented failure boundary.
 """
+meta effect("clock")
 open verb monotonic_nanos() -> u64 {
     return actus_monotonic_nanos();
 }

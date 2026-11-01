@@ -22,6 +22,7 @@ verb publication_path(erg suffix: u8) -> Result[path::Path, path::PathError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb atomic_publication_replaces_staging_file() -> Int {
     erg destination_suffix: u8 = 49u8;
     erg destination_result = publication_path(suffix: erg destination_suffix);
@@ -69,8 +70,9 @@ verb atomic_publication_replaces_staging_file() -> Int {
     };
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking")
 verb atomic_publication_syncs_parent_directory() -> Int {
     erg destination_suffix: u8 = 53u8;
     erg destination_result = publication_path(suffix: erg destination_suffix);
@@ -118,6 +120,7 @@ verb atomic_publication_syncs_parent_directory() -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb write_replace_fixture(abs path: path::Path, abs value: u8) -> Bool {
     erg payload = Buffer[0];
     append(payload, value);
@@ -128,6 +131,7 @@ verb write_replace_fixture(abs path: path::Path, abs value: u8) -> Bool {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb read_replace_fixture(abs path: path::Path) -> Int {
     erg loaded = fs::read_to_bytes(path: abs path);
     return case dat loaded {
@@ -143,13 +147,16 @@ verb read_replace_fixture(abs path: path::Path) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb cleanup_replace_fixture(abs destination: path::Path, abs staging: path::Path) {
     fs::remove_file(path: abs destination);
     fs::remove_file(path: abs staging);
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
 verb atomic_replace_replaces_existing_destination() -> Int {
     erg destination_suffix: u8 = 57u8;
     erg staging_suffix: u8 = 58u8;
@@ -217,6 +224,7 @@ verb missing_parent_path(erg suffix: u8) -> Result[path::Path, path::PathError] 
     return path::path_from_ascii(storage: dat raw);
 }
 
+meta effect("filesystem", "blocking")
 verb verify_failed_publication(
     abs destination: path::Path,
     abs staging: path::Path
@@ -245,8 +253,9 @@ verb verify_failed_publication(
     };
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking")
 verb atomic_publication_cleans_failed_rename() -> Int {
     erg destination_suffix: u8 = 61u8;
     erg staging_suffix: u8 = 62u8;
@@ -289,8 +298,9 @@ verb atomic_publication_cleans_failed_rename() -> Int {
     };
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking")
 verb atomic_publication_replaces_stale_staging() -> Int {
     erg destination_suffix: u8 = 63u8;
     erg staging_suffix: u8 = 64u8;
@@ -338,7 +348,11 @@ verb atomic_publication_replaces_stale_staging() -> Int {
     };
 }
 
-verb injected_prepublication_failure(erg destination_suffix: u8, erg staging_suffix: u8) -> Int {
+meta effect("filesystem", "blocking")
+verb injected_prepublication_failure(
+    erg destination_suffix: u8,
+    erg staging_suffix: u8
+) -> Int {
     erg destination_result = publication_path(suffix: erg destination_suffix);
     return case dat destination_result {
         Result.Err(_) => 1,
@@ -367,10 +381,7 @@ verb injected_prepublication_failure(erg destination_suffix: u8, erg staging_suf
                                     4;
                                 },
                                 Result.Err(_) => {
-                                    erg result = verify_failed_publication(
-                                        destination: abs destination,
-                                        staging: abs staging_check
-                                    );
+                                    erg result = verify_failed_publication(destination: abs destination, staging: abs staging_check);
                                     drop(staging_check);
                                     result;
                                 },
@@ -383,45 +394,40 @@ verb injected_prepublication_failure(erg destination_suffix: u8, erg staging_suf
     };
 }
 
+meta test
 meta target("unix")
 meta fault("short_write")
-meta test
+meta effect("filesystem", "blocking")
 verb injected_short_write_is_rejected() -> Int {
     erg destination_suffix: u8 = 65u8;
     erg staging_suffix: u8 = 66u8;
-    return injected_prepublication_failure(
-        destination_suffix: erg destination_suffix,
-        staging_suffix: erg staging_suffix
-    );
+    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
 }
 
+meta test
 meta target("unix")
 meta fault("flush_failure")
-meta test
+meta effect("filesystem", "blocking")
 verb injected_flush_failure_is_rejected() -> Int {
     erg destination_suffix: u8 = 67u8;
     erg staging_suffix: u8 = 68u8;
-    return injected_prepublication_failure(
-        destination_suffix: erg destination_suffix,
-        staging_suffix: erg staging_suffix
-    );
+    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
 }
 
+meta test
 meta target("unix")
 meta fault("rename_failure")
-meta test
+meta effect("filesystem", "blocking")
 verb injected_rename_failure_is_rejected() -> Int {
     erg destination_suffix: u8 = 69u8;
     erg staging_suffix: u8 = 70u8;
-    return injected_prepublication_failure(
-        destination_suffix: erg destination_suffix,
-        staging_suffix: erg staging_suffix
-    );
+    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
 }
 
+meta test
 meta target("unix")
 meta fault("parent_sync_failure")
-meta test
+meta effect("filesystem", "blocking")
 verb injected_parent_sync_failure_reports_published_file() -> Int {
     erg destination_suffix: u8 = 71u8;
     erg staging_suffix: u8 = 72u8;
@@ -462,9 +468,10 @@ verb injected_parent_sync_failure_reports_published_file() -> Int {
     };
 }
 
+meta test
 meta target("unix")
 meta fault("interrupted_publication")
-meta test
+meta effect("filesystem", "blocking")
 verb interrupted_publication_is_expected_signal() -> Int {
     erg destination_suffix: u8 = 73u8;
     erg staging_suffix: u8 = 74u8;

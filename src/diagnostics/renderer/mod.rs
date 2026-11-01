@@ -138,6 +138,9 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::UnsupportedTargetPlatform { name } => {
             format!("unsupported target platform `{name}`")
         }
+        ParseErrorKind::UnsupportedCapability { name } => {
+            format!("unsupported capability `{name}`")
+        }
         ParseErrorKind::ConflictingTargetPlatforms { first, second } => {
             format!("conflicting target platforms `{first}` and `{second}`")
         }
@@ -152,6 +155,19 @@ fn parse_message(error: &ParseError) -> String {
         }
         ParseErrorKind::DuplicateMetadata { name } => {
             format!("duplicate metadata attribute `{name}`")
+        }
+        ParseErrorKind::FaultRequiresTest => {
+            "fault metadata requires `meta test` on the same declaration".to_owned()
+        }
+        ParseErrorKind::TestMetadataRequiresVerb => {
+            "test metadata can only be attached to an ordinary verb".to_owned()
+        }
+        ParseErrorKind::MustUseRequiresReturn => {
+            "must-use metadata can only be attached to a verb with a return value".to_owned()
+        }
+        ParseErrorKind::UnsupportedEffect { name } => format!("unsupported effect `{name}`"),
+        ParseErrorKind::InvalidBoundedLimit { reason } => {
+            format!("invalid bounded execution limit: {reason}")
         }
         ParseErrorKind::MalformedVerbContract { reason } => {
             format!("malformed verb contract: {reason}")

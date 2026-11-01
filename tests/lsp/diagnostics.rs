@@ -37,6 +37,97 @@ fn lsp_keeps_lexical_and_type_diagnostics_stable() {
 }
 
 #[test]
+fn lsp_reports_metadata_contract_diagnostics() {
+    let fault_uri = "file:///tmp/actus-lsp-fault-metadata.act";
+    let external_uri = "file:///tmp/actus-lsp-external-test-metadata.act";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":fault_uri,"version":1,"text":"meta fault(\"flush_failure\") verb main() -> Int { return 0; }"}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":external_uri,"version":1,"text":"meta test extern \"C\" verb native_test() -> Int;"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"code\":\"E0016\""), "fault diagnostic missing: {stdout}");
+    assert!(stdout.contains("\"code\":\"E0017\""), "external test diagnostic missing: {stdout}");
+}
+
+#[test]
+fn lsp_accepts_effect_contracts_without_erasing_metadata() {
+    let uri = "file:///tmp/actus-lsp-effect-metadata.act";
+    let source = "role Writer { meta effect(\"filesystem\") verb write(abs self: Int); }\nmeta effect(\"network\") extern \"C\" verb host() -> Int;\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "effect metadata was rejected: {stdout}");
+}
+
+#[test]
+fn lsp_preserves_capability_contracts_and_reports_unavailable_targets() {
+    let valid_uri = "file:///tmp/actus-lsp-capability-valid.act";
+    let invalid_uri = "file:///tmp/actus-lsp-capability-invalid.act";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":valid_uri,"version":1,"text":"meta capability(\"posix.cloexec\") verb open_secure() -> Int { return 0; }"}}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":invalid_uri,"version":1,"text":"meta capability(\"windows.file_identity\") verb inspect() -> Int { return 0; }"}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "valid capability was rejected: {stdout}");
+    assert!(
+        stdout.contains("\"code\":\"E1132\""),
+        "capability target diagnostic missing: {stdout}"
+    );
+}
+
+#[test]
+fn lsp_accepts_deterministic_contracts() {
+    let uri = "file:///tmp/actus-lsp-deterministic-metadata.act";
+    let source = "meta deterministic verb stable() -> Int { return 0; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "deterministic metadata was rejected: {stdout}");
+}
+
+#[test]
+fn lsp_accepts_realtime_contracts() {
+    let uri = "file:///tmp/actus-lsp-realtime-metadata.act";
+    let source = "meta realtime verb tick() -> Int { for erg index: u32 in 0u32..4u32 { if index == 2u32 { break; } } return 0; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "realtime metadata was rejected: {stdout}");
+}
+
+#[test]
+fn lsp_reports_bounded_contract_diagnostics() {
+    let uri = "file:///tmp/actus-lsp-bounded-metadata.act";
+    let source = "meta bounded(max_iterations: 2u32) verb bounded() -> Int { for erg index: u32 in 0u32..4u32 { } return 0; }\n";
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"code\":\"E1130\""), "bounded diagnostic missing: {stdout}");
+}
+
+#[test]
 fn lsp_accepts_statement_conditionals_and_type_directed_integer_indexing() {
     let uri = "file:///tmp/actus-lsp-ergonomics.act";
     let source = "verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); erg index: u32 = 0; loop { if index >= 1 { break; } values[index] = 41; index += 1; } return values[0] + 1; }";

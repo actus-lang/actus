@@ -1,3 +1,4 @@
+use actus::diagnostics::semantic_diagnostic;
 use actus::lexer::scan;
 use actus::parser::parse;
 use actus::semantic::{ArgumentRoleSource, SemanticErrorKind, SemanticModel, analyze};
@@ -13,6 +14,67 @@ const VALID_WRITER: &str = "struct File { value: Int, } role Writer { verb write
 #[test]
 fn validates_a_performance_against_its_role_contract() {
     analyze_source(VALID_WRITER).expect("matching role performance should pass");
+}
+
+#[test]
+fn requires_role_and_performance_effect_contracts_to_match() {
+    let valid = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(valid).expect("matching role and implementation effects should pass");
+
+    let pure = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(pure)
+        .expect("a pure implementation may satisfy an effect-bearing role contract");
+
+    let bounded = "struct File { value: Int, } role Writer { meta effect(\"filesystem\", \"blocking\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\") verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(bounded)
+        .expect("an implementation may use a strict subset of the role effect contract");
+
+    let extra = "struct File { value: Int, } role Writer { meta effect(\"filesystem\") verb write(abs self: File) -> Int; } perform Writer for File { meta effect(\"filesystem\", \"blocking\") verb write(abs self: File) -> Int { return 1; } }";
+    let error = analyze_source(extra).expect_err("implementation-only effects must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodEffectMismatch { role, method, .. }
+            if role == "Writer" && method == "write"
+    ));
+}
+
+#[test]
+fn requires_role_and_performance_capability_contracts_to_match() {
+    let valid = "struct File { value: Int, } role Writer { meta capability(\"posix.cloexec\") verb write(abs self: File) -> Int; } perform Writer for File { meta capability(\"posix.cloexec\") verb write(abs self: File) -> Int { return 1; } }";
+    analyze_source(valid).expect("matching role and implementation capabilities should pass");
+
+    let extra = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { meta capability(\"posix.cloexec\") verb write(abs self: File) -> Int { return 1; } }";
+    let error = analyze_source(extra).expect_err("implementation-only capabilities must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodCapabilityMismatch { ref role, ref method, .. }
+            if role == "Writer" && method == "write"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1133");
+}
+
+#[test]
+fn requires_role_and_performance_must_use_contracts_to_match() {
+    let valid = "struct File { value: Int, } role Writer { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int; } perform Writer for File { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int { return 1; } } verb main() -> Int { erg file = File { value: 1, }; abs view = ref file; return view.write(); }";
+    analyze_source(valid).expect("matching role and implementation must-use contracts should pass");
+
+    let missing = "struct File { value: Int, } role Writer { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return 1; } }";
+    let error =
+        analyze_source(missing).expect_err("missing implementation must-use contract must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodMustUseMismatch { ref role, ref method, .. }
+            if role == "Writer" && method == "write"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1123");
+
+    let extra = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int { return 1; } }";
+    let error = analyze_source(extra).expect_err("implementation-only must-use contract must fail");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodMustUseMismatch { ref role, ref method, .. }
+            if role == "Writer" && method == "write"
+    ));
 }
 
 #[test]

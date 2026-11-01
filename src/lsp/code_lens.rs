@@ -4,7 +4,7 @@ use crate::ast::TopLevelDecl;
 use crate::configuration::CompilerConfiguration;
 use crate::lexer::scan;
 use crate::parser::parse;
-use crate::semantic::filter_program_for_target;
+use crate::semantic::filter_program_for_target_checked;
 use crate::target::TargetSpec;
 
 use super::documents::DocumentStore;
@@ -28,7 +28,10 @@ pub(super) fn entry_lenses(
         return Value::Array(Vec::new());
     }
     let program = match parse(scan(source).0) {
-        Ok(program) => filter_program_for_target(&program, target),
+        Ok(program) => match filter_program_for_target_checked(&program, target) {
+            Ok(program) => program,
+            Err(_) => return Value::Array(Vec::new()),
+        },
         Err(_) => return Value::Array(Vec::new()),
     };
     let Some(entry) = configuration.entry_symbol() else { return Value::Array(Vec::new()) };

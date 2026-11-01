@@ -25,7 +25,7 @@ impl Analyzer {
         let method_decl = self.generic_method(role_name, method, span)?;
         let receiver_role = self.generic_receiver_role(&method_decl, method, span)?;
         let signature = super::super::dynamic::role_method_signature(&method_decl);
-        self.visit_expression(receiver)?;
+        self.visit_consumed_expression(receiver)?;
         if receiver_role == crate::ast::Role::Ins && !self.is_exclusive_owner(receiver) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },

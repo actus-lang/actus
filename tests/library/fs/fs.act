@@ -41,6 +41,7 @@ verb missing_metadata_path() -> Result[path::Path, path::PathError] {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb qualified_filesystem_facade_opens_and_closes_directory() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -70,6 +71,7 @@ verb qualified_filesystem_facade_opens_and_closes_directory() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb qualified_filesystem_facade_reports_directory_metadata() -> Int {
     erg current = current_directory();
     return case dat current {
@@ -94,6 +96,7 @@ verb qualified_filesystem_facade_reports_directory_metadata() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb qualified_filesystem_facade_distinguishes_missing_metadata() -> Int {
     erg path = missing_metadata_path();
     return case dat path {

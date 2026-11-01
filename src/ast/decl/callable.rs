@@ -67,6 +67,131 @@ pub enum MetaAttribute {
     Target(String),
     Fault(TestFault),
     Limitless(LimitlessScope),
+    MustUse(String),
+    Effect(Effect),
+    Deterministic,
+    Realtime,
+    Bounded(BoundedContract),
+    Capability(Capability),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BoundedContract {
+    pub max_iterations: Option<u32>,
+    pub max_call_depth: Option<u32>,
+    pub max_calls: Option<u32>,
+    pub max_allocations: Option<u32>,
+    pub max_allocation_bytes: Option<u64>,
+    pub max_stack_bytes: Option<u64>,
+    pub max_io_bytes: Option<u64>,
+}
+
+impl BoundedContract {
+    pub fn is_empty(&self) -> bool {
+        self.max_iterations.is_none()
+            && self.max_call_depth.is_none()
+            && self.max_calls.is_none()
+            && self.max_allocations.is_none()
+            && self.max_allocation_bytes.is_none()
+            && self.max_stack_bytes.is_none()
+            && self.max_io_bytes.is_none()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Effect {
+    Blocking,
+    Clock,
+    Filesystem,
+    Network,
+    Allocation,
+    Entropy,
+}
+
+impl Effect {
+    pub const ALL: [Self; 6] = [
+        Self::Blocking,
+        Self::Clock,
+        Self::Filesystem,
+        Self::Network,
+        Self::Allocation,
+        Self::Entropy,
+    ];
+
+    pub fn parse(name: &str) -> Option<Self> {
+        Some(match name {
+            "blocking" => Self::Blocking,
+            "clock" => Self::Clock,
+            "filesystem" => Self::Filesystem,
+            "network" => Self::Network,
+            "allocation" => Self::Allocation,
+            "entropy" => Self::Entropy,
+            _ => return None,
+        })
+    }
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Blocking => "blocking",
+            Self::Clock => "clock",
+            Self::Filesystem => "filesystem",
+            Self::Network => "network",
+            Self::Allocation => "allocation",
+            Self::Entropy => "entropy",
+        }
+    }
+
+    pub const fn is_nondeterministic(self) -> bool {
+        matches!(self, Self::Clock | Self::Filesystem | Self::Network | Self::Entropy)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Capability {
+    FilesystemCreateExclusive,
+    PosixCloexec,
+    PosixCreateExclusive,
+    UnixRenameAtomic,
+    WindowsFileIdentity,
+    WindowsCreateNew,
+    WindowsReplaceFile,
+}
+
+impl Capability {
+    pub const ALL: [Self; 7] = [
+        Self::FilesystemCreateExclusive,
+        Self::PosixCloexec,
+        Self::PosixCreateExclusive,
+        Self::UnixRenameAtomic,
+        Self::WindowsFileIdentity,
+        Self::WindowsCreateNew,
+        Self::WindowsReplaceFile,
+    ];
+
+    pub fn parse(name: &str) -> Option<Self> {
+        Some(match name {
+            "filesystem.create_exclusive" => Self::FilesystemCreateExclusive,
+            "posix.cloexec" => Self::PosixCloexec,
+            "posix.create_exclusive" => Self::PosixCreateExclusive,
+            "unix.rename_atomic" => Self::UnixRenameAtomic,
+            "windows.file_identity" => Self::WindowsFileIdentity,
+            "windows.create_new" => Self::WindowsCreateNew,
+            "windows.replace_file" => Self::WindowsReplaceFile,
+            _ => return None,
+        })
+    }
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::FilesystemCreateExclusive => "filesystem.create_exclusive",
+            Self::PosixCloexec => "posix.cloexec",
+            Self::PosixCreateExclusive => "posix.create_exclusive",
+            Self::UnixRenameAtomic => "unix.rename_atomic",
+            Self::WindowsFileIdentity => "windows.file_identity",
+            Self::WindowsCreateNew => "windows.create_new",
+            Self::WindowsReplaceFile => "windows.replace_file",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -85,6 +210,20 @@ pub enum TestFault {
 }
 
 impl TestFault {
+    pub const ALL: [Self; 11] = [
+        Self::StagingOpenFailure,
+        Self::WriteFailure,
+        Self::ShortWrite,
+        Self::FlushFailure,
+        Self::CloseFailure,
+        Self::CleanupFailure,
+        Self::RenameFailure,
+        Self::InterruptedBeforeRename,
+        Self::ParentOpenFailure,
+        Self::ParentSyncFailure,
+        Self::InterruptedPublication,
+    ];
+
     pub const fn name(self) -> &'static str {
         match self {
             Self::StagingOpenFailure => "staging_open_failure",

@@ -286,6 +286,13 @@ fn type_role_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::RoleMethodMismatch { role, method } => {
             format!("method `{method}` does not satisfy role `{role}`")
         }
+        SemanticErrorKind::RoleMethodEffectMismatch { role, method, expected, found } => {
+            format!(
+                "method `{method}` effects do not match role `{role}`: expected [{}], found [{}]",
+                expected.iter().map(|effect| effect.name()).collect::<Vec<_>>().join(", "),
+                found.iter().map(|effect| effect.name()).collect::<Vec<_>>().join(", "),
+            )
+        }
         SemanticErrorKind::InvalidRoleReceiver { role, method } => {
             format!("method `{method}` in role `{role}` must declare an explicit `self` receiver")
         }

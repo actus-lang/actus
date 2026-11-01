@@ -45,7 +45,7 @@ impl Analyzer {
             }
             Expr::Grouping { expression, .. } => self.visit_expression(expression),
             Expr::Unary { operator, expression, span } => {
-                self.visit_expression(expression)?;
+                self.visit_consumed_expression(expression)?;
                 self.validate_unary_operator(*operator, expression)?;
                 let unary = Expr::Unary {
                     operator: *operator,
@@ -55,10 +55,10 @@ impl Analyzer {
                 self.validate_typed_integer_expression(&unary)
             }
             Expr::Cast { expression, target, span } => {
-                self.visit_expression(expression)?;
+                self.visit_consumed_expression(expression)?;
                 self.validate_primitive_cast(expression, target, *span)
             }
-            Expr::Borrow { expression, .. } => self.visit_expression(expression),
+            Expr::Borrow { expression, .. } => self.visit_consumed_expression(expression),
             Expr::Try { expression, span } => self.visit_try_expression(expression, *span),
             Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
             Expr::MethodCall { receiver, method, arguments, span } => {
@@ -71,8 +71,8 @@ impl Analyzer {
                 self.visit_field_access(object, field, *span)
             }
             Expr::Index { target, index, .. } => {
-                self.visit_expression(target)?;
-                self.visit_expression(index)?;
+                self.visit_consumed_expression(target)?;
+                self.visit_consumed_expression(index)?;
                 self.validate_index_access(target, index).map(|_| ())
             }
             Expr::Case { mode, subject, branches, span } => {
@@ -85,12 +85,20 @@ impl Analyzer {
                 Ok(())
             }
             Expr::FloatLiteral { value, suffix, span } => {
+                self.reject_realtime_float(*span)?;
                 self.validate_typed_float_literal(value, suffix.as_deref(), *span)?;
                 self.record_literal_fact("float", value, suffix, *span);
                 Ok(())
             }
             Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+
+    fn reject_realtime_float(&self, span: SourceSpan) -> Result<(), SemanticError> {
+        if self.current_realtime {
+            return Err(SemanticError { kind: SemanticErrorKind::RealtimeFloatingPoint, span });
+        }
+        Ok(())
     }
 
     fn visit_bool_literal(&mut self, value: bool, span: SourceSpan) -> Result<(), SemanticError> {
@@ -214,7 +222,7 @@ impl Analyzer {
     }
 
     fn visit_buffer_literal(&mut self, length: &Expr) -> Result<(), SemanticError> {
-        self.visit_expression(length)?;
+        self.visit_consumed_expression(length)?;
         self.require_buffer_length(length)
     }
 
@@ -232,8 +240,8 @@ impl Analyzer {
         operator: &BinaryOp,
         right: &Expr,
     ) -> Result<(), SemanticError> {
-        self.visit_expression(left)?;
-        self.visit_expression(right)?;
+        self.visit_consumed_expression(left)?;
+        self.visit_consumed_expression(right)?;
         self.validate_binary_operator(*operator, left, right)
     }
 
@@ -330,7 +338,7 @@ impl Analyzer {
         expression: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.visit_expression(expression)?;
+        self.visit_consumed_expression(expression)?;
         self.validate_try_expression(expression, span)
     }
 
@@ -369,7 +377,7 @@ impl Analyzer {
         branches: &[crate::ast::CaseBranch],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.visit_expression(subject)?;
+        self.visit_consumed_expression(subject)?;
         let result = self.validate_case_patterns(mode, subject, branches, span);
         if result.is_ok()
             && let Some(expected) = self.expected_expression_type.as_ref()

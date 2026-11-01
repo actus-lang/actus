@@ -33,6 +33,7 @@ verb sync_path() -> Result[path::Path, path::PathError] {
     return path::path_from_ascii(storage: dat raw);
 }
 
+meta effect("filesystem", "blocking")
 verb sync_and_close(ins file: fs::File, abs path: path::Path) -> Int {
     erg synced_data = fs::file_sync_data(self: ins file);
     return case dat synced_data {
@@ -63,6 +64,7 @@ verb sync_and_close(ins file: fs::File, abs path: path::Path) -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb file_sync_operations_return_success() -> Int {
     erg path_result = sync_path();
     return case dat path_result {

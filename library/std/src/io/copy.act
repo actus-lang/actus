@@ -91,6 +91,7 @@ immutable `abs` view owned by `copy_stream`. A complete write returns the new
 count, a short write returns `IoError.Failed`, and writer errors are preserved
 without allocation or retained state.
 """
+meta effect("filesystem", "blocking")
 open verb copy_stream_write[W: Writer](
     ins writer: W,
     abs scratch: Buffer,
@@ -117,6 +118,7 @@ normal `EndOfStream`; short writes, invalid zero-length chunks, allocation
 failures, and typed reader/writer failures return `Err`. No entire input is
 loaded or retained in memory.
 """
+meta effect("filesystem", "blocking")
 open verb copy_stream[R: Reader, W: Writer](ins reader: R, ins writer: W) -> Result[Int, IoError] {
     erg scratch = copy_scratch()?;
     erg total = 0;

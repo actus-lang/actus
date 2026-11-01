@@ -9,7 +9,9 @@ open role Writer {
     Write through an `ins` receiver and `abs` byte view without allocating or
     retaining input bytes. `Ok(count)` is exact; `Err` is the typed `IoError`.
     """
+    meta effect("filesystem", "blocking")
     verb write(ins self: Self, abs buffer: Buffer) -> Result[Int, IoError];
     """Flush through an ins receiver and return a typed status after mutation."""
+    meta effect("filesystem", "blocking")
     verb flush(ins self: Self) -> Result[Int, IoError];
 }

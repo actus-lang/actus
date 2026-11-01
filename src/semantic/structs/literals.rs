@@ -73,7 +73,7 @@ impl Analyzer {
                 span: initializer.span,
             });
         };
-        self.visit_expression(&initializer.value)?;
+        self.visit_consumed_expression(&initializer.value)?;
         let mut expected = substitution.apply(&field.ty);
         self.normalize_array_capacities(&mut expected)?;
         self.validate_field_value_type(

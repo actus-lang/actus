@@ -285,6 +285,24 @@ impl TargetSpec {
         }
     }
 
+    pub fn supports_capability(&self, capability: crate::ast::Capability) -> bool {
+        match capability {
+            crate::ast::Capability::FilesystemCreateExclusive => {
+                self.entry_contract() == EntryContract::Hosted
+                    && (self.matches_platform("posix")
+                        || self.triple.operating_system == OperatingSystem::Windows)
+            }
+            crate::ast::Capability::PosixCloexec
+            | crate::ast::Capability::PosixCreateExclusive
+            | crate::ast::Capability::UnixRenameAtomic => self.matches_platform("posix"),
+            crate::ast::Capability::WindowsFileIdentity
+            | crate::ast::Capability::WindowsCreateNew
+            | crate::ast::Capability::WindowsReplaceFile => {
+                self.triple.operating_system == OperatingSystem::Windows
+            }
+        }
+    }
+
     pub const fn linker_flavor(&self) -> LinkerFlavor {
         self.linker_flavor
     }

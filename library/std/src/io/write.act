@@ -5,6 +5,7 @@ The `abs` parameter is a read-only, non-owning view. Writing consumes the
 bytes presented by the view, not the buffer's ownership, so the caller can
 continue using its `erg` buffer after the call.
 """
+meta effect("blocking")
 unsafe extern "C" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int;
 
 """
@@ -14,6 +15,7 @@ Write the complete available buffer to stdout when the runtime accepts it.
 ABI. The raw `-1` and `-2` statuses are translated to `Failed` and
 `EndOfStream`; status encoding is never exposed to Actus callers.
 """
+meta effect("blocking")
 open verb write(abs buffer: Buffer) -> Result[Int, IoError] {
     """
     Keep the native status in an owned scalar while the borrowed view is

@@ -25,17 +25,17 @@ fn generic_result_facade_project_named(
         .expect("write runtime facade");
     fs::write(
         root.join("src/feature/runtime/api.act"),
-        "import std::io; import std::fs; import std::path; open io; open fs; open path; open verb write_stage(abs staged: Path, abs payload: Buffer) -> Result[Int, IoError] { return write_file(path: abs staged, contents: abs payload); } open verb publish_stage(abs staged: Path, abs active: Path) -> Result[Int, IoError] { erg loaded = read_to_bytes(path: abs staged); return case dat loaded { Result.Err(error) => Err(error), Result.Ok(bytes) => { drop(bytes); return rename(from: abs staged, to: abs active); }, }; }\n",
+        "import std::io; import std::fs; import std::path; open io; open fs; open path; meta effect(\"filesystem\", \"blocking\") open verb write_stage(abs staged: Path, abs payload: Buffer) -> Result[Int, IoError] { return write_file(path: abs staged, contents: abs payload); } meta effect(\"filesystem\", \"blocking\") open verb publish_stage(abs staged: Path, abs active: Path) -> Result[Int, IoError] { erg loaded = read_to_bytes(path: abs staged); return case dat loaded { Result.Err(error) => Err(error), Result.Ok(bytes) => { drop(bytes); return rename(from: abs staged, to: abs active); }, }; }\n",
     )
     .expect("write result producer");
     fs::write(
         root.join("src/feature/runtime/flush.act"),
-        "import std::io; import std::path; open io; open path; open api; open verb flush_stage(abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg written = write_stage(staged: abs staged, payload: abs payload); return case dat written { Result.Err(error) => Err(error), Result.Ok(_) => publish_stage(staged: abs staged, active: abs active), }; }\n",
+        "import std::io; import std::path; open io; open path; open api; meta effect(\"filesystem\", \"blocking\") open verb flush_stage(abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg written = write_stage(staged: abs staged, payload: abs payload); return case dat written { Result.Err(error) => Err(error), Result.Ok(_) => publish_stage(staged: abs staged, active: abs active), }; }\n",
     )
     .expect("write result flusher");
     fs::write(
         root.join("src/feature/runtime/save.act"),
-        "import std::io; import std::path; open io; open path; open flush; open struct State { erg value: Int, } verb complete(ins state: State, dat flushed: Result[Int, IoError]) -> Result[Int, IoError] { return case dat flushed { Result.Err(error) => Err(error), Result.Ok(bytes) => { state.value = bytes; return Ok(bytes); }, }; } open verb forward(ins state: State, abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg flushed = flush_stage(staged: abs staged, active: abs active, payload: abs payload); return complete(state: ins state, flushed: dat flushed); }\n",
+        "import std::io; import std::path; open io; open path; open flush; open struct State { erg value: Int, } verb complete(ins state: State, dat flushed: Result[Int, IoError]) -> Result[Int, IoError] { return case dat flushed { Result.Err(error) => Err(error), Result.Ok(bytes) => { state.value = bytes; return Ok(bytes); }, }; } meta effect(\"filesystem\", \"blocking\") open verb forward(ins state: State, abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg flushed = flush_stage(staged: abs staged, active: abs active, payload: abs payload); return complete(state: ins state, flushed: dat flushed); }\n",
     )
     .expect("write result forwarder");
 

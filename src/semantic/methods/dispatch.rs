@@ -51,7 +51,7 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.visit_expression(receiver)?;
+        self.visit_consumed_expression(receiver)?;
         let Some(actual_type) = self.expression_type_name(receiver) else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },

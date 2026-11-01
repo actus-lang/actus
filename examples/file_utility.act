@@ -49,6 +49,7 @@ verb validate_path(abs path: Path) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb process_file(abs path: Path, abs payload: Buffer) -> Int {
     erg written = write_file(path: abs path, contents: abs payload);
     case dat written {
@@ -72,6 +73,7 @@ verb process_file(abs path: Path, abs payload: Buffer) -> Int {
     return 12;
 }
 
+meta effect("filesystem", "blocking")
 verb inspect_and_remove(abs path: Path) -> Int {
     erg information = metadata(path: abs path);
     case dat information {
@@ -107,6 +109,7 @@ verb inspect_and_remove(abs path: Path) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb main() -> Int {
     erg path_result = utility_path();
     erg payload = Buffer[0];

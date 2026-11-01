@@ -254,6 +254,7 @@ return `IoError.InvalidInput`. A root permission failure returns
 `IoError.PermissionDenied`; other provider failures retain their mapped error
 class. No walker is returned on failure and the input views remain unchanged.
 """
+meta effect("filesystem", "blocking")
 open verb walk(abs path: path_module::Path, abs options: WalkOptions) -> Result[Walker, io::IoError] {
     erg depth: Int = options.max_depth as Int;
     erg follow = options.follow_symlinks;
@@ -320,6 +321,7 @@ does not retain the caller's temporary path storage. Under `EmitError`, an
 entry failure is returned as an owned `WalkEvent` with `kind == Error` and the
 typed cause in `error`; traversal then continues with later siblings.
 """
+meta effect("filesystem", "blocking")
 open verb next_walk_event(ins walker: Walker) -> Result[Option[WalkEvent], io::IoError] {
     erg path_result = walk_path_placeholder();
     return case dat path_result {
@@ -378,6 +380,7 @@ Explicit close is the status-bearing cleanup path. Callers may rely on `Drop`
 for early returns, but `Drop` intentionally discards the native close status
 because cleanup performances cannot report an error to the caller.
 """
+meta effect("filesystem", "blocking")
 open verb close_walker(dat walker: Walker) -> Result[Int, io::IoError] {
     erg status = actus_walker_close(handle: abs walker.handle);
     return case status {
@@ -398,6 +401,7 @@ open perform Drop for Walker {
     `self` is an `ins` loan of the Drop owner; the performance may inspect its
     handle for cleanup but does not transfer the owner to another binding.
     """
+    meta effect("filesystem", "blocking")
     verb drop(ins self: Walker) {
         erg owner = Walker {
             handle: self.handle,

@@ -1,6 +1,6 @@
 use crate::ast::{
-    Argument, BuiltinType, DispatchMode, ExternalVerbDecl, GenericParam, ReturnAccess, Role,
-    VerbDecl, lookup_builtin_type,
+    Argument, BuiltinType, Capability, DispatchMode, Effect, ExternalVerbDecl, GenericParam,
+    ReturnAccess, Role, VerbDecl, lookup_builtin_type,
 };
 
 use super::super::analyzer::canonical_type_name;
@@ -14,6 +14,12 @@ pub(crate) struct VerbSignature {
     pub(crate) return_access: Option<ReturnAccess>,
     pub(crate) generic_parameters: Vec<GenericParam>,
     pub(crate) external: bool,
+    pub(crate) must_use: Option<String>,
+    pub(crate) effects: Vec<Effect>,
+    pub(crate) capabilities: Vec<Capability>,
+    pub(crate) deterministic: bool,
+    pub(crate) realtime: bool,
+    pub(crate) bounded: Option<crate::ast::BoundedContract>,
 }
 
 pub(super) fn has_matching_named_signature(
@@ -52,6 +58,15 @@ impl VerbDecl {
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
             generic_parameters: self.generic_parameters.clone(),
             external: false,
+            must_use: self.metadata.iter().find_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::MustUse(reason) => Some(reason.clone()),
+                _ => None,
+            }),
+            effects: metadata_effects(&self.metadata),
+            capabilities: metadata_capabilities(&self.metadata),
+            deterministic: metadata_is_deterministic(&self.metadata),
+            realtime: metadata_is_realtime(&self.metadata),
+            bounded: metadata_bounded(&self.metadata),
         }
     }
 }
@@ -79,6 +94,50 @@ impl ExternalVerbDecl {
             return_access: self.return_type.as_ref().map(|return_type| return_type.access),
             generic_parameters: self.generic_parameters.clone(),
             external: true,
+            must_use: self.metadata.iter().find_map(|attribute| match attribute {
+                crate::ast::MetaAttribute::MustUse(reason) => Some(reason.clone()),
+                _ => None,
+            }),
+            effects: metadata_effects(&self.metadata),
+            capabilities: metadata_capabilities(&self.metadata),
+            deterministic: metadata_is_deterministic(&self.metadata),
+            realtime: metadata_is_realtime(&self.metadata),
+            bounded: metadata_bounded(&self.metadata),
         }
     }
+}
+
+fn metadata_effects(metadata: &[crate::ast::MetaAttribute]) -> Vec<Effect> {
+    metadata
+        .iter()
+        .filter_map(|attribute| match attribute {
+            crate::ast::MetaAttribute::Effect(effect) => Some(*effect),
+            _ => None,
+        })
+        .collect()
+}
+
+fn metadata_capabilities(metadata: &[crate::ast::MetaAttribute]) -> Vec<Capability> {
+    metadata
+        .iter()
+        .filter_map(|attribute| match attribute {
+            crate::ast::MetaAttribute::Capability(capability) => Some(*capability),
+            _ => None,
+        })
+        .collect()
+}
+
+fn metadata_is_deterministic(metadata: &[crate::ast::MetaAttribute]) -> bool {
+    metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Deterministic))
+}
+
+fn metadata_is_realtime(metadata: &[crate::ast::MetaAttribute]) -> bool {
+    metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Realtime))
+}
+
+fn metadata_bounded(metadata: &[crate::ast::MetaAttribute]) -> Option<crate::ast::BoundedContract> {
+    metadata.iter().find_map(|attribute| match attribute {
+        crate::ast::MetaAttribute::Bounded(contract) => Some(contract.clone()),
+        _ => None,
+    })
 }

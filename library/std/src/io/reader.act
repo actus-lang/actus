@@ -6,5 +6,6 @@ The static read contract used by buffered input adapters.
 """
 open role Reader {
     """Read through ins receiver and buffer loans, returning count or typed error."""
+    meta effect("filesystem", "blocking")
     verb read(ins self: Self, ins buffer: Buffer) -> Result[Int, IoError];
 }

@@ -37,5 +37,6 @@ open role Seeker {
     absolute byte position; `Err(IoError.Failed)` reports native rejection.
     No path, buffer, hidden allocation, or implicit cleanup is introduced.
     """
+    meta effect("filesystem", "blocking")
     verb seek(ins self: File, dat from: SeekFrom) -> Result[Int, IoError];
 }

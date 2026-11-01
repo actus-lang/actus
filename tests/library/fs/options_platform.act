@@ -26,6 +26,8 @@ verb platform_prefix() -> Buffer {
     return prefix;
 }
 
+meta effect("filesystem", "blocking", "entropy")
+meta capability("filesystem.create_exclusive")
 verb close_on_exec_open_succeeds() -> Int {
     erg root_result = platform_root();
     return case dat root_result {
@@ -68,14 +70,18 @@ verb close_on_exec_open_succeeds() -> Int {
     };
 }
 
-meta target("unix")
 meta test
+meta target("unix")
+meta effect("filesystem", "blocking", "entropy")
+meta capability("filesystem.create_exclusive")
 verb unix_close_on_exec_open_is_supported() -> Int {
     return close_on_exec_open_succeeds();
 }
 
-meta target("windows")
 meta test
+meta target("windows")
+meta effect("filesystem", "blocking", "entropy")
+meta capability("filesystem.create_exclusive")
 verb windows_close_on_exec_open_is_supported() -> Int {
     return close_on_exec_open_succeeds();
 }

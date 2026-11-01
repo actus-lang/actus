@@ -19,6 +19,76 @@ fn formats_nested_blocks_and_calls() {
 }
 
 #[test]
+fn preserves_metadata_on_external_verbs_idempotently() {
+    let formatted =
+        format_source("meta target(\"unix\") extern \"C\" verb native_boundary() -> Int;");
+    assert!(formatted.contains("meta target(\"unix\")"));
+    assert!(formatted.contains("extern \"C\" verb native_boundary()"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_must_use_metadata_idempotently() {
+    let formatted = format_source(
+        "meta must_use(\"check the result before continuing\") verb status() -> Int { return 0; }",
+    );
+    assert!(formatted.contains("meta must_use(\"check the result before continuing\")"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_effect_metadata_idempotently() {
+    let formatted =
+        format_source("meta effect(\"filesystem\", \"blocking\") verb load() -> Int { return 0; }");
+    assert!(formatted.contains("meta effect(\"filesystem\", \"blocking\")"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_capability_metadata_idempotently() {
+    let formatted = format_source(
+        "meta capability(\"windows.file_identity\", \"windows.replace_file\") extern \"C\" verb native_boundary() -> Int;",
+    );
+    assert!(
+        formatted.contains("meta capability(\"windows.file_identity\", \"windows.replace_file\")")
+    );
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_deterministic_metadata_idempotently() {
+    let formatted = format_source("meta deterministic verb stable() -> Int { return 0; }");
+    assert!(formatted.contains("meta deterministic"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_realtime_metadata_idempotently() {
+    let formatted = format_source("meta realtime verb tick() -> Int { return 0; }");
+    assert!(formatted.contains("meta realtime"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_bounded_metadata_idempotently() {
+    let formatted = format_source(
+        "meta bounded(max_iterations: 1024u32, max_call_depth: 16u32, max_stack_bytes: 4096u64) verb process() -> Int { return 0; }",
+    );
+    assert!(formatted.contains(
+        "meta bounded(max_iterations: 1024u32, max_call_depth: 16u32, max_stack_bytes: 4096u64)"
+    ));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
+fn preserves_role_method_effect_metadata_idempotently() {
+    let formatted =
+        format_source("role Writer { meta effect(\"filesystem\") verb write(abs self: Int); }");
+    assert!(formatted.contains("meta effect(\"filesystem\")"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn formats_bounded_for_ranges_idempotently() {
     let formatted = format_source(
         "verb main(){for erg index:u32 in 0u32..4u32 { if index == 2u32 { break; } }}",

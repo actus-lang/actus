@@ -39,6 +39,7 @@ verb relative_fixture_path(erg depth: u8) -> Result[path::Path, path::PathError]
     return path::path_from_ascii(storage: dat raw);
 }
 
+meta effect("filesystem", "blocking")
 verb remove_fixture(erg depth: u8) -> Int {
     erg path_result = relative_fixture_path(depth: erg depth);
     return case dat path_result {
@@ -51,6 +52,7 @@ verb remove_fixture(erg depth: u8) -> Int {
     };
 }
 
+meta effect("filesystem", "blocking")
 verb exercise_directory_chain(
     dat nested: path::Path,
     erg deepest: u8,
@@ -103,6 +105,7 @@ verb exercise_directory_chain(
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb create_dir_all_creates_and_reuses_parent_chain() -> Int {
     erg deepest: u8 = 2u8;
     erg middle: u8 = 1u8;
@@ -123,6 +126,7 @@ verb create_dir_all_creates_and_reuses_parent_chain() -> Int {
 }
 
 meta test
+meta effect("filesystem", "blocking")
 verb remove_dir_all_is_explicit_and_recursive() -> Int {
     erg root_depth: u8 = 0u8;
     erg deepest: u8 = 2u8;

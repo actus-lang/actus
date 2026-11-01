@@ -109,6 +109,8 @@ global workspace or predictable filename is selected implicitly. `root` and
 dropped and no file remains published. The operation may block on OS entropy
 and filesystem creation and must not be used in realtime engine paths.
 """
+meta capability("filesystem.create_exclusive")
+meta effect("filesystem", "blocking", "entropy")
 open verb temporary_file_open(abs root: path_module::Path, abs prefix: Buffer) -> Result[TemporaryFile, TemporaryError] {
     erg output_result = temporary_output_path();
     return case dat output_result {
@@ -153,6 +155,7 @@ path. A failed attempt drops the placeholder and leaves no directory behind;
 the operation is bounded by the runtime collision retry limit and may block on
 the host filesystem.
 """
+meta effect("filesystem", "blocking", "entropy")
 open verb temporary_directory_open(
     abs root: path_module::Path,
     abs prefix: Buffer
@@ -203,6 +206,7 @@ close succeeds, removal failure is returned instead of being silently
 discarded. Calling cleanup again is a normal host error because the path is
 already absent.
 """
+meta effect("filesystem", "blocking")
 open verb temporary_file_cleanup(ins self: TemporaryFile) -> Result[Int, io::IoError] {
     erg closed = file_close(self: ins self.file);
     return case dat closed {
@@ -219,6 +223,7 @@ borrowed only for removal; the caller receives the typed host result and
 retains ownership for deterministic scope cleanup. Recursive deletion is
 never implicit.
 """
+meta effect("filesystem", "blocking")
 open verb temporary_directory_cleanup(ins self: TemporaryDirectory) -> Result[Int, io::IoError] {
     return remove_dir(path: abs self.path);
 }
@@ -232,6 +237,7 @@ required when cleanup failure must be observed. File close is idempotent.
 """
 open perform Drop for TemporaryFile {
     """Consume an `ins` loan of the owner, close the handle, and attempt path removal without masking another error."""
+    meta effect("filesystem", "blocking")
     verb drop(ins self: TemporaryFile) {
         file_close(self: ins self.file);
         remove_file(path: abs self.path);
@@ -247,6 +253,7 @@ removal is never performed.
 """
 open perform Drop for TemporaryDirectory {
     """Consume an `ins` loan of the owner and attempt removal without converting cleanup failure into a new throw path."""
+    meta effect("filesystem", "blocking")
     verb drop(ins self: TemporaryDirectory) {
         remove_dir(path: abs self.path);
     }
