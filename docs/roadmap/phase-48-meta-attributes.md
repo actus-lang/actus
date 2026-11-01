@@ -6,6 +6,15 @@ The extension backlog below is intentionally recorded here so that future
 metadata work can be executed in a deliberate order without closing this
 phase prematurely.
 
+## Current execution status
+
+Metadata extension work is temporarily paused until the LLVM backend is fully
+implemented and promoted to the primary native backend. The completed metadata
+contracts remain unchanged and this phase stays open. After the LLVM backend
+implementation, validation, and backend-specific CI work are complete, return
+here and continue the remaining metadata backlog, beginning with the next
+accepted contract.
+
 ## Scope
 
 - `meta test`
