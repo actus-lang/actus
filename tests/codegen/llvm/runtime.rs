@@ -154,6 +154,45 @@ fn llvm_lowers_the_filesystem_close_bridge_with_its_status_contract() {
 }
 
 #[test]
+fn llvm_lowers_the_filesystem_read_bridge_with_a_mutable_buffer() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int; verb call(erg handle: Int, ins buffer: Buffer) -> Int { return actus_file_read_buffer(handle: abs handle, buffer: ins buffer); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_read_buffer(i32, ptr align 8)"), "{ir}");
+    assert!(ir.contains("call i32 @actus_file_read_buffer(i32 %0, ptr %1)"), "{ir}");
+}
+
+#[test]
+fn llvm_lowers_the_filesystem_write_bridge_with_a_borrowed_buffer() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int; verb call(erg handle: Int, abs buffer: Buffer) -> Int { return actus_file_write_buffer(handle: abs handle, buffer: abs buffer); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_write_buffer(i32, ptr align 8)"), "{ir}");
+    assert!(ir.contains("call i32 @actus_file_write_buffer(i32 %0, ptr %1)"), "{ir}");
+}
+
+#[test]
+fn llvm_lowers_the_filesystem_seek_bridge_with_three_signed_scalars() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_seek_buffer(abs handle: Int, abs offset: Int, abs whence: Int) -> Int; verb call(erg handle: Int, erg offset: Int, erg whence: Int) -> Int { return actus_file_seek_buffer(handle: abs handle, offset: abs offset, whence: abs whence); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_seek_buffer(i32, i32, i32)"), "{ir}");
+    assert!(ir.contains("call i32 @actus_file_seek_buffer(i32 %0, i32 %1, i32 %2)"), "{ir}");
+}
+
+#[test]
+fn llvm_lowers_the_filesystem_sync_bridges_as_scalar_statuses() {
+    for symbol in ["actus_file_sync_data_buffer", "actus_file_sync_all_buffer"] {
+        let source = format!(
+            "unsafe extern \"C\" verb {symbol}(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int {{ return {symbol}(handle: abs handle); }}"
+        );
+        let ir = emit_source_runtime_bridge(&source);
+        assert!(ir.contains(&format!("declare i32 @{symbol}(i32)")), "{ir}");
+        assert!(ir.contains(&format!("call i32 @{symbol}(i32 %0)")), "{ir}");
+    }
+}
+
+#[test]
 fn llvm_lowers_the_monotonic_clock_bridge_without_hidden_parameters() {
     let ir = emit_source_runtime_bridge(
         "unsafe extern \"C\" verb actus_monotonic_nanos() -> u64; verb call() -> u64 { return actus_monotonic_nanos(); }",
@@ -237,6 +276,40 @@ fn llvm_lowers_the_buffer_utf8_validation_bridge_as_a_signed_status() {
     );
     assert!(ir.contains("declare i32 @actus_buffer_validate_utf8(ptr align 8)"));
     assert!(ir.contains("call i32 @actus_buffer_validate_utf8(ptr %0)"));
+}
+
+#[test]
+fn llvm_lowers_buffer_allocation_with_a_pointer_result() {
+    let ir = emit_source_runtime_bridge("verb call() -> Buffer { return Buffer[4]; }");
+    assert!(ir.contains("declare ptr @actus_buffer_allocate(i64)"), "{ir}");
+    assert!(ir.contains("call ptr @actus_buffer_allocate(i64 4)"), "{ir}");
+}
+
+#[test]
+fn llvm_lowers_buffer_append_with_an_eight_bit_byte() {
+    let ir = emit_source_runtime_bridge(
+        "verb call() -> Int { erg buffer: Buffer = Buffer[0]; append(handle: buffer, byte: 7u8); return 0; }",
+    );
+    assert!(ir.contains("declare i8 @actus_buffer_append(ptr, i8)"), "{ir}");
+    assert!(ir.contains("call i8 @actus_buffer_append(ptr %"), "{ir}");
+}
+
+#[test]
+fn llvm_lowers_buffer_byte_set_with_checked_index_and_byte_types() {
+    let ir = emit_source_runtime_bridge(
+        "verb call(ins buffer: Buffer, erg index: Int, erg byte: u8) -> Int { buffer[index] = byte; return 0; }",
+    );
+    assert!(ir.contains("declare i32 @actus_buffer_byte_set(ptr, i32, i8)"), "{ir}");
+    assert!(ir.contains("call i32 @actus_buffer_byte_set(ptr %0, i32 %1, i8 %2)"), "{ir}");
+}
+
+#[test]
+fn llvm_lowers_buffer_move_as_a_void_ownership_bridge() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_buffer_move(abs destination: Buffer, abs source: Buffer); verb call(abs destination: Buffer, abs source: Buffer) -> Int { actus_buffer_move(destination: abs destination, source: abs source); return 0; }",
+    );
+    assert!(ir.contains("declare void @actus_buffer_move(ptr align 8, ptr align 8)"), "{ir}");
+    assert!(ir.contains("call void @actus_buffer_move(ptr %0, ptr %1)"), "{ir}");
 }
 
 #[test]
