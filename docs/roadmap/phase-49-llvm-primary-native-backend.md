@@ -46,7 +46,7 @@ The initial inventory identifies 32 LLVM implementation files under
 | Responsibility | LLVM-owned paths | Initial classification |
 | --- | --- | --- |
 | Module and emission boundary | `mod.rs`, `context.rs`, `module.rs`, `declarations.rs`, `emission.rs`, `object.rs`, `instruction.rs`, `verification.rs` | Implemented boundary; end-to-end acceptance remains open |
-| Values and scalar operations | `values.rs`, `scalar.rs`, `scalar_loan.rs`, `literals.rs`, `float.rs`, `integer/mod.rs`, `integer/cast.rs`, `integer/ops.rs` | Implemented coverage; `values.rs:33` contains an explicit incomplete type-lowering error |
+| Values and scalar operations | `values.rs`, `scalar.rs`, `scalar_loan.rs`, `literals.rs`, `float.rs`, `integer/mod.rs`, `integer/cast.rs`, `integer/ops.rs` | Implemented coverage; scalar integer widths `u1..=u128` are represented directly by LLVM |
 | Control flow and calls | `branches.rs`, `control_flow.rs`, `guards.rs`, `failures.rs`, `calls.rs`, `returns.rs` | Implemented focused coverage; full shared-operation mapping remains open |
 | Aggregate and layout lowering | `aggregates.rs`, `arrays.rs`, `arena.rs`, `enums.rs`, `memory.rs`, `packed/mod.rs`, `packed/wide.rs` | Implemented focused coverage; full ABI and target matrix remains open |
 | Cleanup and ownership bridges | `cleanup.rs`, `cleanup/bridge.rs`, `cleanup/bridge/address.rs` | Implemented focused coverage; complete ownership-path audit remains open |
@@ -59,8 +59,9 @@ test target `tests/codegen/llvm/backend.rs`. The current policy is:
 - default feature: `cranelift`;
 - LLVM-only focused backend suite: `34 passed, 0 failed`;
 - LLVM-only library suite: `148 passed, 0 failed`;
-- explicit incomplete path: `src/codegen/llvm/values.rs:33`, which returns
-  `LLVM type lowering is not implemented` for an unsupported type path.
+- defensive invalid-type path: `src/codegen/llvm/values.rs`, which rejects
+  integer widths outside `1..=128` and floating-point widths other than `32`
+  or `64` with deterministic backend errors.
 
 These results are inventory evidence, not completion evidence. The remaining
 49.1 checks must run the complete backend configurations and replace
@@ -89,10 +90,12 @@ The baseline repairs were kept at the correct backend/shared boundaries:
   that owns them, while semantic and cross-backend coverage remains active.
 
 The complete-baseline checkbox is closed by the three passing configurations.
-The stable-diagnostics checkbox remains open because the explicit unsupported
-LLVM type-lowering path at `src/codegen/llvm/values.rs:33` still requires a
-source-spanned diagnostic contract. No default-backend change is permitted
-before that contract and the later shared-contract work are complete.
+The stable-diagnostics checkbox remains open for the remaining intentionally
+unsupported LLVM operations. The invalid type-width paths now have stable
+deterministic rejection tests; source-spanned unsupported operations continue
+to use the shared `BackendContractError::Unsupported` contract. No
+default-backend change is permitted before the remaining diagnostic inventory
+is complete.
 
 #### 49.1 shared-operation mapping
 
@@ -113,10 +116,9 @@ operations. Each operation has one explicit LLVM dispatch path:
 | Aggregate operations | `AggregateConstruct`, `AggregateCopy`, `AggregateFieldLoad`, `PackedFieldLoad`, `PackedFieldStore`, `ArrayElementLoad`, `ArrayElementStore` | `llvm/instruction.rs` dispatches to `llvm/aggregates.rs`, with layout and packed helpers in `llvm/packed/` |
 
 LLVM value-type mapping is centralized in `llvm/values.rs` for `Unit`, `Bool`,
-fixed-width integers, floating-point values, pointers, aggregates, Regions,
-enums, and niche pointer options. The inventory found one deliberately
-incomplete type-lowering branch at `values.rs:33`; it is recorded as an
-implementation item, not treated as successful lowering.
+all Actus integer widths, floating-point values, pointers, aggregates,
+Regions, enums, and niche pointer options. Invalid widths remain defensive
+backend-contract failures rather than silently being coerced to another type.
 
 This mapping closes the inventory/documentation part of 49.1. It does not
 close implementation acceptance: the remaining checks still require complete

@@ -1,7 +1,7 @@
 use llvm_sys::core::{
     LLVMArrayType2, LLVMDoubleTypeInContext, LLVMFloatTypeInContext, LLVMInt1TypeInContext,
     LLVMInt8TypeInContext, LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
-    LLVMPointerTypeInContext, LLVMVoidTypeInContext,
+    LLVMIntTypeInContext, LLVMPointerTypeInContext, LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMContextRef, LLVMTypeRef};
 
@@ -14,10 +14,14 @@ pub(super) fn llvm_type(
     let result = match ty {
         BackendValueType::Unit => unsafe { LLVMVoidTypeInContext(context) },
         BackendValueType::Bool => unsafe { LLVMInt1TypeInContext(context) },
+        BackendValueType::Integer { width: 1, .. } => unsafe { LLVMInt1TypeInContext(context) },
         BackendValueType::Integer { width: 8, .. } => unsafe { LLVMInt8TypeInContext(context) },
         BackendValueType::Integer { width: 16, .. } => unsafe { LLVMInt16TypeInContext(context) },
         BackendValueType::Integer { width: 32, .. } => unsafe { LLVMInt32TypeInContext(context) },
         BackendValueType::Integer { width: 64, .. } => unsafe { LLVMInt64TypeInContext(context) },
+        BackendValueType::Integer { width, .. } if (2..=128).contains(&width) => unsafe {
+            LLVMIntTypeInContext(context, u32::from(width))
+        },
         BackendValueType::Float { width: 32 } => unsafe { LLVMFloatTypeInContext(context) },
         BackendValueType::Float { width: 64 } => unsafe { LLVMDoubleTypeInContext(context) },
         BackendValueType::Pointer => unsafe { LLVMPointerTypeInContext(context, 0) },
@@ -29,8 +33,15 @@ pub(super) fn llvm_type(
         | BackendValueType::Enum { layout: super::super::BackendEnumLayout { layout, .. } } => {
             return aggregate_type(context, layout);
         }
-        BackendValueType::Integer { .. } | BackendValueType::Float { .. } => {
-            return Err(BackendEmitError("LLVM type lowering is not implemented".to_owned()));
+        BackendValueType::Integer { width, .. } => {
+            return Err(BackendEmitError(format!(
+                "LLVM type lowering rejects invalid integer width {width}; expected 1..=128"
+            )));
+        }
+        BackendValueType::Float { width } => {
+            return Err(BackendEmitError(format!(
+                "LLVM type lowering rejects invalid floating-point width {width}; expected 32 or 64"
+            )));
         }
     };
     Ok(result)

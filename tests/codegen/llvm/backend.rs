@@ -39,6 +39,54 @@ fn llvm_emits_unit_enum_equality() {
     assert!(llvm_ir.contains("icmp eq"));
 }
 
+#[test]
+fn llvm_emits_non_native_integer_widths() {
+    let source = "verb narrow(erg value: u1) -> u1 { return value; } verb wide(erg value: u128) -> u128 { return value; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "non-native integer fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("non-native integer fixture should parse");
+    let module = lower_scalar_program("actus_root", &program, Some("narrow"))
+        .expect("non-native integer widths should lower through the shared contract");
+    let llvm_ir = emit_module(&module).expect("LLVM should represent all Actus integer widths");
+    assert!(llvm_ir.contains("define i1 @narrow"));
+    assert!(llvm_ir.contains("define i128") && llvm_ir.contains("wide"));
+}
+
+#[test]
+fn llvm_rejects_invalid_integer_width_with_stable_error() {
+    let invalid = BackendValueType::Integer { signed: false, width: 129 };
+    let symbol = SymbolIdentity::new("actus_root", SymbolKind::Verb, "invalid_width")
+        .expect("fixture symbol should be valid");
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![BackendFunction {
+            symbol,
+            parameters: Vec::new(),
+            return_value: BackendReturn {
+                role: Some(Role::Erg),
+                ty: invalid,
+                passing: BackendReturnMode::Direct,
+            },
+            hosted_entry_return: false,
+            entry: BackendBlockId(0),
+            blocks: vec![BackendBlock {
+                id: BackendBlockId(0),
+                parameters: Vec::new(),
+                instructions: vec![BackendInstruction::Return {
+                    value: None,
+                    span: actus::lexer::SourceSpan::new(0, 1),
+                }],
+            }],
+            cleanup: Vec::new(),
+        }],
+    };
+    let error = emit_module(&module).expect_err("invalid integer width must be rejected");
+    assert_eq!(
+        error.to_string(),
+        "LLVM type lowering rejects invalid integer width 129; expected 1..=128"
+    );
+}
+
 fn has_symbol<'data>(object: &object::File<'data>, expected: &str) -> bool {
     object
         .symbols()
