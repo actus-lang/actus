@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(feature = "cranelift")]
 #[test]
 fn shared_lowered_module_is_consumed_by_llvm_and_cranelift() {
     let source = "verb main() -> Int { return 40 + 2; }";
