@@ -60,6 +60,15 @@ fn emit_runtime_status_bridge(
         .expect("runtime bridge ABI should lower through LLVM")
 }
 
+fn emit_source_runtime_bridge(source: &str) -> String {
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "runtime bridge fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("runtime bridge fixture should parse");
+    let module = lower_scalar_program("runtime_test", &program, Some("call"))
+        .expect("runtime bridge fixture should lower through the shared contract");
+    emit_module(&module).expect("runtime bridge fixture should lower through LLVM")
+}
+
 #[test]
 fn llvm_preserves_i32_runtime_status_through_a_bridge_call() {
     let ir = emit_runtime_status_bridge(
@@ -94,4 +103,34 @@ fn llvm_preserves_pointer_runtime_result_without_status_coercion() {
     assert!(ir.contains("declare ptr @runtime__extern_allocate_5fhandle(i64)"));
     assert!(ir.contains("call ptr @runtime__extern_allocate_5fhandle(i64 %0)"));
     assert!(ir.contains("ret ptr %call1"));
+}
+
+#[test]
+fn llvm_lowers_the_filesystem_close_bridge_with_its_status_contract() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_file_close_buffer(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_close_buffer(handle: abs handle); }",
+    );
+    assert!(ir.contains("declare i32 @actus_file_close_buffer(i32)"));
+    assert!(ir.contains("call i32 @actus_file_close_buffer(i32 %0)"));
+    assert!(ir.contains("ret i32 %call1"));
+}
+
+#[test]
+fn llvm_lowers_the_monotonic_clock_bridge_without_hidden_parameters() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_monotonic_nanos() -> u64; verb call() -> u64 { return actus_monotonic_nanos(); }",
+    );
+    assert!(ir.contains("declare i64 @actus_monotonic_nanos()"));
+    assert!(ir.contains("call i64 @actus_monotonic_nanos()"));
+    assert!(ir.contains("ret i64 %call0"));
+}
+
+#[test]
+fn llvm_lowers_the_process_count_bridge_as_a_scalar_status() {
+    let ir = emit_source_runtime_bridge(
+        "unsafe extern \"C\" verb actus_process_arg_count() -> Int; verb call() -> Int { return actus_process_arg_count(); }",
+    );
+    assert!(ir.contains("declare i32 @actus_process_arg_count()"));
+    assert!(ir.contains("call i32 @actus_process_arg_count()"));
+    assert!(ir.contains("ret i32 %call0"));
 }
