@@ -1,6 +1,29 @@
 use super::*;
 
 #[test]
+fn emits_a_freestanding_llvm_object_without_host_runtime_imports() {
+    let source = "verb main() -> Int { return 41; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "freestanding fixture should lex: {errors:?}");
+    let program = parse(tokens).expect("freestanding fixture should parse");
+    let module = lower_scalar_program("freestanding_test", &program, Some("main"))
+        .expect("freestanding fixture should lower through the neutral contract");
+    let target = actus::target::TargetSpec::parse("x86_64-unknown-uefi")
+        .expect("freestanding target should parse");
+    let bytes =
+        emit_object_bytes_with_configuration_and_float_policy(&module, &target, false, true)
+            .expect("freestanding LLVM object should emit");
+    let object = object::File::parse(bytes.as_slice()).expect("freestanding object should parse");
+    assert_eq!(object.architecture(), object::Architecture::X86_64);
+    let undefined = object
+        .symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok())
+        .collect::<Vec<_>>();
+    assert!(undefined.is_empty(), "freestanding LLVM object imports host symbols: {undefined:?}");
+}
+
+#[test]
 fn emits_a_host_object_with_a_stable_public_symbol() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "main").expect("valid symbol");
     let module = BackendModule {
