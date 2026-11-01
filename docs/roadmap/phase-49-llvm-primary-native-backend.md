@@ -28,7 +28,7 @@ runtime, serialization, and zero-float contracts.
 
 - [x] Inventory every LLVM-only path and classify it as complete, partial,
       unsupported, or untested.
-- [ ] Inventory all shared lowering operations and map each to an LLVM emitter.
+- [x] Inventory all shared lowering operations and map each to an LLVM emitter.
 - [ ] Record the supported LLVM version, installation contract, linker policy,
       target matrix, and clean-checkout setup.
 - [x] Capture the focused LLVM-only baseline before changing the default.
@@ -61,9 +61,38 @@ test target `tests/codegen/llvm/backend.rs`. The current policy is:
   `LLVM type lowering is not implemented` for an unsupported type path.
 
 These results are inventory evidence, not completion evidence. The remaining
-49.1 checks must classify every shared lowering operation, run the complete
-backend configurations, and replace intentional incomplete paths with either
-full implementations or stable, source-spanned diagnostics.
+49.1 checks must run the complete backend configurations and replace
+intentional incomplete paths with either full implementations or stable,
+source-spanned diagnostics.
+
+#### 49.1 shared-operation mapping
+
+The shared lowering contract currently exposes 37 `BackendInstruction`
+operations. Each operation has one explicit LLVM dispatch path:
+
+| Shared operation family | Operations | LLVM dispatch and implementation |
+| --- | --- | --- |
+| Constants and literals | `Constant`, `FloatConstant`, `StringLiteral` | `llvm/instruction.rs` dispatches to `llvm/scalar.rs`, `llvm/float.rs`, and `llvm/literals.rs` |
+| Integer and floating operations | `IntegerBinary`, `IntegerCast`, `FloatCast`, `IntegerCompare`, `FloatCompare`, `IntegerUnary`, `ScalarSelect` | `llvm/scalar.rs` dispatches to `llvm/integer/`, `llvm/float.rs`, and LLVM select emission |
+| Checked traps | `TrapIfZero`, `TrapIfSignedDivisionOverflow`, `TrapIfShiftCountOutOfRange`, `TrapIfArrayIndexOutOfBounds` | `llvm/scalar.rs` dispatches to `llvm/guards.rs` |
+| Enum operations | `EnumDiscriminant`, `EnumPayload`, `EnumPayloadBinding`, `EnumConstruct` | `llvm/scalar.rs` dispatches to `llvm/enums.rs` |
+| Calls and terminal control | `Call`, `Return`, `Fail`, `Trap` | `llvm/instruction.rs` dispatches to `llvm/calls.rs`, `llvm/returns.rs`, `llvm/failures.rs`, and the LLVM unreachable terminator |
+| Block control flow | `Branch`, `Jump` | `llvm/instruction.rs` dispatches to `llvm/branches.rs` |
+| Cleanup and memory | `Cleanup`, `MemoryCopy`, `AggregateFieldStore` | `llvm/instruction.rs` dispatches to `llvm/cleanup.rs`, `llvm/memory.rs`, and `llvm/aggregates.rs` |
+| Scalar loans | `ScalarLoanLoad`, `ScalarLoanStore`, `ScalarLoanMaterialize` | `llvm/scalar.rs` dispatches to `llvm/scalar_loan.rs` |
+| Arena operations | `ArenaConstruct`, `ArenaPlace` | `llvm/instruction.rs` dispatches to `llvm/arena.rs` |
+| Aggregate operations | `AggregateConstruct`, `AggregateCopy`, `AggregateFieldLoad`, `PackedFieldLoad`, `PackedFieldStore`, `ArrayElementLoad`, `ArrayElementStore` | `llvm/instruction.rs` dispatches to `llvm/aggregates.rs`, with layout and packed helpers in `llvm/packed/` |
+
+LLVM value-type mapping is centralized in `llvm/values.rs` for `Unit`, `Bool`,
+fixed-width integers, floating-point values, pointers, aggregates, Regions,
+enums, and niche pointer options. The inventory found one deliberately
+incomplete type-lowering branch at `values.rs:33`; it is recorded as an
+implementation item, not treated as successful lowering.
+
+This mapping closes the inventory/documentation part of 49.1. It does not
+close implementation acceptance: the remaining checks still require complete
+operation coverage, target-specific validation, and stable diagnostics for
+unsupported paths.
 
 ### 49.2 — Complete shared-contract lowering
 
