@@ -198,3 +198,23 @@ verb repr_transparent_preserves_value_layout_and_nesting() -> Int {
     }
     return 0;
 }
+
+meta repr(C, align(8u32))
+struct AlignedByte {
+    value: u8,
+}
+
+meta test
+verb repr_explicit_alignment_is_minimum_and_checked() -> Int {
+    erg value = AlignedByte { value: 7u8, };
+    if size_of[AlignedByte]() != 8u64 {
+        return 1;
+    }
+    if align_of[AlignedByte]() != 8u64 {
+        return 2;
+    }
+    if value.value != 7u8 {
+        return 3;
+    }
+    return 0;
+}

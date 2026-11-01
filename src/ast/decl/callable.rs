@@ -81,19 +81,29 @@ pub struct Repr {
     c: bool,
     packed: bool,
     transparent: bool,
+    alignment: Option<u32>,
 }
 
 impl Repr {
-    pub const C: Self = Self { c: true, packed: false, transparent: false };
-    pub const PACKED: Self = Self { c: false, packed: true, transparent: false };
-    pub const TRANSPARENT: Self = Self { c: false, packed: false, transparent: true };
+    pub const C: Self = Self { c: true, packed: false, transparent: false, alignment: None };
+    pub const PACKED: Self = Self { c: false, packed: true, transparent: false, alignment: None };
+    pub const TRANSPARENT: Self =
+        Self { c: false, packed: false, transparent: true, alignment: None };
 
     pub const fn new(c: bool, packed: bool) -> Self {
         Self::from_flags(c, packed, false)
     }
 
     pub const fn from_flags(c: bool, packed: bool, transparent: bool) -> Self {
-        Self { c, packed, transparent }
+        Self { c, packed, transparent, alignment: None }
+    }
+
+    pub const fn with_alignment(self, alignment: u32) -> Self {
+        Self { alignment: Some(alignment), ..self }
+    }
+
+    pub const fn with_optional_alignment(self, alignment: Option<u32>) -> Self {
+        Self { alignment, ..self }
     }
 
     pub const fn transparent() -> Self {
@@ -112,6 +122,10 @@ impl Repr {
         self.transparent
     }
 
+    pub const fn alignment(self) -> Option<u32> {
+        self.alignment
+    }
+
     pub fn name(self) -> String {
         let mut names = Vec::new();
         if self.c {
@@ -123,7 +137,14 @@ impl Repr {
         if self.transparent {
             names.push("transparent");
         }
-        names.join(", ")
+        let mut result = names.join(", ");
+        if let Some(alignment) = self.alignment {
+            if !result.is_empty() {
+                result.push_str(", ");
+            }
+            result.push_str(&format!("align({alignment}u32)"));
+        }
+        result
     }
 
     pub const fn combine(self, other: Self) -> Self {
@@ -131,6 +152,10 @@ impl Repr {
             c: self.c || other.c,
             packed: self.packed || other.packed,
             transparent: self.transparent || other.transparent,
+            alignment: match self.alignment {
+                Some(alignment) => Some(alignment),
+                None => other.alignment,
+            },
         }
     }
 }

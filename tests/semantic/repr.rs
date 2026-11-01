@@ -35,6 +35,24 @@ fn accepts_single_field_transparent_structs() {
 }
 
 #[test]
+fn accepts_explicit_alignment_and_rejects_unsafe_combinations() {
+    analyze_source("meta repr(C, align(8u32)) struct Aligned { value: u8, }")
+        .expect("power-of-two explicit alignment should analyze");
+
+    let non_power = analyze_source("meta repr(C, align(3u32)) struct Invalid { value: u8, }")
+        .expect_err("non-power-of-two alignment must be rejected");
+    assert!(
+        matches!(non_power.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("power of two"))
+    );
+
+    let packed = analyze_source("meta repr(C, packed, align(8u32)) struct Invalid { value: u8, }")
+        .expect_err("packed and explicit alignment must not be combined");
+    assert!(
+        matches!(packed.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("packed"))
+    );
+}
+
+#[test]
 fn rejects_invalid_transparent_contracts() {
     let fields = analyze_source("meta repr(transparent) struct Pair { left: u32, right: u32, }")
         .expect_err("transparent structs must contain exactly one field");

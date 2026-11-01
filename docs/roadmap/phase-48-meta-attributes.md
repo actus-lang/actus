@@ -62,6 +62,9 @@ phase prematurely.
 - [x] Extend `meta repr` with `packed` composition in grouped and separate
       forms, checked unpadded layout, safe unaligned backend access, packed C
       ABI mapping, and parser/semantic/native fixtures.
+- [x] Add explicit `repr(align(N))` for concrete structs with grouped and
+      separate composition, power-of-two validation, minimum-alignment and
+      trailing-size guarantees, FFI gating, and regression coverage.
 
 ## Planned metadata extension backlog
 

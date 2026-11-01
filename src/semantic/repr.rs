@@ -8,18 +8,22 @@ use super::errors::{SemanticError, SemanticErrorKind};
 impl Analyzer {
     pub(super) fn validate_repr_declarations(&self) -> Result<(), SemanticError> {
         for definition in self.struct_types.values() {
-            if definition
-                .repr()
-                .is_some_and(|repr| repr.is_c() || repr.is_packed() || repr.is_transparent())
-            {
+            if definition.repr().is_some_and(|repr| {
+                repr.is_c()
+                    || repr.is_packed()
+                    || repr.is_transparent()
+                    || repr.alignment().is_some()
+            }) {
                 self.validate_repr_struct(definition)?;
             }
         }
         for definition in self.enum_types.values() {
-            if definition
-                .repr()
-                .is_some_and(|repr| repr.is_c() || repr.is_packed() || repr.is_transparent())
-            {
+            if definition.repr().is_some_and(|repr| {
+                repr.is_c()
+                    || repr.is_packed()
+                    || repr.is_transparent()
+                    || repr.alignment().is_some()
+            }) {
                 self.validate_repr_enum(definition)?;
             }
         }
@@ -28,11 +32,27 @@ impl Analyzer {
 
     fn validate_repr_struct(&self, definition: &StructDef) -> Result<(), SemanticError> {
         let repr = definition.repr().unwrap_or(crate::ast::Repr::C);
+        self.validate_repr_struct_contract(definition, repr)?;
+        if !definition.generic_parameters.is_empty() {
+            return Err(repr_error_at(
+                &definition.name,
+                "generic structs cannot declare a concrete native representation",
+                definition.span,
+            ));
+        }
+        self.validate_repr_struct_fields(definition)
+    }
+
+    fn validate_repr_struct_contract(
+        &self,
+        definition: &StructDef,
+        repr: crate::ast::Repr,
+    ) -> Result<(), SemanticError> {
         if repr.is_transparent() {
-            if repr.is_c() || repr.is_packed() {
+            if repr.is_c() || repr.is_packed() || repr.alignment().is_some() {
                 return Err(repr_error_at(
                     &definition.name,
-                    "transparent representation cannot be combined with C or packed representation",
+                    "transparent representation cannot be combined with C, packed, or explicit alignment",
                     definition.span,
                 ));
             }
@@ -44,13 +64,26 @@ impl Analyzer {
                 ));
             }
         }
-        if !definition.generic_parameters.is_empty() {
-            return Err(repr_error_at(
-                &definition.name,
-                "generic structs cannot declare a concrete native representation",
-                definition.span,
-            ));
+        if let Some(alignment) = repr.alignment() {
+            if !alignment.is_power_of_two() {
+                return Err(repr_error_at(
+                    &definition.name,
+                    "explicit alignment must be a positive power of two",
+                    definition.span,
+                ));
+            }
+            if repr.is_packed() {
+                return Err(repr_error_at(
+                    &definition.name,
+                    "explicit alignment cannot be combined with packed representation",
+                    definition.span,
+                ));
+            }
         }
+        Ok(())
+    }
+
+    fn validate_repr_struct_fields(&self, definition: &StructDef) -> Result<(), SemanticError> {
         for field in &definition.fields {
             if !matches!(field.role, StructFieldRole::Value) {
                 return Err(repr_error_at(
@@ -74,7 +107,9 @@ impl Analyzer {
     }
 
     fn validate_repr_enum(&self, definition: &EnumDef) -> Result<(), SemanticError> {
-        if definition.repr().is_some_and(|repr| repr.is_packed() || repr.is_transparent()) {
+        if definition.repr().is_some_and(|repr| {
+            repr.is_packed() || repr.is_transparent() || repr.alignment().is_some()
+        }) {
             return Err(repr_error_at(
                 &definition.name,
                 "packed and transparent representations are supported only for structs",
@@ -187,10 +222,9 @@ impl Analyzer {
         structure: &StructDef,
         visiting: &mut Vec<String>,
     ) -> Result<(), SemanticError> {
-        if !structure
-            .repr()
-            .is_some_and(|repr| repr.is_c() || repr.is_packed() || repr.is_transparent())
-            || !type_name.arguments.is_empty()
+        if !structure.repr().is_some_and(|repr| {
+            repr.is_c() || repr.is_packed() || repr.is_transparent() || repr.alignment().is_some()
+        }) || !type_name.arguments.is_empty()
         {
             return Err(repr_error_at(
                 declaration,

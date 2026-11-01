@@ -16,12 +16,13 @@ would make ownership and layout implicit.
 ## Decision
 
 Actus supports the closed metadata forms `meta repr(C)`,
-`meta repr(packed)`, `meta repr(transparent)`, and the grouped spelling
-`meta repr(C, packed)`. The representation names are bare compiler-defined
+`meta repr(packed)`, `meta repr(align(N))`, `meta repr(transparent)`, and the
+grouped spellings `meta repr(C, packed)` and `meta repr(C, align(N))`. The
+representation names are bare compiler-defined
 identifiers, not user strings. Separate `repr(C)` and `repr(packed)` attributes
 are combined component-wise; repeating a component is rejected. Transparent is
-not composable with C or packed. `repr(packed)` and `repr(transparent)` are
-valid only for concrete structs. `repr(C)` remains valid for concrete structs
+not composable with C, packed, or align. `repr(packed)`, `repr(align(N))`, and
+`repr(transparent)` are valid only for concrete structs. `repr(C)` remains valid for concrete structs
 and unit-variant enums.
 
 The compiler validates the complete declaration before code generation:
@@ -41,11 +42,15 @@ The compiler validates the complete declaration before code generation:
    one-byte memory alignment contract;
 8. packed enums and payload/tagged-union representations are rejected until a
    separate enum ABI contract exists.
-9. `repr(transparent)` requires exactly one ordinary value field, uses that
+9. `repr(align(N))` requires a positive power-of-two `u32` literal, raises the
+   minimum aggregate alignment without lowering natural alignment, and rounds
+   the final size to that alignment. It cannot be combined with packed or
+   transparent representation and requires `repr(C)` for FFI mapping.
+10. `repr(transparent)` requires exactly one ordinary value field, uses that
    field's size and alignment at offset zero, and recursively resolves nested
    transparent wrappers. It is rejected for enums, generic declarations,
    ownership-qualified fields, opaque values, recursive layouts, and any
-   combination with C or packed representation.
+   combination with C, packed, or explicit alignment representation.
 
 Neither representation grants native access, changes ownership, alters
 cleanup, serializes a value, or weakens unsafe-boundary checks. A packed C
@@ -94,6 +99,9 @@ for an explicit `CAbiTarget`, and preserves Actus ownership at the boundary:
 - transparent aggregates resolve directly to the mapped type of their one
   value field, preserving direct scalar/array passing and avoiding an implicit
   aggregate pointer layer.
+- explicitly aligned C aggregates report their checked minimum alignment and
+  trailing size padding; alignment-only representations remain internal layout
+  contracts and are not accepted as FFI aggregates.
 
 The convenience program-aware API uses the repository's 64-bit target model.
 Callers targeting another pointer width must use the explicit target API. The

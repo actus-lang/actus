@@ -232,6 +232,7 @@ impl Parser {
                     if (current.is_c() && repr.is_c())
                         || (current.is_packed() && repr.is_packed())
                         || (current.is_transparent() && repr.is_transparent())
+                        || (current.alignment().is_some() && repr.alignment().is_some())
                     {
                         duplicate = true;
                         break;

@@ -39,6 +39,21 @@ fn parses_transparent_representation() {
 }
 
 #[test]
+fn parses_explicit_alignment_in_grouped_and_separate_forms() {
+    let program = parse_source(
+        "meta repr(C, align(8u32)) struct Grouped { value: u8, } meta repr(C) meta repr(align(16u32)) struct Separate { value: u8, }",
+    );
+    let TopLevelDecl::Struct(grouped) = &program.declarations[0] else {
+        panic!("expected grouped struct")
+    };
+    assert_eq!(grouped.repr(), Some(Repr::C.with_alignment(8)));
+    let TopLevelDecl::Struct(separate) = &program.declarations[1] else {
+        panic!("expected separately annotated struct")
+    };
+    assert_eq!(separate.repr(), Some(Repr::C.with_alignment(16)));
+}
+
+#[test]
 fn rejects_string_representation_names() {
     let error = parse_error("meta repr(\"C\") struct Point { x: i32, }");
     assert_eq!(error.code, ParseErrorCode::UnexpectedToken);
@@ -55,6 +70,12 @@ fn rejects_duplicate_representation_modifiers() {
 #[test]
 fn rejects_duplicate_transparent_representation_modifiers() {
     let error = parse_error("meta repr(transparent, transparent) struct UserId { value: u64, }");
+    assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
+}
+
+#[test]
+fn rejects_duplicate_explicit_alignment_modifiers() {
+    let error = parse_error("meta repr(align(8u32), align(16u32)) struct Aligned { value: u8, }");
     assert_eq!(error.code, ParseErrorCode::DuplicateMetadata);
 }
 

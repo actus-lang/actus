@@ -1,9 +1,10 @@
-# `meta repr(C)`, `meta repr(packed)`, and `meta repr(transparent)`
+# `meta repr(C)`, `meta repr(packed)`, `meta repr(align(...))`, and `meta repr(transparent)`
 
 These are closed, compiler-defined layout contracts for concrete value types.
 `repr(C)` makes a type intentionally usable as a C-style native aggregate.
 `repr(packed)` removes inter-field padding and sets aggregate alignment to one
-byte. `repr(transparent)` makes a one-field wrapper use exactly the underlying
+byte. `repr(align(N))` raises the aggregate's minimum alignment to the
+compiler-checked power-of-two byte value `N`. `repr(transparent)` makes a one-field wrapper use exactly the underlying
 field's layout and C ABI type while preserving a distinct Actus source type.
 All three declarations are assertions with checks; none bypasses ownership,
 cleanup, or layout validation.
@@ -34,6 +35,16 @@ struct SeparateSpelling {
     length: u32,
 }
 
+meta repr(C, align(8u32))
+struct AlignedHeader {
+    tag: u8,
+}
+
+meta repr(align(16u32))
+struct SeparatelyAligned {
+    tag: u8,
+}
+
 meta repr(transparent)
 struct UserId {
     value: u64,
@@ -47,13 +58,17 @@ arbitrary strings, and unknown names are rejected. The supported spellings are
 `repr(C)`, `repr(packed)`, `repr(transparent)`, and the grouped form
 `repr(C, packed)`. Separate `repr(C)` and `repr(packed)` attributes are also
 combined on the same declaration; repeating any component is rejected.
-`repr(transparent)` is intentionally not composable with `C` or `packed`.
+`repr(transparent)` is intentionally not composable with `C`, `packed`, or
+`align`. `align(N)` requires an explicit positive power-of-two `u32` literal;
+it may be written in the same `repr(...)` group or as a separate component,
+but repeating the component is rejected.
 The metadata may be attached only to a `struct` or `enum`; it is rejected on
 verbs, external verbs, packs, roles, performances, and file metadata.
 
 ## The checked contract
 
-`repr(C)` and `repr(packed)` are accepted only for a concrete declaration:
+`repr(C)`, `repr(packed)`, and `repr(align(N))` are accepted only for a
+concrete struct declaration:
 
 - generic structs and enums are rejected because their layout depends on an
   unresolved type or const parameter;
@@ -73,6 +88,15 @@ verbs, external verbs, packs, roles, performances, and file metadata.
 - enums must contain unit variants only. Payload enums require a separate
   tagged-union ABI contract and are not inferred from `repr(C)`.
 
+For `repr(align(N))` specifically:
+
+- `N` must be a positive power of two and must use the `u32` literal suffix;
+- the requested value is a minimum: natural field alignment is never lowered;
+- the final aggregate size is rounded up to the resulting alignment;
+- it cannot be combined with `repr(packed)` or `repr(transparent)`;
+- a type crossing the native FFI boundary must also declare `repr(C)`;
+- explicit alignment does not grant native access or make unsupported fields ABI-safe.
+
 `repr(transparent)` is a separate wrapper contract:
 
 - the declaration must be a concrete struct with exactly one field;
@@ -87,7 +111,9 @@ verbs, external verbs, packs, roles, performances, and file metadata.
   ownership-qualified references are rejected.
 
 For `repr(C)`, field order and the existing neutral layout engine determine
-alignment, padding, size, and offsets. For `repr(packed)`, fields are laid out
+alignment, padding, size, and offsets. For `repr(align(N))`, the layout engine
+uses the greater of the natural aggregate alignment and `N`, then rounds the
+size to that alignment. For `repr(packed)`, fields are laid out
 in declaration order with one-byte field alignment and the aggregate alignment
 is one; trailing padding is not added. A field keeps its logical type and
 natural size, so an integer or floating-point field may begin at an unaligned
@@ -131,8 +157,9 @@ ownership roles, external boundary, and target-specific native implementation.
 boundary. The program-aware FFI mapper reports the packed flag and exact field
 offsets; the foreign declaration must use a matching packed C layout contract.
 Transparent wrappers are mapped directly to the underlying ABI type and do not
-produce an aggregate pointer layer. Packed enums, volatile access, explicit
-alignment overrides, tagged unions, and target-specific layout overrides remain
+produce an aggregate pointer layer. Explicit alignment is reported in the
+checked aggregate layout and requires `repr(C)` for FFI mapping. Packed enums,
+volatile access, tagged unions, and target-specific layout overrides remain
 separate contracts.
 
 ## Diagnostics and compatibility

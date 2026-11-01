@@ -325,3 +325,20 @@ fn rejects_combined_transparent_ffi_representation_before_mapping() {
         matches!(error, CAbiError::TransparentCombinedRepresentation { name } if name == "UserId")
     );
 }
+
+#[test]
+fn maps_repr_c_explicit_alignment_into_the_aggregate_layout() {
+    let program = parse_program(
+        "meta repr(C, align(8u32)) struct Aligned { value: u8, } verb inspect(erg value: Aligned) -> Int { return 0; }",
+    );
+    let actus::ast::TopLevelDecl::Verb(verb) = &program.declarations[1] else {
+        panic!("expected ordinary verb")
+    };
+    let signature = c_abi_signature_in_program(&program, verb)
+        .expect("explicitly aligned repr(C) aggregate should map");
+    let CAbiType::Aggregate(aggregate) = &signature.parameters[0].ty else {
+        panic!("expected aggregate parameter")
+    };
+    assert_eq!(aggregate.layout, CAbiLayout { size: 8, alignment: 8 });
+    assert_eq!(aggregate.fields[0].offset, 0);
+}

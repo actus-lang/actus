@@ -171,6 +171,7 @@ fn map_struct(
     }
     visiting.push(definition.name.clone());
     let packed = definition.repr().is_some_and(|repr| repr.is_packed());
+    let explicit_alignment = definition.repr().and_then(|repr| repr.alignment()).unwrap_or(1);
     let mut offset = 0u32;
     let mut alignment = 1u32;
     let mut fields = Vec::new();
@@ -204,6 +205,7 @@ fn map_struct(
         });
     }
     visiting.pop();
+    alignment = alignment.max(explicit_alignment);
     Ok(CAbiType::Aggregate(CAbiAggregate {
         name: definition.name.clone(),
         packed,
