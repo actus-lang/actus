@@ -161,7 +161,7 @@ combination is executable or that LLVM is ready to become the default.
       early return, failure, and branch-join lowering.
 - [x] Complete generic specialization, imported modules, dynamic dispatch,
       native boundaries, and recursive call handling.
-- [ ] Verify LLVM module signatures and layouts before object emission.
+- [x] Verify LLVM module signatures and layouts before object emission.
 
 #### 49.2 scalar/control-flow evidence
 
@@ -207,6 +207,18 @@ currently lowered function symbol for self-calls, including hosted entry verbs,
 so LLVM and Cranelift consume the same symbol contract without backend-specific
 aliases. The LLVM backend suite passed 56 tests and the all-features shared
 codegen target passed 106 tests after this coverage was added.
+
+#### 49.2 module verification evidence
+
+LLVM object emission is fail-closed at both contract boundaries. The shared
+`BackendModule::validate()` check runs before LLVM lowering and validates every
+external/function signature, symbol identity, block contract, instruction
+layout, aggregate layout, enum layout, and cleanup descriptor. After lowering,
+`LLVMVerifyModule()` validates the generated LLVM module before any object or
+object-buffer emission is attempted. The LLVM object, aggregate ABI, packed,
+transparent, explicit-alignment, enum, return-slot, and external-boundary
+fixtures all pass in the 57-test LLVM backend suite and the full all-targets,
+all-features test run.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
