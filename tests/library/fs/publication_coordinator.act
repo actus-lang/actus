@@ -367,7 +367,7 @@ verb coordinator_publishes_matching_existing_identity() -> Int {
 meta target("windows")
 meta effect("filesystem", "blocking")
 meta capability("windows.file_identity", "windows.replace_file")
-verb windows_unsupported_case(
+verb windows_publish_case(
     abs lock_path: path::Path,
     abs destination: path::Path,
     abs staging: path::Path
@@ -395,11 +395,14 @@ verb windows_unsupported_case(
         staging: abs staging
     );
     return case dat published {
-        Result.Err(error) => case dat error {
-            IoError.Unsupported => 0,
-            _ => 2,
+        Result.Ok(outcome) => case dat outcome {
+            CoordinatedPublication.Published => {
+                erg expected_size: Int = 1;
+                verify_size(destination: abs destination, expected: erg expected_size);
+            },
+            CoordinatedPublication.Conflict => 2,
         },
-        _ => 2,
+        Result.Err(_) => 3,
     };
 }
 
@@ -407,7 +410,7 @@ meta test
 meta target("windows")
 meta effect("filesystem", "blocking")
 meta capability("windows.file_identity", "windows.replace_file")
-verb coordinator_reports_windows_unsupported() -> Int {
+verb coordinator_publishes_on_windows() -> Int {
     erg lock_suffix: u8 = 101u8;
     erg destination_suffix: u8 = 102u8;
     erg staging_suffix: u8 = 103u8;
@@ -422,7 +425,7 @@ verb coordinator_reports_windows_unsupported() -> Int {
                     erg staging_result = coordinator_path(suffix: erg staging_suffix);
                     return case dat staging_result {
                         Result.Err(_) => 3,
-                        Result.Ok(staging) => windows_unsupported_case(
+                        Result.Ok(staging) => windows_publish_case(
                             lock_path: abs lock_path,
                             destination: abs destination,
                             staging: abs staging
