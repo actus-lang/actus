@@ -233,10 +233,10 @@ is covered by the LLVM backend suite.
 - [ ] Verify all runtime bridge signatures and failure statuses through LLVM.
 - [ ] Verify external C declarations, checked representations, aggregate
       passing, aggregate returns, and calling-convention contracts.
-- [ ] Complete hosted target object/link/execute coverage.
-- [ ] Complete freestanding object and link-contract coverage where startup,
+- [x] Complete hosted target object/link/execute coverage.
+- [x] Complete freestanding object and link-contract coverage where startup,
       provider, linker, and target evidence exist.
-- [ ] Keep filesystem, clock, allocation, and other hosted services explicit;
+- [x] Keep filesystem, clock, allocation, and other hosted services explicit;
       never inherit them into freestanding targets.
 
 #### 49.3 current LLVM ABI evidence
@@ -250,6 +250,29 @@ caller-provided return slot: the external declaration returns `void`, writes
 into the aligned slot, and the caller copies the declared aggregate layout
 back into its destination. These tests do not introduce a second FFI layout
 or silently reinterpret a C declaration.
+
+Hosted target coverage is also complete for the current CI matrix. The LLVM
+host-object suite emits and inspects a host object, while the portable CLI
+fixture builds and executes `examples/hello.act` with the explicit LLVM
+backend. The fixture uses the target runner's executable suffix and is enabled
+on hosted Linux, macOS, and Windows jobs; no Unix-only linker assumption is
+made by this coverage.
+
+Freestanding coverage is complete for the currently supported evidence
+boundary. LLVM emits a freestanding host-independent object without implicit
+runtime imports, emits the Cortex-M Thumb object for the declared target
+profile, and links the ARM image only with explicit startup, provider, and
+linker inputs. The external-provider fixture also verifies that the provider
+symbol is resolved and that the final image contains no unresolved symbols or
+relocations. Unsupported startup or target combinations remain explicit
+configuration errors rather than implicit hosted fallback.
+
+Hosted-service isolation is covered by target-aware module resolution and
+native rejection fixtures: hosted `std::fs`, `std::time`, and process modules
+are rejected before native emission for freestanding targets, while allocation
+and Region operations use an explicit target runtime contract. Effect metadata
+is preserved during target filtering and is never used as an implicit service
+permission.
 
 ### 49.4 — Backend parity and regression hardening
 
