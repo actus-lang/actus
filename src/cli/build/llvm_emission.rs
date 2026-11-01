@@ -38,6 +38,7 @@ pub(super) fn emit_objects_llvm(
                 &lowered.module,
                 configuration.target(),
                 configuration.native_backend().position_independent(),
+                configuration.native_backend().verifies_no_float_ir(),
             )
         })
         .collect()
@@ -48,11 +49,13 @@ fn llvm_object(
     module: &crate::codegen::BackendModule,
     target: &crate::target::TargetSpec,
     position_independent: bool,
+    verify_no_float: bool,
 ) -> Result<EmittedObject, BackendEmitError> {
-    let bytes = crate::codegen::llvm::emit_object_bytes_with_configuration(
+    let bytes = crate::codegen::llvm::emit_object_bytes_with_configuration_and_float_policy(
         module,
         target,
         position_independent,
+        verify_no_float,
     )?;
     let symbols =
         module.functions.iter().map(|function| function.symbol.as_str().to_owned()).collect();

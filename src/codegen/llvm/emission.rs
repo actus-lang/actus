@@ -2,7 +2,7 @@ use std::path::Path;
 
 use super::super::{BackendEmitError, BackendModule};
 use super::module::lower_module;
-use super::verification::{print_module, verify_module};
+use super::verification::{print_module, verify_module, verify_no_float_ir};
 use crate::target::TargetSpec;
 
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.
@@ -48,7 +48,25 @@ pub fn emit_object_bytes_with_configuration(
     target: &TargetSpec,
     position_independent: bool,
 ) -> Result<Vec<u8>, BackendEmitError> {
+    emit_object_bytes_with_configuration_and_float_policy(
+        module,
+        target,
+        position_independent,
+        false,
+    )
+}
+
+/// Emits an object buffer and optionally rejects floating-point LLVM IR.
+pub fn emit_object_bytes_with_configuration_and_float_policy(
+    module: &BackendModule,
+    target: &TargetSpec,
+    position_independent: bool,
+    verify_no_float: bool,
+) -> Result<Vec<u8>, BackendEmitError> {
     let (_context, owned_module) = lower_module(module, target.pointer_width.bits())?;
     verify_module(owned_module.raw)?;
+    if verify_no_float {
+        verify_no_float_ir(owned_module.raw)?;
+    }
     super::object::emit_object_bytes(owned_module.raw, target, position_independent)
 }

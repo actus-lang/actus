@@ -27,5 +27,5 @@ mod verification;
 
 pub use emission::{
     emit_module, emit_object, emit_object_bytes, emit_object_bytes_with_configuration,
-    emit_object_with_configuration,
+    emit_object_bytes_with_configuration_and_float_policy, emit_object_with_configuration,
 };
