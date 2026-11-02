@@ -372,7 +372,7 @@ frontend contract failures.
 - [x] Update backend support documentation, configuration examples, help text,
       artifact metadata, and clean-checkout instructions.
 - [x] Verify explicit Cranelift selection and rollback from a clean checkout.
-- [ ] Measure and record compile time, artifact size, cache behavior, and
+- [x] Measure and record compile time, artifact size, cache behavior, and
       relevant native execution evidence.
 - [ ] Run the complete default-LLVM suite before declaring the migration ready.
 
@@ -385,7 +385,9 @@ compatibility backend remains available without changing Actus source code.
 Configuration regression tests cover both feature configurations. CLI help,
 support documentation, and clean-checkout rollback instructions are covered
 by this documentation check; compatibility measurements and release-artifact
-work remain intentionally open under the subsequent 49.5 checks.
+work are now separated: the measurements are recorded below, while
+release-artifact work remains intentionally open under the subsequent 49.5
+check.
 
 The backend support guide, native-build guide, workflow reference, manifest
 reference, README, and CLI help now describe LLVM as the default and Cranelift
@@ -406,6 +408,18 @@ same Cranelift-only compiler rejected an explicit LLVM request with the typed
 unavailable-backend diagnostic before object emission, and no rejected object
 was created. This demonstrates both source-preserving rollback and the
 fail-closed no-fallback rule from a clean build state.
+
+The reproducible host measurements are recorded in
+`docs/benchmarks/phase-49-default-backend-2026-11-02.md`. On the recorded
+Linux x86-64 host with Rust 1.98.0, LLVM 23.1.3, and one Cargo build job, the
+clean LLVM compiler build took 22.909 seconds and the Cranelift-only build
+took 47.952 seconds. Warm no-source-change rebuilds took 57 ms and 38 ms,
+respectively. The LLVM debug compiler and target directory measured
+101,954,824 and 864,763,890 bytes; the Cranelift measurements were
+177,938,504 and 1,380,849,377 bytes. Both backends built and ran
+`examples/hello.act`, returned the expected exit code 42, and completed native
+build/run in 41/2 ms and 37/2 ms. These results are host evidence only and do
+not claim release, cross-platform, embedded, or production performance.
 
 ## Non-negotiable invariants
 
