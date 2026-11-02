@@ -298,7 +298,7 @@ permission.
 
 ### 49.4 — Backend parity and regression hardening
 
-- [ ] Run the shared semantic and negative fixture matrix through both
+- [x] Run the shared semantic and negative fixture matrix through both
       backends wherever both target contracts support the fixture.
 - [ ] Compare deterministic outputs, object symbols, ABI layouts, exit status,
       cleanup behavior, and typed failures.
@@ -309,7 +309,7 @@ permission.
 
 #### 49.4 current parity evidence
 
-The backend-parity suite currently passes 18/18 tests on Unix hosts with
+The backend-parity suite currently passes 19/19 tests on Unix hosts with
 both backends enabled. It compares hosted exit status and buffer ownership,
 directory cleanup and deterministic order, qualified imports, generic calls,
 aggregate and enum construction, named array constants, typed failures, and
@@ -331,6 +331,13 @@ before object emission and leave no invalid artifact behind.
 The complete semantic and negative fixture matrix and the full ABI-layout
 comparison remain open until every supported shared fixture is represented in
 the backend parity matrix with an explicit layout assertion.
+
+The current semantic-contract matrix additionally covers `must_use`, effect,
+capability, deterministic, realtime, and bounded-contract failures, plus
+parser, unknown-type, and unknown-verb failures. Each failure is compared
+across both backends, checks the stable diagnostic code, and asserts that no
+object is emitted. This closes the shared semantic and negative fixture matrix
+for the currently supported hosted and freestanding target contracts.
 
 ### 49.5 — Default selection migration
 

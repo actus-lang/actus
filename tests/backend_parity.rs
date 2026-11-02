@@ -294,6 +294,77 @@ fn hosted_cli_backends_reject_the_same_semantic_failure_before_object_emission()
 }
 
 #[test]
+fn hosted_cli_backends_reject_the_same_contract_failures_before_object_emission() {
+    let fixtures = [
+        (
+            "must-use",
+            "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { status(); return 0; }\n",
+            "E1120",
+        ),
+        (
+            "effect",
+            "meta effect(\"filesystem\") verb load() -> Int { return 0; } verb main() -> Int { load(); return 0; }\n",
+            "E1121",
+        ),
+        (
+            "capability",
+            "meta capability(\"posix.cloexec\") verb primitive() -> Int { return 0; } verb main() -> Int { primitive(); return 0; }\n",
+            "E1131",
+        ),
+        (
+            "deterministic",
+            "meta effect(\"filesystem\") verb source() -> Int { return 0; } meta deterministic verb stable() -> Int { source(); return 0; }\n",
+            "E1124",
+        ),
+        ("realtime", "meta realtime verb tick() -> Int { loop { break; } return 0; }\n", "E1126"),
+        (
+            "bounded",
+            "meta bounded(max_iterations: 3u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { } return 0; }\n",
+            "E1130",
+        ),
+        ("parser", "verbb main() -> Int { return 0; }\n", "E0009"),
+        ("unknown-type", "verb main() -> Missing { return 0; }\n", "E1023"),
+        ("unknown-verb", "verb main() -> Int { missing(); return 0; }\n", "E1069"),
+        ("undeclared-identifier", "verb main() -> Int { return missing; }\n", "E1003"),
+        (
+            "use-after-move",
+            "unsafe extern \"C\" verb inspect(abs view: Buffer); verb consume(dat packet: Buffer) { drop(packet); } verb main() -> Int { erg buffer = Buffer[1]; consume(packet: dat buffer); inspect(view: abs buffer); return 0; }\n",
+            "E1005",
+        ),
+        (
+            "exclusive-loan-alias",
+            "verb merge_slots(ins left: Int, ins right: Int) { } verb main() -> Int { erg values: Array[Int, 4] = Array[Int, 4](); merge_slots(left: ins values[0], right: ins values[1]); return 0; }\n",
+            "E1065",
+        ),
+        (
+            "missing-module",
+            "import { open missing::module }; verb main() -> Int { return 0; }\n",
+            "E1101",
+        ),
+    ];
+    for (fixture, source, expected_code) in fixtures {
+        for backend in BACKENDS {
+            let root = fixture_root(&format!("contract-failure-{fixture}"), backend);
+            let input = write_fixture(&root, backend, None, None, source);
+            let output = root.join("main.o");
+            let build = build(&root, &input, &output, "obj");
+            assert!(!build.status.success(), "{backend} must reject {fixture}");
+            let diagnostics = format!(
+                "{}{}",
+                String::from_utf8_lossy(&build.stdout),
+                String::from_utf8_lossy(&build.stderr)
+            );
+            assert!(
+                diagnostics.contains(expected_code),
+                "{backend} changed {fixture} diagnostic: {diagnostics}"
+            );
+            assert!(!output.exists(), "{backend} emitted an object for {fixture}");
+            fs::remove_dir_all(root).expect("remove contract failure fixture");
+        }
+    }
+}
+
+#[test]
 fn hosted_cli_backends_lower_directory_drop_cleanup_identically() {
     let source = "import { open std::fs, open std::path, }; verb current() -> Result[Path, PathError] { erg raw: Buffer = Buffer[0]; append(raw, 46u8); append(raw, 0u8); return path_from_ascii(storage: dat raw); } meta effect(\"filesystem\", \"blocking\") verb main() -> Int { erg current_path = current(); return case dat current_path { Result.Err(_) => 1, Result.Ok(path) => { erg opened = read_dir(path: abs path); return case dat opened { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
     let mut statuses = Vec::new();
