@@ -300,7 +300,7 @@ permission.
 
 - [x] Run the shared semantic and negative fixture matrix through both
       backends wherever both target contracts support the fixture.
-- [ ] Compare deterministic outputs, object symbols, ABI layouts, exit status,
+- [x] Compare deterministic outputs, object symbols, ABI layouts, exit status,
       cleanup behavior, and typed failures.
 - [ ] Add regressions for every LLVM failure found during the inventory.
 - [x] Verify that unsupported operations fail before invalid object emission.
@@ -309,7 +309,7 @@ permission.
 
 #### 49.4 current parity evidence
 
-The backend-parity suite currently passes 19/19 tests on Unix hosts with
+The backend-parity suite currently passes 20/20 tests on Unix hosts with
 both backends enabled. It compares hosted exit status and buffer ownership,
 directory cleanup and deterministic order, qualified imports, generic calls,
 aggregate and enum construction, named array constants, typed failures, and
@@ -317,6 +317,9 @@ hosted float behavior. It also verifies deterministic object bytes, compares
 source-declared external aggregate provider symbols and relocation sizes, and
 checks the external provider contract for `repr(C, packed)`,
 `repr(transparent)`, and `repr(C, align(...))` aggregates.
+The same checked representations are also exercised through external return
+boundaries, so parameter and return relocation contracts must agree across
+both backends.
 It also verifies that the same semantic or target rejection occurs before
 either backend emits an object. Freestanding fixtures compare exported symbols,
 zero-float evidence, large-aggregate rejection, hosted-service rejection for
@@ -328,9 +331,9 @@ standard-library suites. The unsupported-operation contract is therefore
 closed for the covered semantic and target fixtures: both backends reject
 before object emission and leave no invalid artifact behind.
 
-The complete semantic and negative fixture matrix and the full ABI-layout
-comparison remain open until every supported shared fixture is represented in
-the backend parity matrix with an explicit layout assertion.
+The remaining 49.4 work is limited to LLVM-specific regression inventory and
+the supported CI configuration checks; the cross-backend output, symbol,
+cleanup, typed-failure, and checked ABI boundary comparison is covered.
 
 The current semantic-contract matrix additionally covers `must_use`, effect,
 capability, deterministic, realtime, and bounded-contract failures, plus
