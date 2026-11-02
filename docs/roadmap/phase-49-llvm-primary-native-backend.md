@@ -230,8 +230,8 @@ is covered by the LLVM backend suite.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
-- [ ] Verify all runtime bridge signatures and failure statuses through LLVM.
-- [ ] Verify external C declarations, checked representations, aggregate
+- [x] Verify all runtime bridge signatures and failure statuses through LLVM.
+- [x] Verify external C declarations, checked representations, aggregate
       passing, aggregate returns, and calling-convention contracts.
 - [x] Complete hosted target object/link/execute coverage.
 - [x] Complete freestanding object and link-contract coverage where startup,
@@ -246,15 +246,19 @@ standard library with the native runtime's exported C providers, including
 parameter arity. The only permitted arity difference is the one caller-owned
 return slot required by the established aggregate `sret` ABI. It also lowers
 all hosted standard-library facades through strict LLVM object emission with
-no-float verification enabled. Representative failure statuses execute
-through LLVM, including invalid handles, invalid process indexes, invalid path
-storage, empty-buffer bounds, malformed UTF-8 rejection, and valid-byte
-preservation. A hosted C-provider fixture links and executes both a `repr(C)`
-aggregate parameter and an aggregate return through the LLVM-produced object,
-proving the pointer and `sret` ABIs at a real C boundary rather than only in
-generated IR text. A hosted executable fixture also constructs, mutates, and
-observes packed, transparent, explicitly aligned, and payload-enum values
-through LLVM, so these checked representations are exercised at runtime.
+no-float verification enabled. The executable runtime-status matrix covers
+the deterministic success, boundary, and failure contracts for process
+arguments, UTF-8 string access, buffer capacity and clearing, cursor bounds,
+and restricted blocking contexts. The existing filesystem, path, directory,
+region, stream, clock, and locking fixtures remain part of the same LLVM
+bridge suite, so status values are checked at the native boundary rather than
+only in Rust unit tests. A hosted C-provider fixture links and executes both
+a `repr(C)` aggregate parameter and an aggregate return through the
+LLVM-produced object, proving the pointer and `sret` ABIs at a real C boundary
+rather than only in generated IR text. A hosted executable fixture also
+constructs, mutates, and observes packed, transparent, explicitly aligned,
+and payload-enum values through LLVM, so these checked representations are
+exercised at runtime.
 The CI matrix now invokes the LLVM bridge suite explicitly on Ubuntu, macOS,
 and Windows; target-specific native-provider fixtures remain guarded by their
 actual host contract instead of being treated as portable evidence.
