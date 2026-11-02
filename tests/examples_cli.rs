@@ -3,7 +3,7 @@ use std::fs;
 
 #[cfg(any(unix, feature = "llvm"))]
 use actus::cli::run_with_args;
-#[cfg(any(unix, feature = "llvm"))]
+#[cfg(unix)]
 use object::Object;
 #[cfg(unix)]
 use object::ObjectSymbol;
