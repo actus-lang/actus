@@ -574,20 +574,29 @@ fn freestanding_cli_backends_reject_float_at_shared_target_boundary() {
 
 #[test]
 fn freestanding_cli_backends_reject_hosted_services_before_codegen() {
-    let source = "import { open std::fs }; verb boot() -> Int { return 0; }\n";
-    for backend in BACKENDS {
-        let root = fixture_root("hosted-service-failure", backend);
-        let input = write_fixture(&root, backend, Some("thumbv7em-none-eabihf"), None, source);
-        let output = root.join("main.o");
-        let build = build(&root, &input, &output, "obj");
-        assert!(!build.status.success(), "{backend} must reject hosted std::fs");
-        let diagnostics = format!(
-            "{}{}",
-            String::from_utf8_lossy(&build.stdout),
-            String::from_utf8_lossy(&build.stderr)
-        );
-        assert!(diagnostics.contains("E1112"), "{backend} changed target rejection: {diagnostics}");
-        assert!(!output.exists(), "{backend} emitted an object for hosted std::fs");
-        fs::remove_dir_all(root).expect("remove hosted-service failure fixture");
+    let services = [
+        ("fs", "import { open std::fs }; verb boot() -> Int { return 0; }\n"),
+        ("time", "import { open std::time }; verb boot() -> Int { return 0; }\n"),
+        ("process", "import { open std::process }; verb boot() -> Int { return 0; }\n"),
+    ];
+    for (service, source) in services {
+        for backend in BACKENDS {
+            let root = fixture_root(&format!("hosted-service-failure-{service}"), backend);
+            let input = write_fixture(&root, backend, Some("thumbv7em-none-eabihf"), None, source);
+            let output = root.join("main.o");
+            let build = build(&root, &input, &output, "obj");
+            assert!(!build.status.success(), "{backend} must reject hosted std::{service}");
+            let diagnostics = format!(
+                "{}{}",
+                String::from_utf8_lossy(&build.stdout),
+                String::from_utf8_lossy(&build.stderr)
+            );
+            assert!(
+                diagnostics.contains("E1112"),
+                "{backend} changed std::{service} target rejection: {diagnostics}"
+            );
+            assert!(!output.exists(), "{backend} emitted an object for hosted std::{service}");
+            fs::remove_dir_all(root).expect("remove hosted-service failure fixture");
+        }
     }
 }
