@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use actus::cli::run_with_args;
+#[cfg(feature = "cranelift")]
 use object::{Object, ObjectSymbol};
 
 use super::fixtures::library_source;
@@ -31,7 +32,10 @@ fn project(name: &str, facade: &str, files: &[&str], source: &str) -> (PathBuf, 
 }
 
 fn build(input: &Path, output: &Path) {
+    #[cfg(feature = "cranelift")]
     build_with_backend(input, output, "cranelift");
+    #[cfg(all(not(feature = "cranelift"), feature = "llvm"))]
+    build_with_backend(input, output, "llvm");
 }
 
 fn build_with_backend(input: &Path, output: &Path, backend: &str) {
@@ -133,6 +137,7 @@ fn assert_labelled_print_output(backend: &str) {
 }
 
 #[test]
+#[cfg(feature = "cranelift")]
 fn std_io_native_labelled_print_works_on_cranelift() {
     assert_labelled_print_output("cranelift");
 }
@@ -190,6 +195,7 @@ verb main() -> Int {
 }
 
 #[test]
+#[cfg(feature = "cranelift")]
 fn native_string_data_is_deduplicated_and_deterministic() {
     let (root, input, output) = project(
         "string-data",
@@ -281,16 +287,19 @@ fn std_io_native_bridge_reports_eof_from_read_byte() {
 }
 
 #[test]
+#[cfg(feature = "cranelift")]
 fn std_io_native_bridge_mutates_ins_scalar_after_read_byte() {
     run_mutating_ins_scalar_fixture("cranelift");
 }
 
 #[test]
+#[cfg(feature = "cranelift")]
 fn std_io_native_bridge_carries_mutated_ins_scalar_through_loop() {
     run_loop_mutating_ins_scalar_fixture("cranelift");
 }
 
 #[test]
+#[cfg(feature = "cranelift")]
 fn std_io_native_bridge_reads_multiple_bytes_in_loop() {
     run_loop_read_byte_fixture("cranelift");
 }

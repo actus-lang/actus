@@ -39,6 +39,33 @@ impl std::fmt::Display for BackendEmitError {
 
 impl std::error::Error for BackendEmitError {}
 
+pub(crate) fn reject_float_ir(
+    backend_module: &BackendModule,
+    verify_no_float_ir: bool,
+) -> Result<(), BackendEmitError> {
+    if !verify_no_float_ir {
+        return Ok(());
+    }
+    for function in &backend_module.functions {
+        if function.blocks.iter().any(|block| {
+            block.instructions.iter().any(|instruction| {
+                matches!(
+                    instruction,
+                    BackendInstruction::FloatConstant { .. }
+                        | BackendInstruction::FloatCompare { .. }
+                        | BackendInstruction::FloatCast { .. }
+                )
+            })
+        }) {
+            return Err(BackendEmitError(format!(
+                "native function `{}` contains floating-point IR instructions: shared float instruction",
+                function.symbol.as_str()
+            )));
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendAbiError(pub String);
 

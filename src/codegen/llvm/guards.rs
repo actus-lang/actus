@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
-    LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr,
-    LLVMBuildICmp, LLVMBuildUnreachable, LLVMConstInt, LLVMConstNull, LLVMFunctionType,
-    LLVMGetGlobalParent, LLVMGetNamedFunction, LLVMInt32TypeInContext, LLVMPositionBuilderAtEnd,
-    LLVMTypeOf,
+    LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildICmp,
+    LLVMBuildUnreachable, LLVMConstInt, LLVMConstNull, LLVMFunctionType, LLVMGetGlobalParent,
+    LLVMGetIntrinsicDeclaration, LLVMLookupIntrinsicID, LLVMPositionBuilderAtEnd, LLVMTypeOf,
+    LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -59,7 +59,7 @@ pub(super) fn emit_trap_if_zero(
     Ok(false)
 }
 
-fn emit_llvm_trap(
+pub(super) fn emit_llvm_trap(
     context: llvm_sys::prelude::LLVMContextRef,
     function: LLVMValueRef,
     builder: LLVMBuilderRef,
@@ -69,33 +69,20 @@ fn emit_llvm_trap(
         if module.is_null() {
             return Err(BackendEmitError("LLVM trap function has no parent module".to_owned()));
         }
-        let name = b"raise\0";
-        let trap = {
-            let existing = LLVMGetNamedFunction(module, name.as_ptr().cast());
-            if existing.is_null() {
-                let mut parameter_types = [LLVMInt32TypeInContext(context)];
-                let trap_type = LLVMFunctionType(
-                    LLVMInt32TypeInContext(context),
-                    parameter_types.as_mut_ptr(),
-                    1,
-                    0,
-                );
-                LLVMAddFunction(module, name.as_ptr().cast(), trap_type)
-            } else {
-                existing
-            }
-        };
-        if trap.is_null() {
-            return Err(BackendEmitError("LLVM failed to declare raise function".to_owned()));
+        let name = b"llvm.trap";
+        let intrinsic_id = LLVMLookupIntrinsicID(name.as_ptr().cast(), name.len());
+        if intrinsic_id == 0 {
+            return Err(BackendEmitError("LLVM trap intrinsic is unavailable".to_owned()));
         }
-        let mut arguments = [LLVMConstInt(LLVMInt32TypeInContext(context), 4, 0)];
-        let mut parameter_types = [LLVMInt32TypeInContext(context)];
+        let trap = LLVMGetIntrinsicDeclaration(module, intrinsic_id, std::ptr::null_mut(), 0);
+        if trap.is_null() {
+            return Err(BackendEmitError("LLVM failed to declare trap intrinsic".to_owned()));
+        }
         let trap_type =
-            LLVMFunctionType(LLVMInt32TypeInContext(context), parameter_types.as_mut_ptr(), 1, 0);
-        if LLVMBuildCall2(builder, trap_type, trap, arguments.as_mut_ptr(), 1, c"".as_ptr())
-            .is_null()
+            LLVMFunctionType(LLVMVoidTypeInContext(context), std::ptr::null_mut(), 0, 0);
+        if LLVMBuildCall2(builder, trap_type, trap, std::ptr::null_mut(), 0, c"".as_ptr()).is_null()
         {
-            return Err(BackendEmitError("LLVM failed to emit raise call".to_owned()));
+            return Err(BackendEmitError("LLVM failed to emit trap intrinsic call".to_owned()));
         }
         if LLVMBuildUnreachable(builder).is_null() {
             return Err(BackendEmitError("LLVM failed to terminate trap block".to_owned()));

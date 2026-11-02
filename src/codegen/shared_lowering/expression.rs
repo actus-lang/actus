@@ -28,6 +28,7 @@ use super::super::{
 use super::support::{expression_span, unsupported};
 pub(crate) struct SharedExpressionProvider<'a> {
     namespace: &'a str,
+    pub(super) current_symbol: SymbolIdentity,
     layouts: &'a dyn super::super::BackendLayoutProvider,
     parameters: BTreeMap<String, BackendValueId>,
     scalar_loan_parameters: Vec<(String, BackendValueId, BackendValueId, BackendValueType)>,
@@ -67,6 +68,7 @@ impl<'a> SharedExpressionProvider<'a> {
     pub(super) fn new(
         namespace: &'a str,
         verb: &VerbDecl,
+        current_symbol: SymbolIdentity,
         layouts: &'a impl super::super::BackendLayoutProvider,
         return_types: &'a BTreeMap<String, Option<BackendValueType>>,
         return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
@@ -86,6 +88,7 @@ impl<'a> SharedExpressionProvider<'a> {
         let parameter_state = parameter_state::initialize(verb, layouts);
         Self {
             namespace,
+            current_symbol,
             layouts,
             parameters: parameter_state.parameters,
             scalar_loan_parameters: parameter_state.scalar_loan_parameters,

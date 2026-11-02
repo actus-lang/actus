@@ -1,4 +1,4 @@
-#[cfg(feature = "llvm")]
+#[cfg(all(feature = "llvm", feature = "cranelift"))]
 #[test]
 fn backend_change_invalidates_generated_artifacts() {
     use std::fs;

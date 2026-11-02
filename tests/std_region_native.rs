@@ -685,7 +685,7 @@ fn hosted_region_object_has_bounded_abi_sections_and_relocations() {
     let _ = fs::remove_dir_all(inline_root);
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), feature = "cranelift", feature = "llvm"))]
 #[test]
 fn freestanding_region_object_imports_only_target_provider_bridges() {
     let root =
@@ -813,7 +813,7 @@ verb boot(erg backing: Buffer, erg destination: Buffer, erg source: Buffer) -> I
     let _ = fs::remove_dir_all(root);
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), feature = "cranelift", feature = "llvm"))]
 #[test]
 fn freestanding_region_object_scales_logical_capacity_with_bounded_output() {
     let logical_lengths = ["1048576u64", "4294967296u64", "1099511627776u64"];

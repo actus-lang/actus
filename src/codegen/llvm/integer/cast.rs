@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
+use super::super::guards::emit_llvm_trap;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildSExt,
-    LLVMBuildTrunc, LLVMBuildUnreachable, LLVMBuildZExt, LLVMConstInt, LLVMPositionBuilderAtEnd,
+    LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt, LLVMPositionBuilderAtEnd,
 };
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
@@ -31,11 +32,9 @@ pub(in crate::codegen::llvm) fn emit_integer_cast(
     if unsafe { LLVMBuildCondBr(builder, valid, ok_block, trap_block) }.is_null() {
         return Err(BackendEmitError("LLVM failed to emit integer cast branch".to_owned()));
     }
-    unsafe {
-        LLVMPositionBuilderAtEnd(builder, trap_block);
-        LLVMBuildUnreachable(builder);
-        LLVMPositionBuilderAtEnd(builder, ok_block);
-    }
+    unsafe { LLVMPositionBuilderAtEnd(builder, trap_block) };
+    emit_llvm_trap(context, function, builder)?;
+    unsafe { LLVMPositionBuilderAtEnd(builder, ok_block) };
     let converted = convert_value(context, builder, wide, *target_type)?;
     values.insert(*result, converted);
     Ok(false)
