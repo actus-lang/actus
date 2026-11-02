@@ -304,7 +304,7 @@ permission.
       cleanup behavior, and typed failures.
 - [x] Add regressions for every LLVM failure found during the inventory.
 - [x] Verify that unsupported operations fail before invalid object emission.
-- [ ] Run source limits, formatter, documentation, dependency, and security
+- [x] Run source limits, formatter, documentation, dependency, and security
       checks in every supported CI configuration.
 
 #### 49.4 current parity evidence
@@ -347,6 +347,17 @@ shared 106-test codegen suite. It includes stable regressions for non-native
 integer widths, recursive calls, enum equality, zero-float rejection,
 runtime status boundaries, checked representations, aggregate return slots,
 cleanup ordering, and target-specific object/link contracts.
+
+The final quality-check contract is also complete. The source-limit,
+formatter, documentation, standard-library, architecture, secrets, and
+dependency/security checks pass locally; `cargo check --all-targets
+--all-features` and strict clippy pass as well. The explicit CI backend
+configurations pass with Cranelift enabled and LLVM enabled, including the
+LLVM backend suite. The CI workflow applies the corresponding Rust, backend,
+standard-library, source-limit, and security checks across its hosted Linux,
+macOS, and Windows matrix, with target-specific LLVM jobs kept explicit.
+No unsupported platform result is inferred from a different host, and no
+later default-backend migration work is included in this acceptance check.
 
 The fail-closed target matrix separately verifies floating-point policy,
 hosted-service imports, and unsupported large aggregates on freestanding
