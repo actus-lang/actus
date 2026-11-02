@@ -199,6 +199,58 @@ fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
 }
 
 #[test]
+fn hosted_cli_backends_preserve_checked_representation_provider_contracts() {
+    let fixtures = [
+        (
+            "packed",
+            "meta repr(C, packed) struct PackedPoint { prefix: u8, value: u32, } unsafe extern \"C\" verb inspect(erg point: PackedPoint) -> Int; verb main() -> Int { erg point: PackedPoint = PackedPoint { prefix: 1u8, value: 41u32, }; return inspect(point: erg point); }\n",
+        ),
+        (
+            "transparent",
+            "meta repr(transparent) struct UserId { value: u64, } unsafe extern \"C\" verb inspect(erg point: UserId) -> Int; verb main() -> Int { erg point: UserId = UserId { value: 42u64, }; return inspect(point: erg point); }\n",
+        ),
+        (
+            "aligned",
+            "meta repr(C, align(8u32)) struct AlignedValue { value: u8, } unsafe extern \"C\" verb inspect(erg point: AlignedValue) -> Int; verb main() -> Int { erg point: AlignedValue = AlignedValue { value: 42u8, }; return inspect(point: erg point); }\n",
+        ),
+    ];
+    for (fixture, source) in fixtures {
+        let mut provider_symbols = Vec::new();
+        let mut relocation_sizes = Vec::new();
+        for backend in BACKENDS {
+            let root = fixture_root(&format!("representation-{fixture}"), backend);
+            let input = write_fixture(&root, backend, None, None, source);
+            let output = root.join("main.o");
+            let build = build(&root, &input, &output, "obj");
+            assert!(
+                build.status.success(),
+                "{backend} {fixture} representation build failed: {}",
+                String::from_utf8_lossy(&build.stderr)
+            );
+            let bytes = fs::read(&output).expect("read representation parity object");
+            provider_symbols.push(
+                undefined_symbols(&bytes)
+                    .into_iter()
+                    .filter(|symbol| symbol == "inspect")
+                    .collect::<BTreeSet<_>>(),
+            );
+            relocation_sizes.push(external_relocation_sizes(&bytes, "inspect"));
+            fs::remove_dir_all(root).expect("remove representation parity fixture");
+        }
+        assert!(
+            provider_symbols[0].contains("inspect"),
+            "{fixture} provider symbol is missing: {:?}",
+            provider_symbols[0]
+        );
+        assert_eq!(provider_symbols[0], provider_symbols[1], "{fixture} provider symbols diverged");
+        assert_eq!(
+            relocation_sizes[0], relocation_sizes[1],
+            "{fixture} relocation contracts diverged"
+        );
+    }
+}
+
+#[test]
 fn hosted_cli_backends_preserve_typed_failure_exit_status() {
     let source = "enum Failure { Rejected, } verb reject() -> Result[Int, Failure] { return Err(Failure.Rejected); } verb main() -> Int { erg result = reject(); return case dat result { Result.Err(_) => 42, Result.Ok(_) => 1, }; }\n";
     let mut statuses = Vec::new();
