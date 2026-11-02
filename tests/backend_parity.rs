@@ -116,6 +116,29 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
 }
 
 #[test]
+fn hosted_cli_backends_reject_the_same_semantic_failure_before_object_emission() {
+    let source = "verb main() -> Int { return missing_verb(); }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("semantic-failure", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main.o");
+        let build = build(&root, &input, &output, "obj");
+        assert!(!build.status.success(), "{backend} must reject the unknown call");
+        let diagnostics = format!(
+            "{}{}",
+            String::from_utf8_lossy(&build.stdout),
+            String::from_utf8_lossy(&build.stderr)
+        );
+        assert!(
+            diagnostics.contains("E1069"),
+            "{backend} changed the semantic diagnostic: {diagnostics}"
+        );
+        assert!(!output.exists(), "{backend} emitted an object after semantic rejection");
+        fs::remove_dir_all(root).expect("remove semantic failure fixture");
+    }
+}
+
+#[test]
 fn hosted_cli_backends_lower_directory_drop_cleanup_identically() {
     let source = "import { open std::fs, open std::path, }; verb current() -> Result[Path, PathError] { erg raw: Buffer = Buffer[0]; append(raw, 46u8); append(raw, 0u8); return path_from_ascii(storage: dat raw); } meta effect(\"filesystem\", \"blocking\") verb main() -> Int { erg current_path = current(); return case dat current_path { Result.Err(_) => 1, Result.Ok(path) => { erg opened = read_dir(path: abs path); return case dat opened { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
     let mut statuses = Vec::new();
