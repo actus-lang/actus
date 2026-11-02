@@ -172,7 +172,7 @@ fn shared_codegen_facade_does_not_reexport_cranelift_emission() {
 }
 
 #[test]
-fn cranelift_dependencies_are_optional_and_defaulted() {
+fn cranelift_dependencies_are_optional_and_llvm_is_default() {
     let source = fs::read_to_string(repository_path("Cargo.toml"))
         .expect("Cargo manifest should be readable");
     let manifest: toml::Value =
@@ -185,7 +185,7 @@ fn cranelift_dependencies_are_optional_and_defaulted() {
         .get("default")
         .and_then(toml::Value::as_array)
         .expect("default Cargo features should be an array");
-    assert!(default_features.iter().any(|feature| feature.as_str() == Some("cranelift")));
+    assert!(default_features.iter().any(|feature| feature.as_str() == Some("llvm")));
     let cranelift_features = features
         .get("cranelift")
         .and_then(toml::Value::as_array)
@@ -216,10 +216,10 @@ fn cranelift_dependencies_are_optional_and_defaulted() {
 }
 
 #[test]
-fn llvm_integration_is_an_explicit_opt_in_feature() {
+fn llvm_integration_is_the_default_feature() {
     let manifest = fs::read_to_string(repository_path("Cargo.toml"))
         .expect("Cargo manifest should be readable");
-    assert!(manifest.contains("default = [\"cranelift\"]"));
+    assert!(manifest.contains("default = [\"llvm\"]"));
     assert!(manifest.contains("llvm = [\"dep:llvm-sys\"]"));
     assert!(manifest.contains(
         "llvm-sys = { version = \"231.0.0\", optional = true, features = [\"strict-versioning\"] }"

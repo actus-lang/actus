@@ -374,7 +374,7 @@ frontend contract failures.
 - [x] Verify explicit Cranelift selection and rollback from a clean checkout.
 - [x] Measure and record compile time, artifact size, cache behavior, and
       relevant native execution evidence.
-- [ ] Run the complete default-LLVM suite before declaring the migration ready.
+- [x] Run the complete default-LLVM suite before declaring the migration ready.
 
 #### 49.5 default selection evidence
 
@@ -420,6 +420,16 @@ respectively. The LLVM debug compiler and target directory measured
 `examples/hello.act`, returned the expected exit code 42, and completed native
 build/run in 41/2 ms and 37/2 ms. These results are host evidence only and do
 not claim release, cross-platform, embedded, or production performance.
+
+The complete default-LLVM all-targets suite then passed with exit code 0 after
+updating two architecture assertions that still encoded the former
+Cranelift-default policy. The final run covered the compiler unit suite,
+architecture and configuration contracts, CLI and strict workflows, shared
+codegen, LLVM backend emission, FFI, filesystem, time, I/O, Region, Wire,
+standard-library visibility/conformance, source limits, semantic diagnostics,
+and target contracts. The assertions now verify that LLVM is the default
+feature while Cranelift remains optional and explicitly selectable. No source
+language, ownership, cleanup, runtime, or serialized-data behavior changed.
 
 ## Non-negotiable invariants
 
