@@ -31,11 +31,37 @@ pub(super) fn run_tests(
         }
         return 0;
     }
+    if collection.tests.is_empty() {
+        return print_test_summary(0, 0, &output_style);
+    }
+    let worker_count = options.test_threads.min(collection.tests.len());
+    let chunk_size = collection.tests.len().div_ceil(worker_count);
+    let tests = &collection.tests;
+    let results = std::thread::scope(|scope| {
+        (0..collection.tests.len())
+            .step_by(chunk_size)
+            .map(|start| {
+                let end = (start + chunk_size).min(collection.tests.len());
+                scope.spawn(move || {
+                    (start..end)
+                        .map(|index| {
+                            let started = Instant::now();
+                            let result = run_test(&tests[index], configuration, index);
+                            (index, result, started.elapsed())
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .flat_map(|handle| handle.join().expect("test execution worker panicked"))
+            .collect::<Vec<_>>()
+    });
+    let mut results = results;
+    results.sort_by_key(|(index, _, _)| *index);
     let mut passed = 0;
-    for (index, test) in collection.tests.iter().enumerate() {
-        let started = Instant::now();
-        let result = run_test(test, configuration, index);
-        if report_test_result(test, result, started, &output_style) {
+    for (index, result, elapsed) in results {
+        if report_test_result(&collection.tests[index], result, elapsed, &output_style) {
             passed += 1;
         }
     }
@@ -53,10 +79,10 @@ fn print_test_header(total: usize, filtered: usize, mode: ConformanceMode) {
 fn report_test_result(
     test: &DiscoveredTest,
     result: Result<TestProcessResult, String>,
-    started: Instant,
+    elapsed: std::time::Duration,
     output_style: &TestOutputStyle,
 ) -> bool {
-    let elapsed = started.elapsed().as_millis();
+    let elapsed = elapsed.as_millis();
     match result {
         Ok(TestProcessResult::Exited(0)) => {
             let status = output_style.success(&format!("ok ({elapsed} ms, exit code 0)"));

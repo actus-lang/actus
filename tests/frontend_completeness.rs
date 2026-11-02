@@ -389,6 +389,35 @@ fn imported_facades_preserve_effectful_public_signatures() {
     .expect("declared imported effect fixture should parse");
     analyze_with_imports(&declared, &ModuleResolver::new(&fixture.root))
         .expect("declared imported effect should pass");
+
+    let nested = ModuleFixture::new();
+    nested.write("teaching/teaching.act", "open transport;");
+    nested.write("teaching/transport/transport.act", "open logical;");
+    nested.write("teaching/transport/logical/logical.act", "open file;");
+    nested.write(
+        "teaching/transport/logical/file.act",
+        "import teaching; meta effect(\"filesystem\") open verb load() -> Int { return 0; } meta effect(\"filesystem\") verb caller() -> Int { teaching::load(); return 0; }",
+    );
+    let nested_missing =
+        parse_source("import teaching; verb main() -> Int { teaching::load(); return 0; }")
+            .expect("nested imported effect fixture should parse");
+    let nested_error = analyze_with_imports(&nested_missing, &ModuleResolver::new(&nested.root))
+        .expect_err("nested facades must preserve effect contracts");
+    let ModuleError::Semantic(nested_error) = nested_error else {
+        panic!("expected nested imported semantic error")
+    };
+    assert!(matches!(
+        nested_error.kind,
+        SemanticErrorKind::UndeclaredEffect { ref callee, effect }
+            if callee == "teaching::load" && effect == actus::ast::Effect::Filesystem
+    ));
+
+    let nested_declared = parse_source(
+        "import teaching; meta effect(\"filesystem\") verb main() -> Int { teaching::load(); return 0; }",
+    )
+    .expect("nested declared effect fixture should parse");
+    analyze_with_imports(&nested_declared, &ModuleResolver::new(&nested.root))
+        .expect("nested declared imported effect should pass");
 }
 
 #[test]

@@ -41,18 +41,44 @@ pub(super) fn collect_tests(
     configuration: &CompilerConfiguration,
     options: &TestOptions,
 ) -> Result<TestCollection, String> {
-    let resolver = ModuleResolver::with_dependencies_and_runtime(
-        configuration.source_root(),
-        configuration.dependency_roots(),
-        configuration.runtime_source_root(),
-        configuration.runtime_module_roots(),
-    );
+    if files.is_empty() {
+        return Ok(TestCollection { tests: Vec::new(), filtered: 0 });
+    }
+    let worker_count =
+        std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(files.len());
+    let chunk_size = files.len().div_ceil(worker_count);
+    let chunks = files.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
+    let results = std::thread::scope(|scope| {
+        chunks
+            .into_iter()
+            .map(|chunk| {
+                let configuration = configuration.clone();
+                let options = options.clone();
+                scope.spawn(move || {
+                    let resolver = ModuleResolver::with_dependencies_and_runtime(
+                        configuration.source_root(),
+                        configuration.dependency_roots(),
+                        configuration.runtime_source_root(),
+                        configuration.runtime_module_roots(),
+                    );
+                    chunk
+                        .into_iter()
+                        .map(|path| collect_file_tests(&path, &configuration, &options, &resolver))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|handle| handle.join().expect("test collection worker panicked"))
+            .collect::<Result<Vec<_>, _>>()
+    })?;
     let mut tests = Vec::new();
     let mut filtered = 0;
-    for path in files {
-        let collected = collect_file_tests(&path, configuration, options, &resolver)?;
-        tests.extend(collected.tests);
-        filtered += collected.filtered;
+    for collected_files in results {
+        for collected in collected_files {
+            tests.extend(collected.tests);
+            filtered += collected.filtered;
+        }
     }
     tests.sort_by(|left, right| left.path.cmp(&right.path).then(left.name.cmp(&right.name)));
     Ok(TestCollection { tests, filtered })

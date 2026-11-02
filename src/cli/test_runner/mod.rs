@@ -7,6 +7,7 @@ use crate::configuration::CompilerConfiguration;
 
 use super::conformance::{ConformanceMode, parse_strict_option};
 
+#[derive(Clone)]
 pub(super) struct TestOptions {
     pub(super) mode: ConformanceMode,
     pub(super) filter: Option<String>,
@@ -15,6 +16,7 @@ pub(super) struct TestOptions {
     pub(super) exact: bool,
     pub(super) list: bool,
     pub(super) mirror: bool,
+    pub(super) test_threads: usize,
 }
 
 pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
@@ -55,6 +57,7 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
     let mut exact = false;
     let mut list = false;
     let mut mirror = false;
+    let mut test_threads = default_test_threads();
     while let Some(argument) = arguments.next() {
         if argument == "--exact" {
             exact = true;
@@ -62,6 +65,11 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
             list = true;
         } else if argument == "--mirror" {
             mirror = true;
+        } else if argument == "--test-threads" {
+            test_threads = parse_test_threads(&next_test_value(&mut arguments, "--test-threads")?)?;
+        } else if let Some(value) = argument.strip_prefix("--test-threads=") {
+            test_threads =
+                parse_test_threads(non_empty_test_value(value, "--test-threads")?.as_str())?;
         } else if argument == "--module" {
             module = Some(next_test_value(&mut arguments, "--module")?);
         } else if let Some(value) = argument.strip_prefix("--module=") {
@@ -82,7 +90,21 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
             return Err("`actus test` accepts only one positional filter".to_owned());
         }
     }
-    Ok(TestOptions { mode, filter, module, file, exact, list, mirror })
+    Ok(TestOptions { mode, filter, module, file, exact, list, mirror, test_threads })
+}
+
+fn default_test_threads() -> usize {
+    std::thread::available_parallelism().map(usize::from).unwrap_or(1)
+}
+
+fn parse_test_threads(value: &str) -> Result<usize, String> {
+    let threads = value
+        .parse::<usize>()
+        .map_err(|_| "`--test-threads` must be a positive integer".to_owned())?;
+    if threads == 0 {
+        return Err("`--test-threads` must be a positive integer".to_owned());
+    }
+    Ok(threads)
 }
 
 fn next_test_value(
