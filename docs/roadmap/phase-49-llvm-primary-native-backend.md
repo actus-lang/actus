@@ -371,7 +371,7 @@ frontend contract failures.
       prior acceptance work passes.
 - [x] Update backend support documentation, configuration examples, help text,
       artifact metadata, and clean-checkout instructions.
-- [ ] Verify explicit Cranelift selection and rollback from a clean checkout.
+- [x] Verify explicit Cranelift selection and rollback from a clean checkout.
 - [ ] Measure and record compile time, artifact size, cache behavior, and
       relevant native execution evidence.
 - [ ] Run the complete default-LLVM suite before declaring the migration ready.
@@ -396,6 +396,16 @@ source-preserving rollback. The existing artifact metadata contract already
 records the selected backend together with target, profile, runtime,
 source-limit, compiler, and runtime identity fields; the documentation now
 describes that contract rather than introducing a second cache mechanism.
+
+Clean-target verification was performed with separate compiler target
+directories. An all-features compiler selected LLVM by default and emitted a
+strict object; the same compiler emitted a second strict object when passed
+`--backend cranelift`. A compiler built with only the `cranelift` feature
+selected Cranelift by default and emitted the same source successfully. The
+same Cranelift-only compiler rejected an explicit LLVM request with the typed
+unavailable-backend diagnostic before object emission, and no rejected object
+was created. This demonstrates both source-preserving rollback and the
+fail-closed no-fallback rule from a clean build state.
 
 ## Non-negotiable invariants
 
