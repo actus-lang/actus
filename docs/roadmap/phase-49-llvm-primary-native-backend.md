@@ -2,12 +2,12 @@
 
 ## Status
 
-In progress. The complete backend baseline and the initial LLVM type-contract
-hardening are complete; the next work is shared-contract lowering. LLVM
-remains opt-in and the
-default backend remains Cranelift until the shared-contract, target, runtime,
-and parity work below is complete. No metadata contract is changed by this
-plan.
+In progress. The complete backend baseline, shared-contract lowering, target
+contracts, runtime contracts, parity evidence, and default selection change
+are complete through the current migration checks. LLVM is now the default
+native backend while Cranelift remains explicitly available during the
+compatibility period. No Actus source, ownership, runtime, or serialized-data
+contract is changed by this plan.
 
 ## Objective
 
@@ -57,7 +57,7 @@ The compiler integration surface is feature-gated through `Cargo.toml`,
 test target `tests/codegen/llvm/backend.rs`. The current policy is:
 
 - LLVM feature: `llvm-sys 231.0.0` with strict versioning;
-- default feature: `cranelift`;
+- default feature: `llvm`;
 - LLVM-only focused backend suite: `34 passed, 0 failed`;
 - LLVM-only library suite: `148 passed, 0 failed`;
 - defensive invalid-type path: `src/codegen/llvm/values.rs`, which rejects
@@ -369,7 +369,7 @@ frontend contract failures.
 
 - [x] Change the default Cargo feature and backend selection only after all
       prior acceptance work passes.
-- [ ] Update backend support documentation, configuration examples, help text,
+- [x] Update backend support documentation, configuration examples, help text,
       artifact metadata, and clean-checkout instructions.
 - [ ] Verify explicit Cranelift selection and rollback from a clean checkout.
 - [ ] Measure and record compile time, artifact size, cache behavior, and
@@ -383,8 +383,19 @@ selects LLVM whenever the LLVM feature is available. The explicit
 Cranelift-only feature configuration retains Cranelift as its default, so the
 compatibility backend remains available without changing Actus source code.
 Configuration regression tests cover both feature configurations. CLI help,
-release documentation, compatibility measurements, and clean-checkout
-rollback remain intentionally open under the subsequent 49.5 checks.
+support documentation, and clean-checkout rollback instructions are covered
+by this documentation check; compatibility measurements and release-artifact
+work remain intentionally open under the subsequent 49.5 checks.
+
+The backend support guide, native-build guide, workflow reference, manifest
+reference, README, and CLI help now describe LLVM as the default and Cranelift
+as an explicit compatibility choice. They document feature requirements,
+manifest and command-line precedence, target validation, unavailable-backend
+errors, artifact metadata invalidation, clean-checkout verification, and
+source-preserving rollback. The existing artifact metadata contract already
+records the selected backend together with target, profile, runtime,
+source-limit, compiler, and runtime identity fields; the documentation now
+describes that contract rather than introducing a second cache mechanism.
 
 ## Non-negotiable invariants
 
