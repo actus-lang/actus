@@ -367,7 +367,7 @@ frontend contract failures.
 
 ### 49.5 — Default selection migration
 
-- [ ] Change the default Cargo feature and backend selection only after all
+- [x] Change the default Cargo feature and backend selection only after all
       prior acceptance work passes.
 - [ ] Update backend support documentation, configuration examples, help text,
       artifact metadata, and clean-checkout instructions.
@@ -375,6 +375,16 @@ frontend contract failures.
 - [ ] Measure and record compile time, artifact size, cache behavior, and
       relevant native execution evidence.
 - [ ] Run the complete default-LLVM suite before declaring the migration ready.
+
+#### 49.5 default selection evidence
+
+The default Cargo feature now selects LLVM, and the backend configuration
+selects LLVM whenever the LLVM feature is available. The explicit
+Cranelift-only feature configuration retains Cranelift as its default, so the
+compatibility backend remains available without changing Actus source code.
+Configuration regression tests cover both feature configurations. CLI help,
+release documentation, compatibility measurements, and clean-checkout
+rollback remain intentionally open under the subsequent 49.5 checks.
 
 ## Non-negotiable invariants
 
