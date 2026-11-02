@@ -467,6 +467,7 @@ fn freestanding_cli_backends_share_large_aggregate_failure_class() {
                 || diagnostics.contains("implicit heap allocation"),
             "{backend} failure class changed: {diagnostics}"
         );
+        assert!(!output.exists(), "{backend} emitted an object after allocation rejection");
         fs::remove_dir_all(root).expect("remove failure parity fixture");
     }
 }
@@ -490,6 +491,7 @@ fn freestanding_cli_backends_reject_float_at_shared_target_boundary() {
                 .contains("floating-point values are forbidden by the freestanding target profile"),
             "{backend} float policy diagnostic changed: {diagnostics}"
         );
+        assert!(!output.exists(), "{backend} emitted an object after float rejection");
         fs::remove_dir_all(root).expect("remove freestanding float fixture");
     }
 }
