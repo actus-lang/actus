@@ -137,6 +137,24 @@ fn test_lists_filtered_canonical_test_names_without_execution() {
 
 #[cfg(unix)]
 #[test]
+fn test_parallel_execution_preserves_canonical_output_order() {
+    let root = create_test_project(
+        "runner-parallel-order",
+        "order.act",
+        "meta test\nverb zeta() -> Int { return 0; }\nmeta test\nverb alpha() -> Int { return 0; }\n",
+    );
+    let output = run_command(&root, &["test", "--test-threads", "2"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    let alpha = stdout.find("test <root>::alpha").expect("alpha result missing");
+    let zeta = stdout.find("test <root>::zeta").expect("zeta result missing");
+    assert!(alpha < zeta, "parallel output order changed: {stdout}");
+    assert!(stdout.contains("2 passed; 0 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn test_mirror_gate_rejects_unmapped_nested_test_files() {
     let root = create_test_project(
         "runner-mirror",
