@@ -303,7 +303,7 @@ permission.
 - [ ] Compare deterministic outputs, object symbols, ABI layouts, exit status,
       cleanup behavior, and typed failures.
 - [ ] Add regressions for every LLVM failure found during the inventory.
-- [ ] Verify that unsupported operations fail before invalid object emission.
+- [x] Verify that unsupported operations fail before invalid object emission.
 - [ ] Run source limits, formatter, documentation, dependency, and security
       checks in every supported CI configuration.
 
@@ -321,9 +321,16 @@ It also verifies that the same semantic or target rejection occurs before
 either backend emits an object. Freestanding fixtures compare exported symbols,
 zero-float evidence, large-aggregate rejection, hosted-service rejection for
 `std::fs`, `std::time`, and `std::process`, and shared target diagnostics. This
-is stronger regression evidence, but it does not yet close the complete
-semantic and negative fixture matrix or the full ABI-layout comparison
-checkbox.
+is stronger regression evidence. The full
+`cargo test --all-targets --all-features` suite also passes, including the
+shared lowering, FFI, LLVM object, target filtering, source-limit, and
+standard-library suites. The unsupported-operation contract is therefore
+closed for the covered semantic and target fixtures: both backends reject
+before object emission and leave no invalid artifact behind.
+
+The complete semantic and negative fixture matrix and the full ABI-layout
+comparison remain open until every supported shared fixture is represented in
+the backend parity matrix with an explicit layout assertion.
 
 ### 49.5 — Default selection migration
 
