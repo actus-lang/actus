@@ -103,6 +103,22 @@ fn undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
         .collect()
 }
 
+fn external_relocation_sizes(bytes: &[u8], expected: &str) -> Vec<u8> {
+    let file = object::File::parse(bytes).expect("parity object should parse");
+    let mut sizes = Vec::new();
+    for section in file.sections() {
+        for (_, relocation) in section.relocations() {
+            let RelocationTarget::Symbol(index) = relocation.target() else { continue };
+            let symbol = file.symbol_by_index(index).expect("relocation symbol should exist");
+            if symbol.name().ok() == Some(expected) {
+                sizes.push(relocation.size());
+            }
+        }
+    }
+    sizes.sort_unstable();
+    sizes
+}
+
 #[test]
 fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
     let mut statuses = Vec::new();
@@ -128,6 +144,7 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
 fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
     let source = "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; verb main() -> Int { erg point: Point = Point { x: 40i32, y: 2i32, }; return inspect(point: erg point); }\n";
     let mut providers = Vec::new();
+    let mut relocations = Vec::new();
     for backend in BACKENDS {
         let root = fixture_root("external-aggregate", backend);
         let input = write_fixture(&root, backend, None, None, source);
@@ -145,6 +162,7 @@ fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
                 .filter(|symbol| symbol == "inspect")
                 .collect::<BTreeSet<_>>(),
         );
+        relocations.push(external_relocation_sizes(&bytes, "inspect"));
         fs::remove_dir_all(root).expect("remove external aggregate parity fixture");
     }
     assert!(
@@ -153,6 +171,7 @@ fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
         providers[0]
     );
     assert_eq!(providers[0], providers[1], "external aggregate provider symbols diverged");
+    assert_eq!(relocations[0], relocations[1], "external aggregate relocation contracts diverged");
 }
 
 #[test]
