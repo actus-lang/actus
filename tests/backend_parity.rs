@@ -156,6 +156,26 @@ fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
 }
 
 #[test]
+fn hosted_cli_backends_preserve_typed_failure_exit_status() {
+    let source = "enum Failure { Rejected, } verb reject() -> Result[Int, Failure] { return Err(Failure.Rejected); } verb main() -> Int { erg result = reject(); return case dat result { Result.Err(_) => 42, Result.Ok(_) => 1, }; }\n";
+    let mut statuses = Vec::new();
+    for backend in BACKENDS {
+        let root = fixture_root("typed-failure", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} typed-failure build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        statuses.push(Command::new(&output).status().expect("run typed-failure fixture").code());
+        fs::remove_dir_all(root).expect("remove typed-failure parity fixture");
+    }
+    assert_eq!(statuses, vec![Some(42), Some(42)]);
+}
+
+#[test]
 fn hosted_cli_backends_reject_the_same_semantic_failure_before_object_emission() {
     let source = "verb main() -> Int { return missing_verb(); }\n";
     for backend in BACKENDS {
