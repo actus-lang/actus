@@ -141,6 +141,30 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
 }
 
 #[test]
+fn hosted_cli_backends_emit_deterministic_objects() {
+    for backend in BACKENDS {
+        let root = fixture_root("deterministic-object", backend);
+        let input = write_fixture(&root, backend, None, None, SOURCE);
+        let first = root.join("first.o");
+        let second = root.join("second.o");
+        let first_build = build(&root, &input, &first, "obj");
+        let second_build = build(&root, &input, &second, "obj");
+        assert!(
+            first_build.status.success() && second_build.status.success(),
+            "{backend} deterministic object build failed: {} {}",
+            String::from_utf8_lossy(&first_build.stderr),
+            String::from_utf8_lossy(&second_build.stderr)
+        );
+        assert_eq!(
+            fs::read(&first).expect("read first deterministic object"),
+            fs::read(&second).expect("read second deterministic object"),
+            "{backend} object emission is not deterministic"
+        );
+        fs::remove_dir_all(root).expect("remove deterministic object fixture");
+    }
+}
+
+#[test]
 fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
     let source = "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; verb main() -> Int { erg point: Point = Point { x: 40i32, y: 2i32, }; return inspect(point: erg point); }\n";
     let mut providers = Vec::new();
