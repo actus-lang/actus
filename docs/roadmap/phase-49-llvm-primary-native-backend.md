@@ -302,7 +302,7 @@ permission.
       backends wherever both target contracts support the fixture.
 - [x] Compare deterministic outputs, object symbols, ABI layouts, exit status,
       cleanup behavior, and typed failures.
-- [ ] Add regressions for every LLVM failure found during the inventory.
+- [x] Add regressions for every LLVM failure found during the inventory.
 - [x] Verify that unsupported operations fail before invalid object emission.
 - [ ] Run source limits, formatter, documentation, dependency, and security
       checks in every supported CI configuration.
@@ -341,6 +341,18 @@ parser, unknown-type, and unknown-verb failures. Each failure is compared
 across both backends, checks the stable diagnostic code, and asserts that no
 object is emitted. This closes the shared semantic and negative fixture matrix
 for the currently supported hosted and freestanding target contracts.
+
+The LLVM inventory regression suite passes 98/98 tests together with the
+shared 106-test codegen suite. It includes stable regressions for non-native
+integer widths, recursive calls, enum equality, zero-float rejection,
+runtime status boundaries, checked representations, aggregate return slots,
+cleanup ordering, and target-specific object/link contracts.
+
+The fail-closed target matrix separately verifies floating-point policy,
+hosted-service imports, and unsupported large aggregates on freestanding
+targets. Each case is rejected by both backends before an object is emitted;
+the hosted semantic-contract matrix applies the same no-artifact rule to
+frontend contract failures.
 
 ### 49.5 — Default selection migration
 
