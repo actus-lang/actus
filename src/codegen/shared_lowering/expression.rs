@@ -51,6 +51,7 @@ pub(crate) struct SharedExpressionProvider<'a> {
     nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
     array_big_endian: BTreeMap<BackendValueId, bool>,
     aggregate_places: std::collections::BTreeSet<BackendValueId>,
+    heap_owned_aggregate_values: std::collections::BTreeSet<BackendValueId>,
     enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
     next_value: u32,
     loop_depth: usize,
@@ -111,6 +112,7 @@ impl<'a> SharedExpressionProvider<'a> {
             nominal_types: parameter_state.nominal_types,
             array_big_endian: BTreeMap::new(),
             aggregate_places: std::collections::BTreeSet::new(),
+            heap_owned_aggregate_values: std::collections::BTreeSet::new(),
             enum_payload_types: parameter_state.enum_payload_types,
             next_value: parameter_state.next_value,
             loop_depth: 0,
@@ -161,6 +163,7 @@ impl<'a> SharedExpressionProvider<'a> {
             layout,
             span,
         });
+        self.remember_heap_owned_aggregate(copy, layout);
         Ok(copy)
     }
     pub(super) fn scalar_loan_prologue(&self) -> Vec<BackendInstruction> {
@@ -256,6 +259,18 @@ impl<'a> SharedExpressionProvider<'a> {
     }
     pub(super) fn is_aggregate_place(&self, value: BackendValueId) -> bool {
         self.aggregate_places.contains(&value)
+    }
+    pub(super) fn remember_heap_owned_aggregate(
+        &mut self,
+        value: BackendValueId,
+        layout: super::super::BackendLayout,
+    ) {
+        if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
+            self.heap_owned_aggregate_values.insert(value);
+        }
+    }
+    pub(super) fn is_heap_owned_aggregate(&self, value: BackendValueId) -> bool {
+        self.heap_owned_aggregate_values.contains(&value)
     }
     pub(super) fn remember_enum_payload(
         &mut self,

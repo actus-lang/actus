@@ -39,6 +39,7 @@ pub(super) fn lower_array_constructor(
         fields: Vec::new(),
         span,
     });
+    provider.remember_heap_owned_aggregate(result, layout);
     Ok(result)
 }
 

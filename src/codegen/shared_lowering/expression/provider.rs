@@ -219,6 +219,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
                 layout,
                 span,
             });
+            self.remember_heap_owned_aggregate(copy, layout);
             copy
         } else {
             value
