@@ -94,6 +94,15 @@ fn referenced_undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
     symbols
 }
 
+fn undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
+    let file = object::File::parse(bytes).expect("parity object should parse");
+    let format = file.format();
+    file.symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok().map(|name| canonical_symbol_name(format, name)))
+        .collect()
+}
+
 #[test]
 fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
     let mut statuses = Vec::new();
@@ -113,6 +122,37 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
         fs::remove_dir_all(root).expect("remove hosted parity fixture");
     }
     assert_eq!(statuses, vec![Some(42), Some(42)]);
+}
+
+#[test]
+fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
+    let source = "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; verb main() -> Int { erg point: Point = Point { x: 40i32, y: 2i32, }; return inspect(point: erg point); }\n";
+    let mut providers = Vec::new();
+    for backend in BACKENDS {
+        let root = fixture_root("external-aggregate", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main.o");
+        let build = build(&root, &input, &output, "obj");
+        assert!(
+            build.status.success(),
+            "{backend} external aggregate build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let bytes = fs::read(&output).expect("read external aggregate parity object");
+        providers.push(
+            undefined_symbols(&bytes)
+                .into_iter()
+                .filter(|symbol| symbol == "inspect")
+                .collect::<BTreeSet<_>>(),
+        );
+        fs::remove_dir_all(root).expect("remove external aggregate parity fixture");
+    }
+    assert!(
+        providers[0].contains("inspect"),
+        "external provider symbol is missing: {:?}",
+        providers[0]
+    );
+    assert_eq!(providers[0], providers[1], "external aggregate provider symbols diverged");
 }
 
 #[test]
