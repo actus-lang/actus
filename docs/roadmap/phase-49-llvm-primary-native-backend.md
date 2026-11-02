@@ -309,14 +309,17 @@ permission.
 
 #### 49.4 current parity evidence
 
-The backend-parity suite currently passes 12/12 fixtures on Unix hosts with
+The backend-parity suite currently passes 15/15 fixtures on Unix hosts with
 both backends enabled. It compares hosted exit status and buffer ownership,
 directory cleanup and deterministic order, qualified imports, generic calls,
-aggregate and enum construction, named array constants, and hosted float
-behavior. Freestanding fixtures compare exported symbols, zero-float evidence,
-large-aggregate rejection, and shared target diagnostics. This is useful
-regression evidence, but it does not yet close the complete semantic and
-negative fixture matrix or the full ABI-layout comparison checkbox.
+aggregate and enum construction, named array constants, typed failures, and
+hosted float behavior. It also compares source-declared external aggregate
+provider symbols and verifies that the same semantic rejection occurs before
+either backend emits an object. Freestanding fixtures compare exported
+symbols, zero-float evidence, large-aggregate rejection, and shared target
+diagnostics. This is stronger regression evidence, but it does not yet close
+the complete semantic and negative fixture matrix or the full ABI-layout
+comparison checkbox.
 
 ### 49.5 — Default selection migration
 
