@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use object::{Object, ObjectSymbol};
+use object::{Object, ObjectSection, ObjectSymbol};
 
 const CASES: &[(&str, &str)] =
     &[("64", "aggregate_64.act"), ("1024", "aggregate_1024.act"), ("65536", "aggregate_65536.act")];
@@ -74,7 +74,7 @@ fn compiles_and_runs_small_scalable_aggregate_fixtures() {
 }
 
 #[test]
-fn large_zero_initialized_aggregate_uses_bounded_memset_lowering() {
+fn large_zero_initialized_aggregate_has_bounded_zeroing_storage() {
     let input = fixture("aggregate_65536.act");
     let root = std::env::temp_dir().join(format!("actus-scale-object-{}", std::process::id()));
     let output = root.with_extension("o");
@@ -91,9 +91,22 @@ fn large_zero_initialized_aggregate_uses_bounded_memset_lowering() {
 
     let bytes = fs::read(&output).expect("read generated object");
     let object = object::File::parse(bytes.as_slice()).expect("parse generated object");
-    let has_memset_symbol =
-        object.symbols().any(|symbol| symbol.name().is_ok_and(|name| name.contains("memset")));
-    assert!(has_memset_symbol, "large aggregate initialization must lower through memset");
+    let has_allocator_symbol = object
+        .symbols()
+        .any(|symbol| symbol.name().is_ok_and(|name| name.contains("actus_aggregate_allocate")));
+    assert!(
+        has_allocator_symbol,
+        "large aggregate initialization must use bounded runtime storage"
+    );
+    let initialized_bytes = object
+        .sections()
+        .filter(|section| section.kind() == object::SectionKind::Data)
+        .map(|section| section.size())
+        .sum::<u64>();
+    assert!(
+        initialized_bytes <= 4096,
+        "large aggregate zeroing must not become a static initializer: {initialized_bytes} bytes"
+    );
     let _ = fs::remove_file(output);
 }
 
