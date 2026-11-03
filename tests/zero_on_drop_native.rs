@@ -8,6 +8,10 @@ fn compiler() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_actus"))
 }
 
+fn is_secure_zero_symbol(symbol: &str) -> bool {
+    symbol.trim_start_matches('_') == "actus_secure_zero"
+}
+
 #[cfg(all(feature = "llvm", feature = "cranelift"))]
 const NATIVE_BACKENDS: &[&str] = &["llvm", "cranelift"];
 #[cfg(all(feature = "llvm", not(feature = "cranelift")))]
@@ -66,7 +70,7 @@ verb main() -> Int {
             .filter_map(|symbol| symbol.name().ok())
             .collect::<Vec<_>>();
         assert!(
-            symbols.contains(&"actus_secure_zero"),
+            symbols.iter().any(|symbol| is_secure_zero_symbol(symbol)),
             "secure-zero runtime bridge missing for {backend}: {symbols:?}"
         );
     }
