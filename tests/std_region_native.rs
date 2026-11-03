@@ -3,6 +3,11 @@ use std::process::Command;
 
 use object::{Object, ObjectSection, ObjectSymbol};
 
+#[cfg(feature = "llvm")]
+const HOST_OBJECT_BACKEND: &str = "llvm";
+#[cfg(all(not(feature = "llvm"), feature = "cranelift"))]
+const HOST_OBJECT_BACKEND: &str = "cranelift";
+
 fn write_region_object_fixture(root: &std::path::Path, logical_length: &str) {
     let source_root = root.join("src");
     fs::create_dir_all(&source_root).expect("fixture source directory should be created");
@@ -44,7 +49,7 @@ fn build_region_object(root: &std::path::Path) -> Vec<u8> {
             input.to_str().expect("fixture path should be valid UTF-8"),
             "--strict",
             "--backend",
-            "llvm",
+            HOST_OBJECT_BACKEND,
             "--emit",
             "obj",
             "-o",
