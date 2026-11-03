@@ -27,6 +27,10 @@ fn undefined_symbols(output: &PathBuf) -> Vec<String> {
         .collect()
 }
 
+fn is_provider_symbol(symbol: &str) -> bool {
+    symbol.trim_start_matches('_') == "provider"
+}
+
 #[test]
 fn typed_volatile_read_fixture_emits_checked_native_call() {
     let root = std::env::temp_dir().join(format!("actus-volatile-read-{}", std::process::id()));
@@ -84,7 +88,7 @@ verb main() -> Int {
             "typed volatile read specialization missing for {backend}: {undefined:?}"
         );
         assert!(
-            undefined.iter().any(|symbol| symbol == "provider"),
+            undefined.iter().any(|symbol| is_provider_symbol(symbol)),
             "trusted provider symbol missing for {backend}: {undefined:?}"
         );
     }
@@ -150,7 +154,7 @@ verb main() -> Int {
             "typed volatile write specialization missing for {backend}: {undefined:?}"
         );
         assert!(
-            undefined.iter().any(|symbol| symbol == "provider"),
+            undefined.iter().any(|symbol| is_provider_symbol(symbol)),
             "trusted provider symbol missing for {backend}: {undefined:?}"
         );
     }
