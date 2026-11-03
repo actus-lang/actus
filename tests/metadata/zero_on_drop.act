@@ -1,0 +1,50 @@
+"""Executable coverage for the bounded zero_on_drop ownership contract.
+
+The fixture keeps the secret representation concrete and value-only. Its
+tests exercise cleanup at ordinary scope exit, explicit drop, and an early
+return; the native bridge tests separately prove that both backends emit the
+secure-zero operation.
+"""
+meta repr(C)
+meta zero_on_drop
+struct SecretMaterial {
+    key_a: u64,
+    key_b: u64,
+}
+
+meta test
+verb zero_on_drop_scope_exit_is_executable() -> Int {
+    erg secret = SecretMaterial {
+        key_a: 123456789u64,
+        key_b: 987654321u64,
+    };
+    if secret.key_a == 123456789u64 {
+        if secret.key_b == 987654321u64 {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+meta test
+verb zero_on_drop_explicit_drop_is_executable() -> Int {
+    erg secret = SecretMaterial {
+        key_a: 7u64,
+        key_b: 11u64,
+    };
+    drop(secret);
+    return 0;
+}
+
+meta test
+verb zero_on_drop_early_return_is_executable() -> Int {
+    erg secret = SecretMaterial {
+        key_a: 13u64,
+        key_b: 17u64,
+    };
+    if secret.key_a == 13u64 {
+        return 0;
+    }
+    drop(secret);
+    return 1;
+}
