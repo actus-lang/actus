@@ -55,6 +55,22 @@ fn rejects_volatile_generic_and_non_scalar_fields() {
 }
 
 #[test]
+fn resolves_volatile_address_only_for_volatile_register_blocks() {
+    analyze_source(
+        "meta repr(C) meta volatile struct Registers { status: u32, } verb inspect(abs address: VolatileAddress[Registers]) -> Int { return 0; }",
+    )
+    .expect("typed volatile addresses should resolve to their checked target");
+
+    let error = analyze_source(
+        "meta repr(C) struct Registers { status: u32, } verb inspect(abs address: VolatileAddress[Registers]) -> Int { return 0; }",
+    )
+    .expect_err("volatile addresses must not target ordinary structs");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("meta volatile"))
+    );
+}
+
+#[test]
 fn accepts_packed_structs_in_grouped_and_separate_forms() {
     analyze_source(
         "meta repr(C, packed) struct Grouped { prefix: u8, value: u32, } meta repr(C) meta repr(packed) struct Separate { prefix: u8, value: u32, }",

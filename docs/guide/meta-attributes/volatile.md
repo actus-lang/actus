@@ -53,10 +53,19 @@ checked Region descriptors and caller-owned buffers, perform volatile access
 only on the resident source or destination bytes, and carry the compiler's
 `volatile` effect. They do not expose raw addresses or unchecked arithmetic.
 
-The typed `VolatileAddress[T]` provider and field-level access primitives are
-the remaining implementation work. Until those are available, the bounded
-Region primitive is the only executable volatile access surface; it must not
-be presented as a typed register-block implementation.
+The typed `VolatileAddress[T]` read surface is now available through
+`std::volatile`. A trusted native provider returns the opaque descriptor; the
+Actus caller can only borrow it and select a fixed-width read at an explicit
+compile-time byte offset. The runtime validates the descriptor marker, target
+size, target alignment, offset arithmetic, bounds, and access alignment before
+performing one volatile load. Supported read widths are `u8`, `u16`, `u32`,
+and `u64`. No integer-to-address conversion or write operation is provided.
+
+The provider remains responsible for the lifetime and provenance of the
+descriptor and addressed object. A descriptor that does not describe live
+storage is outside the contract and must be rejected by the native provider;
+the Actus runtime still rejects malformed metadata and every checked access
+that it can prove invalid before loading.
 
 The accepted design and required evidence are recorded in
 [ADR-0101](../../decisions/ADR-0101-volatile-memory-contract.md).

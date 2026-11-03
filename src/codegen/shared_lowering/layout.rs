@@ -120,7 +120,10 @@ impl<'program> ProgramLayouts<'program> {
         if is_niche_pointer_option(type_name) {
             return Some(self.pointer_layout());
         }
-        if matches!(type_name.name.as_str(), "Arena" | "Buffer" | "Region" | "String") {
+        if matches!(
+            type_name.name.as_str(),
+            "Arena" | "Buffer" | "Region" | "String" | "VolatileAddress"
+        ) {
             return Some(self.pointer_layout());
         }
         if type_name.name == "Int" {

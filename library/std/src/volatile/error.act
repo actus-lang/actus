@@ -1,0 +1,25 @@
+"""
+Typed failures for explicit volatile memory reads.
+
+The error set covers descriptor provenance, target-layout agreement, checked
+offset arithmetic, bounds, alignment, supported width, and runtime allocation
+failure. Native status values are never exposed through the public facade.
+"""
+open enum VolatileError {
+    """The opaque descriptor is null, has an invalid marker, or violates its layout contract."""
+    InvalidDescriptor,
+    """The descriptor does not contain a non-null native address."""
+    NullAddress,
+    """The requested byte offset or end position cannot be represented safely."""
+    OffsetOverflow,
+    """The requested access extends beyond the provider-declared byte extent."""
+    OutOfBounds,
+    """The native address is not aligned for the requested access width or target type."""
+    Misaligned,
+    """The provider descriptor does not match the concrete target type's size or alignment."""
+    TypeMismatch,
+    """The requested read width is not implemented by the target runtime."""
+    UnsupportedWidth,
+    """The runtime could not allocate the typed Result value."""
+    AllocationFailure,
+}

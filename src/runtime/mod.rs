@@ -21,6 +21,7 @@ mod serialization;
 mod stream;
 mod time;
 mod types;
+mod volatile;
 
 pub use allocation::{
     actus_aggregate_allocate, actus_aggregate_drop, actus_buffer_allocate, actus_buffer_append,
@@ -132,6 +133,10 @@ pub use time::{
     actus_monotonic_nanos, actus_sleep_context_enter, actus_sleep_context_exit, actus_sleep_nanos,
 };
 pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
+pub use volatile::{
+    VolatileAddressDescriptor, actus_volatile_read_u8, actus_volatile_read_u16,
+    actus_volatile_read_u32, actus_volatile_read_u64,
+};
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
     option_env!("ACTUS_RUNTIME_ARCHIVE").map(Path::new)

@@ -13,11 +13,11 @@ cache an ordinary access when the language contract says that no ordinary
 memory observer can see the difference. MMIO and device memory are different:
 each access may have an observable hardware effect.
 
-Actus currently has checked aggregate layouts and unsafe native boundaries, but
-it does not yet have a source-level operation that names a volatile memory
-access. Adding `meta volatile` as a marker without such an operation would
-create the appearance of safety while leaving the backend free to emit ordinary
-loads and stores. That would be an unsound contract.
+Actus has checked aggregate layouts and unsafe native boundaries, but a type
+marker alone cannot name a volatile memory access. Adding `meta volatile`
+without an explicit operation would create the appearance of safety while
+leaving the backend/runtime boundary free to perform ordinary loads and
+stores. That would be an unsound contract.
 
 ## Proposed decision
 
@@ -77,9 +77,13 @@ effect propagates to callers and is rejected from deterministic and realtime
 contexts.
 
 The bounded Region primitive is separate from the standalone type-level
-`meta volatile` contract.
-It does not make every `repr(C)` value automatically volatile and does not
-replace the typed address contract above.
+`meta volatile` contract. The typed read surface now supplies
+`VolatileAddress[T]` and fixed-width `u8`/`u16`/`u32`/`u64` reads through the
+same explicit `volatile` effect. The provider owns the descriptor and storage;
+the runtime validates its marker, target layout, bounds, offset arithmetic, and
+alignment before calling `read_volatile`. Typed writes remain intentionally
+unimplemented and require a later contract with an exclusive ownership and
+device-write policy.
 
 ## Alternatives rejected
 
@@ -103,11 +107,13 @@ The implementation must contain:
   and unsupported target contracts;
 - a dedicated unsafe volatile access primitive with explicit ownership and
   address contracts;
-- shared backend instruction validation;
-- LLVM and Cranelift behavior, or a stable pre-emission rejection for a
-  backend without the required primitive;
+- shared backend validation of the opaque pointer and typed native call;
+- LLVM and Cranelift object lowering for the typed read call, with the native
+  runtime bridge performing the actual volatile load;
 - positive and negative `.act` fixtures for width, alignment, ordering,
   ownership, deterministic/realtime interaction, and target availability;
-- native IR/object evidence proving that volatile operations remain volatile;
+- native runtime and object evidence proving that the typed read reaches the
+  volatile runtime bridge and cannot silently become an ordinary Actus field
+  access;
 - documentation of the exact hardware and memory-ordering guarantees.
 

@@ -86,8 +86,11 @@ representation audit.
       native execution evidence, and strict `.act` coverage.
 - [x] Define the accepted native metadata contract for `meta volatile` in
       ADR-0101 and the dedicated guide.
-- [ ] Implement the typed `VolatileAddress[T]` provider and explicit field
-      access primitives with shared backend validation.
+- [x] Implement the typed borrowed `VolatileAddress[T]` descriptor contract,
+      explicit fixed-width read primitives, shared pointer/layout lowering,
+      runtime descriptor/bounds/alignment validation, and native object tests.
+- [ ] Add a separate exclusive-write contract for `VolatileAddress[T]`; no
+      volatile write operation is provided by the read-only implementation.
 
 ## Planned metadata extension backlog
 
