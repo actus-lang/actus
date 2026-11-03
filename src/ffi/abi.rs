@@ -329,9 +329,12 @@ fn signature_parts_with_program(
 fn map_type(name: &str) -> Result<CAbiType, CAbiError> {
     match lookup_builtin_type(name) {
         Some(BuiltinType::Int) => Ok(CAbiType::Int32),
-        Some(BuiltinType::Buffer | BuiltinType::String | BuiltinType::VolatileAddress) => {
-            Ok(CAbiType::OpaquePointer)
-        }
+        Some(
+            BuiltinType::Buffer
+            | BuiltinType::String
+            | BuiltinType::VolatileAddress
+            | BuiltinType::VolatileWriteAddress,
+        ) => Ok(CAbiType::OpaquePointer),
         Some(BuiltinType::Bool | BuiltinType::Array | BuiltinType::Map) | None => {
             Err(CAbiError::UnsupportedType { name: name.to_owned() })
         }

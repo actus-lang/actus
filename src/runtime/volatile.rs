@@ -24,6 +24,7 @@ pub struct VolatileAddressDescriptor {
     pub alignment: usize,
     pub target_size: usize,
     pub target_alignment: usize,
+    pub writable: u8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,6 +82,7 @@ fn validate(
     width: usize,
     target_size: u64,
     target_alignment: u64,
+    require_write: bool,
 ) -> Result<*const u8, VolatileReadError> {
     let descriptor = unsafe { descriptor.as_ref() }.ok_or(VolatileReadError::InvalidDescriptor)?;
     if descriptor.magic != DESCRIPTOR_MAGIC {
@@ -94,6 +96,9 @@ fn validate(
         usize::try_from(target_alignment).map_err(|_| VolatileReadError::TypeMismatch)?;
     if descriptor.target_size != target_size || descriptor.target_alignment != target_alignment {
         return Err(VolatileReadError::TypeMismatch);
+    }
+    if require_write && descriptor.writable == 0 {
+        return Err(VolatileReadError::InvalidDescriptor);
     }
     if descriptor.alignment == 0 || !descriptor.alignment.is_power_of_two() {
         return Err(VolatileReadError::InvalidDescriptor);
@@ -132,7 +137,7 @@ fn read<T: Copy>(
     load: unsafe fn(*const T) -> T,
 ) -> *mut u8 {
     let result_size = if width == 8 { RESULT_U64_SIZE } else { RESULT_SCALAR_SIZE };
-    let address = match validate(descriptor, offset, width, target_size, target_alignment) {
+    let address = match validate(descriptor, offset, width, target_size, target_alignment, false) {
         Ok(address) => address,
         Err(error) => return error_result(result_size, error),
     };
@@ -153,6 +158,27 @@ fn read<T: Copy>(
         };
         write_u32(result, PAYLOAD_OFFSET, value);
     }
+    result
+}
+
+fn write<T: Copy>(
+    descriptor: *const VolatileAddressDescriptor,
+    offset: u64,
+    target_size: u64,
+    target_alignment: u64,
+    width: usize,
+    value: T,
+    store: unsafe fn(*mut T, T),
+) -> *mut u8 {
+    let address = match validate(descriptor, offset, width, target_size, target_alignment, true) {
+        Ok(address) => address,
+        Err(error) => return error_result(RESULT_SCALAR_SIZE, error),
+    };
+    let result = allocate_result(RESULT_SCALAR_SIZE, RESULT_OK);
+    if result.is_null() {
+        return error_result(RESULT_SCALAR_SIZE, VolatileReadError::AllocationFailure);
+    }
+    unsafe { store(address.cast_mut().cast::<T>(), value) };
     result
 }
 
@@ -220,6 +246,74 @@ pub unsafe extern "C" fn actus_volatile_read_u64(
     read(descriptor, offset, target_size, target_alignment, 8, ptr::read_volatile::<u64>)
 }
 
+/// Performs one checked volatile `u8` store.
+///
+/// # Safety
+///
+/// `descriptor` must be a live provider-owned writable descriptor. The
+/// function validates its marker, permission, and layout before storing.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_volatile_write_u8(
+    descriptor: *const VolatileAddressDescriptor,
+    offset: u64,
+    target_size: u64,
+    target_alignment: u64,
+    value: u8,
+) -> *mut u8 {
+    write(descriptor, offset, target_size, target_alignment, 1, value, ptr::write_volatile::<u8>)
+}
+
+/// Performs one checked volatile `u16` store.
+///
+/// # Safety
+///
+/// `descriptor` must be a live provider-owned writable descriptor. The
+/// function validates its marker, permission, and layout before storing.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_volatile_write_u16(
+    descriptor: *const VolatileAddressDescriptor,
+    offset: u64,
+    target_size: u64,
+    target_alignment: u64,
+    value: u16,
+) -> *mut u8 {
+    write(descriptor, offset, target_size, target_alignment, 2, value, ptr::write_volatile::<u16>)
+}
+
+/// Performs one checked volatile `u32` store.
+///
+/// # Safety
+///
+/// `descriptor` must be a live provider-owned writable descriptor. The
+/// function validates its marker, permission, and layout before storing.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_volatile_write_u32(
+    descriptor: *const VolatileAddressDescriptor,
+    offset: u64,
+    target_size: u64,
+    target_alignment: u64,
+    value: u32,
+) -> *mut u8 {
+    write(descriptor, offset, target_size, target_alignment, 4, value, ptr::write_volatile::<u32>)
+}
+
+/// Performs one checked volatile `u64` store.
+///
+/// # Safety
+///
+/// `descriptor` must be a live provider-owned writable descriptor. The
+/// function validates its marker, permission, and layout before storing.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_volatile_write_u64(
+    descriptor: *const VolatileAddressDescriptor,
+    offset: u64,
+    target_size: u64,
+    target_alignment: u64,
+    value: u64,
+) -> *mut u8 {
+    write(descriptor, offset, target_size, target_alignment, 8, value, ptr::write_volatile::<u64>)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,6 +335,7 @@ mod tests {
             alignment: std::mem::align_of::<Registers>(),
             target_size: std::mem::size_of::<Registers>(),
             target_alignment: std::mem::align_of::<Registers>(),
+            writable: 0,
         };
         let result = unsafe {
             actus_volatile_read_u32(
@@ -265,6 +360,7 @@ mod tests {
             alignment: 4,
             target_size: 4,
             target_alignment: 4,
+            writable: 0,
         };
         let out_of_bounds = unsafe { actus_volatile_read_u32(&descriptor, 8, 4, 4) };
         let misaligned = unsafe { actus_volatile_read_u32(&descriptor, 1, 4, 4) };
@@ -276,5 +372,30 @@ mod tests {
             actus_enum_drop(out_of_bounds, RESULT_SCALAR_SIZE);
             actus_enum_drop(misaligned, RESULT_SCALAR_SIZE);
         }
+    }
+
+    #[test]
+    fn writable_descriptor_allows_store_and_read_only_descriptor_rejects_it() {
+        let mut value = 1u32;
+        let descriptor = VolatileAddressDescriptor {
+            magic: DESCRIPTOR_MAGIC,
+            address: (&mut value as *mut u32).cast(),
+            byte_length: std::mem::size_of::<u32>(),
+            alignment: std::mem::align_of::<u32>(),
+            target_size: std::mem::size_of::<u32>(),
+            target_alignment: std::mem::align_of::<u32>(),
+            writable: 1,
+        };
+        let result = unsafe { actus_volatile_write_u32(&descriptor, 0, 4, 4, 9) };
+        assert!(!result.is_null());
+        assert_eq!(value, 9);
+        unsafe { actus_enum_drop(result, RESULT_SCALAR_SIZE) };
+
+        let read_only = VolatileAddressDescriptor { writable: 0, ..descriptor };
+        let rejected = unsafe { actus_volatile_write_u32(&read_only, 0, 4, 4, 10) };
+        assert!(!rejected.is_null());
+        assert_eq!(value, 9);
+        assert_eq!(unsafe { *(rejected.add(PAYLOAD_OFFSET).cast::<u32>()) }, 0);
+        unsafe { actus_enum_drop(rejected, RESULT_SCALAR_SIZE) };
     }
 }

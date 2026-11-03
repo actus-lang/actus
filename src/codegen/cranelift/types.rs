@@ -59,6 +59,7 @@ impl NativeType {
             BuiltinType::Buffer => Some(Self::Buffer),
             BuiltinType::Array | BuiltinType::Map => None,
             BuiltinType::VolatileAddress => Some(Self::FatPointer),
+            BuiltinType::VolatileWriteAddress => Some(Self::FatPointer),
         }
     }
 

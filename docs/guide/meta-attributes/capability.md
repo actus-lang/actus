@@ -28,6 +28,7 @@ open verb publish(...) -> Result[Int, IoError] { ... }
 | `windows.file_identity` | Require the Windows native file-identity query needed to compare an opened file's identity, rather than comparing names or timestamps. | Windows targets |
 | `windows.create_new` | Require Windows create-new disposition so an existing destination is rejected without overwrite. | Windows targets |
 | `windows.replace_file` | Require the Windows native replacement primitive for an atomic replacement publication. It does not by itself prove expected-identity matching or recovery after an interrupted operation. | Windows targets |
+| `volatile.write` | Require the target's checked writable volatile-memory primitive. It does not grant raw pointer access, bypass ownership, or select an ordering stronger than the declared device contract. | targets with a proven writable volatile provider |
 
 These names describe required host primitives, not broad permissions. For
 example, `windows.replace_file` does not mean that every rename is safe, and
@@ -42,7 +43,7 @@ preserves capability order.
 
 ## Registry scope and extension policy
 
-The seven entries are the current registry required by the native file and
+The eight entries are the current registry required by the native file and
 publication boundaries; they are not intended to cover every operating-system
 facility. Planned candidates include descriptor-relative open, no-follow path
 resolution, no-replace rename, file and directory synchronization, POSIX and

@@ -260,7 +260,7 @@ fn lower_type(
         })?;
         return Ok((BackendValueType::Region { layout }, Some(layout)));
     }
-    if type_name.name == "VolatileAddress" {
+    if matches!(type_name.name.as_str(), "VolatileAddress" | "VolatileWriteAddress") {
         return Ok((BackendValueType::Pointer, layouts.layout_for(type_name)));
     }
     if is_opaque_runtime_type(type_name) {
@@ -308,7 +308,10 @@ fn lower_type(
 }
 
 fn is_opaque_runtime_type(type_name: &TypeName) -> bool {
-    matches!(type_name.name.as_str(), "Arena" | "Buffer" | "String" | "Region" | "VolatileAddress")
+    matches!(
+        type_name.name.as_str(),
+        "Arena" | "Buffer" | "String" | "Region" | "VolatileAddress" | "VolatileWriteAddress"
+    )
 }
 
 fn passing_for(

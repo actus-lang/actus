@@ -18,12 +18,13 @@ impl Analyzer {
             ));
         }
         let target = &type_name.arguments[0];
+        let address_type = type_name.name.as_str();
         if self.is_generic_parameter(&target.name) {
             if !target.arguments.is_empty() {
                 return Err(arity_error(&target.name, 0, target.arguments.len(), target.span));
             }
             return Ok(ResolvedType::Applied {
-                name: "VolatileAddress".to_owned(),
+                name: address_type.to_owned(),
                 arguments: vec![ResolvedType::GenericParameter(target.name.clone())],
             });
         }
@@ -36,7 +37,7 @@ impl Analyzer {
         if !structure.is_volatile() {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidReprC {
-                    declaration: "VolatileAddress".to_owned(),
+                    declaration: address_type.to_owned(),
                     reason: format!(
                         "address target `{}` must be declared `meta volatile`",
                         target.name
@@ -46,7 +47,7 @@ impl Analyzer {
             });
         }
         Ok(ResolvedType::Applied {
-            name: "VolatileAddress".to_owned(),
+            name: address_type.to_owned(),
             arguments: vec![ResolvedType::Concrete(target.name.clone())],
         })
     }

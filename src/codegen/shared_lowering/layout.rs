@@ -122,7 +122,7 @@ impl<'program> ProgramLayouts<'program> {
         }
         if matches!(
             type_name.name.as_str(),
-            "Arena" | "Buffer" | "Region" | "String" | "VolatileAddress"
+            "Arena" | "Buffer" | "Region" | "String" | "VolatileAddress" | "VolatileWriteAddress"
         ) {
             return Some(self.pointer_layout());
         }

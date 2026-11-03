@@ -7,6 +7,7 @@ pub enum BuiltinType {
     Array,
     Map,
     VolatileAddress,
+    VolatileWriteAddress,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -51,6 +52,9 @@ impl BuiltinType {
             Self::VolatileAddress => {
                 BuiltinTypeSpec { name: "VolatileAddress", status: RegistryStatus::Active }
             }
+            Self::VolatileWriteAddress => {
+                BuiltinTypeSpec { name: "VolatileWriteAddress", status: RegistryStatus::Active }
+            }
         }
     }
 }
@@ -64,6 +68,7 @@ pub fn lookup_builtin_type(name: &str) -> Option<BuiltinType> {
         "Array" => Some(BuiltinType::Array),
         "Map" => Some(BuiltinType::Map),
         "VolatileAddress" => Some(BuiltinType::VolatileAddress),
+        "VolatileWriteAddress" => Some(BuiltinType::VolatileWriteAddress),
         _ => None,
     }
 }

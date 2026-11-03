@@ -63,7 +63,7 @@ pub(super) fn backend_value_type(
         return Some(scalar);
     }
     let layout = layouts.layout_for(type_name)?;
-    if type_name.name == "VolatileAddress" {
+    if matches!(type_name.name.as_str(), "VolatileAddress" | "VolatileWriteAddress") {
         return Some(super::super::BackendValueType::Pointer);
     }
     if type_name.name == "Region" {

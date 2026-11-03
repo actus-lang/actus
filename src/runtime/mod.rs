@@ -135,7 +135,8 @@ pub use time::{
 pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
 pub use volatile::{
     VolatileAddressDescriptor, actus_volatile_read_u8, actus_volatile_read_u16,
-    actus_volatile_read_u32, actus_volatile_read_u64,
+    actus_volatile_read_u32, actus_volatile_read_u64, actus_volatile_write_u8,
+    actus_volatile_write_u16, actus_volatile_write_u32, actus_volatile_write_u64,
 };
 
 pub fn runtime_archive_path() -> Option<&'static Path> {

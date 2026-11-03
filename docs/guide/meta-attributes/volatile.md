@@ -53,13 +53,16 @@ checked Region descriptors and caller-owned buffers, perform volatile access
 only on the resident source or destination bytes, and carry the compiler's
 `volatile` effect. They do not expose raw addresses or unchecked arithmetic.
 
-The typed `VolatileAddress[T]` read surface is now available through
-`std::volatile`. A trusted native provider returns the opaque descriptor; the
-Actus caller can only borrow it and select a fixed-width read at an explicit
-compile-time byte offset. The runtime validates the descriptor marker, target
+The typed `VolatileAddress[T]` read surface and separate
+`VolatileWriteAddress[T]` write surface are available through `std::volatile`.
+A trusted native provider returns the opaque descriptor; the Actus caller can
+only borrow a read descriptor or take an exclusive `ins` loan of a writable
+descriptor and select a fixed-width operation at an explicit compile-time byte
+offset. The runtime validates the descriptor marker, write permission, target
 size, target alignment, offset arithmetic, bounds, and access alignment before
-performing one volatile load. Supported read widths are `u8`, `u16`, `u32`,
-and `u64`. No integer-to-address conversion or write operation is provided.
+performing one volatile load or store. Supported widths are `u8`, `u16`,
+`u32`, and `u64`. Integer-to-address conversion and unchecked pointer
+arithmetic remain forbidden.
 
 The provider remains responsible for the lifetime and provenance of the
 descriptor and addressed object. A descriptor that does not describe live
@@ -67,11 +70,11 @@ storage is outside the contract and must be rejected by the native provider;
 the Actus runtime still rejects malformed metadata and every checked access
 that it can prove invalid before loading.
 
-## Planned exclusive writes
+## Exclusive writes
 
-Writes are a separate contract from the completed read-only surface. They will
-use `VolatileWriteAddress[T]`, not `VolatileAddress[T]`, so a read-only native
-descriptor cannot be reused as a writable one. A write will require an
+Writes are a separate contract from the read-only surface. They use
+`VolatileWriteAddress[T]`, not `VolatileAddress[T]`, so a read-only native
+descriptor cannot be reused as a writable one. A write requires an
 exclusive `ins` loan and the closed `volatile.write` capability in addition to
 the `volatile` effect. The runtime will validate writable provenance, target
 layout, bounds, offset arithmetic, and alignment before one fixed-width
@@ -80,8 +83,8 @@ layout, bounds, offset arithmetic, and alignment before one fixed-width
 The first write ordering mode will remain `device`. There will be no ordinary
 store fallback, no check-then-store emulation, no retained pointer, and no
 implicit serialization of device state. Targets without a proven writable
-volatile primitive will fail closed before object emission. This write contract
-is not implemented by the current read-only API.
+volatile primitive will fail closed before object emission. The write API does
+not retain the descriptor or expose a raw pointer.
 
 The accepted design and required evidence are recorded in
 [ADR-0101](../../decisions/ADR-0101-volatile-memory-contract.md).

@@ -1,5 +1,5 @@
 """
-Typed failures for explicit volatile memory reads.
+Typed failures for explicit volatile memory reads and writes.
 
 The error set covers descriptor provenance, target-layout agreement, checked
 offset arithmetic, bounds, alignment, supported width, and runtime allocation

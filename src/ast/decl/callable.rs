@@ -248,10 +248,11 @@ pub enum Capability {
     WindowsFileIdentity,
     WindowsCreateNew,
     WindowsReplaceFile,
+    VolatileWrite,
 }
 
 impl Capability {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::FilesystemCreateExclusive,
         Self::PosixCloexec,
         Self::PosixCreateExclusive,
@@ -259,6 +260,7 @@ impl Capability {
         Self::WindowsFileIdentity,
         Self::WindowsCreateNew,
         Self::WindowsReplaceFile,
+        Self::VolatileWrite,
     ];
 
     pub fn parse(name: &str) -> Option<Self> {
@@ -270,6 +272,7 @@ impl Capability {
             "windows.file_identity" => Self::WindowsFileIdentity,
             "windows.create_new" => Self::WindowsCreateNew,
             "windows.replace_file" => Self::WindowsReplaceFile,
+            "volatile.write" => Self::VolatileWrite,
             _ => return None,
         })
     }
@@ -283,6 +286,7 @@ impl Capability {
             Self::WindowsFileIdentity => "windows.file_identity",
             Self::WindowsCreateNew => "windows.create_new",
             Self::WindowsReplaceFile => "windows.replace_file",
+            Self::VolatileWrite => "volatile.write",
         }
     }
 }

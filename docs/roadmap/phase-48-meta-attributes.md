@@ -89,8 +89,10 @@ representation audit.
 - [x] Implement the typed borrowed `VolatileAddress[T]` descriptor contract,
       explicit fixed-width read primitives, shared pointer/layout lowering,
       runtime descriptor/bounds/alignment validation, and native object tests.
-- [ ] Add a separate exclusive-write contract for `VolatileAddress[T]`; no
-      volatile write operation is provided by the read-only implementation.
+- [ ] Complete the separate exclusive-write contract using
+      `VolatileWriteAddress[T]`; the compiler/runtime plumbing and strict
+      native fixture are in progress, but the full backend-parity, negative
+      ownership, target, and documentation evidence is not closed yet.
       The accepted design must use `VolatileWriteAddress[T]`, an `ins` loan,
       `volatile.write` capability, fixed-width writes, explicit device
       ordering, fail-closed target validation, and LLVM/Cranelift runtime

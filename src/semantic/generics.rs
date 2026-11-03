@@ -117,7 +117,7 @@ impl Analyzer {
         if name == "Region" {
             return self.resolve_region_type(&normalized_type_name);
         }
-        if name == "VolatileAddress" {
+        if matches!(name, "VolatileAddress" | "VolatileWriteAddress") {
             return self.resolve_volatile_address_type(&normalized_type_name);
         }
         if let Some(generic) = self.resolve_generic_parameter(&normalized_type_name)? {

@@ -81,8 +81,8 @@ The bounded Region primitive is separate from the standalone type-level
 `VolatileAddress[T]` and fixed-width `u8`/`u16`/`u32`/`u64` reads through the
 same explicit `volatile` effect. The provider owns the descriptor and storage;
 the runtime validates its marker, target layout, bounds, offset arithmetic, and
-alignment before calling `read_volatile`. Typed writes remain intentionally
-unimplemented and require the following separate contract.
+alignment before calling `read_volatile`. Typed writes use the following
+separate contract.
 
 ### Exclusive write contract
 
