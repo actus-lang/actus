@@ -8,6 +8,15 @@ fn compiler() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_actus"))
 }
 
+#[cfg(all(feature = "llvm", feature = "cranelift"))]
+const NATIVE_BACKENDS: &[&str] = &["llvm", "cranelift"];
+#[cfg(all(feature = "llvm", not(feature = "cranelift")))]
+const NATIVE_BACKENDS: &[&str] = &["llvm"];
+#[cfg(all(feature = "cranelift", not(feature = "llvm")))]
+const NATIVE_BACKENDS: &[&str] = &["cranelift"];
+#[cfg(not(any(feature = "llvm", feature = "cranelift")))]
+const NATIVE_BACKENDS: &[&str] = &[];
+
 #[test]
 fn zero_on_drop_emits_secure_zero_on_both_native_backends() {
     let root = std::env::temp_dir().join(format!("actus-zero-on-drop-{}", std::process::id()));
@@ -36,7 +45,7 @@ verb main() -> Int {
     )
     .expect("write fixture source");
 
-    for backend in ["llvm", "cranelift"] {
+    for backend in NATIVE_BACKENDS {
         let output = root.join(format!("zero-on-drop-{backend}.o"));
         let build = Command::new(compiler())
             .current_dir(&root)

@@ -8,6 +8,15 @@ fn compiler() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_actus"))
 }
 
+#[cfg(all(feature = "llvm", feature = "cranelift"))]
+const NATIVE_BACKENDS: &[&str] = &["llvm", "cranelift"];
+#[cfg(all(feature = "llvm", not(feature = "cranelift")))]
+const NATIVE_BACKENDS: &[&str] = &["llvm"];
+#[cfg(all(feature = "cranelift", not(feature = "llvm")))]
+const NATIVE_BACKENDS: &[&str] = &["cranelift"];
+#[cfg(not(any(feature = "llvm", feature = "cranelift")))]
+const NATIVE_BACKENDS: &[&str] = &[];
+
 fn undefined_symbols(output: &PathBuf) -> Vec<String> {
     let bytes = fs::read(output).expect("read generated object");
     let object = object::File::parse(bytes.as_slice()).expect("parse generated object");
@@ -55,7 +64,7 @@ verb main() -> Int {
     )
     .expect("write fixture source");
 
-    for backend in ["llvm", "cranelift"] {
+    for backend in NATIVE_BACKENDS {
         let output = root.join(format!("volatile-read-{backend}.o"));
         let build = Command::new(compiler())
             .current_dir(&root)
@@ -121,7 +130,7 @@ verb main() -> Int {
     )
     .expect("write fixture source");
 
-    for backend in ["llvm", "cranelift"] {
+    for backend in NATIVE_BACKENDS {
         let output = root.join(format!("volatile-write-{backend}.o"));
         let build = Command::new(compiler())
             .current_dir(&root)
