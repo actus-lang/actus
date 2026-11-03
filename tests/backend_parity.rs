@@ -105,12 +105,15 @@ fn undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
 
 fn external_relocation_sizes(bytes: &[u8], expected: &str) -> Vec<u8> {
     let file = object::File::parse(bytes).expect("parity object should parse");
+    let format = file.format();
     let mut sizes = Vec::new();
     for section in file.sections() {
         for (_, relocation) in section.relocations() {
             let RelocationTarget::Symbol(index) = relocation.target() else { continue };
             let symbol = file.symbol_by_index(index).expect("relocation symbol should exist");
-            if symbol.name().ok() == Some(expected) {
+            if symbol.name().ok().map(|name| canonical_symbol_name(format, name)).as_deref()
+                == Some(expected)
+            {
                 sizes.push(relocation.size());
             }
         }
