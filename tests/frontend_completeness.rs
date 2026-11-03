@@ -159,6 +159,25 @@ fn deterministic_verbs_reject_nondeterministic_effects() {
 }
 
 #[test]
+fn deterministic_verbs_reject_floating_point_at_every_local_boundary() {
+    for source in [
+        "meta deterministic verb stable() -> f32 { return 1.0f32; }",
+        "meta deterministic verb stable() -> Int { erg sample: f64 = 1.0f64; return 0; }",
+        "verb source() -> f32 { return 1.0f32; } meta deterministic verb stable() -> Int { source(); return 0; }",
+        "unsafe extern \"C\" verb source(erg sample: f32) -> Int; meta deterministic verb stable() -> Int { source(sample: 1.0f32); return 0; }",
+    ] {
+        let error = expect_semantic_error(source);
+        assert!(matches!(error.kind, SemanticErrorKind::DeterministicFloatingPoint));
+        assert_eq!(semantic_diagnostic(&error).code(), "E1135");
+    }
+
+    analyze_source(
+        "verb source() -> f32 { return 1.0f32; } meta deterministic verb stable() -> Int { return 0; }",
+    )
+    .expect("floating-point declarations outside the deterministic call graph remain valid");
+}
+
+#[test]
 fn realtime_verbs_reject_effects_unbounded_loops_and_floating_point() {
     for effect in ["blocking", "clock", "filesystem", "network", "allocation", "entropy"] {
         let source = format!(

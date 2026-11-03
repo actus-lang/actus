@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::ast::{Effect, Param, PerformDecl, RoleDecl, RoleMethod, TopLevelDecl, TypeName};
 use crate::lexer::SourceSpan;
 
-use super::analyzer::Analyzer;
+use super::analyzer::{Analyzer, type_contains_float};
 use super::dynamic::role_method_signature;
 use super::errors::{SemanticError, SemanticErrorKind};
 
@@ -69,6 +69,18 @@ impl Analyzer {
         }
         if let Some(return_type) = &method.return_type {
             self.validate_type_reference(&return_type.ty)?;
+        }
+        if method
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Deterministic))
+            && (method.params.iter().any(|parameter| type_contains_float(&parameter.ty))
+                || method
+                    .return_type
+                    .as_ref()
+                    .is_some_and(|return_type| type_contains_float(&return_type.ty)))
+        {
+            return Err(role_error(SemanticErrorKind::DeterministicFloatingPoint, method.span));
         }
         Ok(())
     }
@@ -169,19 +181,8 @@ impl Analyzer {
             }
             self.validate_capability_method(required, implementation, &perform.role_name)?;
             self.validate_realtime_method(required, implementation, &perform.role_name)?;
-            let expected = role_method_signature(required).must_use;
-            let found = implementation.signature().must_use;
-            if expected != found {
-                return Err(role_error(
-                    SemanticErrorKind::RoleMethodMustUseMismatch {
-                        role: perform.role_name.clone(),
-                        method: required.name.clone(),
-                        expected,
-                        found,
-                    },
-                    implementation.span,
-                ));
-            }
+            self.validate_deterministic_method(required, implementation, &perform.role_name)?;
+            self.validate_must_use_method(required, implementation, &perform.role_name)?;
         }
         Ok(())
     }
@@ -224,6 +225,48 @@ impl Analyzer {
             ));
         }
         Ok(())
+    }
+
+    fn validate_deterministic_method(
+        &self,
+        required: &crate::ast::RoleMethod,
+        implementation: &crate::ast::VerbDecl,
+        role: &str,
+    ) -> Result<(), SemanticError> {
+        if role_method_signature(required).deterministic
+            && !implementation.signature().deterministic
+        {
+            return Err(role_error(
+                SemanticErrorKind::RoleMethodDeterministicMismatch {
+                    role: role.to_owned(),
+                    method: required.name.clone(),
+                },
+                implementation.span,
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_must_use_method(
+        &self,
+        required: &RoleMethod,
+        implementation: &crate::ast::VerbDecl,
+        role: &str,
+    ) -> Result<(), SemanticError> {
+        let expected = role_method_signature(required).must_use;
+        let found = implementation.signature().must_use;
+        if expected == found {
+            return Ok(());
+        }
+        Err(role_error(
+            SemanticErrorKind::RoleMethodMustUseMismatch {
+                role: role.to_owned(),
+                method: required.name.clone(),
+                expected,
+                found,
+            },
+            implementation.span,
+        ))
     }
 
     fn validate_unique_performance_methods(

@@ -2,6 +2,7 @@ use crate::ast::{VerbDecl, lookup_builtin_type};
 
 use super::super::analyzer::Analyzer;
 use super::super::errors::{SemanticError, SemanticErrorKind};
+use super::type_contains_float;
 use super::validation::block_guarantees_return;
 
 impl Analyzer {
@@ -9,7 +10,7 @@ impl Analyzer {
         self.next_expression_scope += 1;
         self.current_expression_scope = self.next_expression_scope;
         self.configure_return_state(verb);
-        self.validate_realtime_signature(verb)?;
+        self.validate_restricted_float_signature(verb)?;
         self.initialize_origin_parameter_map(&verb.params);
         self.enter_scope(verb.body.span);
         self.bind_parameters(&verb.params)?;
@@ -70,27 +71,35 @@ impl Analyzer {
             });
     }
 
-    pub(super) fn validate_realtime_signature(&self, verb: &VerbDecl) -> Result<(), SemanticError> {
-        if !self.current_realtime {
+    pub(super) fn validate_restricted_float_signature(
+        &self,
+        verb: &VerbDecl,
+    ) -> Result<(), SemanticError> {
+        if !self.current_realtime && !self.current_deterministic {
             return Ok(());
         }
         if let Some(parameter) =
             verb.params.iter().find(|parameter| type_contains_float(&parameter.ty))
         {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::RealtimeFloatingPoint,
-                span: parameter.span,
-            });
+            return Err(SemanticError { kind: self.floating_point_error(), span: parameter.span });
         }
         if let Some(return_type) = &verb.return_type
             && type_contains_float(&return_type.ty)
         {
             return Err(SemanticError {
-                kind: SemanticErrorKind::RealtimeFloatingPoint,
+                kind: self.floating_point_error(),
                 span: return_type.span,
             });
         }
         Ok(())
+    }
+
+    fn floating_point_error(&self) -> SemanticErrorKind {
+        if self.current_deterministic {
+            SemanticErrorKind::DeterministicFloatingPoint
+        } else {
+            SemanticErrorKind::RealtimeFloatingPoint
+        }
     }
 
     fn bind_parameters(&mut self, parameters: &[crate::ast::Param]) -> Result<(), SemanticError> {
@@ -128,9 +137,4 @@ impl Analyzer {
         }
         Ok(())
     }
-}
-
-fn type_contains_float(type_name: &crate::ast::TypeName) -> bool {
-    matches!(type_name.name.as_str(), "f32" | "f64")
-        || type_name.arguments.iter().any(type_contains_float)
 }

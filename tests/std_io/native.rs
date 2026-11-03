@@ -219,6 +219,8 @@ verb main() -> Int {
                 "build",
                 input.to_str().expect("source path"),
                 "--strict",
+                "--backend",
+                "cranelift",
                 "--emit",
                 "obj",
                 "-o",

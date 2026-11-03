@@ -22,7 +22,6 @@ pub(super) fn lower_module(
     pointer_width: u8,
 ) -> Result<(LlvmContext, LlvmModule), BackendEmitError> {
     module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
-    validate_integer_only(module)?;
     let context = LlvmContext::new()?;
     let module_name = CString::new("actus.module")
         .map_err(|_| BackendEmitError("LLVM module name contains NUL".to_owned()))?;
@@ -37,31 +36,6 @@ pub(super) fn lower_module(
         emit_function(context.raw, pointer_width, function, declaration, &declarations)?;
     }
     Ok((context, owned_module))
-}
-
-fn validate_integer_only(module: &BackendModule) -> Result<(), BackendEmitError> {
-    for function in &module.functions {
-        reject_float(function.symbol.as_str(), function.return_value.ty)?;
-        for parameter in &function.parameters {
-            reject_float(function.symbol.as_str(), parameter.ty)?;
-        }
-    }
-    for external in &module.externals {
-        reject_float(external.symbol.as_str(), external.return_value.ty)?;
-        for parameter in &external.parameters {
-            reject_float(external.symbol.as_str(), parameter.ty)?;
-        }
-    }
-    Ok(())
-}
-
-fn reject_float(symbol: &str, ty: BackendValueType) -> Result<(), BackendEmitError> {
-    if matches!(ty, BackendValueType::Float { .. }) {
-        return Err(BackendEmitError(format!(
-            "LLVM integer-only emission rejects floating-point type in `{symbol}`"
-        )));
-    }
-    Ok(())
 }
 
 fn declare_module_functions(

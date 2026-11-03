@@ -98,6 +98,7 @@ pub enum SemanticErrorKind {
         callee: String,
         effect: crate::ast::Effect,
     },
+    DeterministicFloatingPoint,
     RealtimeEffect {
         callee: String,
         effect: crate::ast::Effect,
@@ -169,6 +170,10 @@ pub enum SemanticErrorKind {
         found: Vec<crate::ast::Capability>,
     },
     RoleMethodRealtimeMismatch {
+        role: String,
+        method: String,
+    },
+    RoleMethodDeterministicMismatch {
         role: String,
         method: String,
     },

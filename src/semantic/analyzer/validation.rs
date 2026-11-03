@@ -5,6 +5,19 @@ use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
 
 impl Analyzer {
+    pub(crate) fn reject_restricted_float(&self, span: SourceSpan) -> Result<(), SemanticError> {
+        if self.current_deterministic {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::DeterministicFloatingPoint,
+                span,
+            });
+        }
+        if self.current_realtime {
+            return Err(SemanticError { kind: SemanticErrorKind::RealtimeFloatingPoint, span });
+        }
+        Ok(())
+    }
+
     pub(super) fn require_buffer_length(&self, expression: &Expr) -> Result<(), SemanticError> {
         if self.expression_type(expression) == Some(BuiltinType::Int) {
             return Ok(());
@@ -54,6 +67,15 @@ pub(crate) fn canonical_type_name(type_name: &TypeName) -> String {
         type_name.name,
         type_name.arguments.iter().map(canonical_type_name).collect::<Vec<_>>().join(",")
     )
+}
+
+pub(crate) fn type_contains_float(type_name: &TypeName) -> bool {
+    matches!(type_name.name.as_str(), "f32" | "f64")
+        || type_name.arguments.iter().any(type_contains_float)
+}
+
+pub(crate) fn type_name_text_contains_float(type_name: &str) -> bool {
+    type_name.split([' ', '[', ']', ',']).any(|part| matches!(part, "f32" | "f64"))
 }
 
 pub(super) fn block_guarantees_return(block: &Block) -> bool {

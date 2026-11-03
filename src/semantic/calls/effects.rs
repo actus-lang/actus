@@ -1,6 +1,6 @@
 use crate::lexer::SourceSpan;
 
-use super::super::analyzer::Analyzer;
+use super::super::analyzer::{Analyzer, type_contains_float, type_name_text_contains_float};
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::VerbSignature;
 
@@ -42,9 +42,13 @@ impl Analyzer {
         }
         self.validate_capabilities(callee, signature, span)?;
         self.validate_bounded_call(callee, signature, span)?;
-        if self.current_realtime
-            && signature.return_type_name.as_ref().is_some_and(type_contains_float)
-        {
+        if self.current_deterministic && signature_contains_float(signature) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::DeterministicFloatingPoint,
+                span,
+            });
+        }
+        if self.current_realtime && signature_contains_float(signature) {
             return Err(SemanticError { kind: SemanticErrorKind::RealtimeFloatingPoint, span });
         }
         if self.current_realtime && self.current_verb_name.as_deref() == Some(callee) {
@@ -108,7 +112,7 @@ fn bounded_error(dimension: &str, limit: u64, required: &str, span: SourceSpan) 
     }
 }
 
-fn type_contains_float(type_name: &crate::ast::TypeName) -> bool {
-    matches!(type_name.name.as_str(), "f32" | "f64")
-        || type_name.arguments.iter().any(type_contains_float)
+fn signature_contains_float(signature: &VerbSignature) -> bool {
+    signature.params.iter().any(|(_, _, type_name)| type_name_text_contains_float(type_name))
+        || signature.return_type_name.as_ref().is_some_and(type_contains_float)
 }

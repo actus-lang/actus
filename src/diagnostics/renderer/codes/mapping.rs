@@ -170,6 +170,7 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::UndeclaredCapability { .. } => "E1131",
         SemanticErrorKind::UnsupportedCapability { .. } => "E1132",
         SemanticErrorKind::NondeterministicCall { .. } => "E1124",
+        SemanticErrorKind::DeterministicFloatingPoint => "E1135",
         SemanticErrorKind::RealtimeEffect { .. } => "E1125",
         SemanticErrorKind::RealtimeUnboundedLoop => "E1126",
         SemanticErrorKind::RealtimeFloatingPoint => "E1127",
@@ -216,6 +217,7 @@ fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::RoleMethodEffectMismatch { .. } => "E1122",
         SemanticErrorKind::RoleMethodCapabilityMismatch { .. } => "E1133",
         SemanticErrorKind::RoleMethodRealtimeMismatch { .. } => "E1128",
+        SemanticErrorKind::RoleMethodDeterministicMismatch { .. } => "E1136",
         SemanticErrorKind::InvalidRoleReceiver { .. } => "E1060",
         _ => return None,
     })
