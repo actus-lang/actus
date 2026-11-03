@@ -8,12 +8,14 @@ use super::errors::{SemanticError, SemanticErrorKind};
 impl Analyzer {
     pub(super) fn validate_repr_declarations(&self) -> Result<(), SemanticError> {
         for definition in self.struct_types.values() {
-            if definition.repr().is_some_and(|repr| {
-                repr.is_c()
-                    || repr.is_packed()
-                    || repr.is_transparent()
-                    || repr.alignment().is_some()
-            }) {
+            if definition.is_volatile()
+                || definition.repr().is_some_and(|repr| {
+                    repr.is_c()
+                        || repr.is_packed()
+                        || repr.is_transparent()
+                        || repr.alignment().is_some()
+                })
+            {
                 self.validate_repr_struct(definition)?;
             }
         }
@@ -32,6 +34,23 @@ impl Analyzer {
 
     fn validate_repr_struct(&self, definition: &StructDef) -> Result<(), SemanticError> {
         let repr = definition.repr().unwrap_or(crate::ast::Repr::C);
+        if definition.is_volatile() {
+            if !definition.repr().is_some_and(|declared| declared.is_c()) {
+                return Err(repr_error_at(
+                    &definition.name,
+                    "volatile values require an explicit repr(C) contract",
+                    definition.span,
+                ));
+            }
+            if !definition.generic_parameters.is_empty() {
+                return Err(repr_error_at(
+                    &definition.name,
+                    "volatile values cannot be generic",
+                    definition.span,
+                ));
+            }
+            self.validate_volatile_struct_fields(definition)?;
+        }
         self.validate_repr_struct_contract(definition, repr)?;
         if !definition.generic_parameters.is_empty() {
             return Err(repr_error_at(
@@ -41,6 +60,36 @@ impl Analyzer {
             ));
         }
         self.validate_repr_struct_fields(definition)
+    }
+
+    fn validate_volatile_struct_fields(&self, definition: &StructDef) -> Result<(), SemanticError> {
+        for field in &definition.fields {
+            if !matches!(field.role, StructFieldRole::Value) {
+                return Err(repr_error_at(
+                    &definition.name,
+                    format!("volatile field `{}` must use the value role", field.name),
+                    field.span,
+                ));
+            }
+            let supported = primitive_type(&field.ty.name).is_some_and(|primitive| {
+                matches!(
+                    primitive,
+                    PrimitiveType::Integer { width, .. } if width.is_multiple_of(8)
+                )
+            }) || (matches!(field.ty.name.as_str(), "Int" | "Bool")
+                && field.ty.arguments.is_empty());
+            if !supported {
+                return Err(repr_error_at(
+                    &definition.name,
+                    format!(
+                        "volatile field `{}` must use a fixed-width integer or Bool type",
+                        field.name
+                    ),
+                    field.ty.span,
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn validate_repr_struct_contract(

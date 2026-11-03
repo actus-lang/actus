@@ -1,6 +1,6 @@
 # ADR-0101: Explicit volatile memory-access contract
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-03
 - Scope: metadata, native memory access, MMIO safety, backend lowering, and
   target contracts
@@ -44,9 +44,27 @@ The final contract must contain all of the following:
    allocation paths. A volatile access is an externally observable operation,
    not a persistence or ownership mechanism.
 
-The exact primitive syntax, address representation, ordering model, backend
-instruction contract, and target capability registry must be accepted before
-the attribute is enabled. Until then, `meta volatile` remains unsupported.
+The accepted source contract is a checked `repr(C)` struct declaration:
+
+```actus
+meta repr(C)
+meta volatile
+open struct UartRegisters {
+    status: u32,
+    data: u32,
+    control: u32,
+}
+```
+
+`meta volatile` is a type/layout contract only. It never turns ordinary field
+access into a volatile access. Hardware access must use an explicit volatile
+primitive and an opaque `VolatileAddress[T]` supplied by a trusted native
+provider. Integer-to-address conversion, arbitrary address arithmetic, and
+raw pointer values in Actus state remain forbidden.
+
+The initial ordering contract is `device`, selected explicitly by the volatile
+primitive. Additional ordering modes require a target capability and backend
+proof; they are not inferred from the metadata.
 
 ## Current implementation boundary
 
@@ -58,11 +76,10 @@ bytes. The operations carry the compiler-recognized `volatile` effect, so the
 effect propagates to callers and is rejected from deterministic and realtime
 contexts.
 
-This does not yet enable the standalone type-level `meta volatile` attribute.
-That attribute still requires the explicit storage/provenance and target
-ordering contract described above. The bounded Region primitive is therefore a
-real, usable access boundary without pretending that every `repr(C)` value is
-automatically volatile.
+The bounded Region primitive is separate from the standalone type-level
+`meta volatile` contract.
+It does not make every `repr(C)` value automatically volatile and does not
+replace the typed address contract above.
 
 ## Alternatives rejected
 
@@ -79,7 +96,7 @@ automatically volatile.
 
 ## Required implementation evidence
 
-Before this ADR can be accepted, the repository must contain:
+The implementation must contain:
 
 - parser, formatter, LSP, and placement diagnostics for `meta volatile`;
 - semantic rejection of incomplete layouts, unsupported fields, invalid roles,

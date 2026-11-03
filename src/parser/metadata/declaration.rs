@@ -10,15 +10,7 @@ impl Parser {
     ) -> Result<TopLevelDecl, ParseError> {
         self.validate_metadata_target(&metadata)?;
         let is_open = self.match_simple(TokenKind::Open);
-        if metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Repr(_)))
-            && !(self.check_simple(&TokenKind::Struct) || self.check_simple(&TokenKind::Enum))
-        {
-            return Err(ParseError {
-                code: ParseErrorCode::MetadataTargetNotAllowed,
-                kind: ParseErrorKind::MetadataTargetNotAllowed,
-                span: self.metadata_span(),
-            });
-        }
+        ensure_type_metadata_target(self, &metadata)?;
         if self.check_simple(&TokenKind::Verb) {
             let verb = self.parse_verb_with_metadata(is_open, metadata.clone(), doc)?;
             ensure_must_use_return(&metadata, verb.return_type.is_some(), verb.span)?;
@@ -79,11 +71,36 @@ impl Parser {
     }
 }
 
+fn ensure_type_metadata_target(
+    parser: &Parser,
+    metadata: &[MetaAttribute],
+) -> Result<(), ParseError> {
+    let has_volatile =
+        metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Volatile));
+    let is_type = parser.check_simple(&TokenKind::Struct) || parser.check_simple(&TokenKind::Enum);
+    if (has_volatile && !parser.check_simple(&TokenKind::Struct))
+        || (metadata
+            .iter()
+            .any(|attribute| matches!(attribute, MetaAttribute::Repr(_) | MetaAttribute::Volatile))
+            && !is_type)
+    {
+        return Err(ParseError {
+            code: ParseErrorCode::MetadataTargetNotAllowed,
+            kind: ParseErrorKind::MetadataTargetNotAllowed,
+            span: parser.metadata_span(),
+        });
+    }
+    Ok(())
+}
+
 fn ensure_repr_type_metadata(
     metadata: &[MetaAttribute],
     span: SourceSpan,
 ) -> Result<(), ParseError> {
-    if metadata.iter().all(|attribute| matches!(attribute, MetaAttribute::Repr(_))) {
+    if metadata
+        .iter()
+        .all(|attribute| matches!(attribute, MetaAttribute::Repr(_) | MetaAttribute::Volatile))
+    {
         return Ok(());
     }
     Err(ParseError {

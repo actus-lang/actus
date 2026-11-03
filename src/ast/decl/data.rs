@@ -74,6 +74,10 @@ pub struct PackDecl {
 }
 
 impl StructDef {
+    pub fn is_volatile(&self) -> bool {
+        self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Volatile))
+    }
+
     pub fn repr(&self) -> Option<Repr> {
         self.metadata
             .iter()

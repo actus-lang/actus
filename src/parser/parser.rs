@@ -224,6 +224,13 @@ impl Parser {
                 > 1
             {
                 Some("must_use")
+            } else if metadata
+                .iter()
+                .filter(|attribute| matches!(attribute, MetaAttribute::Volatile))
+                .nth(1)
+                .is_some()
+            {
+                Some("volatile")
             } else {
                 let mut repr = crate::ast::Repr::new(false, false);
                 let mut duplicate = false;

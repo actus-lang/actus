@@ -21,6 +21,40 @@ fn accepts_concrete_c_structs_and_unit_enums() {
 }
 
 #[test]
+fn accepts_volatile_fixed_width_register_structs() {
+    analyze_source(
+        "meta repr(C) meta volatile struct UartRegisters { status: u32, data: u8, ready: Bool, }",
+    )
+    .expect("volatile register blocks require a checked repr(C) layout");
+}
+
+#[test]
+fn rejects_volatile_structs_without_c_layout() {
+    let error = analyze_source("meta volatile struct Registers { status: u32, }")
+        .expect_err("volatile values must declare repr(C)");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("repr(C)"))
+    );
+}
+
+#[test]
+fn rejects_volatile_generic_and_non_scalar_fields() {
+    let generic = analyze_source("meta repr(C) meta volatile struct Registers[T] { status: T, }")
+        .expect_err("volatile register blocks cannot be generic");
+    assert!(
+        matches!(generic.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("generic"))
+    );
+
+    let aggregate = analyze_source(
+        "meta repr(C) struct Inner { value: u32, } meta repr(C) meta volatile struct Registers { inner: Inner, }",
+    )
+    .expect_err("volatile fields must be fixed-width scalars");
+    assert!(
+        matches!(aggregate.kind, SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("fixed-width integer"))
+    );
+}
+
+#[test]
 fn accepts_packed_structs_in_grouped_and_separate_forms() {
     analyze_source(
         "meta repr(C, packed) struct Grouped { prefix: u8, value: u32, } meta repr(C) meta repr(packed) struct Separate { prefix: u8, value: u32, }",

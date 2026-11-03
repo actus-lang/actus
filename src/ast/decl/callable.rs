@@ -74,6 +74,7 @@ pub enum MetaAttribute {
     Bounded(BoundedContract),
     Capability(Capability),
     Repr(Repr),
+    Volatile,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]

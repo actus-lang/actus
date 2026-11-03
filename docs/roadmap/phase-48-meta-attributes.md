@@ -84,8 +84,10 @@ representation audit.
 - [x] Add an explicit bounded volatile Region primitive with checked
       ownership, range validation, volatile runtime access, effect propagation,
       native execution evidence, and strict `.act` coverage.
-- [ ] Define and implement the next accepted native metadata contract:
-      `meta volatile`.
+- [x] Define the accepted native metadata contract for `meta volatile` in
+      ADR-0101 and the dedicated guide.
+- [ ] Implement the typed `VolatileAddress[T]` provider and explicit field
+      access primitives with shared backend validation.
 
 ## Planned metadata extension backlog
 
@@ -118,8 +120,8 @@ advance.
    restricted, explicitly checked ABI/layout contracts for native
    interoperability. Transparent wrappers require one value field and map to
    that field's layout and native ABI type.
-3. `meta volatile` — define explicit hardware-observable access semantics only
-   after the native memory-access contract is specified.
+3. `meta volatile` — implement the accepted hardware-observable access
+   semantics and typed storage/provenance contract from ADR-0101.
 4. `meta zero_on_drop` — guarantee secret-material clearing across ownership
    moves and every cleanup path.
 5. `meta stack_limit(...)` — enforce a bounded stack contract once the compiler
