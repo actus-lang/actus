@@ -191,16 +191,18 @@ pub enum Effect {
     Network,
     Allocation,
     Entropy,
+    Volatile,
 }
 
 impl Effect {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Blocking,
         Self::Clock,
         Self::Filesystem,
         Self::Network,
         Self::Allocation,
         Self::Entropy,
+        Self::Volatile,
     ];
 
     pub fn parse(name: &str) -> Option<Self> {
@@ -211,6 +213,7 @@ impl Effect {
             "network" => Self::Network,
             "allocation" => Self::Allocation,
             "entropy" => Self::Entropy,
+            "volatile" => Self::Volatile,
             _ => return None,
         })
     }
@@ -223,11 +226,15 @@ impl Effect {
             Self::Network => "network",
             Self::Allocation => "allocation",
             Self::Entropy => "entropy",
+            Self::Volatile => "volatile",
         }
     }
 
     pub const fn is_nondeterministic(self) -> bool {
-        matches!(self, Self::Clock | Self::Filesystem | Self::Network | Self::Entropy)
+        matches!(
+            self,
+            Self::Clock | Self::Filesystem | Self::Network | Self::Entropy | Self::Volatile
+        )
     }
 }
 

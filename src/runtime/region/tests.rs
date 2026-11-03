@@ -19,6 +19,34 @@ fn bounded_views_read_write_and_publish() {
 }
 
 #[test]
+fn volatile_views_read_and_write_without_changing_region_bounds() {
+    let mut region = InMemoryRegion::new(7, 2, 4, 0, 2).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    {
+        let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+        assert_eq!(view.volatile_write_range(0, 2, &[0x11, 0x22, 0x33, 0x44]), Ok(2));
+    }
+    let view = region.borrow_abs(7, generation).expect("read view should open");
+    let mut destination = [0u8; 4];
+    assert_eq!(view.volatile_read_range(0, 2, &mut destination), Ok(2));
+    assert_eq!(destination, [0x11, 0x22, 0x33, 0x44]);
+    assert_eq!(region.descriptor().dirty, 1);
+}
+
+#[test]
+fn volatile_views_reject_invalid_ranges_before_access() {
+    let mut region = InMemoryRegion::new(7, 2, 4, 0, 2).expect("region should be valid");
+    let generation = region.descriptor().generation;
+    let view = region.borrow_abs(7, generation).expect("read view should open");
+    let mut destination = [0xa5u8; 1];
+    assert_eq!(view.volatile_read_range(0, 2, &mut destination), Err(RegionError::BufferTooSmall));
+    assert_eq!(destination, [0xa5]);
+    let mut view = region.borrow_ins(7, generation).expect("mutable view should open");
+    assert_eq!(view.volatile_write_range(0, 2, &[1]), Err(RegionError::BufferTooSmall));
+    assert_eq!(region.descriptor().dirty, 0);
+}
+
+#[test]
 fn bounded_range_access_is_atomic_and_supports_empty_and_full_windows() {
     let mut region = InMemoryRegion::new(7, 2, 8, 2, 3).expect("region should be valid");
     let generation = region.descriptor().generation;

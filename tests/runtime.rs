@@ -127,6 +127,14 @@ fn exposes_the_versioned_runtime_contract_symbols() {
     assert_eq!(actus::runtime::BUFFER_APPEND_SYMBOL, "actus_buffer_append");
     assert_eq!(actus::runtime::BUFFER_DROP_SYMBOL, "actus_buffer_drop");
     assert_eq!(actus::runtime::MONOTONIC_NANOS_SYMBOL, "actus_monotonic_nanos");
+    assert_eq!(
+        actus::runtime::REGION_VOLATILE_READ_RANGE_SYMBOL,
+        "actus_region_volatile_read_range"
+    );
+    assert_eq!(
+        actus::runtime::REGION_VOLATILE_WRITE_RANGE_SYMBOL,
+        "actus_region_volatile_write_range"
+    );
 }
 
 #[test]

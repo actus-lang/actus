@@ -357,6 +357,76 @@ verb main() -> Int {
 }
 
 #[test]
+fn hosted_std_region_volatile_ranges_run_with_explicit_effects() {
+    let root =
+        std::env::temp_dir().join(format!("actus-std-region-volatile-{}", std::process::id()));
+    let source_root = root.join("src");
+    let output = root.join("region-volatile-example");
+    fs::create_dir_all(&source_root).expect("fixture source directory should be created");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"std_region_volatile_fixture\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
+    )
+    .expect("fixture manifest should be written");
+    fs::write(
+        source_root.join("main.act"),
+        r#"import { open std::region };
+meta effect("allocation", "volatile")
+verb main() -> Int {
+    erg backing: Buffer = Buffer[2];
+    erg source: Buffer = Buffer[0];
+    append(source, 41u8);
+    append(source, 42u8);
+    erg logical_length: u64 = 2u64;
+    erg window_start: u64 = 0u64;
+    erg window_count: u64 = 2u64;
+    erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
+    return case dat opened {
+        Result.Err(_) => 1,
+        Result.Ok(region) => {
+            erg access_start: u64 = 0u64;
+            erg access_count: u64 = 2u64;
+            erg written = region_volatile_write_range(region: ins region, start_index: erg access_start, element_count: erg access_count, source: abs source);
+            return case dat written {
+                Result.Err(_) => 2,
+                Result.Ok(count) => {
+                    if count != 2u64 { return 3; }
+                    erg destination: Buffer = Buffer[2];
+                    erg read = region_volatile_read_range(region: abs region, start_index: erg access_start, element_count: erg access_count, destination: ins destination);
+                    return case dat read {
+                        Result.Err(_) => 4,
+                        Result.Ok(read_count) => if read_count == 2u64 && destination[0u32] == 41u8 && destination[1u32] == 42u8 { return 0; } else { return 5; },
+                    };
+                },
+            };
+        },
+    };
+}
+"#,
+    )
+    .expect("fixture source should be written");
+
+    let status = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args([
+            "build",
+            source_root.join("main.act").to_str().expect("fixture path should be valid UTF-8"),
+            "--strict",
+            "--emit",
+            "exe",
+            "-o",
+            output.to_str().expect("output path should be valid UTF-8"),
+        ])
+        .status()
+        .expect("Actus build should start");
+    assert!(status.success(), "hosted volatile Region build failed: {status}");
+    let execution = Command::new(&output).output().expect("volatile executable should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn hosted_std_region_accepts_exact_128_kib_bulk_transfer() {
     let root = std::env::temp_dir().join(format!("actus-std-region-128k-{}", std::process::id()));
     let source_root = root.join("src");

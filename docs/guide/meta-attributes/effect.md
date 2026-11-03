@@ -30,6 +30,7 @@ The supported vocabulary is deliberately closed:
 - `network`
 - `allocation`
 - `entropy`
+- `volatile`
 
 The vocabulary and propagation rules are compiler contracts. The compiler must
 reject unknown names rather than treating them as documentation-only
@@ -78,6 +79,11 @@ extern "C" verb host_call() -> Int;
 
 The caller must explicitly declare `network`; the metadata does not authorize
 the native operation or insert a runtime guard.
+
+`volatile` marks an explicit hardware-observable memory access. It is not a
+permission to use arbitrary addresses: the operation must still use a checked
+native memory contract. The effect propagates to callers and is rejected from
+deterministic and realtime contexts.
 
 The contract is compile-time only. It does not authorize an operation, alter
 ownership, or by itself make a verb safe for a realtime or bounded context.

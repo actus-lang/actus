@@ -139,7 +139,7 @@ fn create_exclusive_capabilities_are_declared_by_callers() {
 
 #[test]
 fn deterministic_verbs_reject_nondeterministic_effects() {
-    for effect in ["filesystem", "network", "entropy"] {
+    for effect in ["filesystem", "network", "entropy", "volatile"] {
         let source = format!(
             "meta effect(\"{effect}\") verb source() -> Int {{ return 0; }} meta deterministic verb stable() -> Int {{ source(); return 0; }}"
         );
@@ -179,7 +179,9 @@ fn deterministic_verbs_reject_floating_point_at_every_local_boundary() {
 
 #[test]
 fn realtime_verbs_reject_effects_unbounded_loops_and_floating_point() {
-    for effect in ["blocking", "clock", "filesystem", "network", "allocation", "entropy"] {
+    for effect in
+        ["blocking", "clock", "filesystem", "network", "allocation", "entropy", "volatile"]
+    {
         let source = format!(
             "meta effect(\"{effect}\") verb source() -> Int {{ return 0; }} meta realtime verb tick() -> Int {{ source(); return 0; }}"
         );

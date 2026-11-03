@@ -48,6 +48,22 @@ The exact primitive syntax, address representation, ordering model, backend
 instruction contract, and target capability registry must be accepted before
 the attribute is enabled. Until then, `meta volatile` remains unsupported.
 
+## Current implementation boundary
+
+The first primitive now exists as a bounded `std::region` operation:
+`region_volatile_read_range` and `region_volatile_write_range`. The runtime
+uses checked Region descriptors and caller-owned buffers, and applies
+`read_volatile` or `write_volatile` only to the resident source or destination
+bytes. The operations carry the compiler-recognized `volatile` effect, so the
+effect propagates to callers and is rejected from deterministic and realtime
+contexts.
+
+This does not yet enable the standalone type-level `meta volatile` attribute.
+That attribute still requires the explicit storage/provenance and target
+ordering contract described above. The bounded Region primitive is therefore a
+real, usable access boundary without pretending that every `repr(C)` value is
+automatically volatile.
+
 ## Alternatives rejected
 
 - **Marker-only metadata:** rejected because it provides no enforceable access

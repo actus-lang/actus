@@ -81,6 +81,9 @@ representation audit.
 - [x] Re-audit the complete `repr` family after the LLVM backend migration,
       including parser, semantic, FFI, formatter/LSP, backend-parity, native
       object, target, and negative-fixture coverage.
+- [x] Add an explicit bounded volatile Region primitive with checked
+      ownership, range validation, volatile runtime access, effect propagation,
+      native execution evidence, and strict `.act` coverage.
 - [ ] Define and implement the next accepted native metadata contract:
       `meta volatile`.
 

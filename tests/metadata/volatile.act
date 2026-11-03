@@ -1,0 +1,16 @@
+"""Executable coverage for explicit volatile effect propagation."""
+
+meta effect("volatile")
+verb volatile_leaf() -> Int {
+    return 7;
+}
+
+meta effect("volatile")
+meta test
+verb volatile_effect_must_be_declared_at_the_caller() -> Int {
+    erg value = volatile_leaf();
+    if value == 7 {
+        return 0;
+    }
+    return 1;
+}

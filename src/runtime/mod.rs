@@ -16,6 +16,7 @@ mod region_pinning_bridge;
 mod region_profile;
 mod region_provider;
 mod region_range_bridge;
+mod region_volatile_bridge;
 mod serialization;
 mod stream;
 mod time;
@@ -61,13 +62,14 @@ pub use contract::{
     REGION_GENERATION_SYMBOL, REGION_LOGICAL_LENGTH_SYMBOL, REGION_MAX_BULK_BYTES,
     REGION_OPEN_SYMBOL, REGION_PIN_SYMBOL, REGION_PINNED_SYMBOL, REGION_PROVIDER_QUEUE_CAPACITY,
     REGION_PUBLISH_SYMBOL, REGION_READ_RANGE_SYMBOL, REGION_READ_SYMBOL, REGION_REMAP_SYMBOL,
-    REGION_UNPIN_SYMBOL, REGION_WINDOW_COUNT_SYMBOL, REGION_WINDOW_START_SYMBOL,
-    REGION_WRITE_RANGE_SYMBOL, REGION_WRITE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
-    SLEEP_CONTEXT_CRITICAL_SECTION, SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL,
-    SLEEP_CONTEXT_INTERRUPT, SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL,
-    STRING_COPY_STATUS_CAPACITY, STRING_COPY_STATUS_INVALID_UTF8, STRING_LENGTH_SYMBOL,
-    STRING_STATUS_INVALID_UTF8, STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS,
-    WRITE_BUFFER_STDOUT_SYMBOL, WRITE_STRING_STDOUT_SYMBOL, is_successful_count,
+    REGION_UNPIN_SYMBOL, REGION_VOLATILE_READ_RANGE_SYMBOL, REGION_VOLATILE_WRITE_RANGE_SYMBOL,
+    REGION_WINDOW_COUNT_SYMBOL, REGION_WINDOW_START_SYMBOL, REGION_WRITE_RANGE_SYMBOL,
+    REGION_WRITE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability, SLEEP_CONTEXT_CRITICAL_SECTION,
+    SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL, SLEEP_CONTEXT_INTERRUPT,
+    SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL, STRING_COPY_STATUS_CAPACITY,
+    STRING_COPY_STATUS_INVALID_UTF8, STRING_LENGTH_SYMBOL, STRING_STATUS_INVALID_UTF8,
+    STRING_STATUS_NULL, STRING_STATUS_OUT_OF_BOUNDS, WRITE_BUFFER_STDOUT_SYMBOL,
+    WRITE_STRING_STDOUT_SYMBOL, is_successful_count,
 };
 pub use fs::{
     actus_directory_close, actus_directory_create_temporary_path, actus_directory_next,
@@ -114,6 +116,9 @@ pub use region_provider::{
     MemoryRegionProvider, RegionProvider, RegionProviderError, RegionProviderRequest,
 };
 pub use region_range_bridge::{actus_region_read_range, actus_region_write_range};
+pub use region_volatile_bridge::{
+    actus_region_volatile_read_range, actus_region_volatile_write_range,
+};
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
     validate_fixed_frame,
