@@ -255,6 +255,8 @@ fn builtin_native_type(name: &str) -> Result<Option<NativeType>, BackendEmitErro
         BuiltinType::Int | BuiltinType::Bool => NativeType::Int,
         BuiltinType::String => NativeType::String,
         BuiltinType::Buffer => NativeType::Buffer,
+        BuiltinType::VolatileAddress => NativeType::FatPointer,
+        BuiltinType::VolatileWriteAddress => NativeType::FatPointer,
         BuiltinType::Array | BuiltinType::Map => {
             return Err(BackendEmitError(format!("unsupported layout type `{name}`")));
         }

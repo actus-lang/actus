@@ -1,0 +1,289 @@
+"""
+Explicit typed volatile loads and stores through trusted native descriptors.
+
+`VolatileAddress[T]` is an opaque borrowed capability supplied by a trusted
+native provider. Actus code cannot construct it from an integer, inspect the
+native pointer, or perform pointer arithmetic. Each read supplies the concrete
+target size and alignment to the runtime, and the runtime validates the
+provider descriptor, checked offset, bounds, and alignment before executing
+one native volatile load. The addressed object is never allocated; the typed
+`Result` representation uses the runtime's standard enum-result allocation
+boundary and carries the `volatile` effect. Stores additionally require a
+distinct writable descriptor, an exclusive `ins` loan, and the
+`volatile.write` capability.
+"""
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_read_u8[T](
+    abs address: VolatileAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64
+) -> Result[u8, VolatileError];
+
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_read_u16[T](
+    abs address: VolatileAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64
+) -> Result[u16, VolatileError];
+
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_read_u32[T](
+    abs address: VolatileAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64
+) -> Result[u32, VolatileError];
+
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_read_u64[T](
+    abs address: VolatileAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64
+) -> Result[u64, VolatileError];
+
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_write_u8[T](
+    ins address: VolatileWriteAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64,
+    erg value: u8
+) -> Result[Void, VolatileError];
+
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_write_u16[T](
+    ins address: VolatileWriteAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64,
+    erg value: u16
+) -> Result[Void, VolatileError];
+
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_write_u32[T](
+    ins address: VolatileWriteAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64,
+    erg value: u32
+) -> Result[Void, VolatileError];
+
+meta effect("volatile")
+unsafe extern "C" verb actus_volatile_write_u64[T](
+    ins address: VolatileWriteAddress[T],
+    erg offset: u64,
+    erg target_size: u64,
+    erg target_alignment: u64,
+    erg value: u64
+) -> Result[Void, VolatileError];
+
+"""
+Read one byte at a compile-time byte offset in a volatile register block.
+
+`address` is an immutable borrow of a provider-owned `VolatileAddress[T]`; the
+call does not take ownership of the descriptor, the register block, or any
+resource reachable through it. `OFFSET` is encoded in the type-level call and
+is converted to a checked runtime offset. The runtime verifies descriptor
+provenance, the concrete size and alignment of `T`, checked offset arithmetic,
+the provider-declared byte extent, and the final access alignment before
+issuing exactly one native volatile byte load.
+
+The operation carries the `volatile` effect because the read is observable to
+the device and must not be removed, merged, or replaced by an ordinary memory
+load. It performs no pointer arithmetic in Actus, no allocation for the
+addressed object, no ownership transfer, and no write. Invalid descriptors or
+layout, overflow, out-of-bounds offsets, and misalignment return a typed
+`VolatileError` without issuing a load; allocation failure while constructing
+the standard `Result` value is also reported through that error type.
+"""
+meta effect("volatile")
+open verb volatile_read_u8[T, OFFSET: Usize](abs address: VolatileAddress[T]) -> Result[u8, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_read_u8[T](
+        address: abs address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment
+    );
+}
+
+"""
+Read one 16-bit value at a compile-time byte offset in a volatile register
+block. `address` is borrowed and remains owned by the trusted native provider.
+`OFFSET` must identify an aligned `u16` field within `T`; the runtime checks
+the descriptor, target layout, offset, bounds, and alignment before issuing
+one volatile load. The operation does not mutate Actus ownership or storage,
+does not perform filesystem work or allocate the addressed object, and
+returns `Err` with `VolatileError` without loading when validation fails.
+"""
+meta effect("volatile")
+open verb volatile_read_u16[T, OFFSET: Usize](abs address: VolatileAddress[T]) -> Result[u16, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_read_u16[T](
+        address: abs address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment
+    );
+}
+
+"""
+Read one 32-bit value at a compile-time byte offset in a volatile register
+block. `address` is borrowed for the call and remains owned by the native
+provider. `OFFSET` must identify an aligned `u32` field within `T`; descriptor
+identity, target size/alignment, checked offset arithmetic, bounds, and access
+alignment are validated before the load. The read carries the `volatile`
+effect, performs no Actus ownership transfer, and returns a typed
+`VolatileError` without touching the device when validation is rejected.
+"""
+meta effect("volatile")
+open verb volatile_read_u32[T, OFFSET: Usize](abs address: VolatileAddress[T]) -> Result[u32, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_read_u32[T](
+        address: abs address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment
+    );
+}
+
+"""
+Read one 64-bit value at a compile-time byte offset in a volatile register
+block. `address` is an immutable call-scoped borrow of a descriptor owned by
+the trusted native provider. `OFFSET` must identify an aligned `u64` field
+within `T`; the runtime verifies descriptor provenance, target layout, checked
+offset arithmetic, bounds, and alignment before issuing one device-observable
+load. No write, pointer arithmetic, ownership transfer, or implicit cleanup
+is performed; invalid requests return `Err` with `VolatileError` before a load
+is attempted.
+"""
+meta effect("volatile")
+open verb volatile_read_u64[T, OFFSET: Usize](abs address: VolatileAddress[T]) -> Result[u64, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_read_u64[T](
+        address: abs address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment
+    );
+}
+
+"""
+Write one byte at a compile-time offset through an exclusive writable
+descriptor. `address` is an `ins` loan: the caller keeps ownership, but no
+shared alias may be used during the device-visible operation. The runtime
+validates writable provenance, target layout, bounds, offset arithmetic, and
+alignment before one `write_volatile` store. The caller must declare both the
+`volatile` effect and `volatile.write` capability. Invalid descriptors return
+`VolatileError` and do not issue a store.
+"""
+meta effect("volatile")
+meta capability("volatile.write")
+open verb volatile_write_u8[T, OFFSET: Usize](
+    ins address: VolatileWriteAddress[T],
+    erg value: u8
+) -> Result[Void, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_write_u8[T](
+        address: ins address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment,
+        value: erg value
+    );
+}
+
+"""
+Write one 16-bit value through an exclusive `VolatileWriteAddress[T]` loan.
+The fixed width and compile-time offset are checked against the provider's
+descriptor before one device-ordered volatile store. Ownership remains with
+the caller after the call; shared aliases are forbidden for the loan. The
+`volatile` effect and `volatile.write` capability are required, and every
+validation failure returns without touching the device.
+"""
+meta effect("volatile")
+meta capability("volatile.write")
+open verb volatile_write_u16[T, OFFSET: Usize](
+    ins address: VolatileWriteAddress[T],
+    erg value: u16
+) -> Result[Void, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_write_u16[T](
+        address: ins address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment,
+        value: erg value
+    );
+}
+
+"""
+Write one 32-bit value through an exclusive writable descriptor. The runtime
+checks descriptor permission, target size and alignment, checked offset and
+bounds, and final access alignment before issuing exactly one volatile store.
+The call is device-observable, requires `volatile.write`, and cannot fall back
+to an ordinary store or retain the address after the `ins` loan ends. Invalid
+permission, layout, bounds, offset, or alignment returns `Err` with
+`VolatileError` and performs no store; Result allocation failure is reported
+through the same typed error.
+"""
+meta effect("volatile")
+meta capability("volatile.write")
+open verb volatile_write_u32[T, OFFSET: Usize](
+    ins address: VolatileWriteAddress[T],
+    erg value: u32
+) -> Result[Void, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_write_u32[T](
+        address: ins address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment,
+        value: erg value
+    );
+}
+
+"""
+Write one 64-bit value through an exclusive `VolatileWriteAddress[T]` loan.
+Only a trusted provider can supply the writable descriptor; Actus performs no
+integer-to-address conversion, pointer arithmetic, serialization, or hidden
+cleanup. The current contract guarantees device ordering only, requires the
+`volatile` effect plus `volatile.write`, and fails closed before any store when
+permission, layout, bounds, offset, or alignment validation fails. Such a
+failure returns `Err(VolatileError)` without writing; Result allocation failure
+is also returned through the typed error.
+"""
+meta effect("volatile")
+meta capability("volatile.write")
+open verb volatile_write_u64[T, OFFSET: Usize](
+    ins address: VolatileWriteAddress[T],
+    erg value: u64
+) -> Result[Void, VolatileError] {
+    erg offset: u64 = OFFSET as u64;
+    erg target_size: u64 = size_of[T]();
+    erg target_alignment: u64 = align_of[T]();
+    return actus_volatile_write_u64[T](
+        address: ins address,
+        offset: erg offset,
+        target_size: erg target_size,
+        target_alignment: erg target_alignment,
+        value: erg value
+    );
+}

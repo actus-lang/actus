@@ -56,6 +56,10 @@ pub const REGION_READ_RANGE_SYMBOL: &str = "actus_region_read_range";
 pub const REGION_WRITE_SYMBOL: &str = "actus_region_write";
 /// Stable runtime symbol for writing a bounded resident Region range.
 pub const REGION_WRITE_RANGE_SYMBOL: &str = "actus_region_write_range";
+/// Stable runtime symbol for volatile reads from a bounded resident Region range.
+pub const REGION_VOLATILE_READ_RANGE_SYMBOL: &str = "actus_region_volatile_read_range";
+/// Stable runtime symbol for volatile writes to a bounded resident Region range.
+pub const REGION_VOLATILE_WRITE_RANGE_SYMBOL: &str = "actus_region_volatile_write_range";
 /// Stable runtime symbol for publishing a dirty resident region window.
 pub const REGION_PUBLISH_SYMBOL: &str = "actus_region_publish";
 /// Stable runtime symbol for cancelling dirty resident region bytes.
@@ -133,6 +137,8 @@ pub const ENUM_DROP_SYMBOL: &str = "actus_enum_drop";
 /// Stable runtime symbols used for compiler-managed large aggregate storage.
 pub const AGGREGATE_ALLOCATE_SYMBOL: &str = "actus_aggregate_allocate";
 pub const AGGREGATE_DROP_SYMBOL: &str = "actus_aggregate_drop";
+/// Stable runtime symbol used by compiler-generated zero_on_drop cleanup.
+pub const SECURE_ZERO_SYMBOL: &str = "actus_secure_zero";
 /// Stable hosted runtime symbol for monotonic nanosecond reads.
 pub const MONOTONIC_NANOS_SYMBOL: &str = "actus_monotonic_nanos";
 /// Stable hosted runtime symbol for scheduler-aware monotonic sleeping.

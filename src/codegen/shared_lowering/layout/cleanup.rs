@@ -7,6 +7,21 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
         if let Some(descriptor) = self.resolve_region_result(type_name) {
             return Ok(Some(descriptor));
         }
+        if let Some(type_name) = type_name
+            && self
+                .structs
+                .get(type_name.name.as_str())
+                .is_some_and(|definition| definition.is_zero_on_drop())
+        {
+            let Some(layout) = self.type_layout(type_name, &mut Vec::new()) else {
+                return Ok(None);
+            };
+            return Ok(Some(self.cleanup_descriptor(
+                BackendCleanupBridge::SecureZero { size: layout.size },
+                layout,
+                None,
+            )));
+        }
         if let Some(descriptor) = self.resolve_large_aggregate(type_name)? {
             return Ok(Some(descriptor));
         }

@@ -1,0 +1,4 @@
+"""The canonical facade for explicit typed volatile memory reads."""
+open error;
+"""Re-export the checked read-only volatile API and its typed failures."""
+open api;

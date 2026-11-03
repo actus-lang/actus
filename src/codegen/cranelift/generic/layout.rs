@@ -204,6 +204,12 @@ fn builtin_layout(
         BuiltinType::String | BuiltinType::Buffer => {
             Ok(ValueLayout { size: pointer_size, alignment: pointer_size })
         }
+        BuiltinType::VolatileAddress => {
+            Ok(ValueLayout { size: pointer_size, alignment: pointer_size })
+        }
+        BuiltinType::VolatileWriteAddress => {
+            Ok(ValueLayout { size: pointer_size, alignment: pointer_size })
+        }
         BuiltinType::Array | BuiltinType::Map => Err(BackendEmitError(format!(
             "unsupported generic layout type `{}`",
             builtin.spec().name

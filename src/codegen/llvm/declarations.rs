@@ -164,6 +164,9 @@ fn cleanup_signature(
         BackendCleanupBridge::AggregateDrop { .. } => {
             cleanup_drop_signature(crate::runtime::AGGREGATE_DROP_SYMBOL, pointer_width, true)
         }
+        BackendCleanupBridge::SecureZero { .. } => {
+            cleanup_drop_signature(crate::runtime::SECURE_ZERO_SYMBOL, pointer_width, false)
+        }
         BackendCleanupBridge::PerformanceDrop => performance_cleanup_signature(),
     }
 }

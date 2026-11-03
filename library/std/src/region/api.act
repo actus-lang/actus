@@ -47,6 +47,24 @@ unsafe extern "C" verb actus_region_write_range[T](
     abs source: Buffer
 ) -> Result[u64, RegionError];
 
+"""Private bridge that reads a resident range with volatile source accesses."""
+meta effect("volatile")
+unsafe extern "C" verb actus_region_volatile_read_range[T](
+    abs region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    ins destination: Buffer
+) -> Result[u64, RegionError];
+
+"""Private bridge that writes a resident range with volatile destination accesses."""
+meta effect("volatile")
+unsafe extern "C" verb actus_region_volatile_write_range[T](
+    ins region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    abs source: Buffer
+) -> Result[u64, RegionError];
+
 """Private bridge that publishes dirty resident bytes and advances generation."""
 unsafe extern "C" verb actus_region_publish[T](ins region: Region[T]) -> Result[u64, RegionError];
 
@@ -191,6 +209,58 @@ open verb region_write_range[T](
     abs source: Buffer
 ) -> Result[u64, RegionError] {
     return actus_region_write_range[T](
+        region: ins region,
+        start_index: erg start_index,
+        element_count: erg element_count,
+        source: abs source
+    );
+}
+
+"""
+Read a bounded resident range using volatile source accesses.
+
+The `volatile` effect is explicit and propagates to callers. The destination
+remains ordinary caller-owned storage; only resident source bytes are accessed
+volatilely. The source range and destination size remain fully checked.
+Returns the number of elements read. Errors report an invalid descriptor,
+stale generation, out-of-window range, overflow, bulk-limit violation, or
+destination-size mismatch; no destination bytes are changed after validation
+failure.
+"""
+meta effect("volatile")
+open verb region_volatile_read_range[T](
+    abs region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    ins destination: Buffer
+) -> Result[u64, RegionError] {
+    return actus_region_volatile_read_range[T](
+        region: abs region,
+        start_index: erg start_index,
+        element_count: erg element_count,
+        destination: ins destination
+    );
+}
+
+"""
+Write a bounded resident range using volatile destination accesses.
+
+The `volatile` effect is explicit and propagates to callers. The source
+remains ordinary caller-owned storage; only resident destination bytes are
+accessed volatilely. A successful write marks the Region dirty and returns the
+number of elements written. Errors report an invalid descriptor, stale
+generation, out-of-window range, overflow, bulk-limit violation, or
+source-size mismatch; failed validation leaves the resident bytes and dirty
+state unchanged.
+"""
+meta effect("volatile")
+open verb region_volatile_write_range[T](
+    ins region: Region[T],
+    erg start_index: u64,
+    erg element_count: u64,
+    abs source: Buffer
+) -> Result[u64, RegionError] {
+    return actus_region_volatile_write_range[T](
         region: ins region,
         start_index: erg start_index,
         element_count: erg element_count,

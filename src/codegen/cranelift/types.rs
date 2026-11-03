@@ -58,6 +58,8 @@ impl NativeType {
             BuiltinType::String => Some(Self::String),
             BuiltinType::Buffer => Some(Self::Buffer),
             BuiltinType::Array | BuiltinType::Map => None,
+            BuiltinType::VolatileAddress => Some(Self::FatPointer),
+            BuiltinType::VolatileWriteAddress => Some(Self::FatPointer),
         }
     }
 
@@ -98,6 +100,9 @@ impl NativeType {
                     .first()
                     .and_then(|capacity| capacity.name.parse::<u32>().ok())
                     .map(Self::Arena);
+            }
+            if type_name.name == "VolatileAddress" {
+                return Some(Self::FatPointer);
             }
             layouts
                 .type_for_type_name(type_name)

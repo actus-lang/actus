@@ -412,6 +412,24 @@ impl RegionView<'_> {
         );
         Ok(element_count)
     }
+
+    /// Reads a bounded resident range with volatile source accesses.
+    pub fn volatile_read_range(
+        &self,
+        start_index: u64,
+        element_count: u64,
+        destination: &mut [u8],
+    ) -> Result<u64, RegionError> {
+        let range =
+            self.descriptor.byte_range_for(start_index, element_count, self.bulk_limit_bytes)?;
+        if destination.len() != range.len() {
+            return Err(RegionError::BufferTooSmall);
+        }
+        for (index, byte) in destination.iter_mut().enumerate() {
+            *byte = unsafe { self.storage.as_ptr().add(range.start + index).read_volatile() };
+        }
+        Ok(element_count)
+    }
 }
 
 /// Mutable resident view tied to the borrow that created it.
@@ -445,6 +463,25 @@ impl MutableRegionView<'_> {
             unsafe { self.storage.as_mut_ptr().add(range.start) },
             range.len(),
         );
+        self.descriptor.dirty = 1;
+        Ok(element_count)
+    }
+
+    /// Writes a bounded resident range with volatile destination accesses.
+    pub fn volatile_write_range(
+        &mut self,
+        start_index: u64,
+        element_count: u64,
+        source: &[u8],
+    ) -> Result<u64, RegionError> {
+        let range =
+            self.descriptor.byte_range_for(start_index, element_count, self.bulk_limit_bytes)?;
+        if source.len() != range.len() {
+            return Err(RegionError::BufferTooSmall);
+        }
+        for (index, byte) in source.iter().copied().enumerate() {
+            unsafe { self.storage.as_mut_ptr().add(range.start + index).write_volatile(byte) };
+        }
         self.descriptor.dirty = 1;
         Ok(element_count)
     }

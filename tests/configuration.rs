@@ -262,8 +262,9 @@ fn allows_standard_runtime_profile_for_freestanding_target() {
     let configuration = CompilerConfiguration::from_manifest_read_only(&path)
         .expect("target-aware std must load for freestanding targets");
     assert_eq!(configuration.runtime_profile(), RuntimeProfile::Std);
-    assert_eq!(configuration.runtime_module_roots().len(), 2);
+    assert_eq!(configuration.runtime_module_roots().len(), 3);
     assert!(configuration.runtime_module_roots().contains_key("region"));
+    assert!(configuration.runtime_module_roots().contains_key("volatile"));
     assert!(configuration.runtime_module_roots().contains_key("wire"));
     fs::remove_dir_all(root).expect("remove fixture");
 }
@@ -283,8 +284,9 @@ fn allows_standard_runtime_profile_for_embedded_target_fixture() {
         .expect("embedded std manifest should load");
     assert_eq!(configuration.runtime_profile(), RuntimeProfile::Std);
     assert!(!configuration.host_runtime_enabled());
-    assert_eq!(configuration.runtime_module_roots().len(), 2);
+    assert_eq!(configuration.runtime_module_roots().len(), 3);
     assert!(configuration.runtime_module_roots().contains_key("region"));
+    assert!(configuration.runtime_module_roots().contains_key("volatile"));
     assert!(configuration.runtime_module_roots().contains_key("wire"));
     fs::remove_dir_all(root).expect("remove fixture");
 }

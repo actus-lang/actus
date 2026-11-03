@@ -37,6 +37,9 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
             format!("cannot drop frozen binding `{name}`")
         }
         SemanticErrorKind::InvalidDatArgument { name } => format!("invalid dat argument `{name}`"),
+        SemanticErrorKind::ZeroOnDropFieldMove { owner, field } => {
+            format!("cannot move field `{field}` out of zero_on_drop owner `{owner}`")
+        }
         SemanticErrorKind::MoveFrozen { name, .. } => {
             format!("cannot move frozen binding `{name}`")
         }

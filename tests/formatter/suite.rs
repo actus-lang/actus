@@ -67,6 +67,14 @@ fn preserves_repr_metadata_on_value_types_idempotently() {
 }
 
 #[test]
+fn preserves_zero_on_drop_metadata_on_value_types_idempotently() {
+    let formatted = format_source("meta repr(C) meta zero_on_drop struct Secret { key: u64, }");
+    assert!(formatted.contains("meta repr(C)"));
+    assert!(formatted.contains("meta zero_on_drop"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_deterministic_metadata_idempotently() {
     let formatted = format_source("meta deterministic verb stable() -> Int { return 0; }");
     assert!(formatted.contains("meta deterministic"));

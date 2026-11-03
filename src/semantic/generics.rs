@@ -3,6 +3,7 @@ use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
+use super::generic_errors::arity_error;
 use super::type_substitution::TypeSubstitution;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -115,6 +116,9 @@ impl Analyzer {
         }
         if name == "Region" {
             return self.resolve_region_type(&normalized_type_name);
+        }
+        if matches!(name, "VolatileAddress" | "VolatileWriteAddress") {
+            return self.resolve_volatile_address_type(&normalized_type_name);
         }
         if let Some(generic) = self.resolve_generic_parameter(&normalized_type_name)? {
             return Ok(generic);
@@ -309,6 +313,9 @@ impl Analyzer {
     }
 
     fn named_type_arity(&self, name: &str) -> Option<usize> {
+        if name == "VolatileAddress" {
+            return Some(1);
+        }
         if self.type_registry.is_known(name) {
             return Some(0);
         }
@@ -483,13 +490,6 @@ fn canonical_type_name(type_name: &TypeName) -> String {
 fn arena_capacity_error(span: SourceSpan, capacity: &str) -> SemanticError {
     SemanticError {
         kind: SemanticErrorKind::InvalidArenaCapacity { capacity: capacity.to_owned() },
-        span,
-    }
-}
-
-fn arity_error(name: &str, expected: usize, found: usize, span: SourceSpan) -> SemanticError {
-    SemanticError {
-        kind: SemanticErrorKind::GenericArityMismatch { name: name.to_owned(), expected, found },
         span,
     }
 }

@@ -219,6 +219,7 @@ fn cleanup_bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
         BackendCleanupBridge::AggregateDrop { .. } => crate::runtime::AGGREGATE_DROP_SYMBOL,
+        BackendCleanupBridge::SecureZero { .. } => crate::runtime::SECURE_ZERO_SYMBOL,
         BackendCleanupBridge::PerformanceDrop => "",
     }
 }

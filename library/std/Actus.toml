@@ -49,6 +49,11 @@ path = "src/region"
 targets = ["hosted", "freestanding"]
 
 [[runtime.modules]]
+name = "volatile"
+path = "src/volatile"
+targets = ["hosted", "freestanding"]
+
+[[runtime.modules]]
 name = "wire"
 path = "src/wire"
 targets = ["hosted", "freestanding"]

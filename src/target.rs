@@ -300,6 +300,7 @@ impl TargetSpec {
             | crate::ast::Capability::WindowsReplaceFile => {
                 self.triple.operating_system == OperatingSystem::Windows
             }
+            crate::ast::Capability::VolatileWrite => true,
         }
     }
 

@@ -8,12 +8,13 @@ phase prematurely.
 
 ## Current execution status
 
-Metadata extension work is temporarily paused until the LLVM backend is fully
-implemented and promoted to the primary native backend. The completed metadata
-contracts remain unchanged and this phase stays open. After the LLVM backend
-implementation, validation, and backend-specific CI work are complete, return
-here and continue the remaining metadata backlog, beginning with the next
-accepted contract.
+Metadata extension work was temporarily paused while the LLVM backend was
+implemented and promoted to the primary native backend. That prerequisite is
+now satisfied by the merged LLVM migration and its passing Ubuntu, macOS,
+Windows, LLVM-only, Cranelift-only, ARM32, coverage, and dependency-policy CI
+checks. The completed metadata contracts remain unchanged. This phase is now
+active again and continues with the next accepted metadata contract after the
+representation audit.
 
 ## Scope
 
@@ -77,6 +78,29 @@ accepted contract.
 - [x] Add the explicit `repr(C)` payload-enum tagged-union contract with
       fixed `u32` discriminants, bounded payload layout, C ABI mapping, and
       semantic/FFI regression coverage.
+- [x] Re-audit the complete `repr` family after the LLVM backend migration,
+      including parser, semantic, FFI, formatter/LSP, backend-parity, native
+      object, target, and negative-fixture coverage.
+- [x] Add an explicit bounded volatile Region primitive with checked
+      ownership, range validation, volatile runtime access, effect propagation,
+      native execution evidence, and strict `.act` coverage.
+- [x] Define the accepted native metadata contract for `meta volatile` in
+      ADR-0101 and the dedicated guide.
+- [x] Implement the typed borrowed `VolatileAddress[T]` descriptor contract,
+      explicit fixed-width read primitives, shared pointer/layout lowering,
+      runtime descriptor/bounds/alignment validation, and native object tests.
+- [x] Complete the separate exclusive-write contract using
+      `VolatileWriteAddress[T]`, an `ins` loan, the closed `volatile.write`
+      capability, fixed-width writes, explicit device ordering, fail-closed
+      target validation, and LLVM/Cranelift runtime evidence. Negative
+      coverage proves that callers must declare the capability and that a
+      shared `abs` alias cannot coexist with the exclusive write loan.
+- [x] Implement the initial `meta zero_on_drop` contract for concrete
+      `repr(C)` value-only structs, including rejection of generic, borrowed,
+      and runtime-resource fields, a volatile secure-zero runtime bridge,
+      LLVM/Cranelift cleanup lowering, and parser/formatter/semantic/native
+      regression coverage. Resource-bearing and borrowed-secret extensions
+      remain separate work with their own proof requirements.
 
 ## Planned metadata extension backlog
 
@@ -109,10 +133,12 @@ advance.
    restricted, explicitly checked ABI/layout contracts for native
    interoperability. Transparent wrappers require one value field and map to
    that field's layout and native ABI type.
-3. `meta volatile` — define explicit hardware-observable access semantics only
-   after the native memory-access contract is specified.
+3. `meta volatile` — implement the accepted hardware-observable access
+   semantics and typed storage/provenance contract from ADR-0101.
 4. `meta zero_on_drop` — guarantee secret-material clearing across ownership
-   moves and every cleanup path.
+   moves and every cleanup path. The initial concrete `repr(C)` owner-only
+   contract and native cleanup bridge are implemented; resource-bearing and
+   borrowed-field extensions remain intentionally separate work.
 5. `meta stack_limit(...)` — enforce a bounded stack contract once the compiler
     has a sound interprocedural stack-size model.
 
@@ -134,6 +160,23 @@ advance.
 The implementation order is intentional: semantic safety and effects precede
 ABI/platform metadata; ergonomics follow the safety model; backend hints come
 last. The phase remains open for adding and refining metadata proposals.
+
+## Resumption evidence
+
+The LLVM prerequisite was verified on the merged default branch through PR
+`#97`. Its required checks passed on Ubuntu, macOS, Windows, LLVM-only,
+Cranelift-only, ARM32 Thumb, coverage, and dependency/license-policy jobs.
+The Linux LLVM bootstrap additionally verifies the pinned fallback archive by
+SHA-256 when the apt-based installer is unavailable. This evidence establishes
+that metadata work can resume; it does not change the metadata semantics or
+close this phase.
+
+The representation audit confirms that `repr(C)`, `repr(packed)`,
+`repr(align(N))`, `repr(transparent)`, and the checked `repr(C)` payload-enum
+tagged-union contract are implemented and covered by parser, semantic, FFI,
+formatter/LSP, backend-parity, native, and negative fixtures. Volatile access
+remains a separate contract and is not inferred from any representation
+attribute.
 
 ## Validation evidence
 

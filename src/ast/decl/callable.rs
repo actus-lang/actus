@@ -74,6 +74,8 @@ pub enum MetaAttribute {
     Bounded(BoundedContract),
     Capability(Capability),
     Repr(Repr),
+    Volatile,
+    ZeroOnDrop,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -191,16 +193,18 @@ pub enum Effect {
     Network,
     Allocation,
     Entropy,
+    Volatile,
 }
 
 impl Effect {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Blocking,
         Self::Clock,
         Self::Filesystem,
         Self::Network,
         Self::Allocation,
         Self::Entropy,
+        Self::Volatile,
     ];
 
     pub fn parse(name: &str) -> Option<Self> {
@@ -211,6 +215,7 @@ impl Effect {
             "network" => Self::Network,
             "allocation" => Self::Allocation,
             "entropy" => Self::Entropy,
+            "volatile" => Self::Volatile,
             _ => return None,
         })
     }
@@ -223,11 +228,15 @@ impl Effect {
             Self::Network => "network",
             Self::Allocation => "allocation",
             Self::Entropy => "entropy",
+            Self::Volatile => "volatile",
         }
     }
 
     pub const fn is_nondeterministic(self) -> bool {
-        matches!(self, Self::Clock | Self::Filesystem | Self::Network | Self::Entropy)
+        matches!(
+            self,
+            Self::Clock | Self::Filesystem | Self::Network | Self::Entropy | Self::Volatile
+        )
     }
 }
 
@@ -240,10 +249,11 @@ pub enum Capability {
     WindowsFileIdentity,
     WindowsCreateNew,
     WindowsReplaceFile,
+    VolatileWrite,
 }
 
 impl Capability {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::FilesystemCreateExclusive,
         Self::PosixCloexec,
         Self::PosixCreateExclusive,
@@ -251,6 +261,7 @@ impl Capability {
         Self::WindowsFileIdentity,
         Self::WindowsCreateNew,
         Self::WindowsReplaceFile,
+        Self::VolatileWrite,
     ];
 
     pub fn parse(name: &str) -> Option<Self> {
@@ -262,6 +273,7 @@ impl Capability {
             "windows.file_identity" => Self::WindowsFileIdentity,
             "windows.create_new" => Self::WindowsCreateNew,
             "windows.replace_file" => Self::WindowsReplaceFile,
+            "volatile.write" => Self::VolatileWrite,
             _ => return None,
         })
     }
@@ -275,6 +287,7 @@ impl Capability {
             Self::WindowsFileIdentity => "windows.file_identity",
             Self::WindowsCreateNew => "windows.create_new",
             Self::WindowsReplaceFile => "windows.replace_file",
+            Self::VolatileWrite => "volatile.write",
         }
     }
 }

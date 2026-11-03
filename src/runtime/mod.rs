@@ -16,16 +16,18 @@ mod region_pinning_bridge;
 mod region_profile;
 mod region_provider;
 mod region_range_bridge;
+mod region_volatile_bridge;
 mod serialization;
 mod stream;
 mod time;
 mod types;
+mod volatile;
 
 pub use allocation::{
     actus_aggregate_allocate, actus_aggregate_drop, actus_buffer_allocate, actus_buffer_append,
     actus_buffer_append_buffer, actus_buffer_append_range, actus_buffer_capacity,
     actus_buffer_clear, actus_buffer_drop, actus_buffer_move, actus_buffer_reserve,
-    actus_copy_buffer_reserve, actus_enum_allocate, actus_enum_drop,
+    actus_copy_buffer_reserve, actus_enum_allocate, actus_enum_drop, actus_secure_zero,
 };
 pub use capabilities::{
     REGION_CAPABILITY_CAPACITY, REGION_HANDLE_GENERATION_BITS, REGION_HANDLE_SLOT_BITS,
@@ -61,8 +63,9 @@ pub use contract::{
     REGION_GENERATION_SYMBOL, REGION_LOGICAL_LENGTH_SYMBOL, REGION_MAX_BULK_BYTES,
     REGION_OPEN_SYMBOL, REGION_PIN_SYMBOL, REGION_PINNED_SYMBOL, REGION_PROVIDER_QUEUE_CAPACITY,
     REGION_PUBLISH_SYMBOL, REGION_READ_RANGE_SYMBOL, REGION_READ_SYMBOL, REGION_REMAP_SYMBOL,
-    REGION_UNPIN_SYMBOL, REGION_WINDOW_COUNT_SYMBOL, REGION_WINDOW_START_SYMBOL,
-    REGION_WRITE_RANGE_SYMBOL, REGION_WRITE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability,
+    REGION_UNPIN_SYMBOL, REGION_VOLATILE_READ_RANGE_SYMBOL, REGION_VOLATILE_WRITE_RANGE_SYMBOL,
+    REGION_WINDOW_COUNT_SYMBOL, REGION_WINDOW_START_SYMBOL, REGION_WRITE_RANGE_SYMBOL,
+    REGION_WRITE_SYMBOL, RUNTIME_ABI_VERSION, RuntimeCapability, SECURE_ZERO_SYMBOL,
     SLEEP_CONTEXT_CRITICAL_SECTION, SLEEP_CONTEXT_ENTER_SYMBOL, SLEEP_CONTEXT_EXIT_SYMBOL,
     SLEEP_CONTEXT_INTERRUPT, SLEEP_NANOS_SYMBOL, STRING_BYTE_AT_SYMBOL,
     STRING_COPY_STATUS_CAPACITY, STRING_COPY_STATUS_INVALID_UTF8, STRING_LENGTH_SYMBOL,
@@ -114,6 +117,9 @@ pub use region_provider::{
     MemoryRegionProvider, RegionProvider, RegionProviderError, RegionProviderRequest,
 };
 pub use region_range_bridge::{actus_region_read_range, actus_region_write_range};
+pub use region_volatile_bridge::{
+    actus_region_volatile_read_range, actus_region_volatile_write_range,
+};
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
     validate_fixed_frame,
@@ -127,6 +133,11 @@ pub use time::{
     actus_monotonic_nanos, actus_sleep_context_enter, actus_sleep_context_exit, actus_sleep_nanos,
 };
 pub use types::{ActusBuffer, ActusMetadata, BufferHandle};
+pub use volatile::{
+    VolatileAddressDescriptor, actus_volatile_read_u8, actus_volatile_read_u16,
+    actus_volatile_read_u32, actus_volatile_read_u64, actus_volatile_write_u8,
+    actus_volatile_write_u16, actus_volatile_write_u32, actus_volatile_write_u64,
+};
 
 pub fn runtime_archive_path() -> Option<&'static Path> {
     option_env!("ACTUS_RUNTIME_ARCHIVE").map(Path::new)

@@ -123,14 +123,17 @@ fn capability_matrix_is_target_specific_and_closed() {
     assert!(linux.supports_capability(actus::ast::Capability::FilesystemCreateExclusive));
     assert!(linux.supports_capability(actus::ast::Capability::PosixCreateExclusive));
     assert!(linux.supports_capability(actus::ast::Capability::UnixRenameAtomic));
+    assert!(linux.supports_capability(actus::ast::Capability::VolatileWrite));
     assert!(!linux.supports_capability(actus::ast::Capability::WindowsFileIdentity));
     assert!(!linux.supports_capability(actus::ast::Capability::WindowsCreateNew));
     assert!(windows.supports_capability(actus::ast::Capability::WindowsFileIdentity));
     assert!(windows.supports_capability(actus::ast::Capability::FilesystemCreateExclusive));
     assert!(windows.supports_capability(actus::ast::Capability::WindowsCreateNew));
     assert!(windows.supports_capability(actus::ast::Capability::WindowsReplaceFile));
+    assert!(windows.supports_capability(actus::ast::Capability::VolatileWrite));
     assert!(!embedded.supports_capability(actus::ast::Capability::PosixCloexec));
     assert!(!embedded.supports_capability(actus::ast::Capability::PosixCreateExclusive));
+    assert!(embedded.supports_capability(actus::ast::Capability::VolatileWrite));
 }
 
 #[test]

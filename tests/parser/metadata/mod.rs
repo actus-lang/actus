@@ -23,3 +23,4 @@ mod repr;
 mod syntax;
 mod target;
 mod test;
+mod zero_on_drop;

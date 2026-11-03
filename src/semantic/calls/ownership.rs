@@ -182,6 +182,19 @@ impl Analyzer {
                 span,
             });
         };
+        if self
+            .struct_types
+            .get(&struct_name)
+            .is_some_and(|definition| definition.is_zero_on_drop())
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::ZeroOnDropFieldMove {
+                    owner: struct_name,
+                    field: field.to_owned(),
+                },
+                span,
+            });
+        }
         if matches!(struct_field.role, crate::ast::StructFieldRole::Erg) {
             return Ok(());
         }
