@@ -398,7 +398,9 @@ impl<'program> ProgramLayouts<'program> {
                     BackendCleanupArgument::FieldAddress
                 } else if matches!(
                     bridge,
-                    BackendCleanupBridge::BufferDrop | BackendCleanupBridge::AggregateDrop { .. }
+                    BackendCleanupBridge::BufferDrop
+                        | BackendCleanupBridge::AggregateDrop { .. }
+                        | BackendCleanupBridge::SecureZero { .. }
                 ) {
                     BackendCleanupArgument::Value
                 } else {

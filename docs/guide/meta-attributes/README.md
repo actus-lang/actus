@@ -32,8 +32,11 @@ platform capability and propagates that requirement across call boundaries.
 `meta repr(transparent)`](repr.md) declare restricted, compiler-checked ABI
 and layout representations for concrete value types.
 
-[`meta volatile`](volatile.md) is reserved for the explicit hardware-observable
-memory-access contract described in ADR-0101; it is not enabled yet.
+[`meta volatile`](volatile.md) documents the explicit hardware-observable
+memory-access contract described in ADR-0101.
+
+[`meta zero_on_drop`](zero-on-drop.md) documents the explicit secret-storage
+clearing contract described in ADR-0102.
 
 ## General rules
 

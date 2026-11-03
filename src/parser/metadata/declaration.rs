@@ -3,6 +3,14 @@ use crate::ast::{MetaAttribute, TopLevelDecl};
 use crate::lexer::{SourceSpan, TokenKind};
 
 impl Parser {
+    pub(in crate::parser) fn file_metadata_error(&self) -> ParseError {
+        ParseError {
+            code: ParseErrorCode::MetadataFileScopeNotAllowed,
+            kind: ParseErrorKind::MetadataFileScopeNotAllowed,
+            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
+        }
+    }
+
     pub(in crate::parser) fn parse_metadata_declaration(
         &mut self,
         metadata: Vec<MetaAttribute>,
@@ -77,12 +85,16 @@ fn ensure_type_metadata_target(
 ) -> Result<(), ParseError> {
     let has_volatile =
         metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Volatile));
+    let has_zero_on_drop =
+        metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::ZeroOnDrop));
     let is_type = parser.check_simple(&TokenKind::Struct) || parser.check_simple(&TokenKind::Enum);
-    if (has_volatile && !parser.check_simple(&TokenKind::Struct))
-        || (metadata
-            .iter()
-            .any(|attribute| matches!(attribute, MetaAttribute::Repr(_) | MetaAttribute::Volatile))
-            && !is_type)
+    if ((has_volatile || has_zero_on_drop) && !parser.check_simple(&TokenKind::Struct))
+        || (metadata.iter().any(|attribute| {
+            matches!(
+                attribute,
+                MetaAttribute::Repr(_) | MetaAttribute::Volatile | MetaAttribute::ZeroOnDrop
+            )
+        }) && !is_type)
     {
         return Err(ParseError {
             code: ParseErrorCode::MetadataTargetNotAllowed,
@@ -97,10 +109,12 @@ fn ensure_repr_type_metadata(
     metadata: &[MetaAttribute],
     span: SourceSpan,
 ) -> Result<(), ParseError> {
-    if metadata
-        .iter()
-        .all(|attribute| matches!(attribute, MetaAttribute::Repr(_) | MetaAttribute::Volatile))
-    {
+    if metadata.iter().all(|attribute| {
+        matches!(
+            attribute,
+            MetaAttribute::Repr(_) | MetaAttribute::Volatile | MetaAttribute::ZeroOnDrop
+        )
+    }) {
         return Ok(());
     }
     Err(ParseError {

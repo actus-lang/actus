@@ -236,6 +236,10 @@ fn append_bridge_parameters(
             signature.params.push(AbiParam::new(pointer_type));
             vec![1, 1, 1]
         }
+        BackendCleanupBridge::SecureZero { .. } => {
+            signature.params.push(AbiParam::new(pointer_type));
+            vec![1, 1]
+        }
         _ => vec![1],
     }
 }
@@ -291,6 +295,8 @@ pub(super) fn lower_cleanup(
     } else if let BackendCleanupBridge::AggregateDrop { size, alignment } = operand.bridge {
         arguments.push(builder.ins().iconst(module.isa().pointer_type(), i64::from(size)));
         arguments.push(builder.ins().iconst(module.isa().pointer_type(), i64::from(alignment)));
+    } else if let BackendCleanupBridge::SecureZero { size } = operand.bridge {
+        arguments.push(builder.ins().iconst(module.isa().pointer_type(), i64::from(size)));
     }
     builder.ins().call(reference, &arguments);
     Ok(())
@@ -302,6 +308,7 @@ fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::RegionDrop => crate::runtime::REGION_DROP_SYMBOL,
         BackendCleanupBridge::EnumDrop { .. } => crate::runtime::ENUM_DROP_SYMBOL,
         BackendCleanupBridge::AggregateDrop { .. } => crate::runtime::AGGREGATE_DROP_SYMBOL,
+        BackendCleanupBridge::SecureZero { .. } => crate::runtime::SECURE_ZERO_SYMBOL,
         BackendCleanupBridge::PerformanceDrop => "",
     }
 }

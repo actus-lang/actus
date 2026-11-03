@@ -31,6 +31,10 @@ pub enum SemanticErrorKind {
     InvalidDatArgument {
         name: String,
     },
+    ZeroOnDropFieldMove {
+        owner: String,
+        field: String,
+    },
     MoveFrozen {
         name: String,
         borrow_ids: Vec<usize>,

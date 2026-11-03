@@ -10,6 +10,7 @@ pub enum BackendCleanupBridge {
     RegionDrop,
     EnumDrop { size: u32 },
     AggregateDrop { size: u32, alignment: u32 },
+    SecureZero { size: u32 },
     PerformanceDrop,
 }
 
@@ -153,6 +154,7 @@ pub(super) fn validate_cleanup_operand(
     }
     if matches!(operand.bridge, BackendCleanupBridge::EnumDrop { size: 0 })
         || matches!(operand.bridge, BackendCleanupBridge::AggregateDrop { size: 0, .. })
+        || matches!(operand.bridge, BackendCleanupBridge::SecureZero { size: 0 })
     {
         return Err(BackendContractError::InvalidCleanupOperand);
     }

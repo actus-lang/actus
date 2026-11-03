@@ -19,6 +19,7 @@ impl Parser {
             "capability" => self.parse_capability_metadata(),
             "repr" => self.parse_repr_metadata(),
             "volatile" => Ok(vec![MetaAttribute::Volatile]),
+            "zero_on_drop" => Ok(vec![MetaAttribute::ZeroOnDrop]),
             name => Err(ParseError {
                 code: ParseErrorCode::UnknownMetadata,
                 kind: ParseErrorKind::UnknownMetadata { name: name.to_owned() },

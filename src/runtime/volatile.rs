@@ -398,4 +398,11 @@ mod tests {
         assert_eq!(unsafe { *(rejected.add(PAYLOAD_OFFSET).cast::<u32>()) }, 0);
         unsafe { actus_enum_drop(rejected, RESULT_SCALAR_SIZE) };
     }
+
+    #[test]
+    fn secure_zero_overwrites_the_complete_owned_storage() {
+        let mut secret = [0xA5u8; 32];
+        unsafe { crate::runtime::actus_secure_zero(secret.as_mut_ptr(), secret.len()) };
+        assert_eq!(secret, [0u8; 32]);
+    }
 }

@@ -29,6 +29,30 @@ fn accepts_volatile_fixed_width_register_structs() {
 }
 
 #[test]
+fn accepts_zero_on_drop_concrete_c_structs() {
+    analyze_source("meta repr(C) meta zero_on_drop struct SessionKey { key_a: u64, key_b: u64, }")
+        .expect("zero_on_drop requires a concrete repr(C) value layout");
+}
+
+#[test]
+fn rejects_zero_on_drop_without_c_layout_or_with_runtime_resources() {
+    let missing_c = analyze_source("meta zero_on_drop struct Secret { key: u64, }")
+        .expect_err("zero_on_drop must require explicit repr(C)");
+    assert!(matches!(
+        missing_c.kind,
+        SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("repr(C)")
+    ));
+
+    let resource =
+        analyze_source("meta repr(C) meta zero_on_drop struct Secret { bytes: Buffer, }")
+            .expect_err("zero_on_drop must reject runtime-resource fields");
+    assert!(matches!(
+        resource.kind,
+        SemanticErrorKind::InvalidReprC { ref reason, .. } if reason.contains("runtime resource")
+    ));
+}
+
+#[test]
 fn rejects_volatile_structs_without_c_layout() {
     let error = analyze_source("meta volatile struct Registers { status: u32, }")
         .expect_err("volatile values must declare repr(C)");

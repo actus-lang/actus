@@ -143,6 +143,7 @@ fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::DropBorrow { .. } => "E1008",
         SemanticErrorKind::DropFrozen { .. } => "E1009",
         SemanticErrorKind::InvalidDatArgument { .. } => "E1010",
+        SemanticErrorKind::ZeroOnDropFieldMove { .. } => "E1136",
         SemanticErrorKind::MoveFrozen { .. } => "E1011",
         SemanticErrorKind::UnknownParameter { .. } => "E1012",
         SemanticErrorKind::DuplicateArgument { .. } => "E1013",

@@ -137,6 +137,8 @@ pub const ENUM_DROP_SYMBOL: &str = "actus_enum_drop";
 /// Stable runtime symbols used for compiler-managed large aggregate storage.
 pub const AGGREGATE_ALLOCATE_SYMBOL: &str = "actus_aggregate_allocate";
 pub const AGGREGATE_DROP_SYMBOL: &str = "actus_aggregate_drop";
+/// Stable runtime symbol used by compiler-generated zero_on_drop cleanup.
+pub const SECURE_ZERO_SYMBOL: &str = "actus_secure_zero";
 /// Stable hosted runtime symbol for monotonic nanosecond reads.
 pub const MONOTONIC_NANOS_SYMBOL: &str = "actus_monotonic_nanos";
 /// Stable hosted runtime symbol for scheduler-aware monotonic sleeping.

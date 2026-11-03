@@ -78,6 +78,10 @@ impl StructDef {
         self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Volatile))
     }
 
+    pub fn is_zero_on_drop(&self) -> bool {
+        self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::ZeroOnDrop))
+    }
+
     pub fn repr(&self) -> Option<Repr> {
         self.metadata
             .iter()

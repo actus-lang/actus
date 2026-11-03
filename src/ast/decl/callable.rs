@@ -75,6 +75,7 @@ pub enum MetaAttribute {
     Capability(Capability),
     Repr(Repr),
     Volatile,
+    ZeroOnDrop,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]

@@ -95,6 +95,12 @@ representation audit.
       target validation, and LLVM/Cranelift runtime evidence. Negative
       coverage proves that callers must declare the capability and that a
       shared `abs` alias cannot coexist with the exclusive write loan.
+- [x] Implement the initial `meta zero_on_drop` contract for concrete
+      `repr(C)` value-only structs, including rejection of generic, borrowed,
+      and runtime-resource fields, a volatile secure-zero runtime bridge,
+      LLVM/Cranelift cleanup lowering, and parser/formatter/semantic/native
+      regression coverage. Resource-bearing and borrowed-secret extensions
+      remain separate work with their own proof requirements.
 
 ## Planned metadata extension backlog
 
@@ -130,7 +136,9 @@ advance.
 3. `meta volatile` — implement the accepted hardware-observable access
    semantics and typed storage/provenance contract from ADR-0101.
 4. `meta zero_on_drop` — guarantee secret-material clearing across ownership
-   moves and every cleanup path.
+   moves and every cleanup path. The initial concrete `repr(C)` owner-only
+   contract and native cleanup bridge are implemented; resource-bearing and
+   borrowed-field extensions remain intentionally separate work.
 5. `meta stack_limit(...)` — enforce a bounded stack contract once the compiler
     has a sound interprocedural stack-size model.
 

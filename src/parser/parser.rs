@@ -231,6 +231,13 @@ impl Parser {
                 .is_some()
             {
                 Some("volatile")
+            } else if metadata
+                .iter()
+                .filter(|attribute| matches!(attribute, MetaAttribute::ZeroOnDrop))
+                .nth(1)
+                .is_some()
+            {
+                Some("zero_on_drop")
             } else {
                 let mut repr = crate::ast::Repr::new(false, false);
                 let mut duplicate = false;
@@ -355,14 +362,6 @@ impl Parser {
             });
         }
         Ok(())
-    }
-
-    fn file_metadata_error(&self) -> ParseError {
-        ParseError {
-            code: ParseErrorCode::MetadataFileScopeNotAllowed,
-            kind: ParseErrorKind::MetadataFileScopeNotAllowed,
-            span: self.peek().map(|token| token.span).unwrap_or(SourceSpan::new(0, 0)),
-        }
     }
 
     fn take_doc_string(&mut self) -> Option<String> {

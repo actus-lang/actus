@@ -215,6 +215,9 @@ fn resolved_drop_symbol(
         super::super::contract::BackendCleanupBridge::AggregateDrop { .. } => {
             Ok(crate::runtime::AGGREGATE_DROP_SYMBOL.to_owned())
         }
+        super::super::contract::BackendCleanupBridge::SecureZero { .. } => {
+            Ok(crate::runtime::SECURE_ZERO_SYMBOL.to_owned())
+        }
         super::super::contract::BackendCleanupBridge::PerformanceDrop => Err(BackendEmitError(
             "Cranelift user-defined Drop performance emission is not implemented".to_owned(),
         )),
@@ -239,6 +242,7 @@ fn append_resolved_drop_arguments(
     } else if matches!(
         descriptor.descriptor.bridge,
         super::super::contract::BackendCleanupBridge::AggregateDrop { .. }
+            | super::super::contract::BackendCleanupBridge::SecureZero { .. }
     ) {
         arguments.push(
             context

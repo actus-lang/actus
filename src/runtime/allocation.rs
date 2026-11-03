@@ -49,6 +49,23 @@ pub unsafe extern "C" fn actus_aggregate_drop(pointer: *mut u8, size: usize, ali
     unsafe { std::alloc::dealloc(pointer, layout) };
 }
 
+/// Overwrites owned secret storage through volatile byte stores.
+///
+/// # Safety
+///
+/// `pointer` must be null or point to at least `size` writable bytes for the
+/// duration of this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_secure_zero(pointer: *mut u8, size: usize) {
+    if pointer.is_null() {
+        return;
+    }
+    for offset in 0..size {
+        unsafe { std::ptr::write_volatile(pointer.add(offset), 0) };
+    }
+    std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_buffer_allocate(length: usize) -> BufferHandle {
     let mut data = Vec::<u8>::new();

@@ -302,6 +302,7 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
         }
         crate::ast::MetaAttribute::Repr(repr) => format!("repr({})", repr.name()),
         crate::ast::MetaAttribute::Volatile => "volatile".to_owned(),
+        crate::ast::MetaAttribute::ZeroOnDrop => "zero_on_drop".to_owned(),
     }
 }
 

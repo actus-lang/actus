@@ -128,6 +128,7 @@ fn declaration_matches_target(
         crate::ast::MetaAttribute::Capability(_) => true,
         crate::ast::MetaAttribute::Repr(_) => true,
         crate::ast::MetaAttribute::Volatile => true,
+        crate::ast::MetaAttribute::ZeroOnDrop => true,
     })
 }
 pub(crate) use type_substitution::TypeSubstitution;
