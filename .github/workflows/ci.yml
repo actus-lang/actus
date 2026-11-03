@@ -56,8 +56,13 @@ jobs:
             throw "MSVC linker was not selected: $linker"
           }
 
-      - name: Set up LLVM 23 (Unix)
-        if: runner.os != 'Windows'
+      - name: Set up LLVM 23 (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ./scripts/setup_llvm_linux.sh 23
+
+      - name: Set up LLVM 23 (macOS)
+        if: runner.os == 'macOS'
         uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
         with:
           llvm-version: 23
@@ -308,10 +313,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Set up LLVM 23
-        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
-        with:
-          llvm-version: 23
+      - name: Set up LLVM 23 (Linux)
+        shell: bash
+        run: ./scripts/setup_llvm_linux.sh 23
 
       - name: Install ARM32 native link tools
         run: |
@@ -354,10 +358,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Set up LLVM 23
-        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
-        with:
-          llvm-version: 23
+      - name: Set up LLVM 23 (Linux)
+        shell: bash
+        run: ./scripts/setup_llvm_linux.sh 23
 
       - name: Install ARM32 target toolchain
         run: |

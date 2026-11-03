@@ -17,10 +17,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Set up LLVM 23
-        uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
-        with:
-          llvm-version: 23
+      - name: Set up LLVM 23 (Linux)
+        shell: bash
+        run: ./scripts/setup_llvm_linux.sh 23
 
       - name: Export LLVM build environment
         shell: bash

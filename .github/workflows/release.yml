@@ -31,8 +31,13 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
 
-      - name: Set up LLVM 23 (Unix)
-        if: runner.os != 'Windows'
+      - name: Set up LLVM 23 (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ./scripts/setup_llvm_linux.sh 23
+
+      - name: Set up LLVM 23 (macOS)
+        if: runner.os == 'macOS'
         uses: ZhongRuoyu/setup-llvm@eea6238baf53d41c1615923680d7a738da584318 # v0
         with:
           llvm-version: 23
