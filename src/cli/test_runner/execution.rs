@@ -28,12 +28,13 @@ pub(super) fn run_tests(
     print_test_header(collection.tests.len(), collection.filtered, options.mode);
     if options.list {
         for test in &collection.tests {
-            println!("{}::{}", test.module, test.name);
+            println!("{}::{}", test.display_module, test.name);
         }
         return 0;
     }
+    let run_started = Instant::now();
     if collection.tests.is_empty() {
-        return print_test_summary(0, 0, &output_style);
+        return print_test_summary(0, 0, run_started.elapsed(), &output_style);
     }
     let worker_count = options.test_threads.min(collection.tests.len());
     let chunk_size = collection.tests.len().div_ceil(worker_count);
@@ -69,7 +70,7 @@ pub(super) fn run_tests(
         }
         passed
     });
-    print_test_summary(collection.tests.len(), passed, &output_style)
+    print_test_summary(collection.tests.len(), passed, run_started.elapsed(), &output_style)
 }
 
 fn print_test_header(total: usize, filtered: usize, mode: ConformanceMode) {
@@ -87,17 +88,18 @@ fn report_test_result(
     output_style: &TestOutputStyle,
 ) -> bool {
     let elapsed = elapsed.as_millis();
+    let label = format!("test {}::{}", test.display_module, test.name);
     match result {
         Ok(TestProcessResult::Exited { code: 0, .. }) => {
             let status = output_style.success(&format!("ok ({elapsed} ms, exit code 0)"));
-            println!("test {}::{} ... {status}", test.module, test.name);
+            println!("{label} ... {status}");
             true
         }
         Ok(TestProcessResult::Exited { code, stderr }) => {
             let mut detail = format!("FAILED ({elapsed} ms, exit code {code})");
             super::process::append_stderr_for_report(&mut detail, &stderr);
             let status = output_style.failure(&detail);
-            println!("test {}::{} ... {status}", test.module, test.name);
+            println!("{label} ... {status}");
             false
         }
         Ok(TestProcessResult::Signaled { signal, stderr }) => {
@@ -107,30 +109,50 @@ fn report_test_result(
             ) {
                 let status =
                     output_style.success(&format!("ok ({elapsed} ms, expected interruption)"));
-                println!("test {}::{} ... {status}", test.module, test.name);
+                println!("{label} ... {status}");
                 return true;
             }
             let signal = signal.map_or_else(|| "unknown".to_owned(), |value| value.to_string());
             let mut detail = format!("FAILED ({elapsed} ms, terminated by signal {signal})");
             super::process::append_stderr_for_report(&mut detail, &stderr);
             let status = output_style.failure(&detail);
-            println!("test {}::{} ... {status}", test.module, test.name);
+            println!("{label} ... {status}");
             false
         }
         Err(error) => {
             let status = output_style.failure(&format!("FAILED ({elapsed} ms, {error})"));
-            println!("test {}::{} ... {status}", test.module, test.name);
+            println!("{label} ... {status}");
             false
         }
     }
 }
 
-fn print_test_summary(total: usize, passed: usize, output_style: &TestOutputStyle) -> i32 {
+fn print_test_summary(
+    total: usize,
+    passed: usize,
+    elapsed: std::time::Duration,
+    output_style: &TestOutputStyle,
+) -> i32 {
     let failed = total - passed;
     let result =
         if failed == 0 { output_style.success("ok") } else { output_style.failure("FAILED") };
-    println!("test result: {result}. {passed} passed; {failed} failed");
+    println!(
+        "test result: {result}. {passed} passed; {failed} failed; finished in {}",
+        format_duration(elapsed)
+    );
     i32::from(failed != 0)
+}
+
+fn format_duration(duration: std::time::Duration) -> String {
+    let millis = duration.as_millis();
+    if millis < 1_000 {
+        return format!("{millis} ms");
+    }
+    let seconds = millis / 1_000;
+    if seconds < 60 {
+        return format!("{}.{:01} s", seconds, (millis % 1_000) / 100);
+    }
+    format!("{}m {:02}.{:01}s", seconds / 60, seconds % 60, (millis % 1_000) / 100)
 }
 
 fn run_test(

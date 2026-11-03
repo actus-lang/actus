@@ -17,6 +17,7 @@ use super::TestOptions;
 pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
     pub(super) module: String,
+    pub(super) display_module: String,
     pub(super) relative_path: PathBuf,
     pub(super) name: String,
     pub(super) program: Program,
@@ -327,6 +328,7 @@ fn discover_tests(
                 Some(DiscoveredTest {
                     path: path.to_path_buf(),
                     module: if module.is_empty() { "<root>".to_owned() } else { module.to_owned() },
+                    display_module: display_module(module, relative_path),
                     relative_path: relative_path.to_path_buf(),
                     name: verb.name.clone(),
                     program: program.clone(),
@@ -340,6 +342,31 @@ fn discover_tests(
             _ => None,
         })
         .collect()
+}
+
+fn display_module(module: &str, relative_path: &Path) -> String {
+    if !module.is_empty() {
+        return module.to_owned();
+    }
+    let mut parts = relative_path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    if let Some(last) = parts.last_mut()
+        && let Some((stem, _)) = last.rsplit_once('.')
+    {
+        *last = stem.to_owned();
+    }
+    parts
+        .into_iter()
+        .map(|part| {
+            part.chars()
+                .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
+                .collect::<String>()
+        })
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("::")
 }
 
 fn test_matches(test: &DiscoveredTest, options: &TestOptions) -> bool {
