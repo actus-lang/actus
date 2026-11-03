@@ -82,8 +82,41 @@ The bounded Region primitive is separate from the standalone type-level
 same explicit `volatile` effect. The provider owns the descriptor and storage;
 the runtime validates its marker, target layout, bounds, offset arithmetic, and
 alignment before calling `read_volatile`. Typed writes remain intentionally
-unimplemented and require a later contract with an exclusive ownership and
-device-write policy.
+unimplemented and require the following separate contract.
+
+### Exclusive write contract
+
+Typed writes must not reuse `VolatileAddress[T]`. The write surface will use a
+distinct opaque `VolatileWriteAddress[T]` supplied by a trusted native provider.
+This prevents a read-only descriptor from being reinterpreted as writable and
+makes the provider's permission boundary visible in the type system.
+
+The public write verbs will have these properties:
+
+1. The address parameter is an `ins VolatileWriteAddress[T]` loan. The caller
+   keeps ownership of the descriptor, but no aliased `abs` view may coexist
+   during the write call.
+2. The write width is fixed by the verb (`u8`, `u16`, `u32`, or `u64`) and the
+   field offset is a compile-time `Usize` parameter. Runtime input cannot
+   select an unchecked width or perform address arithmetic.
+3. The descriptor carries writable provenance, target size/alignment, and
+   bounded storage extent. The runtime validates all of them, including
+   checked offset arithmetic and final access alignment, before one
+   `write_volatile` operation.
+4. The caller must declare both `meta effect("volatile")` and the closed
+   `meta capability("volatile.write")`. The capability is authorization, not
+   a replacement for ownership or descriptor validation.
+5. The initial ordering guarantee remains `device`. Stronger ordering modes
+   require a future target-specific capability and backend proof; they are not
+   implied by a write declaration.
+6. A target or backend without a proven writable volatile primitive must reject
+   the declaration before object emission. No check-then-store or ordinary
+   store fallback is permitted.
+
+The write contract will return a typed `Result[Void, VolatileError]`. It will
+not publish the descriptor, retain a pointer, serialize device state, or hide
+an allocation/cleanup boundary. Read and write descriptors remain distinct
+even when they refer to the same hardware register block.
 
 ## Alternatives rejected
 
@@ -115,5 +148,8 @@ The implementation must contain:
 - native runtime and object evidence proving that the typed read reaches the
   volatile runtime bridge and cannot silently become an ordinary Actus field
   access;
+- exclusive-write evidence proving that read-only descriptors cannot reach the
+  write bridge, aliased `abs` views are rejected during an `ins` write loan,
+  and both native backends preserve the typed `write_volatile` operation;
 - documentation of the exact hardware and memory-ordering guarantees.
 

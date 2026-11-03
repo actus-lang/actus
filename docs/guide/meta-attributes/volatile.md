@@ -67,6 +67,22 @@ storage is outside the contract and must be rejected by the native provider;
 the Actus runtime still rejects malformed metadata and every checked access
 that it can prove invalid before loading.
 
+## Planned exclusive writes
+
+Writes are a separate contract from the completed read-only surface. They will
+use `VolatileWriteAddress[T]`, not `VolatileAddress[T]`, so a read-only native
+descriptor cannot be reused as a writable one. A write will require an
+exclusive `ins` loan and the closed `volatile.write` capability in addition to
+the `volatile` effect. The runtime will validate writable provenance, target
+layout, bounds, offset arithmetic, and alignment before one fixed-width
+`write_volatile` operation.
+
+The first write ordering mode will remain `device`. There will be no ordinary
+store fallback, no check-then-store emulation, no retained pointer, and no
+implicit serialization of device state. Targets without a proven writable
+volatile primitive will fail closed before object emission. This write contract
+is not implemented by the current read-only API.
+
 The accepted design and required evidence are recorded in
 [ADR-0101](../../decisions/ADR-0101-volatile-memory-contract.md).
 
