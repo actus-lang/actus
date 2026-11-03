@@ -8,12 +8,13 @@ phase prematurely.
 
 ## Current execution status
 
-Metadata extension work is temporarily paused until the LLVM backend is fully
-implemented and promoted to the primary native backend. The completed metadata
-contracts remain unchanged and this phase stays open. After the LLVM backend
-implementation, validation, and backend-specific CI work are complete, return
-here and continue the remaining metadata backlog, beginning with the next
-accepted contract.
+Metadata extension work was temporarily paused while the LLVM backend was
+implemented and promoted to the primary native backend. That prerequisite is
+now satisfied by the merged LLVM migration and its passing Ubuntu, macOS,
+Windows, LLVM-only, Cranelift-only, ARM32, coverage, and dependency-policy CI
+checks. The completed metadata contracts remain unchanged. This phase is now
+active again and continues with the next accepted metadata contract after the
+representation audit.
 
 ## Scope
 
@@ -77,6 +78,11 @@ accepted contract.
 - [x] Add the explicit `repr(C)` payload-enum tagged-union contract with
       fixed `u32` discriminants, bounded payload layout, C ABI mapping, and
       semantic/FFI regression coverage.
+- [x] Re-audit the complete `repr` family after the LLVM backend migration,
+      including parser, semantic, FFI, formatter/LSP, backend-parity, native
+      object, target, and negative-fixture coverage.
+- [ ] Define and implement the next accepted native metadata contract:
+      `meta volatile`.
 
 ## Planned metadata extension backlog
 
@@ -134,6 +140,23 @@ advance.
 The implementation order is intentional: semantic safety and effects precede
 ABI/platform metadata; ergonomics follow the safety model; backend hints come
 last. The phase remains open for adding and refining metadata proposals.
+
+## Resumption evidence
+
+The LLVM prerequisite was verified on the merged default branch through PR
+`#97`. Its required checks passed on Ubuntu, macOS, Windows, LLVM-only,
+Cranelift-only, ARM32 Thumb, coverage, and dependency/license-policy jobs.
+The Linux LLVM bootstrap additionally verifies the pinned fallback archive by
+SHA-256 when the apt-based installer is unavailable. This evidence establishes
+that metadata work can resume; it does not change the metadata semantics or
+close this phase.
+
+The representation audit confirms that `repr(C)`, `repr(packed)`,
+`repr(align(N))`, `repr(transparent)`, and the checked `repr(C)` payload-enum
+tagged-union contract are implemented and covered by parser, semantic, FFI,
+formatter/LSP, backend-parity, native, and negative fixtures. Volatile access
+remains a separate contract and is not inferred from any representation
+attribute.
 
 ## Validation evidence
 

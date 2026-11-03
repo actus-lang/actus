@@ -32,6 +32,9 @@ platform capability and propagates that requirement across call boundaries.
 `meta repr(transparent)`](repr.md) declare restricted, compiler-checked ABI
 and layout representations for concrete value types.
 
+[`meta volatile`](volatile.md) is reserved for the explicit hardware-observable
+memory-access contract described in ADR-0101; it is not enabled yet.
+
 ## General rules
 
 - Metadata must use a compiler-recognized attribute name and argument shape.
