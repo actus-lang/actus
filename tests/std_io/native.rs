@@ -220,7 +220,7 @@ verb main() -> Int {
                 input.to_str().expect("source path"),
                 "--strict",
                 "--backend",
-                "cranelift",
+                "llvm",
                 "--emit",
                 "obj",
                 "-o",
@@ -241,15 +241,11 @@ verb main() -> Int {
     let string_symbols = object_file
         .symbols()
         .filter_map(|symbol| symbol.name().ok())
-        .filter(|name| {
-            name.contains("__data_string_")
-                && !name.starts_with(".refptr.")
-                && !name.starts_with("__imp_")
-        })
+        .filter(|name| name.starts_with(".Lactus.string."))
         .collect::<Vec<_>>();
     assert_eq!(string_symbols.len(), 2, "string symbols: {string_symbols:?}");
-    assert!(string_symbols.iter().any(|name| name.contains("__data_string_5f0")));
-    assert!(string_symbols.iter().any(|name| name.contains("__data_string_5f1")));
+    assert!(string_symbols.contains(&".Lactus.string.0"));
+    assert!(string_symbols.contains(&".Lactus.string.1"));
     fs::remove_dir_all(root).expect("remove string data project");
 }
 

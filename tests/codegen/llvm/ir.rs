@@ -918,7 +918,7 @@ fn lowers_niche_option_failure_to_a_null_pointer() {
 }
 
 #[test]
-fn lowers_floating_point_types_when_zero_float_verification_is_disabled() {
+fn rejects_floating_point_types_before_llvm_lowering() {
     let symbol = SymbolIdentity::new("test", SymbolKind::Verb, "float_value").expect("symbol");
     let module = BackendModule {
         externals: Vec::new(),
@@ -935,25 +935,13 @@ fn lowers_floating_point_types_when_zero_float_verification_is_disabled() {
             blocks: vec![BackendBlock {
                 parameters: Vec::new(),
                 id: BackendBlockId(0),
-                instructions: vec![
-                    BackendInstruction::FloatConstant {
-                        result: BackendValueId(0),
-                        ty: BackendValueType::Float { width: 32 },
-                        bits: 0x3fc0_0000,
-                        span: actus::lexer::SourceSpan::new(0, 1),
-                    },
-                    BackendInstruction::Return {
-                        value: Some(BackendValueId(0)),
-                        span: actus::lexer::SourceSpan::new(0, 1),
-                    },
-                ],
+                instructions: Vec::new(),
             }],
             cleanup: Vec::new(),
         }],
     };
-    let ir = emit_module(&module).expect("LLVM should lower float values when permitted");
-    assert!(ir.contains("define float"));
-    assert!(ir.contains("ret float"));
+    let error = emit_module(&module).expect_err("LLVM integer-only lowering must reject floats");
+    assert!(error.to_string().contains("integer-only emission"));
 }
 
 #[test]

@@ -108,10 +108,44 @@ fn initialize_aggregate_storage(
     fields: &[crate::codegen::BackendAggregateField],
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<(), BackendEmitError> {
-    let zero = unsafe { LLVMConstInt(LLVMInt8TypeInContext(context), 0, 0) };
-    let size = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
-    if unsafe { LLVMBuildMemSet(builder, address, zero, size, layout.alignment) }.is_null() {
-        return Err(BackendEmitError("LLVM failed to zero-initialize aggregate value".to_owned()));
+    if layout.size <= 4096 {
+        let byte_type = unsafe { LLVMInt8TypeInContext(context) };
+        let zero = unsafe { LLVMConstInt(byte_type, 0, 0) };
+        for offset in 0..layout.size {
+            let index =
+                unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(offset), 0) };
+            let destination = unsafe {
+                LLVMBuildGEP2(
+                    builder,
+                    byte_type,
+                    address,
+                    &index as *const _ as *mut _,
+                    1,
+                    c"aggregate.zero".as_ptr().cast(),
+                )
+            };
+            if destination.is_null() {
+                return Err(BackendEmitError(
+                    "LLVM failed to address aggregate zero byte".to_owned(),
+                ));
+            }
+            let store = unsafe { LLVMBuildStore(builder, zero, destination) };
+            if store.is_null() {
+                return Err(BackendEmitError(
+                    "LLVM failed to zero-initialize aggregate value".to_owned(),
+                ));
+            }
+            unsafe { LLVMSetAlignment(store, 1) };
+        }
+    } else {
+        let zero = unsafe { LLVMConstInt(LLVMInt8TypeInContext(context), 0, 0) };
+        let size =
+            unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(layout.size), 0) };
+        if unsafe { LLVMBuildMemSet(builder, address, zero, size, layout.alignment) }.is_null() {
+            return Err(BackendEmitError(
+                "LLVM failed to zero-initialize aggregate value".to_owned(),
+            ));
+        }
     }
     for field in fields {
         initialize_aggregate_field(context, builder, address, field, values)?;
