@@ -89,14 +89,12 @@ representation audit.
 - [x] Implement the typed borrowed `VolatileAddress[T]` descriptor contract,
       explicit fixed-width read primitives, shared pointer/layout lowering,
       runtime descriptor/bounds/alignment validation, and native object tests.
-- [ ] Complete the separate exclusive-write contract using
-      `VolatileWriteAddress[T]`; the compiler/runtime plumbing and strict
-      native fixture are in progress, but the full backend-parity, negative
-      ownership, target, and documentation evidence is not closed yet.
-      The accepted design must use `VolatileWriteAddress[T]`, an `ins` loan,
-      `volatile.write` capability, fixed-width writes, explicit device
-      ordering, fail-closed target validation, and LLVM/Cranelift runtime
-      evidence before this item can be closed.
+- [x] Complete the separate exclusive-write contract using
+      `VolatileWriteAddress[T]`, an `ins` loan, the closed `volatile.write`
+      capability, fixed-width writes, explicit device ordering, fail-closed
+      target validation, and LLVM/Cranelift runtime evidence. Negative
+      coverage proves that callers must declare the capability and that a
+      shared `abs` alias cannot coexist with the exclusive write loan.
 
 ## Planned metadata extension backlog
 

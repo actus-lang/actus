@@ -151,5 +151,7 @@ The implementation must contain:
 - exclusive-write evidence proving that read-only descriptors cannot reach the
   write bridge, aliased `abs` views are rejected during an `ins` write loan,
   and both native backends preserve the typed `write_volatile` operation;
+- capability-propagation evidence proving that `volatile.write` cannot be
+  reached through an undeclared caller contract;
 - documentation of the exact hardware and memory-ordering guarantees.
 

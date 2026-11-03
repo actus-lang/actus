@@ -120,6 +120,24 @@ fn capabilities_are_declared_by_callers_and_propagate_through_calls() {
 }
 
 #[test]
+fn volatile_write_capability_is_declared_by_callers() {
+    let undeclared = expect_semantic_error(
+        "meta capability(\"volatile.write\") verb primitive() -> Int { return 0; } verb main() -> Int { primitive(); return 0; }",
+    );
+    assert!(matches!(
+        undeclared.kind,
+        SemanticErrorKind::UndeclaredCapability { ref callee, capability }
+            if callee == "primitive" && capability == actus::ast::Capability::VolatileWrite
+    ));
+    assert_eq!(semantic_diagnostic(&undeclared).code(), "E1131");
+
+    analyze_source(
+        "meta capability(\"volatile.write\") verb primitive() -> Int { return 0; } meta capability(\"volatile.write\") verb main() -> Int { primitive(); return 0; }",
+    )
+    .expect("a caller declaring volatile.write should pass");
+}
+
+#[test]
 fn create_exclusive_capabilities_are_declared_by_callers() {
     let undeclared = expect_semantic_error(
         "meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } verb main() -> Int { primitive(); return 0; }",

@@ -132,6 +132,17 @@ fn rejects_duplicate_ins_and_ins_abs_aliases() {
 }
 
 #[test]
+fn rejects_shared_alias_during_writable_volatile_loan() {
+    let error = analyze_source(
+        "meta repr(C) meta volatile struct Registers { status: u32, } verb merge(ins target: VolatileWriteAddress[Registers], abs view: VolatileWriteAddress[Registers]) { } verb main(erg address: VolatileWriteAddress[Registers]) { merge(target: ins address, view: abs address); }",
+    )
+    .expect_err("a writable volatile loan must reject a shared alias");
+    assert!(
+        matches!(error.kind, SemanticErrorKind::ExclusiveLoanAlias { name } if name == "address")
+    );
+}
+
+#[test]
 fn rejects_ins_loan_escape_through_owner_initialization_and_return() {
     let initialized = analyze_source("verb broken(ins input: Buffer) { erg stored = input; }")
         .expect_err("an ins loan must not initialize an escaping owner");
