@@ -14,10 +14,11 @@ native lowering, runtime linkage, target configuration, or the external linker.
 
 ## Backend and target selection
 
-The backend is selected by the manifest or equivalent CLI configuration.
-Cranelift remains the default when its Cargo feature is enabled; LLVM requires
-the `llvm` feature. Backend selection happens after semantic analysis and
-generic specialization, so both backends consume the same source contract.
+LLVM is the default native backend. Cranelift remains available as an explicit
+compatibility backend when the compiler is built with its `cranelift` feature.
+The backend is selected by the manifest or equivalent CLI configuration, and
+selection happens after semantic analysis and generic specialization, so both
+backends consume the same source contract.
 
 ```toml
 [build]
@@ -26,6 +27,13 @@ target = "x86_64-unknown-linux-gnu"
 runtime = "std"
 verify_no_float_ir = true
 ```
+
+The manifest may instead pin the compatibility backend with
+`backend = "cranelift"`. Omitting `backend` selects LLVM. A command-line
+`--backend` value overrides the manifest for one invocation, but only when
+that backend is compiled into the `actus` binary and supported by the target.
+Unavailable selections fail before native emission; there is no silent
+fallback between emitters.
 
 For a freestanding object, declare the entry contract explicitly:
 

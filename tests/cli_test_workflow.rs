@@ -130,8 +130,26 @@ fn test_lists_filtered_canonical_test_names_without_execution() {
     let output = run_command(&root, &["test", "--list"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success(), "stdout: {stdout}");
-    assert!(stdout.contains("<root>::listed"), "stdout: {stdout}");
+    assert!(stdout.contains("tests::list::listed"), "stdout: {stdout}");
     assert!(!stdout.contains("passed"), "list mode must not execute tests: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_parallel_execution_reports_each_completed_test() {
+    let root = create_test_project(
+        "runner-parallel-order",
+        "order.act",
+        "meta test\nverb zeta() -> Int { return 0; }\nmeta test\nverb alpha() -> Int { return 0; }\n",
+    );
+    let output = run_command(&root, &["test", "--test-threads", "2"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("test tests::order::alpha"), "alpha result missing: {stdout}");
+    assert!(stdout.contains("test tests::order::zeta"), "zeta result missing: {stdout}");
+    assert!(!stdout.contains("[001/002]"), "index should not be displayed: {stdout}");
+    assert!(stdout.contains("2 passed; 0 failed; finished in "), "stdout: {stdout}");
     let _ = fs::remove_dir_all(root);
 }
 
@@ -199,7 +217,10 @@ fn fixture_resolves_nested_sibling_aliases_and_qualified_types() {
         "stdout: {stdout}\nstderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(stdout.contains("<root>::nested_sibling_aliases ... ok"), "stdout: {stdout}");
+    assert!(
+        stdout.contains("tests::qualified_consumer::nested_sibling_aliases ... ok"),
+        "stdout: {stdout}"
+    );
     assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
     let _ = fs::remove_dir_all(root);
 }

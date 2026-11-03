@@ -1,4 +1,5 @@
 use std::fs;
+use std::sync::mpsc;
 use std::time::Instant;
 
 use crate::ast::{
@@ -27,19 +28,49 @@ pub(super) fn run_tests(
     print_test_header(collection.tests.len(), collection.filtered, options.mode);
     if options.list {
         for test in &collection.tests {
-            println!("{}::{}", test.module, test.name);
+            println!("{}::{}", test.display_module, test.name);
         }
         return 0;
     }
-    let mut passed = 0;
-    for (index, test) in collection.tests.iter().enumerate() {
-        let started = Instant::now();
-        let result = run_test(test, configuration, index);
-        if report_test_result(test, result, started, &output_style) {
-            passed += 1;
-        }
+    let run_started = Instant::now();
+    if collection.tests.is_empty() {
+        return print_test_summary(0, 0, run_started.elapsed(), &output_style);
     }
-    print_test_summary(collection.tests.len(), passed, &output_style)
+    let worker_count = options.test_threads.min(collection.tests.len());
+    let chunk_size = collection.tests.len().div_ceil(worker_count);
+    let tests = &collection.tests;
+    let (sender, receiver) = mpsc::channel();
+    let passed = std::thread::scope(|scope| {
+        let handles = (0..collection.tests.len())
+            .step_by(chunk_size)
+            .map(|start| {
+                let end = (start + chunk_size).min(collection.tests.len());
+                let sender = sender.clone();
+                scope.spawn(move || {
+                    for (offset, test) in tests[start..end].iter().enumerate() {
+                        let index = start + offset;
+                        let started = Instant::now();
+                        let result = run_test(test, configuration, index);
+                        sender
+                            .send((index, result, started.elapsed()))
+                            .expect("test result receiver dropped");
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        drop(sender);
+        let mut passed = 0;
+        for (index, result, elapsed) in receiver {
+            if report_test_result(&collection.tests[index], result, elapsed, &output_style) {
+                passed += 1;
+            }
+        }
+        for handle in handles {
+            handle.join().expect("test execution worker panicked");
+        }
+        passed
+    });
+    print_test_summary(collection.tests.len(), passed, run_started.elapsed(), &output_style)
 }
 
 fn print_test_header(total: usize, filtered: usize, mode: ConformanceMode) {
@@ -53,50 +84,75 @@ fn print_test_header(total: usize, filtered: usize, mode: ConformanceMode) {
 fn report_test_result(
     test: &DiscoveredTest,
     result: Result<TestProcessResult, String>,
-    started: Instant,
+    elapsed: std::time::Duration,
     output_style: &TestOutputStyle,
 ) -> bool {
-    let elapsed = started.elapsed().as_millis();
+    let elapsed = elapsed.as_millis();
+    let label = format!("test {}::{}", test.display_module, test.name);
     match result {
-        Ok(TestProcessResult::Exited(0)) => {
+        Ok(TestProcessResult::Exited { code: 0, .. }) => {
             let status = output_style.success(&format!("ok ({elapsed} ms, exit code 0)"));
-            println!("test {}::{} ... {status}", test.module, test.name);
+            println!("{label} ... {status}");
             true
         }
-        Ok(TestProcessResult::Exited(code)) => {
-            let status = output_style.failure(&format!("FAILED ({elapsed} ms, exit code {code})"));
-            println!("test {}::{} ... {status}", test.module, test.name);
+        Ok(TestProcessResult::Exited { code, stderr }) => {
+            let mut detail = format!("FAILED ({elapsed} ms, exit code {code})");
+            super::process::append_stderr_for_report(&mut detail, &stderr);
+            let status = output_style.failure(&detail);
+            println!("{label} ... {status}");
             false
         }
-        Ok(TestProcessResult::Signaled) => {
+        Ok(TestProcessResult::Signaled { signal, stderr }) => {
             if matches!(
                 test.fault,
                 Some(TestFault::InterruptedBeforeRename | TestFault::InterruptedPublication)
             ) {
                 let status =
                     output_style.success(&format!("ok ({elapsed} ms, expected interruption)"));
-                println!("test {}::{} ... {status}", test.module, test.name);
+                println!("{label} ... {status}");
                 return true;
             }
-            let status =
-                output_style.failure(&format!("FAILED ({elapsed} ms, terminated by signal)"));
-            println!("test {}::{} ... {status}", test.module, test.name);
+            let signal = signal.map_or_else(|| "unknown".to_owned(), |value| value.to_string());
+            let mut detail = format!("FAILED ({elapsed} ms, terminated by signal {signal})");
+            super::process::append_stderr_for_report(&mut detail, &stderr);
+            let status = output_style.failure(&detail);
+            println!("{label} ... {status}");
             false
         }
         Err(error) => {
             let status = output_style.failure(&format!("FAILED ({elapsed} ms, {error})"));
-            println!("test {}::{} ... {status}", test.module, test.name);
+            println!("{label} ... {status}");
             false
         }
     }
 }
 
-fn print_test_summary(total: usize, passed: usize, output_style: &TestOutputStyle) -> i32 {
+fn print_test_summary(
+    total: usize,
+    passed: usize,
+    elapsed: std::time::Duration,
+    output_style: &TestOutputStyle,
+) -> i32 {
     let failed = total - passed;
     let result =
         if failed == 0 { output_style.success("ok") } else { output_style.failure("FAILED") };
-    println!("test result: {result}. {passed} passed; {failed} failed");
+    println!(
+        "test result: {result}. {passed} passed; {failed} failed; finished in {}",
+        format_duration(elapsed)
+    );
     i32::from(failed != 0)
+}
+
+fn format_duration(duration: std::time::Duration) -> String {
+    let millis = duration.as_millis();
+    if millis < 1_000 {
+        return format!("{millis} ms");
+    }
+    let seconds = millis / 1_000;
+    if seconds < 60 {
+        return format!("{}.{:01} s", seconds, (millis % 1_000) / 100);
+    }
+    format!("{}m {:02}.{:01}s", seconds / 60, seconds % 60, (millis % 1_000) / 100)
 }
 
 fn run_test(
@@ -246,6 +302,9 @@ impl TestArtifactPaths {
     }
 
     fn cleanup(&self) -> Result<(), String> {
+        if std::env::var("ACTUS_TEST_KEEP_ARTIFACTS").as_deref() == Ok("1") {
+            return Ok(());
+        }
         for object in &self.objects {
             remove_artifact(object)?;
         }

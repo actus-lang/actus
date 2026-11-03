@@ -117,6 +117,7 @@ fn lower_named_enum_payload(
         fields: lowered_fields,
         span,
     });
+    provider.remember_heap_owned_aggregate(result, payload_layout);
     Ok(Some(result))
 }
 

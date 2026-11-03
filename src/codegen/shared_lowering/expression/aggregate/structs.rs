@@ -47,6 +47,7 @@ pub(super) fn lower_struct_literal(
         fields: lowered_fields,
         span,
     });
+    provider.remember_heap_owned_aggregate(result, layout);
     Ok(result)
 }
 

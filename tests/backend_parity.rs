@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol, RelocationTarget};
+use object::{Architecture, BinaryFormat, Object, ObjectSection, ObjectSymbol, RelocationTarget};
 
 const BACKENDS: [&str; 2] = ["cranelift", "llvm"];
 const SOURCE: &str = "import { open std::region }; verb main() -> Int { erg values: Array[u8, 4] = Array[u8, 4](); values[0] = 41u8; return values[0] as Int + 1; } meta effect(\"allocation\") verb boot(erg backing: Buffer) -> Int { erg length: u64 = 1u64; erg start: u64 = 0u64; erg count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg length, window_start: erg start, window_count: erg count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { drop(region); return 0; }, }; }\n";
@@ -94,6 +94,54 @@ fn referenced_undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
     symbols
 }
 
+fn undefined_symbols(bytes: &[u8]) -> BTreeSet<String> {
+    let file = object::File::parse(bytes).expect("parity object should parse");
+    let format = file.format();
+    file.symbols()
+        .filter(|symbol| symbol.is_undefined())
+        .filter_map(|symbol| symbol.name().ok().map(|name| canonical_symbol_name(format, name)))
+        .collect()
+}
+
+fn external_relocation_contract(bytes: &[u8], expected: &str) -> (Architecture, Vec<u8>) {
+    let file = object::File::parse(bytes).expect("parity object should parse");
+    let architecture = file.architecture();
+    let format = file.format();
+    let mut sizes = Vec::new();
+    for section in file.sections() {
+        for (_, relocation) in section.relocations() {
+            let RelocationTarget::Symbol(index) = relocation.target() else { continue };
+            let symbol = file.symbol_by_index(index).expect("relocation symbol should exist");
+            if symbol.name().ok().map(|name| canonical_symbol_name(format, name)).as_deref()
+                == Some(expected)
+            {
+                sizes.push(relocation.size());
+            }
+        }
+    }
+    sizes.sort_unstable();
+    (architecture, sizes)
+}
+
+fn assert_external_relocation_contract(bytes: &[u8], expected: &str) {
+    let (architecture, sizes) = external_relocation_contract(bytes, expected);
+    assert!(!sizes.is_empty(), "external relocation is missing for {expected}");
+    // Backends may encode the same external call differently on one target:
+    // AArch64 LLVM commonly uses CALL26 while Cranelift may materialize the
+    // address through two 32-bit relocations. The ABI contract is therefore
+    // symbol reachability plus a valid target relocation encoding, not byte-
+    // identical relocation records.
+    let valid_sizes = match architecture {
+        Architecture::Aarch64 => &[26u8, 32, 64][..],
+        Architecture::X86_64 => &[32u8, 64][..],
+        _ => &[8u8, 16, 26, 32, 64][..],
+    };
+    assert!(
+        sizes.iter().all(|size| valid_sizes.contains(size)),
+        "unsupported {architecture:?} relocation width for {expected}: {sizes:?}"
+    );
+}
+
 #[test]
 fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
     let mut statuses = Vec::new();
@@ -113,6 +161,277 @@ fn hosted_cli_backends_preserve_exit_status_and_buffer_ownership() {
         fs::remove_dir_all(root).expect("remove hosted parity fixture");
     }
     assert_eq!(statuses, vec![Some(42), Some(42)]);
+}
+
+#[test]
+fn hosted_cli_backends_emit_deterministic_objects() {
+    for backend in BACKENDS {
+        let root = fixture_root("deterministic-object", backend);
+        let input = write_fixture(&root, backend, None, None, SOURCE);
+        let first = root.join("first.o");
+        let second = root.join("second.o");
+        let first_build = build(&root, &input, &first, "obj");
+        let second_build = build(&root, &input, &second, "obj");
+        assert!(
+            first_build.status.success() && second_build.status.success(),
+            "{backend} deterministic object build failed: {} {}",
+            String::from_utf8_lossy(&first_build.stderr),
+            String::from_utf8_lossy(&second_build.stderr)
+        );
+        assert_eq!(
+            fs::read(&first).expect("read first deterministic object"),
+            fs::read(&second).expect("read second deterministic object"),
+            "{backend} object emission is not deterministic"
+        );
+        fs::remove_dir_all(root).expect("remove deterministic object fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_preserve_external_aggregate_provider_symbols() {
+    let source = "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; verb main() -> Int { erg point: Point = Point { x: 40i32, y: 2i32, }; return inspect(point: erg point); }\n";
+    let mut providers = Vec::new();
+    for backend in BACKENDS {
+        let root = fixture_root("external-aggregate", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main.o");
+        let build = build(&root, &input, &output, "obj");
+        assert!(
+            build.status.success(),
+            "{backend} external aggregate build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let bytes = fs::read(&output).expect("read external aggregate parity object");
+        providers.push(
+            undefined_symbols(&bytes)
+                .into_iter()
+                .filter(|symbol| symbol == "inspect")
+                .collect::<BTreeSet<_>>(),
+        );
+        assert_external_relocation_contract(&bytes, "inspect");
+        fs::remove_dir_all(root).expect("remove external aggregate parity fixture");
+    }
+    assert!(
+        providers[0].contains("inspect"),
+        "external provider symbol is missing: {:?}",
+        providers[0]
+    );
+    assert_eq!(providers[0], providers[1], "external aggregate provider symbols diverged");
+}
+
+#[test]
+fn hosted_cli_backends_preserve_checked_representation_provider_contracts() {
+    let fixtures = [
+        (
+            "packed",
+            "meta repr(C, packed) struct PackedPoint { prefix: u8, value: u32, } unsafe extern \"C\" verb inspect(erg point: PackedPoint) -> Int; verb main() -> Int { erg point: PackedPoint = PackedPoint { prefix: 1u8, value: 41u32, }; return inspect(point: erg point); }\n",
+        ),
+        (
+            "transparent",
+            "meta repr(transparent) struct UserId { value: u64, } unsafe extern \"C\" verb inspect(erg point: UserId) -> Int; verb main() -> Int { erg point: UserId = UserId { value: 42u64, }; return inspect(point: erg point); }\n",
+        ),
+        (
+            "aligned",
+            "meta repr(C, align(8u32)) struct AlignedValue { value: u8, } unsafe extern \"C\" verb inspect(erg point: AlignedValue) -> Int; verb main() -> Int { erg point: AlignedValue = AlignedValue { value: 42u8, }; return inspect(point: erg point); }\n",
+        ),
+    ];
+    for (fixture, source) in fixtures {
+        let mut provider_symbols = Vec::new();
+        for backend in BACKENDS {
+            let root = fixture_root(&format!("representation-{fixture}"), backend);
+            let input = write_fixture(&root, backend, None, None, source);
+            let output = root.join("main.o");
+            let build = build(&root, &input, &output, "obj");
+            assert!(
+                build.status.success(),
+                "{backend} {fixture} representation build failed: {}",
+                String::from_utf8_lossy(&build.stderr)
+            );
+            let bytes = fs::read(&output).expect("read representation parity object");
+            provider_symbols.push(
+                undefined_symbols(&bytes)
+                    .into_iter()
+                    .filter(|symbol| symbol == "inspect")
+                    .collect::<BTreeSet<_>>(),
+            );
+            assert_external_relocation_contract(&bytes, "inspect");
+            fs::remove_dir_all(root).expect("remove representation parity fixture");
+        }
+        assert!(
+            provider_symbols[0].contains("inspect"),
+            "{fixture} provider symbol is missing: {:?}",
+            provider_symbols[0]
+        );
+        assert_eq!(provider_symbols[0], provider_symbols[1], "{fixture} provider symbols diverged");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_preserve_checked_representation_return_contracts() {
+    let fixtures = [
+        (
+            "c",
+            "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb make() -> Point; verb main() -> Int { erg point = make(); return point.x as Int; }\n",
+        ),
+        (
+            "packed",
+            "meta repr(C, packed) struct PackedPoint { prefix: u8, value: u32, } unsafe extern \"C\" verb make() -> PackedPoint; verb main() -> Int { erg point = make(); return point.value as Int; }\n",
+        ),
+        (
+            "transparent",
+            "meta repr(transparent) struct UserId { value: u64, } unsafe extern \"C\" verb make() -> UserId; verb main() -> Int { erg point = make(); return point.value as Int; }\n",
+        ),
+        (
+            "aligned",
+            "meta repr(C, align(8u32)) struct AlignedValue { value: u8, } unsafe extern \"C\" verb make() -> AlignedValue; verb main() -> Int { erg point = make(); return point.value as Int; }\n",
+        ),
+    ];
+    for (fixture, source) in fixtures {
+        let mut provider_symbols = Vec::new();
+        for backend in BACKENDS {
+            let root = fixture_root(&format!("representation-return-{fixture}"), backend);
+            let input = write_fixture(&root, backend, None, None, source);
+            let output = root.join("main.o");
+            let build = build(&root, &input, &output, "obj");
+            assert!(
+                build.status.success(),
+                "{backend} {fixture} representation return build failed: {}",
+                String::from_utf8_lossy(&build.stderr)
+            );
+            let bytes = fs::read(&output).expect("read representation return parity object");
+            provider_symbols.push(
+                undefined_symbols(&bytes)
+                    .into_iter()
+                    .filter(|symbol| symbol == "make")
+                    .collect::<BTreeSet<_>>(),
+            );
+            assert_external_relocation_contract(&bytes, "make");
+            fs::remove_dir_all(root).expect("remove representation return parity fixture");
+        }
+        assert!(
+            provider_symbols[0].contains("make"),
+            "{fixture} return provider symbol is missing: {:?}",
+            provider_symbols[0]
+        );
+        assert_eq!(
+            provider_symbols[0], provider_symbols[1],
+            "{fixture} return provider symbols diverged"
+        );
+    }
+}
+
+#[test]
+fn hosted_cli_backends_preserve_typed_failure_exit_status() {
+    let source = "enum Failure { Rejected, } verb reject() -> Result[Int, Failure] { return Err(Failure.Rejected); } verb main() -> Int { erg result = reject(); return case dat result { Result.Err(_) => 42, Result.Ok(_) => 1, }; }\n";
+    let mut statuses = Vec::new();
+    for backend in BACKENDS {
+        let root = fixture_root("typed-failure", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main");
+        let build = build(&root, &input, &output, "exe");
+        assert!(
+            build.status.success(),
+            "{backend} typed-failure build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        statuses.push(Command::new(&output).status().expect("run typed-failure fixture").code());
+        fs::remove_dir_all(root).expect("remove typed-failure parity fixture");
+    }
+    assert_eq!(statuses, vec![Some(42), Some(42)]);
+}
+
+#[test]
+fn hosted_cli_backends_reject_the_same_semantic_failure_before_object_emission() {
+    let source = "verb main() -> Int { return missing_verb(); }\n";
+    for backend in BACKENDS {
+        let root = fixture_root("semantic-failure", backend);
+        let input = write_fixture(&root, backend, None, None, source);
+        let output = root.join("main.o");
+        let build = build(&root, &input, &output, "obj");
+        assert!(!build.status.success(), "{backend} must reject the unknown call");
+        let diagnostics = format!(
+            "{}{}",
+            String::from_utf8_lossy(&build.stdout),
+            String::from_utf8_lossy(&build.stderr)
+        );
+        assert!(
+            diagnostics.contains("E1069"),
+            "{backend} changed the semantic diagnostic: {diagnostics}"
+        );
+        assert!(!output.exists(), "{backend} emitted an object after semantic rejection");
+        fs::remove_dir_all(root).expect("remove semantic failure fixture");
+    }
+}
+
+#[test]
+fn hosted_cli_backends_reject_the_same_contract_failures_before_object_emission() {
+    let fixtures = [
+        (
+            "must-use",
+            "meta must_use(\"check the status\") verb status() -> Int { return 0; } verb main() -> Int { status(); return 0; }\n",
+            "E1120",
+        ),
+        (
+            "effect",
+            "meta effect(\"filesystem\") verb load() -> Int { return 0; } verb main() -> Int { load(); return 0; }\n",
+            "E1121",
+        ),
+        (
+            "capability",
+            "meta capability(\"posix.cloexec\") verb primitive() -> Int { return 0; } verb main() -> Int { primitive(); return 0; }\n",
+            "E1131",
+        ),
+        (
+            "deterministic",
+            "meta effect(\"filesystem\") verb source() -> Int { return 0; } meta deterministic verb stable() -> Int { source(); return 0; }\n",
+            "E1124",
+        ),
+        ("realtime", "meta realtime verb tick() -> Int { loop { break; } return 0; }\n", "E1126"),
+        (
+            "bounded",
+            "meta bounded(max_iterations: 3u32) verb main() -> Int { for erg index: u32 in 0u32..4u32 { } return 0; }\n",
+            "E1130",
+        ),
+        ("parser", "verbb main() -> Int { return 0; }\n", "E0009"),
+        ("unknown-type", "verb main() -> Missing { return 0; }\n", "E1023"),
+        ("unknown-verb", "verb main() -> Int { missing(); return 0; }\n", "E1069"),
+        ("undeclared-identifier", "verb main() -> Int { return missing; }\n", "E1003"),
+        (
+            "use-after-move",
+            "unsafe extern \"C\" verb inspect(abs view: Buffer); verb consume(dat packet: Buffer) { drop(packet); } verb main() -> Int { erg buffer = Buffer[1]; consume(packet: dat buffer); inspect(view: abs buffer); return 0; }\n",
+            "E1005",
+        ),
+        (
+            "exclusive-loan-alias",
+            "verb merge_slots(ins left: Int, ins right: Int) { } verb main() -> Int { erg values: Array[Int, 4] = Array[Int, 4](); merge_slots(left: ins values[0], right: ins values[1]); return 0; }\n",
+            "E1065",
+        ),
+        (
+            "missing-module",
+            "import { open missing::module }; verb main() -> Int { return 0; }\n",
+            "E1101",
+        ),
+    ];
+    for (fixture, source, expected_code) in fixtures {
+        for backend in BACKENDS {
+            let root = fixture_root(&format!("contract-failure-{fixture}"), backend);
+            let input = write_fixture(&root, backend, None, None, source);
+            let output = root.join("main.o");
+            let build = build(&root, &input, &output, "obj");
+            assert!(!build.status.success(), "{backend} must reject {fixture}");
+            let diagnostics = format!(
+                "{}{}",
+                String::from_utf8_lossy(&build.stdout),
+                String::from_utf8_lossy(&build.stderr)
+            );
+            assert!(
+                diagnostics.contains(expected_code),
+                "{backend} changed {fixture} diagnostic: {diagnostics}"
+            );
+            assert!(!output.exists(), "{backend} emitted an object for {fixture}");
+            fs::remove_dir_all(root).expect("remove contract failure fixture");
+        }
+    }
 }
 
 #[test]
@@ -365,6 +684,7 @@ fn freestanding_cli_backends_share_large_aggregate_failure_class() {
                 || diagnostics.contains("implicit heap allocation"),
             "{backend} failure class changed: {diagnostics}"
         );
+        assert!(!output.exists(), "{backend} emitted an object after allocation rejection");
         fs::remove_dir_all(root).expect("remove failure parity fixture");
     }
 }
@@ -388,6 +708,36 @@ fn freestanding_cli_backends_reject_float_at_shared_target_boundary() {
                 .contains("floating-point values are forbidden by the freestanding target profile"),
             "{backend} float policy diagnostic changed: {diagnostics}"
         );
+        assert!(!output.exists(), "{backend} emitted an object after float rejection");
         fs::remove_dir_all(root).expect("remove freestanding float fixture");
+    }
+}
+
+#[test]
+fn freestanding_cli_backends_reject_hosted_services_before_codegen() {
+    let services = [
+        ("fs", "import { open std::fs }; verb boot() -> Int { return 0; }\n"),
+        ("time", "import { open std::time }; verb boot() -> Int { return 0; }\n"),
+        ("process", "import { open std::process }; verb boot() -> Int { return 0; }\n"),
+    ];
+    for (service, source) in services {
+        for backend in BACKENDS {
+            let root = fixture_root(&format!("hosted-service-failure-{service}"), backend);
+            let input = write_fixture(&root, backend, Some("thumbv7em-none-eabihf"), None, source);
+            let output = root.join("main.o");
+            let build = build(&root, &input, &output, "obj");
+            assert!(!build.status.success(), "{backend} must reject hosted std::{service}");
+            let diagnostics = format!(
+                "{}{}",
+                String::from_utf8_lossy(&build.stdout),
+                String::from_utf8_lossy(&build.stderr)
+            );
+            assert!(
+                diagnostics.contains("E1112"),
+                "{backend} changed std::{service} target rejection: {diagnostics}"
+            );
+            assert!(!output.exists(), "{backend} emitted an object for hosted std::{service}");
+            fs::remove_dir_all(root).expect("remove hosted-service failure fixture");
+        }
     }
 }

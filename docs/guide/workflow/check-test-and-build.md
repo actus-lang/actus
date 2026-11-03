@@ -115,9 +115,27 @@ actus run --backend cranelift
 actus run --backend llvm
 ```
 
+LLVM is the default backend of the standard Actus compiler build. Therefore
+these commands use the same backend when no project manifest overrides
+`build.backend`:
+
+```sh
+actus build --emit obj
+actus build --backend llvm --emit obj
+```
+
+Use `build.backend = "cranelift"` in `Actus.toml`, or pass
+`--backend cranelift`, when the project explicitly requires the compatibility
+backend. The override is validated before emission. If the compiler binary
+was built without the requested feature, the command fails and does not switch
+to another backend. The same rule applies to `actus run`.
+
 The selected backend must be enabled in the compiler build and compatible with
 the selected target. The backend name is recorded in native artifact metadata,
 so switching backends invalidates a stale artifact instead of reusing it.
+That metadata also includes the target contract, profile, runtime, source-limit
+policy, and runtime identity, so changing any of those inputs triggers the
+same stale-artifact protection.
 
 Record exact failures. Do not call a build successful when a later native link,
 execution, target, or hardware step has not run.

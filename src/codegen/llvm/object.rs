@@ -1,6 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::ptr;
+use std::sync::Once;
 
 use llvm_sys::core::{
     LLVMDisposeMemoryBuffer, LLVMDisposeMessage, LLVMGetBufferSize, LLVMGetBufferStart,
@@ -14,6 +15,8 @@ use llvm_sys::target_machine::{
 
 use super::super::BackendEmitError;
 use crate::target::TargetSpec;
+
+static LLVM_TARGETS_INITIALIZED: Once = Once::new();
 
 pub(super) fn emit_object(
     module: llvm_sys::prelude::LLVMModuleRef,
@@ -101,12 +104,12 @@ pub(super) fn emit_object_bytes(
 }
 
 fn initialize_targets() -> Result<(), BackendEmitError> {
-    unsafe {
+    LLVM_TARGETS_INITIALIZED.call_once(|| unsafe {
         llvm_sys::target::LLVM_InitializeAllTargetInfos();
         llvm_sys::target::LLVM_InitializeAllTargets();
         llvm_sys::target::LLVM_InitializeAllTargetMCs();
         llvm_sys::target::LLVM_InitializeAllAsmPrinters();
-    }
+    });
     Ok(())
 }
 

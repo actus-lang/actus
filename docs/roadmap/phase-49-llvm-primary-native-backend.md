@@ -2,12 +2,12 @@
 
 ## Status
 
-In progress. The complete backend baseline and the initial LLVM type-contract
-hardening are complete; the next work is shared-contract lowering. LLVM
-remains opt-in and the
-default backend remains Cranelift until the shared-contract, target, runtime,
-and parity work below is complete. No metadata contract is changed by this
-plan.
+In progress. The complete backend baseline, shared-contract lowering, target
+contracts, runtime contracts, parity evidence, and default selection change
+are complete through the current migration checks. LLVM is now the default
+native backend while Cranelift remains explicitly available during the
+compatibility period. No Actus source, ownership, runtime, or serialized-data
+contract is changed by this plan.
 
 ## Objective
 
@@ -57,7 +57,7 @@ The compiler integration surface is feature-gated through `Cargo.toml`,
 test target `tests/codegen/llvm/backend.rs`. The current policy is:
 
 - LLVM feature: `llvm-sys 231.0.0` with strict versioning;
-- default feature: `cranelift`;
+- default feature: `llvm`;
 - LLVM-only focused backend suite: `34 passed, 0 failed`;
 - LLVM-only library suite: `148 passed, 0 failed`;
 - defensive invalid-type path: `src/codegen/llvm/values.rs`, which rejects
@@ -230,8 +230,8 @@ is covered by the LLVM backend suite.
 
 ### 49.3 — Runtime, FFI, and target contracts
 
-- [ ] Verify all runtime bridge signatures and failure statuses through LLVM.
-- [ ] Verify external C declarations, checked representations, aggregate
+- [x] Verify all runtime bridge signatures and failure statuses through LLVM.
+- [x] Verify external C declarations, checked representations, aggregate
       passing, aggregate returns, and calling-convention contracts.
 - [x] Complete hosted target object/link/execute coverage.
 - [x] Complete freestanding object and link-contract coverage where startup,
@@ -246,15 +246,19 @@ standard library with the native runtime's exported C providers, including
 parameter arity. The only permitted arity difference is the one caller-owned
 return slot required by the established aggregate `sret` ABI. It also lowers
 all hosted standard-library facades through strict LLVM object emission with
-no-float verification enabled. Representative failure statuses execute
-through LLVM, including invalid handles, invalid process indexes, invalid path
-storage, empty-buffer bounds, malformed UTF-8 rejection, and valid-byte
-preservation. A hosted C-provider fixture links and executes both a `repr(C)`
-aggregate parameter and an aggregate return through the LLVM-produced object,
-proving the pointer and `sret` ABIs at a real C boundary rather than only in
-generated IR text. A hosted executable fixture also constructs, mutates, and
-observes packed, transparent, explicitly aligned, and payload-enum values
-through LLVM, so these checked representations are exercised at runtime.
+no-float verification enabled. The executable runtime-status matrix covers
+the deterministic success, boundary, and failure contracts for process
+arguments, UTF-8 string access, buffer capacity and clearing, cursor bounds,
+and restricted blocking contexts. The existing filesystem, path, directory,
+region, stream, clock, and locking fixtures remain part of the same LLVM
+bridge suite, so status values are checked at the native boundary rather than
+only in Rust unit tests. A hosted C-provider fixture links and executes both
+a `repr(C)` aggregate parameter and an aggregate return through the
+LLVM-produced object, proving the pointer and `sret` ABIs at a real C boundary
+rather than only in generated IR text. A hosted executable fixture also
+constructs, mutates, and observes packed, transparent, explicitly aligned,
+and payload-enum values through LLVM, so these checked representations are
+exercised at runtime.
 The CI matrix now invokes the LLVM bridge suite explicitly on Ubuntu, macOS,
 and Windows; target-specific native-provider fixtures remain guarded by their
 actual host contract instead of being treated as portable evidence.
@@ -294,36 +298,138 @@ permission.
 
 ### 49.4 — Backend parity and regression hardening
 
-- [ ] Run the shared semantic and negative fixture matrix through both
+- [x] Run the shared semantic and negative fixture matrix through both
       backends wherever both target contracts support the fixture.
-- [ ] Compare deterministic outputs, object symbols, ABI layouts, exit status,
+- [x] Compare deterministic outputs, object symbols, ABI layouts, exit status,
       cleanup behavior, and typed failures.
-- [ ] Add regressions for every LLVM failure found during the inventory.
-- [ ] Verify that unsupported operations fail before invalid object emission.
-- [ ] Run source limits, formatter, documentation, dependency, and security
+- [x] Add regressions for every LLVM failure found during the inventory.
+- [x] Verify that unsupported operations fail before invalid object emission.
+- [x] Run source limits, formatter, documentation, dependency, and security
       checks in every supported CI configuration.
 
 #### 49.4 current parity evidence
 
-The backend-parity suite currently passes 12/12 fixtures on Unix hosts with
+The backend-parity suite currently passes 20/20 tests on Unix hosts with
 both backends enabled. It compares hosted exit status and buffer ownership,
 directory cleanup and deterministic order, qualified imports, generic calls,
-aggregate and enum construction, named array constants, and hosted float
-behavior. Freestanding fixtures compare exported symbols, zero-float evidence,
-large-aggregate rejection, and shared target diagnostics. This is useful
-regression evidence, but it does not yet close the complete semantic and
-negative fixture matrix or the full ABI-layout comparison checkbox.
+aggregate and enum construction, named array constants, typed failures, and
+hosted float behavior. It also verifies deterministic object bytes, compares
+source-declared external aggregate provider symbols and relocation sizes, and
+checks the external provider contract for `repr(C, packed)`,
+`repr(transparent)`, and `repr(C, align(...))` aggregates.
+The same checked representations are also exercised through external return
+boundaries, so parameter and return relocation contracts must agree across
+both backends.
+It also verifies that the same semantic or target rejection occurs before
+either backend emits an object. Freestanding fixtures compare exported symbols,
+zero-float evidence, large-aggregate rejection, hosted-service rejection for
+`std::fs`, `std::time`, and `std::process`, and shared target diagnostics. This
+is stronger regression evidence. The full
+`cargo test --all-targets --all-features` suite also passes, including the
+shared lowering, FFI, LLVM object, target filtering, source-limit, and
+standard-library suites. The unsupported-operation contract is therefore
+closed for the covered semantic and target fixtures: both backends reject
+before object emission and leave no invalid artifact behind.
+
+The remaining 49.4 work is limited to LLVM-specific regression inventory and
+the supported CI configuration checks; the cross-backend output, symbol,
+cleanup, typed-failure, and checked ABI boundary comparison is covered.
+
+The current semantic-contract matrix additionally covers `must_use`, effect,
+capability, deterministic, realtime, and bounded-contract failures, plus
+parser, unknown-type, and unknown-verb failures. Each failure is compared
+across both backends, checks the stable diagnostic code, and asserts that no
+object is emitted. This closes the shared semantic and negative fixture matrix
+for the currently supported hosted and freestanding target contracts.
+
+The LLVM inventory regression suite passes 98/98 tests together with the
+shared 106-test codegen suite. It includes stable regressions for non-native
+integer widths, recursive calls, enum equality, zero-float rejection,
+runtime status boundaries, checked representations, aggregate return slots,
+cleanup ordering, and target-specific object/link contracts.
+
+The final quality-check contract is also complete. The source-limit,
+formatter, documentation, standard-library, architecture, secrets, and
+dependency/security checks pass locally; `cargo check --all-targets
+--all-features` and strict clippy pass as well. The explicit CI backend
+configurations pass with Cranelift enabled and LLVM enabled, including the
+LLVM backend suite. The CI workflow applies the corresponding Rust, backend,
+standard-library, source-limit, and security checks across its hosted Linux,
+macOS, and Windows matrix, with target-specific LLVM jobs kept explicit.
+No unsupported platform result is inferred from a different host, and no
+later default-backend migration work is included in this acceptance check.
+
+The fail-closed target matrix separately verifies floating-point policy,
+hosted-service imports, and unsupported large aggregates on freestanding
+targets. Each case is rejected by both backends before an object is emitted;
+the hosted semantic-contract matrix applies the same no-artifact rule to
+frontend contract failures.
 
 ### 49.5 — Default selection migration
 
-- [ ] Change the default Cargo feature and backend selection only after all
+- [x] Change the default Cargo feature and backend selection only after all
       prior acceptance work passes.
-- [ ] Update backend support documentation, configuration examples, help text,
+- [x] Update backend support documentation, configuration examples, help text,
       artifact metadata, and clean-checkout instructions.
-- [ ] Verify explicit Cranelift selection and rollback from a clean checkout.
-- [ ] Measure and record compile time, artifact size, cache behavior, and
+- [x] Verify explicit Cranelift selection and rollback from a clean checkout.
+- [x] Measure and record compile time, artifact size, cache behavior, and
       relevant native execution evidence.
-- [ ] Run the complete default-LLVM suite before declaring the migration ready.
+- [x] Run the complete default-LLVM suite before declaring the migration ready.
+
+#### 49.5 default selection evidence
+
+The default Cargo feature now selects LLVM, and the backend configuration
+selects LLVM whenever the LLVM feature is available. The explicit
+Cranelift-only feature configuration retains Cranelift as its default, so the
+compatibility backend remains available without changing Actus source code.
+Configuration regression tests cover both feature configurations. CLI help,
+support documentation, and clean-checkout rollback instructions are covered
+by this documentation check; compatibility measurements and release-artifact
+work are now separated: the measurements are recorded below, while
+release-artifact work remains intentionally open under the subsequent 49.5
+check.
+
+The backend support guide, native-build guide, workflow reference, manifest
+reference, README, and CLI help now describe LLVM as the default and Cranelift
+as an explicit compatibility choice. They document feature requirements,
+manifest and command-line precedence, target validation, unavailable-backend
+errors, artifact metadata invalidation, clean-checkout verification, and
+source-preserving rollback. The existing artifact metadata contract already
+records the selected backend together with target, profile, runtime,
+source-limit, compiler, and runtime identity fields; the documentation now
+describes that contract rather than introducing a second cache mechanism.
+
+Clean-target verification was performed with separate compiler target
+directories. An all-features compiler selected LLVM by default and emitted a
+strict object; the same compiler emitted a second strict object when passed
+`--backend cranelift`. A compiler built with only the `cranelift` feature
+selected Cranelift by default and emitted the same source successfully. The
+same Cranelift-only compiler rejected an explicit LLVM request with the typed
+unavailable-backend diagnostic before object emission, and no rejected object
+was created. This demonstrates both source-preserving rollback and the
+fail-closed no-fallback rule from a clean build state.
+
+The reproducible host measurements are recorded in
+`docs/benchmarks/phase-49-default-backend-2026-11-02.md`. On the recorded
+Linux x86-64 host with Rust 1.98.0, LLVM 23.1.3, and one Cargo build job, the
+clean LLVM compiler build took 22.909 seconds and the Cranelift-only build
+took 47.952 seconds. Warm no-source-change rebuilds took 57 ms and 38 ms,
+respectively. The LLVM debug compiler and target directory measured
+101,954,824 and 864,763,890 bytes; the Cranelift measurements were
+177,938,504 and 1,380,849,377 bytes. Both backends built and ran
+`examples/hello.act`, returned the expected exit code 42, and completed native
+build/run in 41/2 ms and 37/2 ms. These results are host evidence only and do
+not claim release, cross-platform, embedded, or production performance.
+
+The complete default-LLVM all-targets suite then passed with exit code 0 after
+updating two architecture assertions that still encoded the former
+Cranelift-default policy. The final run covered the compiler unit suite,
+architecture and configuration contracts, CLI and strict workflows, shared
+codegen, LLVM backend emission, FFI, filesystem, time, I/O, Region, Wire,
+standard-library visibility/conformance, source limits, semantic diagnostics,
+and target contracts. The assertions now verify that LLVM is the default
+feature while Cranelift remains optional and explicitly selectable. No source
+language, ownership, cleanup, runtime, or serialized-data behavior changed.
 
 ## Non-negotiable invariants
 

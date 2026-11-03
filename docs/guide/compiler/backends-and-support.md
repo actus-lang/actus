@@ -1,9 +1,15 @@
 # Backends and support matrix
 
-Actus has two native emitters. They are selected at build time, after parsing,
-semantic analysis, ownership checking, generic specialization, and shared
-lowering. Backend selection therefore changes machine emission, not Actus
-source semantics or ownership rules.
+Actus has two native emitters. LLVM is the default native backend; Cranelift
+remains an explicit compatibility backend. The emitter is selected after
+parsing, semantic analysis, ownership checking, generic specialization, and
+shared lowering. Backend selection therefore changes machine emission, not
+Actus source semantics, ownership roles, cleanup rules, or serialized data.
+
+Both backends consume the same checked semantic and lowering contract. A
+backend change is therefore not a change to the language's ownership model or
+to the meaning of an Actus program; it changes only the final native emission
+and target-linking path.
 
 ## Installation and availability
 
@@ -11,17 +17,26 @@ The compiler feature set controls which emitters are available:
 
 | Backend | Cargo feature | Version in this repository | External requirement |
 | --- | --- | --- | --- |
-| Cranelift | `cranelift` (default) | `0.136.2` | Rust/Cargo only |
-| LLVM | `llvm` | `llvm-sys 231.0.0` | LLVM 23.x installation and matching `LLVM_SYS_231_PREFIX` |
+| LLVM | `llvm` (default) | `llvm-sys 231.0.0` | LLVM 23.x installation and matching `LLVM_SYS_231_PREFIX` |
+| Cranelift | `cranelift` (explicit) | `0.137.0` | Rust/Cargo only |
 
-The default build enables Cranelift. An LLVM-only compiler can be built with:
+The default build enables LLVM and therefore requires the matching LLVM
+toolchain:
 
 ```sh
-cargo build --no-default-features --features llvm --bin actus
+cargo build --bin actus
 ```
 
-An installation with both emitters enabled is the normal parity-validation
-configuration:
+For a compiler installation that deliberately avoids LLVM, build the explicit
+Cranelift-only variant:
+
+```sh
+cargo build --no-default-features --features cranelift --bin actus
+```
+
+An installation with both emitters enabled is the parity-validation and
+development configuration. LLVM remains the default in that configuration;
+Cranelift is selected only by an explicit manifest or command-line override:
 
 ```sh
 cargo build --all-features --bin actus
@@ -32,9 +47,25 @@ installation must provide the version selected by `llvm-sys`, and the native
 linker and target libraries must be available for the requested target.
 Cranelift does not require a system LLVM installation. A backend that was not
 compiled into the `actus` binary is rejected with a typed availability error;
-the compiler never silently switches to the other backend.
+the compiler never silently switches to the other backend. Enabling both
+features does not create an implicit fallback; it only makes both backends
+available for explicit selection.
 
 ## Selecting a backend
+
+The selection order is explicit and deterministic:
+
+1. a valid `--backend` command-line option overrides the project default for
+   that invocation;
+2. otherwise, `build.backend` in `Actus.toml` selects the project backend;
+3. when neither is present, the compiler uses LLVM, the default enabled
+   backend;
+4. in a Cranelift-only compiler build, Cranelift becomes the available default
+   because LLVM is not compiled into that binary.
+
+An explicit selection is validated against the compiler feature set and the
+target contract. An unavailable selection is an error, not a request to try a
+different backend.
 
 The backend may be selected in `Actus.toml`:
 
@@ -45,6 +76,10 @@ target = "x86_64-unknown-linux-gnu"
 runtime = "std"
 ```
 
+To pin the compatibility backend for the same project, use
+`backend = "cranelift"`. This changes only native emission; it does not alter
+Actus source syntax, ownership roles, cleanup behavior, or serialized data.
+
 It may also be overridden for one invocation:
 
 ```sh
@@ -54,9 +89,17 @@ actus build --backend llvm --emit exe -o build/app
 
 The selected backend is recorded in native artifact metadata. Changing it
 invalidates stale generated artifacts rather than reusing an object emitted by
-the other backend. Use `actus build --emit obj` when inspecting object symbols
-or freestanding imports; use `actus build --emit exe` only when the target's
-entry, runtime, and linker contract is complete.
+the other backend. The sidecar metadata records compiler and toolchain
+identity, backend, target triple and target-contract hash, profile, runtime,
+source-limit policy, and runtime version/checksum when applicable. The build
+graph compares these fields before reusing an artifact. A backend, target,
+runtime, profile, or incompatible toolchain change therefore invalidates the
+generated artifact family and causes a rebuild.
+
+Use `actus build --emit obj` when inspecting object symbols or freestanding
+imports. Use `actus build --emit exe` only when the target's entry, runtime,
+and linker contract is complete. An object emitted by one backend is not
+evidence that the other backend can link or execute the same target.
 
 ## Supported target profiles
 
@@ -125,14 +168,52 @@ classify it as semantic, module visibility, shared lowering, backend emission,
 runtime linkage, target configuration, or external linker failure. A linker
 error must not be used to hide a missing shared contract.
 
+## Clean checkout and backend verification
+
+Use a clean checkout when validating an installation or investigating a
+backend-selection problem. This separates toolchain availability from stale
+objects left in an older target directory:
+
+```sh
+git clone <repository-url> actus-clean
+cd actus-clean
+git checkout <revision>
+cargo build --bin actus
+./target/debug/actus check examples/hello.act --strict
+./target/debug/actus test --strict
+```
+
+The default build in this checkout is LLVM. Before the first Cargo command,
+install LLVM 23.x for the host and expose the matching installation through
+`LLVM_SYS_231_PREFIX` when `llvm-config` is not already discoverable. The
+variable only tells `llvm-sys` where LLVM is installed; it does not install
+LLVM, the native linker, system libraries, or a target SDK.
+
+To validate the compatibility path from the same clean checkout, use a
+separate target directory and disable default features:
+
+```sh
+CARGO_TARGET_DIR=target-cranelift \
+  cargo build --no-default-features --features cranelift --bin actus
+CARGO_TARGET_DIR=target-cranelift \
+  cargo test --no-default-features --features cranelift --all-targets -- --test-threads=1
+```
+
+Do not copy objects between these target directories. The compiler records the
+backend in artifact metadata, while separate directories also make the chosen
+toolchain visible in local and CI logs.
+
 ## Rollback and compatibility
 
-The migration did not change Actus source syntax, ownership roles, serialized
-runtime layouts, or public standard-library contracts. To roll back backend
-selection, remove the `backend = "llvm"` override or select
-`backend = "cranelift"`; rebuild the artifact so its metadata matches the
-selected backend. The original pre-LLVM Cranelift checkpoint remains
-recoverable at commit `b886bbc66731675e660d10d9d4ae99cd8e5f1524`.
+The migration does not change Actus source syntax, ownership roles,
+serialized runtime layouts, or public standard-library contracts. To roll back
+the native emitter for a project, set `backend = "cranelift"` in
+`Actus.toml`, or pass `--backend cranelift` for one build/run. The compiler
+must have been built with the `cranelift` feature. Rebuild the artifact so its
+metadata matches the selected backend; no source rewrite or serialized-data
+migration is required. For a toolchain-level rollback, build Actus with
+`--no-default-features --features cranelift`. This is an explicit rollback,
+not a silent fallback.
 
 This document records supported evidence, not a claim that every Actus program
 or every target triple is complete. New target or runtime support requires its

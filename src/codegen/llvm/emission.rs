@@ -7,9 +7,38 @@ use crate::target::TargetSpec;
 
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.
 pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
+    validate_integer_only_signature(module)?;
     let (_context, owned_module) = lower_module(module, usize::BITS as u8)?;
     verify_module(owned_module.raw)?;
     print_module(owned_module.raw)
+}
+
+fn validate_integer_only_signature(module: &BackendModule) -> Result<(), BackendEmitError> {
+    for function in &module.functions {
+        reject_float_signature(function.symbol.as_str(), function.return_value.ty)?;
+        for parameter in &function.parameters {
+            reject_float_signature(function.symbol.as_str(), parameter.ty)?;
+        }
+    }
+    for external in &module.externals {
+        reject_float_signature(external.symbol.as_str(), external.return_value.ty)?;
+        for parameter in &external.parameters {
+            reject_float_signature(external.symbol.as_str(), parameter.ty)?;
+        }
+    }
+    Ok(())
+}
+
+fn reject_float_signature(
+    symbol: &str,
+    ty: super::super::BackendValueType,
+) -> Result<(), BackendEmitError> {
+    if matches!(ty, super::super::BackendValueType::Float { .. }) {
+        return Err(BackendEmitError(format!(
+            "LLVM integer-only emission rejects floating-point type in `{symbol}`"
+        )));
+    }
+    Ok(())
 }
 
 /// Emits a validated backend-neutral module as a target-specific object file.

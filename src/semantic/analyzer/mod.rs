@@ -20,6 +20,7 @@ pub(crate) use expressions::case_branch_type;
 pub(crate) use state::{Analyzer, ScopeFrame};
 pub(crate) use validation::{
     canonical_type_name, expression_span, is_origin_return_expression, try_type_mismatch,
+    type_contains_float, type_name_text_contains_float,
 };
 
 pub(crate) fn validate_bounded_recursion(

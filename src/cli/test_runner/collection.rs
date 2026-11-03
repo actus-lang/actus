@@ -17,6 +17,7 @@ use super::TestOptions;
 pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
     pub(super) module: String,
+    pub(super) display_module: String,
     pub(super) relative_path: PathBuf,
     pub(super) name: String,
     pub(super) program: Program,
@@ -41,18 +42,44 @@ pub(super) fn collect_tests(
     configuration: &CompilerConfiguration,
     options: &TestOptions,
 ) -> Result<TestCollection, String> {
-    let resolver = ModuleResolver::with_dependencies_and_runtime(
-        configuration.source_root(),
-        configuration.dependency_roots(),
-        configuration.runtime_source_root(),
-        configuration.runtime_module_roots(),
-    );
+    if files.is_empty() {
+        return Ok(TestCollection { tests: Vec::new(), filtered: 0 });
+    }
+    let worker_count =
+        std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(files.len());
+    let chunk_size = files.len().div_ceil(worker_count);
+    let chunks = files.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
+    let results = std::thread::scope(|scope| {
+        chunks
+            .into_iter()
+            .map(|chunk| {
+                let configuration = configuration.clone();
+                let options = options.clone();
+                scope.spawn(move || {
+                    let resolver = ModuleResolver::with_dependencies_and_runtime(
+                        configuration.source_root(),
+                        configuration.dependency_roots(),
+                        configuration.runtime_source_root(),
+                        configuration.runtime_module_roots(),
+                    );
+                    chunk
+                        .into_iter()
+                        .map(|path| collect_file_tests(&path, &configuration, &options, &resolver))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|handle| handle.join().expect("test collection worker panicked"))
+            .collect::<Result<Vec<_>, _>>()
+    })?;
     let mut tests = Vec::new();
     let mut filtered = 0;
-    for path in files {
-        let collected = collect_file_tests(&path, configuration, options, &resolver)?;
-        tests.extend(collected.tests);
-        filtered += collected.filtered;
+    for collected_files in results {
+        for collected in collected_files {
+            tests.extend(collected.tests);
+            filtered += collected.filtered;
+        }
     }
     tests.sort_by(|left, right| left.path.cmp(&right.path).then(left.name.cmp(&right.name)));
     Ok(TestCollection { tests, filtered })
@@ -301,6 +328,7 @@ fn discover_tests(
                 Some(DiscoveredTest {
                     path: path.to_path_buf(),
                     module: if module.is_empty() { "<root>".to_owned() } else { module.to_owned() },
+                    display_module: display_module(module, relative_path),
                     relative_path: relative_path.to_path_buf(),
                     name: verb.name.clone(),
                     program: program.clone(),
@@ -314,6 +342,31 @@ fn discover_tests(
             _ => None,
         })
         .collect()
+}
+
+fn display_module(module: &str, relative_path: &Path) -> String {
+    if !module.is_empty() {
+        return module.to_owned();
+    }
+    let mut parts = relative_path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    if let Some(last) = parts.last_mut()
+        && let Some((stem, _)) = last.rsplit_once('.')
+    {
+        *last = stem.to_owned();
+    }
+    parts
+        .into_iter()
+        .map(|part| {
+            part.chars()
+                .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
+                .collect::<String>()
+        })
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("::")
 }
 
 fn test_matches(test: &DiscoveredTest, options: &TestOptions) -> bool {

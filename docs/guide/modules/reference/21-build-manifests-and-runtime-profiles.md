@@ -19,6 +19,7 @@ profile = "debug"
 runtime = "std"
 native_module = "actus"
 position_independent = true
+# Optional: backend = "llvm" or backend = "cranelift"
 
 [dependencies]
 ```
@@ -44,3 +45,10 @@ configuration, not hard-coded language types. Future ARM Cortex, RISC-V,
 STM32, RP, WASM, or other profiles must be added through target manifests and
 backend/runtime contracts rather than by changing the meaning of `u32`,
 `Buffer`, or `pack` in source.
+
+The default native backend is LLVM. Most projects should omit `backend` and
+accept that default. Set `backend = "llvm"` when making the choice explicit in
+the project manifest, or set `backend = "cranelift"` when the compatibility
+backend is required and the compiler was built with its feature. A manifest
+selection is not a fallback declaration: an unavailable backend is rejected
+before native emission.

@@ -34,6 +34,9 @@ pub(crate) fn descriptor_applies(
     if !matches!(bridge, super::super::super::BackendCleanupBridge::AggregateDrop { .. }) {
         return true;
     }
+    if descriptor.field.is_none() && !provider.is_heap_owned_aggregate(value) {
+        return false;
+    }
     let actual = match provider.value_type(value) {
         Some(super::super::super::BackendValueType::Aggregate { layout })
         | Some(super::super::super::BackendValueType::Region { layout }) => Some(layout),

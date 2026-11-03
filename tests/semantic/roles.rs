@@ -54,6 +54,22 @@ fn requires_role_and_performance_capability_contracts_to_match() {
 }
 
 #[test]
+fn requires_role_and_performance_deterministic_contracts_to_match() {
+    let valid = "struct File { value: Int, } role Writer { meta deterministic verb write(abs self: File) -> Int; } perform Writer for File { meta deterministic verb write(abs self: File) -> Int { return self.value; } }";
+    analyze_source(valid).expect("matching deterministic contracts should pass");
+
+    let missing = "struct File { value: Int, } role Writer { meta deterministic verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value; } }";
+    let error = analyze_source(missing)
+        .expect_err("an implementation must preserve a deterministic role contract");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::RoleMethodDeterministicMismatch { ref role, ref method }
+            if role == "Writer" && method == "write"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1136");
+}
+
+#[test]
 fn requires_role_and_performance_must_use_contracts_to_match() {
     let valid = "struct File { value: Int, } role Writer { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int; } perform Writer for File { meta must_use(\"inspect the write result\") verb write(abs self: File) -> Int { return 1; } } verb main() -> Int { erg file = File { value: 1, }; abs view = ref file; return view.write(); }";
     analyze_source(valid).expect("matching role and implementation must-use contracts should pass");

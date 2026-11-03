@@ -166,18 +166,18 @@ fn rejects_llvm_backend_when_the_feature_is_disabled() {
     let _ = fs::remove_file(path);
 }
 
-#[cfg(feature = "cranelift")]
+#[cfg(feature = "llvm")]
 #[test]
-fn defaults_to_cranelift_as_the_native_backend() {
-    let configuration = CompilerConfiguration::from_environment();
-    assert_eq!(configuration.native_backend().backend(), BackendKind::Cranelift);
-}
-
-#[cfg(all(not(feature = "cranelift"), feature = "llvm"))]
-#[test]
-fn defaults_to_llvm_when_cranelift_is_not_compiled() {
+fn defaults_to_llvm_as_the_native_backend() {
     let configuration = CompilerConfiguration::from_environment();
     assert_eq!(configuration.native_backend().backend(), BackendKind::Llvm);
+}
+
+#[cfg(all(not(feature = "llvm"), feature = "cranelift"))]
+#[test]
+fn defaults_to_cranelift_when_llvm_is_not_compiled() {
+    let configuration = CompilerConfiguration::from_environment();
+    assert_eq!(configuration.native_backend().backend(), BackendKind::Cranelift);
 }
 
 #[test]

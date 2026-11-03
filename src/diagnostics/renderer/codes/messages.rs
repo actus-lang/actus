@@ -93,6 +93,9 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::NondeterministicCall { callee, effect } => {
             format!("deterministic code cannot call `{callee}` with effect `{}`", effect.name())
         }
+        SemanticErrorKind::DeterministicFloatingPoint => {
+            "deterministic code cannot use floating-point types, literals, or operations".to_owned()
+        }
         SemanticErrorKind::RealtimeEffect { callee, effect } => {
             format!("realtime code cannot call `{callee}` with effect `{}`", effect.name())
         }
@@ -113,6 +116,9 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::RoleMethodRealtimeMismatch { role, method } => {
             format!("role method `{role}::{method}` must preserve its realtime contract")
+        }
+        SemanticErrorKind::RoleMethodDeterministicMismatch { role, method } => {
+            format!("role method `{role}::{method}` must preserve its deterministic contract")
         }
         _ => return None,
     })

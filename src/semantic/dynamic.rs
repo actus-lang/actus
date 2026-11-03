@@ -3,7 +3,7 @@ use crate::ast::{
     TopLevelDecl, lookup_builtin_type,
 };
 
-use super::analyzer::Analyzer;
+use super::analyzer::{Analyzer, canonical_type_name};
 use super::calls::VerbSignature;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::{DynamicRoleType, FatPointerLayout};
@@ -37,7 +37,7 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
             .params
             .iter()
             .map(|parameter| {
-                (parameter.name.clone(), parameter.role.clone(), parameter.ty.name.clone())
+                (parameter.name.clone(), parameter.role.clone(), canonical_type_name(&parameter.ty))
             })
             .collect(),
         dynamic_params: method.params.iter().map(|parameter| parameter.dispatch).collect(),

@@ -156,16 +156,16 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         ),
         "parse" => Some("usage: actus parse <file.act>\n\nParse a source file and print its AST."),
         "build" => Some(
-            "usage: actus build [file.act] [--strict] [--release|--profile <name>] [--backend cranelift|llvm] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Actus.toml.",
+            "usage: actus build [file.act] [--strict] [--release|--profile <name>] [--backend cranelift|llvm] [--emit obj|exe] [-o <output>]\n\nBuild an Actus source file or the project entry from Actus.toml.\n\nLLVM is the default backend. Use --backend cranelift for the explicit compatibility backend; the selected backend must be compiled into this actus binary and supported by the target. The compiler never silently falls back between backends.",
         ),
         "run" => Some(
-            "usage: actus run [file.act] [--release|--profile <name>] [--backend cranelift|llvm] [-- program-args...]\n\nBuild and execute an Actus program once.",
+            "usage: actus run [file.act] [--release|--profile <name>] [--backend cranelift|llvm] [-- program-args...]\n\nBuild and execute an Actus program once.\n\nLLVM is the default backend. Use --backend cranelift for the explicit compatibility backend; an unavailable backend is an error, not a fallback.",
         ),
         "watch" => Some(
             "usage: actus watch [file.act] [--once|--build] [--interval <ms>] [--release|--profile <name>]\n\nCheck an Actus project after source changes.",
         ),
         "test" => Some(
-            "usage: actus test [FILTER] [--module PATH] [--file PATH] [--exact] [--list] [--mirror] [--strict]\n\nCollect and run Actus meta tests. FILTER, --module, and --file select tests by substring; --exact requires exact matches, --list prints selected tests without executing them, and --mirror requires tests/<path>.act to map to src/<path>.act or its canonical facade.\n\nSet ACTUS_TEST_TIMEOUT_SECONDS to override the per-test process timeout; the default is 30 seconds.",
+            "usage: actus test [FILTER] [--module PATH] [--file PATH] [--exact] [--list] [--mirror] [--test-threads N] [--strict]\n\nCollect and run Actus meta tests. FILTER, --module, and --file select tests by substring; --exact requires exact matches, --list prints selected tests without executing them, --mirror requires tests/<path>.act to map to src/<path>.act or its canonical facade, and --test-threads controls bounded parallel execution while preserving output order.\n\nSet ACTUS_TEST_TIMEOUT_SECONDS to override the per-test process timeout; the default is 30 seconds.",
         ),
         "conformance" => Some(
             "usage: actus conformance [--strict]\n\nReport source structure and size conformance across the repository.",
@@ -218,7 +218,13 @@ mod tests {
         assert!(help.contains("build    Compile"));
         assert!(help.contains("watch    Re-check"));
         assert!(command_help_text("check").unwrap().contains("--strict"));
-        assert!(command_help_text("build").unwrap().contains("--strict"));
+        let build_help = command_help_text("build").unwrap();
+        assert!(build_help.contains("--strict"));
+        assert!(build_help.contains("LLVM is the default backend"));
+        assert!(build_help.contains("never silently falls back"));
+        let run_help = command_help_text("run").unwrap();
+        assert!(run_help.contains("LLVM is the default backend"));
+        assert!(run_help.contains("an unavailable backend is an error"));
         assert!(command_help_text("test").unwrap().contains("--strict"));
     }
 
