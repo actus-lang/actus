@@ -2,6 +2,15 @@ name: Build bundled LLVM development archive
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'toolchains/llvm/**'
+      - 'scripts/build_llvm_dev_linux.sh'
+      - 'scripts/verify_llvm_dev_linux.sh'
+      - 'tests/toolchain/**'
+      - '.github/workflows/build-bundled-llvm.yml'
 
 permissions:
   contents: read
