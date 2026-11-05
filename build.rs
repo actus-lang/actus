@@ -37,6 +37,7 @@ fn build_llvm_target_options_shim() {
     let llvm_config = env::var_os("DEP_LLVM_23_CONFIG_PATH")
         .map(PathBuf::from)
         .unwrap_or_else(|| panic!("LLVM feature enabled but llvm-sys did not provide llvm-config"));
+    println!("cargo:rustc-env=ACTUS_LLVM_CONFIG_PATH={}", llvm_config.display());
     let version = command_output(&llvm_config, "--version");
     let version = version.split_whitespace().next().unwrap_or_default();
     let mut components = version.split('.');

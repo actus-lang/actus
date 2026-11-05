@@ -52,3 +52,4 @@ mod ir;
 mod objects;
 mod regressions;
 mod runtime;
+mod stack_contracts;

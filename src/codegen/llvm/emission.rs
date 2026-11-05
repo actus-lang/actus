@@ -11,6 +11,15 @@ use crate::target::TargetSpec;
 pub struct ObjectEmissionOptions {
     pub emit_stack_size_section: bool,
     pub function_sections: bool,
+    pub optimization_level: ObjectOptimizationLevel,
+}
+
+/// LLVM optimization level used by an object emission request.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ObjectOptimizationLevel {
+    #[default]
+    None,
+    Default,
 }
 
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.

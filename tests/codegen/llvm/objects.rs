@@ -64,7 +64,11 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
         &target,
         &configured_output,
         true,
-        ObjectEmissionOptions { emit_stack_size_section: true, function_sections: true },
+        ObjectEmissionOptions {
+            emit_stack_size_section: true,
+            function_sections: true,
+            ..ObjectEmissionOptions::default()
+        },
     )
     .expect("configured host object should be emitted");
     let configured_bytes =
@@ -112,7 +116,11 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
             &non_elf_target,
             true,
             false,
-            ObjectEmissionOptions { emit_stack_size_section: true, function_sections: true },
+            ObjectEmissionOptions {
+                emit_stack_size_section: true,
+                function_sections: true,
+                ..ObjectEmissionOptions::default()
+            },
         )
         .expect("non-ELF object should emit");
     let non_elf =
@@ -315,7 +323,11 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         &target,
         &output,
         true,
-        ObjectEmissionOptions { emit_stack_size_section: true, function_sections: true },
+        ObjectEmissionOptions {
+            emit_stack_size_section: true,
+            function_sections: true,
+            ..ObjectEmissionOptions::default()
+        },
     )
     .expect("ARM call fixture object should be emitted");
     let bytes = std::fs::read(&output).expect("ARM call fixture object should be readable");

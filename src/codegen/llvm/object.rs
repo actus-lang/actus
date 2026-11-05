@@ -15,7 +15,7 @@ use llvm_sys::target_machine::{
 use target_lexicon::BinaryFormat;
 
 use super::super::BackendEmitError;
-use super::emission::ObjectEmissionOptions;
+use super::emission::{ObjectEmissionOptions, ObjectOptimizationLevel};
 use crate::target::TargetSpec;
 
 static LLVM_TARGETS_INITIALIZED: Once = Once::new();
@@ -118,11 +118,17 @@ pub(super) fn emit_object_bytes(
 }
 
 fn initialize_targets() -> Result<(), BackendEmitError> {
-    LLVM_TARGETS_INITIALIZED.call_once(|| unsafe {
-        llvm_sys::target::LLVM_InitializeAllTargetInfos();
-        llvm_sys::target::LLVM_InitializeAllTargets();
-        llvm_sys::target::LLVM_InitializeAllTargetMCs();
-        llvm_sys::target::LLVM_InitializeAllAsmPrinters();
+    LLVM_TARGETS_INITIALIZED.call_once(|| {
+        unsafe {
+            llvm_sys::target::LLVM_InitializeAllTargetInfos();
+            llvm_sys::target::LLVM_InitializeAllTargets();
+            llvm_sys::target::LLVM_InitializeAllTargetMCs();
+            llvm_sys::target::LLVM_InitializeAllAsmPrinters();
+        }
+        // LLVM exposes this control as a process-global cl::opt rather than a
+        // TargetMachine option. Set it before any TargetMachine is created so
+        // every LLVM emission in this process has the same frame accounting.
+        super::shim::disable_x86_call_frame_optimization();
     });
     Ok(())
 }
@@ -150,13 +156,19 @@ impl TargetMachine {
         }
         let cpu = CString::new("").expect("empty CPU string cannot contain NUL");
         let features = CString::new("").expect("empty feature string cannot contain NUL");
+        let options = if is_elf { options } else { ObjectEmissionOptions::default() };
         let raw = unsafe {
             LLVMCreateTargetMachine(
                 llvm_target,
                 triple.as_ptr(),
                 cpu.as_ptr(),
                 features.as_ptr(),
-                LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+                match options.optimization_level {
+                    ObjectOptimizationLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+                    ObjectOptimizationLevel::Default => {
+                        LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault
+                    }
+                },
                 if position_independent {
                     LLVMRelocMode::LLVMRelocPIC
                 } else {
@@ -168,7 +180,6 @@ impl TargetMachine {
         if raw.is_null() {
             return Err(BackendEmitError("LLVM failed to create target machine".to_owned()));
         }
-        let options = if is_elf { options } else { ObjectEmissionOptions::default() };
         super::shim::apply(
             raw,
             super::shim::TargetMachineOptions {

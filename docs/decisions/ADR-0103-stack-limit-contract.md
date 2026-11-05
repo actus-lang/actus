@@ -132,8 +132,17 @@ be enforced by fixtures under the pinned LLVM version:
 
 - **Push-based outgoing arguments.** On x86-64, call-frame optimization can
   pass stack arguments with pushes that are not included in the reported fixed
-  frame. `stack_limit` builds must disable this optimization, or the target is
-  unsupported for the contract.
+  frame. LLVM 23 exposes this control only as the process-global
+  `-no-x86-call-frame-opt` `cl::opt`; it has no per-`TargetMachine` field in
+  the LLVM C or C++ target-machine API. The Actus shim therefore parses this
+  option unconditionally, exactly once during LLVM target initialization,
+  before any `TargetMachine` is created. Every LLVM emission in that process
+  observes the same disabled mode, including ordinary builds that do not
+  request a `stack_limit` report. This is intentional: a process-global
+  option cannot be safely enabled and disabled per request, and request-local
+  state would make long-lived LSP, test-runner, or future service processes
+  dependent on build order. A build that cannot establish this process-wide
+  mode is unsupported for the contract.
 - **Red zone.** A hosted x86-64 SysV leaf may use 128 bytes below the stack
   pointer while reporting a smaller frame. Hosted x86-64 therefore adds
   exactly 128 bytes to the frame of every leaf function; non-leaf functions
