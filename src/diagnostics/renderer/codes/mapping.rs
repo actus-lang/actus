@@ -179,6 +179,7 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::RealtimeUnboundedRecursion => "E1129",
         SemanticErrorKind::StackLimitRecursion => "E1858",
         SemanticErrorKind::MissingStackLimitClaim { .. } => "E1861",
+        SemanticErrorKind::UnsupportedStackLimitTarget { .. } => "E1863",
         SemanticErrorKind::BoundedBudgetExceeded { .. } => "E1130",
         SemanticErrorKind::RoleMethodMustUseMismatch { .. } => "E1123",
         _ => return None,

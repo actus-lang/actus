@@ -156,6 +156,12 @@ fn lower_unit_module(
         context.configuration.target(),
     )
     .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
+    crate::semantic::validate_stack_limit_backend_target(
+        &targeted_program,
+        context.configuration.target(),
+        context.backend,
+    )
+    .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
     let targeted = crate::codegen::normalize_program(&targeted_program);
     let program = crate::codegen::specialize_program(&targeted, context.generic_instances)?;
     let performance_context = (index != 0).then(|| {
