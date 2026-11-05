@@ -75,19 +75,30 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
         std::fs::read(&configured_output).expect("configured object should read");
     let configured =
         object::File::parse(configured_bytes.as_slice()).expect("configured object should parse");
-    assert!(
-        configured.section_by_name(".stack_sizes").is_some(),
-        "configured LLVM object must publish .stack_sizes"
-    );
-    let text_sections = configured
-        .sections()
-        .filter(|section| section.kind() == object::SectionKind::Text)
-        .filter_map(|section| section.name().ok())
-        .collect::<Vec<_>>();
-    assert!(
-        text_sections.iter().any(|name| name.contains("test__verb_main")),
-        "configured object must isolate the function section: {text_sections:?}"
-    );
+    if target.object_format == target_lexicon::BinaryFormat::Elf {
+        assert!(
+            configured.section_by_name(".stack_sizes").is_some(),
+            "configured ELF object must publish .stack_sizes"
+        );
+        let text_sections = configured
+            .sections()
+            .filter(|section| section.kind() == object::SectionKind::Text)
+            .filter_map(|section| section.name().ok())
+            .collect::<Vec<_>>();
+        assert!(
+            text_sections.iter().any(|name| name.contains("test__verb_main")),
+            "configured ELF object must isolate the function section: {text_sections:?}"
+        );
+    } else {
+        assert_eq!(
+            configured_bytes, bytes,
+            "non-ELF configured options must preserve default object bytes"
+        );
+        assert!(
+            configured.section_by_name(".stack_sizes").is_none(),
+            "non-ELF targets must not enable the ELF frame-report option"
+        );
+    }
     let disabled_output =
         std::env::temp_dir().join(format!("actus-llvm-object-{}-disabled.o", std::process::id()));
     emit_object_with_configuration_and_options(
