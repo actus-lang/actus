@@ -107,6 +107,11 @@ The backend is authoritative for the fixed frame size. The proof is performed
 against the exact object or machine representation selected for the build:
 same target, profile, optimization settings, backend, and feature set.
 
+For LLVM, the frame report source is `TargetOptions::EmitStackSizeSection` and
+function-level section identity is provided by `TargetOptions::FunctionSections`.
+Actus enables these fields through its LLVM target-machine C++ shim because the
+LLVM C API does not expose them.
+
 The initial LLVM contract is limited to targets and object formats for which
 Actus can extract and validate a complete frame report. The first supported
 set is ELF-based hosted Linux and ELF-based `thumbv7em-none-eabi`. Thumb is a
