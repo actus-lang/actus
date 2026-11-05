@@ -94,9 +94,9 @@ shown in successful command output. `parse`, `run`, `watch`, `fmt`, `lsp`, and
 That boundary must be documented in the eventual compatibility matrix rather
 than inferred from command names.
 
-Build and test input discovery can walk to a parent `Actus.toml`. Strict
-configuration rejects legacy `Arca.toml` manifests and validates the lockfile
-policy. Module resolution requires the directory facade named after the
+Build and test input discovery can walk to a parent `Actus.toml`. Configuration
+requires the canonical manifest and validates the lockfile policy. Module
+resolution requires the directory facade named after the
 module, rejects ambiguous file/directory roots, sorts sibling declarations,
 and reports unknown or duplicate module declarations through module-specific
 diagnostics.
@@ -217,7 +217,7 @@ recorded before implementation expands the strict boundary:
 
 | Existing compatibility path | Strict policy | Reason and follow-up |
 | --- | --- | --- |
-| Normal configuration can accept legacy `Arca.toml` manifests with compatibility handling. | Reject the legacy root and dependency manifest with stable strict diagnostics. | Prevents ambiguous project identity; covered by strict configuration fixtures. |
+| Configuration previously had a legacy manifest fallback. | Require the canonical `Actus.toml` manifest for every project and local dependency. | Prevents ambiguous project identity and removes compatibility-only configuration paths. |
 | Normal configuration can synchronize a missing lockfile. | Require the lockfile policy and reject stale or absent required content. | Makes dependency selection reproducible; close with lockfile command fixtures. |
 | The source-limit script currently checks only Rust hard limits. | Extend strict validation to preferred/warning thresholds and Actus source boundaries. | Prevents standard-library and documentation drift; close in Gate 18.8/18.10. |
 | Strict mode currently applies only to `check`, `build`, and `test`. | Do not imply strict guarantees for `run`, `watch`, `fmt`, `parse`, `lsp`, or `publish`. | Avoids an undocumented partial contract; expand only through a reviewed roadmap change. |

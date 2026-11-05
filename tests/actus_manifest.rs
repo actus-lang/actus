@@ -35,10 +35,6 @@ impl Fixture {
             ),
         );
     }
-
-    fn legacy_manifest(&self) {
-        self.write("Arca.toml", "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n");
-    }
 }
 
 impl Drop for Fixture {
@@ -97,20 +93,6 @@ fn rejects_missing_custom_source_root() {
     let error = CompilerConfiguration::from_input_path(&fixture.root.join("main.act"))
         .expect_err("missing source root must fail");
     assert!(error.to_string().contains("InvalidSourceRoot"));
-}
-
-#[test]
-fn resolves_legacy_manifest_with_compatibility_fallback() {
-    let fixture = Fixture::new();
-    fixture.legacy_manifest();
-    fixture.write("main.act", "");
-    fixture.write("src/calc/calc.act", "open ops;");
-    fixture.write(
-        "src/calc/ops.act",
-        "open verb add(erg left: Int, erg right: Int) -> Int { return left + right; }",
-    );
-
-    assert_import_resolves(&fixture, &fixture.root.join("src"));
 }
 
 #[test]

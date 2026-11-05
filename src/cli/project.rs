@@ -124,10 +124,7 @@ fn create_project(path: &Path, name: &str, options: &ProjectOptions) -> Result<(
 }
 
 fn initialize_project(path: &Path, options: &ProjectOptions) -> Result<(), String> {
-    if path.join("Actus.toml").exists() || path.join("Arca.toml").exists() {
-        if path.join("Arca.toml").exists() {
-            eprintln!("warning: 'Arca.toml' is deprecated, please rename to 'Actus.toml'");
-        }
+    if path.join("Actus.toml").exists() {
         return Err(format!("`{}` is already an Actus project", path.display()));
     }
     initialize_project_files(path, "project", options.runtime)?;

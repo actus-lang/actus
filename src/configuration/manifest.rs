@@ -7,7 +7,7 @@ use super::ConfigurationError;
 use super::dependencies::DependencySpec;
 
 pub(crate) const MANIFEST_FILE_NAME: &str = "Actus.toml";
-pub(crate) const LEGACY_MANIFEST_FILE_NAME: &str = "Arca.toml";
+pub(crate) const LOCK_FILE_NAME: &str = "Actus.lock";
 pub(crate) const DEFAULT_EDITION: &str = "alpha";
 
 #[derive(Deserialize)]
@@ -303,21 +303,7 @@ pub(crate) fn find_manifest(start: &Path) -> Option<PathBuf> {
 
 pub(crate) fn manifest_in_directory(directory: &Path) -> Option<PathBuf> {
     let canonical = directory.join(MANIFEST_FILE_NAME);
-    if canonical.is_file() {
-        return Some(canonical);
-    }
-    let legacy = directory.join(LEGACY_MANIFEST_FILE_NAME);
-    legacy.is_file().then_some(legacy)
-}
-
-pub(crate) fn warn_if_legacy_manifest(path: &Path) {
-    if is_legacy_manifest(path) {
-        eprintln!("warning: 'Arca.toml' is deprecated, please rename to 'Actus.toml'");
-    }
-}
-
-pub(crate) fn is_legacy_manifest(path: &Path) -> bool {
-    path.file_name().and_then(|name| name.to_str()) == Some(LEGACY_MANIFEST_FILE_NAME)
+    canonical.is_file().then_some(canonical)
 }
 
 #[cfg(test)]
