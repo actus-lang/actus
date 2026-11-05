@@ -124,6 +124,9 @@ fn ownership_contract_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::StackLimitRecursion => {
             "stack_limit contract cannot contain a reachable recursive call path".to_owned()
         }
+        SemanticErrorKind::MissingStackLimitClaim { callee } => {
+            format!("stack_limit call to unsafe extern `{callee}` requires a stack_limit claim")
+        }
         SemanticErrorKind::BoundedBudgetExceeded { dimension, limit, required } => {
             format!("bounded contract for `{dimension}` allows {limit}, but the body requires {required}")
         }

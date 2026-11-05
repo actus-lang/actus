@@ -66,6 +66,18 @@ impl Analyzer {
         }
         Ok(())
     }
+
+    pub(crate) fn validate_stack_limit_native_claims(
+        &self,
+        program: &Program,
+    ) -> Result<(), SemanticError> {
+        let graph = call_graph(program);
+        let external_claims = external_stack_claims(program);
+        for root in stack_limit_roots(program) {
+            visit_native_claims(&root, &graph, &external_claims, &mut HashSet::new())?;
+        }
+        Ok(())
+    }
 }
 
 fn is_bounded(metadata: &[crate::ast::MetaAttribute]) -> bool {
@@ -74,6 +86,62 @@ fn is_bounded(metadata: &[crate::ast::MetaAttribute]) -> bool {
 
 fn is_stack_limited(metadata: &[crate::ast::MetaAttribute]) -> bool {
     metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::StackLimit(_)))
+}
+
+fn stack_limit_roots(program: &Program) -> Vec<String> {
+    program
+        .declarations
+        .iter()
+        .flat_map(|declaration| match declaration {
+            TopLevelDecl::Verb(verb) if is_stack_limited(&verb.metadata) => {
+                vec![verb.name.clone()]
+            }
+            TopLevelDecl::Perform(perform) if !perform.module_import => perform
+                .methods
+                .iter()
+                .filter(|method| is_stack_limited(&method.metadata))
+                .map(|method| performance_node(perform, &method.name))
+                .collect(),
+            _ => Vec::new(),
+        })
+        .collect()
+}
+
+fn external_stack_claims(program: &Program) -> HashMap<String, bool> {
+    program
+        .declarations
+        .iter()
+        .filter_map(|declaration| {
+            let TopLevelDecl::ExternalVerb(verb) = declaration else { return None };
+            if !verb.unsafe_boundary {
+                return None;
+            }
+            Some((verb.name.clone(), is_stack_limited(&verb.metadata)))
+        })
+        .collect()
+}
+
+fn visit_native_claims(
+    name: &str,
+    graph: &CallGraph,
+    external_claims: &HashMap<String, bool>,
+    visited: &mut HashSet<String>,
+) -> Result<(), SemanticError> {
+    if !visited.insert(name.to_owned()) {
+        return Ok(());
+    }
+    for (callee, span) in graph.get(name).into_iter().flatten() {
+        if external_claims.get(callee).is_some_and(|claimed| !claimed) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MissingStackLimitClaim { callee: callee.clone() },
+                span: *span,
+            });
+        }
+        if graph.contains_key(callee) {
+            visit_native_claims(callee, graph, external_claims, visited)?;
+        }
+    }
+    Ok(())
 }
 
 fn call_graph(program: &Program) -> CallGraph {

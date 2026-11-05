@@ -111,6 +111,9 @@ pub enum SemanticErrorKind {
     RealtimeFloatingPoint,
     RealtimeUnboundedRecursion,
     StackLimitRecursion,
+    MissingStackLimitClaim {
+        callee: String,
+    },
     BoundedBudgetExceeded {
         dimension: String,
         limit: u64,

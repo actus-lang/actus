@@ -36,3 +36,22 @@ fn leaves_non_stack_limited_recursion_to_existing_contracts() {
         "verb first() -> Int { second(); return 0; } verb second() -> Int { first(); return 0; }";
     assert!(analyze_source(source).is_ok());
 }
+
+#[test]
+fn rejects_reachable_unsafe_extern_without_a_stack_claim() {
+    let error = analyze_source(
+        "unsafe extern \"C\" verb native() -> Int; meta stack_limit(bytes: 256u32) verb main() -> Int { return native(); }",
+    )
+    .expect_err("stack_limit must require a native claim");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::MissingStackLimitClaim { ref callee } if callee == "native"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1861");
+}
+
+#[test]
+fn accepts_reachable_unsafe_extern_with_a_stack_claim() {
+    let source = "meta stack_limit(bytes: 128u32) unsafe extern \"C\" verb native() -> Int; meta stack_limit(bytes: 256u32) verb main() -> Int { return native(); }";
+    assert!(analyze_source(source).is_ok());
+}
