@@ -11,7 +11,9 @@ Ship Actus with a reproducible, checksum-verified LLVM 23.1.2 toolchain so
 that normal users and clean CI environments do not require a separately
 installed LLVM development package or lld. Preserve the explicit backend,
 target, ownership, deterministic, zero-float, ABI, and stack-proof contracts
-while adding a product-quality distribution path.
+while adding a product-quality distribution path. The primary freestanding
+target is `thumbv7em-none-eabihf` for Cortex-M4F-class devices; the secondary
+target is `thumbv7em-none-eabi` for soft-float/no-FPU devices.
 
 ## Governing decision
 
@@ -25,7 +27,8 @@ ADR is reviewed and accepted.
 
 - [x] Create ADR-0105 with the static/shared linkage comparison and initial
       static-link recommendation.
-- [x] Pin the initial LLVM release line to LLVM 23.1.2 in the proposal.
+- [x] Pin LLVM 23.1.2 to source commit
+      `85ac560262434c9ccfc0c183ec22d4138ed647fb`.
 - [x] Define target selection, optional dependency policy, and the Linux C++
       runtime policy.
 - [x] Define toolchain identity, checksum, archive, license, and relocation
@@ -36,6 +39,8 @@ ADR is reviewed and accepted.
 - [x] Define clean-environment and release-archive acceptance evidence.
 - [x] Define freestanding compiler-rt builtin and ADR-0103 helper-registry
       requirements.
+- [x] Define `thumbv7em-none-eabihf` as the primary and
+      `thumbv7em-none-eabi` as the secondary freestanding target.
 - [x] Define separate user and contributor/development artifacts.
 - [x] Define the glibc 2.28 Linux baseline and Windows `/MD` runtime policy.
 - [x] Define `unverified` system-override behavior and strict-build rejection.
@@ -55,8 +60,14 @@ ADR is reviewed and accepted.
 - [ ] Produce separate user and `llvm-dev-23.1.2` archives with
       repository-tracked SHA-256 entries.
 - [ ] Include target-specific compiler-rt builtins in both artifacts at
-      `lib/actus/targets/<target>/libclang_rt.builtins.a` and register their
+      `lib/actus/targets/<target>/libclang_rt.builtins.a` for both
+      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`, and register their
       helper symbols and stack claims through the ADR-0103 helper registry.
+- [ ] Use LLVM distribution components and `install-distribution` so Clang is
+      built but not shipped in the contributor archive; ship only headers,
+      LLVM libraries, `llvm-config`, lld, builtins, and inspection tools.
+- [ ] Keep the CMake cache free of build-host-specific compiler launchers;
+      pass ccache through workflow `-D` arguments.
 - [ ] Publish the compiler, headers, tools, lld, manifest, and licenses needed
       by the supported build paths.
 - [ ] Verify archive contents and identity before release publication.
@@ -89,8 +100,8 @@ ADR is reviewed and accepted.
 
 - [ ] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
       record it in the identity manifest without shadowing system `PATH` tools.
-- [ ] Select bundled lld only for the supported freestanding
-      `thumbv7em-none-eabi` path.
+- [ ] Select bundled lld only for the primary `thumbv7em-none-eabihf` and
+      secondary `thumbv7em-none-eabi` freestanding paths.
 - [ ] Keep hosted Linux on its documented C linker/libc contract and preserve
       explicit `ACTUS_LINKER` overrides.
 - [ ] Reject linker version or target mismatches with stable diagnostics.
@@ -103,6 +114,15 @@ ADR is reviewed and accepted.
 - [ ] Test missing, corrupted, and wrong-version archives.
 - [ ] Test the distinct user archive and contributor `llvm-dev` archive from
       clean environments.
+- [ ] Verify `llvm-config` and `ld.lld` have no libstdc++, zlib, zstd, libxml2,
+      or libtinfo dependency and require no GLIBC symbol newer than 2.28.
+- [ ] Disassemble an integer-only `thumbv7em-none-eabihf` fixture and reject
+      any VFP instruction, including `vadd`, `vmov`, `vldr`, `vstr`, or
+      `vpush`, despite the ABI permitting FPU instructions.
+- [ ] In T4/T5, disassemble real Actus-generated
+      `thumbv7em-none-eabihf` objects and apply the same zero-float VFP
+      rejection; the LLVM IR fixture above is only the T2 toolchain smoke
+      test.
 - [ ] Test repeated bootstrap and repeated builds for the required byte-level
       determinism.
 - [ ] Test archive relocation and a clean user installation path.

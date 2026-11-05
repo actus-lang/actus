@@ -54,9 +54,17 @@ for the first release is **LLVM 23.1.2**. Every archive, build job, and
 reported toolchain identity must use that patch level unless this ADR is
 amended.
 
+The T2 Linux source build pins LLVM to commit
+`85ac560262434c9ccfc0c183ec22d4138ed647fb`, the dereferenced commit for the
+`llvmorg-23.1.2` release tag. A tag name alone is not sufficient provenance.
+
 The first supported architecture includes X86, ARM, and AArch64 LLVM targets.
-The toolchain build must not include unrelated targets or optional external
-dependencies merely because the host distribution provides them.
+The first freestanding targets are `thumbv7em-none-eabihf` as the primary
+Cortex-M4F target and `thumbv7em-none-eabi` as the secondary soft-float/no-FPU
+target. The eabihf choice matches the ABI used by Cortex-M4F devices such as
+STM32F411 and compatible vendor C libraries. The toolchain build must not
+include unrelated targets or optional external dependencies merely because the
+host distribution provides them.
 
 The implementation is divided into independently reviewable steps:
 
@@ -106,12 +114,21 @@ and utilities.
 The release builder must build LLVM 23.1.2 with a reproducible configuration:
 
 - `LLVM_TARGETS_TO_BUILD=X86;ARM;AArch64`;
+- `LLVM_BUILTIN_TARGETS=thumbv7em-none-eabihf;thumbv7em-none-eabi`, with the
+  LLVM 23.1.2 `BaremetalARM.cmake` pattern: `CMAKE_SYSTEM_NAME=Generic`,
+  `COMPILER_RT_BAREMETAL_BUILD=ON`, `COMPILER_RT_OS_DIR=baremetal`, and
+  explicit Thumb/Cortex-M4 compiler and assembler flags for each ABI;
 - zlib disabled;
 - zstd disabled;
 - libxml2 disabled;
 - terminfo disabled;
-- only the libraries and tools required by Actus, the LLVM backend shim, the
-  supported object inspection tests, and lld are installed into the archive;
+- libedit, libpfm, CURL, httplib, FFI, Z3, libFuzzer, ORC, context profiling,
+  GWP-ASan, CRT, assertions, and the LLVM shared library disabled;
+- `LLVM_STATIC_LINK_CXX_STDLIB=ON`;
+- `LLVM_DISTRIBUTION_COMPONENTS` plus `install-distribution` used so only the
+  required LLVM headers/libraries, `llvm-config`, lld, compiler-rt builtins,
+  and inspection tools are installed; Clang is built as a dependency but is
+  not included in the development archive;
 - compiler and linker flags are recorded in the archive manifest; and
 - the C++ runtime policy is explicit for every supported host.
 
@@ -127,12 +144,25 @@ contract. A mismatch between LLVM's C++ runtime and Rust's runtime is a build
 failure, not a packaging variation.
 
 The freestanding toolchain must also provide the compiler-rt builtins needed
-by each supported freestanding target. For `thumbv7em-none-eabi`, this
-includes `__aeabi_uldivmod` and every other compiler-generated helper required
-by the emitted object. The preferred v1 decision is to package the matching
-compiler-rt builtins archive and link it explicitly. An alternative runtime
-implementation is acceptable only when the final link command and symbol
-manifest prove that every required helper is supplied.
+by each supported freestanding target. This includes `__aeabi_uldivmod` and
+every other compiler-generated helper required by the emitted object. The
+archives are published at:
+
+```text
+lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a
+lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a
+```
+
+The preferred v1 decision is to package the matching compiler-rt builtins
+archives and link them explicitly. An alternative runtime implementation is
+acceptable only when the final link command and symbol manifest prove that
+every required helper is supplied.
+
+Although `thumbv7em-none-eabihf` permits hardware floating-point instructions,
+it does not relax Actus's zero-float contract. T2 verification must disassemble
+an integer-only Thumb fixture and reject VFP instructions (`vadd`, `vmov`,
+`vldr`, `vstr`, `vpush`, and equivalent operations). The eabihf ABI and the
+object-level zero-float policy are separate contracts.
 
 Compiler-generated helpers must be registered at the runtime/backend boundary
 described by ADR-0103. A builtin is not an untracked linker convenience: its
@@ -170,7 +200,8 @@ identify the toolchain with at least:
 - Actus target triple;
 - compiler profile and backend;
 - toolchain build revision; and
-- relevant linker identity.
+- relevant linker identity; and
+- the immutable build-image digest for source-built archives.
 
 The identity is read from the selected `toolchain.json` at build time and is
 embedded in the compiler binary and generated proof metadata. It is not
@@ -233,7 +264,8 @@ linker its own versioned boundary, simplifies archive layout and signing, and
 avoids coupling Actus to lld's internal C++ ABI.
 
 For v1, the bundled lld default is limited to the freestanding
-`thumbv7em-none-eabi` link contract. Hosted Linux continues to use the
+`thumbv7em-none-eabihf` and secondary `thumbv7em-none-eabi` link contracts.
+Hosted Linux continues to use the
 configured system C linker and libc startup objects; hosted Windows and Apple
 link contracts remain explicit and target-specific. `ACTUS_LINKER` remains an
 explicit override and is never replaced silently.
