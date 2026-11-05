@@ -1,0 +1,38 @@
+use actus::diagnostics::semantic_diagnostic;
+use actus::lexer::scan;
+use actus::parser::parse;
+use actus::semantic::{SemanticErrorKind, analyze};
+
+fn analyze_source(
+    source: &str,
+) -> Result<actus::semantic::SemanticModel, actus::semantic::SemanticError> {
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    analyze(&parse(tokens).expect("stack_limit fixture should parse"))
+}
+
+#[test]
+fn rejects_direct_stack_limit_recursion_before_codegen() {
+    let error = analyze_source(
+        "meta stack_limit(bytes: 256u32) verb recurse() -> Int { recurse(); return 0; }",
+    )
+    .expect_err("stack_limit recursion must be rejected");
+    assert!(matches!(error.kind, SemanticErrorKind::StackLimitRecursion));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1858");
+}
+
+#[test]
+fn rejects_mutual_stack_limit_recursion() {
+    let error = analyze_source(
+        "meta stack_limit(bytes: 256u32) verb first() -> Int { second(); return 0; } meta stack_limit(bytes: 256u32) verb second() -> Int { first(); return 0; }",
+    )
+    .expect_err("mutual stack_limit recursion must be rejected");
+    assert!(matches!(error.kind, SemanticErrorKind::StackLimitRecursion));
+}
+
+#[test]
+fn leaves_non_stack_limited_recursion_to_existing_contracts() {
+    let source =
+        "verb first() -> Int { second(); return 0; } verb second() -> Int { first(); return 0; }";
+    assert!(analyze_source(source).is_ok());
+}

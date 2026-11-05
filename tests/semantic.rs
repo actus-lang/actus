@@ -26,6 +26,8 @@ mod pattern_ownership;
 mod repr;
 #[path = "semantic/roles.rs"]
 mod roles;
+#[path = "semantic/stack_limit.rs"]
+mod stack_limit;
 #[path = "semantic/state.rs"]
 mod state;
 #[path = "semantic/structs.rs"]

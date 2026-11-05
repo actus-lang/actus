@@ -17,13 +17,47 @@ impl Analyzer {
         for declaration in &program.declarations {
             match declaration {
                 TopLevelDecl::Verb(verb) if is_bounded(&verb.metadata) => {
-                    visit_graph(&verb.name, &graph, &mut HashSet::new())?;
+                    visit_graph(&verb.name, &graph, &mut HashSet::new(), recursion_error)?;
                 }
                 TopLevelDecl::Perform(perform) if !perform.module_import => {
                     for method in &perform.methods {
                         if is_bounded(&method.metadata) {
                             let node = performance_node(perform, &method.name);
-                            visit_graph(&node, &graph, &mut HashSet::new())?;
+                            visit_graph(&node, &graph, &mut HashSet::new(), recursion_error)?;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_stack_limit_recursion(
+        &self,
+        program: &Program,
+    ) -> Result<(), SemanticError> {
+        let graph = call_graph(program);
+        for declaration in &program.declarations {
+            match declaration {
+                TopLevelDecl::Verb(verb) if is_stack_limited(&verb.metadata) => {
+                    visit_graph(
+                        &verb.name,
+                        &graph,
+                        &mut HashSet::new(),
+                        stack_limit_recursion_error,
+                    )?;
+                }
+                TopLevelDecl::Perform(perform) if !perform.module_import => {
+                    for method in &perform.methods {
+                        if is_stack_limited(&method.metadata) {
+                            let node = performance_node(perform, &method.name);
+                            visit_graph(
+                                &node,
+                                &graph,
+                                &mut HashSet::new(),
+                                stack_limit_recursion_error,
+                            )?;
                         }
                     }
                 }
@@ -36,6 +70,10 @@ impl Analyzer {
 
 fn is_bounded(metadata: &[crate::ast::MetaAttribute]) -> bool {
     metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::Bounded(_)))
+}
+
+fn is_stack_limited(metadata: &[crate::ast::MetaAttribute]) -> bool {
+    metadata.iter().any(|attribute| matches!(attribute, crate::ast::MetaAttribute::StackLimit(_)))
 }
 
 fn call_graph(program: &Program) -> CallGraph {
@@ -95,6 +133,7 @@ fn visit_graph(
     name: &str,
     graph: &CallGraph,
     active: &mut HashSet<String>,
+    recursion_error: fn(SourceSpan) -> SemanticError,
 ) -> Result<(), SemanticError> {
     if !active.insert(name.to_owned()) {
         return Err(recursion_error(SourceSpan::new(0, 0)));
@@ -104,7 +143,7 @@ fn visit_graph(
             if active.contains(callee) {
                 return Err(recursion_error(*span));
             }
-            visit_graph(callee, graph, active)?;
+            visit_graph(callee, graph, active, recursion_error)?;
         }
     }
     active.remove(name);
@@ -120,6 +159,10 @@ fn recursion_error(span: SourceSpan) -> SemanticError {
         },
         span,
     }
+}
+
+fn stack_limit_recursion_error(span: SourceSpan) -> SemanticError {
+    SemanticError { kind: SemanticErrorKind::StackLimitRecursion, span }
 }
 
 fn block_calls(block: &Block, performance_prefix: Option<&str>) -> Vec<(String, SourceSpan)> {

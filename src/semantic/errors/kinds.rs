@@ -110,6 +110,7 @@ pub enum SemanticErrorKind {
     RealtimeUnboundedLoop,
     RealtimeFloatingPoint,
     RealtimeUnboundedRecursion,
+    StackLimitRecursion,
     BoundedBudgetExceeded {
         dimension: String,
         limit: u64,

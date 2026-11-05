@@ -89,6 +89,7 @@ impl Analyzer {
         self.collect_dynamic_roles(program);
         self.validate_method_declarations(program)?;
         self.validate_bounded_recursion(program)?;
+        self.validate_stack_limit_recursion(program)?;
         self.analyze_verbs(program)?;
         Ok(self.finalize_model())
     }
