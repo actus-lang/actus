@@ -439,6 +439,7 @@ fn target_selector(attribute: &crate::ast::MetaAttribute) -> Option<&str> {
         crate::ast::MetaAttribute::Deterministic => None,
         crate::ast::MetaAttribute::Realtime => None,
         crate::ast::MetaAttribute::Bounded(_) => None,
+        crate::ast::MetaAttribute::StackLimit(_) => None,
         crate::ast::MetaAttribute::Capability(_) => None,
         crate::ast::MetaAttribute::Repr(_) => None,
         crate::ast::MetaAttribute::Volatile => None,

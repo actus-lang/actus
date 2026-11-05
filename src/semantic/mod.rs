@@ -38,6 +38,10 @@ mod volatile;
 
 pub use analyzer::analyze;
 pub(crate) use analyzer::validate_bounded_recursion;
+pub(crate) use analyzer::{
+    validate_stack_limit_dynamic_dispatch, validate_stack_limit_native_claims,
+    validate_stack_limit_recursion,
+};
 pub(crate) use calls::parse_type_name_key;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
@@ -106,6 +110,52 @@ pub fn filter_program_for_target_checked(
     Ok(filtered)
 }
 
+pub fn validate_stack_limit_backend_target(
+    program: &crate::ast::Program,
+    target: &crate::target::TargetSpec,
+    backend: &str,
+) -> Result<(), SemanticError> {
+    let has_stack_limit = program.declarations.iter().any(|declaration| match declaration {
+        crate::ast::TopLevelDecl::Verb(verb) => verb
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::StackLimit(_))),
+        crate::ast::TopLevelDecl::ExternalVerb(verb) => verb
+            .metadata
+            .iter()
+            .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::StackLimit(_))),
+        crate::ast::TopLevelDecl::Perform(perform) => perform.methods.iter().any(|method| {
+            method
+                .metadata
+                .iter()
+                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::StackLimit(_)))
+        }),
+        crate::ast::TopLevelDecl::Role(role) => role.methods.iter().any(|method| {
+            method
+                .metadata
+                .iter()
+                .any(|attribute| matches!(attribute, crate::ast::MetaAttribute::StackLimit(_)))
+        }),
+        _ => false,
+    });
+    if !has_stack_limit {
+        return Ok(());
+    }
+    let target_name = target.triple().to_string();
+    let supported_target =
+        matches!(target_name.as_str(), "x86_64-unknown-linux-gnu" | "thumbv7em-none-eabi");
+    if backend == "llvm" && supported_target {
+        return Ok(());
+    }
+    Err(SemanticError {
+        kind: SemanticErrorKind::UnsupportedStackLimitTarget {
+            backend: backend.to_owned(),
+            target: target_name,
+        },
+        span: crate::lexer::SourceSpan::new(0, 0),
+    })
+}
+
 fn declaration_matches_target(
     declaration: &crate::ast::TopLevelDecl,
     target: &crate::target::TargetSpec,
@@ -125,6 +175,7 @@ fn declaration_matches_target(
         crate::ast::MetaAttribute::Deterministic => true,
         crate::ast::MetaAttribute::Realtime => true,
         crate::ast::MetaAttribute::Bounded(_) => true,
+        crate::ast::MetaAttribute::StackLimit(_) => true,
         crate::ast::MetaAttribute::Capability(_) => true,
         crate::ast::MetaAttribute::Repr(_) => true,
         crate::ast::MetaAttribute::Volatile => true,

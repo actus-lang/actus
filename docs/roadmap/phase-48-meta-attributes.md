@@ -139,8 +139,10 @@ advance.
    moves and every cleanup path. The initial concrete `repr(C)` owner-only
    contract and native cleanup bridge are implemented; resource-bearing and
    borrowed-field extensions remain intentionally separate work.
-5. `meta stack_limit(...)` — enforce a bounded stack contract once the compiler
-    has a sound interprocedural stack-size model.
+5. [`meta stack_limit(...)`](../decisions/ADR-0103-stack-limit-contract.md) —
+   enforce a target-specific machine-level stack contract once the compiler
+   has a sound interprocedural stack-size model. ADR-0103 is currently
+   Proposed; S0–S2 must be accepted before machine-level implementation.
 
 ### Ergonomics and compatibility
 

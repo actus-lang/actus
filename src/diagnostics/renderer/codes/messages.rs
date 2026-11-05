@@ -69,6 +69,10 @@ fn capability_message(kind: &SemanticErrorKind) -> Option<String> {
 }
 
 fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
+    ownership_argument_core_message(kind).or_else(|| ownership_contract_message(kind))
+}
+
+fn ownership_argument_core_message(kind: &SemanticErrorKind) -> Option<String> {
     Some(match kind {
         SemanticErrorKind::UnknownParameter { callee, name } => {
             format!("unknown parameter `{name}` in call to `{callee}`")
@@ -87,6 +91,12 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidAbsReturnOrigin { reason } => {
             format!("invalid abs return origin: {reason}")
         }
+        _ => return None,
+    })
+}
+
+fn ownership_contract_message(kind: &SemanticErrorKind) -> Option<String> {
+    Some(match kind {
         SemanticErrorKind::MustUseIgnored { callee, reason } => {
             format!("must-use result from `{callee}` was ignored: {reason}")
         }
@@ -110,6 +120,21 @@ fn ownership_argument_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::RealtimeUnboundedRecursion => {
             "realtime code cannot recursively call itself without a static bound".to_owned()
+        }
+        SemanticErrorKind::StackLimitRecursion => {
+            "stack_limit contract cannot contain a reachable recursive call path".to_owned()
+        }
+        SemanticErrorKind::MissingStackLimitClaim { callee } => {
+            format!("stack_limit call to unsafe extern `{callee}` requires a stack_limit claim")
+        }
+        SemanticErrorKind::MissingImportedStackLimitClaim { callee } => {
+            format!("stack_limit call to imported `{callee}` requires a stack_limit claim")
+        }
+        SemanticErrorKind::UnsupportedStackLimitTarget { backend, target } => {
+            format!("stack_limit proof is not supported by backend `{backend}` for target `{target}`")
+        }
+        SemanticErrorKind::OpenStackLimitDispatch { method } => {
+            format!("stack_limit dynamic call `{method}` has no closed implementation set")
         }
         SemanticErrorKind::BoundedBudgetExceeded { dimension, limit, required } => {
             format!("bounded contract for `{dimension}` allows {limit}, but the body requires {required}")

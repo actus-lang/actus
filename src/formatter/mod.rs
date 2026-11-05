@@ -297,6 +297,9 @@ fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
         crate::ast::MetaAttribute::Deterministic => "deterministic".to_owned(),
         crate::ast::MetaAttribute::Realtime => "realtime".to_owned(),
         crate::ast::MetaAttribute::Bounded(contract) => format_bounded_metadata(contract),
+        crate::ast::MetaAttribute::StackLimit(contract) => {
+            format!("stack_limit(bytes: {}u32)", contract.bytes)
+        }
         crate::ast::MetaAttribute::Capability(capability) => {
             format!("capability(\"{}\")", capability.name())
         }

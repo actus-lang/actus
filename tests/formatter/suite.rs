@@ -100,6 +100,14 @@ fn preserves_bounded_metadata_idempotently() {
 }
 
 #[test]
+fn preserves_stack_limit_metadata_idempotently() {
+    let formatted =
+        format_source("meta stack_limit(bytes: 2048u32) verb control() -> Int { return 0; }");
+    assert!(formatted.contains("meta stack_limit(bytes: 2048u32)"));
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_role_method_effect_metadata_idempotently() {
     let formatted =
         format_source("role Writer { meta effect(\"filesystem\") verb write(abs self: Int); }");

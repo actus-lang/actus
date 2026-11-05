@@ -11,6 +11,7 @@ use actus::modules::{
     analyze_with_imports_for_target, build_compilation_plan, load_module_unit, parse_module,
 };
 use actus::parser::parse;
+use actus::semantic::SemanticErrorKind;
 
 struct Fixture {
     root: PathBuf,
@@ -93,6 +94,39 @@ fn resolves_qualified_call_through_an_open_import() {
 
     analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
         .expect("open imports should preserve their qualified namespace binding");
+}
+
+#[test]
+fn stack_limit_requires_an_imported_claim_at_the_call_boundary() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write("shared/api.act", "open verb load() -> Int { return 7; }");
+    let program = parse_source(
+        "import shared; meta stack_limit(bytes: 256u32) verb main() -> Int { return shared::load(); }",
+    );
+    let error = analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("stack_limit must close imported call claims");
+    let ModuleError::Semantic(error) = error else { panic!("expected semantic error") };
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::MissingImportedStackLimitClaim { ref callee } if callee == "shared::load"
+    ));
+}
+
+#[test]
+fn accepts_a_stack_limited_imported_call_with_a_claim() {
+    let fixture = Fixture::new();
+    fixture.write("shared/shared.act", "open api;");
+    fixture.write(
+        "shared/api.act",
+        "meta stack_limit(bytes: 128u32) open verb load() -> Int { return 7; }",
+    );
+    let program = parse_source(
+        "import shared; meta stack_limit(bytes: 256u32) verb main() -> Int { return shared::load(); }",
+    );
+
+    analyze_with_imports(&program, &ModuleResolver::new(&fixture.root))
+        .expect("a claimed imported stack boundary should be accepted");
 }
 
 #[test]

@@ -120,6 +120,7 @@ pub struct CompilerConfiguration {
     pub(super) dependency_roots: BTreeMap<String, PathBuf>,
     pub(super) target: TargetSpec,
     pub(super) target_spec_hash: String,
+    pub(super) lockfile_checksum: Option<String>,
     pub(super) time_provider: Option<TimeProviderContract>,
     pub(super) profile: BuildProfile,
     pub(super) profiles: manifest::ProfilesManifest,

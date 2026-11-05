@@ -12,8 +12,10 @@ use llvm_sys::target_machine::{
     LLVMCreateTargetMachine, LLVMDisposeTargetMachine, LLVMGetTargetFromTriple, LLVMRelocMode,
     LLVMTargetHasTargetMachine, LLVMTargetMachineEmitToFile, LLVMTargetMachineEmitToMemoryBuffer,
 };
+use target_lexicon::BinaryFormat;
 
 use super::super::BackendEmitError;
+use super::emission::{ObjectEmissionOptions, ObjectOptimizationLevel};
 use crate::target::TargetSpec;
 
 static LLVM_TARGETS_INITIALIZED: Once = Once::new();
@@ -23,6 +25,7 @@ pub(super) fn emit_object(
     target: &TargetSpec,
     output: &Path,
     position_independent: bool,
+    options: ObjectEmissionOptions,
 ) -> Result<(), BackendEmitError> {
     initialize_targets()?;
     let triple = CString::new(target.triple().to_string())
@@ -32,7 +35,12 @@ pub(super) fn emit_object(
         .ok_or_else(|| BackendEmitError("LLVM object path is not valid UTF-8".to_owned()))?;
     let output = CString::new(output)
         .map_err(|_| BackendEmitError("LLVM object path contains NUL".to_owned()))?;
-    let machine = TargetMachine::new(triple.as_c_str(), position_independent)?;
+    let machine = TargetMachine::new(
+        triple.as_c_str(),
+        position_independent,
+        target.object_format == BinaryFormat::Elf,
+        options,
+    )?;
     let data_layout = unsafe { LLVMCreateTargetDataLayout(machine.raw) };
     if data_layout.is_null() {
         return Err(BackendEmitError("LLVM failed to create target data layout".to_owned()));
@@ -60,11 +68,17 @@ pub(super) fn emit_object_bytes(
     module: llvm_sys::prelude::LLVMModuleRef,
     target: &TargetSpec,
     position_independent: bool,
+    options: ObjectEmissionOptions,
 ) -> Result<Vec<u8>, BackendEmitError> {
     initialize_targets()?;
     let triple = CString::new(target.triple().to_string())
         .map_err(|_| BackendEmitError("LLVM target triple contains NUL".to_owned()))?;
-    let machine = TargetMachine::new(triple.as_c_str(), position_independent)?;
+    let machine = TargetMachine::new(
+        triple.as_c_str(),
+        position_independent,
+        target.object_format == BinaryFormat::Elf,
+        options,
+    )?;
     let data_layout = unsafe { LLVMCreateTargetDataLayout(machine.raw) };
     if data_layout.is_null() {
         return Err(BackendEmitError("LLVM failed to create target data layout".to_owned()));
@@ -104,11 +118,17 @@ pub(super) fn emit_object_bytes(
 }
 
 fn initialize_targets() -> Result<(), BackendEmitError> {
-    LLVM_TARGETS_INITIALIZED.call_once(|| unsafe {
-        llvm_sys::target::LLVM_InitializeAllTargetInfos();
-        llvm_sys::target::LLVM_InitializeAllTargets();
-        llvm_sys::target::LLVM_InitializeAllTargetMCs();
-        llvm_sys::target::LLVM_InitializeAllAsmPrinters();
+    LLVM_TARGETS_INITIALIZED.call_once(|| {
+        unsafe {
+            llvm_sys::target::LLVM_InitializeAllTargetInfos();
+            llvm_sys::target::LLVM_InitializeAllTargets();
+            llvm_sys::target::LLVM_InitializeAllTargetMCs();
+            llvm_sys::target::LLVM_InitializeAllAsmPrinters();
+        }
+        // LLVM exposes this control as a process-global cl::opt rather than a
+        // TargetMachine option. Set it before any TargetMachine is created so
+        // every LLVM emission in this process has the same frame accounting.
+        super::shim::disable_x86_call_frame_optimization();
     });
     Ok(())
 }
@@ -118,26 +138,37 @@ struct TargetMachine {
 }
 
 impl TargetMachine {
-    fn new(triple: &std::ffi::CStr, position_independent: bool) -> Result<Self, BackendEmitError> {
-        let mut target = ptr::null_mut();
+    fn new(
+        triple: &std::ffi::CStr,
+        position_independent: bool,
+        is_elf: bool,
+        options: super::emission::ObjectEmissionOptions,
+    ) -> Result<Self, BackendEmitError> {
+        let mut llvm_target = ptr::null_mut();
         let mut error = ptr::null_mut();
         let failed =
-            unsafe { LLVMGetTargetFromTriple(triple.as_ptr(), &mut target, &mut error) != 0 };
+            unsafe { LLVMGetTargetFromTriple(triple.as_ptr(), &mut llvm_target, &mut error) != 0 };
         if failed {
             return Err(BackendEmitError(format_llvm_error(error, "LLVM target lookup failed")));
         }
-        if target.is_null() || unsafe { LLVMTargetHasTargetMachine(target) == 0 } {
+        if llvm_target.is_null() || unsafe { LLVMTargetHasTargetMachine(llvm_target) == 0 } {
             return Err(BackendEmitError("LLVM target has no target machine".to_owned()));
         }
         let cpu = CString::new("").expect("empty CPU string cannot contain NUL");
         let features = CString::new("").expect("empty feature string cannot contain NUL");
+        let options = if is_elf { options } else { ObjectEmissionOptions::default() };
         let raw = unsafe {
             LLVMCreateTargetMachine(
-                target,
+                llvm_target,
                 triple.as_ptr(),
                 cpu.as_ptr(),
                 features.as_ptr(),
-                LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+                match options.optimization_level {
+                    ObjectOptimizationLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+                    ObjectOptimizationLevel::Default => {
+                        LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault
+                    }
+                },
                 if position_independent {
                     LLVMRelocMode::LLVMRelocPIC
                 } else {
@@ -146,9 +177,17 @@ impl TargetMachine {
                 LLVMCodeModel::LLVMCodeModelDefault,
             )
         };
-        (!raw.is_null())
-            .then_some(Self { raw })
-            .ok_or_else(|| BackendEmitError("LLVM failed to create target machine".to_owned()))
+        if raw.is_null() {
+            return Err(BackendEmitError("LLVM failed to create target machine".to_owned()));
+        }
+        super::shim::apply(
+            raw,
+            super::shim::TargetMachineOptions {
+                emit_stack_size_section: options.emit_stack_size_section,
+                function_sections: options.function_sections,
+            },
+        );
+        Ok(Self { raw })
     }
 }
 

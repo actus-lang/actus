@@ -21,6 +21,7 @@ impl CompilerConfiguration {
             source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
             dependency_roots: std::collections::BTreeMap::new(),
             target_spec_hash: target.spec_hash(),
+            lockfile_checksum: None,
             time_provider: (entry_contract == super::EntryContract::Hosted)
                 .then(crate::target::TimeProviderContract::hosted_default),
             target,
@@ -45,20 +46,19 @@ impl CompilerConfiguration {
     }
 
     pub fn from_manifest(path: &Path) -> Result<Self, ConfigurationError> {
-        Self::from_manifest_with_lockfile_policy(path, true, false)
+        Self::from_manifest_with_lockfile_policy(path, true)
     }
 
     pub fn from_manifest_read_only(path: &Path) -> Result<Self, ConfigurationError> {
-        Self::from_manifest_with_lockfile_policy(path, false, false)
+        Self::from_manifest_with_lockfile_policy(path, false)
     }
 
     pub(crate) fn from_manifest_with_lockfile_policy(
         path: &Path,
         sync_missing_lockfile: bool,
-        reject_legacy_manifest: bool,
     ) -> Result<Self, ConfigurationError> {
-        let manifest = read_manifest_for_policy(path, reject_legacy_manifest)?;
-        let dependency_graph = super::dependencies::resolve(path, reject_legacy_manifest)?;
+        let manifest = manifest::read(path)?;
+        let dependency_graph = super::dependencies::resolve(path)?;
         validate_lockfile(path, sync_missing_lockfile)?;
         let environment = Self::from_environment();
         build_from_manifest(path, manifest, dependency_graph, environment)
@@ -107,15 +107,12 @@ fn build_from_manifest(
         super::resolution::runtime_identity(runtime, runtime_source_root.as_deref())?;
     let runtime_module_roots = super::resolution::runtime_module_roots(runtime, entry_contract)?;
     let manifest_directory = path.parent().unwrap_or_else(|| Path::new("."));
+    let lockfile_checksum =
+        super::checksum::file_checksum(&manifest_directory.join(manifest::LOCK_FILE_NAME)).ok();
     let source_root = validated_source_root(&manifest, manifest_directory)?;
     let (profile, native_backend, libraries, library_paths, linker_script) =
         build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
-    if explicit_backend {
-        native_backend
-            .backend()
-            .validate_target(&target)
-            .map_err(|error| ConfigurationError(error.to_string()))?;
-    }
+    validate_explicit_backend(explicit_backend, &native_backend, &target)?;
     Ok(CompilerConfiguration {
         project_root: manifest_directory.to_path_buf(),
         source_root,
@@ -125,6 +122,7 @@ fn build_from_manifest(
             &target,
             time_provider.as_ref(),
         ),
+        lockfile_checksum,
         target,
         time_provider,
         profile,
@@ -145,6 +143,20 @@ fn build_from_manifest(
         libraries,
         ..environment
     })
+}
+
+fn validate_explicit_backend(
+    explicit: bool,
+    backend: &super::NativeBackendConfiguration,
+    target: &crate::target::TargetSpec,
+) -> Result<(), ConfigurationError> {
+    if explicit {
+        backend
+            .backend()
+            .validate_target(target)
+            .map_err(|error| ConfigurationError(error.to_string()))?;
+    }
+    Ok(())
 }
 
 fn resolve_time_provider(
@@ -227,21 +239,6 @@ fn validated_source_root(
         "InvalidSourceRoot: Actus.toml package.source_root `{}` does not exist",
         source_root.display()
     )))
-}
-
-fn read_manifest_for_policy(
-    path: &Path,
-    reject_legacy_manifest: bool,
-) -> Result<manifest::ActusManifest, ConfigurationError> {
-    if reject_legacy_manifest && manifest::is_legacy_manifest(path) {
-        return Err(ConfigurationError(
-            "strict mode rejects deprecated `Arca.toml`; rename it to `Actus.toml`".to_owned(),
-        ));
-    }
-    if !reject_legacy_manifest {
-        manifest::warn_if_legacy_manifest(path);
-    }
-    manifest::read(path)
 }
 
 pub(crate) fn manifest_path_in_directory(path: &Path) -> Option<PathBuf> {

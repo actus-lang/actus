@@ -98,6 +98,10 @@ impl CompilerConfiguration {
         &self.target_spec_hash
     }
 
+    pub fn lockfile_checksum(&self) -> Option<&str> {
+        self.lockfile_checksum.as_deref()
+    }
+
     pub fn time_provider(&self) -> Option<&TimeProviderContract> {
         self.time_provider.as_ref()
     }

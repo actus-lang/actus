@@ -31,8 +31,8 @@ behavior around the existing language and runtime contracts.
 - [x] Reject duplicate strict flags before configuration loading or source
       compilation.
 - [x] Route strict configuration loading through a dedicated policy boundary.
-- [x] Reject deprecated root and local dependency `Arca.toml` manifests in
-      strict mode instead of emitting compatibility warnings.
+- [x] Require the canonical `Actus.toml` manifest for root projects and local
+      dependencies in strict mode.
 - [x] Run source-aware semantic preflight before strict build code generation.
 - [x] Run source-aware semantic validation while collecting strict meta tests.
 - [x] Add positive and negative CLI/configuration regression tests for the

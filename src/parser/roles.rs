@@ -111,6 +111,7 @@ impl Parser {
                     | MetaAttribute::Deterministic
                     | MetaAttribute::Realtime
                     | MetaAttribute::Bounded(_)
+                    | MetaAttribute::StackLimit(_)
                     | MetaAttribute::Capability(_)
             )
         }) {

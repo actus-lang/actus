@@ -72,6 +72,7 @@ pub enum MetaAttribute {
     Deterministic,
     Realtime,
     Bounded(BoundedContract),
+    StackLimit(StackLimitContract),
     Capability(Capability),
     Repr(Repr),
     Volatile,
@@ -171,6 +172,11 @@ pub struct BoundedContract {
     pub max_allocation_bytes: Option<u64>,
     pub max_stack_bytes: Option<u64>,
     pub max_io_bytes: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct StackLimitContract {
+    pub bytes: u32,
 }
 
 impl BoundedContract {

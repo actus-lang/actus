@@ -27,14 +27,6 @@ pub const STRICT_CODE_RANGE_END: u16 = 1899;
 /// specific classification.
 pub const STRICT_CONFIGURATION_FAILURE: &str = "E1800";
 
-/// Stable diagnostic code for a deprecated root `Arca.toml` manifest rejected
-/// by strict configuration loading.
-pub const STRICT_LEGACY_MANIFEST: &str = "E1801";
-
-/// Stable diagnostic code for a deprecated local dependency manifest rejected
-/// by strict configuration loading.
-pub const STRICT_LEGACY_DEPENDENCY: &str = "E1802";
-
 /// The selected runtime profile requires unavailable compiler-owned metadata.
 pub const STRICT_RUNTIME_METADATA_MISSING: &str = "E1803";
 

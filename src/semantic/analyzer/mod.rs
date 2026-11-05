@@ -29,6 +29,24 @@ pub(crate) fn validate_bounded_recursion(
     Analyzer::new().validate_bounded_recursion(program)
 }
 
+pub(crate) fn validate_stack_limit_recursion(
+    program: &Program,
+) -> Result<(), super::errors::SemanticError> {
+    Analyzer::new().validate_stack_limit_recursion(program)
+}
+
+pub(crate) fn validate_stack_limit_native_claims(
+    program: &Program,
+) -> Result<(), super::errors::SemanticError> {
+    Analyzer::new().validate_stack_limit_native_claims(program)
+}
+
+pub(crate) fn validate_stack_limit_dynamic_dispatch(
+    program: &Program,
+) -> Result<(), super::errors::SemanticError> {
+    Analyzer::new().validate_stack_limit_dynamic_dispatch(program)
+}
+
 use super::errors::SemanticError;
 use super::model::SemanticModel;
 use crate::ast::Program;

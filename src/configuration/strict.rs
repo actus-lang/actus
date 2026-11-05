@@ -3,9 +3,8 @@ use std::path::Path;
 
 use super::{CompilerConfiguration, ConfigurationError, manifest};
 use crate::diagnostics::{
-    Diagnostic, DiagnosticPhase, STRICT_CONFIGURATION_FAILURE, STRICT_LEGACY_DEPENDENCY,
-    STRICT_LEGACY_MANIFEST, STRICT_RUNTIME_METADATA_MISSING, STRICT_RUNTIME_TARGET_INCOMPATIBLE,
-    STRICT_RUNTIME_UNSUPPORTED,
+    Diagnostic, DiagnosticPhase, STRICT_CONFIGURATION_FAILURE, STRICT_RUNTIME_METADATA_MISSING,
+    STRICT_RUNTIME_TARGET_INCOMPATIBLE, STRICT_RUNTIME_UNSUPPORTED,
 };
 use crate::lexer::SourceSpan;
 
@@ -23,9 +22,7 @@ impl StrictConfigurationError {
 
     fn from_configuration(error: ConfigurationError) -> Self {
         let message = error.to_string();
-        let code = if message.contains("deprecated dependency `Arca.toml`") {
-            STRICT_LEGACY_DEPENDENCY
-        } else if message.contains("cannot locate the compiler-owned standard library")
+        let code = if message.contains("cannot locate the compiler-owned standard library")
             || message.contains("builtin standard library is missing its runtime registry")
             || message.contains("builtin standard-library root has no package parent")
         {
@@ -44,20 +41,6 @@ impl StrictConfigurationError {
             ),
         }
     }
-
-    fn legacy_manifest(path: &Path) -> Self {
-        Self {
-            diagnostic: Box::new(
-                Diagnostic::error(
-                    STRICT_LEGACY_MANIFEST,
-                    SourceSpan::new(0, 0),
-                    "strict mode rejects deprecated `Arca.toml`; rename it to `Actus.toml`",
-                )
-                .with_phase(DiagnosticPhase::Configuration)
-                .with_source_path(path.display().to_string()),
-            ),
-        }
-    }
 }
 
 impl Display for StrictConfigurationError {
@@ -73,10 +56,7 @@ impl std::error::Error for StrictConfigurationError {}
 
 impl CompilerConfiguration {
     pub fn from_manifest_strict(path: &Path) -> Result<Self, StrictConfigurationError> {
-        if manifest::is_legacy_manifest(path) {
-            return Err(StrictConfigurationError::legacy_manifest(path));
-        }
-        Self::from_manifest_with_lockfile_policy(path, true, true)
+        Self::from_manifest_with_lockfile_policy(path, true)
             .map_err(StrictConfigurationError::from_configuration)
     }
 

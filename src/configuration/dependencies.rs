@@ -36,13 +36,10 @@ pub(crate) struct DependencyGraph {
     pub(crate) packages: Vec<DependencyPackage>,
 }
 
-pub(crate) fn resolve(
-    manifest_path: &Path,
-    reject_legacy_manifest: bool,
-) -> Result<DependencyGraph, ConfigurationError> {
+pub(crate) fn resolve(manifest_path: &Path) -> Result<DependencyGraph, ConfigurationError> {
     let mut graph = DependencyGraph::default();
     let mut visiting = HashSet::new();
-    visit_manifest(manifest_path, &mut graph, &mut visiting, reject_legacy_manifest)?;
+    visit_manifest(manifest_path, &mut graph, &mut visiting)?;
     graph.packages.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(graph)
 }
@@ -51,9 +48,7 @@ fn visit_manifest(
     manifest_path: &Path,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
-    reject_legacy_manifest: bool,
 ) -> Result<(), ConfigurationError> {
-    reject_legacy_dependency(manifest_path, reject_legacy_manifest)?;
     let canonical = canonical_manifest_path(manifest_path)?;
     if !visiting.insert(canonical.clone()) {
         return Err(ConfigurationError(format!(
@@ -63,21 +58,8 @@ fn visit_manifest(
     }
     let manifest = super::manifest::read(&canonical)?;
     let dependencies = dependency_specs(&manifest)?;
-    visit_dependency_specs(&canonical, dependencies, graph, visiting, reject_legacy_manifest)?;
+    visit_dependency_specs(&canonical, dependencies, graph, visiting)?;
     visiting.remove(&canonical);
-    Ok(())
-}
-
-fn reject_legacy_dependency(
-    manifest_path: &Path,
-    reject_legacy_manifest: bool,
-) -> Result<(), ConfigurationError> {
-    if reject_legacy_manifest && super::manifest::is_legacy_manifest(manifest_path) {
-        return Err(ConfigurationError(
-            "strict mode rejects deprecated dependency `Arca.toml`; rename it to `Actus.toml`"
-                .to_owned(),
-        ));
-    }
     Ok(())
 }
 
@@ -95,7 +77,6 @@ fn visit_dependency_specs(
     dependencies: BTreeMap<String, DependencySpec>,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
-    reject_legacy_manifest: bool,
 ) -> Result<(), ConfigurationError> {
     for (name, specification) in dependencies {
         match specification {
@@ -108,14 +89,9 @@ fn visit_dependency_specs(
                     DependencyPackage { name, version, path: None, checksum: None },
                 )?;
             }
-            DependencySpec::Local(table) => visit_local_dependency(
-                canonical,
-                name,
-                table,
-                graph,
-                visiting,
-                reject_legacy_manifest,
-            )?,
+            DependencySpec::Local(table) => {
+                visit_local_dependency(canonical, name, table, graph, visiting)?
+            }
         }
     }
     Ok(())
@@ -147,16 +123,15 @@ fn visit_local_dependency(
     table: DependencyTable,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
-    reject_legacy_manifest: bool,
 ) -> Result<(), ConfigurationError> {
     let relative_path = required_local_path(&name, table.path)?;
     let (package_root, dependency_manifest, child) =
-        load_local_dependency(parent_manifest, &name, &relative_path, reject_legacy_manifest)?;
+        load_local_dependency(parent_manifest, &name, &relative_path)?;
     validate_dependency_version(&name, table.version.as_deref(), &child.package.version)?;
     let child_source_root = dependency_source_root(&name, &child, &package_root)?;
     graph.roots.insert(name.clone(), child_source_root);
     record_local_package(graph, name, relative_path, &child, &package_root)?;
-    visit_manifest(&dependency_manifest, graph, visiting, reject_legacy_manifest)
+    visit_manifest(&dependency_manifest, graph, visiting)
 }
 
 fn required_local_path(name: &str, path: Option<String>) -> Result<String, ConfigurationError> {
@@ -202,7 +177,6 @@ fn load_local_dependency(
     parent_manifest: &Path,
     name: &str,
     relative_path: &str,
-    reject_legacy_manifest: bool,
 ) -> Result<(PathBuf, PathBuf, ActusManifest), ConfigurationError> {
     let package_root =
         parent_manifest.parent().unwrap_or_else(|| Path::new(".")).join(relative_path);
@@ -212,15 +186,6 @@ fn load_local_dependency(
             package_root.display()
         )));
     };
-    if reject_legacy_manifest && super::manifest::is_legacy_manifest(&dependency_manifest) {
-        return Err(ConfigurationError(
-            "strict mode rejects deprecated dependency `Arca.toml`; rename it to `Actus.toml`"
-                .to_owned(),
-        ));
-    }
-    if !reject_legacy_manifest {
-        super::manifest::warn_if_legacy_manifest(&dependency_manifest);
-    }
     let child = super::manifest::read(&dependency_manifest)?;
     Ok((package_root, dependency_manifest, child))
 }

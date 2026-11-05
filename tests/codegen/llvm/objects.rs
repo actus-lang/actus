@@ -57,6 +57,94 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
     assert_eq!(bytes, second_bytes, "repeated object emission must be deterministic");
     let object = object::File::parse(bytes.as_slice()).expect("object should parse");
     assert!(has_symbol(&object, "test__verb_main"));
+    let configured_output =
+        std::env::temp_dir().join(format!("actus-llvm-object-{}-configured.o", std::process::id()));
+    emit_object_with_configuration_and_options(
+        &module,
+        &target,
+        &configured_output,
+        true,
+        ObjectEmissionOptions {
+            emit_stack_size_section: true,
+            function_sections: true,
+            ..ObjectEmissionOptions::default()
+        },
+    )
+    .expect("configured host object should be emitted");
+    let configured_bytes =
+        std::fs::read(&configured_output).expect("configured object should read");
+    let configured =
+        object::File::parse(configured_bytes.as_slice()).expect("configured object should parse");
+    if target.object_format == target_lexicon::BinaryFormat::Elf {
+        assert!(
+            configured.section_by_name(".stack_sizes").is_some(),
+            "configured ELF object must publish .stack_sizes"
+        );
+        let text_sections = configured
+            .sections()
+            .filter(|section| section.kind() == object::SectionKind::Text)
+            .filter_map(|section| section.name().ok())
+            .collect::<Vec<_>>();
+        assert!(
+            text_sections.iter().any(|name| name.contains("test__verb_main")),
+            "configured ELF object must isolate the function section: {text_sections:?}"
+        );
+    } else {
+        assert_eq!(
+            configured_bytes, bytes,
+            "non-ELF configured options must preserve default object bytes"
+        );
+        assert!(
+            configured.section_by_name(".stack_sizes").is_none(),
+            "non-ELF targets must not enable the ELF frame-report option"
+        );
+    }
+    let disabled_output =
+        std::env::temp_dir().join(format!("actus-llvm-object-{}-disabled.o", std::process::id()));
+    emit_object_with_configuration_and_options(
+        &module,
+        &target,
+        &disabled_output,
+        true,
+        ObjectEmissionOptions::default(),
+    )
+    .expect("disabled-options object should be emitted");
+    let disabled_bytes = std::fs::read(&disabled_output).expect("disabled object should read");
+    let default_bytes = std::fs::read(&output).expect("default object should read");
+    assert_eq!(disabled_bytes, default_bytes, "disabled options must preserve default bytes");
+    let disabled =
+        object::File::parse(disabled_bytes.as_slice()).expect("disabled object should parse");
+    assert!(
+        disabled.section_by_name(".stack_sizes").is_none(),
+        "disabled options must not publish .stack_sizes"
+    );
+    std::fs::remove_file(disabled_output).expect("disabled object should be removed");
+    let non_elf_target = actus::target::TargetSpec::parse("x86_64-apple-darwin")
+        .expect("Mach-O target should parse");
+    let non_elf_bytes =
+        actus::codegen::llvm::emit_object_bytes_with_configuration_and_options_and_float_policy(
+            &module,
+            &non_elf_target,
+            true,
+            false,
+            ObjectEmissionOptions {
+                emit_stack_size_section: true,
+                function_sections: true,
+                ..ObjectEmissionOptions::default()
+            },
+        )
+        .expect("non-ELF object should emit");
+    let non_elf =
+        object::File::parse(non_elf_bytes.as_slice()).expect("non-ELF object should parse");
+    assert!(
+        non_elf.section_by_name(".stack_sizes").is_none(),
+        "non-ELF targets must not enable the ELF frame-report option"
+    );
+    if std::env::var_os("ACTUS_KEEP_LLVM_OPTIONS_OBJECT").is_none() {
+        std::fs::remove_file(configured_output).expect("configured object should be removed");
+    } else {
+        eprintln!("kept configured object at {}", configured_output.display());
+    }
     std::fs::remove_file(output).expect("test object should be removed");
     std::fs::remove_file(second_output).expect("second test object should be removed");
 }
@@ -241,11 +329,26 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         std::env::temp_dir().join(format!("actus-llvm-arm-call-fixtures-{}.o", std::process::id()));
     let target = actus::target::TargetSpec::parse("thumbv7em-none-eabihf")
         .expect("Cortex-M target should parse");
-    emit_object(&module, &target, &output).expect("ARM call fixture object should be emitted");
+    emit_object_with_configuration_and_options(
+        &module,
+        &target,
+        &output,
+        true,
+        ObjectEmissionOptions {
+            emit_stack_size_section: true,
+            function_sections: true,
+            ..ObjectEmissionOptions::default()
+        },
+    )
+    .expect("ARM call fixture object should be emitted");
     let bytes = std::fs::read(&output).expect("ARM call fixture object should be readable");
     let object =
         object::File::parse(bytes.as_slice()).expect("ARM call fixture object should parse");
     assert_eq!(object.architecture(), object::Architecture::Arm);
+    assert!(
+        object.section_by_name(".stack_sizes").is_some(),
+        "configured ARM object must publish .stack_sizes"
+    );
     let text = object.section_by_name(".text").expect("ARM call fixture should contain .text");
     assert!(text.align() >= 2, "Thumb code must have at least halfword alignment");
     let hosted_imports = ["abort", "free", "malloc", "memcpy", "printf"];
@@ -260,6 +363,11 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         "arm__verb_aggregate_5fcaller",
     ] {
         assert!(object.symbols().any(|candidate| candidate.name() == Ok(symbol)));
+        let section_name = format!(".text.{symbol}");
+        assert!(
+            object.section_by_name(&section_name).is_some(),
+            "function sections must isolate `{symbol}`"
+        );
     }
     #[cfg(target_os = "linux")]
     {

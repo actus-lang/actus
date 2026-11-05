@@ -18,6 +18,15 @@ pub(crate) fn content_checksum(root: &Path) -> Result<String, ConfigurationError
     Ok(format!("{hash:016x}"))
 }
 
+pub(crate) fn file_checksum(path: &Path) -> Result<String, ConfigurationError> {
+    let bytes = fs::read(path).map_err(|error| {
+        ConfigurationError(format!("cannot hash `{}`: {error}", path.display()))
+    })?;
+    let mut hash = 0xcbf29ce484222325_u64;
+    update_hash(&mut hash, &bytes);
+    Ok(format!("{hash:016x}"))
+}
+
 fn collect_files(
     root: &Path,
     directory: &Path,

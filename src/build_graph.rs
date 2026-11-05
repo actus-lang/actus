@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::configuration::CompilerConfiguration;
 
-const ACTMETA_FORMAT_VERSION: u32 = 4;
+const ACTMETA_FORMAT_VERSION: u32 = 5;
 
 #[derive(Debug)]
 pub struct BuildGraphError(String);
@@ -28,7 +28,9 @@ pub struct UnitMetadata {
     pub backend: String,
     pub target_triple: String,
     pub target_spec_hash: String,
+    pub lockfile_checksum: Option<String>,
     pub profile: String,
+    pub backend_identity: String,
     pub runtime: String,
     pub source_limits: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -50,7 +52,9 @@ impl UnitMetadata {
             backend: configuration.native_backend().backend().name().to_owned(),
             target_triple: configuration.target().triple().to_string(),
             target_spec_hash: configuration.target_spec_hash().to_owned(),
+            lockfile_checksum: configuration.lockfile_checksum().map(str::to_owned),
             profile: configuration.profile().directory_name().to_owned(),
+            backend_identity: backend_identity(configuration.native_backend().backend().name()),
             runtime: configuration.runtime_profile().to_string(),
             source_limits: source_limit_name(configuration.source_limit_mode()).to_owned(),
             runtime_version: configuration.runtime_version().map(str::to_owned),
@@ -65,7 +69,10 @@ impl UnitMetadata {
             && self.backend == configuration.native_backend().backend().name()
             && self.target_triple == configuration.target().triple().to_string()
             && self.target_spec_hash == configuration.target_spec_hash()
+            && self.lockfile_checksum.as_deref() == configuration.lockfile_checksum()
             && self.profile == configuration.profile().directory_name()
+            && self.backend_identity
+                == backend_identity(configuration.native_backend().backend().name())
             && self.runtime == configuration.runtime_profile().to_string()
             && self.source_limits == source_limit_name(configuration.source_limit_mode())
             && self.runtime_version.as_deref() == configuration.runtime_version()
@@ -78,6 +85,16 @@ impl UnitMetadata {
         })?;
         toml::from_str(&source)
             .map_err(|error| BuildGraphError(format!("cannot parse `{}`: {error}", path.display())))
+    }
+}
+
+fn backend_identity(backend: &str) -> String {
+    match backend {
+        "llvm" => option_env!("ACTUS_LLVM_IDENTITY").unwrap_or("llvm-sys-231.0.0").to_owned(),
+        "cranelift" => {
+            option_env!("ACTUS_CRANELIFT_IDENTITY").unwrap_or("cranelift-0.137.0").to_owned()
+        }
+        other => format!("unknown-{other}"),
     }
 }
 

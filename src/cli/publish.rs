@@ -119,9 +119,7 @@ fn manifest_path(input: &Path) -> PathBuf {
     if input.is_dir() {
         crate::configuration::manifest_path_in_directory(&input)
             .unwrap_or_else(|| input.join("Actus.toml"))
-    } else if input.file_name().and_then(|name| name.to_str()) == Some("Actus.toml")
-        || input.file_name().and_then(|name| name.to_str()) == Some("Arca.toml")
-    {
+    } else if input.file_name().and_then(|name| name.to_str()) == Some("Actus.toml") {
         input
     } else {
         let parent = input.parent().unwrap_or_else(|| Path::new("."));

@@ -6,7 +6,9 @@ use actus::codegen::cranelift::emit_contract_module_object;
 #[cfg(target_os = "linux")]
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{
-    emit_module, emit_object, emit_object_bytes_with_configuration_and_float_policy,
+    ObjectEmissionOptions, emit_module, emit_object,
+    emit_object_bytes_with_configuration_and_float_policy,
+    emit_object_with_configuration_and_options,
 };
 use actus::codegen::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendCaseMode, BackendCleanupArgument,
@@ -50,3 +52,4 @@ mod ir;
 mod objects;
 mod regressions;
 mod runtime;
+mod stack_contracts;
