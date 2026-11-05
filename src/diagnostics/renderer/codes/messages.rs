@@ -130,6 +130,9 @@ fn ownership_contract_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::UnsupportedStackLimitTarget { backend, target } => {
             format!("stack_limit proof is not supported by backend `{backend}` for target `{target}`")
         }
+        SemanticErrorKind::OpenStackLimitDispatch { method } => {
+            format!("stack_limit dynamic call `{method}` has no closed implementation set")
+        }
         SemanticErrorKind::BoundedBudgetExceeded { dimension, limit, required } => {
             format!("bounded contract for `{dimension}` allows {limit}, but the body requires {required}")
         }

@@ -69,3 +69,22 @@ fn rejects_stack_limit_on_unverified_backend_target_pairs() {
     assert!(matches!(error.kind, SemanticErrorKind::UnsupportedStackLimitTarget { .. }));
     assert_eq!(semantic_diagnostic(&error).code(), "E1863");
 }
+
+#[test]
+fn rejects_stack_limit_with_open_dynamic_dispatch() {
+    let error = analyze_source(
+        "role Writer { verb write(abs self: Int) -> Int; } meta stack_limit(bytes: 256u32) verb send(abs writer: dynamic Writer) -> Int { return writer.write(); }",
+    )
+    .expect_err("stack_limit must reject an open dynamic dispatch set");
+    assert!(matches!(
+        error.kind,
+        SemanticErrorKind::OpenStackLimitDispatch { ref method } if method == "write"
+    ));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1862");
+}
+
+#[test]
+fn accepts_stack_limit_with_closed_dynamic_dispatch() {
+    let source = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value; } } meta stack_limit(bytes: 256u32) verb send(abs writer: dynamic Writer) -> Int { return writer.write(); }";
+    analyze_source(source).expect("a closed dynamic dispatch set should be accepted");
+}

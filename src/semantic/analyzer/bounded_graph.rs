@@ -78,6 +78,19 @@ impl Analyzer {
         }
         Ok(())
     }
+
+    pub(crate) fn validate_stack_limit_dynamic_dispatch(
+        &self,
+        program: &Program,
+    ) -> Result<(), SemanticError> {
+        let graph = unresolved_call_graph(program);
+        let performance_nodes =
+            graph.keys().filter(|name| name.starts_with("perform::")).cloned().collect::<Vec<_>>();
+        for root in stack_limit_roots(program) {
+            visit_dynamic_targets(&root, &graph, &performance_nodes, &mut HashSet::new())?;
+        }
+        Ok(())
+    }
 }
 
 fn is_bounded(metadata: &[crate::ast::MetaAttribute]) -> bool {
@@ -145,6 +158,10 @@ fn visit_native_claims(
 }
 
 fn call_graph(program: &Program) -> CallGraph {
+    resolve_method_edges(unresolved_call_graph(program))
+}
+
+fn unresolved_call_graph(program: &Program) -> CallGraph {
     let mut graph = HashMap::new();
     for declaration in &program.declarations {
         match declaration {
@@ -160,7 +177,7 @@ fn call_graph(program: &Program) -> CallGraph {
             _ => {}
         }
     }
-    resolve_method_edges(graph)
+    graph
 }
 
 fn resolve_method_edges(graph: CallGraph) -> CallGraph {
@@ -187,6 +204,31 @@ fn resolve_method_edges(graph: CallGraph) -> CallGraph {
             (caller, calls)
         })
         .collect()
+}
+
+fn visit_dynamic_targets(
+    name: &str,
+    graph: &CallGraph,
+    performance_nodes: &[String],
+    visited: &mut HashSet<String>,
+) -> Result<(), SemanticError> {
+    if !visited.insert(name.to_owned()) {
+        return Ok(());
+    }
+    for (callee, span) in graph.get(name).into_iter().flatten() {
+        if let Some(method) = callee.strip_prefix("@method::")
+            && !performance_nodes.iter().any(|node| node.ends_with(&format!("::{method}")))
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::OpenStackLimitDispatch { method: method.to_owned() },
+                span: *span,
+            });
+        }
+        if graph.contains_key(callee) {
+            visit_dynamic_targets(callee, graph, performance_nodes, visited)?;
+        }
+    }
+    Ok(())
 }
 
 fn performance_node(perform: &crate::ast::PerformDecl, method: &str) -> String {

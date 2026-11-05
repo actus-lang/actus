@@ -118,6 +118,9 @@ pub enum SemanticErrorKind {
         backend: String,
         target: String,
     },
+    OpenStackLimitDispatch {
+        method: String,
+    },
     BoundedBudgetExceeded {
         dimension: String,
         limit: u64,
