@@ -18,14 +18,14 @@ permissions:
 env:
   LLVM_VERSION: 23.1.2
   LLVM_SOURCE_REVISION: 85ac560262434c9ccfc0c183ec22d4138ed647fb
-  ACTUS_GLIBC_IMAGE_DIGEST: sha256:9756efb8fb8476b5318596892edaab48562e5984cfbcba98a07216664d7f5981
+  ACTUS_GLIBC_IMAGE_DIGEST: sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded
   CCACHE_DIR: /root/.cache/ccache
 
 jobs:
   build-linux-x86_64:
     name: Build LLVM 23.1.2 (Linux x86-64, glibc 2.28)
     runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux_2_28_x86_64@sha256:9756efb8fb8476b5318596892edaab48562e5984cfbcba98a07216664d7f5981
+    container: quay.io/pypa/manylinux_2_28_x86_64@sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -85,7 +85,7 @@ jobs:
     name: Verify LLVM development archive (Linux x86-64, glibc 2.28)
     needs: build-linux-x86_64
     runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux_2_28_x86_64@sha256:9756efb8fb8476b5318596892edaab48562e5984cfbcba98a07216664d7f5981
+    container: quay.io/pypa/manylinux_2_28_x86_64@sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
