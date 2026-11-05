@@ -38,6 +38,10 @@ mod volatile;
 
 pub use analyzer::analyze;
 pub(crate) use analyzer::validate_bounded_recursion;
+pub(crate) use analyzer::{
+    validate_stack_limit_dynamic_dispatch, validate_stack_limit_native_claims,
+    validate_stack_limit_recursion,
+};
 pub(crate) use calls::parse_type_name_key;
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};

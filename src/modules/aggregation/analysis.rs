@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 use crate::semantic::{
     SemanticModel, analyze, filter_program_for_target_checked, validate_bounded_recursion,
+    validate_stack_limit_dynamic_dispatch, validate_stack_limit_native_claims,
+    validate_stack_limit_recursion,
 };
 
 use super::super::resolver::ModuleResolver;
@@ -100,6 +102,7 @@ fn analyze_imported_units(
         )?;
         validate_bounded_recursion(module_plan.caller())
             .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
+        validate_stack_limit_contracts(module_plan.caller())?;
         let expanded = module_scope_program(module_plan.caller());
         analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     }
@@ -125,9 +128,20 @@ fn analyze_imported_units_for_target(
             .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
         validate_bounded_recursion(&targeted)
             .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
+        validate_stack_limit_contracts(&targeted)?;
         let expanded = module_scope_program(&targeted);
         analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     }
+    Ok(())
+}
+
+fn validate_stack_limit_contracts(program: &Program) -> Result<(), ModuleError> {
+    validate_stack_limit_recursion(program)
+        .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
+    validate_stack_limit_native_claims(program)
+        .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
+    validate_stack_limit_dynamic_dispatch(program)
+        .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     Ok(())
 }
 
