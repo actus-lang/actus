@@ -38,6 +38,11 @@ memory-access contract described in ADR-0101.
 [`meta zero_on_drop`](zero-on-drop.md) documents the explicit secret-storage
 clearing contract described in ADR-0102.
 
+[`meta stack_limit(...)`](stack-limit.md) documents the target-specific
+machine-stack proof contract described in ADR-0103. The frontend contract is
+implemented first; machine-level enforcement requires the staged proof model
+defined by the ADR.
+
 ## General rules
 
 - Metadata must use a compiler-recognized attribute name and argument shape.

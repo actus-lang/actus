@@ -367,6 +367,7 @@ fn declarations(
                 MetaAttribute::Deterministic => true,
                 MetaAttribute::Realtime => true,
                 MetaAttribute::Bounded(_) => true,
+                MetaAttribute::StackLimit(_) => true,
                 MetaAttribute::Capability(_) => true,
                 MetaAttribute::Repr(_) => true,
                 MetaAttribute::Volatile => true,

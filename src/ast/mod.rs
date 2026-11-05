@@ -13,9 +13,9 @@ pub use decl::{
     EnumPayload, EnumVariant, ExternalVerbDecl, GenericParam, GenericParamKind, ImportDecl,
     LayoutEndianness, LimitlessScope, MetaAttribute, OpenSiblingDecl, PackDecl, PackField,
     PackStorage, Param, PerformDecl, Program, Repr, ReturnAccess, ReturnType, Role, RoleDecl,
-    RoleMethod, SerializeDecl, SerializeSection, StructDef, StructField, StructFieldRole,
-    TestFault, TopLevelDecl, TypeIdentity, TypeName, VerbContract, VerbContractSection,
-    VerbContractSectionKind, VerbDecl, builtin_enum_definitions,
+    RoleMethod, SerializeDecl, SerializeSection, StackLimitContract, StructDef, StructField,
+    StructFieldRole, TestFault, TopLevelDecl, TypeIdentity, TypeName, VerbContract,
+    VerbContractSection, VerbContractSectionKind, VerbDecl, builtin_enum_definitions,
 };
 pub use expr::{
     Argument, ArgumentRoleResolution, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, IfBranch,

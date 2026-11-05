@@ -35,6 +35,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
         ParseErrorCode::MustUseRequiresReturn => "E0018",
         ParseErrorCode::UnsupportedEffect => "E0019",
         ParseErrorCode::InvalidBoundedLimit => "E0020",
+        ParseErrorCode::InvalidStackLimit => "E0023",
         ParseErrorCode::UnsupportedCapability => "E0021",
         ParseErrorCode::UnsupportedRepresentation => "E0022",
     }

@@ -16,6 +16,7 @@ impl Parser {
             "deterministic" => self.parse_deterministic_metadata(),
             "realtime" => self.parse_realtime_metadata(),
             "bounded" => self.parse_bounded_metadata(),
+            "stack_limit" => self.parse_stack_limit_metadata(),
             "capability" => self.parse_capability_metadata(),
             "repr" => self.parse_repr_metadata(),
             "volatile" => Ok(vec![MetaAttribute::Volatile]),

@@ -172,6 +172,7 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::InvalidBoundedLimit { reason } => {
             format!("invalid bounded execution limit: {reason}")
         }
+        ParseErrorKind::InvalidStackLimit { reason } => invalid_stack_limit_message(reason),
         ParseErrorKind::MalformedVerbContract { reason } => {
             format!("malformed verb contract: {reason}")
         }
@@ -179,6 +180,10 @@ fn parse_message(error: &ParseError) -> String {
             "`open` imports are only allowed inside an `import { ... };` block".to_owned()
         }
     }
+}
+
+fn invalid_stack_limit_message(reason: &str) -> String {
+    format!("invalid stack limit: {reason}")
 }
 
 fn line_column(source: &str, byte_offset: usize) -> (usize, usize) {
