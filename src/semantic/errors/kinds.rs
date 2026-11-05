@@ -114,6 +114,9 @@ pub enum SemanticErrorKind {
     MissingStackLimitClaim {
         callee: String,
     },
+    MissingImportedStackLimitClaim {
+        callee: String,
+    },
     UnsupportedStackLimitTarget {
         backend: String,
         target: String,

@@ -72,9 +72,15 @@ impl Analyzer {
         program: &Program,
     ) -> Result<(), SemanticError> {
         let graph = call_graph(program);
-        let external_claims = external_stack_claims(program);
+        let (external_claims, imported_claims) = external_stack_claims(program);
         for root in stack_limit_roots(program) {
-            visit_native_claims(&root, &graph, &external_claims, &mut HashSet::new())?;
+            visit_native_claims(
+                &root,
+                &graph,
+                &external_claims,
+                &imported_claims,
+                &mut HashSet::new(),
+            )?;
         }
         Ok(())
     }
@@ -120,24 +126,25 @@ fn stack_limit_roots(program: &Program) -> Vec<String> {
         .collect()
 }
 
-fn external_stack_claims(program: &Program) -> HashMap<String, bool> {
-    program
-        .declarations
-        .iter()
-        .filter_map(|declaration| {
-            let TopLevelDecl::ExternalVerb(verb) = declaration else { return None };
-            if !verb.unsafe_boundary {
-                return None;
-            }
-            Some((verb.name.clone(), is_stack_limited(&verb.metadata)))
-        })
-        .collect()
+fn external_stack_claims(program: &Program) -> (HashMap<String, bool>, HashMap<String, bool>) {
+    let mut native = HashMap::new();
+    let mut imported = HashMap::new();
+    for declaration in &program.declarations {
+        let TopLevelDecl::ExternalVerb(verb) = declaration else { continue };
+        if verb.unsafe_boundary {
+            native.insert(verb.name.clone(), is_stack_limited(&verb.metadata));
+        } else if verb.module_import {
+            imported.insert(verb.name.clone(), is_stack_limited(&verb.metadata));
+        }
+    }
+    (native, imported)
 }
 
 fn visit_native_claims(
     name: &str,
     graph: &CallGraph,
     external_claims: &HashMap<String, bool>,
+    imported_claims: &HashMap<String, bool>,
     visited: &mut HashSet<String>,
 ) -> Result<(), SemanticError> {
     if !visited.insert(name.to_owned()) {
@@ -150,8 +157,14 @@ fn visit_native_claims(
                 span: *span,
             });
         }
+        if imported_claims.get(callee).is_some_and(|claimed| !claimed) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MissingImportedStackLimitClaim { callee: callee.clone() },
+                span: *span,
+            });
+        }
         if graph.contains_key(callee) {
-            visit_native_claims(callee, graph, external_claims, visited)?;
+            visit_native_claims(callee, graph, external_claims, imported_claims, visited)?;
         }
     }
     Ok(())

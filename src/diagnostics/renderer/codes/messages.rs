@@ -127,6 +127,9 @@ fn ownership_contract_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::MissingStackLimitClaim { callee } => {
             format!("stack_limit call to unsafe extern `{callee}` requires a stack_limit claim")
         }
+        SemanticErrorKind::MissingImportedStackLimitClaim { callee } => {
+            format!("stack_limit call to imported `{callee}` requires a stack_limit claim")
+        }
         SemanticErrorKind::UnsupportedStackLimitTarget { backend, target } => {
             format!("stack_limit proof is not supported by backend `{backend}` for target `{target}`")
         }
