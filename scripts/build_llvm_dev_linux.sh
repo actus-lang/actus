@@ -23,7 +23,7 @@ require_command() {
     }
 }
 
-for command_name in git cmake ninja ccache python3 tar xz sha256sum gcc; do
+for command_name in git cmake make ccache python3 tar xz sha256sum gcc; do
     require_command "${command_name}"
 done
 
@@ -43,7 +43,7 @@ rm -rf "${build_root}" "${install_root}" "${staging_root}"
 cmake_args=(
     -S "${source_root}/llvm"
     -B "${build_root}"
-    -G Ninja
+    -G "Unix Makefiles"
     -C "${cmake_cache}"
     -DCMAKE_INSTALL_PREFIX="${install_root}"
     -DCMAKE_INSTALL_LIBDIR=lib
