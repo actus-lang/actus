@@ -85,7 +85,8 @@ integration is tracked in 51.5 and is linked to ADR-0103 S3.
       target, system-library dependency, target, builtin, lld, manifest, and
       zero-float checks.
 - [ ] Build and verify the Windows `llvm-dev-23.1.2-x86_64-pc-windows-msvc`
-      archive with the pinned MSVC `/MD` contract.
+      archive with the pinned MSVC `/MD` contract, toolset identity, builtin
+      provenance, and archive-prefix dependency checks.
 
 #### Linux T2 evidence
 

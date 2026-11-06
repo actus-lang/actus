@@ -11,6 +11,8 @@ on:
       - 'scripts/verify_llvm_dev_linux.sh'
       - 'scripts/build_llvm_dev_macos.sh'
       - 'scripts/verify_llvm_dev_macos.sh'
+      - 'scripts/build_llvm_dev_windows.ps1'
+      - 'scripts/verify_llvm_dev_windows.ps1'
       - 'scripts/llvm/package_archive.py'
       - 'tests/toolchain/**'
       - '.github/workflows/build-bundled-llvm.yml'
@@ -206,3 +208,119 @@ jobs:
         env:
           MACOSX_DEPLOYMENT_TARGET: 13.0
         run: bash ./scripts/verify_llvm_dev_macos.sh
+
+  build-windows-x86_64:
+    name: Build LLVM 23.1.2 (Windows x86-64, MSVC /MD)
+    runs-on: windows-2022
+    timeout-minutes: 340
+    env:
+      ACTUS_MSVC_TOOLSET_VERSION: 14.44.35207
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Select pinned MSVC toolset
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw 'MSVC installation was not found' }
+          $vcvars = Join-Path $vsPath 'VC/Auxiliary/Build/vcvars64.bat'
+          $environment = cmd /s /c "`"$vcvars`" amd64 -vcvars_ver=14.44 && set"
+          foreach ($line in $environment) {
+            if ($line -match '^([^=]+)=(.*)$') {
+              Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2]
+              Add-Content -Path $env:GITHUB_ENV -Value "$($Matches[1])=$($Matches[2])"
+            }
+          }
+          if ($env:VCToolsVersion -ne $env:ACTUS_MSVC_TOOLSET_VERSION) {
+            throw "expected MSVC toolset $env:ACTUS_MSVC_TOOLSET_VERSION, got $env:VCToolsVersion"
+          }
+          cl.exe 2>&1 | Select-Object -First 1
+
+      - name: Install build tools
+        shell: pwsh
+        run: |
+          choco install ninja sccache --no-progress --yes
+          foreach ($commandName in @('git', 'cmake', 'ninja', 'sccache', 'python', 'dumpbin')) {
+            Get-Command $commandName
+          }
+
+      - name: Restore compiler cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/sccache
+          key: llvm-windows-${{ env.LLVM_VERSION }}-${{ env.LLVM_SOURCE_REVISION }}-${{ github.run_id }}
+          restore-keys: |
+            llvm-windows-${{ env.LLVM_VERSION }}-${{ env.LLVM_SOURCE_REVISION }}-
+
+      - name: Configure sccache
+        shell: pwsh
+        env:
+          SCCACHE_DIR: ${{ runner.temp }}/sccache
+        run: |
+          sccache --zero-stats
+
+      - name: Configure LLVM without building
+        shell: pwsh
+        env:
+          ACTUS_CMAKE_LAUNCHER: sccache
+          ACTUS_LLVM_CONFIGURE_ONLY: 1
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+          SCCACHE_DIR: ${{ runner.temp }}/sccache
+        run: ./scripts/build_llvm_dev_windows.ps1
+
+      - name: Build and package after successful configure
+        shell: pwsh
+        env:
+          ACTUS_CMAKE_LAUNCHER: sccache
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
+          SCCACHE_DIR: ${{ runner.temp }}/sccache
+        run: ./scripts/build_llvm_dev_windows.ps1
+
+      - name: Upload development archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: llvm-dev-${{ env.LLVM_VERSION }}-x86_64-pc-windows-msvc
+          path: |
+            dist/llvm-dev-${{ env.LLVM_VERSION }}-x86_64-pc-windows-msvc.zip
+            dist/llvm-dev-${{ env.LLVM_VERSION }}-x86_64-pc-windows-msvc.zip.sha256
+          if-no-files-found: error
+
+  verify-windows-x86_64:
+    name: Verify LLVM development archive (Windows x86-64, MSVC /MD)
+    needs: build-windows-x86_64
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      ACTUS_MSVC_TOOLSET_VERSION: 14.44.35207
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Select pinned MSVC toolset
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $vcvars = Join-Path $vsPath 'VC/Auxiliary/Build/vcvars64.bat'
+          $environment = cmd /s /c "`"$vcvars`" amd64 -vcvars_ver=14.44 && set"
+          foreach ($line in $environment) {
+            if ($line -match '^([^=]+)=(.*)$') {
+              Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2]
+              Add-Content -Path $env:GITHUB_ENV -Value "$($Matches[1])=$($Matches[2])"
+            }
+          }
+          if ($env:VCToolsVersion -ne $env:ACTUS_MSVC_TOOLSET_VERSION) {
+            throw "expected MSVC toolset $env:ACTUS_MSVC_TOOLSET_VERSION, got $env:VCToolsVersion"
+          }
+
+      - name: Download development archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: llvm-dev-${{ env.LLVM_VERSION }}-x86_64-pc-windows-msvc
+          path: dist
+
+      - name: Verify archive with archive-prefix checks
+        shell: pwsh
+        run: ./scripts/verify_llvm_dev_windows.ps1

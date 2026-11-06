@@ -157,6 +157,13 @@ decision about delivering the VC runtime, either through the redistributable
 installer contract or app-local DLLs; the development archive does not settle
 that release decision.
 
+The first Windows contributor archive is built on the fixed `windows-2022`
+runner with the pinned MSVC 14.44.35207 toolset, Ninja, and `sccache`. It is a
+`.zip` archive and its executables use the `.exe` suffix. Verification uses
+`dumpbin /dependents` and rejects dependencies outside the Windows system DLL
+set and the `/MD` VC runtime family. The archive manifest records the toolset
+identity and the `MultiThreadedDLL` CMake value.
+
 The freestanding toolchain must also provide the compiler-rt builtins needed
 by each supported freestanding target. This includes `__aeabi_uldivmod` and
 every other compiler-generated helper required by the emitted object. The
@@ -392,6 +399,13 @@ clean-environment proof is a strict archive-prefix check: every inspection
 tool must resolve from the extracted archive before it is executed. This is a
 documented limitation of hosted runner verification, not permission to use a
 system tool accidentally.
+
+The Windows verification additionally checks both Thumb builtin archives for
+`__aeabi_uldivmod`, validates the bundled `ld.lld.exe`, checks the `/MD`
+dependency contract, and disassembles the integer-only Thumb fixture to reject
+VFP instructions. The compiler-rt builtin build must use the freshly built
+in-tree Clang tool, not `clang-cl`; a failed or ambiguous builtin build is a
+hard CI failure rather than a fallback to a host LLVM installation.
 
 ## Alternatives considered
 
