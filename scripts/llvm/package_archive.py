@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+from pathlib import PureWindowsPath
 import stat
 import tarfile
 import zipfile
@@ -29,7 +31,18 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def archive_entries(root: Path, output: Path) -> list[tuple[Path, str]]:
+def validate_relative_symlink(root: Path, path: Path, relative: str) -> None:
+    target = os.readlink(path)
+    if os.path.isabs(target) or PureWindowsPath(target).is_absolute() or PureWindowsPath(target).drive:
+        raise SystemExit(f"absolute symlink target is not allowed: {relative} -> {target}")
+    resolved_target = (path.parent / target).resolve(strict=False)
+    if resolved_target == root or root not in resolved_target.parents:
+        raise SystemExit(f"symlink target escapes archive root: {relative} -> {target}")
+    if not resolved_target.exists():
+        raise SystemExit(f"symlink target does not exist: {relative} -> {target}")
+
+
+def archive_entries(root: Path, output: Path, archive_format: str) -> list[tuple[Path, str]]:
     root = root.resolve()
     output = output.resolve()
     if not root.is_dir():
@@ -41,7 +54,10 @@ def archive_entries(root: Path, output: Path) -> list[tuple[Path, str]]:
     for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
         relative = path.relative_to(root).as_posix()
         if path.is_symlink():
-            raise SystemExit(f"symlinks are not allowed in deterministic archives: {relative}")
+            if archive_format == "zip":
+                raise SystemExit(f"symlinks are not allowed in zip archives: {relative}")
+            validate_relative_symlink(root, path, relative)
+            entries.append((path, relative))
         if path.is_dir():
             entries.append((path, f"{relative}/"))
         elif path.is_file():
@@ -52,6 +68,8 @@ def archive_entries(root: Path, output: Path) -> list[tuple[Path, str]]:
 
 
 def fixed_mode(path: Path, relative: str) -> int:
+    if path.is_symlink():
+        return 0o777
     if path.is_dir():
         return 0o755
     executable = bool(path.stat().st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
@@ -84,7 +102,7 @@ def write_tar(output: Path, entries: list[tuple[Path, str]]) -> None:
             info.uname = ""
             info.gname = ""
             info.mode = fixed_mode(path, relative)
-            if path.is_file():
+            if path.is_file() and not path.is_symlink():
                 with path.open("rb") as source:
                     archive.addfile(info, source)
             else:
@@ -118,7 +136,7 @@ def main() -> int:
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     normalize_manifest(root, args.manifest)
-    entries = archive_entries(root, output)
+    entries = archive_entries(root, output, args.format)
     if args.format == "tar.xz":
         write_tar(output, entries)
     else:

@@ -48,6 +48,16 @@ foreach ($builtin in @($eabihfBuiltin, $eabiBuiltin)) {
     }
 }
 
+foreach ($toolName in @("ld.lld.exe", "ld64.lld.exe", "wasm-ld.exe", "lld-link.exe")) {
+    $toolPath = Join-Path $prefix "bin/$toolName"
+    if (-not (Test-Path -LiteralPath $toolPath -PathType Leaf)) {
+        throw "bundled linker tool is missing: $toolPath"
+    }
+    if ((Get-Item -LiteralPath $toolPath).LinkType) {
+        throw "Windows archive contains a symlink: $toolPath"
+    }
+}
+
 foreach ($binary in @($llvmConfig, $ldLld)) {
     $dependencies = (& dumpbin /dependents $binary | Out-String)
     $dlls = [regex]::Matches($dependencies, "(?im)^\s+([A-Za-z0-9_.-]+\.dll)\s*$") |

@@ -104,6 +104,59 @@ class PackageArchiveTests(unittest.TestCase):
                 ],
             )
 
+    def test_tar_xz_preserves_valid_relative_symlink(self) -> None:
+        (self.root / "bin/real-ld").write_bytes(b"lld")
+        (self.root / "bin/ld.lld").symlink_to("real-ld")
+
+        archive = self.run_packager("tar.xz", "links.tar.xz")
+        with tarfile.open(archive, mode="r:xz") as tar:
+            member = tar.getmember("bin/ld.lld")
+            self.assertTrue(member.issym())
+            self.assertEqual(member.linkname, "real-ld")
+            self.assertEqual(member.mtime, 0)
+            self.assertEqual(member.uid, 0)
+            self.assertEqual(member.gid, 0)
+
+    def test_external_symlink_is_rejected(self) -> None:
+        outside = Path(self.tempdir.name) / "outside"
+        outside.write_bytes(b"outside")
+        (self.root / "bin/outside").symlink_to("../../outside")
+        process = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--input-root",
+                str(self.root),
+                "--output",
+                str(self.output / "outside.tar.xz"),
+                "--format",
+                "tar.xz",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("symlink target escapes archive root", process.stderr)
+
+    def test_zip_rejects_symlink(self) -> None:
+        (self.root / "bin/alias").symlink_to("actus")
+        process = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--input-root",
+                str(self.root),
+                "--output",
+                str(self.output / "links.zip"),
+                "--format",
+                "zip",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("symlinks are not allowed in zip archives", process.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

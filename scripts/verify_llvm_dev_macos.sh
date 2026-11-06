@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
+    echo "Bash >= 4.4 is required" >&2
+    exit 1
+fi
+shopt -s inherit_errexit
 set -euo pipefail
 
 readonly llvm_version="23.1.2"
@@ -47,6 +52,32 @@ for command_name in llvm-config llvm-nm llvm-objdump llc; do
     }
 done
 [[ -x "${ld_lld}" ]] || { echo "bundled ld.lld is missing" >&2; exit 1; }
+verify_tool_symlink() {
+    local link_path="$1"
+    [[ -L "${link_path}" ]] || { echo "expected symlink is missing: ${link_path}" >&2; exit 1; }
+    local link_target
+    link_target="$(readlink "${link_path}")"
+    [[ "${link_target}" != /* ]] || { echo "absolute tool symlink: ${link_path}" >&2; exit 1; }
+    local resolved_target
+    resolved_target="$(python3 - "${link_path}" "${prefix}" <<'PY'
+import pathlib
+import sys
+
+link = pathlib.Path(sys.argv[1])
+prefix_path = pathlib.Path(sys.argv[2]).resolve()
+target = link.resolve()
+if prefix_path not in target.parents:
+    raise SystemExit("tool symlink escapes archive prefix")
+if not target.exists():
+    raise SystemExit("tool symlink target does not exist")
+print(target)
+PY
+)"
+    [[ -x "${resolved_target}" ]] || { echo "tool symlink target is not executable: ${resolved_target}" >&2; exit 1; }
+}
+for tool_name in ld.lld ld64.lld wasm-ld lld-link; do
+    verify_tool_symlink "${prefix}/bin/${tool_name}"
+done
 [[ "$("${llvm_config}" --version)" == "${llvm_version}" ]] || {
     echo "llvm-config version mismatch" >&2
     exit 1
