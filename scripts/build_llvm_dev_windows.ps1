@@ -85,7 +85,9 @@ function Resolve-Builtin([string]$Abi) {
         (Join-Path $runtimeRoot "$triple/libclang_rt.builtins.a"),
         (Join-Path $runtimeRoot "thumbv7em-unknown-none-$Abi/libclang_rt.builtins.a")
     )
-    $existing = @($candidates | Where-Object { Test-Path $_ -PathType Leaf -and (Get-Item $_).Length -gt 0 })
+    $existing = @($candidates | Where-Object {
+        (Test-Path -LiteralPath $_ -PathType Leaf) -and ((Get-Item -LiteralPath $_).Length -gt 0)
+    })
     if ($existing.Count -ne 1) {
         Write-Error "expected exactly one compiler-rt builtin for $triple, found $($existing.Count)"
         Write-Host "all discovered compiler-rt builtins:"
