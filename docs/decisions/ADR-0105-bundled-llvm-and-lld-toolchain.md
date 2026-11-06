@@ -138,10 +138,24 @@ archive on that baseline and on the supported newer Linux images. The archive
 must not accidentally acquire a newer glibc symbol requirement from the CI
 runner.
 
+The macOS development archive is built on the fixed `macos-15` arm64 runner
+with Xcode 16.4, the macOS 13.0 deployment target, and the selected SDK
+recorded in its manifest. It uses the system `libc++`; it does not ship a
+private C++ runtime. The first macOS archive is
+`aarch64-apple-darwin`. An x86_64 macOS archive is deferred until a reliable
+cross-build or runner contract is approved; it is not silently substituted by
+an arm64 archive.
+
 On Windows, the LLVM CMake build must use
 `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`, matching Rust's `/MD` runtime
 contract. A mismatch between LLVM's C++ runtime and Rust's runtime is a build
 failure, not a packaging variation.
+
+The Windows development archive uses the dynamic MSVC runtime and must record
+the selected MSVC toolset. The later user archive must make an explicit
+decision about delivering the VC runtime, either through the redistributable
+installer contract or app-local DLLs; the development archive does not settle
+that release decision.
 
 The freestanding toolchain must also provide the compiler-rt builtins needed
 by each supported freestanding target. This includes `__aeabi_uldivmod` and
@@ -183,6 +197,12 @@ revision and publishes them as release assets. A transitional fallback may
 use the official LLVM 23.1.2 release archives when building from source would
 exceed the CI runner's time or storage budget; this does not remove checksum
 verification.
+
+T2 development archives are packaged with the repository's deterministic
+Python packager. macOS uses `.tar.xz`; Windows uses `.zip`. File ordering,
+archive timestamps, ownership metadata, and permissions are normalized where
+the format permits. Linux retains its already-published archive identity and
+does not migrate to the new packager in T2.
 
 Each published archive has a repository-tracked SHA-256 entry. The checksum
 covers the complete archive, not only the LLVM source or one binary. The build
@@ -365,6 +385,13 @@ distribution behavior from clean environments:
 
 The tests must not depend on the developer's home directory, shell profile,
 current working directory, or pre-existing global LLVM installation.
+
+Linux clean-environment evidence is provided by the pinned glibc container.
+The hosted macOS and Windows runners contain preinstalled LLVM tools, so their
+clean-environment proof is a strict archive-prefix check: every inspection
+tool must resolve from the extracted archive before it is executed. This is a
+documented limitation of hosted runner verification, not permission to use a
+system tool accidentally.
 
 ## Alternatives considered
 

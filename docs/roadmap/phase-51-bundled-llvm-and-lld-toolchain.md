@@ -79,6 +79,13 @@ integration is tracked in 51.5 and is linked to ADR-0103 S3.
 - [x] Publish the Linux contributor archive with the compiler headers, tools,
       lld, manifest, and licenses needed by the supported build paths.
 - [x] Verify the Linux archive contents and identity before release publication.
+- [ ] Build the macOS arm64 `llvm-dev-23.1.2-aarch64-apple-darwin` archive on
+      the pinned `macos-15`/Xcode 16.4 image with the system libc++ policy.
+- [ ] Verify the macOS archive through archive-prefix resolution, deployment
+      target, system-library dependency, target, builtin, lld, manifest, and
+      zero-float checks.
+- [ ] Build and verify the Windows `llvm-dev-23.1.2-x86_64-pc-windows-msvc`
+      archive with the pinned MSVC `/MD` contract.
 
 #### Linux T2 evidence
 
