@@ -50,27 +50,67 @@ ADR is reviewed and accepted.
 
 ### 51.2 — Reproducible LLVM archive builder
 
-- [ ] Add CI jobs that build LLVM 23.1.2 from the pinned source revision.
-- [ ] Restrict the build to X86, ARM, and AArch64.
-- [ ] Disable zlib, zstd, libxml2, and terminfo unless a reviewed dependency
+- [x] Add CI jobs that build LLVM 23.1.2 from the pinned source revision for
+      Linux x86-64.
+- [x] Restrict the Linux build to X86, ARM, and AArch64.
+- [x] Disable zlib, zstd, libxml2, and terminfo unless a reviewed dependency
       exception is recorded.
-- [ ] Build in a Linux image with glibc 2.28 as the compatibility baseline.
+- [x] Build the Linux archive in an image with glibc 2.28 as the compatibility
+      baseline.
 - [ ] Configure Windows LLVM with `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`
       so it matches Rust's `/MD` runtime contract.
-- [ ] Produce separate user and `llvm-dev-23.1.2` archives with
-      repository-tracked SHA-256 entries.
-- [ ] Include target-specific compiler-rt builtins in both artifacts at
-      `lib/actus/targets/<target>/libclang_rt.builtins.a` for both
-      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`, and register their
-      helper symbols and stack claims through the ADR-0103 helper registry.
-- [ ] Use LLVM distribution components and `install-distribution` so Clang is
-      built but not shipped in the contributor archive; ship only headers,
-      LLVM libraries, `llvm-config`, lld, builtins, and inspection tools.
-- [ ] Keep the CMake cache free of build-host-specific compiler launchers;
+- [x] Produce the Linux `llvm-dev-23.1.2` contributor archive with a
+      repository-generated SHA-256 entry. The separate user archive remains
+      open for a later release-packaging step.
+- [x] Include target-specific compiler-rt builtins in the Linux contributor
+      archive at `lib/actus/targets/<target>/libclang_rt.builtins.a` for both
+      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`. The corresponding
+      user-archive requirement remains open.
+- [ ] Register the builtin helper symbols and stack claims through the
+      ADR-0103 helper registry.
+- [x] Use LLVM distribution components and `install-distribution` so Clang is
+      built but not shipped in the Linux contributor archive; ship only
+      headers, LLVM libraries, `llvm-config`, lld, builtins, and inspection
+      tools.
+- [x] Keep the CMake cache free of build-host-specific compiler launchers;
       pass ccache through workflow `-D` arguments.
-- [ ] Publish the compiler, headers, tools, lld, manifest, and licenses needed
-      by the supported build paths.
-- [ ] Verify archive contents and identity before release publication.
+- [x] Publish the Linux contributor archive with the compiler headers, tools,
+      lld, manifest, and licenses needed by the supported build paths.
+- [x] Verify the Linux archive contents and identity before release publication.
+
+#### Linux T2 evidence
+
+The following evidence was collected from the two successful workflow runs:
+
+- [Run #5](https://github.com/actus-lang/actus/actions/runs/42146115312)
+  built the archive without a reusable compiler cache. The full build ran
+  from `2026-11-06T01:51:26Z` to `2026-11-06T03:21:30Z`, approximately
+  **1h 30m 04s**. Its ccache report was: 3,315 misses, 0 direct hits, 0
+  preprocessed hits, 0.00% hit rate, 9,522 files, and 562.5 MB used.
+- [Run #6](https://github.com/actus-lang/actus/actions/runs/42158469005)
+  rebuilt the same archive with the restored compiler cache. The full build
+  ran from `2026-11-06T03:49:43Z` to `2026-11-06T03:58:15Z`, approximately
+  **8m 32s**. Its ccache report was: 2,846 direct hits, 469 preprocessed
+  hits, 0 misses, 100.00% hit rate, 9,522 files, and 562.5 MB used.
+- Both runs produced the same archive size: **184,020,984 bytes**.
+- Both runs produced the same archive SHA-256:
+  `6a73055d2c36b10b14ccd0fba354bc5ad95f8ffd71e1c1f3a69d22eaf7b7a3e7`.
+- `resolve_builtin` found exactly one approved source path for each target:
+  - `lib/clang/23/lib/thumbv7em-unknown-none-eabi/libclang_rt.builtins.a`
+  - `lib/clang/23/lib/thumbv7em-unknown-none-eabihf/libclang_rt.builtins.a`
+  These were staged into the public archive paths:
+  - `lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a`
+  - `lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a`
+- The clean verification job passed for both runs with the exact output:
+  `verified llvm-dev-23.1.2-x86_64-unknown-linux-gnu.tar.xz in a clean glibc
+  2.28 container`.
+  This verification checked LLVM 23.1.2, the X86/ARM/AArch64 targets, bundled
+  lld, both builtin archives and `__aeabi_uldivmod`, forbidden shared-library
+  dependencies, the glibc 2.28 ceiling, the manifest identity, and the
+  integer-only Thumb fixture's absence of VFP instructions.
+- Both runs used LLVM source revision
+  `85ac560262434c9ccfc0c183ec22d4138ed647fb` and image digest
+  `sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded`.
 
 ### 51.3 — Contributor bootstrap and Cargo discovery
 
