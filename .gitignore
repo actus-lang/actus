@@ -1,5 +1,8 @@
 # Rust build output
 /target/
+/dist/
+/.llvm-build/
+/.actus-toolchain/
 /runtime/**/target/
 /runtime/**/Cargo.lock
 

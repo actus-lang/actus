@@ -87,6 +87,15 @@ checked `u64`; overflow is a rejection.
 The contract excludes runtime startup before the entry, signal handlers,
 debugger activity, and interrupt or exception frames on the same stack.
 
+For the primary Cortex-M target `thumbv7em-none-eabihf`, the target contract
+must additionally record whether the FPU context is active and whether lazy
+stacking is enabled in FPCCR. With FPU stacking and lazy-stacking behavior
+enabled, an exception frame may be **104 bytes** rather than the basic frame;
+that interrupt-domain cost is not silently included in a task's limit. The
+target contract must publish the FPCCR state used by the proof and reject a
+missing or ambiguous state. `thumbv7em-none-eabi` is the secondary
+soft-float/no-FPU target and has its own exception-frame contract.
+
 ## Relationship to `bounded`
 
 `bounded(max_stack_bytes: ...)` remains a source-level estimate under
@@ -114,8 +123,18 @@ LLVM C API does not expose them.
 
 The initial LLVM contract is limited to targets and object formats for which
 Actus can extract and validate a complete frame report. The first supported
-set is ELF-based hosted Linux and ELF-based `thumbv7em-none-eabi`. Thumb is a
-target mode, not a separate object format.
+set is ELF-based hosted Linux, primary ELF-based
+`thumbv7em-none-eabihf` for Cortex-M4F-class devices, and secondary ELF-based
+`thumbv7em-none-eabi` for devices without an FPU. Thumb is a target mode, not
+a separate object format.
+
+The `eabihf` target is the primary Cortex-M contract because it matches the
+ABI used by Cortex-M4F devices such as STM32F411 and by compatible vendor C
+libraries. The `eabi` target remains supported for soft-float/no-FPU devices.
+The eabihf ABI permission does not weaken Actus's zero-float contract: every
+integer-only object fixture must be disassembled and rejected if it contains
+VFP instructions such as `vadd`, `vmov`, `vldr`, `vstr`, `vpush`, or equivalent
+floating-point operations.
 
 Mach-O, COFF, and other formats remain unsupported until their own frame-report
 and call-graph contracts are implemented and tested. The compiler must emit a
