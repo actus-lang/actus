@@ -22,6 +22,7 @@ function Require-Command([string]$Name) {
 foreach ($commandName in @("git", "cmake", "ninja", "sccache", "python", "clang", "dumpbin")) {
     Require-Command $commandName
 }
+. (Join-Path $repositoryRoot "scripts/llvm/Resolve-Builtin.ps1")
 if (-not (Test-Path $cmakeCache)) {
     throw "LLVM CMake cache is missing: $cmakeCache"
 }
@@ -78,28 +79,8 @@ foreach ($targetName in @("AArch64", "ARM", "X86")) {
     }
 }
 
-function Resolve-Builtin([string]$Abi) {
-    $triple = "thumbv7em-none-$Abi"
-    $runtimeRoot = Join-Path $installRoot "lib/clang/23/lib"
-    $candidates = @(
-        (Join-Path $runtimeRoot "$triple/libclang_rt.builtins.a"),
-        (Join-Path $runtimeRoot "thumbv7em-unknown-none-$Abi/libclang_rt.builtins.a")
-    )
-    $existing = @($candidates | Where-Object {
-        (Test-Path -LiteralPath $_ -PathType Leaf) -and ((Get-Item -LiteralPath $_).Length -gt 0)
-    })
-    if ($existing.Count -ne 1) {
-        Write-Error "expected exactly one compiler-rt builtin for $triple, found $($existing.Count)"
-        Write-Host "all discovered compiler-rt builtins:"
-        Get-ChildItem -Path $installRoot -Recurse -File -Filter "libclang_rt.builtins*" |
-            ForEach-Object { Write-Host $_.FullName }
-        throw "compiler-rt builtin resolution failed"
-    }
-    return $existing[0]
-}
-
-$eabihfBuiltin = Resolve-Builtin "eabihf"
-$eabiBuiltin = Resolve-Builtin "eabi"
+$eabihfBuiltin = Resolve-Builtin -InstallRoot $installRoot -Abi "eabihf"
+$eabiBuiltin = Resolve-Builtin -InstallRoot $installRoot -Abi "eabi"
 New-Item -ItemType Directory -Force -Path `
     (Join-Path $stagingRoot "lib/actus/bin"), `
     (Join-Path $stagingRoot "lib/actus/targets/thumbv7em-none-eabihf"), `
