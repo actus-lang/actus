@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
+    echo "Bash >= 4.4 is required" >&2
+    exit 1
+fi
+shopt -s inherit_errexit
 set -euo pipefail
 
 readonly llvm_version="23.1.2"

@@ -174,7 +174,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          brew install ccache
+          brew install bash ccache
+          echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          /opt/homebrew/bin/bash --version | head -n 1
           for command_name in git cmake ninja ccache python3 xcodebuild xcrun shasum; do
             command -v "${command_name}"
           done
