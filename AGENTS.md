@@ -69,6 +69,10 @@ This structure is a guide for the initial implementation and may grow with new, 
 
 Module files such as `mod.rs` should define module boundaries and public exports. Substantial implementation logic belongs in responsibility-specific files.
 
+Do not create a new file, action, or helper for logic under ~30 lines that is
+used in one place. Keep it inline where it is used. A new file requires real
+size, multiple callers, or an independent test suite.
+
 The following generic filenames are forbidden:
 
 - `utils.rs`

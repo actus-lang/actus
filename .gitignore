@@ -3,6 +3,8 @@
 /dist/
 /.llvm-build/
 /.actus-toolchain/
+__pycache__/
+*.py[cod]
 /runtime/**/target/
 /runtime/**/Cargo.lock
 

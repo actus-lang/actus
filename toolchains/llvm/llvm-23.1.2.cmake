@@ -71,3 +71,17 @@ set(LLVM_DISTRIBUTION_COMPONENTS
     builtins-thumbv7em-none-eabihf builtins-thumbv7em-none-eabi
     ${LLVM_TOOLCHAIN_TOOLS}
     CACHE STRING "Actus distribution components")
+
+# Hosted platform policies are isolated from the Linux baseline.
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Actus macOS deployment target" FORCE)
+    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Actus macOS archive architecture" FORCE)
+    set(LLVM_STATIC_LINK_CXX_STDLIB OFF CACHE BOOL "Use the system macOS libc++" FORCE)
+endif()
+
+if(WIN32)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "Use the dynamic MSVC CRT (/MD)" FORCE)
+    set(CMAKE_C_FLAGS_RELEASE "/O2 /DNDEBUG" CACHE STRING "Release C flags without debug information" FORCE)
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG" CACHE STRING "Release C++ flags without debug information" FORCE)
+    set(LLVM_STATIC_LINK_CXX_STDLIB OFF CACHE BOOL "Use the MSVC runtime contract" FORCE)
+endif()

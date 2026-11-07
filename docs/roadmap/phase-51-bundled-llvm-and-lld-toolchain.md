@@ -50,6 +50,12 @@ ADR is reviewed and accepted.
 
 ### 51.2 — Reproducible LLVM archive builder
 
+T2 is limited to contributor/development archives named
+`llvm-dev-23.1.2-<host-triple>`. The user-facing `actus-<version>-<host-triple>`
+archive requires an Actus binary built with the bundled LLVM toolchain and is
+tracked in 51.7 after the compiler integration work. Builtin helper-registry
+integration is tracked in 51.5 and is linked to ADR-0103 S3.
+
 - [x] Add CI jobs that build LLVM 23.1.2 from the pinned source revision for
       Linux x86-64.
 - [x] Restrict the Linux build to X86, ARM, and AArch64.
@@ -60,14 +66,10 @@ ADR is reviewed and accepted.
 - [ ] Configure Windows LLVM with `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`
       so it matches Rust's `/MD` runtime contract.
 - [x] Produce the Linux `llvm-dev-23.1.2` contributor archive with a
-      repository-generated SHA-256 entry. The separate user archive remains
-      open for a later release-packaging step.
+      repository-generated SHA-256 entry.
 - [x] Include target-specific compiler-rt builtins in the Linux contributor
       archive at `lib/actus/targets/<target>/libclang_rt.builtins.a` for both
-      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`. The corresponding
-      user-archive requirement remains open.
-- [ ] Register the builtin helper symbols and stack claims through the
-      ADR-0103 helper registry.
+      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`.
 - [x] Use LLVM distribution components and `install-distribution` so Clang is
       built but not shipped in the Linux contributor archive; ship only
       headers, LLVM libraries, `llvm-config`, lld, builtins, and inspection
@@ -77,6 +79,14 @@ ADR is reviewed and accepted.
 - [x] Publish the Linux contributor archive with the compiler headers, tools,
       lld, manifest, and licenses needed by the supported build paths.
 - [x] Verify the Linux archive contents and identity before release publication.
+- [ ] Build the macOS arm64 `llvm-dev-23.1.2-aarch64-apple-darwin` archive on
+      the pinned `macos-15`/Xcode 16.4 image with the system libc++ policy.
+- [ ] Verify the macOS archive through archive-prefix resolution, deployment
+      target, system-library dependency, target, builtin, lld, manifest, and
+      zero-float checks.
+- [ ] Build and verify the Windows `llvm-dev-23.1.2-x86_64-pc-windows-msvc`
+      archive with the pinned MSVC `/MD` contract, toolset identity, builtin
+      provenance, and archive-prefix dependency checks.
 
 #### Linux T2 evidence
 
@@ -138,6 +148,8 @@ The following evidence was collected from the two successful workflow runs:
 
 ### 51.5 — Bundled lld target contract
 
+- [ ] Integrate compiler-rt builtin helper symbols and transitive stack claims
+      with the ADR-0103 S3 helper registry.
 - [ ] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
       record it in the identity manifest without shadowing system `PATH` tools.
 - [ ] Select bundled lld only for the primary `thumbv7em-none-eabihf` and
@@ -171,6 +183,11 @@ The following evidence was collected from the two successful workflow runs:
 
 ### 51.7 — Release packaging and notices
 
+- [ ] Produce the user-facing `actus-<version>-<host-triple>` archive after
+      T4 provides an Actus binary built with the bundled LLVM toolchain. It
+      must include the compiler, runtime, standard library, target builtins,
+      identity metadata, licenses, and supported link tools, but no development
+      headers or `llvm-config` prefix.
 - [ ] Produce relocatable Unix and Windows distribution archives.
 - [ ] Include `actus`, standard library/runtime files, identity metadata, and
       third-party notices.

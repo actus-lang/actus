@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
+    echo "Bash >= 4.4 is required" >&2
+    exit 1
+fi
+shopt -s inherit_errexit
 set -euo pipefail
 
 readonly llvm_version="23.1.2"
@@ -26,6 +31,7 @@ require_command() {
 for command_name in git cmake make ccache python3 tar xz sha256sum gcc; do
     require_command "${command_name}"
 done
+source "${repository_root}/scripts/llvm/resolve_builtin.sh"
 
 mkdir -p "${work_root}" "${output_root}"
 export CCACHE_DIR="${CCACHE_DIR:-${work_root}/ccache}"
@@ -80,32 +86,8 @@ for target_name in AArch64 ARM X86; do
     }
 done
 
-resolve_builtin() {
-    local abi="$1"
-    local triple="thumbv7em-none-${abi}"
-    local runtime_root="${install_root}/lib/clang/${llvm_major}/lib"
-    local candidates=(
-        "${runtime_root}/${triple}/libclang_rt.builtins.a"
-        "${runtime_root}/thumbv7em-unknown-none-${abi}/libclang_rt.builtins.a"
-    )
-    local existing=()
-    local candidate
-    for candidate in "${candidates[@]}"; do
-        if [[ -s "${candidate}" ]]; then
-            existing+=("${candidate}")
-        fi
-    done
-    if [[ "${#existing[@]}" -ne 1 ]]; then
-        echo "expected exactly one compiler-rt builtin for ${triple}, found ${#existing[@]}" >&2
-        echo "all discovered compiler-rt builtins:" >&2
-        find "${install_root}" -type f -name 'libclang_rt.builtins*' -print >&2 || true
-        exit 1
-    fi
-    printf '%s\n' "${existing[0]}"
-}
-
-thumb_eabihf_builtin="$(resolve_builtin eabihf)"
-thumb_eabi_builtin="$(resolve_builtin eabi)"
+thumb_eabihf_builtin="$(resolve_builtin "${install_root}" eabihf)"
+thumb_eabi_builtin="$(resolve_builtin "${install_root}" eabi)"
 
 mkdir -p "${staging_root}/lib/actus/bin" \
     "${staging_root}/lib/actus/targets/thumbv7em-none-eabihf" \
