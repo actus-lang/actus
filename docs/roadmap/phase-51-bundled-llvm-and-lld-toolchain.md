@@ -50,6 +50,12 @@ ADR is reviewed and accepted.
 
 ### 51.2 — Reproducible LLVM archive builder
 
+T2 is limited to contributor/development archives named
+`llvm-dev-23.1.2-<host-triple>`. The user-facing `actus-<version>-<host-triple>`
+archive requires an Actus binary built with the bundled LLVM toolchain and is
+tracked in 51.7 after the compiler integration work. Builtin helper-registry
+integration is tracked in 51.5 and is linked to ADR-0103 S3.
+
 - [x] Add CI jobs that build LLVM 23.1.2 from the pinned source revision for
       Linux x86-64.
 - [x] Restrict the Linux build to X86, ARM, and AArch64.
@@ -60,14 +66,10 @@ ADR is reviewed and accepted.
 - [ ] Configure Windows LLVM with `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`
       so it matches Rust's `/MD` runtime contract.
 - [x] Produce the Linux `llvm-dev-23.1.2` contributor archive with a
-      repository-generated SHA-256 entry. The separate user archive remains
-      open for a later release-packaging step.
+      repository-generated SHA-256 entry.
 - [x] Include target-specific compiler-rt builtins in the Linux contributor
       archive at `lib/actus/targets/<target>/libclang_rt.builtins.a` for both
-      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`. The corresponding
-      user-archive requirement remains open.
-- [ ] Register the builtin helper symbols and stack claims through the
-      ADR-0103 helper registry.
+      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`.
 - [x] Use LLVM distribution components and `install-distribution` so Clang is
       built but not shipped in the Linux contributor archive; ship only
       headers, LLVM libraries, `llvm-config`, lld, builtins, and inspection
@@ -77,6 +79,14 @@ ADR is reviewed and accepted.
 - [x] Publish the Linux contributor archive with the compiler headers, tools,
       lld, manifest, and licenses needed by the supported build paths.
 - [x] Verify the Linux archive contents and identity before release publication.
+- [x] Build the macOS arm64 `llvm-dev-23.1.2-aarch64-apple-darwin` archive on
+      the pinned `macos-15`/Xcode 16.4 image with the system libc++ policy.
+- [x] Verify the macOS archive through archive-prefix resolution, deployment
+      target, system-library dependency, target, builtin, lld, manifest, and
+      zero-float checks.
+- [x] Build and verify the Windows `llvm-dev-23.1.2-x86_64-pc-windows-msvc`
+      archive with the pinned MSVC `/MD` contract, toolset identity, builtin
+      provenance, and archive-prefix dependency checks.
 
 #### Linux T2 evidence
 
@@ -112,6 +122,47 @@ The following evidence was collected from the two successful workflow runs:
   `85ac560262434c9ccfc0c183ec22d4138ed647fb` and image digest
   `sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded`.
 
+#### macOS and Windows T2 evidence
+
+Run [#14](https://github.com/actus-lang/actus/actions/runs/42330707485)
+completed successfully on all Linux, macOS, and Windows build and verification
+jobs.
+
+- macOS arm64 ran on `macos-15` arm64 with Xcode 16.4 and
+  `MACOSX_DEPLOYMENT_TARGET=13.0`. The build job ran from
+  `2026-11-07T02:44:26Z` to `2026-11-07T03:47:35Z`, approximately
+  **1h 03m 09s**. It produced
+  `llvm-dev-23.1.2-aarch64-apple-darwin.tar.xz`, **118,078,516 bytes**, with
+  SHA-256
+  `d9ac829b0a1ee4e36d8993f28f4494120b43c1cfc82ec61076f83bb63860c8f4`.
+- macOS `resolve_builtin` found the approved source paths
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabihf/libclang_rt.builtins.a` and
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabi/libclang_rt.builtins.a`.
+  They were staged as
+  `lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a` and
+  `lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a`.
+  Verification passed with archive-prefix, deployment-target, system-library,
+  target, builtin, lld, manifest, and zero-float checks.
+- The macOS run recorded the pre-PCH-cache baseline: 3,322 compiler calls,
+  19 cacheable calls, 0 hits, 19 misses, 3,303 uncacheable calls, and a
+  0.02% cache-size utilization. The uncacheable-call cause is tracked
+  separately: LLVM's enabled precompiled headers are not cacheable by ccache.
+- Windows x86-64 ran on `windows-2022` with MSVC toolset `14.44.35207`
+  (`VCToolsVersion`) and the `/MD` contract. The build job ran from
+  `2026-11-07T02:44:26Z` to `2026-11-07T03:00:11Z`, approximately
+  **15m 45s**. It produced
+  `llvm-dev-23.1.2-x86_64-pc-windows-msvc.zip`, **1,194,964,192 bytes**, with
+  SHA-256
+  `92fd65fb609f54906437de78edb45a58534f7ff20793c5d41ac821ce47347a01`.
+- Windows staged the two builtins as
+  `lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a` and
+  `lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a`; their source
+  paths were
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabihf/libclang_rt.builtins.a` and
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabi/libclang_rt.builtins.a`.
+  Verification passed with archive-prefix, MSVC dependency, builtin, and
+  zero-float checks.
+
 ### 51.3 — Contributor bootstrap and Cargo discovery
 
 - [ ] Add idempotent Unix and Windows bootstrap scripts.
@@ -138,6 +189,8 @@ The following evidence was collected from the two successful workflow runs:
 
 ### 51.5 — Bundled lld target contract
 
+- [ ] Integrate compiler-rt builtin helper symbols and transitive stack claims
+      with the ADR-0103 S3 helper registry.
 - [ ] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
       record it in the identity manifest without shadowing system `PATH` tools.
 - [ ] Select bundled lld only for the primary `thumbv7em-none-eabihf` and
@@ -171,6 +224,11 @@ The following evidence was collected from the two successful workflow runs:
 
 ### 51.7 — Release packaging and notices
 
+- [ ] Produce the user-facing `actus-<version>-<host-triple>` archive after
+      T4 provides an Actus binary built with the bundled LLVM toolchain. It
+      must include the compiler, runtime, standard library, target builtins,
+      identity metadata, licenses, and supported link tools, but no development
+      headers or `llvm-config` prefix.
 - [ ] Produce relocatable Unix and Windows distribution archives.
 - [ ] Include `actus`, standard library/runtime files, identity metadata, and
       third-party notices.
