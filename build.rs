@@ -9,8 +9,6 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(coverage)");
     println!("cargo:rustc-check-cfg=cfg(actus_test_faults)");
 
-    validate_llvm_selection();
-
     let output_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo must provide OUT_DIR"));
     let archive = output_dir.join("libactus_runtime.a");
     let rustc = env::var_os("RUSTC").expect("Cargo must provide RUSTC");
@@ -32,6 +30,7 @@ fn main() {
     println!("cargo:rustc-env=ACTUS_RUNTIME_ARCHIVE={}", archive.display());
 
     if env::var_os("CARGO_FEATURE_LLVM").is_some() {
+        validate_llvm_selection();
         build_llvm_target_options_shim();
     }
 }
