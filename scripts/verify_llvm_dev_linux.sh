@@ -83,7 +83,7 @@ for tool_name in ld.lld ld64.lld wasm-ld lld-link; do
     verify_tool_symlink "${prefix}/bin/${tool_name}"
 done
 for builtin in "${eabihf_builtins}" "${eabi_builtins}"; do
-    llvm-nm --defined-only "${builtin}" | awk '{print $NF}' | grep -qx '__aeabi_uldivmod' || {
+    llvm-nm --quiet --defined-only "${builtin}" | awk '{print $NF}' | grep -qx '__aeabi_uldivmod' || {
         echo "${builtin} does not define __aeabi_uldivmod" >&2
         exit 1
     }

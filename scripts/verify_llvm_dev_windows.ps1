@@ -43,7 +43,7 @@ foreach ($targetName in @("AArch64", "ARM", "X86")) {
 }
 foreach ($builtin in @($eabihfBuiltin, $eabiBuiltin)) {
     if (-not (Test-Path $builtin)) { throw "missing builtin archive: $builtin" }
-    if ((& llvm-nm.exe --defined-only $builtin | Select-String "__aeabi_uldivmod").Count -eq 0) {
+    if ((& llvm-nm.exe --quiet --defined-only $builtin | Select-String "__aeabi_uldivmod").Count -eq 0) {
         throw "$builtin does not define __aeabi_uldivmod"
     }
 }

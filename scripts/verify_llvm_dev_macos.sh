@@ -13,6 +13,45 @@ readonly verification_root="${RUNNER_TEMP:-/tmp}/actus-llvm-macos-verification"
 readonly extracted_root="${verification_root}/extracted"
 readonly deployment_target="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
 
+macos_version_at_most() {
+    local candidate_version="$1"
+    local target_version="$2"
+    local -a candidate_parts=()
+    local -a target_parts=()
+    local index
+    local candidate_part
+    local target_part
+
+    [[ "${candidate_version}" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || return 2
+    [[ "${target_version}" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || return 2
+    IFS=. read -r -a candidate_parts <<<"${candidate_version}"
+    IFS=. read -r -a target_parts <<<"${target_version}"
+    for ((index = 0; index < 3; index += 1)); do
+        candidate_part="${candidate_parts[index]:-0}"
+        target_part="${target_parts[index]:-0}"
+        if ((10#${candidate_part} > 10#${target_part})); then
+            return 1
+        fi
+        if ((10#${candidate_part} < 10#${target_part})); then
+            return 0
+        fi
+    done
+    return 0
+}
+
+if ! macos_version_at_most 13 13.0; then
+    echo "macOS version self-check failed: 13 must be at most 13.0" >&2
+    exit 1
+fi
+if ! macos_version_at_most 13.0 13.1; then
+    echo "macOS version self-check failed: 13.0 must be at most 13.1" >&2
+    exit 1
+fi
+if macos_version_at_most 14 13.0; then
+    echo "macOS version self-check failed: 14 must not be at most 13.0" >&2
+    exit 1
+fi
+
 require_command() {
     command -v "$1" >/dev/null 2>&1 || {
         echo "required verification command is missing: $1" >&2
@@ -92,27 +131,31 @@ done
 
 for builtin in "${eabihf_builtins}" "${eabi_builtins}"; do
     [[ -s "${builtin}" ]] || { echo "missing builtin archive: ${builtin}" >&2; exit 1; }
-    llvm-nm --defined-only "${builtin}" | awk '{print $NF}' | grep -qx '__aeabi_uldivmod' || {
+    llvm-nm --quiet --defined-only "${builtin}" | awk '{print $NF}' | grep -qx '__aeabi_uldivmod' || {
         echo "${builtin} does not define __aeabi_uldivmod" >&2
         exit 1
     }
 done
 
-python3 - "${llvm_config}" "${ld_lld}" "${deployment_target}" <<'PY'
-import re
+for binary in "${llvm_config}" "${ld_lld}"; do
+    minos_versions="$(otool -l "${binary}" | sed -nE 's/^[[:space:]]*minos[[:space:]]+([0-9]+([.][0-9]+){0,2})[[:space:]]*$/\1/p')"
+    [[ -n "${minos_versions}" ]] || {
+        echo "missing LC_BUILD_VERSION minos in ${binary}" >&2
+        exit 1
+    }
+    while IFS= read -r version; do
+        macos_version_at_most "${version}" "${deployment_target}" || {
+            echo "${binary} requires macOS ${version}, target is ${deployment_target}" >&2
+            exit 1
+        }
+    done <<<"${minos_versions}"
+done
+
+python3 - "${llvm_config}" "${ld_lld}" <<'PY'
 import subprocess
 import sys
 
-deployment = tuple(map(int, sys.argv[3].split(".")))
 for binary in sys.argv[1:3]:
-    load_commands = subprocess.check_output(["otool", "-l", binary], text=True)
-    matches = re.findall(r"\bminos\s+(\d+\.\d+(?:\.\d+)?)", load_commands)
-    if not matches:
-        raise SystemExit(f"missing LC_BUILD_VERSION minos in {binary}")
-    for version in matches:
-        if tuple(map(int, version.split("."))) > deployment:
-            raise SystemExit(f"{binary} requires macOS {version}, target is {sys.argv[3]}")
-
     dependencies = subprocess.check_output(["otool", "-L", binary], text=True).splitlines()[1:]
     for dependency in dependencies:
         path = dependency.strip().split(" ", 1)[0]
