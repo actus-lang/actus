@@ -434,7 +434,7 @@ jobs:
           $output = Join-Path $root 'output'
           $archive = Join-Path $root 'linux-toolchain.tar.xz'
           $manifest = Get-Content -Raw -LiteralPath 'toolchains/llvm/llvm-23.1.2.json' | ConvertFrom-Json
-          $linuxUrl = $manifest.archives.'x86_64-unknown-linux-gnu'.url
+          $linuxUrl = $manifest.archives.'x86_64-unknown-linux-gnu'.release_url
           New-Item -ItemType Directory -Force -Path $output | Out-Null
           Invoke-WebRequest -Uri $linuxUrl -OutFile $archive
           & $tar -xJf $archive -C $output
