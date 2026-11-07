@@ -100,6 +100,20 @@ cp "${thumb_eabihf_builtin}" \
     "${staging_root}/lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a"
 cp "${thumb_eabi_builtin}" \
     "${staging_root}/lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a"
+cp "${source_root}/LICENSE.TXT" "${staging_root}/licenses/LLVM-LICENSE.TXT"
+cp "${source_root}/clang/LICENSE.TXT" "${staging_root}/licenses/LLVM-CLANG-LICENSE.TXT"
+cp "${source_root}/compiler-rt/LICENSE.TXT" \
+    "${staging_root}/licenses/LLVM-COMPILER-RT-LICENSE.TXT"
+LLVM_SOURCE_REVISION="${source_revision}" \
+python3 - "${staging_root}/licenses/THIRD-PARTY-NOTICES.txt" <<'PY'
+import os
+import sys
+
+with open(sys.argv[1], "w", encoding="utf-8", newline="\n") as handle:
+    handle.write("LLVM 23.1.2 third-party license index\n")
+    handle.write(f"Source revision: {os.environ['LLVM_SOURCE_REVISION']}\n")
+    handle.write("Component license texts are included in this directory.\n")
+PY
 
 LLVM_VERSION="${llvm_version}" \
 LLVM_SOURCE_REVISION="${source_revision}" \
