@@ -1,4 +1,5 @@
 [env]
+LLVM_SYS_231_PREFIX = { value = ".actus-toolchain/llvm-23.1.2", relative = true, force = false }
 # Native integration tests launch compiler and linker subprocesses. Keep the
 # default libtest concurrency bounded so a plain `cargo test` cannot fan out
 # into competing native toolchains. CI commands may still override this with
