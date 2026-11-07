@@ -555,15 +555,3 @@ jobs:
             --notes-file release-description.md \
             --prerelease --latest=false
 
-      - name: Record published manifest on main
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ACTUS_RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          set -euo pipefail
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add toolchains/llvm/llvm-23.1.2.json
-          git commit -m "ci(llvm): record published toolchain ${ACTUS_RELEASE_TAG}" || exit 0
-          git push origin HEAD:main

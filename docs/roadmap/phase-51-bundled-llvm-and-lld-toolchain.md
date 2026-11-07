@@ -165,16 +165,26 @@ jobs.
 
 ### 51.3 — Contributor bootstrap and Cargo discovery
 
-- [ ] Add idempotent Unix and Windows bootstrap scripts.
-- [ ] Install verified archives under `.actus-toolchain/llvm-23.1.2/`.
-- [ ] Configure `LLVM_SYS_231_PREFIX` through repository-local Cargo
+- [x] Add idempotent Unix and Windows bootstrap scripts.
+- [x] Install verified archives under `.actus-toolchain/llvm-23.1.2/`.
+- [x] Configure `LLVM_SYS_231_PREFIX` through repository-local Cargo
       configuration with relative environment lookup.
-- [ ] Reject corrupted, mismatched, or incomplete archives before extraction or
+- [x] Reject corrupted, mismatched, or incomplete archives before extraction or
       compilation.
-- [ ] Warn clearly when an explicit system LLVM override is used.
+- [x] Warn clearly when an explicit system LLVM override is used.
 - [ ] Mark system-override identity as `unverified` and reject it from
       `--strict` builds and stack-limit proof acceptance.
-- [ ] Prove bootstrap does not modify shell profiles or global configuration.
+- [x] Prove bootstrap does not modify shell profiles or global configuration.
+
+T3 release evidence:
+
+- Release: [llvm-23.1.2-actus-1](https://github.com/actus-lang/actus/releases/tag/llvm-23.1.2-actus-1), a prerelease development toolchain rather than an Actus release.
+- Publish/verification run: [42417431157](https://github.com/actus-lang/actus/actions/runs/42417431157). Linux, macOS arm64, and Windows verification passed; the workflow's direct manifest push was rejected by branch protection and was removed. The manifest is maintained through normal pull requests.
+- `x86_64-unknown-linux-gnu`: 184026264 bytes, SHA-256 `af5e2c36266e955b3814ca48a49b128a9edb93bc9d93c782fa2d30789a2de679`.
+- `aarch64-apple-darwin`: 118102460 bytes, SHA-256 `0572360506bc40e0203cb341ad8e400fc138b62c233ed14fec2602fbf0fdaa5b`.
+- `x86_64-pc-windows-msvc`: 1195012852 bytes, SHA-256 `85876a42e66d0ca4720a5884256cbe5ba1da1e3787190c1791d1b7bad84669b9`.
+- Each archive contains `licenses/LLVM-LICENSE.TXT` and
+  `licenses/THIRD-PARTY-NOTICES.txt`.
 
 ### 51.4 — Compiler identity and backend integration
 

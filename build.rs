@@ -4,6 +4,7 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=src/runtime");
+    println!("cargo:rerun-if-changed=.cargo/config.toml");
     println!("cargo:rerun-if-env-changed=LLVM_SYS_231_PREFIX");
     println!("cargo:rustc-check-cfg=cfg(coverage)");
     println!("cargo:rustc-check-cfg=cfg(actus_test_faults)");
@@ -29,8 +30,48 @@ fn main() {
     println!("cargo:rustc-env=ACTUS_RUNTIME_ARCHIVE={}", archive.display());
 
     if env::var_os("CARGO_FEATURE_LLVM").is_some() {
+        validate_llvm_selection();
         build_llvm_target_options_shim();
     }
+}
+
+fn validate_llvm_selection() {
+    let repository_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let bundled_prefix = repository_root.join(".actus-toolchain/llvm-23.1.2");
+    let configured_prefix = env::var_os("LLVM_SYS_231_PREFIX").map(PathBuf::from);
+    let selected_prefix = configured_prefix
+        .clone()
+        .map(|prefix| if prefix.is_absolute() { prefix } else { repository_root.join(prefix) })
+        .unwrap_or_else(|| bundled_prefix.clone());
+
+    let bundled_identity = bundled_prefix.canonicalize().unwrap_or_else(|_| bundled_prefix.clone());
+    let selected_identity =
+        selected_prefix.canonicalize().unwrap_or_else(|_| selected_prefix.clone());
+    if selected_identity == bundled_identity {
+        if !selected_prefix.is_dir() {
+            panic!(
+                "the verified LLVM toolchain is missing at `{}`; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1",
+                selected_prefix.display()
+            );
+        }
+        return;
+    }
+
+    let llvm_config_name = if cfg!(windows) { "bin/llvm-config.exe" } else { "bin/llvm-config" };
+    let llvm_config = selected_prefix.join(llvm_config_name);
+    if !llvm_config.is_file() {
+        panic!(
+            "LLVM_SYS_231_PREFIX points to `{}`, but `{}` is missing",
+            selected_prefix.display(),
+            llvm_config.display()
+        );
+    }
+    let version = command_output(&llvm_config, "--version");
+    println!(
+        "cargo:warning=LLVM toolchain override is unverified: prefix `{}`, version `{}`",
+        selected_prefix.display(),
+        version.trim()
+    );
 }
 
 fn build_llvm_target_options_shim() {

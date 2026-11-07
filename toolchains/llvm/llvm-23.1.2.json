@@ -5,20 +5,20 @@
     "x86_64-unknown-linux-gnu": {
       "file": "llvm-dev-23.1.2-x86_64-unknown-linux-gnu.tar.xz",
       "release_url": "https://github.com/actus-lang/actus/releases/download/llvm-23.1.2-actus-1/llvm-dev-23.1.2-x86_64-unknown-linux-gnu.tar.xz",
-      "size": null,
-      "sha256": null
+      "size": 184026264,
+      "sha256": "af5e2c36266e955b3814ca48a49b128a9edb93bc9d93c782fa2d30789a2de679"
     },
     "aarch64-apple-darwin": {
       "file": "llvm-dev-23.1.2-aarch64-apple-darwin.tar.xz",
       "release_url": "https://github.com/actus-lang/actus/releases/download/llvm-23.1.2-actus-1/llvm-dev-23.1.2-aarch64-apple-darwin.tar.xz",
-      "size": null,
-      "sha256": null
+      "size": 118102460,
+      "sha256": "0572360506bc40e0203cb341ad8e400fc138b62c233ed14fec2602fbf0fdaa5b"
     },
     "x86_64-pc-windows-msvc": {
       "file": "llvm-dev-23.1.2-x86_64-pc-windows-msvc.zip",
       "release_url": "https://github.com/actus-lang/actus/releases/download/llvm-23.1.2-actus-1/llvm-dev-23.1.2-x86_64-pc-windows-msvc.zip",
-      "size": null,
-      "sha256": null
+      "size": 1195012852,
+      "sha256": "85876a42e66d0ca4720a5884256cbe5ba1da1e3787190c1791d1b7bad84669b9"
     }
   }
 }
