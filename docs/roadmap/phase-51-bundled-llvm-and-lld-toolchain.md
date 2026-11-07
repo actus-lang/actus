@@ -79,12 +79,12 @@ integration is tracked in 51.5 and is linked to ADR-0103 S3.
 - [x] Publish the Linux contributor archive with the compiler headers, tools,
       lld, manifest, and licenses needed by the supported build paths.
 - [x] Verify the Linux archive contents and identity before release publication.
-- [ ] Build the macOS arm64 `llvm-dev-23.1.2-aarch64-apple-darwin` archive on
+- [x] Build the macOS arm64 `llvm-dev-23.1.2-aarch64-apple-darwin` archive on
       the pinned `macos-15`/Xcode 16.4 image with the system libc++ policy.
-- [ ] Verify the macOS archive through archive-prefix resolution, deployment
+- [x] Verify the macOS archive through archive-prefix resolution, deployment
       target, system-library dependency, target, builtin, lld, manifest, and
       zero-float checks.
-- [ ] Build and verify the Windows `llvm-dev-23.1.2-x86_64-pc-windows-msvc`
+- [x] Build and verify the Windows `llvm-dev-23.1.2-x86_64-pc-windows-msvc`
       archive with the pinned MSVC `/MD` contract, toolset identity, builtin
       provenance, and archive-prefix dependency checks.
 
@@ -121,6 +121,47 @@ The following evidence was collected from the two successful workflow runs:
 - Both runs used LLVM source revision
   `85ac560262434c9ccfc0c183ec22d4138ed647fb` and image digest
   `sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded`.
+
+#### macOS and Windows T2 evidence
+
+Run [#14](https://github.com/actus-lang/actus/actions/runs/42330707485)
+completed successfully on all Linux, macOS, and Windows build and verification
+jobs.
+
+- macOS arm64 ran on `macos-15` arm64 with Xcode 16.4 and
+  `MACOSX_DEPLOYMENT_TARGET=13.0`. The build job ran from
+  `2026-11-07T02:44:26Z` to `2026-11-07T03:47:35Z`, approximately
+  **1h 03m 09s**. It produced
+  `llvm-dev-23.1.2-aarch64-apple-darwin.tar.xz`, **118,078,516 bytes**, with
+  SHA-256
+  `d9ac829b0a1ee4e36d8993f28f4494120b43c1cfc82ec61076f83bb63860c8f4`.
+- macOS `resolve_builtin` found the approved source paths
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabihf/libclang_rt.builtins.a` and
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabi/libclang_rt.builtins.a`.
+  They were staged as
+  `lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a` and
+  `lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a`.
+  Verification passed with archive-prefix, deployment-target, system-library,
+  target, builtin, lld, manifest, and zero-float checks.
+- The macOS run recorded the pre-PCH-cache baseline: 3,322 compiler calls,
+  19 cacheable calls, 0 hits, 19 misses, 3,303 uncacheable calls, and a
+  0.02% cache-size utilization. The uncacheable-call cause is tracked
+  separately: LLVM's enabled precompiled headers are not cacheable by ccache.
+- Windows x86-64 ran on `windows-2022` with MSVC toolset `14.44.35207`
+  (`VCToolsVersion`) and the `/MD` contract. The build job ran from
+  `2026-11-07T02:44:26Z` to `2026-11-07T03:00:11Z`, approximately
+  **15m 45s**. It produced
+  `llvm-dev-23.1.2-x86_64-pc-windows-msvc.zip`, **1,194,964,192 bytes**, with
+  SHA-256
+  `92fd65fb609f54906437de78edb45a58534f7ff20793c5d41ac821ce47347a01`.
+- Windows staged the two builtins as
+  `lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a` and
+  `lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a`; their source
+  paths were
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabihf/libclang_rt.builtins.a` and
+  `lib/clang/23/lib/thumbv7em-unknown-none-eabi/libclang_rt.builtins.a`.
+  Verification passed with archive-prefix, MSVC dependency, builtin, and
+  zero-float checks.
 
 ### 51.3 — Contributor bootstrap and Cargo discovery
 
