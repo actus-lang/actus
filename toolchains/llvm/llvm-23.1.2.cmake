@@ -74,6 +74,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
 
 # Hosted platform policies are isolated from the Linux baseline.
 if(APPLE)
+    set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON CACHE BOOL "ccache cannot cache PCH builds")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Actus macOS deployment target" FORCE)
     set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Actus macOS archive architecture" FORCE)
     set(LLVM_STATIC_LINK_CXX_STDLIB OFF CACHE BOOL "Use the system macOS libc++" FORCE)
