@@ -32,6 +32,28 @@ build/<short-name>
 
 Direct pushes to `main` are not part of the normal contribution workflow. Changes should be submitted through a pull request.
 
+## LLVM contributor toolchain
+
+LLVM is the default native backend. Contributors should install the verified
+development toolchain for the current host and then build Actus:
+
+```sh
+./scripts/bootstrap_llvm.sh
+cargo build
+```
+
+On Windows, run `./scripts/bootstrap_llvm.ps1` from PowerShell instead of the
+Unix script. The bootstrap command downloads the host archive named by
+`toolchains/llvm/llvm-23.1.2.json`, verifies its SHA-256 and size before
+extraction, and installs it only under `.actus-toolchain/llvm-23.1.2/`.
+It does not modify a shell profile, global Cargo configuration, or system
+packages.
+
+`LLVM_SYS_231_PREFIX` may be set explicitly when working with a separately
+managed LLVM installation. That override has precedence over the repository
+default, but the compiler reports it as an unverified toolchain; use the
+verified bootstrap for strict builds and reproducible stack evidence.
+
 ## Contribution workflow
 
 1. Check existing issues and discussions before starting work.
