@@ -402,3 +402,100 @@ jobs:
 
       - name: Run ARM32 LLVM object and link tests
         run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
+
+  contributor-bootstrap:
+    name: Contributor bootstrap (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Bootstrap verified LLVM (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./scripts/bootstrap_llvm.sh
+
+      - name: Bootstrap verified LLVM (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/bootstrap_llvm.ps1
+
+      - name: Prove Cargo uses the bundled LLVM (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          prefix="$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2"
+          echo "$prefix/bin" >> "$GITHUB_PATH"
+          export PATH="$prefix/bin:$PATH"
+          selected="$(realpath "$(command -v llvm-config)")"
+          expected="$(realpath "$prefix/bin/llvm-config")"
+          test "$selected" = "$expected"
+          llvm-config --version
+
+      - name: Prove Cargo uses the bundled LLVM (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $prefix = Join-Path $env:GITHUB_WORKSPACE '.actus-toolchain\llvm-23.1.2'
+          $bin = Join-Path $prefix 'bin'
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $selected = (Get-Command llvm-config.exe -ErrorAction Stop).Source
+          $expected = Join-Path $bin 'llvm-config.exe'
+          if ((Resolve-Path $selected).Path -ne (Resolve-Path $expected).Path) { throw "system llvm-config selected: $selected" }
+          & $expected --version
+
+      - name: Reject a corrupted manifest before extraction (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          temporary_manifest="$RUNNER_TEMP/llvm-corrupt.json"
+          python3 - "$GITHUB_WORKSPACE/toolchains/llvm/llvm-23.1.2.json" "$temporary_manifest" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          manifest = json.loads(Path(sys.argv[1]).read_text())
+          import platform
+          triple = "x86_64-unknown-linux-gnu" if platform.system() == "Linux" else "aarch64-apple-darwin"
+          manifest["archives"][triple]["sha256"] = "0" * 64
+          Path(sys.argv[2]).write_text(json.dumps(manifest))
+          PY
+          if ./scripts/bootstrap_llvm.sh --manifest "$temporary_manifest" --install-root "$RUNNER_TEMP/llvm-corrupt"; then
+            echo 'corrupted manifest unexpectedly succeeded' >&2
+            exit 1
+          fi
+
+      - name: Reject a corrupted manifest before extraction (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $temporaryManifest = Join-Path $env:RUNNER_TEMP 'llvm-corrupt.json'
+          $manifest = Get-Content -Raw -LiteralPath 'toolchains/llvm/llvm-23.1.2.json' | ConvertFrom-Json
+          $manifest.archives.'x86_64-pc-windows-msvc'.sha256 = '0' * 64
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $temporaryManifest
+          try {
+            & ./scripts/bootstrap_llvm.ps1 -ManifestPath $temporaryManifest -InstallRoot (Join-Path $env:RUNNER_TEMP 'llvm-corrupt')
+            throw 'corrupted manifest unexpectedly succeeded'
+          } catch {
+            if ($_.Exception.Message -notmatch 'SHA-256 mismatch') { throw }
+          }
+
+      - name: Prove idempotent bootstrap (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./scripts/bootstrap_llvm.sh --offline
+
+      - name: Prove idempotent bootstrap (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/bootstrap_llvm.ps1 -Offline
+
+      - name: Check contributor build surface
+        run: cargo check --all-targets --all-features
+
+      - name: Run LLVM backend tests
+        run: cargo test --test llvm_backend --all-features -- --test-threads=1
