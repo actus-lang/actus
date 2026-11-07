@@ -217,18 +217,6 @@ jobs:
           CCACHE_LOGFILE: ${{ runner.temp }}/ccache.log
         run: bash ./scripts/build_llvm_dev_macos.sh
 
-      - name: Inspect macOS compiler cache wiring
-        shell: /opt/homebrew/bin/bash --noprofile --norc -eo pipefail {0}
-        env:
-          CCACHE_DIR: ${{ runner.temp }}/ccache
-        run: |
-          configured_cache_dir="$(ccache --get-config cache_dir)"
-          test "${configured_cache_dir}" = "${CCACHE_DIR}"
-          printf 'ccache cache_dir: %s\n' "${configured_cache_dir}"
-          ninja -C "${RUNNER_TEMP}/actus-llvm/build" -t commands > "${RUNNER_TEMP}/ninja-commands.txt"
-          head -n 10 "${RUNNER_TEMP}/ninja-commands.txt"
-          ccache --show-stats -v
-
       - name: Build and package after successful configure
         shell: bash
         env:
@@ -239,21 +227,6 @@ jobs:
           ACTUS_MACOS_RUNNER_IMAGE: macos-15
           CCACHE_LOGFILE: ${{ runner.temp }}/ccache.log
         run: bash ./scripts/build_llvm_dev_macos.sh
-
-      - name: Record macOS compiler cache result
-        if: always()
-        shell: /opt/homebrew/bin/bash --noprofile --norc -eo pipefail {0}
-        env:
-          CCACHE_DIR: ${{ runner.temp }}/ccache
-        run: |
-          configured_cache_dir="$(ccache --get-config cache_dir)"
-          test "${configured_cache_dir}" = "${CCACHE_DIR}"
-          printf 'ccache cache_dir: %s\n' "${configured_cache_dir}"
-          ccache --show-stats -v
-          du -sh "${CCACHE_DIR}"
-          if [[ -f "${RUNNER_TEMP}/ccache.log" ]]; then
-            tail -n 120 "${RUNNER_TEMP}/ccache.log"
-          fi
 
       - name: Save compiler cache
         if: always()

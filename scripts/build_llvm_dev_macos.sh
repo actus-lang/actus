@@ -77,6 +77,8 @@ if [[ -n "${ACTUS_CMAKE_LAUNCHER:-}" ]]; then
     )
 fi
 cmake "${cmake_args[@]}"
+grep -c ccache "${build_root}/build.ninja" || true
+ccache --show-stats -v || true
 if [[ "${ACTUS_LLVM_CONFIGURE_ONLY:-0}" == "1" ]]; then
     echo "LLVM CMake configure completed; build intentionally skipped"
     exit 0
