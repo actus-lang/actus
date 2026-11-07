@@ -180,13 +180,27 @@ import sys
 
 with open(sys.argv[1], encoding="utf-8") as handle:
     manifest = json.load(handle)
-assert manifest["llvm_version"] == "23.1.2"
-assert manifest["host_triple"] == "aarch64-apple-darwin"
-assert manifest["cxx_runtime"] == "system-libc++"
-assert manifest["macos_deployment_target"] == "13.0"
-assert manifest["identity"] == "published-archive-sha256"
-assert manifest["cmake_flags"]["LLVM_TARGETS_TO_BUILD"] == ["X86", "ARM", "AArch64"]
-assert manifest["targets"] == sys.argv[2].split()
-assert len(manifest["cmake_cache_sha256"]) == 64
+def require_equal(label, actual, expected):
+    assert actual == expected, f"{label}: expected {expected!r}, got {actual!r}"
+
+require_equal("LLVM version", manifest["llvm_version"], "23.1.2")
+require_equal("host triple", manifest["host_triple"], "aarch64-apple-darwin")
+require_equal("C++ runtime", manifest["cxx_runtime"], "system-libc++")
+require_equal(
+    "macOS deployment target",
+    manifest["macos_deployment_target"],
+    "13.0",
+)
+require_equal("archive identity", manifest["identity"], "published-archive-sha256")
+require_equal(
+    "LLVM targets",
+    manifest["cmake_flags"]["LLVM_TARGETS_TO_BUILD"],
+    ["X86", "ARM", "AArch64"],
+)
+require_equal("built targets", manifest["targets"], sys.argv[2].split())
+assert len(manifest["cmake_cache_sha256"]) == 64, (
+    "CMake cache SHA-256: expected 64 hex characters, "
+    f"got {len(manifest['cmake_cache_sha256'])}"
+)
 PY
 echo "verified ${archive_name} with archive-prefix and macOS dependency checks"
