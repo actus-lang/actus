@@ -90,6 +90,16 @@ Copy-Item -Path (Join-Path $installRoot "*") -Destination $stagingRoot -Recurse 
 Copy-Item $ldLld (Join-Path $stagingRoot "lib/actus/bin/ld.lld.exe") -Force
 Copy-Item $eabihfBuiltin (Join-Path $stagingRoot "lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a") -Force
 Copy-Item $eabiBuiltin (Join-Path $stagingRoot "lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a") -Force
+$licenseRoot = Join-Path $stagingRoot "licenses"
+New-Item -ItemType Directory -Force -Path $licenseRoot | Out-Null
+Copy-Item (Join-Path $sourceRoot "LICENSE.TXT") (Join-Path $licenseRoot "LLVM-LICENSE.TXT") -Force
+Copy-Item (Join-Path $sourceRoot "clang/LICENSE.TXT") (Join-Path $licenseRoot "LLVM-CLANG-LICENSE.TXT") -Force
+Copy-Item (Join-Path $sourceRoot "compiler-rt/LICENSE.TXT") (Join-Path $licenseRoot "LLVM-COMPILER-RT-LICENSE.TXT") -Force
+@(
+    "LLVM 23.1.2 third-party license index",
+    "Source revision: $resolvedSourceRevision",
+    "Component license texts are included in this directory."
+) | Set-Content -Encoding utf8 (Join-Path $licenseRoot "THIRD-PARTY-NOTICES.txt")
 
 $manifest = [ordered]@{
     llvm_version = $llvmVersion

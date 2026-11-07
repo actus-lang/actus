@@ -2,6 +2,17 @@ name: Build bundled LLVM development archive
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish verified archives as a prerelease
+        required: true
+        type: boolean
+        default: false
+      release_tag:
+        description: Release tag; use a new actus-N value for a new release
+        required: true
+        type: string
+        default: llvm-23.1.2-actus-1
   push:
     branches:
       - main
@@ -402,3 +413,157 @@ jobs:
       - name: Verify archive with archive-prefix checks
         shell: pwsh
         run: ./scripts/verify_llvm_dev_windows.ps1
+
+  publish:
+    name: Publish LLVM development archives
+    if: github.event_name == 'workflow_dispatch' && inputs.publish == true
+    needs:
+      - verify-linux-x86_64
+      - verify-macos-arm64
+      - verify-windows-x86_64
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Download Linux archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: llvm-dev-${{ env.LLVM_VERSION }}-x86_64-unknown-linux-gnu
+          path: release-assets
+
+      - name: Download macOS archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: llvm-dev-${{ env.LLVM_VERSION }}-aarch64-apple-darwin
+          path: release-assets
+
+      - name: Download Windows archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: llvm-dev-${{ env.LLVM_VERSION }}-x86_64-pc-windows-msvc
+          path: release-assets
+
+      - name: Validate release assets and create manifest
+        shell: bash
+        env:
+          ACTUS_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import tarfile
+          import zipfile
+          from pathlib import Path
+
+          tag = os.environ["ACTUS_RELEASE_TAG"]
+          if tag != "llvm-23.1.2-actus-1" and not tag.startswith("llvm-23.1.2-actus-"):
+              raise SystemExit(f"invalid LLVM release tag: {tag}")
+          manifest_path = Path("toolchains/llvm/llvm-23.1.2.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          records = {}
+          for triple, record in manifest["archives"].items():
+              archive = Path("release-assets") / record["file"]
+              if not archive.is_file():
+                  raise SystemExit(f"release asset is missing: {archive}")
+              digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+              size = archive.stat().st_size
+              if archive.suffix == ".zip":
+                  with zipfile.ZipFile(archive) as archive_file:
+                      names = archive_file.namelist()
+                      contents = {
+                          name[2:] if name.startswith("./") else name: archive_file.read(name)
+                          for name in names
+                          if name in {"licenses/LLVM-LICENSE.TXT", "./licenses/LLVM-LICENSE.TXT",
+                                      "licenses/THIRD-PARTY-NOTICES.txt", "./licenses/THIRD-PARTY-NOTICES.txt"}
+                      }
+              else:
+                  with tarfile.open(archive, "r:*") as archive_file:
+                      members = archive_file.getmembers()
+                      names = [member.name for member in members]
+                      contents = {}
+                      for member in members:
+                          normalized_name = member.name[2:] if member.name.startswith("./") else member.name
+                          if normalized_name in {"licenses/LLVM-LICENSE.TXT", "licenses/THIRD-PARTY-NOTICES.txt"}:
+                              extracted = archive_file.extractfile(member)
+                              contents[normalized_name] = extracted.read() if extracted else b""
+              normalized_names = {name[2:] if name.startswith("./") else name for name in names}
+              license_names = [name for name in normalized_names if name.startswith("licenses/")]
+              required = {"licenses/LLVM-LICENSE.TXT", "licenses/THIRD-PARTY-NOTICES.txt"}
+              if not required.issubset(license_names):
+                  raise SystemExit(f"license files are missing from {archive}: {sorted(required - set(license_names))}")
+              for license_name in required:
+                  if not contents.get(license_name, b"").strip():
+                      raise SystemExit(f"license file is empty in {archive}: {license_name}")
+              if b"Apache" not in contents["licenses/LLVM-LICENSE.TXT"]:
+                  raise SystemExit(f"LLVM license text is not Apache-licensed in {archive}")
+              record = dict(record)
+              record["release_url"] = f"https://github.com/actus-lang/actus/releases/download/{tag}/{record['file']}"
+              record["size"] = size
+              record["sha256"] = digest
+              records[triple] = record
+          manifest["release_tag"] = tag
+          manifest["archives"] = records
+          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          description = Path("release-description.md")
+          lines = [
+              "This is not an Actus release.",
+              "",
+              "This prerelease contains the pinned LLVM 23.1.2 development toolchain used to build Actus from source.",
+              "Install it with `scripts/bootstrap_llvm.sh` or `scripts/bootstrap_llvm.ps1`.",
+              "",
+              "Architecture and provenance: [ADR-0105](https://github.com/actus-lang/actus/blob/main/docs/decisions/ADR-0105-bundled-llvm-and-lld-toolchain.md).",
+              "",
+              "SHA-256:",
+          ]
+          for triple, record in records.items():
+              lines.append(f"- `{record['file']}` ({triple}): `{record['sha256']}`")
+          description.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Refuse to overwrite an existing release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTUS_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${ACTUS_RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "release tag already exists: ${ACTUS_RELEASE_TAG}" >&2
+            exit 1
+          fi
+          if gh release view "${ACTUS_RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "release already exists: ${ACTUS_RELEASE_TAG}" >&2
+            exit 1
+          fi
+
+      - name: Create prerelease and upload assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTUS_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release create "${ACTUS_RELEASE_TAG}" \
+            release-assets/*.tar.xz release-assets/*.zip \
+            release-assets/*.sha256 toolchains/llvm/llvm-23.1.2.json \
+            --title "LLVM 23.1.2 development toolchain (${ACTUS_RELEASE_TAG##*-})" \
+            --notes-file release-description.md \
+            --prerelease --latest=false
+
+      - name: Record published manifest on main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTUS_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add toolchains/llvm/llvm-23.1.2.json
+          git commit -m "ci(llvm): record published toolchain ${ACTUS_RELEASE_TAG}" || exit 0
+          git push origin HEAD:main
