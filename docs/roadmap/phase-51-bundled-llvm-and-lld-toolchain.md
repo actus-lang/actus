@@ -172,8 +172,8 @@ jobs.
 - [x] Reject corrupted, mismatched, or incomplete archives before extraction or
       compilation.
 - [x] Warn clearly when an explicit system LLVM override is used.
-- [ ] Mark system-override identity as `unverified` and reject it from
-      `--strict` builds and stack-limit proof acceptance.
+- [x] Mark system-override identity as `unverified` and reject it from
+      `--strict` LLVM builds and stack-limit proof acceptance with E1806.
 - [x] Prove bootstrap does not modify shell profiles or global configuration.
 
 T3 release evidence:
@@ -217,11 +217,12 @@ The `actus-1` release remains immutable and untouched.
 
 ### 51.4 — Compiler identity and backend integration
 
-T4 embeds and reports the LLVM identity, but strict rejection of an unverified
-system override is temporarily deferred. The existing Rust, LLVM-only, ARM32,
-and coverage jobs still select system LLVM instead of the verified T3 archive;
-E1806 will be restored in a follow-up after every LLVM job uses the bundled
-toolchain.
+T4 embeds and reports the LLVM identity. With all LLVM CI jobs now using the
+verified T3 archive, strict LLVM builds reject an explicit unverified system
+override with E1806. Cranelift-only builds and non-strict builds retain their
+previous behavior. `release.yml` is intentionally unchanged: its release build
+does not use `--strict`, and its migration to the bundled toolchain remains a
+later T7 decision.
 
 - [ ] Add LLVM version, archive checksum, build revision, target, profile, and
       linker identity to `actus --version`.
