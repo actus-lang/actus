@@ -440,6 +440,19 @@ jobs:
         shell: bash
         run: ./scripts/bootstrap_llvm.sh
 
+      - name: Install ARM32 native link tools
+        timeout-minutes: 20
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 update
+          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends --yes clang binutils-arm-none-eabi
+          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
+          echo "$RUST_BIN" >> "$GITHUB_PATH"
+          export PATH="$RUST_BIN:$PATH"
+          command -v clang
+          command -v arm-none-eabi-ld
+
       - name: Save LLVM archive cache
         if: success() && steps.llvm_archive_cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -451,10 +464,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          prefix="$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2"
+          echo "$prefix/bin" >> "$GITHUB_PATH"
+          export PATH="$prefix/bin:$PATH"
           echo '--- df -h before full suite ---'
           df -h
           echo '--- bundled LLVM ---'
-          ./.actus-toolchain/llvm-23.1.2/bin/llvm-config --version
+          llvm-config --version
 
       - name: Run and measure full suite
         shell: bash
