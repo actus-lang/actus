@@ -26,6 +26,7 @@ use actus::lexer::scan;
 use actus::parser::parse;
 use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol};
 
+#[cfg(target_os = "linux")]
 pub(crate) fn llvm_tool(name: &str) -> std::path::PathBuf {
     let config = std::path::PathBuf::from(env!(
         "ACTUS_LLVM_CONFIG_PATH",
