@@ -12,7 +12,7 @@ on:
         description: Release tag; use a new actus-N value for a new release
         required: true
         type: string
-        default: llvm-23.1.2-actus-1
+        default: llvm-23.1.2-actus-3
   push:
     branches:
       - main

@@ -196,6 +196,25 @@ bytes for Windows. These values are acceptance ceilings, not replacement
 release identities; the published `actus-1` checksums remain unchanged until
 the next release is explicitly published.
 
+The corrected archive set was published as the prerelease
+[llvm-23.1.2-actus-2](https://github.com/actus-lang/actus/releases/tag/llvm-23.1.2-actus-2)
+by workflow [#42433465998](https://github.com/actus-lang/actus/actions/runs/42433465998).
+The release assets were downloaded and checked against their accompanying
+`.sha256` files before updating the contributor manifest:
+
+- `x86_64-unknown-linux-gnu`: **161,765,900 bytes**, SHA-256
+  `3dfe69ed3a2f1cb86e65c417ead3552d6dae6350b70947c3c35ff47cc0adfddc`.
+- `aarch64-apple-darwin`: **104,259,476 bytes**, SHA-256
+  `429f49aca94a89b39bf3c9491b90911cc3901206cfceb4fcbf5f4a9e3cf9cb53`.
+- `x86_64-pc-windows-msvc`: **252,625,655 bytes**, SHA-256
+  `919730c11401b7598fc8ee2b86eeb320e946d282a2d07a9ba972c25e18d594e3`.
+
+The original diagnosis remains recorded: `actus-1` contained 2,653 Windows
+ZIP entries with `compress_type=0` (`ZIP_STORED`), which explained why its
+compressed size was almost identical to the extracted payload. `actus-2`
+contains the deterministic DEFLATE level-9 output and retains the ZIP format.
+The `actus-1` release remains immutable and untouched.
+
 ### 51.4 — Compiler identity and backend integration
 
 - [ ] Add LLVM version, archive checksum, build revision, target, profile, and
