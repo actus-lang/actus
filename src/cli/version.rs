@@ -68,7 +68,7 @@ fn identity() -> VersionIdentity {
     #[cfg(feature = "llvm")]
     {
         let identity = crate::codegen::llvm::toolchain_identity();
-        return VersionIdentity {
+        VersionIdentity {
             schema_version: identity.schema_version,
             actus_version: identity.actus_version,
             commit: identity.commit,
@@ -81,7 +81,7 @@ fn identity() -> VersionIdentity {
             },
             host: identity.host,
             backends: identity.backends,
-        };
+        }
     }
 
     #[cfg(not(feature = "llvm"))]
