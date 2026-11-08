@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 [CmdletBinding()]
 param(
     [string]$ManifestPath = (Join-Path $PSScriptRoot "..\toolchains\llvm\llvm-23.1.2.json"),
@@ -41,13 +42,26 @@ New-Item -ItemType Directory -Force -Path $parentRoot | Out-Null
 $temporaryRoot = Join-Path $parentRoot (".llvm-$llvmVersion-" + [Guid]::NewGuid().ToString("N"))
 $extractRoot = Join-Path $temporaryRoot "extracted"
 $archivePath = Join-Path $temporaryRoot $record.file
+$archiveCachePath = $env:ACTUS_LLVM_ARCHIVE_CACHE
+$archiveCacheHit = $false
 New-Item -ItemType Directory -Path $extractRoot | Out-Null
 try {
-    Invoke-WebRequest -Uri $record.release_url -OutFile $archivePath
+    if (-not [string]::IsNullOrWhiteSpace($archiveCachePath) -and (Test-Path -LiteralPath $archiveCachePath -PathType Leaf)) {
+        $archivePath = $archiveCachePath
+        $archiveCacheHit = $true
+        Write-Host "using cached LLVM archive $archivePath"
+    } else {
+        Invoke-WebRequest -Uri $record.release_url -OutFile $archivePath -MaximumRetryCount 5 -RetryIntervalSec 10
+    }
     $actualSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash.ToLowerInvariant()
     if ($actualSha256 -ne $record.sha256.ToLowerInvariant()) { throw "LLVM archive SHA-256 mismatch: expected $($record.sha256), got $actualSha256" }
     $actualSize = (Get-Item -LiteralPath $archivePath).Length
     if ($actualSize -ne [int64]$record.size) { throw "LLVM archive size mismatch: expected $($record.size), got $actualSize" }
+    if (-not [string]::IsNullOrWhiteSpace($archiveCachePath) -and -not $archiveCacheHit) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $archiveCachePath) | Out-Null
+        Copy-Item -LiteralPath $archivePath -Destination $archiveCachePath -Force
+        $archivePath = $archiveCachePath
+    }
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractRoot
     if (-not (Test-VerifiedInstall $extractRoot)) { throw "downloaded LLVM archive failed verification" }
     Move-Item -LiteralPath $extractRoot -Destination $InstallRoot

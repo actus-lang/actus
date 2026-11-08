@@ -80,7 +80,17 @@ mkdir -p "${parent_root}"
 temporary_root="$(mktemp -d "${parent_root}/.llvm-${llvm_version}.XXXXXX")"
 trap 'rm -rf "${temporary_root}"' EXIT
 archive_path="${temporary_root}/${archive_name}"
-curl --fail --location --proto '=https' --tlsv1.2 "${archive_url}" -o "${archive_path}"
+archive_cache_path="${ACTUS_LLVM_ARCHIVE_CACHE:-}"
+archive_cache_hit=false
+if [[ -n "${archive_cache_path}" && -f "${archive_cache_path}" ]]; then
+    archive_path="${archive_cache_path}"
+    archive_cache_hit=true
+    echo "using cached LLVM archive ${archive_path}"
+else
+    curl --fail --location --proto '=https' --tlsv1.2 \
+        --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 30 \
+        "${archive_url}" -o "${archive_path}"
+fi
 if command -v sha256sum >/dev/null; then
     actual_sha256="$(sha256sum "${archive_path}" | awk '{print $1}')"
 else
@@ -89,6 +99,11 @@ fi
 [[ "${actual_sha256}" == "${expected_sha256}" ]] || { echo "LLVM archive SHA-256 mismatch: expected ${expected_sha256}, got ${actual_sha256}" >&2; exit 1; }
 actual_size="$(python3 -c 'import os, sys; print(os.path.getsize(sys.argv[1]))' "${archive_path}")"
 [[ "${actual_size}" == "${expected_size}" ]] || { echo "LLVM archive size mismatch: expected ${expected_size}, got ${actual_size}" >&2; exit 1; }
+if [[ -n "${archive_cache_path}" && "${archive_cache_hit}" == false ]]; then
+    mkdir -p "$(dirname "${archive_cache_path}")"
+    cp "${archive_path}" "${archive_cache_path}"
+    archive_path="${archive_cache_path}"
+fi
 extract_root="${temporary_root}/extracted"
 mkdir "${extract_root}"
 tar -xJf "${archive_path}" -C "${extract_root}"
