@@ -217,6 +217,12 @@ The `actus-1` release remains immutable and untouched.
 
 ### 51.4 — Compiler identity and backend integration
 
+T4 embeds and reports the LLVM identity, but strict rejection of an unverified
+system override is temporarily deferred. The existing Rust, LLVM-only, ARM32,
+and coverage jobs still select system LLVM instead of the verified T3 archive;
+E1806 will be restored in a follow-up after every LLVM job uses the bundled
+toolchain.
+
 - [ ] Add LLVM version, archive checksum, build revision, target, profile, and
       linker identity to `actus --version`.
 - [ ] Include the same identity in stack-limit reports and future structured
