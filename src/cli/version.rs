@@ -1,48 +1,64 @@
 use serde::Serialize;
 
 pub(super) fn version_command(arguments: impl Iterator<Item = String>) -> i32 {
-    let mut json = false;
-    for argument in arguments {
-        if argument == "--json" {
-            if json {
-                eprintln!("error: duplicate --json option");
-                return 2;
-            }
-            json = true;
-        } else {
-            eprintln!("error: unexpected argument {argument}");
-            return 2;
-        }
-    }
+    let json = match parse_json_flag(arguments) {
+        Ok(json) => json,
+        Err(()) => return 2,
+    };
     let identity = identity();
     if json {
-        match serde_json::to_string_pretty(&identity) {
-            Ok(output) => println!("{output}"),
-            Err(error) => {
-                eprintln!("error: cannot serialize toolchain identity: {error}");
-                return 1;
-            }
-        }
+        return print_json(&identity);
     } else {
-        println!("actus {} ({})", identity.actus_version, identity.commit);
-        println!(
-            "llvm {} {}{}",
-            identity.llvm.version,
-            identity.llvm.status,
-            identity
-                .llvm
-                .release_tag
-                .as_deref()
-                .map(|tag| format!(
-                    " {tag} sha256:{}",
-                    identity.llvm.archive_sha256.as_deref().unwrap_or("")
-                ))
-                .unwrap_or_default()
-        );
-        println!("host {}", identity.host);
-        println!("backends {}", identity.backends.join(", "));
+        print_human(&identity);
     }
     0
+}
+
+fn parse_json_flag(arguments: impl Iterator<Item = String>) -> Result<bool, ()> {
+    let mut json = false;
+    for argument in arguments {
+        if argument == "--json" && !json {
+            json = true;
+        } else if argument == "--json" {
+            eprintln!("error: duplicate --json option");
+            return Err(());
+        } else {
+            eprintln!("error: unexpected argument {argument}");
+            return Err(());
+        }
+    }
+    Ok(json)
+}
+
+fn print_json(identity: &VersionIdentity) -> i32 {
+    match serde_json::to_string_pretty(identity) {
+        Ok(output) => println!("{output}"),
+        Err(error) => {
+            eprintln!("error: cannot serialize toolchain identity: {error}");
+            return 1;
+        }
+    }
+    0
+}
+
+fn print_human(identity: &VersionIdentity) {
+    println!("actus {} ({})", identity.actus_version, identity.commit);
+    println!(
+        "llvm {} {}{}",
+        identity.llvm.version,
+        identity.llvm.status,
+        identity
+            .llvm
+            .release_tag
+            .as_deref()
+            .map(|tag| format!(
+                " {tag} sha256:{}",
+                identity.llvm.archive_sha256.as_deref().unwrap_or("")
+            ))
+            .unwrap_or_default()
+    );
+    println!("host {}", identity.host);
+    println!("backends {}", identity.backends.join(", "));
 }
 
 #[derive(Serialize)]
