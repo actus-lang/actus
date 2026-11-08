@@ -29,18 +29,19 @@ if ($archiveSize -gt $maximumArchiveSize) {
 Expand-Archive -Path $archivePath -DestinationPath $extractedRoot -Force
 
 $prefix = $extractedRoot
-$env:PATH = "$(Join-Path $prefix 'bin');$env:PATH"
 $llvmConfig = Join-Path $prefix "bin/llvm-config.exe"
+$llvmNm = Join-Path $prefix "bin/llvm-nm.exe"
+$llvmObjdump = Join-Path $prefix "bin/llvm-objdump.exe"
+$llc = Join-Path $prefix "bin/llc.exe"
 $ldLld = Join-Path $prefix "lib/actus/bin/ld.lld.exe"
 $eabihfBuiltin = Join-Path $prefix "lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a"
 $eabiBuiltin = Join-Path $prefix "lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a"
 $manifestPath = Join-Path $prefix "share/actus/toolchain.json"
-foreach ($commandName in @("llvm-config.exe", "llvm-nm.exe", "llvm-objdump.exe", "llc.exe")) {
-    $resolved = (Get-Command $commandName).Source
-    $expected = Join-Path $prefix "bin/$commandName"
-    if ($resolved -ne $expected) { throw "$commandName resolved outside archive prefix: $resolved" }
+foreach ($toolPath in @($llvmConfig, $llvmNm, $llvmObjdump, $llc, $ldLld)) {
+    if (-not (Test-Path -LiteralPath $toolPath -PathType Leaf)) {
+        throw "bundled LLVM tool is missing: $toolPath"
+    }
 }
-if (-not (Test-Path $ldLld)) { throw "bundled ld.lld.exe is missing" }
 if ((& $llvmConfig --version).Trim() -ne $llvmVersion) { throw "llvm-config version mismatch" }
 $targetsBuilt = (& $llvmConfig --targets-built).Trim()
 foreach ($targetName in @("AArch64", "ARM", "X86")) {
@@ -48,7 +49,7 @@ foreach ($targetName in @("AArch64", "ARM", "X86")) {
 }
 foreach ($builtin in @($eabihfBuiltin, $eabiBuiltin)) {
     if (-not (Test-Path $builtin)) { throw "missing builtin archive: $builtin" }
-    if ((& llvm-nm.exe --quiet --defined-only $builtin | Select-String "__aeabi_uldivmod").Count -eq 0) {
+    if ((& $llvmNm --quiet --defined-only $builtin | Select-String "__aeabi_uldivmod").Count -eq 0) {
         throw "$builtin does not define __aeabi_uldivmod"
     }
 }
@@ -85,9 +86,9 @@ foreach ($binary in @($llvmConfig, $ldLld)) {
 }
 
 $thumbObject = Join-Path $verificationRoot "thumb-zero-float.o"
-& llc.exe -mtriple=thumbv7em-none-eabihf -mcpu=cortex-m4 -filetype=obj `
+& $llc -mtriple=thumbv7em-none-eabihf -mcpu=cortex-m4 -filetype=obj `
     (Join-Path "tests/toolchain" "thumb_zero_float.ll") -o $thumbObject
-$disassembly = (& llvm-objdump.exe -d $thumbObject | Out-String)
+$disassembly = (& $llvmObjdump -d $thumbObject | Out-String)
 if ($disassembly -match "(?i)\b(vadd|vsub|vmul|vdiv|vmov|vldr|vstr|vpush|vpop|vmla|vmsr|vmrs)[A-Za-z0-9_.]*\b") {
     throw "Thumb zero-float fixture contains a VFP instruction"
 }
