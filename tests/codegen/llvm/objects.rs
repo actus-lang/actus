@@ -1,5 +1,31 @@
 use super::*;
 
+#[cfg(target_os = "linux")]
+fn llvm_tool(name: &str) -> std::path::PathBuf {
+    let config = std::path::PathBuf::from(env!(
+        "ACTUS_LLVM_CONFIG_PATH",
+        "Actus must expose the selected llvm-config path for LLVM tool tests"
+    ));
+    let version = std::process::Command::new(&config)
+        .arg("--version")
+        .output()
+        .expect("selected llvm-config should run");
+    assert!(version.status.success(), "selected llvm-config failed");
+    let version = String::from_utf8(version.stdout).expect("llvm-config version should be UTF-8");
+    assert_eq!(version.trim(), "23.1.2", "LLVM 23.1.2 is required for LLVM tool tests");
+    let bindir = std::process::Command::new(&config)
+        .arg("--bindir")
+        .output()
+        .expect("selected llvm-config should report its bin directory");
+    assert!(bindir.status.success(), "llvm-config --bindir failed");
+    let tool = std::path::PathBuf::from(
+        String::from_utf8(bindir.stdout).expect("llvm-config bindir should be UTF-8").trim(),
+    )
+    .join(name);
+    assert!(tool.is_file(), "selected LLVM tool is missing: {}", tool.display());
+    tool
+}
+
 #[test]
 fn emits_a_freestanding_llvm_object_without_host_runtime_imports() {
     let source = "verb main() -> Int { erg value: u32 = 41u32; return value as Int; }";
@@ -373,7 +399,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     {
         use std::process::Command;
 
-        let disassembly = Command::new("llvm-objdump")
+        let disassembly = Command::new(llvm_tool("llvm-objdump"))
             .args(["-d", "--triple=thumbv7em-none-eabihf"])
             .arg(&output)
             .output()
