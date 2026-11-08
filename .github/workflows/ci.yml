@@ -425,24 +425,6 @@ jobs:
         shell: pwsh
         run: ./scripts/bootstrap_llvm.ps1
 
-      - name: Prove Windows native tar extracts xz
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $tar = Join-Path $env:WINDIR 'System32\tar.exe'
-          $root = Join-Path $env:RUNNER_TEMP 'native-tar-xz-proof'
-          $output = Join-Path $root 'output'
-          $archive = Join-Path $root 'linux-toolchain.tar.xz'
-          $manifest = Get-Content -Raw -LiteralPath 'toolchains/llvm/llvm-23.1.2.json' | ConvertFrom-Json
-          $linuxUrl = $manifest.archives.'x86_64-unknown-linux-gnu'.release_url
-          New-Item -ItemType Directory -Force -Path $output | Out-Null
-          Invoke-WebRequest -Uri $linuxUrl -OutFile $archive
-          & $tar -xJf $archive -C $output
-          if ($LASTEXITCODE -ne 0) { throw "Windows native tar failed to extract an xz archive" }
-          if (-not (Test-Path -LiteralPath (Join-Path $output 'bin\llvm-config') -PathType Leaf)) {
-            throw 'Windows native tar extracted an unexpected archive layout'
-          }
-
       - name: Prove Cargo uses the bundled LLVM (Unix)
         if: runner.os != 'Windows'
         shell: bash

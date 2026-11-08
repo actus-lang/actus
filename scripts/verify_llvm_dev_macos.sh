@@ -12,6 +12,7 @@ readonly archive_name="llvm-dev-${llvm_version}-${archive_target}.tar.xz"
 readonly verification_root="${RUNNER_TEMP:-/tmp}/actus-llvm-macos-verification"
 readonly extracted_root="${verification_root}/extracted"
 readonly deployment_target="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+readonly maximum_archive_size=125088711
 
 macos_version_at_most() {
     local candidate_version="$1"
@@ -73,6 +74,11 @@ actual_digest="$(shasum -a 256 "${verification_root}/${archive_name}" | awk '{pr
     echo "archive checksum mismatch" >&2
     exit 1
 }
+archive_size="$(stat -f '%z' "${verification_root}/${archive_name}")"
+(( archive_size <= maximum_archive_size )) || {
+    echo "archive exceeds size limit: ${archive_size} > ${maximum_archive_size}" >&2
+    exit 1
+}
 tar -xJf "${verification_root}/${archive_name}" -C "${extracted_root}"
 
 prefix="${extracted_root}"
@@ -91,6 +97,17 @@ for command_name in llvm-config llvm-nm llvm-objdump llc; do
     }
 done
 [[ -x "${ld_lld}" ]] || { echo "bundled ld.lld is missing" >&2; exit 1; }
+for forbidden_path in \
+    "${prefix}/bin/ld64.lld" "${prefix}/bin/wasm-ld"; do
+    [[ ! -e "${forbidden_path}" && ! -L "${forbidden_path}" ]] || {
+        echo "forbidden linker alias is present: ${forbidden_path}" >&2
+        exit 1
+    }
+done
+if compgen -G "${prefix}/lib/libLTO.dylib" >/dev/null; then
+    echo "forbidden libLTO artifact is present" >&2
+    exit 1
+fi
 verify_tool_symlink() {
     local link_path="$1"
     [[ -L "${link_path}" ]] || { echo "expected symlink is missing: ${link_path}" >&2; exit 1; }
@@ -114,7 +131,7 @@ PY
 )"
     [[ -x "${resolved_target}" ]] || { echo "tool symlink target is not executable: ${resolved_target}" >&2; exit 1; }
 }
-for tool_name in ld.lld ld64.lld wasm-ld lld-link; do
+for tool_name in ld.lld lld-link; do
     verify_tool_symlink "${prefix}/bin/${tool_name}"
 done
 [[ "$("${llvm_config}" --version)" == "${llvm_version}" ]] || {

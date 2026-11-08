@@ -7,6 +7,7 @@ import tarfile
 import tempfile
 import unittest
 import zipfile
+import zlib
 
 
 SCRIPT = Path(__file__).parents[2] / "scripts" / "llvm" / "package_archive.py"
@@ -103,6 +104,27 @@ class PackageArchiveTests(unittest.TestCase):
                     "share/actus/toolchain.json",
                 ],
             )
+            self.assertTrue(
+                all(
+                    entry.compress_type == zipfile.ZIP_DEFLATED
+                    for entry in zip_archive.infolist()
+                )
+            )
+
+    def test_zip_uses_deflate_level_nine(self) -> None:
+        payload = (b"a" * 1000 + b"b" * 1000) * 1000
+        payload_path = self.root / "bin" / "compression-level-proof"
+        payload_path.write_bytes(payload)
+        archive = self.run_packager("zip", "compression-level.zip")
+        compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
+        expected_size = len(compressor.compress(payload) + compressor.flush())
+        level_six = zlib.compressobj(6, zlib.DEFLATED, -15)
+        level_six_size = len(level_six.compress(payload) + level_six.flush())
+        with zipfile.ZipFile(archive) as zip_archive:
+            entry = zip_archive.getinfo("bin/compression-level-proof")
+            self.assertEqual(entry.compress_type, zipfile.ZIP_DEFLATED)
+            self.assertEqual(entry.compress_size, expected_size)
+            self.assertLess(entry.compress_size, level_six_size)
 
     def test_tar_xz_preserves_valid_relative_symlink(self) -> None:
         (self.root / "bin/real-ld").write_bytes(b"lld")

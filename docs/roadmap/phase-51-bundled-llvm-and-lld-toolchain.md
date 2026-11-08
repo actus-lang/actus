@@ -186,6 +186,16 @@ T3 release evidence:
 - Each archive contains `licenses/LLVM-LICENSE.TXT` and
   `licenses/THIRD-PARTY-NOTICES.txt`.
 
+The archive-size investigation found that the published Windows ZIP used
+`ZIP_STORED` for all 2,653 entries, so its 1,195,012,852-byte size was nearly
+the same as the extracted payload. The packager now uses deterministic
+DEFLATE level 9 for every ZIP entry. The next archive verification also keeps
+the format as ZIP and enforces upper bounds derived from the rebuilt contents:
+196,686,557 bytes for Linux, 125,088,711 bytes for macOS arm64, and 332,593,539
+bytes for Windows. These values are acceptance ceilings, not replacement
+release identities; the published `actus-1` checksums remain unchanged until
+the next release is explicitly published.
+
 ### 51.4 — Compiler identity and backend integration
 
 - [ ] Add LLVM version, archive checksum, build revision, target, profile, and

@@ -110,16 +110,32 @@ def write_tar(output: Path, entries: list[tuple[Path, str]]) -> None:
 
 
 def write_zip(output: Path, entries: list[tuple[Path, str]]) -> None:
-    with zipfile.ZipFile(output, mode="w", compression=zipfile.ZIP_STORED) as archive:
+    with zipfile.ZipFile(
+        output,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as archive:
         for path, relative in entries:
             info = zipfile.ZipInfo(relative, date_time=ZIP_EPOCH)
             info.create_system = 3
+            info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = fixed_mode(path, relative) << 16
             if path.is_dir():
                 info.external_attr |= 0x10
-                archive.writestr(info, b"")
+                archive.writestr(
+                    info,
+                    b"",
+                    compress_type=zipfile.ZIP_DEFLATED,
+                    compresslevel=9,
+                )
             else:
-                archive.writestr(info, path.read_bytes())
+                archive.writestr(
+                    info,
+                    path.read_bytes(),
+                    compress_type=zipfile.ZIP_DEFLATED,
+                    compresslevel=9,
+                )
 
 
 def write_checksum(output: Path) -> str:

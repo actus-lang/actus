@@ -7,6 +7,7 @@ $verificationRoot = Join-Path $env:RUNNER_TEMP "actus-llvm-windows-verification"
 $extractedRoot = Join-Path $verificationRoot "extracted"
 $archivePath = Join-Path $verificationRoot $archiveName
 $checksumPath = "$archivePath.sha256"
+$maximumArchiveSize = [int64]332593539
 
 foreach ($commandName in @("python", "dumpbin")) {
     if (-not (Get-Command $commandName -ErrorAction SilentlyContinue)) {
@@ -21,6 +22,10 @@ Copy-Item "$(Join-Path "dist" $archiveName).sha256" $checksumPath
 $expectedDigest = (Get-Content $checksumPath -Raw).Split()[0]
 $actualDigest = (Get-FileHash $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualDigest -ne $expectedDigest) { throw "archive checksum mismatch" }
+$archiveSize = (Get-Item -LiteralPath $archivePath).Length
+if ($archiveSize -gt $maximumArchiveSize) {
+    throw "archive exceeds size limit: $archiveSize > $maximumArchiveSize"
+}
 Expand-Archive -Path $archivePath -DestinationPath $extractedRoot -Force
 
 $prefix = $extractedRoot
@@ -48,13 +53,24 @@ foreach ($builtin in @($eabihfBuiltin, $eabiBuiltin)) {
     }
 }
 
-foreach ($toolName in @("ld.lld.exe", "ld64.lld.exe", "wasm-ld.exe", "lld-link.exe")) {
+foreach ($toolName in @("ld.lld.exe", "lld-link.exe")) {
     $toolPath = Join-Path $prefix "bin/$toolName"
     if (-not (Test-Path -LiteralPath $toolPath -PathType Leaf)) {
         throw "bundled linker tool is missing: $toolPath"
     }
     if ((Get-Item -LiteralPath $toolPath).LinkType) {
         throw "Windows archive contains a symlink: $toolPath"
+    }
+}
+foreach ($forbiddenPath in @(
+    (Join-Path $prefix "bin/lld.exe"),
+    (Join-Path $prefix "bin/ld64.lld.exe"),
+    (Join-Path $prefix "bin/wasm-ld.exe"),
+    (Join-Path $prefix "bin/LTO.dll"),
+    (Join-Path $prefix "lib/LTO.lib")
+)) {
+    if (Test-Path -LiteralPath $forbiddenPath) {
+        throw "forbidden archive artifact is present: $forbiddenPath"
     }
 }
 

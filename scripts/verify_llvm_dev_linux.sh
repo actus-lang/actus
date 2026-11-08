@@ -12,6 +12,7 @@ readonly archive_name="llvm-dev-${llvm_version}-${archive_target}.tar.xz"
 readonly verification_root="${RUNNER_TEMP:-/tmp}/actus-llvm-verification"
 readonly extracted_root="${verification_root}/extracted"
 readonly expected_image_digest="${ACTUS_GLIBC_IMAGE_DIGEST:?ACTUS_GLIBC_IMAGE_DIGEST is required}"
+readonly maximum_archive_size=196686557
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -29,6 +30,11 @@ mkdir -p "${extracted_root}"
 cp "dist/${archive_name}" "${verification_root}/"
 cp "dist/${archive_name}.sha256" "${verification_root}/"
 (cd "${verification_root}" && sha256sum --check "${archive_name}.sha256")
+archive_size="$(stat -c '%s' "${verification_root}/${archive_name}")"
+(( archive_size <= maximum_archive_size )) || {
+    echo "archive exceeds size limit: ${archive_size} > ${maximum_archive_size}" >&2
+    exit 1
+}
 tar -xJf "${verification_root}/${archive_name}" -C "${extracted_root}"
 
 prefix="${extracted_root}"
@@ -56,6 +62,17 @@ done
 [[ -x "${ld_lld}" ]] || { echo "bundled ld.lld is missing" >&2; exit 1; }
 [[ -s "${eabihf_builtins}" ]] || { echo "Thumb eabihf builtins are missing" >&2; exit 1; }
 [[ -s "${eabi_builtins}" ]] || { echo "Thumb eabi builtins are missing" >&2; exit 1; }
+for forbidden_path in \
+    "${prefix}/bin/ld64.lld" "${prefix}/bin/wasm-ld"; do
+    [[ ! -e "${forbidden_path}" && ! -L "${forbidden_path}" ]] || {
+        echo "forbidden linker alias is present: ${forbidden_path}" >&2
+        exit 1
+    }
+done
+if compgen -G "${prefix}/lib/libLTO.so*" >/dev/null; then
+    echo "forbidden libLTO artifact is present" >&2
+    exit 1
+fi
 verify_tool_symlink() {
     local link_path="$1"
     [[ -L "${link_path}" ]] || { echo "expected symlink is missing: ${link_path}" >&2; exit 1; }
@@ -79,7 +96,7 @@ PY
 )"
     [[ -x "${resolved_target}" ]] || { echo "tool symlink target is not executable: ${resolved_target}" >&2; exit 1; }
 }
-for tool_name in ld.lld ld64.lld wasm-ld lld-link; do
+for tool_name in ld.lld lld-link; do
     verify_tool_symlink "${prefix}/bin/${tool_name}"
 done
 for builtin in "${eabihf_builtins}" "${eabi_builtins}"; do

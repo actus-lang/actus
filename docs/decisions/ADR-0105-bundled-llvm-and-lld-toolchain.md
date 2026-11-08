@@ -159,10 +159,18 @@ that release decision.
 
 The first Windows contributor archive is built on the fixed `windows-2022`
 runner with the pinned MSVC 14.44.35207 toolset, Ninja, and `sccache`. It is a
-`.zip` archive and its executables use the `.exe` suffix. Verification uses
+`.zip` archive using deterministic DEFLATE compression at level 9, and its
+executables use the `.exe` suffix. Verification uses
 `dumpbin /dependents` and rejects dependencies outside the Windows system DLL
 set and the `/MD` VC runtime family. The archive manifest records the toolset
 identity and the `MultiThreadedDLL` CMake value.
+
+The development archives retain only the linker names used by Actus: `ld.lld`
+and `lld-link`, plus the canonical `lib/actus/bin/ld.lld` copy. The unused
+`ld64.lld` and `wasm-ld` aliases are not distributed. The standalone legacy
+`libLTO` artifact is also excluded because no Actus build, `llvm-sys` path, or
+test consumes it; the LLVM LTO libraries required by other LLVM components are
+not inferred to be removable from the distribution component as a whole.
 
 The freestanding toolchain must also provide the compiler-rt builtins needed
 by each supported freestanding target. This includes `__aeabi_uldivmod` and

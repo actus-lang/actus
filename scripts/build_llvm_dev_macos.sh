@@ -110,6 +110,10 @@ mkdir -p "${staging_root}/lib/actus/bin" \
     "${staging_root}/share/actus" \
     "${staging_root}/licenses"
 cp -a "${install_root}/." "${staging_root}/"
+# Keep only the linker names used by Actus and the canonical archive copy.
+rm -f "${staging_root}/bin/ld64.lld" \
+    "${staging_root}/bin/wasm-ld"
+rm -f "${staging_root}/lib/libLTO.dylib"
 cp "${ld_lld}" "${staging_root}/lib/actus/bin/ld.lld"
 cp "${thumb_eabihf_builtin}" \
     "${staging_root}/lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a"
