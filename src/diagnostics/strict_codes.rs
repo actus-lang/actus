@@ -27,6 +27,9 @@ pub const STRICT_CODE_RANGE_END: u16 = 1899;
 /// specific classification.
 pub const STRICT_CONFIGURATION_FAILURE: &str = "E1800";
 
+/// An LLVM strict build selected an unverified toolchain override.
+pub const STRICT_LLVM_UNVERIFIED: &str = "E1806";
+
 /// The selected runtime profile requires unavailable compiler-owned metadata.
 pub const STRICT_RUNTIME_METADATA_MISSING: &str = "E1803";
 

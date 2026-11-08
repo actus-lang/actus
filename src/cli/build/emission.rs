@@ -48,6 +48,12 @@ fn build_file_with_report(
     let Some((source, plan)) = load_build_program(input, configuration) else {
         return 1;
     };
+    if mode.is_strict()
+        && configuration.native_backend().backend() == crate::codegen::BackendKind::Llvm
+        && !validate_llvm_identity()
+    {
+        return 1;
+    }
     if !validate_source_limits(Path::new(input), &source, mode, configuration) {
         return 1;
     }
@@ -75,6 +81,17 @@ fn build_file_with_report(
         .to_owned();
     let report_mode = report_output.then_some(mode);
     emit_and_write(input, output, emit, configuration, &plan, &symbol, report_mode)
+}
+
+fn validate_llvm_identity() -> bool {
+    #[cfg(feature = "llvm")]
+    {
+        if let Some(error) = crate::codegen::llvm::strict_identity_error() {
+            eprintln!("{error}");
+            return false;
+        }
+    }
+    true
 }
 
 fn emit_and_write(
