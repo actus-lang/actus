@@ -403,6 +403,106 @@ jobs:
       - name: Run ARM32 LLVM object and link tests
         run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
 
+  bundled-llvm-linux-measurement:
+    name: Bundled LLVM Linux full-suite measurement
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Prepare LLVM archive cache key
+        id: llvm_archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r archive_name archive_sha256 < <(python3 - 'toolchains/llvm/llvm-23.1.2.json' <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          record = json.loads(Path(sys.argv[1]).read_text())['archives']['x86_64-unknown-linux-gnu']
+          print(record['file'], record['sha256'])
+          PY
+          )
+          cache_path="$RUNNER_TEMP/actus-llvm-archive/$archive_name"
+          echo "sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
+          echo "ACTUS_LLVM_ARCHIVE_CACHE=$cache_path" >> "$GITHUB_ENV"
+
+      - name: Restore LLVM archive cache
+        id: llvm_archive_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/actus-llvm-archive
+          key: llvm-archive-${{ steps.llvm_archive.outputs.sha256 }}
+
+      - name: Bootstrap verified LLVM
+        shell: bash
+        run: ./scripts/bootstrap_llvm.sh
+
+      - name: Save LLVM archive cache
+        if: success() && steps.llvm_archive_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/actus-llvm-archive
+          key: llvm-archive-${{ steps.llvm_archive.outputs.sha256 }}
+
+      - name: Measure disk before full suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- df -h before full suite ---'
+          df -h
+          echo '--- bundled LLVM ---'
+          ./.actus-toolchain/llvm-23.1.2/bin/llvm-config --version
+
+      - name: Run and measure full suite
+        shell: bash
+        run: |
+          set -uo pipefail
+          started_at="$(date +%s)"
+          set +e
+          CARGO_BUILD_JOBS=2 cargo test --all-targets --all-features -- --test-threads=1
+          suite_status=$?
+          set -e
+          finished_at="$(date +%s)"
+          echo "full suite exit status: $suite_status"
+          echo "full suite elapsed seconds: $((finished_at - started_at))"
+          echo '--- df -h after full suite ---'
+          df -h
+          echo '--- du -sh target/ ---'
+          du -sh target/ || true
+          python3 <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          metadata = json.loads(subprocess.check_output(
+              ['cargo', 'metadata', '--format-version=1', '--no-deps'], text=True
+          ))
+          target_names = {
+              target['name'].replace('-', '_')
+              for package in metadata['packages']
+              for target in package['targets']
+              if 'test' in target['kind']
+          }
+          dependency_dir = Path('target/debug/deps')
+          binaries = sorted({
+              path
+              for name in target_names
+              for path in dependency_dir.glob(f'{name}-*')
+              if path.is_file() and os.access(path, os.X_OK)
+          })
+          print(f'test binary count: {len(binaries)}')
+          if binaries:
+              typical = binaries[0]
+              print(f'typical test binary: {typical} ({typical.stat().st_size} bytes)')
+          else:
+              print('typical test binary: none found')
+          PY
+          exit "$suite_status"
+
   contributor-bootstrap:
     name: Contributor bootstrap (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
