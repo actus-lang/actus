@@ -17,19 +17,46 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Set up LLVM 23 (Linux)
+      - name: Prepare LLVM archive cache key
+        id: llvm_archive
         shell: bash
-        run: ./scripts/setup_llvm_linux.sh 23
+        run: |
+          set -euo pipefail
+          read -r file sha < <(python3 - 'toolchains/llvm/llvm-23.1.2.json' <<'PY'
+          import json, sys
+          record = json.load(open(sys.argv[1]))['archives']['x86_64-unknown-linux-gnu']
+          print(record['file'], record['sha256'])
+          PY
+          )
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "ACTUS_LLVM_ARCHIVE_CACHE=$RUNNER_TEMP/actus-llvm-archive/$file" >> "$GITHUB_ENV"
+
+      - name: Restore LLVM archive cache
+        id: llvm_archive_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/actus-llvm-archive
+          key: llvm-archive-${{ steps.llvm_archive.outputs.sha }}
+
+      - name: Bootstrap verified LLVM
+        shell: bash
+        run: ./scripts/bootstrap_llvm.sh
+
+      - name: Save LLVM archive cache
+        if: success() && steps.llvm_archive_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/actus-llvm-archive
+          key: llvm-archive-${{ steps.llvm_archive.outputs.sha }}
 
       - name: Export LLVM build environment
         shell: bash
         run: |
-          LLVM_CONFIG_PATH="$(command -v llvm-config)"
-          LLVM_PREFIX="$(llvm-config --prefix)"
-          echo "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" >> "$GITHUB_ENV"
-          echo "LLVM_SYS_231_PREFIX=${LLVM_PREFIX}" >> "$GITHUB_ENV"
-          echo "LLVM version: $(llvm-config --version)"
-          test "$(llvm-config --version | cut -d. -f1)" = "23"
+          prefix="$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2"
+          echo "$prefix/bin" >> "$GITHUB_PATH"
+          echo "LLVM_CONFIG_PATH=$prefix/bin/llvm-config" >> "$GITHUB_ENV"
+          echo "LLVM_SYS_231_PREFIX=$prefix" >> "$GITHUB_ENV"
+          test "$("$prefix/bin/llvm-config" --version)" = 23.1.2
 
       - name: Install ARM32 native link tools
         timeout-minutes: 20
@@ -56,3 +83,13 @@ jobs:
           name: actus-coverage
           path: lcov.info
           if-no-files-found: error
+
+      - name: Record disk and target usage
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Disk and target usage (coverage)'
+            df -h
+            if [ -d target ]; then du -sh target; else echo 'target/ not present'; fi
+          } >> "$GITHUB_STEP_SUMMARY"
