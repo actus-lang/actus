@@ -42,8 +42,9 @@ development toolchain for the current host and then build Actus:
 cargo build
 ```
 
-On Windows, run `./scripts/bootstrap_llvm.ps1` from PowerShell instead of the
-Unix script. The bootstrap command downloads the host archive named by
+On Windows, install and use PowerShell 7 (`pwsh`), then run
+`./scripts/bootstrap_llvm.ps1` instead of the Unix script. The bootstrap command
+downloads the host archive named by
 `toolchains/llvm/llvm-23.1.2.json`, verifies its SHA-256 and size before
 extraction, and installs it only under `.actus-toolchain/llvm-23.1.2/`.
 It does not modify a shell profile, global Cargo configuration, or system

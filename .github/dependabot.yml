@@ -9,8 +9,14 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 1
     groups:
-      cranelift:
+      cargo-dependencies:
         patterns:
-          - "cranelift-*"
+          - "*"
+        exclude-patterns:
+          - "llvm-sys"
+    ignore:
+      - dependency-name: "llvm-sys"
+        update-types:
+          - "version-update:semver-major"
