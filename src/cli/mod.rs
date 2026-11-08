@@ -17,6 +17,7 @@ mod project;
 mod publish;
 mod run;
 mod test_runner;
+mod version;
 mod watch;
 
 pub fn run() -> i32 {
@@ -31,6 +32,9 @@ pub fn run_with_args(mut arguments: impl Iterator<Item = String>) -> i32 {
     if is_help_flag(&command) {
         print_help();
         return 0;
+    }
+    if command == "--version" || command == "-V" {
+        return version::version_command(arguments);
     }
     let remaining: Vec<String> = arguments.collect();
     if remaining.first().is_some_and(|argument| is_help_flag(argument)) {
@@ -54,6 +58,7 @@ fn dispatch_command(command: &str, arguments: Vec<String>) -> i32 {
         "lock" => lock::lock_command(arguments),
         "publish" => publish::publish_command(arguments),
         "watch" => watch::watch_command(arguments),
+        "version" => version::version_command(arguments),
         "parse" => parse_command(arguments),
         _ => unknown_command(command),
     }
@@ -180,6 +185,9 @@ fn command_help_text(command: &str) -> Option<&'static str> {
         "publish" => Some(
             "usage: actus publish [path]\n\nValidate and publish a local deterministic package archive.",
         ),
+        "version" => {
+            Some("usage: actus --version [--json]\n\nPrint compiler and toolchain identity.")
+        }
         _ => None,
     }
 }
@@ -210,6 +218,7 @@ mod tests {
             "lsp",
             "lock",
             "publish",
+            "version",
         ] {
             assert!(command_help_text(command).is_some(), "missing help for {command}");
         }
