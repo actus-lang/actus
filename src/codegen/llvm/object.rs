@@ -171,64 +171,6 @@ fn read_uleb128(data: &[u8], mut offset: usize) -> Result<(u64, usize), StackSiz
     Err(StackSizeParseError::TruncatedRecord { offset })
 }
 
-#[cfg(test)]
-mod stack_size_tests {
-    use super::*;
-
-    fn relocation(offset: usize, width: usize, symbol: &str, address: u64) -> StackSizeRelocation {
-        StackSizeRelocation { offset, width, symbol: symbol.to_owned(), address }
-    }
-
-    #[test]
-    fn empty_section_has_no_records() {
-        assert_eq!(parse_stack_size_records(&[], &[]), Ok(Vec::new()));
-    }
-
-    #[test]
-    fn parses_multiple_uleb128_records_and_symbols() {
-        let data = [0, 0, 0, 0, 0x81, 0x01, 0, 0, 0, 0, 0x7f];
-        let relocations = [relocation(0, 4, "first", 0x1000), relocation(6, 4, "second", 0x2000)];
-        assert_eq!(
-            parse_stack_size_records(&data, &relocations),
-            Ok(vec![
-                StackSizeRecord { symbol: "first".to_owned(), address: 0x1000, size: 129 },
-                StackSizeRecord { symbol: "second".to_owned(), address: 0x2000, size: 127 },
-            ])
-        );
-    }
-
-    #[test]
-    fn rejects_uleb128_overflow() {
-        let data = [0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02];
-        let relocations = [relocation(0, 4, "overflow", 0x1000)];
-        assert_eq!(
-            parse_stack_size_records(&data, &relocations),
-            Err(StackSizeParseError::Uleb128Overflow)
-        );
-    }
-
-    #[test]
-    fn rejects_a_record_truncated_after_relocation() {
-        let data = [0, 0, 0, 0, 0x80];
-        let relocations = [relocation(0, 4, "truncated", 0x1000)];
-        assert_eq!(
-            parse_stack_size_records(&data, &relocations),
-            Err(StackSizeParseError::TruncatedRecord { offset: 5 })
-        );
-    }
-
-    #[test]
-    fn rejects_unknown_symbol() {
-        let data = [0, 0, 0, 0, 0x01];
-        let relocations =
-            [StackSizeRelocation { offset: 0, width: 4, symbol: String::new(), address: 0 }];
-        assert_eq!(
-            parse_stack_size_records(&data, &relocations),
-            Err(StackSizeParseError::UnknownSymbol { offset: 0 })
-        );
-    }
-}
-
 pub(super) fn emit_object(
     module: llvm_sys::prelude::LLVMModuleRef,
     target: &TargetSpec,
@@ -413,4 +355,62 @@ fn format_llvm_error(message: *mut std::ffi::c_char, fallback: &str) -> String {
     let text = unsafe { CStr::from_ptr(message) }.to_string_lossy().into_owned();
     unsafe { LLVMDisposeMessage(message) };
     format!("{fallback}: {text}")
+}
+
+#[cfg(test)]
+mod stack_size_tests {
+    use super::*;
+
+    fn relocation(offset: usize, width: usize, symbol: &str, address: u64) -> StackSizeRelocation {
+        StackSizeRelocation { offset, width, symbol: symbol.to_owned(), address }
+    }
+
+    #[test]
+    fn empty_section_has_no_records() {
+        assert_eq!(parse_stack_size_records(&[], &[]), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn parses_multiple_uleb128_records_and_symbols() {
+        let data = [0, 0, 0, 0, 0x81, 0x01, 0, 0, 0, 0, 0x7f];
+        let relocations = [relocation(0, 4, "first", 0x1000), relocation(6, 4, "second", 0x2000)];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Ok(vec![
+                StackSizeRecord { symbol: "first".to_owned(), address: 0x1000, size: 129 },
+                StackSizeRecord { symbol: "second".to_owned(), address: 0x2000, size: 127 },
+            ])
+        );
+    }
+
+    #[test]
+    fn rejects_uleb128_overflow() {
+        let data = [0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02];
+        let relocations = [relocation(0, 4, "overflow", 0x1000)];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Err(StackSizeParseError::Uleb128Overflow)
+        );
+    }
+
+    #[test]
+    fn rejects_a_record_truncated_after_relocation() {
+        let data = [0, 0, 0, 0, 0x80];
+        let relocations = [relocation(0, 4, "truncated", 0x1000)];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Err(StackSizeParseError::TruncatedRecord { offset: 5 })
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_symbol() {
+        let data = [0, 0, 0, 0, 0x01];
+        let relocations =
+            [StackSizeRelocation { offset: 0, width: 4, symbol: String::new(), address: 0 }];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Err(StackSizeParseError::UnknownSymbol { offset: 0 })
+        );
+    }
 }
