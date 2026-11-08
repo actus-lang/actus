@@ -27,7 +27,7 @@ mod shim;
 mod values;
 mod verification;
 
-pub use identity::{LlvmIdentity, ToolchainIdentity, toolchain_identity};
+pub use identity::{LlvmIdentity, ToolchainIdentity, strict_identity_error, toolchain_identity};
 
 pub use emission::{
     ObjectEmissionOptions, ObjectOptimizationLevel, emit_module, emit_object, emit_object_bytes,
