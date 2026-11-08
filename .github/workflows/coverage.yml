@@ -77,6 +77,18 @@ jobs:
       - name: Generate LCOV report
         run: cargo llvm-cov --all-targets --all-features --lcov --output-path lcov.info
 
+      - name: Assert static LLVM linkage
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --all-features --bin actus
+          ldd target/debug/actus | tee /tmp/actus-coverage-ldd.txt
+          if grep -Eiq 'libLLVM' /tmp/actus-coverage-ldd.txt; then
+            echo 'Actus unexpectedly links to a shared LLVM library' >&2
+            exit 1
+          fi
+
       - name: Upload coverage report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

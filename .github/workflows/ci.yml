@@ -369,8 +369,9 @@ jobs:
       - name: Verify LLVM installation
         shell: bash
         run: |
-          llvm-config --version
-          test "$(llvm-config --version)" = "23.1.2"
+          prefix="$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2"
+          "$prefix/bin/llvm-config" --version
+          test "$("$prefix/bin/llvm-config" --version)" = "23.1.2"
 
       - name: Check LLVM compiler surface
         run: cargo check --no-default-features --features llvm --lib --bin actus
