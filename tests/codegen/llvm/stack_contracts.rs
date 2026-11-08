@@ -7,55 +7,6 @@ use actus::codegen::llvm::ObjectOptimizationLevel;
 use std::process::Command;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn llvm_tool(name: &str) -> std::path::PathBuf {
-    let config = std::path::PathBuf::from(env!(
-        "ACTUS_LLVM_CONFIG_PATH",
-        "Actus must expose the llvm-sys-selected llvm-config path"
-    ));
-    let version = Command::new(&config)
-        .arg("--version")
-        .output()
-        .expect("llvm-sys-selected llvm-config should be executable");
-    assert!(
-        version.status.success(),
-        "llvm-config --version failed: {}",
-        String::from_utf8_lossy(&version.stderr)
-    );
-    let version = String::from_utf8(version.stdout).expect("llvm-config version should be UTF-8");
-    let mut components = version.split_whitespace().next().unwrap_or_default().split('.');
-    assert_eq!(
-        (components.next(), components.next()),
-        (Some("23"), Some("1")),
-        "stack-contract tests require LLVM 23.1 from {}, found {}",
-        config.display(),
-        version.trim()
-    );
-    let bindir = Command::new(&config)
-        .arg("--bindir")
-        .output()
-        .expect("llvm-sys-selected llvm-config should provide --bindir");
-    assert!(
-        bindir.status.success(),
-        "llvm-config --bindir failed: {}",
-        String::from_utf8_lossy(&bindir.stderr)
-    );
-    let mut tool = std::path::PathBuf::from(
-        String::from_utf8(bindir.stdout).expect("llvm-config bindir should be UTF-8").trim(),
-    );
-    tool.push(name);
-    if cfg!(windows) {
-        tool.set_extension("exe");
-    }
-    assert!(
-        tool.is_file(),
-        "LLVM 23.1 tool `{}` is missing from llvm-config bindir `{}`",
-        name,
-        tool.parent().unwrap_or_else(|| std::path::Path::new(".")).display()
-    );
-    tool
-}
-
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn emit_stack_fixture(
     module: &BackendModule,
     name: &str,
