@@ -3,6 +3,7 @@ use std::path::Path;
 use std::ptr;
 use std::sync::Once;
 
+use ::object::{Object, ObjectSection, ObjectSymbol, RelocationTarget};
 use llvm_sys::core::{
     LLVMDisposeMemoryBuffer, LLVMDisposeMessage, LLVMGetBufferSize, LLVMGetBufferStart,
     LLVMSetTarget,
@@ -19,6 +20,214 @@ use super::emission::{ObjectEmissionOptions, ObjectOptimizationLevel};
 use crate::target::TargetSpec;
 
 static LLVM_TARGETS_INITIALIZED: Once = Once::new();
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StackSizeRecord {
+    pub symbol: String,
+    pub address: u64,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StackSizeParseError {
+    InvalidUleb128,
+    Uleb128Overflow,
+    TruncatedRecord { offset: usize },
+    MissingRelocation { offset: usize },
+    InvalidRelocationWidth { offset: usize, bits: u8 },
+    UnknownSymbol { offset: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StackSizeRelocation {
+    offset: usize,
+    width: usize,
+    symbol: String,
+    address: u64,
+}
+
+pub fn parse_stack_sizes<'data>(
+    file: &::object::File<'data>,
+) -> Result<Vec<StackSizeRecord>, StackSizeParseError> {
+    file.sections().filter(|section| section.name_bytes().ok() == Some(b".stack_sizes")).try_fold(
+        Vec::new(),
+        |mut records, section| {
+            records.extend(parse_stack_size_section(file, &section)?);
+            Ok(records)
+        },
+    )
+}
+
+fn parse_stack_size_section<'data>(
+    file: &::object::File<'data>,
+    section: &::object::Section<'data, 'data>,
+) -> Result<Vec<StackSizeRecord>, StackSizeParseError> {
+    let data = section.data().map_err(|_| StackSizeParseError::InvalidUleb128)?;
+    let relocations = section
+        .relocations()
+        .map(|(offset, relocation)| {
+            let (symbol, address) = resolve_stack_relocation(
+                file,
+                relocation.target(),
+                relocation.addend(),
+                offset as usize,
+            )?;
+            let width = relocation.size() / 8;
+            if !matches!(width, 4 | 8) {
+                return Err(StackSizeParseError::InvalidRelocationWidth {
+                    offset: offset as usize,
+                    bits: relocation.size(),
+                });
+            }
+            Ok(StackSizeRelocation {
+                offset: offset as usize,
+                width: width as usize,
+                symbol,
+                address,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    parse_stack_size_records(data, &relocations)
+}
+
+fn resolve_stack_relocation<'data>(
+    file: &::object::File<'data>,
+    target: RelocationTarget,
+    addend: i64,
+    offset: usize,
+) -> Result<(String, u64), StackSizeParseError> {
+    let symbol = match target {
+        RelocationTarget::Symbol(index) => file.symbol_by_index(index).ok(),
+        RelocationTarget::Section(index) => file
+            .symbols()
+            .find(|symbol| symbol.section_index() == Some(index) && symbol.is_definition()),
+        _ => None,
+    };
+    let symbol = symbol.ok_or(StackSizeParseError::UnknownSymbol { offset })?;
+    let address =
+        u64::try_from(addend).ok().and_then(|addend| symbol.address().checked_add(addend));
+    let symbol = if symbol.kind() == ::object::SymbolKind::Section {
+        file.symbols().find(|candidate| {
+            candidate.section_index() == symbol.section_index()
+                && candidate.is_definition()
+                && address == Some(candidate.address())
+        })
+    } else {
+        Some(symbol)
+    };
+    let symbol = symbol.ok_or(StackSizeParseError::UnknownSymbol { offset })?;
+    let name = symbol.name().ok().filter(|name| !name.is_empty());
+    let name = name.ok_or(StackSizeParseError::UnknownSymbol { offset })?;
+    Ok((name.to_owned(), symbol.address()))
+}
+
+fn parse_stack_size_records(
+    data: &[u8],
+    relocations: &[StackSizeRelocation],
+) -> Result<Vec<StackSizeRecord>, StackSizeParseError> {
+    let mut records = Vec::new();
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let record_offset = offset;
+        let relocation = relocations
+            .iter()
+            .find(|relocation| relocation.offset == offset)
+            .ok_or(StackSizeParseError::MissingRelocation { offset })?;
+        if relocation.symbol.is_empty() {
+            return Err(StackSizeParseError::UnknownSymbol { offset });
+        }
+        let size_offset = offset
+            .checked_add(relocation.width)
+            .ok_or(StackSizeParseError::TruncatedRecord { offset: record_offset })?;
+        if size_offset > data.len() {
+            return Err(StackSizeParseError::TruncatedRecord { offset: record_offset });
+        }
+        let (size, end) = read_uleb128(data, size_offset)?;
+        records.push(StackSizeRecord {
+            symbol: relocation.symbol.clone(),
+            address: relocation.address,
+            size,
+        });
+        offset = end;
+    }
+    Ok(records)
+}
+
+fn read_uleb128(data: &[u8], mut offset: usize) -> Result<(u64, usize), StackSizeParseError> {
+    let mut value = 0u64;
+    let mut shift = 0u32;
+    while offset < data.len() {
+        let byte = data[offset];
+        offset += 1;
+        if shift >= 64 || (shift == 63 && byte > 1) {
+            return Err(StackSizeParseError::Uleb128Overflow);
+        }
+        value |= u64::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return Ok((value, offset));
+        }
+        shift += 7;
+    }
+    Err(StackSizeParseError::TruncatedRecord { offset })
+}
+
+#[cfg(test)]
+mod stack_size_tests {
+    use super::*;
+
+    fn relocation(offset: usize, width: usize, symbol: &str, address: u64) -> StackSizeRelocation {
+        StackSizeRelocation { offset, width, symbol: symbol.to_owned(), address }
+    }
+
+    #[test]
+    fn empty_section_has_no_records() {
+        assert_eq!(parse_stack_size_records(&[], &[]), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn parses_multiple_uleb128_records_and_symbols() {
+        let data = [0, 0, 0, 0, 0x81, 0x01, 0, 0, 0, 0, 0x7f];
+        let relocations = [relocation(0, 4, "first", 0x1000), relocation(6, 4, "second", 0x2000)];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Ok(vec![
+                StackSizeRecord { symbol: "first".to_owned(), address: 0x1000, size: 129 },
+                StackSizeRecord { symbol: "second".to_owned(), address: 0x2000, size: 127 },
+            ])
+        );
+    }
+
+    #[test]
+    fn rejects_uleb128_overflow() {
+        let data = [0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02];
+        let relocations = [relocation(0, 4, "overflow", 0x1000)];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Err(StackSizeParseError::Uleb128Overflow)
+        );
+    }
+
+    #[test]
+    fn rejects_a_record_truncated_after_relocation() {
+        let data = [0, 0, 0, 0, 0x80];
+        let relocations = [relocation(0, 4, "truncated", 0x1000)];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Err(StackSizeParseError::TruncatedRecord { offset: 5 })
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_symbol() {
+        let data = [0, 0, 0, 0, 0x01];
+        let relocations =
+            [StackSizeRelocation { offset: 0, width: 4, symbol: String::new(), address: 0 }];
+        assert_eq!(
+            parse_stack_size_records(&data, &relocations),
+            Err(StackSizeParseError::UnknownSymbol { offset: 0 })
+        );
+    }
+}
 
 pub(super) fn emit_object(
     module: llvm_sys::prelude::LLVMModuleRef,
