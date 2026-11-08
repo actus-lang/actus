@@ -15,6 +15,7 @@ project configuration controls checking, native output, and runtime boundaries.
 - [Foreign functions and dispatch](ffi-and-dispatch.md)
 - [Diagnostics](diagnostics.md)
 - [Compiler boundaries](compiler-boundaries.md)
+- [Compiler and toolchain identity](toolchain-identity.md)
 
 ## Complete reference details
 

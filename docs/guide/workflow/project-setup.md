@@ -37,3 +37,10 @@ Developers with an independently managed LLVM may set
 `LLVM_SYS_231_PREFIX` explicitly. Cargo then uses that prefix instead of the
 repository-local one, and Actus emits an `unverified` toolchain warning. Use
 the repository bootstrap for strict builds and reproducible backend evidence.
+
+Inspect the selected compiler and toolchain identity with:
+
+\`\`\`sh
+actus --version
+actus --version --json
+\`\`\`

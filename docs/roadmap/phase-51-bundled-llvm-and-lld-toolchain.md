@@ -228,6 +228,14 @@ The `actus-1` release remains immutable and untouched.
 
 ### 51.5 — Bundled lld target contract
 
+T4 implementation now embeds deterministic compiler identity in the build,
+reports it through the CLI, and verifies the bundled archive identity in the
+contributor bootstrap CI jobs. The static-link evidence gate remains open:
+the Linux ldd, macOS otool, and Windows dumpbin outputs must be recorded from
+the corresponding CI jobs before this gate is closed. No stack-report
+implementation exists yet; the future ADR-0103 S3 report must reuse this same
+identity schema.
+
 - [ ] Integrate compiler-rt builtin helper symbols and transitive stack claims
       with the ADR-0103 S3 helper registry.
 - [ ] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
