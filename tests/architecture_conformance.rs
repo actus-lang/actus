@@ -220,7 +220,7 @@ fn llvm_integration_is_the_default_feature() {
     let manifest = fs::read_to_string(repository_path("Cargo.toml"))
         .expect("Cargo manifest should be readable");
     assert!(manifest.contains("default = [\"llvm\"]"));
-    assert!(manifest.contains("llvm = [\"dep:llvm-sys\"]"));
+    assert!(manifest.contains("llvm = [\"dep:llvm-sys\", \"dep:object\"]"));
     assert!(manifest.contains(
         "llvm-sys = { version = \"231.0.0\", optional = true, features = [\"strict-versioning\"] }"
     ));
