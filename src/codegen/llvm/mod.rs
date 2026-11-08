@@ -12,6 +12,7 @@ mod enums;
 mod failures;
 mod float;
 mod guards;
+mod identity;
 mod instruction;
 mod integer;
 mod literals;
@@ -25,6 +26,8 @@ mod scalar_loan;
 mod shim;
 mod values;
 mod verification;
+
+pub use identity::{LlvmIdentity, ToolchainIdentity, strict_identity_error, toolchain_identity};
 
 pub use emission::{
     ObjectEmissionOptions, ObjectOptimizationLevel, emit_module, emit_object, emit_object_bytes,
