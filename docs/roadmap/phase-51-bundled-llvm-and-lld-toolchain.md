@@ -256,6 +256,23 @@ identity schema.
 
 ### 51.6 — Clean-environment and determinism evidence
 
+- [x] Audit external-process boundaries before making LLVM test tooling
+      self-contained. The compiler source does not invoke LLVM inspection
+      tools or `clang`; `build.rs` invokes the selected `rustc`, Git metadata,
+      and the explicitly selected `llvm-config`. Hosted linking remains the
+      configured native linker boundary. ARM `clang` and `arm-none-eabi-*`
+      invocations remain test/CI dependencies until T6.
+- [x] Resolve LLVM inspection tools from the verified `llvm-config` prefix,
+      require exactly LLVM 23.1.2, and reject a prefix mismatch with
+      `LLVM_SYS_231_PREFIX`. The resolver is shared by the LLVM backend
+      integration modules and appends `.exe` on Windows.
+- [x] Parse `.stack_sizes` directly from emitted objects with the `object`
+      crate. The parser follows relocation records to function symbols,
+      decodes ULEB128 sizes, and rejects missing relocations, truncated
+      records, ULEB128 overflow, invalid relocation widths, and unknown
+      symbols. Unit tests cover the empty, multi-record, overflow,
+      truncation, and unknown-symbol cases. The x86-64 stack contract keeps a
+      cross-check against `llvm-readobj --stack-sizes`.
 - [ ] Run compiler, standard-library, backend, ABI, stack-report, zero-float,
       and ownership tests without a system LLVM installation.
 - [ ] Test missing, corrupted, and wrong-version archives.
