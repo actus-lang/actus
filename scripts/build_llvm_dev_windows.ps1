@@ -87,6 +87,13 @@ New-Item -ItemType Directory -Force -Path `
     (Join-Path $stagingRoot "lib/actus/targets/thumbv7em-none-eabi"), `
     (Join-Path $stagingRoot "share/actus") | Out-Null
 Copy-Item -Path (Join-Path $installRoot "*") -Destination $stagingRoot -Recurse -Force
+# Keep only the linker names used by Actus and the canonical archive copy.
+Remove-Item -Force -ErrorAction SilentlyContinue `
+    (Join-Path $stagingRoot "bin/lld.exe"),
+    (Join-Path $stagingRoot "bin/ld64.lld.exe"),
+    (Join-Path $stagingRoot "bin/wasm-ld.exe"),
+    (Join-Path $stagingRoot "bin/LTO.dll"),
+    (Join-Path $stagingRoot "lib/LTO.lib")
 Copy-Item $ldLld (Join-Path $stagingRoot "lib/actus/bin/ld.lld.exe") -Force
 Copy-Item $eabihfBuiltin (Join-Path $stagingRoot "lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a") -Force
 Copy-Item $eabiBuiltin (Join-Path $stagingRoot "lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a") -Force
