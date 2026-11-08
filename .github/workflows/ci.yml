@@ -148,7 +148,11 @@ jobs:
           "$prefix\bin" | Out-File $env:GITHUB_PATH -Append -Encoding utf8
           "LLVM_CONFIG_PATH=$config" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "LLVM_SYS_231_PREFIX=$prefix" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-          "ACTUS_LINKER=$(Join-Path $prefix 'lib\actus\bin\ld.lld.exe')" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $linker = Join-Path $prefix 'bin\lld-link.exe'
+          if (-not (Test-Path -LiteralPath $linker -PathType Leaf)) {
+            throw "bundled Windows COFF linker is missing: $linker"
+          }
+          "ACTUS_LINKER=$linker" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Install ARM32 native link tools (Ubuntu)
         if: runner.os == 'Linux'
