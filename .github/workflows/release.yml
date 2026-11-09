@@ -128,7 +128,11 @@ jobs:
           $version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages[0].version
           $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
           $vs = & $vswhere -latest -products * -property installationPath
-          $redistVersion = Get-ChildItem "$vs\VC\Redist\MSVC" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          $redistVersion = Get-ChildItem "$vs\VC\Redist\MSVC" -Directory |
+            Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
+          if (-not $redistVersion) { throw 'no numeric VC redist version directory found' }
           $vcRoot = Join-Path $redistVersion.FullName 'x64\Microsoft.VC143.CRT'
           python scripts/release/package_user_archive.py --repository-root $env:GITHUB_WORKSPACE --prefix "$env:GITHUB_WORKSPACE\.actus-toolchain\llvm-23.1.2" --build-root "$env:GITHUB_WORKSPACE\target\release\build" --target x86_64-pc-windows-msvc --version $version --output-dir "$env:GITHUB_WORKSPACE\release" --vc-redist-root $vcRoot
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
