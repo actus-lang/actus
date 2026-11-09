@@ -7,14 +7,16 @@ use serde::Deserialize;
 fn main() {
     println!("cargo:rerun-if-changed=src/runtime");
     println!("cargo:rerun-if-changed=.cargo/config.toml");
-    println!("cargo:rerun-if-changed=.actus-toolchain/llvm-23.1.2/share/actus/toolchain.json");
-    println!("cargo:rerun-if-changed=toolchains/llvm/llvm-23.1.2.json");
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_LLVM");
     println!("cargo:rerun-if-env-changed=DEP_LLVM_23_CONFIG_PATH");
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG_PATH");
     println!("cargo:rerun-if-env-changed=LLVM_SYS_231_PREFIX");
     println!("cargo:rustc-check-cfg=cfg(coverage)");
     println!("cargo:rustc-check-cfg=cfg(actus_test_faults)");
+
+    if env::var_os("CARGO_FEATURE_LLVM").is_some() {
+        emit_llvm_identity_rerun_directives();
+    }
 
     let output_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo must provide OUT_DIR"));
     let archive = output_dir.join("libactus_runtime.a");
@@ -88,11 +90,7 @@ impl LlvmBuildIdentity {
 fn validate_llvm_selection() -> LlvmBuildIdentity {
     let repository_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let bundled_prefix = repository_root.join(".actus-toolchain/llvm-23.1.2");
-    let configured_prefix = env::var_os("LLVM_SYS_231_PREFIX").map(PathBuf::from);
-    let selected_prefix = configured_prefix
-        .clone()
-        .map(|prefix| if prefix.is_absolute() { prefix } else { repository_root.join(prefix) })
-        .unwrap_or_else(|| bundled_prefix.clone());
+    let selected_prefix = selected_llvm_prefix(&repository_root);
 
     let bundled_identity = bundled_prefix.canonicalize().unwrap_or_else(|_| bundled_prefix.clone());
     let selected_identity =
@@ -151,6 +149,29 @@ fn validate_llvm_selection() -> LlvmBuildIdentity {
         archive_sha256: String::new(),
         source_revision: String::new(),
         host_triple: env::var("HOST").unwrap_or_else(|_| "unknown".to_owned()),
+    }
+}
+
+fn selected_llvm_prefix(repository_root: &std::path::Path) -> PathBuf {
+    env::var_os("LLVM_SYS_231_PREFIX")
+        .map(PathBuf::from)
+        .map(|prefix| if prefix.is_absolute() { prefix } else { repository_root.join(prefix) })
+        .unwrap_or_else(|| repository_root.join(".actus-toolchain/llvm-23.1.2"))
+}
+
+fn emit_llvm_identity_rerun_directives() {
+    let repository_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let selected_prefix = selected_llvm_prefix(&repository_root);
+    let bundled_prefix = repository_root.join(".actus-toolchain/llvm-23.1.2");
+    let bundled_manifest = selected_prefix.join("share/actus/toolchain.json");
+    if bundled_manifest.is_file() {
+        println!("cargo:rerun-if-changed={}", bundled_manifest.display());
+    }
+    if selected_prefix.canonicalize().ok() == bundled_prefix.canonicalize().ok() {
+        let release_manifest = repository_root.join("toolchains/llvm/llvm-23.1.2.json");
+        if release_manifest.is_file() {
+            println!("cargo:rerun-if-changed={}", release_manifest.display());
+        }
     }
 }
 

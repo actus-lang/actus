@@ -175,9 +175,20 @@ fn shared_codegen_facade_does_not_reexport_cranelift_emission() {
 fn llvm_identity_inputs_are_tracked_by_build_script() {
     let build_script =
         fs::read_to_string(repository_path("build.rs")).expect("build script should be readable");
+    for source in [
+        "fn selected_llvm_prefix",
+        "let bundled_manifest = selected_prefix.join(\"share/actus/toolchain.json\")",
+        "println!(\"cargo:rerun-if-changed={}\", bundled_manifest.display())",
+        "let release_manifest = repository_root.join(\"toolchains/llvm/llvm-23.1.2.json\")",
+        "println!(\"cargo:rerun-if-changed={}\", release_manifest.display())",
+    ] {
+        assert!(
+            build_script.contains(source),
+            "build script does not derive LLVM invalidation from the selected prefix: {source}"
+        );
+    }
     for directive in [
-        "cargo:rerun-if-changed=.actus-toolchain/llvm-23.1.2/share/actus/toolchain.json",
-        "cargo:rerun-if-changed=toolchains/llvm/llvm-23.1.2.json",
+        "cargo:rerun-if-env-changed=CARGO_FEATURE_LLVM",
         "cargo:rerun-if-env-changed=DEP_LLVM_23_CONFIG_PATH",
         "cargo:rerun-if-env-changed=LLVM_CONFIG_PATH",
         "cargo:rerun-if-env-changed=LLVM_SYS_231_PREFIX",
@@ -187,6 +198,9 @@ fn llvm_identity_inputs_are_tracked_by_build_script() {
             "missing build invalidation directive: {directive}"
         );
     }
+    assert!(!build_script.contains(
+        "cargo:rerun-if-changed=.actus-toolchain/llvm-23.1.2/share/actus/toolchain.json"
+    ));
 }
 
 #[test]
