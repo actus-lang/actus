@@ -76,7 +76,13 @@ fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
     let configuration =
         CompilerConfiguration::from_manifest(&manifest).expect("ARM manifest should load");
     assert!(!configuration.linker_is_explicit());
-    let expected_linker_name = if cfg!(windows) { "ld.lld.exe" } else { "ld.lld" };
+    let expected_linker_name = if cfg!(feature = "llvm") {
+        if cfg!(windows) { "ld.lld.exe" } else { "ld.lld" }
+    } else {
+        TargetSpec::parse("thumbv7em-none-eabihf")
+            .expect("ARM target should parse")
+            .default_linker()
+    };
     assert_eq!(
         Path::new(configuration.linker()).file_name(),
         Some(OsStr::new(expected_linker_name))
@@ -93,10 +99,12 @@ fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
         .iter()
         .map(|argument| argument.to_string_lossy().into_owned())
         .collect::<Vec<_>>();
-    assert!(
-        arguments.iter().any(|argument| argument.ends_with("libclang_rt.builtins.a")),
-        "bundled compiler-rt builtins missing from ARM link plan: {arguments:?}"
-    );
+    if cfg!(feature = "llvm") {
+        assert!(
+            arguments.iter().any(|argument| argument.ends_with("libclang_rt.builtins.a")),
+            "bundled compiler-rt builtins missing from ARM link plan: {arguments:?}"
+        );
+    }
     assert!(arguments.windows(2).any(|window| {
         window[0] == "-T" && window[1] == root.join("memory.x").display().to_string()
     }));
@@ -141,11 +149,13 @@ fn environment_linker_precedes_manifest_and_strict_rejects_it() {
         &configuration,
     )
     .expect("explicit linker plan should still receive bundled builtins");
-    assert!(
-        plan.arguments()
-            .iter()
-            .any(|argument| { argument.to_string_lossy().ends_with("libclang_rt.builtins.a") })
-    );
+    if cfg!(feature = "llvm") {
+        assert!(
+            plan.arguments()
+                .iter()
+                .any(|argument| { argument.to_string_lossy().ends_with("libclang_rt.builtins.a") })
+        );
+    }
     let error = CompilerConfiguration::from_manifest_strict(&path)
         .expect_err("strict mode must reject an explicit environment linker");
     assert_eq!(error.diagnostic().code(), STRICT_MANUAL_FREESTANDING_LINKER);

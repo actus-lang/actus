@@ -73,7 +73,10 @@ pub(super) fn resolve_manifest_target(
         linker
     } else if let Some(linker) = manifest_linker {
         linker
-    } else if entry_contract == EntryContract::Freestanding && target.arm32_profile().is_some() {
+    } else if cfg!(feature = "llvm")
+        && entry_contract == EntryContract::Freestanding
+        && target.arm32_profile().is_some()
+    {
         bundled_component(&target, "ld.lld")?
     } else {
         default_linker(&target)
@@ -270,6 +273,7 @@ fn builtin_root_candidates() -> Vec<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
     use super::validate_bundled_linker_version;
 
     #[cfg(unix)]

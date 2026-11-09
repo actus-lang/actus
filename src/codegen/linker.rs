@@ -146,7 +146,8 @@ fn append_runtime_inputs(
             configuration.linker_flavor().runtime_library_arguments().iter().map(OsString::from),
         );
     }
-    if configuration.entry_contract() == crate::configuration::EntryContract::Freestanding
+    if cfg!(feature = "llvm")
+        && configuration.entry_contract() == crate::configuration::EntryContract::Freestanding
         && configuration.target().arm32_profile().is_some()
     {
         let builtins = crate::configuration::resolution::bundled_builtins(configuration.target())
