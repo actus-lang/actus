@@ -5,8 +5,9 @@ T6 = 51.5, and T7 = 51.7.
 
 ## Status
 
-Proposed. The initial T1 checkpoint drafts ADR-0105 and does not change build,
-bootstrap, compiler, linker, or release code.
+Phase 51 is complete, except for the explicitly deferred ADR-0103 S3 and
+Phase 50 items listed below. The accepted architecture and implementation are
+recorded in PRs #113–#119 and the linked CI evidence.
 
 ## Objective
 
@@ -20,36 +21,36 @@ target is `thumbv7em-none-eabi` for soft-float/no-FPU devices.
 
 ## Governing decision
 
-ADR-0105 defines the proposed linkage, version, archive, bootstrap, identity,
-lld, licensing, and test contracts. Implementation must not begin until the
-ADR is reviewed and accepted.
+ADR-0105 defines the accepted linkage, version, archive, bootstrap, identity,
+lld, licensing, and test contracts. Implementation was gated on review and
+acceptance of the ADR; the accepted decision now governs Phase 51.
 
 ## Work sequence
 
 ### 51.1 — Architecture and release contract
 
 - [x] Create ADR-0105 with the static/shared linkage comparison and initial
-      static-link recommendation.
+      static-link recommendation. (Evidence: [ADR-0105](../decisions/ADR-0105-bundled-llvm-and-lld-toolchain.md), PR #100.)
 - [x] Pin LLVM 23.1.2 to source commit
-      `85ac560262434c9ccfc0c183ec22d4138ed647fb`.
+      `85ac560262434c9ccfc0c183ec22d4138ed647fb`. (Evidence: ADR-0105 Decision, PR #100.)
 - [x] Define target selection, optional dependency policy, and the Linux C++
-      runtime policy.
+      runtime policy. (Evidence: ADR-0105 Decision and linkage sections, PR #100.)
 - [x] Define toolchain identity, checksum, archive, license, and relocation
-      requirements.
-- [x] Define contributor bootstrap behavior and explicit system override rules.
+      requirements. (Evidence: ADR-0105 identity and archive sections, PR #113.)
+- [x] Define contributor bootstrap behavior and explicit system override rules. (Evidence: ADR-0105 bootstrap sections, PR #104.)
 - [x] Define the separate lld executable boundary and its initial freestanding
-      target scope.
-- [x] Define clean-environment and release-archive acceptance evidence.
+      target scope. (Evidence: ADR-0105 bundled-lld section, PR #118.)
+- [x] Define clean-environment and release-archive acceptance evidence. (Evidence: ADR-0105 acceptance section and CI run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621).)
 - [x] Define freestanding compiler-rt builtin and ADR-0103 helper-registry
-      requirements.
+      requirements. (Evidence: ADR-0105 freestanding runtime section, PR #118.)
 - [x] Define `thumbv7em-none-eabihf` as the primary and
-      `thumbv7em-none-eabi` as the secondary freestanding target.
-- [x] Define separate user and contributor/development artifacts.
-- [x] Define the glibc 2.28 Linux baseline and Windows `/MD` runtime policy.
-- [x] Define `unverified` system-override behavior and strict-build rejection.
+      `thumbv7em-none-eabi` as the secondary freestanding target. (Evidence: ADR-0105 Decision, PR #100.)
+- [x] Define separate user and contributor/development artifacts. (Evidence: ADR-0105 archive policy, PR #100 and PR #119.)
+- [x] Define the glibc 2.28 Linux baseline and Windows `/MD` runtime policy. (Evidence: ADR-0105 platform policy, PR #100 and PR #101.)
+- [x] Define `unverified` system-override behavior and strict-build rejection. (Evidence: PR #113 and PR #115 CI.)
 - [x] Record the official LLVM 23.1.2 archive as a transitional fallback and
-      define its provenance trade-off.
-- [ ] Review and accept ADR-0105.
+      define its provenance trade-off. (Evidence: ADR-0105 Alternatives, PR #100.)
+- [x] Review and accept ADR-0105. (Evidence: ADR-0105 Status, 2026-11-09; implemented in PRs #113–#119.)
 
 ### 51.2 — Reproducible LLVM archive builder
 
@@ -60,36 +61,36 @@ tracked in 51.7 after the compiler integration work. Builtin helper-registry
 integration is tracked in 51.5 and is linked to ADR-0103 S3.
 
 - [x] Add CI jobs that build LLVM 23.1.2 from the pinned source revision for
-      Linux x86-64.
-- [x] Restrict the Linux build to X86, ARM, and AArch64.
+      Linux x86-64. (Evidence: `.github/workflows/build-bundled-llvm.yml`, PR #100, CI runs #42146115312 and #42158469005.)
+- [x] Restrict the Linux build to X86, ARM, and AArch64. (Evidence: `toolchains/llvm/llvm-23.1.2.cmake`, PR #100.)
 - [x] Disable zlib, zstd, libxml2, and terminfo unless a reviewed dependency
-      exception is recorded.
+      exception is recorded. (Evidence: `toolchains/llvm/llvm-23.1.2.cmake`, PR #100.)
 - [x] Build the Linux archive in an image with glibc 2.28 as the compatibility
-      baseline.
-- [ ] Configure Windows LLVM with `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`
-      so it matches Rust's `/MD` runtime contract.
+      baseline. (Evidence: `.github/workflows/build-bundled-llvm.yml`, CI run #42158469005, PR #100.)
+- [x] Configure Windows LLVM with `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`
+      so it matches Rust's `/MD` runtime contract. (Evidence: `toolchains/llvm/llvm-23.1.2.cmake:84`, CI run [42709649679](https://github.com/actus-lang/actus/actions/runs/42709649679), PR #101.)
 - [x] Produce the Linux `llvm-dev-23.1.2` contributor archive with a
-      repository-generated SHA-256 entry.
+      repository-generated SHA-256 entry. (Evidence: CI run #42158469005.)
 - [x] Include target-specific compiler-rt builtins in the Linux contributor
       archive at `lib/actus/targets/<target>/libclang_rt.builtins.a` for both
-      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`.
+      `thumbv7em-none-eabihf` and `thumbv7em-none-eabi`. (Evidence: `scripts/verify_llvm_dev_linux.sh`, CI run #42158469005.)
 - [x] Use LLVM distribution components and `install-distribution` so Clang is
       built but not shipped in the Linux contributor archive; ship only
       headers, LLVM libraries, `llvm-config`, lld, builtins, and inspection
-      tools.
+      tools. (Evidence: `toolchains/llvm/llvm-23.1.2.cmake`, CI run #42158469005.)
 - [x] Keep the CMake cache free of build-host-specific compiler launchers;
-      pass ccache through workflow `-D` arguments.
+      pass ccache through workflow `-D` arguments. (Evidence: build workflow configure step, PR #100.)
 - [x] Publish the Linux contributor archive with the compiler headers, tools,
-      lld, manifest, and licenses needed by the supported build paths.
-- [x] Verify the Linux archive contents and identity before release publication.
+      lld, manifest, and licenses needed by the supported build paths. (Evidence: release `llvm-23.1.2-actus-2`, PR #100.)
+- [x] Verify the Linux archive contents and identity before release publication. (Evidence: `scripts/verify_llvm_dev_linux.sh`, CI run #42158469005.)
 - [x] Build the macOS arm64 `llvm-dev-23.1.2-aarch64-apple-darwin` archive on
-      the pinned `macos-15`/Xcode 16.4 image with the system libc++ policy.
+      the pinned `macos-15`/Xcode 16.4 image with the system libc++ policy. (Evidence: CI run #42330707485, PR #101.)
 - [x] Verify the macOS archive through archive-prefix resolution, deployment
       target, system-library dependency, target, builtin, lld, manifest, and
-      zero-float checks.
+      zero-float checks. (Evidence: `scripts/verify_llvm_dev_macos.sh`, CI run #42330707485.)
 - [x] Build and verify the Windows `llvm-dev-23.1.2-x86_64-pc-windows-msvc`
       archive with the pinned MSVC `/MD` contract, toolset identity, builtin
-      provenance, and archive-prefix dependency checks.
+      provenance, and archive-prefix dependency checks. (Evidence: `scripts/verify_llvm_dev_windows.ps1`, CI run #42330707485, PR #101.)
 
 #### Linux T2 evidence
 
@@ -168,16 +169,16 @@ jobs.
 
 ### 51.3 — Contributor bootstrap and Cargo discovery
 
-- [x] Add idempotent Unix and Windows bootstrap scripts.
-- [x] Install verified archives under `.actus-toolchain/llvm-23.1.2/`.
+- [x] Add idempotent Unix and Windows bootstrap scripts. (Evidence: `scripts/bootstrap_llvm.sh:62-68` and `scripts/bootstrap_llvm.ps1:34-36`, PR #104.)
+- [x] Install verified archives under `.actus-toolchain/llvm-23.1.2/`. (Evidence: bootstrap scripts and CI run #42709649621.)
 - [x] Configure `LLVM_SYS_231_PREFIX` through repository-local Cargo
-      configuration with relative environment lookup.
+      configuration with relative environment lookup. (Evidence: `.cargo/config.toml`, PR #104.)
 - [x] Reject corrupted, mismatched, or incomplete archives before extraction or
-      compilation.
-- [x] Warn clearly when an explicit system LLVM override is used.
+      compilation. (Evidence: bootstrap validation functions and CI negative checks in `.github/workflows/ci.yml`, PR #104.)
+- [x] Warn clearly when an explicit system LLVM override is used. (Evidence: `build.rs`, PR #113.)
 - [x] Mark system-override identity as `unverified` and reject it from
-      `--strict` LLVM builds and stack-limit proof acceptance with E1806.
-- [x] Prove bootstrap does not modify shell profiles or global configuration.
+      `--strict` LLVM builds and stack-limit proof acceptance with E1806. (Evidence: PR #113 and contributor bootstrap checks in CI run #42709649621.)
+- [x] Prove bootstrap does not modify shell profiles or global configuration. (Evidence: bootstrap scripts, PR #104.)
 
 T3 release evidence:
 
@@ -228,11 +229,12 @@ does not use `--strict`, and its migration to the bundled toolchain remains a
 later T7 decision.
 
 - [x] Add LLVM version, archive checksum, build revision, target, profile, and
-      linker identity to `actus --version`.
+      linker identity to `actus --version`. (Evidence: `src/cli/version.rs`, PR #113.)
 - [x] Embed the deterministic identity in the build and verify it through the
       contributor bootstrap jobs ([PR #113](https://github.com/actus-lang/actus/pull/113)).
 - [ ] Include the same identity in stack-limit reports and future structured
-      MCP responses.
+      MCP responses. (deferred to ADR-0103 S3: the report and MCP consumers are
+      not implemented until the S3 stack-proof contract exists.)
 - [x] Preserve LLVM identity invalidation: `build.rs:8-18,155-175` tracks the
       selected prefix manifest, the bundled release manifest when applicable,
       LLVM feature selection, and LLVM environment inputs. The regression test
@@ -264,17 +266,17 @@ T4 closed; remaining item deferred to ADR-0103 S3.
 ### 51.5 — Bundled lld target contract
 
 - [x] Complete bundled lld and compiler-rt builtin link integration; helper
-      stack claims remain deferred to ADR-0103 S3.
+      stack claims remain deferred to ADR-0103 S3. (Evidence: PR #118, CI run #42709649621.)
 - [ ] Integrate compiler-rt helper stack claims with the ADR-0103 S3 helper
-      registry (deferred to ADR-0103 S3).
+      registry (deferred to ADR-0103 S3: helper claims require the S3 registry contract.)
 - [x] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
-      record it in the identity manifest without shadowing system `PATH` tools.
+      record it in the identity manifest without shadowing system `PATH` tools. (Evidence: PR #118, `scripts/release/verify_user_archive.py`.)
 - [x] Select bundled lld only for the primary `thumbv7em-none-eabihf` and
-      secondary `thumbv7em-none-eabi` freestanding paths.
+      secondary `thumbv7em-none-eabi` freestanding paths. (Evidence: `src/configuration/resolution.rs`, PR #118.)
 - [x] Keep hosted Linux on its documented C linker/libc contract and preserve
-      explicit `ACTUS_LINKER` overrides.
-- [x] Reject linker version or target mismatches with stable diagnostics.
-- [x] Add object, link, and execution evidence for the freestanding path.
+      explicit `ACTUS_LINKER` overrides. (Evidence: `src/configuration/resolution.rs`, PR #118.)
+- [x] Reject linker version or target mismatches with stable diagnostics. (Evidence: diagnostics registry and PR #118.)
+- [x] Add object, link, and execution evidence for the freestanding path. (Evidence: `tests/codegen/llvm/objects.rs`, QEMU evidence in CI run #42709649621.)
 
 The bundled freestanding path is proven by the LLVM backend fixtures and the
 QEMU test `objects::executes_a_bundled_thumb_image_under_qemu`. The fixture
@@ -298,51 +300,79 @@ belongs to 51.4; stack-limit reports remain under ADR-0103 S3.
       configured native linker boundary. After T6, the freestanding fixtures
       use the bundled LLVM linker and builtins; system `clang` and
       `arm-none-eabi-*` are no longer CI dependencies for these tests.
+      (Evidence: source audit recorded in PR #116 and CI poison-tool checks.)
 - [x] Resolve LLVM inspection tools from the verified `llvm-config` prefix,
       require exactly LLVM 23.1.2, and reject a prefix mismatch with
       `LLVM_SYS_231_PREFIX`. The resolver is shared by the LLVM backend
       integration modules and appends `.exe` on Windows.
+      (Evidence: `tests/codegen/llvm/backend.rs:27`, PR #116.)
 - [x] Parse `.stack_sizes` directly from emitted objects with the `object`
       crate. The parser follows relocation records to function symbols,
       decodes ULEB128 sizes, and rejects missing relocations, truncated
       records, ULEB128 overflow, invalid relocation widths, and unknown
       symbols. Unit tests cover the empty, multi-record, overflow,
       truncation, and unknown-symbol cases. The x86-64 stack contract keeps a
-      cross-check against `llvm-readobj --stack-sizes`.
-- [ ] Run compiler, standard-library, backend, ABI, stack-report, zero-float,
-      and ownership tests without a system LLVM installation.
-- [ ] Test missing, corrupted, and wrong-version archives.
-- [ ] Test the distinct user archive and contributor `llvm-dev` archive from
-      clean environments.
-- [ ] Verify `llvm-config` and `ld.lld` have no libstdc++, zlib, zstd, libxml2,
+      cross-check against `llvm-readobj --stack-sizes`. (Evidence:
+      `src/codegen/llvm/object.rs` parser and unit tests, PR #116.)
+- [x] Run compiler, standard-library, backend, ABI, zero-float, and ownership
+      tests without a system LLVM installation. (Evidence: PR #116, bundled-toolchain CI, and CI run #42709649621.)
+- [ ] Run stack-report tests without a system LLVM installation. (deferred to ADR-0103 S3: stack-report implementation and acceptance evidence are not part of Phase 51.)
+- [x] Test missing, corrupted, and wrong-version archives. (Evidence: the `Reject a corrupted manifest before extraction` checks in `.github/workflows/ci.yml`, introduced by PR #104; PR #114 added the later LLVM-job coverage.)
+- [x] Test the distinct user archive and contributor `llvm-dev` archive from
+      clean environments. (Evidence: contributor verification run #42709649679 and user archive verification run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621).)
+- [x] Verify `llvm-config` and `ld.lld` have no libstdc++, zlib, zstd, libxml2,
       or libtinfo dependency and require no GLIBC symbol newer than 2.28.
-- [ ] Disassemble an integer-only `thumbv7em-none-eabihf` fixture and reject
+      (Evidence: `scripts/verify_llvm_dev_linux.sh:113-128`, `scripts/verify_llvm_dev_macos.sh:157-180`, `scripts/verify_llvm_dev_windows.ps1:78-85`, CI run #42158469005.)
+- [x] Disassemble an integer-only `thumbv7em-none-eabihf` fixture and reject
       any VFP instruction, including `vadd`, `vmov`, `vldr`, `vstr`, or
-      `vpush`, despite the ABI permitting FPU instructions.
-- [ ] In T4/T5, disassemble real Actus-generated
+      `vpush`, despite the ABI permitting FPU instructions. (Evidence: `scripts/verify_llvm_dev_windows.ps1:88-94` and equivalent Linux/macOS checks, CI run #42330707485.)
+- [x] In T4/T5, disassemble real Actus-generated
       `thumbv7em-none-eabihf` objects and apply the same zero-float VFP
       rejection; the LLVM IR fixture above is only the T2 toolchain smoke
-      test.
+      test. (Evidence: `tests/codegen/llvm/objects.rs:778-798`, QEMU verification run #42709649621.)
 - [ ] Test repeated bootstrap and repeated builds for the required byte-level
-      determinism.
-- [ ] Test archive relocation and a clean user installation path.
-- [ ] Record exact commands, target triples, profiles, toolchain checksums, and
-      complete failures in the roadmap.
+      determinism. (deferred to Phase 50: `scripts/check_stdlib.sh:17-19` proves repeated standard-library object bytes and bootstrap tests prove idempotent reuse, but no complete repeated user-archive rebuild comparison exists.)
+- [x] Test archive relocation and a clean user installation path. (Evidence: `scripts/release/verify_user_archive.py:55-67`, CI run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621), verify ×3.)
+- [x] Record exact commands, target triples, profiles, toolchain checksums, and
+      complete failures in the roadmap. (Evidence: this section's T2–T7 evidence, CI runs #42158469005, #42330707485, #42709649621, and PR #119.)
 
 ### 51.7 — Release packaging and notices
 
-- [ ] Produce the user-facing `actus-<version>-<host-triple>` archive after
+- [x] Produce the user-facing `actus-<version>-<host-triple>` archive after
       T4 provides an Actus binary built with the bundled LLVM toolchain. It
       must include the compiler, runtime, standard library, target builtins,
       identity metadata, licenses, and supported link tools, but no development
-      headers or `llvm-config` prefix.
-- [ ] Produce relocatable Unix and Windows distribution archives.
-- [ ] Include `actus`, standard library/runtime files, identity metadata, and
-      third-party notices.
-- [ ] Verify LLVM/lld Apache-2.0 WITH LLVM-exception notices against the pinned
-      source revision.
-- [ ] Publish checksums and a release manifest beside every archive.
-- [ ] Document installation, rollback, explicit system override, and removal.
+      headers or `llvm-config` prefix. (Evidence: `scripts/release/package_user_archive.py`, CI run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621).)
+- [x] Produce relocatable Unix and Windows distribution archives. (Evidence: `scripts/release/package_user_archive.py`, CI run #42709649621.)
+- [x] Include `actus`, standard library/runtime files, identity metadata, and
+      third-party notices. (Evidence: package script license staging and verify support, CI run #42709649621.)
+- [x] Verify LLVM/lld Apache-2.0 WITH LLVM-exception notices against the pinned
+      source revision. (Evidence: `scripts/release/verify_user_archive.py` and CI
+      run [42716442474](https://github.com/actus-lang/actus/actions/runs/42716442474),
+      verify ×3.)
+- [x] Publish checksums and a release manifest beside every archive. (Evidence:
+      the assemble job in CI run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621),
+      which produced six assets and passed `sha256sum -c`. The first Actus
+      publication is the `v0.1.0-alpha.1` tag run; `llvm-23.1.2-actus-2` is a
+      contributor LLVM release, not an Actus release.)
+- [x] Document installation, rollback, explicit system override, and removal. (Evidence: `docs/guide/workflow/project-setup.md:36-70`, this PR.)
+
+T7 implementation is on `feat/user-release-archive`. CI evidence, archive
+sizes, checksums, and the extracted-archive verification run are recorded in
+CI run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621)
+after the three-host pull-request workflow completed. The old release
+installers were removed: they downloaded or unpacked LLVM separately and did
+not preserve the relocatable user layout, identity manifest, runtime archive,
+or verified bundled linker contract.
+
+## Deferred work
+
+- [ ] Stack-limit report and MCP identity, plus compiler-rt helper stack claims,
+      are deferred to ADR-0103 S3 because that report/helper-registry contract
+      is not part of Phase 51.
+- [ ] Full repeated user-archive rebuild byte comparison is deferred to Phase 50 because the current evidence covers stdlib object bytes and bootstrap idempotence, not a complete archive rebuild.
+
+Phase 51 is complete except for the deferred items above.
 
 ## T1 checkpoint evidence
 
@@ -353,6 +383,8 @@ The T1 work is complete when:
 - no compiler, build script, bootstrap script, linker, dependency, or release
   archive has been changed; and
 - the ADR is explicitly awaiting review before T2 begins.
+
+ADR-0105 was later accepted on 2026-11-09.
 
 ## Non-goals
 

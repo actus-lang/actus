@@ -346,3 +346,9 @@ change crosses the code-generation boundary.
   value or input deliberately, run it, confirm it fails, then restore.
 - Before asking for a commit, list each new test with: ran / skipped, and the
   command used.
+- GITHUB_ENV / GITHUB_PATH only affect later steps; inside the same step use
+  `export`.
+- Digests, SHAs, commit hashes and action pins are copied from an existing file
+  or command output, never typed from memory.
+- Workflow shell code must run on every runner it targets (macOS ships bash
+  3.2: no mapfile, no associative arrays); prefer Python for logic.

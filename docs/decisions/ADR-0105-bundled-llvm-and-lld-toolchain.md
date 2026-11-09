@@ -2,21 +2,25 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
 2026-11-05.
+
+## Accepted
+
+2026-11-09 (implemented across the Phase 51 PRs listed in the roadmap).
+
+The decision was implemented in PRs #113–#119.
 
 ## Scope
 
 Compiler distribution, LLVM discovery, lld integration, contributor
 bootstrap, release archives, toolchain identity, and self-contained CI.
 
-This ADR defines the target architecture. It does not implement the
-bootstrap scripts, archive builder, linker integration, or package layout.
-Those changes require the roadmap work described in Phase 51 and must not be
-started until this proposal is reviewed.
+This ADR defines the target architecture and records the implementation delivered
+through the Phase 51 roadmap and PRs #113–#119.
 
 ## Context
 
@@ -199,13 +203,16 @@ symbol, archive identity, target, ABI, and stack claim must be present in the
 helper registry used by stack-limit closure. A missing registry entry or a
 helper supplied by an unverified archive is a strict-build error.
 
-The Linux release builder should statically link libstdc++ when the selected
-toolchain permits that without violating the release license or supported
-glibc baseline. A fully static libc is not required and must not be implied.
-If static libstdc++ is not compatible with a supported host, the archive must
-state the exact dynamic runtime requirement and CI must test that requirement
-from a clean image. This is a documented compatibility contract, not an
-accidental dependency.
+The Linux release builder statically links libstdc++ without making libc
+static. Because llvm-sys emits an explicit `-lstdc++`, the driver's
+`-static-libstdc++` option does not override that later explicit library
+selection. The build therefore creates a temporary `libstdc++.so` symlink to
+the toolchain's `libstdc++.a` and passes that directory through
+`LLVM_SYS_SYSTEM_LIBRARY_DIRS`; the linker then resolves the explicit
+`-lstdc++` to the archive. The extracted release verifier's `ldd` output is
+the authority for this contract and must contain no `libstdc++.so.6`. A fully
+static libc is not required and must not be implied; the manylinux glibc 2.28
+baseline remains the compatibility boundary.
 
 The preferred release path builds archives in CI from a pinned source
 revision and publishes them as release assets. A transitional fallback may
@@ -425,6 +432,43 @@ distribution behavior from clean environments:
 
 The tests must not depend on the developer's home directory, shell profile,
 current working directory, or pre-existing global LLVM installation.
+
+### User release archive policy (T7)
+
+The user archive is a relocatable installation rooted at the directory that
+contains `bin/actus`. It contains `bin/actus`, `lib/actus/bin/ld.lld`, both
+`lib/actus/targets/thumbv7em-none-{eabi,eabihf}/libclang_rt.builtins.a`, the
+complete `lib/actus/std/` package including its `Actus.toml` and sources,
+`lib/actus/runtime/<host-triple>/libactus_runtime.a`,
+`share/actus/toolchain.json`, Actus and LLVM third-party licenses, and a
+README. It does not contain LLVM headers, `llvm-config`, or development LLVM
+libraries. The installed runtime and standard-library resolvers use the
+executable-relative `share/actus/toolchain.json` marker; a marked installation
+never falls back to a build-time runtime archive.
+
+Linux release binaries use the manylinux glibc 2.28 baseline and statically
+link libstdc++ while retaining dynamic glibc. macOS alpha binaries are
+unsigned and use the system Foundation/libobjc runtime; notarization is not a
+release requirement. Windows archives ship exactly the x64
+`VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, and `MSVCP140.dll` files from the
+selected MSVC redistributable. Hosted Windows builds still require `lld-link`
+and the Windows SDK, neither of which is in the user archive; this is a known
+alpha limitation. Freestanding ARM builds on Windows are fully supported
+because they use the bundled `ld.lld` and compiler-rt builtins. Release binaries
+are stripped; Linux `.debug`, macOS
+`.dSYM`, and Windows `.pdb` files are separate debug artifacts with checksums.
+The manifest's `release_artifacts` contains exactly five records: Actus,
+`ld.lld`, both builtins archives, and the runtime archive. Separate SHA-256
+records for those files apply to the user archive; T7 does not alter the
+contributor archive identity.
+
+The archive verifier links its freestanding ARM fixture by invoking the
+installed `ld.lld` directly because the Actus CLI has no startup-object
+argument. It then runs the linked image on Linux QEMU. Removing the installed
+linker and requiring the same ARM operation to fail with E1880 proves that
+verification is using the install layout rather than a host fallback. The
+former `install.sh` and `install.ps1` were removed because they downloaded or
+unpacked LLVM outside this relocatable, identity-checked archive contract.
 
 LLVM inspection tools used by tests are an explicit exception to the general
 "no external tools" rule: they are accepted only from the extracted,

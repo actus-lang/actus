@@ -46,3 +46,6 @@ profile's intended optimization behavior for LLVM-generated objects.
 No LLVM IR pass manager, release optimization mapping, or performance
 benchmarking is implemented by the stack-limit contract work. This roadmap
 item must be planned and reviewed separately before those changes begin.
+
+- [ ] Compare repeated user-archive rebuilds byte for byte under the same
+  compiler, target, profile, lockfile, and LLVM identity.

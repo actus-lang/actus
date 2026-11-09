@@ -44,3 +44,25 @@ Inspect the selected compiler and toolchain identity with:
 actus --version
 actus --version --json
 \`\`\`
+
+## Installing a user archive
+
+User archives are relocatable. Extract the host archive, keep `bin/actus` next
+to `lib/actus/` and `share/actus/`, and add `bin/` to `PATH` if desired. The
+archive carries its standard library, runtime archive, bundled freestanding
+linker, compiler-rt builtins, identity manifest, and license notices.
+
+The alpha archives are unsigned. On macOS, a quarantine attribute may block
+an extracted binary; inspect the source and remove quarantine only when the
+archive is trusted, for example with `xattr -dr com.apple.quarantine <dir>`.
+Windows hosted executable builds require the Windows SDK and MSVC linker; the
+archive supplies the three x64 VC runtime DLLs but does not replace the SDK.
+This is a known alpha limitation: hosted Windows linking needs `lld-link` and
+the Windows SDK, while freestanding ARM linking works from the bundled
+`ld.lld` and compiler-rt builtins.
+
+To remove an installation, delete its extracted archive directory and remove
+that directory's `bin/` entry from `PATH`; restore the previous `PATH` value if
+the entry was added manually. To roll back, remove the current installation,
+extract the previous archive into the same location, and rerun
+`actus --version --json` before using it.

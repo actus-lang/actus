@@ -139,7 +139,8 @@ fn append_runtime_inputs(
     configuration: &CompilerConfiguration,
 ) -> Result<(), NativeLinkError> {
     if configuration.host_runtime_enabled()
-        && let Some(runtime_archive) = crate::runtime::runtime_archive_path()
+        && let Some(runtime_archive) =
+            crate::runtime::runtime_archive_path().map_err(NativeLinkError)?
     {
         arguments.push(runtime_archive.as_os_str().to_os_string());
         arguments.extend(

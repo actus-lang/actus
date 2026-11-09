@@ -87,8 +87,12 @@ if [[ -n "${archive_cache_path}" && -f "${archive_cache_path}" ]]; then
     archive_cache_hit=true
     echo "using cached LLVM archive ${archive_path}"
 else
+    curl_retry_args=(--retry 5 --retry-delay 10 --connect-timeout 30)
+    if curl --help all 2>/dev/null | grep -q -- '--retry-all-errors'; then
+        curl_retry_args+=(--retry-all-errors)
+    fi
     curl --fail --location --proto '=https' --tlsv1.2 \
-        --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 30 \
+        "${curl_retry_args[@]}" \
         "${archive_url}" -o "${archive_path}"
 fi
 if command -v sha256sum >/dev/null; then
