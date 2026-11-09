@@ -265,14 +265,24 @@ T4 closed; remaining item deferred to ADR-0103 S3.
 
 - [ ] Integrate compiler-rt builtin helper symbols and transitive stack claims
       with the ADR-0103 S3 helper registry.
-- [ ] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
+- [x] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
       record it in the identity manifest without shadowing system `PATH` tools.
-- [ ] Select bundled lld only for the primary `thumbv7em-none-eabihf` and
+- [x] Select bundled lld only for the primary `thumbv7em-none-eabihf` and
       secondary `thumbv7em-none-eabi` freestanding paths.
-- [ ] Keep hosted Linux on its documented C linker/libc contract and preserve
+- [x] Keep hosted Linux on its documented C linker/libc contract and preserve
       explicit `ACTUS_LINKER` overrides.
-- [ ] Reject linker version or target mismatches with stable diagnostics.
-- [ ] Add object, link, and execution evidence for the freestanding path.
+- [x] Reject linker version or target mismatches with stable diagnostics.
+- [x] Add object, link, and execution evidence for the freestanding path.
+
+The bundled freestanding path is proven by the LLVM backend fixtures and the
+QEMU test `objects::executes_a_bundled_thumb_image_under_qemu`. The fixture
+builds the Actus object through the public CLI with a manifest target of
+`thumbv7em-none-eabihf`, links it with the bundled `ld.lld` and compiler-rt
+builtins, rejects VFP instructions, and executes the image on
+`qemu-system-arm` with a 30-second timeout. The linked image contains the
+64-bit division builtin (`__aeabi_uldivmod` or `__udivdi3`). System
+`clang`, `arm-none-eabi-*`, and `rust-lld` are poisoned in the relevant CI
+jobs, so these tests cannot silently use a host ARM toolchain.
 
 This section is the T6 bundled-lld work. The identity and strict-build work
 belongs to 51.4; stack-limit reports remain under ADR-0103 S3.
@@ -283,8 +293,9 @@ belongs to 51.4; stack-limit reports remain under ADR-0103 S3.
       self-contained. The compiler source does not invoke LLVM inspection
       tools or `clang`; `build.rs` invokes the selected `rustc`, Git metadata,
       and the explicitly selected `llvm-config`. Hosted linking remains the
-      configured native linker boundary. ARM `clang` and `arm-none-eabi-*`
-      invocations remain test/CI dependencies until T6.
+      configured native linker boundary. After T6, the freestanding fixtures
+      use the bundled LLVM linker and builtins; system `clang` and
+      `arm-none-eabi-*` are no longer CI dependencies for these tests.
 - [x] Resolve LLVM inspection tools from the verified `llvm-config` prefix,
       require exactly LLVM 23.1.2, and reject a prefix mismatch with
       `LLVM_SYS_231_PREFIX`. The resolver is shared by the LLVM backend

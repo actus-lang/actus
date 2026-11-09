@@ -305,11 +305,22 @@ configured system C linker and libc startup objects; hosted Windows and Apple
 link contracts remain explicit and target-specific. `ACTUS_LINKER` remains an
 explicit override and is never replaced silently.
 
+`ACTUS_LINKER` applies to every target, so a cross-target build from a hosted
+host to a freestanding target must not set it. A target-bound override is
+deferred to a future decision.
+
 The freestanding link path must select the bundled lld executable by identity,
 pass the target and linker script explicitly, and reject a mismatched linker.
 The link step must report the selected linker and checksum in verbose build
 metadata. Library-based lld integration may be reconsidered only after the
 separate executable boundary has complete release and cross-platform evidence.
+
+All freestanding Actus functions, including external declarations, are emitted
+as `nounwind`. A native provider must not throw an exception across the
+freestanding boundary; doing so is undefined behavior under the native-boundary
+contract in ADR-0103. ARM `.ARM.exidx` entries remain valid `.cantunwind`
+records, and the recommended freestanding linker script discards `.ARM.exidx*`
+and `.ARM.extab*` after linking.
 
 The executable is intentionally not placed in the top-level `bin/` directory,
 where it could shadow a system `lld` on `PATH`. Its canonical location is
