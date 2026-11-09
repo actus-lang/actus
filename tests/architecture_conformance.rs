@@ -172,6 +172,24 @@ fn shared_codegen_facade_does_not_reexport_cranelift_emission() {
 }
 
 #[test]
+fn llvm_identity_inputs_are_tracked_by_build_script() {
+    let build_script =
+        fs::read_to_string(repository_path("build.rs")).expect("build script should be readable");
+    for directive in [
+        "cargo:rerun-if-changed=.actus-toolchain/llvm-23.1.2/share/actus/toolchain.json",
+        "cargo:rerun-if-changed=toolchains/llvm/llvm-23.1.2.json",
+        "cargo:rerun-if-env-changed=DEP_LLVM_23_CONFIG_PATH",
+        "cargo:rerun-if-env-changed=LLVM_CONFIG_PATH",
+        "cargo:rerun-if-env-changed=LLVM_SYS_231_PREFIX",
+    ] {
+        assert!(
+            build_script.contains(directive),
+            "missing build invalidation directive: {directive}"
+        );
+    }
+}
+
+#[test]
 fn cranelift_dependencies_are_optional_and_llvm_is_default() {
     let source = fs::read_to_string(repository_path("Cargo.toml"))
         .expect("Cargo manifest should be readable");

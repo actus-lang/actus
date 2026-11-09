@@ -7,6 +7,11 @@ use serde::Deserialize;
 fn main() {
     println!("cargo:rerun-if-changed=src/runtime");
     println!("cargo:rerun-if-changed=.cargo/config.toml");
+    println!("cargo:rerun-if-changed=.actus-toolchain/llvm-23.1.2/share/actus/toolchain.json");
+    println!("cargo:rerun-if-changed=toolchains/llvm/llvm-23.1.2.json");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_LLVM");
+    println!("cargo:rerun-if-env-changed=DEP_LLVM_23_CONFIG_PATH");
+    println!("cargo:rerun-if-env-changed=LLVM_CONFIG_PATH");
     println!("cargo:rerun-if-env-changed=LLVM_SYS_231_PREFIX");
     println!("cargo:rustc-check-cfg=cfg(coverage)");
     println!("cargo:rustc-check-cfg=cfg(actus_test_faults)");
@@ -164,7 +169,6 @@ fn emit_identity(identity: &LlvmBuildIdentity) {
     println!("cargo:rustc-env=ACTUS_LLVM_SOURCE_REVISION={}", identity.source_revision);
     println!("cargo:rustc-env=ACTUS_HOST_TRIPLE={}", identity.host_triple);
     println!("cargo:rustc-env=ACTUS_GIT_COMMIT={}", git_commit());
-    println!("cargo:rerun-if-changed=toolchains/llvm/llvm-23.1.2.json");
 }
 
 fn git_commit() -> String {
