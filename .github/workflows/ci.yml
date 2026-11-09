@@ -211,6 +211,7 @@ jobs:
             echo 'Actus unexpectedly links to a shared LLVM library' >&2
             exit 1
           fi
+          printf '%s\n' "$linkage"
           echo "binary size: ${binary_size} bytes"
           echo "stripped size: ${stripped_size} bytes"
           echo "relink elapsed: ${elapsed_millis}ms"
@@ -250,6 +251,7 @@ jobs:
             echo 'Actus unexpectedly links to a shared LLVM library' >&2
             exit 1
           fi
+          printf '%s\n' "$linkage"
           echo "binary size: ${binary_size} bytes"
           echo "stripped size: ${stripped_size} bytes"
           echo "relink elapsed: ${elapsed_millis}ms"
