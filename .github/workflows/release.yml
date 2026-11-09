@@ -45,16 +45,15 @@ jobs:
           cargo build --release --locked --all-features --bin actus
           version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
           python3 scripts/release/package_user_archive.py --repository-root "$GITHUB_WORKSPACE" --prefix "$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2" --build-root "$GITHUB_WORKSPACE/target/release/build" --target x86_64-unknown-linux-gnu --version "$version" --output-dir "$GITHUB_WORKSPACE/release"
+          cp scripts/release/verify_user_archive.py release-support/verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-x86_64-unknown-linux-gnu
-          path: |
-            release/*
-            scripts/release/verify_user_archive.py
+          path: release/
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verify-support-x86_64-unknown-linux-gnu
-          path: release-support/startup.o
+          path: release-support/
 
   build-macos:
     name: Build user archive (macOS arm64)
@@ -87,16 +86,15 @@ jobs:
           cargo build --release --locked --all-features --bin actus
           version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
           python3 scripts/release/package_user_archive.py --repository-root "$GITHUB_WORKSPACE" --prefix "$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2" --build-root "$GITHUB_WORKSPACE/target/release/build" --target aarch64-apple-darwin --version "$version" --output-dir "$GITHUB_WORKSPACE/release"
+          cp scripts/release/verify_user_archive.py release-support/verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-aarch64-apple-darwin
-          path: |
-            release/*
-            scripts/release/verify_user_archive.py
+          path: release/
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verify-support-aarch64-apple-darwin
-          path: release-support/startup.o
+          path: release-support/
 
   build-windows:
     name: Build user archive (Windows x86-64)
@@ -135,16 +133,15 @@ jobs:
           if (-not $redistVersion) { throw 'no numeric VC redist version directory found' }
           $vcRoot = Join-Path $redistVersion.FullName 'x64\Microsoft.VC143.CRT'
           python scripts/release/package_user_archive.py --repository-root $env:GITHUB_WORKSPACE --prefix "$env:GITHUB_WORKSPACE\.actus-toolchain\llvm-23.1.2" --build-root "$env:GITHUB_WORKSPACE\target\release\build" --target x86_64-pc-windows-msvc --version $version --output-dir "$env:GITHUB_WORKSPACE\release" --vc-redist-root $vcRoot
+          Copy-Item scripts/release/verify_user_archive.py release-support\verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-x86_64-pc-windows-msvc
-          path: |
-            release/*
-            scripts/release/verify_user_archive.py
+          path: release/
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verify-support-x86_64-pc-windows-msvc
-          path: release-support/startup.o
+          path: release-support/
 
   verify:
     name: Verify user archive (${{ matrix.target }})
@@ -178,17 +175,24 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           set -euo pipefail
-          archive="$(find incoming -maxdepth 1 -name '*.tar.xz' -print -quit)"
-          verifier="$(find incoming -name verify_user_archive.py -print -quit)"
-          python3 "$verifier" "$archive" --target "${{ matrix.target }}" --startup "$(find support -name startup.o -print -quit)"
+          mapfile -t found < <(find incoming -maxdepth 1 -type f -name '*.tar.xz')
+          test "${#found[@]}" -eq 1 || { echo "expected one archive, found: ${found[*]}" >&2; exit 1; }
+          mapfile -t verifier < <(find support -maxdepth 1 -type f -name verify_user_archive.py)
+          test "${#verifier[@]}" -eq 1 || { echo "expected one verifier, found: ${verifier[*]}" >&2; exit 1; }
+          mapfile -t startup < <(find support -maxdepth 1 -type f -name startup.o)
+          test "${#startup[@]}" -eq 1 || { echo "expected one startup object, found: ${startup[*]}" >&2; exit 1; }
+          python3 "${verifier[0]}" "${found[0]}" --target "${{ matrix.target }}" --startup "${startup[0]}"
       - name: Verify extracted archive (Windows)
         shell: pwsh
         if: runner.os == 'Windows'
         run: |
-          $archive = Get-ChildItem incoming -Filter '*.zip' | Select-Object -First 1
-          $verifier = Get-ChildItem incoming -Recurse -Filter verify_user_archive.py | Select-Object -First 1
-          $startup = Get-ChildItem support -Recurse -Filter startup.o | Select-Object -First 1
-          python $verifier.FullName $archive.FullName --target '${{ matrix.target }}' --startup $startup.FullName
+          $archive = @(Get-ChildItem incoming -File -Filter '*.zip')
+          if ($archive.Count -ne 1) { throw "expected one archive, found $($archive.Name)" }
+          $verifier = @(Get-ChildItem support -File -Filter verify_user_archive.py)
+          if ($verifier.Count -ne 1) { throw "expected one verifier, found $($verifier.Name)" }
+          $startup = @(Get-ChildItem support -File -Filter startup.o)
+          if ($startup.Count -ne 1) { throw "expected one startup object, found $($startup.Name)" }
+          python $verifier[0].FullName $archive[0].FullName --target '${{ matrix.target }}' --startup $startup[0].FullName
 
   assemble:
     name: Assemble release assets
@@ -217,15 +221,16 @@ jobs:
           mkdir -p release-assets
           cp assets/x86_64-unknown-linux-gnu/*.tar.xz assets/x86_64-unknown-linux-gnu/*.debug release-assets/
           cp assets/x86_64-pc-windows-msvc/*.zip assets/x86_64-pc-windows-msvc/*.pdb release-assets/
-          mac_archive="$(find assets/aarch64-apple-darwin -maxdepth 1 -type f -name '*.tar.xz' -print -quit)"
-          mac_dsym="$(find assets/aarch64-apple-darwin -maxdepth 1 -type d -name '*.dSYM' -print -quit)"
-          test -n "$mac_archive" && test -n "$mac_dsym"
-          cp "$mac_archive" release-assets/
+          mapfile -t mac_archives < <(find assets/aarch64-apple-darwin -maxdepth 1 -type f -name '*.tar.xz')
+          test "${#mac_archives[@]}" -eq 1 || { echo "expected one macOS archive, found: ${mac_archives[*]}" >&2; exit 1; }
+          mapfile -t mac_dsyms < <(find assets/aarch64-apple-darwin -maxdepth 1 -type d -name '*.dSYM')
+          test "${#mac_dsyms[@]}" -eq 1 || { echo "expected one macOS dSYM, found: ${mac_dsyms[*]}" >&2; exit 1; }
+          cp "${mac_archives[0]}" release-assets/
           python3 scripts/llvm/package_archive.py \
-            --input-root "$mac_dsym" \
-            --output "release-assets/$(basename "$mac_dsym").zip" \
+            --input-root "${mac_dsyms[0]}" \
+            --output "release-assets/$(basename "${mac_dsyms[0]}").zip" \
             --format zip \
-            --top-level-dir "$(basename "$mac_dsym")" \
+            --top-level-dir "$(basename "${mac_dsyms[0]}")" \
             --manifest ''
           find release-assets -maxdepth 1 -type f -name '*.sha256' -delete
           mapfile -t assets < <(find release-assets -maxdepth 1 -type f \( \

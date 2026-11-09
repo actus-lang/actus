@@ -201,6 +201,8 @@ def verify_arm(root: Path, binary: Path, startup: Path | None, work: Path) -> No
 
 def main() -> int:
     parsed = args()
+    if not parsed.archive.is_file():
+        raise SystemExit(f"archive is not a file: {parsed.archive}")
     for variable in ("LLVM_SYS_231_PREFIX", "ACTUS_LLVM_CONFIG_PATH"):
         if os.environ.get(variable):
             raise SystemExit(f"build-time LLVM prefix must be absent: {variable} is set")

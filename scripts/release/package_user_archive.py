@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 
 
@@ -118,55 +119,51 @@ def main() -> int:
         raise SystemExit(f"release binary is missing: {source}")
     runtime = find_runtime(build_root)
     name = f"actus-{args.version}-{args.target}"
-    stage = output / name
+    output.mkdir(parents=True, exist_ok=True)
     archive = output / (f"{name}.zip" if os.name == "nt" else f"{name}.tar.xz")
     debug_suffix = ".pdb" if os.name == "nt" else (".dSYM" if sys.platform == "darwin" else ".debug")
     debug = output / f"{name}{debug_suffix}"
-    if stage.exists():
-        shutil.rmtree(stage)
-    stage.mkdir(parents=True)
-    (stage / "bin").mkdir()
-    prepare_binary(source, stage / ("bin/actus.exe" if os.name == "nt" else "bin/actus"), debug)
-    suffix = ".exe" if os.name == "nt" else ""
-    copy_file(prefix / f"lib/actus/bin/ld.lld{suffix}", stage / f"lib/actus/bin/ld.lld{suffix}")
-    for abi in ("eabihf", "eabi"):
-        copy_file(prefix / f"lib/actus/targets/thumbv7em-none-{abi}/libclang_rt.builtins.a", stage / f"lib/actus/targets/thumbv7em-none-{abi}/libclang_rt.builtins.a")
-    shutil.copytree(root / "library/std", stage / "lib/actus/std")
-    copy_file(runtime, stage / f"lib/actus/runtime/{args.target}/libactus_runtime.a")
-    copy_file(prefix / "share/actus/toolchain.json", stage / "share/actus/toolchain.json")
-    for license_name in ("README.md", "LICENSE-APACHE", "LICENSE-MIT", "NOTICE"):
-        copy_file(root / license_name, stage / license_name)
-    shutil.copytree(prefix / "licenses", stage / "licenses")
-    copy_file(root / "LICENSE-APACHE", stage / "licenses/LICENSE-APACHE")
-    copy_file(root / "LICENSE-MIT", stage / "licenses/LICENSE-MIT")
-    if os.name == "nt":
-        pdb = source.with_suffix(".pdb")
-        if not pdb.is_file():
-            raise SystemExit(f"Windows debug artifact is missing: {pdb}")
-        copy_file(pdb, debug)
-        copy_windows_runtime(stage, args.vc_redist_root)
-    write_release_manifest(stage, args.target, suffix)
-    package = root / "scripts/llvm/package_archive.py"
-    archive_format = "zip" if os.name == "nt" else "tar.xz"
-    subprocess.run(
-        [
-            sys.executable,
-            str(package),
-            "--input-root",
-            str(stage),
-            "--output",
-            str(archive),
-            "--format",
-            archive_format,
-            "--top-level-dir",
-            name,
-        ],
-        check=True,
-    )
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-    (archive.with_name(f"{archive.name}.sha256")).write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
-    debug_digest = sha256_path(debug)
-    debug.with_name(f"{debug.name}.sha256").write_text(f"{debug_digest}  {debug.name}\n", encoding="utf-8")
+    with tempfile.TemporaryDirectory(prefix=f"actus-{name}-") as temporary:
+        stage = Path(temporary) / name
+        stage.mkdir(parents=True)
+        (stage / "bin").mkdir()
+        prepare_binary(source, stage / ("bin/actus.exe" if os.name == "nt" else "bin/actus"), debug)
+        suffix = ".exe" if os.name == "nt" else ""
+        copy_file(prefix / f"lib/actus/bin/ld.lld{suffix}", stage / f"lib/actus/bin/ld.lld{suffix}")
+        for abi in ("eabihf", "eabi"):
+            copy_file(prefix / f"lib/actus/targets/thumbv7em-none-{abi}/libclang_rt.builtins.a", stage / f"lib/actus/targets/thumbv7em-none-{abi}/libclang_rt.builtins.a")
+        shutil.copytree(root / "library/std", stage / "lib/actus/std")
+        copy_file(runtime, stage / f"lib/actus/runtime/{args.target}/libactus_runtime.a")
+        copy_file(prefix / "share/actus/toolchain.json", stage / "share/actus/toolchain.json")
+        for license_name in ("README.md", "LICENSE-APACHE", "LICENSE-MIT", "NOTICE"):
+            copy_file(root / license_name, stage / license_name)
+        shutil.copytree(prefix / "licenses", stage / "licenses")
+        copy_file(root / "LICENSE-APACHE", stage / "licenses/LICENSE-APACHE")
+        copy_file(root / "LICENSE-MIT", stage / "licenses/LICENSE-MIT")
+        if os.name == "nt":
+            pdb = source.with_suffix(".pdb")
+            if not pdb.is_file():
+                raise SystemExit(f"Windows debug artifact is missing: {pdb}")
+            copy_file(pdb, debug)
+            copy_windows_runtime(stage, args.vc_redist_root)
+        write_release_manifest(stage, args.target, suffix)
+        package = root / "scripts/llvm/package_archive.py"
+        archive_format = "zip" if os.name == "nt" else "tar.xz"
+        subprocess.run(
+            [
+                sys.executable,
+                str(package),
+                "--input-root",
+                str(stage),
+                "--output",
+                str(archive),
+                "--format",
+                archive_format,
+                "--top-level-dir",
+                name,
+            ],
+            check=True,
+        )
     print(f"archive={archive}")
     print(f"debug_artifact={debug}")
     return 0
