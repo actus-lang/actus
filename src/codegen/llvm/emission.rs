@@ -25,7 +25,8 @@ pub enum ObjectOptimizationLevel {
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.
 pub fn emit_module(module: &BackendModule) -> Result<String, BackendEmitError> {
     validate_integer_only_signature(module)?;
-    let (_context, owned_module) = lower_module(module, usize::BITS as u8)?;
+    let (_context, owned_module) =
+        lower_module(module, usize::BITS as u8, crate::target::EntryContract::Hosted)?;
     verify_module(owned_module.raw)?;
     print_module(owned_module.raw)
 }
@@ -91,7 +92,8 @@ pub fn emit_object_with_configuration_and_options(
     position_independent: bool,
     options: ObjectEmissionOptions,
 ) -> Result<(), BackendEmitError> {
-    let (_context, owned_module) = lower_module(module, target.pointer_width.bits())?;
+    let (_context, owned_module) =
+        lower_module(module, target.pointer_width.bits(), target.entry_contract())?;
     verify_module(owned_module.raw)?;
     super::object::emit_object(owned_module.raw, target, output, position_independent, options)?;
     Ok(())
@@ -143,7 +145,8 @@ pub fn emit_object_bytes_with_configuration_and_options_and_float_policy(
     verify_no_float: bool,
     options: ObjectEmissionOptions,
 ) -> Result<Vec<u8>, BackendEmitError> {
-    let (_context, owned_module) = lower_module(module, target.pointer_width.bits())?;
+    let (_context, owned_module) =
+        lower_module(module, target.pointer_width.bits(), target.entry_contract())?;
     verify_module(owned_module.raw)?;
     if verify_no_float {
         verify_no_float_ir(owned_module.raw)?;

@@ -356,6 +356,18 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         let name = symbol.name().expect("undefined ARM symbol should have a name");
         assert!(!hosted_imports.contains(&name), "ARM object imports hosted symbol {name}");
     }
+    assert!(
+        object.section_by_name(".ARM.extab").is_none(),
+        "freestanding ARM object emits personality tables"
+    );
+    for personality in ["__aeabi_unwind_cpp_pr0", "__aeabi_unwind_cpp_pr1"] {
+        assert!(
+            !object
+                .symbols()
+                .any(|symbol| symbol.is_undefined() && symbol.name() == Ok(personality)),
+            "freestanding ARM object imports {personality}"
+        );
+    }
     for symbol in [
         "arm__verb_scalar_5fcallee",
         "arm__verb_scalar_5fcaller",
@@ -414,13 +426,13 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     let startup = root.join("startup.s");
     fs::write(
         &startup,
-        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .isr_vector,\"a\",%progbits\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
+        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .isr_vector,\"a\",%progbits\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n",
     )
     .expect("ARM startup source should be written");
     let linker_script = root.join("memory.x");
     fs::write(
         &linker_script,
-        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n  /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) }\n}\n",
     )
     .expect("ARM linker script should be written");
     let startup_object = root.join("startup.o");
@@ -534,13 +546,13 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let startup = root.join("startup.s");
     fs::write(
         &startup,
-        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
+        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n",
     )
     .expect("external provider startup source should be written");
     let linker_script = root.join("memory.x");
     fs::write(
         &linker_script,
-        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n  /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) }\n}\n",
     )
     .expect("external provider linker script should be written");
     let provider_object = root.join("provider.o");
