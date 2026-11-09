@@ -202,6 +202,8 @@ jobs:
             echo 'Actus unexpectedly links to a shared LLVM library' >&2
             exit 1
           fi
+          echo "binary size: ${binary_size} bytes"
+          echo "build elapsed: ${elapsed_seconds}s"
           {
             echo '## Static LLVM linkage (Linux)'
             echo "- binary size: ${binary_size} bytes"
@@ -228,6 +230,8 @@ jobs:
             echo 'Actus unexpectedly links to a shared LLVM library' >&2
             exit 1
           fi
+          echo "binary size: ${binary_size} bytes"
+          echo "build elapsed: ${elapsed_seconds}s"
           {
             echo '## Static LLVM linkage (macOS)'
             echo "- binary size: ${binary_size} bytes"
@@ -253,6 +257,8 @@ jobs:
           if ($dependencies -match '(?i)LLVM-C\.dll|LLVM\.dll|libLLVM') {
             throw 'Actus unexpectedly links to a shared LLVM library'
           }
+          Write-Host "binary size: $binarySize bytes"
+          Write-Host "build elapsed: ${elapsedSeconds}s"
           "## Static LLVM linkage (Windows)" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           "- binary size: $binarySize bytes" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           "- build elapsed: ${elapsedSeconds}s" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
