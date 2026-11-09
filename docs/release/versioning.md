@@ -75,3 +75,10 @@ and documentation corrections. Minor Alpha releases may add language features
 or change explicitly unstable behavior only under the classification policy.
 Release notes are generated from Conventional Commits and stored under
 `docs/changelog/` for tagged versions.
+
+The first published compiler release is `v0.1.0-alpha.1`, a GitHub
+pre-release and never the repository's `latest` release. Compiler versions are
+Semantic Versioning identifiers; the language edition is a separate manifest
+field and remains `edition = "alpha"`. Breaking changes remain permitted in
+the `0.x` series under the classification policy. Actus will not publish
+`1.0.0` until the Actus compiler is self-hosted by Actus itself.

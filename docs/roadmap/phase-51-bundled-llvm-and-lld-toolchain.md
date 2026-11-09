@@ -344,6 +344,13 @@ belongs to 51.4; stack-limit reports remain under ADR-0103 S3.
 - [ ] Publish checksums and a release manifest beside every archive.
 - [ ] Document installation, rollback, explicit system override, and removal.
 
+T7 implementation is on `feat/user-release-archive`. CI evidence, archive
+sizes, checksums, and the extracted-archive verification run are recorded
+after the three-host pull-request workflow completes. The old release
+installers were removed: they downloaded or unpacked LLVM separately and did
+not preserve the relocatable user layout, identity manifest, runtime archive,
+or verified bundled linker contract.
+
 ## T1 checkpoint evidence
 
 The T1 work is complete when:
