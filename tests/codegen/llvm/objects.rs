@@ -697,7 +697,7 @@ fn executes_a_bundled_thumb_image_under_qemu() {
         "[package]\nname = \"qemu_arm\"\nversion = \"1.0.0\"\nentry = \"boot\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
     )
     .expect("QEMU fixture manifest should be written");
-    let source = "struct Pair { erg left: u64, erg right: u64, } verb dividend() -> u64 { return 80u64; } verb divisor() -> u64 { return 2u64; } verb boot() -> Int { erg source: Pair = Pair { left: 1u64, right: 1u64, }; erg copied: Pair = source; erg numerator: u64 = dividend(); erg denominator: u64 = divisor(); erg quotient: u64 = numerator / denominator; return (copied.left + copied.right + quotient) as Int; }";
+    let source = "struct Pair { erg left: u64, erg right: u64, erg extra0: u64, erg extra1: u64, erg extra2: u64, erg extra3: u64, erg extra4: u64, erg extra5: u64, } verb dividend() -> u64 { return 80u64; } verb divisor() -> u64 { return 2u64; } verb boot() -> Int { erg source: Pair = Pair { left: 1u64, right: 1u64, extra0: 0u64, extra1: 0u64, extra2: 0u64, extra3: 0u64, extra4: 0u64, extra5: 0u64, }; erg copied: Pair = source; erg numerator: u64 = dividend(); erg denominator: u64 = divisor(); erg quotient: u64 = numerator / denominator; return (copied.left + copied.right + quotient) as Int; }";
     let input = root.join("main.act");
     fs::write(&input, source).expect("QEMU Actus source should be written");
     let actus_object = root.join("actus.o");
@@ -763,6 +763,17 @@ module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .isr_vector,\22
             !symbol.is_undefined() && matches!(symbol.name(), Ok("__aeabi_uldivmod" | "__udivdi3"))
         }),
         "QEMU image must include a 64-bit division builtin"
+    );
+    let undefined = std::process::Command::new(llvm_tool("llvm-nm"))
+        .args(["-u"])
+        .arg(&image)
+        .output()
+        .expect("llvm-nm should start");
+    assert!(undefined.status.success(), "llvm-nm failed: {undefined:?}");
+    assert!(
+        String::from_utf8_lossy(&undefined.stdout).trim().is_empty(),
+        "bundled freestanding image has undefined runtime symbols: {}",
+        String::from_utf8_lossy(&undefined.stdout)
     );
     let disassembly = std::process::Command::new(llvm_tool("llvm-objdump"))
         .args(["-d", "--triple=thumbv7em-none-eabihf", "--mattr=+fp-armv8"])
