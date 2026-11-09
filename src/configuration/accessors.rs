@@ -30,6 +30,10 @@ impl CompilerConfiguration {
         &self.linker
     }
 
+    pub const fn linker_is_explicit(&self) -> bool {
+        self.linker_explicit
+    }
+
     pub fn linker_script(&self) -> Option<&Path> {
         self.linker_script.as_deref()
     }
@@ -121,7 +125,7 @@ impl CompilerConfiguration {
     pub fn with_backend(mut self, backend: BackendKind) -> Result<Self, ConfigurationError> {
         backend
             .validate_target(&self.target)
-            .map_err(|error| ConfigurationError(error.to_string()))?;
+            .map_err(|error| ConfigurationError::new(error.to_string()))?;
         self.native_backend = self.native_backend.with_backend(backend);
         Ok(self)
     }

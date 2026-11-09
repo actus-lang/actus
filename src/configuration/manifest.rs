@@ -183,7 +183,7 @@ pub enum LibraryKind {
 
 pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
     let source = std::fs::read_to_string(path).map_err(|error| {
-        ConfigurationError(format!("cannot read `{}`: {error}", path.display()))
+        ConfigurationError::new(format!("cannot read `{}`: {error}", path.display()))
     })?;
     let manifest = toml::from_str::<ActusManifest>(&source).map_err(|error| {
         let message = error.to_string();
@@ -191,12 +191,12 @@ pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
             && message.contains("core")
             && message.contains("std")
         {
-            ConfigurationError(format!(
+            ConfigurationError::new(format!(
                 "unsupported runtime profile in `{}`: {message}",
                 path.display()
             ))
         } else {
-            ConfigurationError(format!("cannot parse `{}`: {message}", path.display()))
+            ConfigurationError::new(format!("cannot parse `{}`: {message}", path.display()))
         }
     })?;
     validate(&manifest)?;
@@ -212,20 +212,20 @@ pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationErro
 
 fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
-        return Err(ConfigurationError(
+        return Err(ConfigurationError::new(
             "Actus.toml package name and version must not be empty".to_owned(),
         ));
     }
     if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
-        return Err(ConfigurationError(format!(
+        return Err(ConfigurationError::new(format!(
             "unsupported Actus edition; expected `{DEFAULT_EDITION}`"
         )));
     }
     if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Actus.toml entry must not be empty".to_owned()));
+        return Err(ConfigurationError::new("Actus.toml entry must not be empty".to_owned()));
     }
     if manifest.package.source_root.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError(
+        return Err(ConfigurationError::new(
             "Actus.toml package.source_root must not be empty".to_owned(),
         ));
     }
@@ -234,16 +234,20 @@ fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> 
 
 fn validate_build(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Actus.toml linker must not be empty".to_owned()));
+        return Err(ConfigurationError::new("Actus.toml linker must not be empty".to_owned()));
     }
     if manifest.build.linker_script.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Actus.toml linker_script must not be empty".to_owned()));
+        return Err(ConfigurationError::new(
+            "Actus.toml linker_script must not be empty".to_owned(),
+        ));
     }
     if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError("Actus.toml native_module must not be empty".to_owned()));
+        return Err(ConfigurationError::new(
+            "Actus.toml native_module must not be empty".to_owned(),
+        ));
     }
     if manifest.build.library_paths.iter().any(|path| path.trim().is_empty()) {
-        return Err(ConfigurationError(
+        return Err(ConfigurationError::new(
             "Actus.toml library_paths must not contain empty paths".to_owned(),
         ));
     }
@@ -257,7 +261,7 @@ fn validate_libraries(manifest: &ActusManifest) -> Result<(), ConfigurationError
         .iter()
         .find(|library| library.name.trim().is_empty() || library.name.starts_with('-'))
     {
-        return Err(ConfigurationError(format!(
+        return Err(ConfigurationError::new(format!(
             "Actus.toml library name `{}` must be non-empty and must not start with `-`",
             library.name
         )));
@@ -273,18 +277,18 @@ fn validate_runtime_manifest(manifest: &ActusManifest) -> Result<(), Configurati
     let mut names = std::collections::BTreeSet::new();
     for module in &runtime.modules {
         if module.name.trim().is_empty() || module.path.trim().is_empty() {
-            return Err(ConfigurationError(
+            return Err(ConfigurationError::new(
                 "Actus.toml runtime modules require non-empty name and path".to_owned(),
             ));
         }
         if !names.insert(&module.name) {
-            return Err(ConfigurationError(format!(
+            return Err(ConfigurationError::new(format!(
                 "Actus.toml runtime module `{}` is declared more than once",
                 module.name
             )));
         }
         if module.targets.is_empty() {
-            return Err(ConfigurationError(format!(
+            return Err(ConfigurationError::new(format!(
                 "Actus.toml runtime module `{}` must declare at least one target class",
                 module.name
             )));

@@ -51,7 +51,7 @@ fn visit_manifest(
 ) -> Result<(), ConfigurationError> {
     let canonical = canonical_manifest_path(manifest_path)?;
     if !visiting.insert(canonical.clone()) {
-        return Err(ConfigurationError(format!(
+        return Err(ConfigurationError::new(format!(
             "DependencyCycle: dependency graph contains `{}`",
             canonical.display()
         )));
@@ -65,7 +65,7 @@ fn visit_manifest(
 
 fn canonical_manifest_path(manifest_path: &Path) -> Result<PathBuf, ConfigurationError> {
     fs::canonicalize(manifest_path).map_err(|error| {
-        ConfigurationError(format!(
+        ConfigurationError::new(format!(
             "cannot resolve manifest `{}`: {error}",
             manifest_path.display()
         ))
@@ -82,7 +82,9 @@ fn visit_dependency_specs(
         match specification {
             DependencySpec::Version(version) => {
                 super::version::validate_constraint(&version).map_err(|error| {
-                    ConfigurationError(format!("InvalidVersionConstraint for `{name}`: {error}"))
+                    ConfigurationError::new(format!(
+                        "InvalidVersionConstraint for `{name}`: {error}"
+                    ))
                 })?;
                 record_package(
                     graph,
@@ -108,7 +110,7 @@ fn dependency_specs(
         if let Some(previous) = dependencies.get(name)
             && previous != specification
         {
-            return Err(ConfigurationError(format!(
+            return Err(ConfigurationError::new(format!(
                 "VersionConflict: dependency `{name}` has conflicting declarations"
             )));
         }
@@ -136,7 +138,7 @@ fn visit_local_dependency(
 
 fn required_local_path(name: &str, path: Option<String>) -> Result<String, ConfigurationError> {
     path.ok_or_else(|| {
-        ConfigurationError(format!("dependency `{name}` must declare a local `path`"))
+        ConfigurationError::new(format!("dependency `{name}` must declare a local `path`"))
     })
 }
 
@@ -149,7 +151,7 @@ fn dependency_source_root(
     if child_source_root.is_dir() {
         return Ok(child_source_root);
     }
-    Err(ConfigurationError(format!(
+    Err(ConfigurationError::new(format!(
         "InvalidSourceRoot: dependency `{name}` source root `{}` does not exist",
         child_source_root.display()
     )))
@@ -181,7 +183,7 @@ fn load_local_dependency(
     let package_root =
         parent_manifest.parent().unwrap_or_else(|| Path::new(".")).join(relative_path);
     let Some(dependency_manifest) = super::manifest::manifest_in_directory(&package_root) else {
-        return Err(ConfigurationError(format!(
+        return Err(ConfigurationError::new(format!(
             "InvalidDependencyPath: dependency `{name}` has no Actus.toml at `{}`",
             package_root.display()
         )));
@@ -200,14 +202,16 @@ fn validate_dependency_version(
     };
     let constraint =
         super::version::VersionConstraint::parse(constraint_text_value).map_err(|error| {
-            ConfigurationError(format!("InvalidVersionConstraint for `{name}`: {error}"))
+            ConfigurationError::new(format!("InvalidVersionConstraint for `{name}`: {error}"))
         })?;
-    let package_version = super::version::Version::parse(package_version_text)
-        .map_err(|error| ConfigurationError(format!("InvalidVersion for `{name}`: {error}")))?;
+    let package_version =
+        super::version::Version::parse(package_version_text).map_err(|error| {
+            ConfigurationError::new(format!("InvalidVersion for `{name}`: {error}"))
+        })?;
     if constraint.matches(&package_version) {
         return Ok(());
     }
-    Err(ConfigurationError(format!(
+    Err(ConfigurationError::new(format!(
         "VersionConflict: dependency `{name}` requires `{}` but package provides `{package_version_text}`",
         constraint_text(constraint)
     )))
@@ -219,7 +223,7 @@ fn record_package(
 ) -> Result<(), ConfigurationError> {
     if let Some(previous) = graph.packages.iter().find(|entry| entry.name == package.name) {
         if previous.version != package.version || previous.path != package.path {
-            return Err(ConfigurationError(format!(
+            return Err(ConfigurationError::new(format!(
                 "VersionConflict: dependency `{}` resolves to incompatible packages",
                 package.name
             )));

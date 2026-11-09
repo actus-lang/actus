@@ -31,7 +31,9 @@ edition.
 | `E1830`–`E1839` | Strict architecture validation |
 | `E1840`–`E1849` | Strict documentation validation |
 | `E1850`–`E1859` | Strict source-limit validation |
-| `E1860`–`E1899` | Strict execution and reserved expansion |
+| `E1860`–`E1879` | Strict execution and reserved expansion |
+| `E1880`–`E1889` | Bundled toolchain and linker validation |
+| `E1890`–`E1899` | Reserved expansion |
 
 Diagnostics are represented independently from terminal rendering. Every
 diagnostic carries a source span, and the CLI renderer converts it to a

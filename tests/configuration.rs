@@ -1,16 +1,22 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 use actus::codegen::LinkerPlan;
 use actus::configuration::{
     BackendKind, BuildProfile, CompilerConfiguration, LibraryKind, OptimizationLevel,
     RuntimeProfile,
 };
-use actus::diagnostics::{STRICT_RUNTIME_TARGET_INCOMPATIBLE, STRICT_RUNTIME_UNSUPPORTED};
+use actus::diagnostics::{
+    STRICT_MANUAL_FREESTANDING_LINKER, STRICT_RUNTIME_TARGET_INCOMPATIBLE,
+    STRICT_RUNTIME_UNSUPPORTED,
+};
 use actus::target::TargetSpec;
 
 #[test]
 fn linker_plan_is_deterministic_across_supported_host_profiles() {
+    let _lock = configuration_test_lock();
     for (label, target, expected_output) in [
         ("linux", "x86_64-unknown-linux-gnu", "/tmp/actus-plan-linux"),
         ("macos", "x86_64-apple-darwin", "/tmp/actus-plan-macos"),
@@ -57,6 +63,7 @@ fn linker_plan_is_deterministic_across_supported_host_profiles() {
 
 #[test]
 fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-arm-linker-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create ARM linker project directory");
     let manifest = root.join("Actus.toml");
@@ -68,6 +75,12 @@ fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
 
     let configuration =
         CompilerConfiguration::from_manifest(&manifest).expect("ARM manifest should load");
+    assert!(!configuration.linker_is_explicit());
+    let expected_linker_name = if cfg!(windows) { "ld.lld.exe" } else { "ld.lld" };
+    assert_eq!(
+        Path::new(configuration.linker()).file_name(),
+        Some(OsStr::new(expected_linker_name))
+    );
     assert_eq!(configuration.linker_script(), Some(root.join("memory.x").as_path()));
     let plan = LinkerPlan::from_configuration(
         &[Path::new("/tmp/actus-arm-root.o")],
@@ -80,6 +93,10 @@ fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
         .iter()
         .map(|argument| argument.to_string_lossy().into_owned())
         .collect::<Vec<_>>();
+    assert!(
+        arguments.iter().any(|argument| argument.ends_with("libclang_rt.builtins.a")),
+        "bundled compiler-rt builtins missing from ARM link plan: {arguments:?}"
+    );
     assert!(arguments.windows(2).any(|window| {
         window[0] == "-T" && window[1] == root.join("memory.x").display().to_string()
     }));
@@ -87,7 +104,73 @@ fn arm_manifest_resolves_a_linker_script_into_the_gnu_link_plan() {
 }
 
 #[test]
+fn strict_rejects_an_explicit_freestanding_linker() {
+    let _lock = configuration_test_lock();
+    let path =
+        std::env::temp_dir().join(format!("actus-strict-linker-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"strict_linker\"\nversion = \"0.1.0\"\n\n[build]\ntarget = \"thumbv7em-none-eabi\"\nlinker = \"custom-ld\"\n",
+    )
+    .expect("write strict linker manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&path)
+        .expect_err("strict mode must reject an explicit freestanding linker");
+    assert_eq!(error.diagnostic().code(), STRICT_MANUAL_FREESTANDING_LINKER);
+    assert!(error.diagnostic().message().contains("custom-ld"));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn environment_linker_precedes_manifest_and_strict_rejects_it() {
+    let _lock = configuration_test_lock();
+    let _environment = LinkerEnvironmentGuard;
+    let path = std::env::temp_dir().join(format!("actus-env-linker-{}.toml", std::process::id()));
+    fs::write(
+        &path,
+        "[package]\nname = \"env_linker\"\nversion = \"0.1.0\"\n\n[build]\ntarget = \"thumbv7em-none-eabi\"\nlinker = \"manifest-ld\"\n",
+    )
+    .expect("write environment linker manifest");
+    unsafe { std::env::set_var("ACTUS_LINKER", "environment-ld") };
+    let configuration = CompilerConfiguration::from_manifest(&path).expect("manifest should load");
+    assert_eq!(configuration.linker().to_string_lossy(), "environment-ld");
+    assert!(configuration.linker_is_explicit());
+    let plan = LinkerPlan::from_configuration(
+        &[Path::new("/tmp/actus-env-root.o")],
+        Path::new("/tmp/actus-env-image"),
+        &configuration,
+    )
+    .expect("explicit linker plan should still receive bundled builtins");
+    assert!(
+        plan.arguments()
+            .iter()
+            .any(|argument| { argument.to_string_lossy().ends_with("libclang_rt.builtins.a") })
+    );
+    let error = CompilerConfiguration::from_manifest_strict(&path)
+        .expect_err("strict mode must reject an explicit environment linker");
+    assert_eq!(error.diagnostic().code(), STRICT_MANUAL_FREESTANDING_LINKER);
+    let _ = fs::remove_file(path);
+}
+
+fn configuration_test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    match LOCK.get_or_init(|| Mutex::new(())).lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+struct LinkerEnvironmentGuard;
+
+impl Drop for LinkerEnvironmentGuard {
+    fn drop(&mut self) {
+        unsafe { std::env::remove_var("ACTUS_LINKER") };
+    }
+}
+
+#[test]
 fn loads_build_settings_from_an_actus_manifest() {
+    let _lock = configuration_test_lock();
     let path = std::env::temp_dir().join(format!("actus-config-{}.toml", std::process::id()));
     fs::write(
         &path,
@@ -116,6 +199,7 @@ fn loads_build_settings_from_an_actus_manifest() {
 #[cfg(feature = "llvm")]
 #[test]
 fn loads_the_explicit_llvm_backend_from_an_actus_manifest() {
+    let _lock = configuration_test_lock();
     let path =
         std::env::temp_dir().join(format!("actus-config-backend-{}.toml", std::process::id()));
     fs::write(
@@ -132,6 +216,7 @@ fn loads_the_explicit_llvm_backend_from_an_actus_manifest() {
 
 #[test]
 fn rejects_unknown_backend_names() {
+    let _lock = configuration_test_lock();
     let path = std::env::temp_dir()
         .join(format!("actus-config-unknown-backend-{}.toml", std::process::id()));
     fs::write(
@@ -149,6 +234,7 @@ fn rejects_unknown_backend_names() {
 #[cfg(not(feature = "llvm"))]
 #[test]
 fn rejects_llvm_backend_when_the_feature_is_disabled() {
+    let _lock = configuration_test_lock();
     let path = std::env::temp_dir()
         .join(format!("actus-config-llvm-disabled-{}.toml", std::process::id()));
     fs::write(
@@ -166,6 +252,7 @@ fn rejects_llvm_backend_when_the_feature_is_disabled() {
 #[cfg(feature = "llvm")]
 #[test]
 fn defaults_to_llvm_as_the_native_backend() {
+    let _lock = configuration_test_lock();
     let configuration = CompilerConfiguration::from_environment();
     assert_eq!(configuration.native_backend().backend(), BackendKind::Llvm);
 }
@@ -173,12 +260,14 @@ fn defaults_to_llvm_as_the_native_backend() {
 #[cfg(all(not(feature = "llvm"), feature = "cranelift"))]
 #[test]
 fn defaults_to_cranelift_when_llvm_is_not_compiled() {
+    let _lock = configuration_test_lock();
     let configuration = CompilerConfiguration::from_environment();
     assert_eq!(configuration.native_backend().backend(), BackendKind::Cranelift);
 }
 
 #[test]
 fn loads_package_zero_float_native_policy() {
+    let _lock = configuration_test_lock();
     let path =
         std::env::temp_dir().join(format!("actus-config-no-float-{}.toml", std::process::id()));
     fs::write(
@@ -195,6 +284,7 @@ fn loads_package_zero_float_native_policy() {
 
 #[test]
 fn loads_and_hashes_an_explicit_manifest_time_provider() {
+    let _lock = configuration_test_lock();
     let path =
         std::env::temp_dir().join(format!("actus-time-provider-{}.toml", std::process::id()));
     fs::write(
@@ -214,6 +304,7 @@ fn loads_and_hashes_an_explicit_manifest_time_provider() {
 
 #[test]
 fn rejects_ambiguous_time_provider_contracts() {
+    let _lock = configuration_test_lock();
     let path = std::env::temp_dir()
         .join(format!("actus-time-provider-invalid-{}.toml", std::process::id()));
     fs::write(
@@ -230,6 +321,7 @@ fn rejects_ambiguous_time_provider_contracts() {
 
 #[test]
 fn loads_explicit_standard_runtime_profile() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-runtime-std-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
     let path = root.join("Actus.toml");
@@ -247,6 +339,7 @@ fn loads_explicit_standard_runtime_profile() {
 
 #[test]
 fn allows_standard_runtime_profile_for_freestanding_target() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-runtime-mismatch-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
     let path = root.join("Actus.toml");
@@ -268,6 +361,7 @@ fn allows_standard_runtime_profile_for_freestanding_target() {
 
 #[test]
 fn allows_standard_runtime_profile_for_embedded_target_fixture() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-runtime-embedded-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
     let path = root.join("Actus.toml");
@@ -290,6 +384,7 @@ fn allows_standard_runtime_profile_for_embedded_target_fixture() {
 
 #[test]
 fn rejects_freestanding_runtime_profile_for_hosted_target() {
+    let _lock = configuration_test_lock();
     let root =
         std::env::temp_dir().join(format!("actus-runtime-hosted-mismatch-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
@@ -309,6 +404,7 @@ fn rejects_freestanding_runtime_profile_for_hosted_target() {
 
 #[test]
 fn rejects_unknown_runtime_profile_with_a_stable_diagnostic() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-runtime-unknown-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
     let path = root.join("Actus.toml");
@@ -327,6 +423,7 @@ fn rejects_unknown_runtime_profile_with_a_stable_diagnostic() {
 
 #[test]
 fn rejects_dependency_alias_that_shadows_builtin_standard_library() {
+    let _lock = configuration_test_lock();
     let root =
         std::env::temp_dir().join(format!("actus-runtime-alias-conflict-{}", std::process::id()));
     let dependency = root.join("local_std");
@@ -350,6 +447,7 @@ fn rejects_dependency_alias_that_shadows_builtin_standard_library() {
 
 #[test]
 fn source_limits_are_enabled_when_package_policy_is_absent() {
+    let _lock = configuration_test_lock();
     let root =
         std::env::temp_dir().join(format!("actus-config-source-limits-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
@@ -365,6 +463,7 @@ fn source_limits_are_enabled_when_package_policy_is_absent() {
 
 #[test]
 fn accepts_package_wide_limitless_source_policy() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-config-limitless-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
     let path = root.join("Actus.toml");
@@ -382,6 +481,7 @@ fn accepts_package_wide_limitless_source_policy() {
 
 #[test]
 fn rejects_unknown_source_limit_policy() {
+    let _lock = configuration_test_lock();
     let root =
         std::env::temp_dir().join(format!("actus-config-invalid-limits-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create source root");
@@ -400,6 +500,7 @@ fn rejects_unknown_source_limit_policy() {
 
 #[test]
 fn loads_target_profile_and_hash_for_capsula_artifacts() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-target-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create project directory");
     let path = root.join("Actus.toml");
@@ -425,6 +526,7 @@ fn loads_target_profile_and_hash_for_capsula_artifacts() {
 
 #[test]
 fn excludes_host_runtime_for_freestanding_targets() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-freestanding-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create project directory");
     let path = root.join("Actus.toml");
@@ -443,6 +545,7 @@ fn excludes_host_runtime_for_freestanding_targets() {
 
 #[test]
 fn loads_profile_tables_and_maps_release_to_speed_optimization() {
+    let _lock = configuration_test_lock();
     let path = std::env::temp_dir().join(format!("actus-profiles-{}.toml", std::process::id()));
     fs::write(
         &path,
@@ -461,6 +564,7 @@ fn loads_profile_tables_and_maps_release_to_speed_optimization() {
 
 #[test]
 fn derives_target_linker_unless_actus_overrides_it() {
+    let _lock = configuration_test_lock();
     let root = std::env::temp_dir().join(format!("actus-linker-{}", std::process::id()));
     fs::create_dir_all(&root).expect("create project directory");
     let path = root.join("Actus.toml");
@@ -478,6 +582,7 @@ fn derives_target_linker_unless_actus_overrides_it() {
 
 #[test]
 fn rejects_unknown_manifest_fields() {
+    let _lock = configuration_test_lock();
     let path =
         std::env::temp_dir().join(format!("actus-config-invalid-{}.toml", std::process::id()));
     fs::write(&path, "[package]\nname = \"sample\"\nversion = \"1.2.3\"\nunknown = true\n")
@@ -490,6 +595,7 @@ fn rejects_unknown_manifest_fields() {
 
 #[test]
 fn rejects_empty_native_module_names() {
+    let _lock = configuration_test_lock();
     let path = std::env::temp_dir().join(format!("actus-config-empty-{}.toml", std::process::id()));
     fs::write(
         &path,
@@ -504,6 +610,7 @@ fn rejects_empty_native_module_names() {
 
 #[test]
 fn rejects_unsafe_library_names() {
+    let _lock = configuration_test_lock();
     let path = std::env::temp_dir()
         .join(format!("actus-config-library-{}-invalid.toml", std::process::id()));
     fs::write(
@@ -519,6 +626,7 @@ fn rejects_unsafe_library_names() {
 
 #[test]
 fn rejects_unknown_language_editions() {
+    let _lock = configuration_test_lock();
     let path =
         std::env::temp_dir().join(format!("actus-config-edition-{}.toml", std::process::id()));
     fs::write(&path, "[package]\nname = \"sample\"\nversion = \"1.2.3\"\nedition = \"future\"\n")
