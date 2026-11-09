@@ -54,6 +54,7 @@ jobs:
           ! ldd target/release/actus | grep -q libstdc++
           version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
           python3 scripts/release/package_user_archive.py --repository-root "$GITHUB_WORKSPACE" --prefix "$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2" --build-root "$GITHUB_WORKSPACE/target/release/build" --target x86_64-unknown-linux-gnu --version "$version" --output-dir "$GITHUB_WORKSPACE/release"
+          cp scripts/release/verify_user_archive.py release-support/verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-x86_64-unknown-linux-gnu
@@ -94,6 +95,7 @@ jobs:
           cargo build --release --locked --all-features --bin actus
           version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
           python3 scripts/release/package_user_archive.py --repository-root "$GITHUB_WORKSPACE" --prefix "$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2" --build-root "$GITHUB_WORKSPACE/target/release/build" --target aarch64-apple-darwin --version "$version" --output-dir "$GITHUB_WORKSPACE/release"
+          cp scripts/release/verify_user_archive.py release-support/verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-aarch64-apple-darwin
@@ -140,6 +142,7 @@ jobs:
           if (-not $redistVersion) { throw 'no numeric VC redist version directory found' }
           $vcRoot = Join-Path $redistVersion.FullName 'x64\Microsoft.VC143.CRT'
           python scripts/release/package_user_archive.py --repository-root $env:GITHUB_WORKSPACE --prefix "$env:GITHUB_WORKSPACE\.actus-toolchain\llvm-23.1.2" --build-root "$env:GITHUB_WORKSPACE\target\release\build" --target x86_64-pc-windows-msvc --version $version --output-dir "$env:GITHUB_WORKSPACE\release" --vc-redist-root $vcRoot
+          Copy-Item scripts/release/verify_user_archive.py release-support\verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-x86_64-pc-windows-msvc
@@ -178,7 +181,8 @@ jobs:
         run: sudo apt-get -o DPkg::Lock::Timeout=300 update && sudo apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends -y qemu-system-arm
       - name: Verify extracted archive
         run: |
-          python scripts/release/verify_user_archive.py --incoming incoming --support support --target '${{ matrix.target }}'
+          ls -R support incoming
+          python support/verify_user_archive.py --incoming incoming --support support --target '${{ matrix.target }}'
 
   assemble:
     name: Assemble release assets
