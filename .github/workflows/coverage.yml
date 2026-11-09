@@ -58,18 +58,17 @@ jobs:
           echo "LLVM_SYS_231_PREFIX=$prefix" >> "$GITHUB_ENV"
           test "$("$prefix/bin/llvm-config" --version)" = 23.1.2
 
-      - name: Install ARM32 native link tools
-        timeout-minutes: 20
-        env:
-          DEBIAN_FRONTEND: noninteractive
+      - name: Poison system ARM tools
+        shell: bash
         run: |
-          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 update
-          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends --yes clang binutils-arm-none-eabi
-          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
-          echo "$RUST_BIN" >> "$GITHUB_PATH"
-          export PATH="$RUST_BIN:$PATH"
-          command -v clang
-          command -v arm-none-eabi-ld
+          poison="$RUNNER_TEMP/poisoned-tools"; mkdir -p "$poison"
+          for tool in clang clang-18 arm-none-eabi-ld arm-none-eabi-gcc arm-none-eabi-as rust-lld; do
+            printf '#!/bin/sh\necho "forbidden system tool: %s $*" >&2\nexit 97\n' "$tool" > "$poison/$tool"
+            chmod +x "$poison/$tool"
+          done
+          echo "$poison" >> "$GITHUB_PATH"
+          export PATH="$poison:$PATH"
+          test "$(command -v clang)" = "$poison/clang"
 
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
