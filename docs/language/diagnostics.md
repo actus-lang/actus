@@ -31,9 +31,15 @@ edition.
 | `E1830`–`E1839` | Strict architecture validation |
 | `E1840`–`E1849` | Strict documentation validation |
 | `E1850`–`E1859` | Strict source-limit validation |
-| `E1860`–`E1879` | Strict execution and reserved expansion |
+| `E1860`–`E1879` | Strict execution |
 | `E1880`–`E1889` | Bundled toolchain and linker validation |
 | `E1890`–`E1899` | Reserved expansion |
+
+| Code | Description |
+| --- | --- |
+| `E1880` | Required bundled linker or compiler-rt component is missing |
+| `E1881` | Selected linker identity or target does not match the bundled contract |
+| `E1882` | Strict mode rejects a manually selected freestanding linker |
 
 Diagnostics are represented independently from terminal rendering. Every
 diagnostic carries a source span, and the CLI renderer converts it to a

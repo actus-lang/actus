@@ -263,8 +263,10 @@ T4 closed; remaining item deferred to ADR-0103 S3.
 
 ### 51.5 — Bundled lld target contract
 
-- [ ] Integrate compiler-rt builtin helper symbols and transitive stack claims
-      with the ADR-0103 S3 helper registry.
+- [x] Complete bundled lld and compiler-rt builtin link integration; helper
+      stack claims remain deferred to ADR-0103 S3.
+- [ ] Integrate compiler-rt helper stack claims with the ADR-0103 S3 helper
+      registry (deferred to ADR-0103 S3).
 - [x] Package a matching `ld.lld` executable at `lib/actus/bin/ld.lld` and
       record it in the identity manifest without shadowing system `PATH` tools.
 - [x] Select bundled lld only for the primary `thumbv7em-none-eabihf` and
