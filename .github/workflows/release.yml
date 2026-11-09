@@ -14,7 +14,7 @@ jobs:
     name: Build user archive (Linux x86-64)
     if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
-    container: quay.io/pypa/manylinux_2_28_x86_64@sha256:7e41d5c7cbf8ff84e2fa2b8f36dd2bf3b2e28a5fc5e47ca3dc8c1ef4f2ee6c4a
+    container: quay.io/pypa/manylinux_2_28_x86_64@sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
