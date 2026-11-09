@@ -40,12 +40,20 @@ jobs:
           set -euo pipefail
           static_cxx="$RUNNER_TEMP/static-cxx"
           mkdir -p "$static_cxx"
-          ln -s "$(gcc -print-file-name=libstdc++.a)" "$static_cxx/libstdc++.so"
-          echo "LLVM_SYS_SYSTEM_LIBRARY_DIRS=$static_cxx" >> "$GITHUB_ENV"
+          static_cxx_archive="$(gcc -print-file-name=libstdc++.a)"
+          echo "$static_cxx_archive"
+          if [ ! -f "$static_cxx_archive" ]; then
+            static_cxx_archive="$(find / -name 'libstdc++.a' -type f -print -quit 2>/dev/null)"
+          fi
+          test -n "$static_cxx_archive" && test -f "$static_cxx_archive"
+          echo "using static C++ archive: $static_cxx_archive"
+          ln -s "$static_cxx_archive" "$static_cxx/libstdc++.so"
+          export RUSTFLAGS="-L native=$static_cxx"
           cargo build --release --locked --all-features --bin actus
+          ldd target/release/actus
+          ! ldd target/release/actus | grep -q libstdc++
           version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
           python3 scripts/release/package_user_archive.py --repository-root "$GITHUB_WORKSPACE" --prefix "$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2" --build-root "$GITHUB_WORKSPACE/target/release/build" --target x86_64-unknown-linux-gnu --version "$version" --output-dir "$GITHUB_WORKSPACE/release"
-          cp scripts/release/verify_user_archive.py release-support/verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-x86_64-unknown-linux-gnu
@@ -86,7 +94,6 @@ jobs:
           cargo build --release --locked --all-features --bin actus
           version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
           python3 scripts/release/package_user_archive.py --repository-root "$GITHUB_WORKSPACE" --prefix "$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2" --build-root "$GITHUB_WORKSPACE/target/release/build" --target aarch64-apple-darwin --version "$version" --output-dir "$GITHUB_WORKSPACE/release"
-          cp scripts/release/verify_user_archive.py release-support/verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-aarch64-apple-darwin
@@ -133,7 +140,6 @@ jobs:
           if (-not $redistVersion) { throw 'no numeric VC redist version directory found' }
           $vcRoot = Join-Path $redistVersion.FullName 'x64\Microsoft.VC143.CRT'
           python scripts/release/package_user_archive.py --repository-root $env:GITHUB_WORKSPACE --prefix "$env:GITHUB_WORKSPACE\.actus-toolchain\llvm-23.1.2" --build-root "$env:GITHUB_WORKSPACE\target\release\build" --target x86_64-pc-windows-msvc --version $version --output-dir "$env:GITHUB_WORKSPACE\release" --vc-redist-root $vcRoot
-          Copy-Item scripts/release/verify_user_archive.py release-support\verify_user_archive.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-x86_64-pc-windows-msvc
@@ -171,28 +177,8 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get -o DPkg::Lock::Timeout=300 update && sudo apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends -y qemu-system-arm
       - name: Verify extracted archive
-        shell: bash
-        if: runner.os != 'Windows'
         run: |
-          set -euo pipefail
-          mapfile -t found < <(find incoming -maxdepth 1 -type f -name '*.tar.xz')
-          test "${#found[@]}" -eq 1 || { echo "expected one archive, found: ${found[*]}" >&2; exit 1; }
-          mapfile -t verifier < <(find support -maxdepth 1 -type f -name verify_user_archive.py)
-          test "${#verifier[@]}" -eq 1 || { echo "expected one verifier, found: ${verifier[*]}" >&2; exit 1; }
-          mapfile -t startup < <(find support -maxdepth 1 -type f -name startup.o)
-          test "${#startup[@]}" -eq 1 || { echo "expected one startup object, found: ${startup[*]}" >&2; exit 1; }
-          python3 "${verifier[0]}" "${found[0]}" --target "${{ matrix.target }}" --startup "${startup[0]}"
-      - name: Verify extracted archive (Windows)
-        shell: pwsh
-        if: runner.os == 'Windows'
-        run: |
-          $archive = @(Get-ChildItem incoming -File -Filter '*.zip')
-          if ($archive.Count -ne 1) { throw "expected one archive, found $($archive.Name)" }
-          $verifier = @(Get-ChildItem support -File -Filter verify_user_archive.py)
-          if ($verifier.Count -ne 1) { throw "expected one verifier, found $($verifier.Name)" }
-          $startup = @(Get-ChildItem support -File -Filter startup.o)
-          if ($startup.Count -ne 1) { throw "expected one startup object, found $($startup.Name)" }
-          python $verifier[0].FullName $archive[0].FullName --target '${{ matrix.target }}' --startup $startup[0].FullName
+          python scripts/release/verify_user_archive.py --incoming incoming --support support --target '${{ matrix.target }}'
 
   assemble:
     name: Assemble release assets

@@ -17,9 +17,9 @@ import tempfile
 
 def args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("archive", type=Path)
+    parser.add_argument("--incoming", type=Path, required=True)
+    parser.add_argument("--support", type=Path, required=True)
     parser.add_argument("--target", required=True)
-    parser.add_argument("--startup", type=Path)
     return parser.parse_args()
 
 
@@ -31,6 +31,25 @@ def run(command: list[str], cwd: Path | None = None) -> subprocess.CompletedProc
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+
+
+def find_single_archive(incoming: Path) -> Path:
+    suffix = ".zip" if os.name == "nt" else ".tar.xz"
+    found = sorted(
+        path
+        for path in incoming.iterdir()
+        if path.is_file() and path.name.startswith("actus-") and path.name.endswith(suffix)
+    )
+    if len(found) != 1:
+        raise SystemExit(f"expected one archive in {incoming}, found {[path.name for path in found]}")
+    return found[0]
+
+
+def find_single_startup(support: Path) -> Path:
+    found = sorted(path for path in support.iterdir() if path.is_file() and path.name == "startup.o")
+    if len(found) != 1:
+        raise SystemExit(f"expected one startup.o in {support}, found {[path.name for path in found]}")
+    return found[0]
 
 
 def extract(archive: Path, directory: Path, expected_root: str) -> Path:
@@ -118,13 +137,14 @@ def verify_platform(binary: Path) -> None:
         if versions and max(versions) > (2, 28):
             raise SystemExit(f"GLIBC baseline exceeded: {max(versions)}")
     elif os.name == "nt":
-        dumpbin = shutil.which("dumpbin.exe") or shutil.which("dumpbin")
-        if dumpbin is None:
-            candidates = sorted(Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)"))
-                                .glob("Microsoft Visual Studio/2022/*/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe"))
-            dumpbin = str(candidates[-1]) if candidates else None
-        if dumpbin is None:
+        vswhere = Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "Microsoft Visual Studio/Installer/vswhere.exe"
+        if not vswhere.is_file():
+            raise SystemExit(f"Windows archive verification requires vswhere.exe: {vswhere}")
+        result = run([str(vswhere), "-latest", "-products", "*", "-find", r"VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe"])
+        candidates = [Path(line.strip()) for line in result.stdout.splitlines() if line.strip()]
+        if result.returncode != 0 or not candidates:
             raise SystemExit("Windows archive verification requires dumpbin.exe")
+        dumpbin = str(candidates[-1])
         result = subprocess.run([dumpbin, "/dependents", str(binary)], text=True)
         if result.returncode != 0:
             raise SystemExit("dumpbin failed")
@@ -143,9 +163,7 @@ def verify_windows_runtime(root: Path) -> None:
             raise SystemExit(f"{name} is not an x64 PE image")
 
 
-def verify_arm(root: Path, binary: Path, startup: Path | None, work: Path) -> None:
-    if startup is None:
-        raise SystemExit("ARM verification requires the release startup.o artifact")
+def verify_arm(root: Path, binary: Path, startup: Path, work: Path) -> None:
     arm = work / "arm"
     arm.mkdir()
     (arm / "Actus.toml").write_text(
@@ -201,20 +219,24 @@ def verify_arm(root: Path, binary: Path, startup: Path | None, work: Path) -> No
 
 def main() -> int:
     parsed = args()
-    if not parsed.archive.is_file():
-        raise SystemExit(f"archive is not a file: {parsed.archive}")
+    if not parsed.incoming.is_dir():
+        raise SystemExit(f"incoming is not a directory: {parsed.incoming}")
+    if not parsed.support.is_dir():
+        raise SystemExit(f"support is not a directory: {parsed.support}")
+    archive = find_single_archive(parsed.incoming)
+    startup = find_single_startup(parsed.support)
     for variable in ("LLVM_SYS_231_PREFIX", "ACTUS_LLVM_CONFIG_PATH"):
         if os.environ.get(variable):
             raise SystemExit(f"build-time LLVM prefix must be absent: {variable} is set")
     print("build-time LLVM prefix: absent")
     with tempfile.TemporaryDirectory(prefix="actus-release-verify-") as temporary:
-        archive_name = parsed.archive.name
+        archive_name = archive.name
         for suffix in (".tar.xz", ".zip"):
             if archive_name.endswith(suffix):
                 archive_name = archive_name[: -len(suffix)]
                 break
         expected_root = archive_name
-        root = extract(parsed.archive, Path(temporary), expected_root)
+        root = extract(archive, Path(temporary), expected_root)
         verify_manifest(root)
         binary = root / ("bin/actus.exe" if os.name == "nt" else "bin/actus")
         verify_identity(binary)
@@ -222,7 +244,7 @@ def main() -> int:
         verify_platform(binary)
         verify_windows_runtime(root)
         verify_hosted(binary, Path(temporary))
-        verify_arm(root, binary, parsed.startup, Path(temporary))
+        verify_arm(root, binary, startup, Path(temporary))
     return 0
 
 
