@@ -1,5 +1,8 @@
 # Phase 51 — Bundled LLVM and lld toolchain
 
+T1–T7 mapping: T1 = 51.1, T2 = 51.2, T3 = 51.3, T4 = 51.4, T5 = 51.6,
+T6 = 51.5, and T7 = 51.7.
+
 ## Status
 
 Proposed. The initial T1 checkpoint drafts ADR-0105 and does not change build,
@@ -224,24 +227,22 @@ previous behavior. `release.yml` is intentionally unchanged: its release build
 does not use `--strict`, and its migration to the bundled toolchain remains a
 later T7 decision.
 
-- [ ] Add LLVM version, archive checksum, build revision, target, profile, and
+- [x] Add LLVM version, archive checksum, build revision, target, profile, and
       linker identity to `actus --version`.
+- [x] Embed the deterministic identity in the build and verify it through the
+      contributor bootstrap jobs ([PR #113](https://github.com/actus-lang/actus/pull/113)).
 - [ ] Include the same identity in stack-limit reports and future structured
       MCP responses.
 - [ ] Preserve artifact invalidation when backend, target, profile, or LLVM
       identity changes.
-- [ ] Keep LLVM-specific types and discovery inside the LLVM backend boundary.
+- [x] Keep LLVM-specific types and discovery inside the LLVM backend boundary
+      ([PR #113](https://github.com/actus-lang/actus/pull/113)).
 - [ ] Verify static-link output and record binary-size and link-time evidence.
 
-### 51.5 — Bundled lld target contract
+The stack-limit report and MCP identity integration remain deferred to
+ADR-0103 S3; this phase does not claim that work is complete.
 
-T4 implementation now embeds deterministic compiler identity in the build,
-reports it through the CLI, and verifies the bundled archive identity in the
-contributor bootstrap CI jobs. The static-link evidence gate remains open:
-the Linux ldd, macOS otool, and Windows dumpbin outputs must be recorded from
-the corresponding CI jobs before this gate is closed. No stack-report
-implementation exists yet; the future ADR-0103 S3 report must reuse this same
-identity schema.
+### 51.5 — Bundled lld target contract
 
 - [ ] Integrate compiler-rt builtin helper symbols and transitive stack claims
       with the ADR-0103 S3 helper registry.
@@ -254,8 +255,28 @@ identity schema.
 - [ ] Reject linker version or target mismatches with stable diagnostics.
 - [ ] Add object, link, and execution evidence for the freestanding path.
 
+This section is the T6 bundled-lld work. The identity and strict-build work
+belongs to 51.4; stack-limit reports remain under ADR-0103 S3.
+
 ### 51.6 — Clean-environment and determinism evidence
 
+- [x] Audit external-process boundaries before making LLVM test tooling
+      self-contained. The compiler source does not invoke LLVM inspection
+      tools or `clang`; `build.rs` invokes the selected `rustc`, Git metadata,
+      and the explicitly selected `llvm-config`. Hosted linking remains the
+      configured native linker boundary. ARM `clang` and `arm-none-eabi-*`
+      invocations remain test/CI dependencies until T6.
+- [x] Resolve LLVM inspection tools from the verified `llvm-config` prefix,
+      require exactly LLVM 23.1.2, and reject a prefix mismatch with
+      `LLVM_SYS_231_PREFIX`. The resolver is shared by the LLVM backend
+      integration modules and appends `.exe` on Windows.
+- [x] Parse `.stack_sizes` directly from emitted objects with the `object`
+      crate. The parser follows relocation records to function symbols,
+      decodes ULEB128 sizes, and rejects missing relocations, truncated
+      records, ULEB128 overflow, invalid relocation widths, and unknown
+      symbols. Unit tests cover the empty, multi-record, overflow,
+      truncation, and unknown-symbol cases. The x86-64 stack contract keeps a
+      cross-check against `llvm-readobj --stack-sizes`.
 - [ ] Run compiler, standard-library, backend, ABI, stack-report, zero-float,
       and ownership tests without a system LLVM installation.
 - [ ] Test missing, corrupted, and wrong-version archives.

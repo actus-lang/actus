@@ -2,58 +2,11 @@
 use super::*;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use actus::codegen::llvm::ObjectOptimizationLevel;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+use actus::codegen::llvm::{StackSizeRecord, parse_stack_sizes};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use std::process::Command;
-
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn llvm_tool(name: &str) -> std::path::PathBuf {
-    let config = std::path::PathBuf::from(env!(
-        "ACTUS_LLVM_CONFIG_PATH",
-        "Actus must expose the llvm-sys-selected llvm-config path"
-    ));
-    let version = Command::new(&config)
-        .arg("--version")
-        .output()
-        .expect("llvm-sys-selected llvm-config should be executable");
-    assert!(
-        version.status.success(),
-        "llvm-config --version failed: {}",
-        String::from_utf8_lossy(&version.stderr)
-    );
-    let version = String::from_utf8(version.stdout).expect("llvm-config version should be UTF-8");
-    let mut components = version.split_whitespace().next().unwrap_or_default().split('.');
-    assert_eq!(
-        (components.next(), components.next()),
-        (Some("23"), Some("1")),
-        "stack-contract tests require LLVM 23.1 from {}, found {}",
-        config.display(),
-        version.trim()
-    );
-    let bindir = Command::new(&config)
-        .arg("--bindir")
-        .output()
-        .expect("llvm-sys-selected llvm-config should provide --bindir");
-    assert!(
-        bindir.status.success(),
-        "llvm-config --bindir failed: {}",
-        String::from_utf8_lossy(&bindir.stderr)
-    );
-    let mut tool = std::path::PathBuf::from(
-        String::from_utf8(bindir.stdout).expect("llvm-config bindir should be UTF-8").trim(),
-    );
-    tool.push(name);
-    if cfg!(windows) {
-        tool.set_extension("exe");
-    }
-    assert!(
-        tool.is_file(),
-        "LLVM 23.1 tool `{}` is missing from llvm-config bindir `{}`",
-        name,
-        tool.parent().unwrap_or_else(|| std::path::Path::new(".")).display()
-    );
-    tool
-}
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn emit_stack_fixture(
@@ -85,7 +38,7 @@ fn emit_stack_fixture(
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn read_stack_sizes(path: &std::path::Path) -> String {
+fn read_stack_size_report(path: &std::path::Path) -> String {
     let output = Command::new(llvm_tool("llvm-readobj"))
         .args(["--stack-sizes"])
         .arg(path)
@@ -96,7 +49,23 @@ fn read_stack_sizes(path: &std::path::Path) -> String {
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn stack_size(report: &str, symbol: &str) -> u64 {
+fn read_stack_sizes(path: &std::path::Path) -> Vec<StackSizeRecord> {
+    let bytes = std::fs::read(path).expect("stack fixture object should be readable");
+    let object = object::File::parse(bytes.as_slice()).expect("stack fixture object should parse");
+    parse_stack_sizes(&object).expect("object stack-size section should parse")
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn stack_size(records: &[StackSizeRecord], symbol: &str) -> u64 {
+    records
+        .iter()
+        .find(|record| record.symbol == symbol)
+        .unwrap_or_else(|| panic!("stack report should contain symbol: {symbol}"))
+        .size
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn reported_stack_size(report: &str, symbol: &str) -> u64 {
     let marker = format!("Functions: [{symbol}]");
     let entry_start = report.find(&marker).expect("stack report should contain symbol");
     let size_start = report[entry_start..]
@@ -174,10 +143,13 @@ fn large_return_slot_aggregate_has_a_real_caller_frame() {
     let module = BackendModule { externals: Vec::new(), functions: vec![callee, caller] };
     let (path, object) = emit_stack_fixture(&module, "large-return-slot");
     assert!(object.section_by_name(".stack_sizes").is_some());
-    let report = read_stack_sizes(&path);
-    assert!(report.contains("stack__verb_large_5fcaller"), "missing large caller: {report}");
+    let records = read_stack_sizes(&path);
+    assert!(
+        records.iter().any(|record| record.symbol == "stack__verb_large_5fcaller"),
+        "missing large caller: {records:?}"
+    );
     assert_eq!(
-        stack_size(&report, "stack__verb_large_5fcaller"),
+        stack_size(&records, "stack__verb_large_5fcaller"),
         0x298,
         "large caller report must include saved registers and its frame"
     );
@@ -271,10 +243,11 @@ fn x86_64_non_leaf_call_with_eight_arguments_has_stack_evidence() {
     let module = eight_argument_module("eight_args", "eight_arg_caller");
     let (path, object) = emit_stack_fixture(&module, "eight-args");
     assert!(object.section_by_name(".stack_sizes").is_some());
-    let report = read_stack_sizes(&path);
+    let records = read_stack_sizes(&path);
+    let report = read_stack_size_report(&path);
     assert!(
-        report.contains("stack__verb_eight_5farg_5fcaller"),
-        "missing non-leaf caller: {report}"
+        records.iter().any(|record| record.symbol == "stack__verb_eight_5farg_5fcaller"),
+        "missing non-leaf caller: {records:?}"
     );
     let disassembly = Command::new(llvm_tool("llvm-objdump"))
         .args(["-d"])
@@ -284,7 +257,7 @@ fn x86_64_non_leaf_call_with_eight_arguments_has_stack_evidence() {
     assert!(disassembly.status.success(), "llvm-objdump failed");
     let disassembly = String::from_utf8(disassembly.stdout).expect("disassembly should be UTF-8");
     assert_eq!(
-        stack_size(&report, "stack__verb_eight_5farg_5fcaller"),
+        stack_size(&records, "stack__verb_eight_5farg_5fcaller"),
         0x18,
         "disabled call-frame optimization must report the outgoing argument area"
     );
@@ -293,6 +266,11 @@ fn x86_64_non_leaf_call_with_eight_arguments_has_stack_evidence() {
         "non-leaf frame must match its report: {disassembly}"
     );
     assert!(disassembly.contains("call"), "non-leaf fixture must contain a call: {disassembly}");
+    assert_eq!(
+        stack_size(&records, "stack__verb_eight_5farg_5fcaller"),
+        reported_stack_size(&report, "stack__verb_eight_5farg_5fcaller"),
+        "object parser must agree with llvm-readobj"
+    );
     if std::env::var_os("ACTUS_KEEP_STACK_FIXTURES").is_none() {
         std::fs::remove_file(path).expect("eight-argument object should be removed");
     } else {
@@ -337,7 +315,7 @@ entry:
         "llc without Actus shim failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let report = read_stack_sizes(&path);
+    let records = read_stack_sizes(&path);
     let disassembly = Command::new(llvm_tool("llvm-objdump"))
         .args(["-d"])
         .arg(&path)
@@ -345,7 +323,7 @@ entry:
         .expect("llvm-objdump should be available");
     assert!(disassembly.status.success(), "llvm-objdump failed");
     let disassembly = String::from_utf8(disassembly.stdout).expect("disassembly should be UTF-8");
-    assert_eq!(stack_size(&report, "optimized_caller"), 0x8);
+    assert_eq!(stack_size(&records, "optimized_caller"), 0x8);
     assert_eq!(
         disassembly.matches("pushq").count(),
         3,

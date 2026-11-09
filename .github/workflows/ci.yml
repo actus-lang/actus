@@ -184,6 +184,42 @@ jobs:
       - name: Run Region native gate
         run: cargo test --test std_region_native --all-features -- --test-threads=1
 
+      - name: Assert static LLVM linkage (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --all-features --bin actus
+          ldd target/debug/actus | tee /tmp/actus-ldd.txt
+          if grep -Eiq 'libLLVM' /tmp/actus-ldd.txt; then
+            echo 'Actus unexpectedly links to a shared LLVM library' >&2
+            exit 1
+          fi
+
+      - name: Assert static LLVM linkage (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --all-features --bin actus
+          otool -L target/debug/actus | tee /tmp/actus-otool.txt
+          if grep -Eiq 'libLLVM' /tmp/actus-otool.txt; then
+            echo 'Actus unexpectedly links to a shared LLVM library' >&2
+            exit 1
+          fi
+
+      - name: Assert static LLVM linkage (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --all-features --bin actus
+          $binary = Join-Path $env:GITHUB_WORKSPACE 'target\debug\actus.exe'
+          $dependencies = & dumpbin.exe /dependents $binary 2>&1
+          $dependencies | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'actus-dependents.txt')
+          if ($dependencies -match '(?i)libLLVM') {
+            throw 'Actus unexpectedly links to a shared LLVM library'
+          }
+
       - name: Record Region cross-target evidence
         shell: bash
         run: |
@@ -296,10 +332,22 @@ jobs:
         shell: bash
         run: |
           prefix="$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2"
-          echo "$prefix/bin" >> "$GITHUB_PATH"
           echo "LLVM_CONFIG_PATH=$prefix/bin/llvm-config" >> "$GITHUB_ENV"
           echo "LLVM_SYS_231_PREFIX=$prefix" >> "$GITHUB_ENV"
           test "$("$prefix/bin/llvm-config" --version)" = 23.1.2
+
+      - name: Prove LLVM tests do not depend on PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2/bin/"
+          paths="$(command -v llc llvm-objdump llvm-readobj ld.lld clang || true)"
+          printf '%s\n' "$paths"
+          if grep -F "$prefix" <<<"$paths"; then
+            echo 'LLVM tool lookup unexpectedly uses the bundled prefix through PATH' >&2
+            exit 1
+          fi
+          echo 'clang and ARM link tools may remain system-provided until T6.'
 
       - name: Install ARM32 native link tools
         timeout-minutes: 20
@@ -321,8 +369,9 @@ jobs:
       - name: Verify LLVM installation
         shell: bash
         run: |
-          llvm-config --version
-          test "$(llvm-config --version)" = "23.1.2"
+          prefix="$GITHUB_WORKSPACE/.actus-toolchain/llvm-23.1.2"
+          "$prefix/bin/llvm-config" --version
+          test "$("$prefix/bin/llvm-config" --version)" = "23.1.2"
 
       - name: Check LLVM compiler surface
         run: cargo check --no-default-features --features llvm --lib --bin actus

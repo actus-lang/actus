@@ -82,21 +82,21 @@ archive_size="$(stat -f '%z' "${verification_root}/${archive_name}")"
 tar -xJf "${verification_root}/${archive_name}" -C "${extracted_root}"
 
 prefix="${extracted_root}"
-export PATH="${prefix}/bin:${PATH}"
 llvm_config="${prefix}/bin/llvm-config"
+llvm_nm="${prefix}/bin/llvm-nm"
+llvm_objdump="${prefix}/bin/llvm-objdump"
+llc="${prefix}/bin/llc"
 ld_lld="${prefix}/lib/actus/bin/ld.lld"
 eabihf_builtins="${prefix}/lib/actus/targets/thumbv7em-none-eabihf/libclang_rt.builtins.a"
 eabi_builtins="${prefix}/lib/actus/targets/thumbv7em-none-eabi/libclang_rt.builtins.a"
 manifest="${prefix}/share/actus/toolchain.json"
 
-for command_name in llvm-config llvm-nm llvm-objdump llc; do
-    resolved="$(command -v "${command_name}")"
-    [[ "${resolved}" == "${prefix}/bin/${command_name}" ]] || {
-        echo "${command_name} resolved outside archive prefix: ${resolved}" >&2
+for tool_path in "${llvm_config}" "${llvm_nm}" "${llvm_objdump}" "${llc}" "${ld_lld}"; do
+    [[ -x "${tool_path}" ]] || {
+        echo "bundled LLVM tool is missing or not executable: ${tool_path}" >&2
         exit 1
     }
 done
-[[ -x "${ld_lld}" ]] || { echo "bundled ld.lld is missing" >&2; exit 1; }
 for forbidden_path in \
     "${prefix}/bin/ld64.lld" "${prefix}/bin/wasm-ld"; do
     [[ ! -e "${forbidden_path}" && ! -L "${forbidden_path}" ]] || {
@@ -148,7 +148,7 @@ done
 
 for builtin in "${eabihf_builtins}" "${eabi_builtins}"; do
     [[ -s "${builtin}" ]] || { echo "missing builtin archive: ${builtin}" >&2; exit 1; }
-    llvm-nm --quiet --defined-only "${builtin}" | awk '{print $NF}' | grep -qx '__aeabi_uldivmod' || {
+    "${llvm_nm}" --quiet --defined-only "${builtin}" | awk '{print $NF}' | grep -qx '__aeabi_uldivmod' || {
         echo "${builtin} does not define __aeabi_uldivmod" >&2
         exit 1
     }
@@ -183,9 +183,9 @@ for binary in sys.argv[1:3]:
 PY
 
 thumb_object="${verification_root}/thumb-zero-float.o"
-llc -mtriple=thumbv7em-none-eabihf -mcpu=cortex-m4 -filetype=obj \
+"${llc}" -mtriple=thumbv7em-none-eabihf -mcpu=cortex-m4 -filetype=obj \
     "tests/toolchain/thumb_zero_float.ll" -o "${thumb_object}"
-disassembly="$(llvm-objdump -d "${thumb_object}")"
+disassembly="$("${llvm_objdump}" -d "${thumb_object}")"
 if grep -Eiq '\<(vadd|vsub|vmul|vdiv|vmov|vldr|vstr|vpush|vpop|vmla|vmsr|vmrs)[[:alnum:]._]*\>' <<<"${disassembly}"; then
     echo "Thumb zero-float fixture contains a VFP instruction" >&2
     exit 1

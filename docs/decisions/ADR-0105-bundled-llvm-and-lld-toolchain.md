@@ -401,6 +401,29 @@ distribution behavior from clean environments:
 The tests must not depend on the developer's home directory, shell profile,
 current working directory, or pre-existing global LLVM installation.
 
+LLVM inspection tools used by tests are an explicit exception to the general
+"no external tools" rule: they are accepted only from the extracted,
+verified archive prefix. The shared test resolver runs that prefix's
+`llvm-config`, requires version 23.1.2, compares its canonical `--prefix`
+with `LLVM_SYS_231_PREFIX` when set, and constructs an absolute path for each
+tool. A missing tool or a mismatched prefix is a hard test failure. Tests do
+not add the archive's `bin` directory to `PATH`, and verification scripts use
+absolute archive paths so a missing archive tool cannot silently fall back to
+the host installation.
+
+The initial `.stack_sizes` proof is implemented in the LLVM backend boundary,
+not in integration-test parsing code. It reads relocation-backed records from
+the object section, resolves the function symbol at each relocation addend,
+and decodes the following ULEB128 frame size. The parser reports malformed
+records explicitly; it does not truncate or guess. The broader ADR-0103 S3
+call-graph and transitive max-plus proof remains a later step.
+
+The self-contained test design deliberately does not add `iced-x86`,
+`capstone`, or another disassembler crate. LLVM's pinned inspection tools are
+already part of the verified contributor archive, and using them preserves
+the target-specific disassembly semantics used by the existing contracts
+without adding another native decoder, dependency, or architecture policy.
+
 Linux clean-environment evidence is provided by the pinned glibc container.
 The hosted macOS and Windows runners contain preinstalled LLVM tools, so their
 clean-environment proof is a strict archive-prefix check: every inspection
