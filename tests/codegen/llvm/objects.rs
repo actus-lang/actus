@@ -683,6 +683,159 @@ module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .text.Reset_Han
     );
 }
 
+#[test]
+fn executes_a_bundled_thumb_image_under_qemu() {
+    let qemu = std::env::var_os("ACTUS_QEMU_SYSTEM_ARM")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("qemu-system-arm"));
+
+    let root = std::env::temp_dir().join(format!("actus-llvm-qemu-arm-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("QEMU fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"qemu_arm\"\nversion = \"1.0.0\"\nentry = \"boot\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("QEMU fixture manifest should be written");
+    let source = "struct Pair { erg left: u64, erg right: u64, } verb dividend() -> u64 { return 80u64; } verb divisor() -> u64 { return 2u64; } verb boot() -> Int { erg source: Pair = Pair { left: 1u64, right: 1u64, }; erg copied: Pair = source; erg numerator: u64 = dividend(); erg denominator: u64 = divisor(); erg quotient: u64 = numerator / denominator; return (copied.left + copied.right + quotient) as Int; }";
+    let input = root.join("main.act");
+    fs::write(&input, source).expect("QEMU Actus source should be written");
+    let actus_object = root.join("actus.o");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("build")
+        .arg(&input)
+        .args(["--strict", "--emit", "obj", "-o"])
+        .arg(&actus_object)
+        .current_dir(&root)
+        .output()
+        .expect("Actus CLI should start");
+    assert!(
+        build.status.success(),
+        "Actus CLI should build the freestanding object: status={:?}, stdout={}, stderr={}",
+        build.status,
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let actus_bytes = fs::read(&actus_object).expect("Actus object should be readable");
+    let actus_file =
+        object::File::parse(actus_bytes.as_slice()).expect("Actus object should parse");
+    assert!(
+        actus_file
+            .symbols()
+            .any(|symbol| { !symbol.is_undefined() && symbol.name().ok() == Some("boot") }),
+        "Actus object must define the boot symbol called by startup"
+    );
+
+    let startup = root.join("startup.ll");
+    fs::write(
+        &startup,
+        r#"target triple = "thumbv7em-none-eabihf"
+
+module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .isr_vector,\22a\22,%progbits\0A.section .text.Reset_Handler,\22ax\22,%progbits\0A.global Reset_Handler\0A.type Reset_Handler,%function\0A.thumb_func\0AReset_Handler:\0A  bl boot\0A  cmp r0, #42\0A  bne 1f\0A  ldr r1, =0x20026\0A  b 2f\0A1:\0A  ldr r1, =0x20023\0A2:\0A  movs r0, #0x18\0A  bkpt 0xab\0A3: b 3b\0A"
+"#,
+    )
+    .expect("QEMU startup source should be written");
+    let startup_object = root.join("startup.o");
+    run_native_command(
+        std::process::Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
+            .arg(&startup)
+            .arg("-o")
+            .arg(&startup_object),
+    );
+    let linker_script = root.join("memory.x");
+    fs::write(
+        &linker_script,
+        "ENTRY(Reset_Handler)\nMEMORY { FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 4M RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 512K }\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS { . = ORIGIN(FLASH); .isr_vector : { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH .text : { *(.text*) *(.rodata*) } > FLASH .data : { *(.data*) } > RAM AT > FLASH .bss : { *(.bss*) *(COMMON) } > RAM /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) } }\n",
+    )
+    .expect("QEMU linker script should be written");
+    let image = root.join("image.elf");
+    let configuration =
+        CompilerConfiguration::from_manifest(&manifest).expect("QEMU configuration should load");
+    assert!(!configuration.linker_is_explicit());
+    link_objects(&[&startup_object, &actus_object], &image, &configuration)
+        .expect("bundled QEMU ARM image should link");
+
+    let bytes = fs::read(&image).expect("QEMU image should be readable");
+    let object = object::File::parse(bytes.as_slice()).expect("QEMU image should parse");
+    assert!(
+        object.symbols().any(|symbol| {
+            !symbol.is_undefined() && matches!(symbol.name(), Ok("__aeabi_uldivmod" | "__udivdi3"))
+        }),
+        "QEMU image must include a 64-bit division builtin"
+    );
+    let disassembly = std::process::Command::new(llvm_tool("llvm-objdump"))
+        .args(["-d", "--triple=thumbv7em-none-eabihf", "--mattr=+fp-armv8"])
+        .arg(&image)
+        .output()
+        .expect("llvm-objdump should start");
+    assert!(disassembly.status.success(), "llvm-objdump failed: {disassembly:?}");
+    let disassembly = String::from_utf8(disassembly.stdout).expect("disassembly should be UTF-8");
+    for mnemonic in [
+        "vadd", "vsub", "vmul", "vdiv", "vmov", "vldr", "vstr", "vpush", "vpop", "vcvt", "vcmp",
+        "vmrs", "vmsr",
+    ] {
+        assert!(
+            !disassembly.lines().any(|line| {
+                let mut fields = line.split('\t');
+                fields.next();
+                fields
+                    .next()
+                    .and_then(|field| field.split_whitespace().next())
+                    .is_some_and(|instruction| instruction.starts_with(mnemonic))
+            }),
+            "QEMU image contains forbidden VFP instruction `{mnemonic}`"
+        );
+    }
+
+    if !qemu.is_file() && std::process::Command::new(&qemu).arg("--version").output().is_err() {
+        if std::env::var_os("ACTUS_REQUIRE_QEMU").is_some() {
+            panic!("qemu-system-arm is required for this CI job: {}", qemu.display());
+        }
+        eprintln!("NOT RUN: skipping QEMU ARM execution test: {} is unavailable", qemu.display());
+        remove_fixture(
+            &root,
+            [&manifest, &input, &startup, &linker_script, &startup_object, &actus_object, &image],
+        );
+        return;
+    }
+
+    let mut child = std::process::Command::new(&qemu)
+        .args([
+            "-M",
+            "mps2-an500",
+            "-nographic",
+            "-semihosting-config",
+            "enable=on,target=native",
+            "-kernel",
+        ])
+        .arg(&image)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("qemu-system-arm should start");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    let output = loop {
+        if child.try_wait().expect("QEMU status should be available").is_some() {
+            break child.wait_with_output().expect("QEMU output should be readable");
+        }
+        if std::time::Instant::now() >= deadline {
+            child.kill().expect("QEMU should be killed after timeout");
+            let _ = child.wait();
+            panic!("QEMU image did not exit within 30 s");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    eprintln!("QEMU exit status: {}", output.status);
+    eprintln!("QEMU stdout: {}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("QEMU stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "QEMU image failed: {output:?}");
+    remove_fixture(
+        &root,
+        [&manifest, &input, &startup, &linker_script, &startup_object, &actus_object, &image],
+    );
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn links_and_runs_a_host_object_through_the_shared_linker() {
