@@ -189,36 +189,75 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          started_at=$(date +%s)
           cargo build --all-features --bin actus
-          ldd target/debug/actus | tee /tmp/actus-ldd.txt
+          elapsed_seconds=$(( $(date +%s) - started_at ))
+          binary_size=$(stat -c '%s' target/debug/actus)
+          linkage=$(ldd target/debug/actus | tee /tmp/actus-ldd.txt)
+          if ! printf '%s\n' 'libLLVM.so.23.1' | grep -Eiq 'libLLVM'; then
+            echo 'Linux shared-LLVM self-check did not match its synthetic input' >&2
+            exit 1
+          fi
           if grep -Eiq 'libLLVM' /tmp/actus-ldd.txt; then
             echo 'Actus unexpectedly links to a shared LLVM library' >&2
             exit 1
           fi
+          {
+            echo '## Static LLVM linkage (Linux)'
+            echo "- binary size: ${binary_size} bytes"
+            echo "- build elapsed: ${elapsed_seconds}s"
+            echo '- dynamic dependencies:'
+            printf '%s\n' "$linkage"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Assert static LLVM linkage (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
+          started_at=$(date +%s)
           cargo build --all-features --bin actus
-          otool -L target/debug/actus | tee /tmp/actus-otool.txt
+          elapsed_seconds=$(( $(date +%s) - started_at ))
+          binary_size=$(stat -f '%z' target/debug/actus)
+          linkage=$(otool -L target/debug/actus | tee /tmp/actus-otool.txt)
+          if ! printf '%s\n' 'libLLVM.dylib' | grep -Eiq 'libLLVM'; then
+            echo 'macOS shared-LLVM self-check did not match its synthetic input' >&2
+            exit 1
+          fi
           if grep -Eiq 'libLLVM' /tmp/actus-otool.txt; then
             echo 'Actus unexpectedly links to a shared LLVM library' >&2
             exit 1
           fi
+          {
+            echo '## Static LLVM linkage (macOS)'
+            echo "- binary size: ${binary_size} bytes"
+            echo "- build elapsed: ${elapsed_seconds}s"
+            echo '- dynamic dependencies:'
+            printf '%s\n' "$linkage"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Assert static LLVM linkage (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $startedAt = Get-Date
           cargo build --all-features --bin actus
           $binary = Join-Path $env:GITHUB_WORKSPACE 'target\debug\actus.exe'
+          $elapsedSeconds = [math]::Round(((Get-Date) - $startedAt).TotalSeconds)
+          $binarySize = (Get-Item -LiteralPath $binary).Length
           $dependencies = & dumpbin.exe /dependents $binary 2>&1
           $dependencies | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'actus-dependents.txt')
-          if ($dependencies -match '(?i)libLLVM') {
+          if ('LLVM-C.dll' -notmatch '(?i)LLVM-C\.dll|LLVM\.dll|libLLVM') {
+            throw 'Windows shared-LLVM self-check did not match its synthetic input'
+          }
+          if ($dependencies -match '(?i)LLVM-C\.dll|LLVM\.dll|libLLVM') {
             throw 'Actus unexpectedly links to a shared LLVM library'
           }
+          "## Static LLVM linkage (Windows)" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- binary size: $binarySize bytes" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- build elapsed: ${elapsedSeconds}s" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '- dynamic dependencies:' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $dependencies | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       - name: Record Region cross-target evidence
         shell: bash
