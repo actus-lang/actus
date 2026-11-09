@@ -15,11 +15,16 @@ use super::super::{
 };
 use super::context::{LlvmContext, LlvmModule};
 use super::control_flow::{BlockParameters, emit_blocks};
-use super::declarations::{FunctionDeclaration, declare_cleanup_bridge, declare_function};
+use super::declarations::{
+    FunctionDeclaration, apply_freestanding_attribute, declare_cleanup_bridge, declare_function,
+};
 use crate::codegen::{BackendCleanupBridge, BackendInstruction};
+use crate::target::EntryContract;
+
 pub(super) fn lower_module(
     module: &BackendModule,
     pointer_width: u8,
+    entry_contract: EntryContract,
 ) -> Result<(LlvmContext, LlvmModule), BackendEmitError> {
     module.validate().map_err(|error| BackendEmitError(error.to_string()))?;
     let context = LlvmContext::new()?;
@@ -28,6 +33,11 @@ pub(super) fn lower_module(
     let owned_module = LlvmModule::new(context.raw, module_name.as_ptr())?;
     let declarations =
         declare_module_functions(context.raw, owned_module.raw, module, pointer_width)?;
+    if entry_contract == EntryContract::Freestanding {
+        for declaration in declarations.values() {
+            apply_freestanding_attribute(context.raw, declaration.value)?;
+        }
+    }
     for function in &module.functions {
         let declaration = declarations
             .get(function.symbol.as_str())

@@ -356,6 +356,18 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
         let name = symbol.name().expect("undefined ARM symbol should have a name");
         assert!(!hosted_imports.contains(&name), "ARM object imports hosted symbol {name}");
     }
+    assert!(
+        object.section_by_name(".ARM.extab").is_none(),
+        "freestanding ARM object emits personality tables"
+    );
+    for personality in ["__aeabi_unwind_cpp_pr0", "__aeabi_unwind_cpp_pr1"] {
+        assert!(
+            !object
+                .symbols()
+                .any(|symbol| symbol.is_undefined() && symbol.name() == Ok(personality)),
+            "freestanding ARM object imports {personality}"
+        );
+    }
     for symbol in [
         "arm__verb_scalar_5fcallee",
         "arm__verb_scalar_5fcaller",
@@ -404,23 +416,31 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     }
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     use std::process::Command;
 
     let root = std::env::temp_dir().join(format!("actus-llvm-arm-image-{}", std::process::id()));
     fs::create_dir_all(&root).expect("ARM image fixture directory should be created");
-    let startup = root.join("startup.s");
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"arm_image\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("ARM image manifest should be written");
+    let startup = root.join("startup.ll");
     fs::write(
         &startup,
-        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .isr_vector,\"a\",%progbits\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
+        r#"target triple = "thumbv7em-none-eabihf"
+
+module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .isr_vector,\22a\22,%progbits\0A.section .text.Reset_Handler,\22ax\22,%progbits\0A.global Reset_Handler\0A.type Reset_Handler,%function\0A.thumb_func\0AReset_Handler:\0A  bl arm__verb_boot\0A1: b 1b\0A"
+"#,
     )
     .expect("ARM startup source should be written");
     let linker_script = root.join("memory.x");
     fs::write(
         &linker_script,
-        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n  /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) }\n}\n",
     )
     .expect("ARM linker script should be written");
     let startup_object = root.join("startup.o");
@@ -428,14 +448,8 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     let image = root.join("image.elf");
 
     run_native_command(
-        Command::new("clang")
-            .args([
-                "--target=thumbv7em-none-eabihf",
-                "-mcpu=cortex-m7",
-                "-mthumb",
-                "-mfloat-abi=soft",
-                "-c",
-            ])
+        Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
             .arg(&startup)
             .arg("-o")
             .arg(&startup_object),
@@ -466,15 +480,14 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
         .expect("Cortex-M target should parse");
     emit_object(&module, &target, &actus_object).expect("ARM Actus object should be emitted");
 
-    run_native_command(
-        arm_linker()
-            .args(["-T"])
-            .arg(&linker_script)
-            .arg(&startup_object)
-            .arg(&actus_object)
-            .arg("-o")
-            .arg(&image),
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("ARM image configuration should load");
+    assert!(
+        !configuration.linker_is_explicit(),
+        "ARM link fixtures require the bundled linker; unset ACTUS_LINKER"
     );
+    link_objects(&[&startup_object, &actus_object], &image, &configuration)
+        .expect("bundled ARM linker should link the image");
 
     let bytes = fs::read(&image).expect("ARM image should be readable");
     let object = object::File::parse(bytes.as_slice()).expect("ARM image should parse");
@@ -514,13 +527,15 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     }
     assert!(object.symbols().all(|symbol| !symbol.is_undefined()));
     if std::env::var_os("ACTUS_KEEP_ARM_IMAGE").is_none() {
-        remove_fixture(&root, [&startup, &linker_script, &startup_object, &actus_object, &image]);
+        remove_fixture(
+            &root,
+            [&manifest, &startup, &linker_script, &startup_object, &actus_object, &image],
+        );
     } else {
         eprintln!("kept ARM image fixture at {}", image.display());
     }
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     use std::process::Command;
@@ -528,19 +543,31 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let root =
         std::env::temp_dir().join(format!("actus-llvm-arm-c-provider-{}", std::process::id()));
     fs::create_dir_all(&root).expect("external provider fixture directory should be created");
-    let provider_source = root.join("provider.c");
-    fs::write(&provider_source, "int runtime__extern_increment(void) { return 7; }\n")
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"arm_provider\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("external provider manifest should be written");
+    let provider_source = root.join("provider.ll");
+    fs::write(
+        &provider_source,
+        "target triple = \"thumbv7em-none-eabihf\"\n\ndefine i32 @runtime__extern_increment() nounwind {\n  ret i32 7\n}\n",
+    )
         .expect("external C provider source should be written");
-    let startup = root.join("startup.s");
+    let startup = root.join("startup.ll");
     fs::write(
         &startup,
-        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n.global __aeabi_unwind_cpp_pr0\n.type __aeabi_unwind_cpp_pr0,%function\n.thumb_func\n__aeabi_unwind_cpp_pr0:\n  bx lr\n",
+        r#"target triple = "thumbv7em-none-eabihf"
+
+module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .text.Reset_Handler,\22ax\22,%progbits\0A.global Reset_Handler\0A.type Reset_Handler,%function\0A.thumb_func\0AReset_Handler:\0A  bl arm__verb_boot\0A1: b 1b\0A"
+"#,
     )
     .expect("external provider startup source should be written");
     let linker_script = root.join("memory.x");
     fs::write(
         &linker_script,
-        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n}\n",
+        "ENTRY(Reset_Handler)\nMEMORY\n{\n  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K\n  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K\n}\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS\n{\n  . = ORIGIN(FLASH);\n  .isr_vector ALIGN(4) : ALIGN(4) { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH\n  .text : { *(.text*) *(.rodata*) } > FLASH\n  .data : { *(.data*) } > RAM AT > FLASH\n  .bss : { *(.bss*) *(COMMON) } > RAM\n  /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) }\n}\n",
     )
     .expect("external provider linker script should be written");
     let provider_object = root.join("provider.o");
@@ -549,30 +576,15 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let image = root.join("image.elf");
 
     run_native_command(
-        Command::new("clang")
-            .args([
-                "--target=thumbv7em-none-eabihf",
-                "-mcpu=cortex-m7",
-                "-mthumb",
-                "-mfloat-abi=soft",
-                "-ffreestanding",
-                "-fno-builtin",
-                "-nostdlib",
-                "-c",
-            ])
+        Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
             .arg(&provider_source)
             .arg("-o")
             .arg(&provider_object),
     );
     run_native_command(
-        Command::new("clang")
-            .args([
-                "--target=thumbv7em-none-eabihf",
-                "-mcpu=cortex-m7",
-                "-mthumb",
-                "-mfloat-abi=soft",
-                "-c",
-            ])
+        Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
             .arg(&startup)
             .arg("-o")
             .arg(&startup_object),
@@ -627,16 +639,14 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     emit_object(&module, &target, &actus_object)
         .expect("Actus object with an external provider call should be emitted");
 
-    run_native_command(
-        arm_linker()
-            .args(["-T"])
-            .arg(&linker_script)
-            .arg(&startup_object)
-            .arg(&actus_object)
-            .arg(&provider_object)
-            .arg("-o")
-            .arg(&image),
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("external provider configuration should load");
+    assert!(
+        !configuration.linker_is_explicit(),
+        "ARM link fixtures require the bundled linker; unset ACTUS_LINKER"
     );
+    link_objects(&[&startup_object, &actus_object, &provider_object], &image, &configuration)
+        .expect("bundled ARM linker should link the external provider image");
 
     let bytes = fs::read(&image).expect("external provider image should be readable");
     let object =
@@ -661,6 +671,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     remove_fixture(
         &root,
         [
+            &manifest,
             &provider_source,
             &startup,
             &linker_script,
@@ -669,6 +680,170 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
             &actus_object,
             &image,
         ],
+    );
+}
+
+#[test]
+fn executes_a_bundled_thumb_image_under_qemu() {
+    let qemu = std::env::var_os("ACTUS_QEMU_SYSTEM_ARM")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("qemu-system-arm"));
+
+    let root = std::env::temp_dir().join(format!("actus-llvm-qemu-arm-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("QEMU fixture directory should be created");
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"qemu_arm\"\nversion = \"1.0.0\"\nentry = \"boot\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("QEMU fixture manifest should be written");
+    let source = "struct Pair { erg left: u64, erg right: u64, erg extra0: u64, erg extra1: u64, erg extra2: u64, erg extra3: u64, erg extra4: u64, erg extra5: u64, } verb dividend() -> u64 { return 80u64; } verb divisor() -> u64 { return 2u64; } verb boot() -> Int { erg source: Pair = Pair { left: 1u64, right: 1u64, extra0: 0u64, extra1: 0u64, extra2: 0u64, extra3: 0u64, extra4: 0u64, extra5: 0u64, }; erg copied: Pair = source; erg numerator: u64 = dividend(); erg denominator: u64 = divisor(); erg quotient: u64 = numerator / denominator; return (copied.left + copied.right + quotient) as Int; }";
+    let input = root.join("main.act");
+    fs::write(&input, source).expect("QEMU Actus source should be written");
+    let actus_object = root.join("actus.o");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("build")
+        .arg(&input)
+        .args(["--strict", "--emit", "obj", "-o"])
+        .arg(&actus_object)
+        .current_dir(&root)
+        .output()
+        .expect("Actus CLI should start");
+    assert!(
+        build.status.success(),
+        "Actus CLI should build the freestanding object: status={:?}, stdout={}, stderr={}",
+        build.status,
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let actus_bytes = fs::read(&actus_object).expect("Actus object should be readable");
+    let actus_file =
+        object::File::parse(actus_bytes.as_slice()).expect("Actus object should parse");
+    assert!(
+        actus_file
+            .symbols()
+            .any(|symbol| { !symbol.is_undefined() && symbol.name().ok() == Some("boot") }),
+        "Actus object must define the boot symbol called by startup"
+    );
+
+    let startup = root.join("startup.ll");
+    fs::write(
+        &startup,
+        r#"target triple = "thumbv7em-none-eabihf"
+
+module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .isr_vector,\22a\22,%progbits\0A.section .text.Reset_Handler,\22ax\22,%progbits\0A.global Reset_Handler\0A.type Reset_Handler,%function\0A.thumb_func\0AReset_Handler:\0A  bl boot\0A  cmp r0, #42\0A  bne 1f\0A  ldr r1, =0x20026\0A  b 2f\0A1:\0A  ldr r1, =0x20023\0A2:\0A  movs r0, #0x18\0A  bkpt 0xab\0A3: b 3b\0A"
+"#,
+    )
+    .expect("QEMU startup source should be written");
+    let startup_object = root.join("startup.o");
+    run_native_command(
+        std::process::Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
+            .arg(&startup)
+            .arg("-o")
+            .arg(&startup_object),
+    );
+    let linker_script = root.join("memory.x");
+    fs::write(
+        &linker_script,
+        "ENTRY(Reset_Handler)\nMEMORY { FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 4M RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 512K }\n_estack = ORIGIN(RAM) + LENGTH(RAM);\nSECTIONS { . = ORIGIN(FLASH); .isr_vector : { LONG(_estack); LONG((Reset_Handler & ~1) + 1); KEEP(*(.isr_vector)) } > FLASH .text : { *(.text*) *(.rodata*) } > FLASH .data : { *(.data*) } > RAM AT > FLASH .bss : { *(.bss*) *(COMMON) } > RAM /DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) } }\n",
+    )
+    .expect("QEMU linker script should be written");
+    let image = root.join("image.elf");
+    let configuration =
+        CompilerConfiguration::from_manifest(&manifest).expect("QEMU configuration should load");
+    assert!(!configuration.linker_is_explicit());
+    link_objects(&[&startup_object, &actus_object], &image, &configuration)
+        .expect("bundled QEMU ARM image should link");
+
+    let bytes = fs::read(&image).expect("QEMU image should be readable");
+    let object = object::File::parse(bytes.as_slice()).expect("QEMU image should parse");
+    assert!(
+        object.symbols().any(|symbol| {
+            !symbol.is_undefined() && matches!(symbol.name(), Ok("__aeabi_uldivmod" | "__udivdi3"))
+        }),
+        "QEMU image must include a 64-bit division builtin"
+    );
+    let undefined = std::process::Command::new(llvm_tool("llvm-nm"))
+        .args(["-u"])
+        .arg(&image)
+        .output()
+        .expect("llvm-nm should start");
+    assert!(undefined.status.success(), "llvm-nm failed: {undefined:?}");
+    assert!(
+        String::from_utf8_lossy(&undefined.stdout).trim().is_empty(),
+        "bundled freestanding image has undefined runtime symbols: {}",
+        String::from_utf8_lossy(&undefined.stdout)
+    );
+    let disassembly = std::process::Command::new(llvm_tool("llvm-objdump"))
+        .args(["-d", "--triple=thumbv7em-none-eabihf", "--mattr=+fp-armv8"])
+        .arg(&image)
+        .output()
+        .expect("llvm-objdump should start");
+    assert!(disassembly.status.success(), "llvm-objdump failed: {disassembly:?}");
+    let disassembly = String::from_utf8(disassembly.stdout).expect("disassembly should be UTF-8");
+    for mnemonic in [
+        "vadd", "vsub", "vmul", "vdiv", "vmov", "vldr", "vstr", "vpush", "vpop", "vcvt", "vcmp",
+        "vmrs", "vmsr",
+    ] {
+        assert!(
+            !disassembly.lines().any(|line| {
+                let mut fields = line.split('\t');
+                fields.next();
+                fields
+                    .next()
+                    .and_then(|field| field.split_whitespace().next())
+                    .is_some_and(|instruction| instruction.starts_with(mnemonic))
+            }),
+            "QEMU image contains forbidden VFP instruction `{mnemonic}`"
+        );
+    }
+
+    if !qemu.is_file() && std::process::Command::new(&qemu).arg("--version").output().is_err() {
+        if std::env::var_os("ACTUS_REQUIRE_QEMU").is_some() {
+            panic!("qemu-system-arm is required for this CI job: {}", qemu.display());
+        }
+        eprintln!("NOT RUN: skipping QEMU ARM execution test: {} is unavailable", qemu.display());
+        remove_fixture(
+            &root,
+            [&manifest, &input, &startup, &linker_script, &startup_object, &actus_object, &image],
+        );
+        return;
+    }
+
+    let mut child = std::process::Command::new(&qemu)
+        .args([
+            "-M",
+            "mps2-an500",
+            "-nographic",
+            "-semihosting-config",
+            "enable=on,target=native",
+            "-kernel",
+        ])
+        .arg(&image)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("qemu-system-arm should start");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    let output = loop {
+        if child.try_wait().expect("QEMU status should be available").is_some() {
+            break child.wait_with_output().expect("QEMU output should be readable");
+        }
+        if std::time::Instant::now() >= deadline {
+            child.kill().expect("QEMU should be killed after timeout");
+            let _ = child.wait();
+            panic!("QEMU image did not exit within 30 s");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    eprintln!("QEMU exit status: {}", output.status);
+    eprintln!("QEMU stdout: {}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("QEMU stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "QEMU image failed: {output:?}");
+    remove_fixture(
+        &root,
+        [&manifest, &input, &startup, &linker_script, &startup_object, &actus_object, &image],
     );
 }
 
@@ -1812,26 +1987,11 @@ fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
     );
 }
 
-#[cfg(target_os = "linux")]
 fn run_native_command(command: &mut std::process::Command) {
     let status = command.status().expect("native compiler should start");
     assert!(status.success(), "native compiler should succeed: {command:?}");
 }
 
-#[cfg(target_os = "linux")]
-fn arm_linker() -> std::process::Command {
-    let has_gnu_linker =
-        std::process::Command::new("arm-none-eabi-ld").arg("--version").output().is_ok();
-    if has_gnu_linker {
-        std::process::Command::new("arm-none-eabi-ld")
-    } else {
-        let mut command = std::process::Command::new("rust-lld");
-        command.args(["-flavor", "gnu"]);
-        command
-    }
-}
-
-#[cfg(target_os = "linux")]
 fn remove_fixture<const N: usize>(root: &Path, files: [&PathBuf; N]) {
     for file in files {
         let _ = fs::remove_file(file);

@@ -21,11 +21,24 @@ pub struct PackageIdentity {
 }
 
 #[derive(Debug)]
-pub struct ConfigurationError(pub(super) String);
+pub struct ConfigurationError {
+    pub(super) message: String,
+    pub(super) code: Option<&'static str>,
+}
+
+impl ConfigurationError {
+    pub(super) fn new(message: impl Into<String>) -> Self {
+        Self { message: message.into(), code: None }
+    }
+
+    pub(super) fn coded(code: &'static str, message: impl Into<String>) -> Self {
+        Self { message: message.into(), code: Some(code) }
+    }
+}
 
 impl Display for ConfigurationError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.message)
     }
 }
 
@@ -125,6 +138,7 @@ pub struct CompilerConfiguration {
     pub(super) profile: BuildProfile,
     pub(super) profiles: manifest::ProfilesManifest,
     pub(super) linker: OsString,
+    pub(super) linker_explicit: bool,
     pub(super) linker_script: Option<PathBuf>,
     pub(super) linker_flavor: LinkerFlavor,
     pub(super) entry_contract: EntryContract,

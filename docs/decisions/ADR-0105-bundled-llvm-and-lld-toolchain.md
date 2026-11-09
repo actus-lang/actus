@@ -305,11 +305,34 @@ configured system C linker and libc startup objects; hosted Windows and Apple
 link contracts remain explicit and target-specific. `ACTUS_LINKER` remains an
 explicit override and is never replaced silently.
 
+Freestanding linker selection is ordered as `ACTUS_LINKER`, manifest
+`[build].linker`, then the bundled linker. The bundled lookup first checks
+`<current_exe>/../lib/actus/bin/ld.lld` when
+`<current_exe>/../share/actus/toolchain.json` exists, then the build-time LLVM
+prefix. The selected executable must report `LLD 23.1.2`. `ACTUS_LINKER`
+applies to every target, so a cross-target build from a hosted host to a
+freestanding target must not set it. A target-bound override is deferred to a
+future decision.
+
 The freestanding link path must select the bundled lld executable by identity,
 pass the target and linker script explicitly, and reject a mismatched linker.
 The link step must report the selected linker and checksum in verbose build
 metadata. Library-based lld integration may be reconsidered only after the
 separate executable boundary has complete release and cross-platform evidence.
+
+All freestanding Actus functions, including external declarations, are emitted
+as `nounwind`. A native provider must not throw an exception across the
+freestanding boundary; doing so is undefined behavior under the native-boundary
+contract in ADR-0103. ARM `.ARM.exidx` entries remain valid `.cantunwind`
+records, and the recommended freestanding linker script discards `.ARM.exidx*`
+and `.ARM.extab*` after linking.
+
+Compiler-rt's registered freestanding builtins are selected independently of
+linker selection from the `compiler_rt_builtins` entries in
+`share/actus/toolchain.json`. In particular, the registry supplies the
+`__aeabi_memcpy`, `__aeabi_memmove`, `__aeabi_memset`, and `__aeabi_memclr`
+implementations; the linked aggregate fixture has no undefined symbols under
+`llvm-nm -u`, so Actus does not need a separate freestanding memcpy runtime.
 
 The executable is intentionally not placed in the top-level `bin/` directory,
 where it could shadow a system `lld` on `PATH`. Its canonical location is
@@ -359,7 +382,9 @@ target inspection tools, and target-specific compiler-rt builtin archives.
 The archive manifest must identify every executable and library that is
 shipped. Checksums are published beside the release assets and reproduced in
 the release manifest. Installation must be relocatable and must not modify a
-shell profile without explicit consent.
+shell profile without explicit consent. Separate SHA-256 entries for `ld.lld`
+and each builtins archive move to the T7 user archive; T6 currently verifies
+the archive SHA-256 and the bundled `LLD 23.1.2` version only.
 
 ## Licensing and notices
 

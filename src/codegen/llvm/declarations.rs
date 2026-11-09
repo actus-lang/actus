@@ -1,8 +1,10 @@
 use std::ffi::CString;
 
+use llvm_sys::LLVMAttributeFunctionIndex;
 use llvm_sys::core::{
-    LLVMAddFunction, LLVMFunctionType, LLVMGetParam, LLVMPointerTypeInContext,
-    LLVMSetParamAlignment, LLVMVoidTypeInContext,
+    LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMCreateEnumAttribute, LLVMFunctionType,
+    LLVMGetEnumAttributeKindForName, LLVMGetParam, LLVMPointerTypeInContext, LLVMSetParamAlignment,
+    LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef, LLVMTypeRef, LLVMValueRef};
 
@@ -80,6 +82,22 @@ pub(super) fn declare_function(
         borrowed_view_return: abi.borrowed_view_return,
         returns_void: abi.returns_void,
     })
+}
+
+pub(super) fn apply_freestanding_attribute(
+    context: LLVMContextRef,
+    function: LLVMValueRef,
+) -> Result<(), BackendEmitError> {
+    let kind = unsafe { LLVMGetEnumAttributeKindForName(c"nounwind".as_ptr(), "nounwind".len()) };
+    if kind == 0 {
+        return Err(BackendEmitError("LLVM does not expose the nounwind attribute".to_owned()));
+    }
+    let attribute = unsafe { LLVMCreateEnumAttribute(context, kind, 0) };
+    if attribute.is_null() {
+        return Err(BackendEmitError("LLVM failed to create the nounwind attribute".to_owned()));
+    }
+    unsafe { LLVMAddAttributeAtIndex(function, LLVMAttributeFunctionIndex, attribute) };
+    Ok(())
 }
 
 fn return_abi(

@@ -28,6 +28,7 @@ impl CompilerConfiguration {
             profile: super::BuildProfile::Debug,
             profiles: manifest::ProfilesManifest::default(),
             linker,
+            linker_explicit: std::env::var_os(LINKER_ENVIRONMENT_VARIABLE).is_some(),
             linker_script: None,
             linker_flavor,
             entry_contract,
@@ -95,7 +96,7 @@ fn build_from_manifest(
     environment: CompilerConfiguration,
 ) -> Result<CompilerConfiguration, ConfigurationError> {
     let explicit_backend = manifest.build.backend.is_some();
-    let (target, linker_flavor, entry_contract, linker) =
+    let (target, linker_flavor, entry_contract, linker, linker_explicit) =
         resolve_manifest_target(&manifest, &environment)?;
     let time_provider = resolve_time_provider(&manifest, entry_contract)?;
     let explicit_time_provider = manifest.build.time_provider.is_some();
@@ -128,6 +129,7 @@ fn build_from_manifest(
         profile,
         profiles: manifest.profile,
         linker,
+        linker_explicit,
         linker_script,
         linker_flavor,
         entry_contract,
@@ -154,7 +156,7 @@ fn validate_explicit_backend(
         backend
             .backend()
             .validate_target(target)
-            .map_err(|error| ConfigurationError(error.to_string()))?;
+            .map_err(|error| ConfigurationError::new(error.to_string()))?;
     }
     Ok(())
 }
@@ -169,7 +171,7 @@ fn resolve_time_provider(
         .clone()
         .map(crate::target::TimeProviderContract::validate)
         .transpose()
-        .map_err(|error| ConfigurationError(error.to_string()))
+        .map_err(|error| ConfigurationError::new(error.to_string()))
         .map(|provider| {
             provider.or_else(|| {
                 (entry_contract == super::EntryContract::Hosted)
@@ -197,7 +199,7 @@ fn validate_runtime_dependency_alias(
     dependency_roots: &std::collections::BTreeMap<String, PathBuf>,
 ) -> Result<(), ConfigurationError> {
     if runtime == manifest::RuntimeProfile::Std && dependency_roots.contains_key("std") {
-        return Err(ConfigurationError(
+        return Err(ConfigurationError::new(
             "dependency alias `std` conflicts with the builtin standard library".to_owned(),
         ));
     }
@@ -222,7 +224,7 @@ fn validate_runtime_profile(
         crate::target::EntryContract::Hosted => "hosted",
         crate::target::EntryContract::Freestanding => "freestanding",
     };
-    Err(ConfigurationError(format!(
+    Err(ConfigurationError::new(format!(
         "runtime profile `{runtime}` is incompatible with {target_kind} target"
     )))
 }
@@ -235,7 +237,7 @@ fn validated_source_root(
     if manifest.package.source_root.is_none() || source_root.is_dir() {
         return Ok(source_root);
     }
-    Err(ConfigurationError(format!(
+    Err(ConfigurationError::new(format!(
         "InvalidSourceRoot: Actus.toml package.source_root `{}` does not exist",
         source_root.display()
     )))
@@ -254,14 +256,14 @@ fn validate_lockfile(path: &Path, sync_missing_lockfile: bool) -> Result<(), Con
     let lock_path = path.with_file_name("Actus.lock");
     if !lock_path.is_file() {
         if sync_missing_lockfile {
-            ActusLock::sync(path).map_err(|error| ConfigurationError(error.to_string()))?;
+            ActusLock::sync(path).map_err(|error| ConfigurationError::new(error.to_string()))?;
         }
         return Ok(());
     }
     let lock_source = std::fs::read_to_string(&lock_path).map_err(|error| {
-        ConfigurationError(format!("cannot read `{}`: {error}", lock_path.display()))
+        ConfigurationError::new(format!("cannot read `{}`: {error}", lock_path.display()))
     })?;
     ActusLock::parse(&lock_source)
         .and_then(|lock| lock.validate_against_manifest(path))
-        .map_err(|error| ConfigurationError(error.to_string()))
+        .map_err(|error| ConfigurationError::new(error.to_string()))
 }

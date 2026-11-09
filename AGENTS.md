@@ -336,3 +336,13 @@ Public API changes require documentation and tests. Ownership, borrowing, C
 ABI, and standard-library changes require both accepted and rejected cases;
 native runtime behavior must be verified with an execution test where the
 change crosses the code-generation boundary.
+
+### Verification rule
+
+- Never present a test as passing unless it actually executed. A test that
+  skipped (missing tool, early return, ignored) counts as NOT RUN, and the
+  report must say so explicitly.
+- Every new or changed test must be seen failing once: break the expected
+  value or input deliberately, run it, confirm it fails, then restore.
+- Before asking for a commit, list each new test with: ran / skipped, and the
+  command used.

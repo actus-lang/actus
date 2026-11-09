@@ -11,7 +11,7 @@ pub(crate) fn content_checksum(root: &Path) -> Result<String, ConfigurationError
     for (relative, path) in files {
         update_hash(&mut hash, relative.as_bytes());
         let bytes = fs::read(path).map_err(|error| {
-            ConfigurationError(format!("cannot hash dependency content: {error}"))
+            ConfigurationError::new(format!("cannot hash dependency content: {error}"))
         })?;
         update_hash(&mut hash, &bytes);
     }
@@ -20,7 +20,7 @@ pub(crate) fn content_checksum(root: &Path) -> Result<String, ConfigurationError
 
 pub(crate) fn file_checksum(path: &Path) -> Result<String, ConfigurationError> {
     let bytes = fs::read(path).map_err(|error| {
-        ConfigurationError(format!("cannot hash `{}`: {error}", path.display()))
+        ConfigurationError::new(format!("cannot hash `{}`: {error}", path.display()))
     })?;
     let mut hash = 0xcbf29ce484222325_u64;
     update_hash(&mut hash, &bytes);
@@ -33,10 +33,13 @@ fn collect_files(
     files: &mut Vec<(String, PathBuf)>,
 ) -> Result<(), ConfigurationError> {
     let entries = fs::read_dir(directory).map_err(|error| {
-        ConfigurationError(format!("cannot inspect dependency `{}`: {error}", directory.display()))
+        ConfigurationError::new(format!(
+            "cannot inspect dependency `{}`: {error}",
+            directory.display()
+        ))
     })?;
     for entry in entries {
-        let path = entry.map_err(|error| ConfigurationError(error.to_string()))?.path();
+        let path = entry.map_err(|error| ConfigurationError::new(error.to_string()))?.path();
         if ignored_dependency_entry(&path) {
             continue;
         }

@@ -7,6 +7,8 @@ pub enum StrictDiagnosticCategory {
     Frontend,
     /// Strict semantic, ownership, type, or exhaustiveness failures.
     Semantic,
+    /// Bundled toolchain, linker, and freestanding component failures.
+    BundledToolchain,
     /// Module, facade, dependency, naming, or responsibility violations.
     Architecture,
     /// Missing or incomplete public documentation contracts.
@@ -29,6 +31,15 @@ pub const STRICT_CONFIGURATION_FAILURE: &str = "E1800";
 
 /// An LLVM strict build selected an unverified toolchain override.
 pub const STRICT_LLVM_UNVERIFIED: &str = "E1806";
+
+/// A required bundled linker or compiler-rt component is missing.
+pub const STRICT_BUNDLED_COMPONENT_MISSING: &str = "E1880";
+
+/// The selected linker does not match the bundled target identity.
+pub const STRICT_LINKER_IDENTITY_MISMATCH: &str = "E1881";
+
+/// Strict mode rejects a manually selected freestanding linker.
+pub const STRICT_MANUAL_FREESTANDING_LINKER: &str = "E1882";
 
 /// The selected runtime profile requires unavailable compiler-owned metadata.
 pub const STRICT_RUNTIME_METADATA_MISSING: &str = "E1803";
@@ -91,6 +102,9 @@ pub fn strict_code_category(code: &str) -> Option<StrictDiagnosticCategory> {
         1830..=1839 => StrictDiagnosticCategory::Architecture,
         1840..=1849 => StrictDiagnosticCategory::Documentation,
         1850..=1859 => StrictDiagnosticCategory::Limits,
-        _ => StrictDiagnosticCategory::Execution,
+        1860..=1879 => StrictDiagnosticCategory::Execution,
+        1880..=1889 => StrictDiagnosticCategory::BundledToolchain,
+        1890..=1899 => StrictDiagnosticCategory::Execution,
+        _ => unreachable!("strict code range was checked above"),
     })
 }

@@ -152,16 +152,19 @@ jobs:
           if (-not (Test-Path -LiteralPath $linker -PathType Leaf)) {
             throw "bundled Windows COFF linker is missing: $linker"
           }
-          "ACTUS_LINKER=$linker" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Install ARM32 native link tools (Ubuntu)
+      - name: Poison system ARM tools (Linux)
         if: runner.os == 'Linux'
-        timeout-minutes: 20
-        env:
-          DEBIAN_FRONTEND: noninteractive
+        shell: bash
         run: |
-          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 update
-          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends --yes clang binutils-arm-none-eabi
+          poison="$RUNNER_TEMP/poisoned-tools"; mkdir -p "$poison"
+          for tool in clang clang-18 arm-none-eabi-ld arm-none-eabi-gcc arm-none-eabi-as rust-lld; do
+            printf '#!/bin/sh\necho "forbidden system tool: %s $*" >&2\nexit 97\n' "$tool" > "$poison/$tool"
+            chmod +x "$poison/$tool"
+          done
+          echo "$poison" >> "$GITHUB_PATH"
+          export PATH="$poison:$PATH"
+          test "$(command -v clang)" = "$poison/clang"
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -428,24 +431,19 @@ jobs:
             echo 'LLVM tool lookup unexpectedly uses the bundled prefix through PATH' >&2
             exit 1
           fi
-          echo 'clang and ARM link tools may remain system-provided until T6.'
+          echo 'system clang/arm-none-eabi/rust-lld are poisoned; ARM tests must use the bundled toolchain'
 
-      - name: Install ARM32 native link tools
-        timeout-minutes: 20
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 update
-          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends --yes clang binutils-arm-none-eabi
-
-      - name: Verify native link tools
+      - name: Poison system ARM tools
         shell: bash
         run: |
-          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
-          echo "$RUST_BIN" >> "$GITHUB_PATH"
-          export PATH="$RUST_BIN:$PATH"
-          command -v clang
-          command -v arm-none-eabi-ld
+          poison="$RUNNER_TEMP/poisoned-tools"; mkdir -p "$poison"
+          for tool in clang clang-18 arm-none-eabi-ld arm-none-eabi-gcc arm-none-eabi-as rust-lld; do
+            printf '#!/bin/sh\necho "forbidden system tool: %s $*" >&2\nexit 97\n' "$tool" > "$poison/$tool"
+            chmod +x "$poison/$tool"
+          done
+          echo "$poison" >> "$GITHUB_PATH"
+          export PATH="$poison:$PATH"
+          test "$(command -v clang)" = "$poison/clang"
 
       - name: Verify LLVM installation
         shell: bash
@@ -458,7 +456,7 @@ jobs:
         run: cargo check --no-default-features --features llvm --lib --bin actus
 
       - name: Run LLVM backend integration suite
-        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
+        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1 --skip objects::executes_a_bundled_thumb_image_under_qemu
 
       - name: Record disk and target usage
         if: always()
@@ -518,32 +516,42 @@ jobs:
           echo "LLVM_SYS_231_PREFIX=$prefix" >> "$GITHUB_ENV"
           test "$("$prefix/bin/llvm-config" --version)" = 23.1.2
 
-      - name: Install ARM32 target toolchain
+      - name: Poison system ARM tools
+        shell: bash
+        run: |
+          poison="$RUNNER_TEMP/poisoned-tools"; mkdir -p "$poison"
+          for tool in clang clang-18 arm-none-eabi-ld arm-none-eabi-gcc arm-none-eabi-as rust-lld; do
+            printf '#!/bin/sh\necho "forbidden system tool: %s $*" >&2\nexit 97\n' "$tool" > "$poison/$tool"
+            chmod +x "$poison/$tool"
+          done
+          echo "$poison" >> "$GITHUB_PATH"
+          export PATH="$poison:$PATH"
+          test "$(command -v clang)" = "$poison/clang"
+
+      - name: Install QEMU ARM32 system emulator
         timeout-minutes: 20
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 update
-          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends --yes clang binutils-arm-none-eabi gcc-arm-none-eabi
+          sudo env DEBIAN_FRONTEND="$DEBIAN_FRONTEND" apt-get -o DPkg::Lock::Timeout=300 install --no-install-recommends --yes qemu-system-arm
 
       - name: Verify target toolchain
         shell: bash
         run: |
-          RUST_BIN="$(dirname "$(rustc --print target-libdir)")/bin"
-          echo "$RUST_BIN" >> "$GITHUB_PATH"
-          export PATH="$RUST_BIN:$PATH"
           llvm-config --version
           test "$(llvm-config --version)" = "23.1.2"
-          command -v clang
-          command -v arm-none-eabi-ld
-          arm-none-eabi-gcc --version
-          arm-none-eabi-objdump --version
 
       - name: Run target contract tests
         run: cargo test --all-features --test target -- --test-threads=1
 
-      - name: Run ARM32 LLVM object and link tests
-        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1
+      - name: Run QEMU ARM32 execution test
+        env:
+          ACTUS_REQUIRE_QEMU: '1'
+        run: cargo test --no-default-features --features llvm --test llvm_backend objects::executes_a_bundled_thumb_image_under_qemu -- --exact --nocapture --test-threads=1
+
+      - name: Run ARM32 LLVM object and link tests (excluding QEMU)
+        run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1 --skip objects::executes_a_bundled_thumb_image_under_qemu
 
       - name: Record disk and target usage
         if: always()
@@ -773,6 +781,4 @@ jobs:
           if ($identity.llvm.release_tag -ne $manifest.release_tag) { throw 'LLVM release identity mismatch' }
 
       - name: Run LLVM backend tests
-        # These ARM32 link tests require system clang/arm-none-eabi; the ARM32 Thumb job covers them.
-        # They return here after T6 when bundled lld is available.
-        run: cargo test --test llvm_backend --all-features -- --test-threads=1 --skip links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider --skip links_an_explicit_external_c_provider_through_the_llvm_arm_path
+        run: cargo test --test llvm_backend --all-features -- --test-threads=1

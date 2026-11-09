@@ -296,8 +296,9 @@ conformance diagnostics. The planned categories and sub-ranges are:
 
 The implementation reserves `E1800`–`E1809` for configuration, `E1810`–`E1819`
 for frontend, `E1820`–`E1829` for semantic, `E1830`–`E1839` for architecture,
-`E1840`–`E1849` for documentation, `E1850`–`E1859` for limits, and
-`E1860`–`E1899` for execution and future strict expansion.
+`E1840`–`E1849` for documentation, `E1850`–`E1859` for limits,
+`E1860`–`E1879` for execution, `E1880`–`E1889` for bundled toolchain and
+linker validation, and `E1890`–`E1899` for future strict expansion.
 
 Diagnostics must be deterministic in ordering and content. Terminal colors,
 LSP rendering, JSON output, and editor presentation are renderers only; they

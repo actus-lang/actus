@@ -46,7 +46,7 @@ impl LinkerPlan {
             arguments.extend([OsString::from("-T"), linker_script.as_os_str().to_os_string()]);
         }
         arguments.extend(objects.iter().map(|object| object.as_os_str().to_os_string()));
-        append_link_inputs(&mut arguments, configuration);
+        append_link_inputs(&mut arguments, configuration)?;
         arguments.extend(
             configuration
                 .linker_flavor()
@@ -111,8 +111,11 @@ pub fn link_objects(
     )))
 }
 
-fn append_link_inputs(arguments: &mut Vec<OsString>, configuration: &CompilerConfiguration) {
-    append_runtime_inputs(arguments, configuration);
+fn append_link_inputs(
+    arguments: &mut Vec<OsString>,
+    configuration: &CompilerConfiguration,
+) -> Result<(), NativeLinkError> {
+    append_runtime_inputs(arguments, configuration)?;
     for path in configuration.library_paths() {
         arguments.push(OsString::from(configuration.linker_flavor().library_path_argument(path)));
     }
@@ -128,9 +131,13 @@ fn append_link_inputs(arguments: &mut Vec<OsString>, configuration: &CompilerCon
                 .map(OsString::from),
         );
     }
+    Ok(())
 }
 
-fn append_runtime_inputs(arguments: &mut Vec<OsString>, configuration: &CompilerConfiguration) {
+fn append_runtime_inputs(
+    arguments: &mut Vec<OsString>,
+    configuration: &CompilerConfiguration,
+) -> Result<(), NativeLinkError> {
     if configuration.host_runtime_enabled()
         && let Some(runtime_archive) = crate::runtime::runtime_archive_path()
     {
@@ -139,6 +146,15 @@ fn append_runtime_inputs(arguments: &mut Vec<OsString>, configuration: &Compiler
             configuration.linker_flavor().runtime_library_arguments().iter().map(OsString::from),
         );
     }
+    if cfg!(feature = "llvm")
+        && configuration.entry_contract() == crate::configuration::EntryContract::Freestanding
+        && configuration.target().arm32_profile().is_some()
+    {
+        let builtins = crate::configuration::resolution::bundled_builtins(configuration.target())
+            .map_err(|error| NativeLinkError(error.to_string()))?;
+        arguments.push(builtins.into_os_string());
+    }
+    Ok(())
 }
 
 fn run_link_command(plan: &LinkerPlan) -> Result<std::process::Output, NativeLinkError> {
