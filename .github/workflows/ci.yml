@@ -189,10 +189,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          started_at=$(date +%s)
+          touch src/main.rs
+          started_at=$(python3 -c 'import time; print(time.time_ns())')
           cargo build --all-features --bin actus
-          elapsed_seconds=$(( $(date +%s) - started_at ))
+          elapsed_millis=$(( ( $(python3 -c 'import time; print(time.time_ns())') - started_at ) / 1000000 ))
+          if (( elapsed_millis < 1000 )); then
+            echo "LLVM relink did not occur: ${elapsed_millis}ms" >&2
+            exit 1
+          fi
           binary_size=$(stat -c '%s' target/debug/actus)
+          stripped_path="$RUNNER_TEMP/actus-stripped"
+          strip -o "$stripped_path" target/debug/actus
+          stripped_size=$(stat -c '%s' "$stripped_path")
           linkage=$(ldd target/debug/actus | tee /tmp/actus-ldd.txt)
           if ! printf '%s\n' 'libLLVM.so.23.1' | grep -Eiq 'libLLVM'; then
             echo 'Linux shared-LLVM self-check did not match its synthetic input' >&2
@@ -203,11 +211,13 @@ jobs:
             exit 1
           fi
           echo "binary size: ${binary_size} bytes"
-          echo "build elapsed: ${elapsed_seconds}s"
+          echo "stripped size: ${stripped_size} bytes"
+          echo "relink elapsed: ${elapsed_millis}ms"
           {
             echo '## Static LLVM linkage (Linux)'
             echo "- binary size: ${binary_size} bytes"
-            echo "- build elapsed: ${elapsed_seconds}s"
+            echo "- stripped size: ${stripped_size} bytes"
+            echo "- relink elapsed: ${elapsed_millis}ms"
             echo '- dynamic dependencies:'
             printf '%s\n' "$linkage"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -217,10 +227,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          started_at=$(date +%s)
+          touch src/main.rs
+          started_at=$(python3 -c 'import time; print(time.time_ns())')
           cargo build --all-features --bin actus
-          elapsed_seconds=$(( $(date +%s) - started_at ))
+          elapsed_millis=$(( ( $(python3 -c 'import time; print(time.time_ns())') - started_at ) / 1000000 ))
+          if (( elapsed_millis < 1000 )); then
+            echo "LLVM relink did not occur: ${elapsed_millis}ms" >&2
+            exit 1
+          fi
           binary_size=$(stat -f '%z' target/debug/actus)
+          stripped_path="$RUNNER_TEMP/actus-stripped"
+          strip -S -o "$stripped_path" target/debug/actus
+          stripped_size=$(stat -f '%z' "$stripped_path")
           linkage=$(otool -L target/debug/actus | tee /tmp/actus-otool.txt)
           if ! printf '%s\n' 'libLLVM.dylib' | grep -Eiq 'libLLVM'; then
             echo 'macOS shared-LLVM self-check did not match its synthetic input' >&2
@@ -231,11 +249,13 @@ jobs:
             exit 1
           fi
           echo "binary size: ${binary_size} bytes"
-          echo "build elapsed: ${elapsed_seconds}s"
+          echo "stripped size: ${stripped_size} bytes"
+          echo "relink elapsed: ${elapsed_millis}ms"
           {
             echo '## Static LLVM linkage (macOS)'
             echo "- binary size: ${binary_size} bytes"
-            echo "- build elapsed: ${elapsed_seconds}s"
+            echo "- stripped size: ${stripped_size} bytes"
+            echo "- relink elapsed: ${elapsed_millis}ms"
             echo '- dynamic dependencies:'
             printf '%s\n' "$linkage"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -244,11 +264,20 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          (Get-Item -LiteralPath 'src\main.rs').LastWriteTime = Get-Date
           $startedAt = Get-Date
           cargo build --all-features --bin actus
           $binary = Join-Path $env:GITHUB_WORKSPACE 'target\debug\actus.exe'
-          $elapsedSeconds = [math]::Round(((Get-Date) - $startedAt).TotalSeconds)
+          $elapsedMillis = [math]::Round(((Get-Date) - $startedAt).TotalMilliseconds)
+          if ($elapsedMillis -lt 1000) {
+            throw "LLVM relink did not occur: ${elapsedMillis}ms"
+          }
           $binarySize = (Get-Item -LiteralPath $binary).Length
+          $pdb = Join-Path $env:GITHUB_WORKSPACE 'target\debug\actus.pdb'
+          if (-not (Test-Path -LiteralPath $pdb -PathType Leaf)) {
+            throw "debug PDB is missing: $pdb"
+          }
+          $pdbSize = (Get-Item -LiteralPath $pdb).Length
           $dependencies = & dumpbin.exe /dependents $binary 2>&1
           $dependencies | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'actus-dependents.txt')
           if ('LLVM-C.dll' -notmatch '(?i)LLVM-C\.dll|LLVM\.dll|libLLVM') {
@@ -258,10 +287,12 @@ jobs:
             throw 'Actus unexpectedly links to a shared LLVM library'
           }
           Write-Host "binary size: $binarySize bytes"
-          Write-Host "build elapsed: ${elapsedSeconds}s"
+          Write-Host "PDB size: $pdbSize bytes"
+          Write-Host "relink elapsed: ${elapsedMillis}ms"
           "## Static LLVM linkage (Windows)" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           "- binary size: $binarySize bytes" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          "- build elapsed: ${elapsedSeconds}s" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- PDB size: $pdbSize bytes" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- relink elapsed: ${elapsedMillis}ms" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           '- dynamic dependencies:' | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           $dependencies | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
