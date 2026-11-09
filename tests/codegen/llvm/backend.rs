@@ -3,7 +3,6 @@
 use actus::ast::Role;
 #[cfg(feature = "cranelift")]
 use actus::codegen::cranelift::emit_contract_module_object;
-#[cfg(target_os = "linux")]
 use actus::codegen::link_objects;
 use actus::codegen::llvm::{
     ObjectEmissionOptions, emit_module, emit_object,
@@ -18,7 +17,6 @@ use actus::codegen::{
     BackendReturnMode, BackendValueId, BackendValueType, LoweredCleanupInstruction, SymbolIdentity,
     SymbolKind, lower_scalar_program,
 };
-#[cfg(target_os = "linux")]
 use actus::configuration::CompilerConfiguration;
 #[cfg(feature = "cranelift")]
 use actus::configuration::NativeBackendConfiguration;
@@ -26,7 +24,6 @@ use actus::lexer::scan;
 use actus::parser::parse;
 use object::{BinaryFormat, Object, ObjectSection, ObjectSymbol};
 
-#[cfg(target_os = "linux")]
 pub(crate) fn llvm_tool(name: &str) -> std::path::PathBuf {
     let config = std::path::PathBuf::from(env!(
         "ACTUS_LLVM_CONFIG_PATH",
@@ -81,9 +78,7 @@ fn has_symbol<'data>(object: &object::File<'data>, expected: &str) -> bool {
 #[cfg(all(feature = "cranelift", target_os = "linux"))]
 use actus::codegen::BackendCleanupResolvedDescriptor;
 
-#[cfg(target_os = "linux")]
 use std::fs;
-#[cfg(target_os = "linux")]
 use std::path::{Path, PathBuf};
 
 mod bridge_contracts;

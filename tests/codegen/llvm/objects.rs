@@ -416,17 +416,25 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     }
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     use std::process::Command;
 
     let root = std::env::temp_dir().join(format!("actus-llvm-arm-image-{}", std::process::id()));
     fs::create_dir_all(&root).expect("ARM image fixture directory should be created");
-    let startup = root.join("startup.s");
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"arm_image\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("ARM image manifest should be written");
+    let startup = root.join("startup.ll");
     fs::write(
         &startup,
-        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .isr_vector,\"a\",%progbits\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n",
+        r#"target triple = "thumbv7em-none-eabihf"
+
+module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .isr_vector,\22a\22,%progbits\0A.section .text.Reset_Handler,\22ax\22,%progbits\0A.global Reset_Handler\0A.type Reset_Handler,%function\0A.thumb_func\0AReset_Handler:\0A  bl arm__verb_boot\0A1: b 1b\0A"
+"#,
     )
     .expect("ARM startup source should be written");
     let linker_script = root.join("memory.x");
@@ -440,14 +448,8 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     let image = root.join("image.elf");
 
     run_native_command(
-        Command::new("clang")
-            .args([
-                "--target=thumbv7em-none-eabihf",
-                "-mcpu=cortex-m7",
-                "-mthumb",
-                "-mfloat-abi=soft",
-                "-c",
-            ])
+        Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
             .arg(&startup)
             .arg("-o")
             .arg(&startup_object),
@@ -478,15 +480,14 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
         .expect("Cortex-M target should parse");
     emit_object(&module, &target, &actus_object).expect("ARM Actus object should be emitted");
 
-    run_native_command(
-        arm_linker()
-            .args(["-T"])
-            .arg(&linker_script)
-            .arg(&startup_object)
-            .arg(&actus_object)
-            .arg("-o")
-            .arg(&image),
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("ARM image configuration should load");
+    assert!(
+        !configuration.linker_is_explicit(),
+        "ARM link fixtures require the bundled linker; unset ACTUS_LINKER"
     );
+    link_objects(&[&startup_object, &actus_object], &image, &configuration)
+        .expect("bundled ARM linker should link the image");
 
     let bytes = fs::read(&image).expect("ARM image should be readable");
     let object = object::File::parse(bytes.as_slice()).expect("ARM image should parse");
@@ -526,13 +527,15 @@ fn links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider() {
     }
     assert!(object.symbols().all(|symbol| !symbol.is_undefined()));
     if std::env::var_os("ACTUS_KEEP_ARM_IMAGE").is_none() {
-        remove_fixture(&root, [&startup, &linker_script, &startup_object, &actus_object, &image]);
+        remove_fixture(
+            &root,
+            [&manifest, &startup, &linker_script, &startup_object, &actus_object, &image],
+        );
     } else {
         eprintln!("kept ARM image fixture at {}", image.display());
     }
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     use std::process::Command;
@@ -540,13 +543,25 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let root =
         std::env::temp_dir().join(format!("actus-llvm-arm-c-provider-{}", std::process::id()));
     fs::create_dir_all(&root).expect("external provider fixture directory should be created");
-    let provider_source = root.join("provider.c");
-    fs::write(&provider_source, "int runtime__extern_increment(void) { return 7; }\n")
+    let manifest = root.join("Actus.toml");
+    fs::write(
+        &manifest,
+        "[package]\nname = \"arm_provider\"\nversion = \"1.0.0\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
+    )
+    .expect("external provider manifest should be written");
+    let provider_source = root.join("provider.ll");
+    fs::write(
+        &provider_source,
+        "target triple = \"thumbv7em-none-eabihf\"\n\ndefine i32 @runtime__extern_increment() nounwind {\n  ret i32 7\n}\n",
+    )
         .expect("external C provider source should be written");
-    let startup = root.join("startup.s");
+    let startup = root.join("startup.ll");
     fs::write(
         &startup,
-        ".syntax unified\n.cpu cortex-m7\n.thumb\n.section .text.Reset_Handler,\"ax\",%progbits\n.global Reset_Handler\n.type Reset_Handler,%function\n.thumb_func\nReset_Handler:\n  bl arm__verb_boot\n1: b 1b\n",
+        r#"target triple = "thumbv7em-none-eabihf"
+
+module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .text.Reset_Handler,\22ax\22,%progbits\0A.global Reset_Handler\0A.type Reset_Handler,%function\0A.thumb_func\0AReset_Handler:\0A  bl arm__verb_boot\0A1: b 1b\0A"
+"#,
     )
     .expect("external provider startup source should be written");
     let linker_script = root.join("memory.x");
@@ -561,30 +576,15 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     let image = root.join("image.elf");
 
     run_native_command(
-        Command::new("clang")
-            .args([
-                "--target=thumbv7em-none-eabihf",
-                "-mcpu=cortex-m7",
-                "-mthumb",
-                "-mfloat-abi=soft",
-                "-ffreestanding",
-                "-fno-builtin",
-                "-nostdlib",
-                "-c",
-            ])
+        Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
             .arg(&provider_source)
             .arg("-o")
             .arg(&provider_object),
     );
     run_native_command(
-        Command::new("clang")
-            .args([
-                "--target=thumbv7em-none-eabihf",
-                "-mcpu=cortex-m7",
-                "-mthumb",
-                "-mfloat-abi=soft",
-                "-c",
-            ])
+        Command::new(llvm_tool("llc"))
+            .args(["-mtriple=thumbv7em-none-eabihf", "-mcpu=cortex-m7", "-filetype=obj"])
             .arg(&startup)
             .arg("-o")
             .arg(&startup_object),
@@ -639,16 +639,14 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     emit_object(&module, &target, &actus_object)
         .expect("Actus object with an external provider call should be emitted");
 
-    run_native_command(
-        arm_linker()
-            .args(["-T"])
-            .arg(&linker_script)
-            .arg(&startup_object)
-            .arg(&actus_object)
-            .arg(&provider_object)
-            .arg("-o")
-            .arg(&image),
+    let configuration = CompilerConfiguration::from_manifest(&manifest)
+        .expect("external provider configuration should load");
+    assert!(
+        !configuration.linker_is_explicit(),
+        "ARM link fixtures require the bundled linker; unset ACTUS_LINKER"
     );
+    link_objects(&[&startup_object, &actus_object, &provider_object], &image, &configuration)
+        .expect("bundled ARM linker should link the external provider image");
 
     let bytes = fs::read(&image).expect("external provider image should be readable");
     let object =
@@ -673,6 +671,7 @@ fn links_an_explicit_external_c_provider_through_the_llvm_arm_path() {
     remove_fixture(
         &root,
         [
+            &manifest,
             &provider_source,
             &startup,
             &linker_script,
@@ -1824,26 +1823,11 @@ fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
     );
 }
 
-#[cfg(target_os = "linux")]
 fn run_native_command(command: &mut std::process::Command) {
     let status = command.status().expect("native compiler should start");
     assert!(status.success(), "native compiler should succeed: {command:?}");
 }
 
-#[cfg(target_os = "linux")]
-fn arm_linker() -> std::process::Command {
-    let has_gnu_linker =
-        std::process::Command::new("arm-none-eabi-ld").arg("--version").output().is_ok();
-    if has_gnu_linker {
-        std::process::Command::new("arm-none-eabi-ld")
-    } else {
-        let mut command = std::process::Command::new("rust-lld");
-        command.args(["-flavor", "gnu"]);
-        command
-    }
-}
-
-#[cfg(target_os = "linux")]
 fn remove_fixture<const N: usize>(root: &Path, files: [&PathBuf; N]) {
     for file in files {
         let _ = fs::remove_file(file);

@@ -152,7 +152,6 @@ jobs:
           if (-not (Test-Path -LiteralPath $linker -PathType Leaf)) {
             throw "bundled Windows COFF linker is missing: $linker"
           }
-          "ACTUS_LINKER=$linker" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Install ARM32 native link tools (Ubuntu)
         if: runner.os == 'Linux'
@@ -773,6 +772,4 @@ jobs:
           if ($identity.llvm.release_tag -ne $manifest.release_tag) { throw 'LLVM release identity mismatch' }
 
       - name: Run LLVM backend tests
-        # These ARM32 link tests require system clang/arm-none-eabi; the ARM32 Thumb job covers them.
-        # They return here after T6 when bundled lld is available.
-        run: cargo test --test llvm_backend --all-features -- --test-threads=1 --skip links_a_minimal_arm32_thumb_image_with_explicit_startup_and_provider --skip links_an_explicit_external_c_provider_through_the_llvm_arm_path
+        run: cargo test --test llvm_backend --all-features -- --test-threads=1
