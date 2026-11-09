@@ -60,3 +60,9 @@ archive supplies the three x64 VC runtime DLLs but does not replace the SDK.
 This is a known alpha limitation: hosted Windows linking needs `lld-link` and
 the Windows SDK, while freestanding ARM linking works from the bundled
 `ld.lld` and compiler-rt builtins.
+
+To remove an installation, delete its extracted archive directory and remove
+that directory's `bin/` entry from `PATH`; restore the previous `PATH` value if
+the entry was added manually. To roll back, remove the current installation,
+extract the previous archive into the same location, and rerun
+`actus --version --json` before using it.

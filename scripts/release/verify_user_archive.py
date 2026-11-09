@@ -85,6 +85,24 @@ def verify_manifest(root: Path) -> dict[str, object]:
     return manifest
 
 
+def verify_licenses(root: Path) -> None:
+    licenses = root / "licenses"
+    required = (
+        "LLVM-LICENSE.TXT",
+        "LLVM-COMPILER-RT-LICENSE.TXT",
+        "THIRD-PARTY-NOTICES.txt",
+        "LICENSE-APACHE",
+        "LICENSE-MIT",
+    )
+    for name in required:
+        path = licenses / name
+        if not path.is_file():
+            raise SystemExit(f"required license notice is missing: {path}")
+    llvm_license = (licenses / "LLVM-LICENSE.TXT").read_text(encoding="utf-8")
+    if "Apache License v2.0 with LLVM Exceptions" not in llvm_license:
+        raise SystemExit("LLVM-LICENSE.TXT does not contain the LLVM exception notice")
+
+
 def verify_identity(binary: Path) -> None:
     result = run([str(binary), "--version", "--json"])
     if result.returncode != 0:
@@ -238,6 +256,7 @@ def main() -> int:
         expected_root = archive_name
         root = extract(archive, Path(temporary), expected_root)
         verify_manifest(root)
+        verify_licenses(root)
         binary = root / ("bin/actus.exe" if os.name == "nt" else "bin/actus")
         verify_identity(binary)
         verify_runtime(root, parsed.target)

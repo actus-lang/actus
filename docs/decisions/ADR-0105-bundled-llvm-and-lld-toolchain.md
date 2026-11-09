@@ -2,21 +2,25 @@
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Date
 
 2026-11-05.
+
+## Accepted
+
+2026-11-09 (implemented across the Phase 51 PRs listed in the roadmap).
+
+The decision was implemented in PRs #113–#119.
 
 ## Scope
 
 Compiler distribution, LLVM discovery, lld integration, contributor
 bootstrap, release archives, toolchain identity, and self-contained CI.
 
-This ADR defines the target architecture. It does not implement the
-bootstrap scripts, archive builder, linker integration, or package layout.
-Those changes require the roadmap work described in Phase 51 and must not be
-started until this proposal is reviewed.
+This ADR defines the target architecture and records the implementation delivered
+through the Phase 51 roadmap and PRs #113–#119.
 
 ## Context
 
