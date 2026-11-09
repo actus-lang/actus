@@ -28,6 +28,11 @@ def parse_args() -> argparse.Namespace:
         default="share/actus/toolchain.json",
         help="manifest path relative to input root",
     )
+    parser.add_argument(
+        "--top-level-dir",
+        default="",
+        help="optional directory containing every archive entry",
+    )
     return parser.parse_args()
 
 
@@ -42,7 +47,9 @@ def validate_relative_symlink(root: Path, path: Path, relative: str) -> None:
         raise SystemExit(f"symlink target does not exist: {relative} -> {target}")
 
 
-def archive_entries(root: Path, output: Path, archive_format: str) -> list[tuple[Path, str]]:
+def archive_entries(
+    root: Path, output: Path, archive_format: str, top_level_dir: str
+) -> list[tuple[Path, str]]:
     root = root.resolve()
     output = output.resolve()
     if not root.is_dir():
@@ -50,9 +57,14 @@ def archive_entries(root: Path, output: Path, archive_format: str) -> list[tuple
     if output == root or root in output.parents:
         raise SystemExit("output archive must be outside input root")
 
+    if top_level_dir and ("/" in top_level_dir or "\\" in top_level_dir or top_level_dir in (".", "..")):
+        raise SystemExit(f"invalid top-level directory name: {top_level_dir}")
+    prefix = f"{top_level_dir}/" if top_level_dir else ""
     entries: list[tuple[Path, str]] = []
+    if top_level_dir:
+        entries.append((root, prefix))
     for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
-        relative = path.relative_to(root).as_posix()
+        relative = prefix + path.relative_to(root).as_posix()
         if path.is_symlink():
             if archive_format == "zip":
                 raise SystemExit(f"symlinks are not allowed in zip archives: {relative}")
@@ -151,8 +163,9 @@ def main() -> int:
     root = args.input_root.resolve()
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    normalize_manifest(root, args.manifest)
-    entries = archive_entries(root, output, args.format)
+    if args.manifest:
+        normalize_manifest(root, args.manifest)
+    entries = archive_entries(root, output, args.format, args.top_level_dir)
     if args.format == "tar.xz":
         write_tar(output, entries)
     else:
