@@ -346,9 +346,15 @@ belongs to 51.4; stack-limit reports remain under ADR-0103 S3.
 - [x] Produce relocatable Unix and Windows distribution archives. (Evidence: `scripts/release/package_user_archive.py`, CI run #42709649621.)
 - [x] Include `actus`, standard library/runtime files, identity metadata, and
       third-party notices. (Evidence: package script license staging and verify support, CI run #42709649621.)
-- [ ] Verify LLVM/lld Apache-2.0 WITH LLVM-exception notices against the pinned
-      source revision. (deferred to this PR's release verification: the verifier now checks all five required license files and the LLVM exception text, but a green run using that check is still required before marking this item complete.)
-- [x] Publish checksums and a release manifest beside every archive. (Evidence: `release.yml` assemble step, `SHA256SUMS` six-asset check, and release [llvm-23.1.2-actus-2](https://github.com/actus-lang/actus/releases/tag/llvm-23.1.2-actus-2).)
+- [x] Verify LLVM/lld Apache-2.0 WITH LLVM-exception notices against the pinned
+      source revision. (Evidence: `scripts/release/verify_user_archive.py` and CI
+      run [42716442474](https://github.com/actus-lang/actus/actions/runs/42716442474),
+      verify ×3.)
+- [x] Publish checksums and a release manifest beside every archive. (Evidence:
+      the assemble job in CI run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621),
+      which produced six assets and passed `sha256sum -c`. The first Actus
+      publication is the `v0.1.0-alpha.1` tag run; `llvm-23.1.2-actus-2` is a
+      contributor LLVM release, not an Actus release.)
 - [x] Document installation, rollback, explicit system override, and removal. (Evidence: `docs/guide/workflow/project-setup.md:36-70`, this PR.)
 
 T7 implementation is on `feat/user-release-archive`. CI evidence, archive
