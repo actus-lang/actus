@@ -233,14 +233,33 @@ later T7 decision.
       contributor bootstrap jobs ([PR #113](https://github.com/actus-lang/actus/pull/113)).
 - [ ] Include the same identity in stack-limit reports and future structured
       MCP responses.
-- [ ] Preserve artifact invalidation when backend, target, profile, or LLVM
-      identity changes.
+- [x] Preserve LLVM identity invalidation: `build.rs:8-18,155-175` tracks the
+      selected prefix manifest, the bundled release manifest when applicable,
+      LLVM feature selection, and LLVM environment inputs. The regression test
+      is `llvm_identity_inputs_are_tracked_by_build_script` in
+      `tests/architecture_conformance.rs:175-204`.
 - [x] Keep LLVM-specific types and discovery inside the LLVM backend boundary
       ([PR #113](https://github.com/actus-lang/actus/pull/113)).
-- [ ] Verify static-link output and record binary-size and link-time evidence.
+- [x] Verify static-link output and record binary-size and link-time evidence
+      in [CI run 42544855953](https://github.com/actus-lang/actus/actions/runs/42544855953).
+
+  The measurements below are debug builds after an explicit package clean and
+  relink. Release sizes and release link times belong to the T7 release
+  workflow.
+
+  | Platform | Dynamic dependencies | Debug size | Stripped/PDB size | Relink time |
+  | --- | --- | ---: | ---: | ---: |
+  | Linux x86-64 | `libstdc++.so.6`, `libm.so.6`, `libgcc_s.so.1`, `libc.so.6`, system loader; no `libLLVM` | 226,811,264 bytes | 74,049,248 bytes | 20,467 ms |
+  | macOS arm64 | `/usr/lib/libc++.1.dylib`, `/usr/lib/libSystem.B.dylib`, `/usr/lib/libobjc.A.dylib`, Foundation framework, `/usr/lib/libiconv.2.dylib`; no `libLLVM` | 88,009,736 bytes | 83,620,752 bytes | 20,886 ms |
+  | Windows x86-64 | Windows system DLLs plus `MSVCP140.dll`, `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`, and `api-ms-win-crt-*`; no LLVM DLL | 69,102,080 bytes | PDB 198,422,528 bytes | 21,446 ms |
+
+  Linux's dynamic `libstdc++.so.6` dependency and Windows' VC runtime
+  dependencies are known states; their distribution policy is deferred to T7.
 
 The stack-limit report and MCP identity integration remain deferred to
 ADR-0103 S3; this phase does not claim that work is complete.
+
+T4 closed; remaining item deferred to ADR-0103 S3.
 
 ### 51.5 — Bundled lld target contract
 
