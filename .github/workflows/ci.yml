@@ -189,6 +189,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cargo clean -p actus
           touch src/main.rs
           started_at=$(python3 -c 'import time; print(time.time_ns())')
           cargo build --all-features --bin actus
@@ -227,6 +228,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cargo clean -p actus
           touch src/main.rs
           started_at=$(python3 -c 'import time; print(time.time_ns())')
           cargo build --all-features --bin actus
@@ -264,6 +266,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          cargo clean -p actus
           (Get-Item -LiteralPath 'src\main.rs').LastWriteTime = Get-Date
           $startedAt = Get-Date
           cargo build --all-features --bin actus
