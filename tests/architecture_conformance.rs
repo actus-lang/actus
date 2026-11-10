@@ -73,7 +73,6 @@ const ALLOWED_RS_PAIRS: &[&str] = &[
     "src/codegen/shared_lowering/layout.rs",
     "src/modules/aggregation/visibility.rs",
     "src/runtime/region.rs",
-    "src/target.rs",
 ];
 
 const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[
