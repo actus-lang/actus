@@ -49,13 +49,6 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/runtime/mod.rs",
     "src/runtime/fs/mod.rs",
     "src/runtime/path/mod.rs",
-    "src/semantic/analyzer/mod.rs",
-    "src/semantic/calls/mod.rs",
-    "src/semantic/enum_constructors/mod.rs",
-    "src/semantic/errors/mod.rs",
-    "src/semantic/mod.rs",
-    "src/semantic/ownership/mod.rs",
-    "src/semantic/patterns/mod.rs",
 ];
 
 const ALLOWED_RS_PAIRS: &[&str] = &[
@@ -80,9 +73,6 @@ const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[
     "src/codegen/llvm/packed",
     "src/codegen/result_constructors",
     "src/codegen/symbols",
-    "src/semantic/enum_constructors",
-    "src/semantic/errors",
-    "src/semantic/ownership",
 ];
 
 const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
