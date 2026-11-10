@@ -5,11 +5,14 @@ use crate::ast::{
 };
 use crate::lexer::SourceSpan;
 
-use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::analyzer::Analyzer;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
-    pub(super) fn register_enums(&mut self, program: &Program) -> Result<(), SemanticError> {
+    pub(in crate::semantic) fn register_enums(
+        &mut self,
+        program: &Program,
+    ) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Enum(definition) = declaration else { continue };
             if let Some(existing) = self.enum_types.get(&definition.name) {
@@ -55,7 +58,7 @@ impl Analyzer {
         })
     }
 
-    pub(super) fn validate_recursive_types(&self) -> Result<(), SemanticError> {
+    pub(in crate::semantic) fn validate_recursive_types(&self) -> Result<(), SemanticError> {
         let graph = self.type_dependency_graph();
         let mut visited = HashSet::new();
         for name in graph.keys() {

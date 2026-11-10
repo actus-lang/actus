@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::{GenericParam, GenericParamKind, TypeName};
 use crate::lexer::SourceSpan;
 
-use super::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
 /// A deterministic mapping from declaration parameters to concrete type arguments.
 ///

@@ -4,7 +4,7 @@ use crate::ast::TypeIdentity;
 
 use super::model::GenericInstance;
 
-pub(super) struct GenericInstanceCache {
+pub(in crate::semantic) struct GenericInstanceCache {
     toolchain_hash: String,
     entries: BTreeMap<(String, TypeIdentity, String, usize, usize), GenericInstance>,
 }
@@ -16,16 +16,16 @@ impl Default for GenericInstanceCache {
 }
 
 impl GenericInstanceCache {
-    pub(super) fn new(toolchain_hash: impl Into<String>) -> Self {
+    pub(in crate::semantic) fn new(toolchain_hash: impl Into<String>) -> Self {
         Self { toolchain_hash: toolchain_hash.into(), entries: BTreeMap::new() }
     }
 
-    pub(super) fn for_current_toolchain() -> Self {
+    pub(in crate::semantic) fn for_current_toolchain() -> Self {
         let identity = option_env!("ACTUS_TOOLCHAIN_HASH").unwrap_or(env!("CARGO_PKG_VERSION"));
         Self::new(stable_digest(identity))
     }
 
-    pub(super) fn insert(&mut self, instance: GenericInstance) {
+    pub(in crate::semantic) fn insert(&mut self, instance: GenericInstance) {
         let caller = instance.caller.clone().unwrap_or_default();
         let key = (
             self.toolchain_hash.clone(),
@@ -37,7 +37,7 @@ impl GenericInstanceCache {
         self.entries.entry(key).or_insert(instance);
     }
 
-    pub(super) fn into_instances(self) -> Vec<GenericInstance> {
+    pub(in crate::semantic) fn into_instances(self) -> Vec<GenericInstance> {
         self.entries.into_values().collect()
     }
 

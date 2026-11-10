@@ -1,57 +1,26 @@
+mod analysis;
 mod bounded;
-mod bounded_graph;
 mod constants;
 mod declarations;
-mod expression_conditionals;
-mod expression_context;
-mod expression_rules;
 mod expressions;
 mod for_loops;
 mod lifecycle;
 mod operator_validation;
 mod state;
-mod statement_control;
 mod statements;
 mod validation;
 mod verb;
 
-pub(crate) use expression_rules::cast_literal_fits;
-pub(crate) use expressions::case_branch_type;
+use crate::semantic::normalize_generated_locals;
+use crate::semantic::{calls, cleanup, errors, model};
+pub use analysis::analyze;
+pub(crate) use analysis::{
+    validate_bounded_recursion, validate_stack_limit_dynamic_dispatch,
+    validate_stack_limit_native_claims, validate_stack_limit_recursion,
+};
+pub(crate) use expressions::{analysis::case_branch_type, rules::cast_literal_fits};
 pub(crate) use state::{Analyzer, ScopeFrame};
 pub(crate) use validation::{
     canonical_type_name, expression_span, is_origin_return_expression, try_type_mismatch,
     type_contains_float, type_name_text_contains_float,
 };
-
-pub(crate) fn validate_bounded_recursion(
-    program: &Program,
-) -> Result<(), super::errors::SemanticError> {
-    Analyzer::new().validate_bounded_recursion(program)
-}
-
-pub(crate) fn validate_stack_limit_recursion(
-    program: &Program,
-) -> Result<(), super::errors::SemanticError> {
-    Analyzer::new().validate_stack_limit_recursion(program)
-}
-
-pub(crate) fn validate_stack_limit_native_claims(
-    program: &Program,
-) -> Result<(), super::errors::SemanticError> {
-    Analyzer::new().validate_stack_limit_native_claims(program)
-}
-
-pub(crate) fn validate_stack_limit_dynamic_dispatch(
-    program: &Program,
-) -> Result<(), super::errors::SemanticError> {
-    Analyzer::new().validate_stack_limit_dynamic_dispatch(program)
-}
-
-use super::errors::SemanticError;
-use super::model::SemanticModel;
-use crate::ast::Program;
-
-pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
-    let normalized = super::normalize_generated_locals(program);
-    Analyzer::new().analyze(&normalized)
-}

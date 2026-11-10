@@ -1,8 +1,8 @@
 use crate::lexer::SourceSpan;
 
-use super::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
-pub(super) fn arity_error(
+pub(in crate::semantic) fn arity_error(
     name: &str,
     expected: usize,
     found: usize,

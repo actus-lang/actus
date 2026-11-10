@@ -31,6 +31,10 @@ harder to audit.
 - Private unit tests in `src/` live in `tests.rs` in the owning module
   directory. Integration tests remain in `tests/` and mirror the public
   module boundary.
+- Inline `#[cfg(test)] mod tests { ... }` blocks are allowed in ordinary
+  implementation files, following Rust convention. A separate `tests.rs` is
+  used when tests are large or cover multiple files in one module. Inline
+  tests are not allowed in facade `mod.rs` files.
 - Existing public paths are preserved through deliberate `pub use` facade
   exports.
 - This decision changes only source layout, module paths, and imports. Logic,

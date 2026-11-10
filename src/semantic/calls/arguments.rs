@@ -1,16 +1,14 @@
 use crate::ast::{Argument, DispatchMode, Expr, Role};
 use crate::lexer::SourceSpan;
 
-use super::analyzer::Analyzer;
-use super::argument_shapes::{
-    argument_span, argument_type_matches, expression_span, is_scalar_name,
-};
-use super::calls::VerbSignature;
-use super::errors::{SemanticError, SemanticErrorKind};
-use super::state::{AccessState, OwnershipState};
+use super::VerbSignature;
+use super::shapes::{argument_span, argument_type_matches, expression_span, is_scalar_name};
+use crate::semantic::analyzer::Analyzer;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::state::{AccessState, OwnershipState};
 
 impl Analyzer {
-    pub(super) fn validate_explicit_owner_view(
+    pub(in crate::semantic) fn validate_explicit_owner_view(
         &self,
         callee: &str,
         argument: &Argument,
@@ -33,7 +31,7 @@ impl Analyzer {
         )
     }
 
-    pub(super) fn validate_argument_type(
+    pub(in crate::semantic) fn validate_argument_type(
         &self,
         callee: &str,
         parameter: &str,
@@ -91,7 +89,7 @@ impl Analyzer {
         })
     }
 
-    pub(super) fn bind_arguments(
+    pub(in crate::semantic) fn bind_arguments(
         &self,
         callee: &str,
         signature: &VerbSignature,
@@ -172,7 +170,7 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn validate_argument_role(
+    pub(in crate::semantic) fn validate_argument_role(
         &self,
         callee: &str,
         parameter: &str,
@@ -197,7 +195,7 @@ impl Analyzer {
         })
     }
 
-    pub(super) fn is_owner_argument(&self, expression: &Expr) -> bool {
+    pub(in crate::semantic) fn is_owner_argument(&self, expression: &Expr) -> bool {
         let index = match expression {
             Expr::Identifier { name, span } => self.binding(name, *span).ok(),
             Expr::FieldAccess { .. } => self.root_binding_index(expression),
@@ -225,7 +223,7 @@ impl Analyzer {
                 || self.expression_type(expression).is_some())
     }
 
-    pub(super) fn is_borrow_argument(&self, expression: &Expr) -> bool {
+    pub(in crate::semantic) fn is_borrow_argument(&self, expression: &Expr) -> bool {
         match expression {
             Expr::Identifier { name, span } => {
                 let Ok(index) = self.binding(name, *span) else { return false };
@@ -243,7 +241,7 @@ impl Analyzer {
         }
     }
 
-    pub(super) fn is_readable_owner(&self, expression: &Expr) -> bool {
+    pub(in crate::semantic) fn is_readable_owner(&self, expression: &Expr) -> bool {
         let Some(index) = self.root_binding_index(expression) else { return false };
         matches!(self.model.bindings[index].role, Role::Erg | Role::Abs | Role::Dat | Role::Ins)
             && matches!(
@@ -253,7 +251,7 @@ impl Analyzer {
             && !self.model.bindings[index].access.is_suspended()
     }
 
-    pub(super) fn is_readonly_scalar_expression(&self, expression: &Expr) -> bool {
+    pub(in crate::semantic) fn is_readonly_scalar_expression(&self, expression: &Expr) -> bool {
         if !self.expression_type_name(expression).is_some_and(|name| is_scalar_name(&name)) {
             return false;
         }
@@ -274,7 +272,7 @@ impl Analyzer {
         }
     }
 
-    pub(super) fn is_exclusive_owner(&self, expression: &Expr) -> bool {
+    pub(in crate::semantic) fn is_exclusive_owner(&self, expression: &Expr) -> bool {
         let Some(index) = self.root_binding_index(expression) else { return false };
         matches!(self.model.bindings[index].role, Role::Erg | Role::Dat | Role::Ins)
             && matches!(self.model.bindings[index].ownership, OwnershipState::Active)
@@ -282,7 +280,11 @@ impl Analyzer {
                 || self.field_loan_available(expression, index))
     }
 
-    pub(super) fn field_loan_available(&self, expression: &Expr, index: usize) -> bool {
+    pub(in crate::semantic) fn field_loan_available(
+        &self,
+        expression: &Expr,
+        index: usize,
+    ) -> bool {
         let Some(path) = field_loan_path(expression) else { return false };
         !path.is_empty()
             && self
@@ -292,7 +294,7 @@ impl Analyzer {
                 .all(|(_, active, _)| !paths_overlap(active, &path))
     }
 
-    pub(super) fn root_binding_index(&self, expression: &Expr) -> Option<usize> {
+    pub(in crate::semantic) fn root_binding_index(&self, expression: &Expr) -> Option<usize> {
         let (name, span) = match expression {
             Expr::Identifier { name, span } => (name, span),
             Expr::FieldAccess { object, .. } => return self.root_binding_index(object),

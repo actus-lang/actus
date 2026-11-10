@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use super::analyzer::Analyzer;
-use super::argument_shapes::argument_span;
 use super::calls::VerbSignature;
+use super::calls::shapes::argument_span;
 use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::ExclusiveLoan;
 use super::state::AccessState;

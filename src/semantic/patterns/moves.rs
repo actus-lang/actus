@@ -1,10 +1,10 @@
 use crate::ast::{EnumPayload, Expr, Pattern, VariantPayload};
 
-use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::analyzer::Analyzer;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
-    pub(super) fn register_unbound_payload_cleanup(
+    pub(in crate::semantic) fn register_unbound_payload_cleanup(
         &mut self,
         subject: &Expr,
         pattern: &Pattern,
@@ -44,7 +44,7 @@ impl Analyzer {
         variant: &str,
         candidate_payload: EnumPayload,
         payload: &VariantPayload,
-        substitution: Option<&super::type_substitution::TypeSubstitution>,
+        substitution: Option<&crate::semantic::TypeSubstitution>,
     ) {
         match (candidate_payload, payload) {
             (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => self
@@ -73,7 +73,7 @@ impl Analyzer {
         &self,
         binding_index: usize,
         definition: &crate::ast::EnumDef,
-    ) -> Result<Option<super::type_substitution::TypeSubstitution>, SemanticError> {
+    ) -> Result<Option<crate::semantic::TypeSubstitution>, SemanticError> {
         let Some(type_name) = self.binding_enum_type_applications.get(&binding_index) else {
             if definition.generic_parameters.is_empty() {
                 return Ok(None);
@@ -87,7 +87,7 @@ impl Analyzer {
                 span: definition.span,
             });
         };
-        super::type_substitution::TypeSubstitution::for_type(
+        crate::semantic::TypeSubstitution::for_type(
             &definition.name,
             &definition.generic_parameters,
             &type_name.arguments,
@@ -103,7 +103,7 @@ impl Analyzer {
         variant: &str,
         types: Vec<crate::ast::TypeName>,
         bindings: &[crate::ast::PatternBinding],
-        substitution: Option<&super::type_substitution::TypeSubstitution>,
+        substitution: Option<&crate::semantic::TypeSubstitution>,
     ) {
         for (index, (binding, ty)) in bindings.iter().zip(types).enumerate() {
             let ty = substitution.map(|substitution| substitution.apply(&ty)).unwrap_or(ty);
@@ -125,7 +125,7 @@ impl Analyzer {
         variant: &str,
         fields: Vec<crate::ast::EnumField>,
         patterns: &[crate::ast::NamedPattern],
-        substitution: Option<&super::type_substitution::TypeSubstitution>,
+        substitution: Option<&crate::semantic::TypeSubstitution>,
     ) {
         for pattern in patterns {
             let Some(field) = fields.iter().find(|field| field.name == pattern.name) else {

@@ -5,8 +5,8 @@ use crate::lexer::SourceSpan;
 
 use super::super::analyzer::Analyzer;
 use super::super::errors::{SemanticError, SemanticErrorKind};
-use super::super::type_substitution::TypeSubstitution;
 use super::canonical_type_name;
+use crate::semantic::TypeSubstitution;
 
 impl Analyzer {
     pub(crate) fn validate_struct_literal(

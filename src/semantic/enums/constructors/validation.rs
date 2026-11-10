@@ -3,16 +3,14 @@ use std::collections::HashSet;
 use crate::ast::{Argument, EnumPayload, Expr, TypeName};
 use crate::lexer::SourceSpan;
 
-use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
-use super::type_substitution::TypeSubstitution;
+use crate::semantic::TypeSubstitution;
+use crate::semantic::analyzer::Analyzer;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
-mod support;
-
-pub(super) use support::generic_receiver_type;
+use super::{type_parsing, variants};
 
 impl Analyzer {
-    pub(super) fn validate_enum_constructor(
+    pub(in crate::semantic) fn validate_enum_constructor(
         &mut self,
         receiver: &Expr,
         variant: &str,
@@ -22,12 +20,12 @@ impl Analyzer {
         let enum_name =
             self.enum_receiver_name(receiver).expect("enum receiver expected").to_owned();
         let definition = self.enum_types[&enum_name].clone();
-        if let Some(receiver_type) = support::receiver_type_name(receiver) {
+        if let Some(receiver_type) = type_parsing::receiver_type_name(receiver) {
             self.validate_type_reference(&receiver_type)?;
         }
-        let substitution = support::enum_substitution(receiver, &definition)?;
-        let Some(candidate) = support::find_variant(&definition, variant).cloned() else {
-            return Err(support::unknown_variant(&enum_name, variant, span));
+        let substitution = type_parsing::enum_substitution(receiver, &definition)?;
+        let Some(candidate) = variants::find_variant(&definition, variant).cloned() else {
+            return Err(variants::unknown_variant(&enum_name, variant, span));
         };
         match &candidate.payload {
             EnumPayload::Unit => {
@@ -70,7 +68,7 @@ impl Analyzer {
                         variant: variant.to_owned(),
                         name: name.clone(),
                     },
-                    span: support::argument_span(argument),
+                    span: variants::argument_span(argument),
                 });
             }
             let expected = substitution
@@ -106,14 +104,14 @@ impl Analyzer {
                         variant: variant.to_owned(),
                         name: "<positional>".to_owned(),
                     },
-                    span: support::argument_span(argument),
+                    span: variants::argument_span(argument),
                 });
             };
             if !seen.insert(name.clone()) {
-                return Err(support::named_argument_error(enum_name, variant, name, argument));
+                return Err(variants::named_argument_error(enum_name, variant, name, argument));
             }
             let Some(field) = fields.iter().find(|field| field.name == *name) else {
-                return Err(support::named_argument_error(enum_name, variant, name, argument));
+                return Err(variants::named_argument_error(enum_name, variant, name, argument));
             };
             let expected = substitution
                 .map(|substitution| substitution.apply(&field.ty))
@@ -134,7 +132,7 @@ impl Analyzer {
         if expected == arguments.len() {
             return Ok(());
         }
-        Err(support::argument_count(enum_name, variant, expected, arguments.len(), span))
+        Err(variants::argument_count(enum_name, variant, expected, arguments.len(), span))
     }
 
     fn validate_variant_argument(
@@ -151,10 +149,10 @@ impl Analyzer {
             .map(|name| self.normalize_imported_type_key(&name))
             .unwrap_or_else(|| "unknown".to_owned());
         let expected_name =
-            self.normalize_imported_type_key(&support::canonical_type_name(expected));
-        if found == expected_name || found == support::strip_reference_role(&expected_name) {
+            self.normalize_imported_type_key(&type_parsing::canonical_type_name(expected));
+        if found == expected_name || found == variants::strip_reference_role(&expected_name) {
             if self.enum_payload_owns_value(expected) {
-                self.initialize_owner(&argument.expression, support::argument_span(argument))?;
+                self.initialize_owner(&argument.expression, variants::argument_span(argument))?;
             }
             return Ok(());
         }
@@ -165,11 +163,11 @@ impl Analyzer {
                 expected: expected_name,
                 found,
             },
-            span: support::argument_span(argument),
+            span: variants::argument_span(argument),
         })
     }
 
-    pub(super) fn enum_payload_owns_value(&self, type_name: &TypeName) -> bool {
+    pub(in crate::semantic) fn enum_payload_owns_value(&self, type_name: &TypeName) -> bool {
         type_name.name == "Buffer"
             || self.struct_types.contains_key(&type_name.name)
             || self.drop_types.contains(&type_name.name)
