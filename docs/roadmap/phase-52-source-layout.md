@@ -149,9 +149,14 @@ resolution`; `arm`, `counter`, and `provider` remain separate domains.
   are `target::tests::*` to `target::resolution::tests::*`. Snapshot diff is
   empty, and formatting, clippy, and all-target tests pass.
 - [x] The filtered source diff from base contains only target extraction and
-  module/import lines plus the internal visibility required by sibling target
-  modules (`pub(in crate::target)` for `TargetSpec` internals and
-  `TargetSpecError` construction); no function body behavior changed.
+  module/import lines plus the internal `pub(super)` visibility required by
+  sibling target modules; no function body behavior changed. A comparison of
+  deleted and added non-`use` lines, excluding visibility modifiers, produced
+  an empty difference list:
+
+  ```text
+  remaining differences:
+  ```
 
 ## 3. Semantic
 

@@ -8,17 +8,17 @@ use super::contracts::LinkerFlavor;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TargetSpec {
-    pub(in crate::target) triple: Triple,
+    pub(super) triple: Triple,
     pub architecture: Architecture,
     pub pointer_width: PointerWidth,
     pub endianness: Endianness,
     pub object_format: BinaryFormat,
     pub abi: CallingConvention,
-    pub(in crate::target) linker_flavor: LinkerFlavor,
+    pub(super) linker_flavor: LinkerFlavor,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct TargetSpecError(pub(in crate::target) String);
+pub struct TargetSpecError(pub(super) String);
 
 impl From<String> for TargetSpecError {
     fn from(message: String) -> Self {

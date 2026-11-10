@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use target_lexicon::{Architecture, ArmArchitecture, OperatingSystem, Triple};
+use target_lexicon::{Architecture, ArmArchitecture, CallingConvention, OperatingSystem, Triple};
 
 use super::{
     Arm32AbiContract, Arm32TargetProfile, ArmInstructionMode, TargetSpecError,
@@ -27,7 +27,7 @@ impl TargetSpec {
             .default_calling_convention()
             .or_else(|()| {
                 if is_freestanding_target(&triple) {
-                    Ok(target_lexicon::CallingConvention::SystemV)
+                    Ok(CallingConvention::SystemV)
                 } else {
                     Err(())
                 }
