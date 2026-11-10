@@ -6,26 +6,31 @@ import subprocess
 import sys
 
 
+VISIBILITY_PREFIXES = ("pub(super) ", "pub(crate) ", "pub ")
+
+
+def body_line(raw: str, skipping_use: bool) -> tuple[str | None, bool]:
+    line = raw.strip()
+    if skipping_use:
+        return None, ";" not in line
+    if line.startswith(("use ", "pub use ")):
+        return None, ";" not in line
+    if not line or line.startswith(("mod ", "pub mod ")):
+        return None, False
+    for prefix in VISIBILITY_PREFIXES:
+        if line.startswith(prefix):
+            line = line[len(prefix) :]
+            break
+    return line, False
+
+
 def normalized(lines: list[str]) -> Counter[str]:
     result: Counter[str] = Counter()
     skipping_use = False
     for raw in lines:
-        line = raw.strip()
-        if skipping_use:
-            if ";" in line:
-                skipping_use = False
-            continue
-        if line.startswith(("use ", "pub use ")):
-            if ";" not in line:
-                skipping_use = True
-            continue
-        if not line or line.startswith(("mod ", "pub mod ")):
-            continue
-        for prefix in ("pub(super) ", "pub(crate) ", "pub "):
-            if line.startswith(prefix):
-                line = line[len(prefix) :]
-                break
-        result[line] += 1
+        line, skipping_use = body_line(raw, skipping_use)
+        if line is not None:
+            result[line] += 1
     return result
 
 
@@ -37,11 +42,11 @@ def diff_lines(base: str, paths: list[str]) -> tuple[list[str], list[str], list[
     for raw in diff.splitlines():
         if raw.startswith(("+++", "---")):
             continue
-        if raw.startswith("+") or raw.startswith("-"):
+        if raw.startswith(("+", "-")):
             line = raw[1:].strip()
             if not line:
                 continue
-            if any(line.startswith(prefix) for prefix in ("pub(super) ", "pub(crate) ", "pub ")):
+            if line.startswith(VISIBILITY_PREFIXES):
                 visibility.append(raw)
             (added if raw[0] == "+" else removed).append(line)
     return removed, added, visibility
