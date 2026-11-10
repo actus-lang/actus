@@ -1,7 +1,9 @@
 use crate::ast::{Argument, BinaryOp, Expr, UnaryOp};
 use crate::lexer::{SourceSpan, TokenKind};
 
-use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span, identifier_text};
+use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
+use crate::parser::spans::expression_span;
+use crate::parser::state::identifier_text;
 
 impl Parser {
     pub(super) fn parse_expression(&mut self) -> Result<Expr, ParseError> {

@@ -1,6 +1,6 @@
-use super::super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 use crate::ast::{MetaAttribute, TopLevelDecl};
 use crate::lexer::{SourceSpan, TokenKind};
+use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 
 impl Parser {
     pub(in crate::parser) fn file_metadata_error(&self) -> ParseError {

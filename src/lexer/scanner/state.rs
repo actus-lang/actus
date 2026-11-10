@@ -1,9 +1,4 @@
-mod cursor;
-mod identifiers;
-mod literals;
-mod tokens;
-
-use super::token::{SourceSpan, Token, TokenKind};
+use crate::lexer::{SourceSpan, Token, TokenKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LexErrorKind {
@@ -22,16 +17,16 @@ pub struct LexError {
 }
 
 impl LexError {
-    const fn new(kind: LexErrorKind, span: SourceSpan) -> Self {
+    pub(super) const fn new(kind: LexErrorKind, span: SourceSpan) -> Self {
         Self { kind, span }
     }
 }
 
 pub struct Scanner<'source> {
-    source: &'source str,
-    cursor: usize,
-    tokens: Vec<Token>,
-    errors: Vec<LexError>,
+    pub(super) source: &'source str,
+    pub(super) cursor: usize,
+    pub(super) tokens: Vec<Token>,
+    pub(super) errors: Vec<LexError>,
 }
 
 impl<'source> Scanner<'source> {

@@ -1,12 +1,13 @@
-use super::super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 use crate::ast::{MetaAttribute, StackLimitContract};
 use crate::lexer::TokenKind;
+use crate::parser::state::identifier_text;
+use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 
 impl Parser {
     pub(super) fn parse_stack_limit_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
         self.expect_simple(TokenKind::LeftParen, "`(` after `stack_limit`")?;
         let field = self.take_identifier("stack_limit parameter name")?;
-        if super::super::identifier_text(&field.kind) != "bytes" {
+        if identifier_text(&field.kind) != "bytes" {
             return Err(
                 self.invalid_stack_limit("the only supported parameter is `bytes`", field.span)
             );

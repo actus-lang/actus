@@ -1,6 +1,7 @@
-use super::super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
 use crate::ast::MetaAttribute;
 use crate::lexer::TokenKind;
+use crate::parser::state::identifier_text;
+use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 
 impl Parser {
     pub(in crate::parser) fn parse_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {

@@ -1,7 +1,8 @@
 use crate::ast::{LayoutEndianness, SerializeDecl, SerializeSection};
 use crate::lexer::{SourceSpan, TokenKind};
 
-use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
+use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
+use crate::parser::state::identifier_text;
 
 impl Parser {
     pub(super) fn parse_serialize_decl(

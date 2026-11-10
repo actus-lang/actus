@@ -1,6 +1,6 @@
-use super::super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 use crate::ast::{MetaAttribute, Repr};
 use crate::lexer::TokenKind;
+use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 
 impl Parser {
     pub(super) fn parse_repr_metadata(&mut self) -> Result<Vec<MetaAttribute>, ParseError> {
@@ -11,7 +11,7 @@ impl Parser {
         let mut alignment = None;
         loop {
             let token = self.take_identifier("representation name")?;
-            let name = super::super::identifier_text(&token.kind);
+            let name = crate::parser::state::identifier_text(&token.kind);
             match name.as_str() {
                 "C" if !c => c = true,
                 "packed" if !packed => packed = true,

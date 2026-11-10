@@ -1,7 +1,8 @@
 use crate::ast::{Expr, IfBranch, Stmt};
 use crate::lexer::{SourceSpan, TokenKind};
 
-use super::{ParseError, Parser, expression_span};
+use super::{ParseError, Parser};
+use crate::parser::spans::expression_span;
 
 impl Parser {
     pub(super) fn parse_if_expression(&mut self, start: SourceSpan) -> Result<Expr, ParseError> {
