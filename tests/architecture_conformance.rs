@@ -239,7 +239,7 @@ fn rust_item_starts(source: &str) -> Vec<String> {
             ]
             .iter()
             .any(|prefix| line.starts_with(prefix))
-                && (line.starts_with("mod ").then_some(line.contains('{')).unwrap_or(true))
+                && if line.starts_with("mod ") { line.contains('{') } else { true }
         })
         .map(str::to_owned)
         .collect()
