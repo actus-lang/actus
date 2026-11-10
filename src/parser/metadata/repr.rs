@@ -11,7 +11,7 @@ impl Parser {
         let mut alignment = None;
         loop {
             let token = self.take_identifier("representation name")?;
-            let name = crate::parser::state::identifier_text(&token.kind);
+            let name = super::super::identifier_text(&token.kind);
             match name.as_str() {
                 "C" if !c => c = true,
                 "packed" if !packed => packed = true,

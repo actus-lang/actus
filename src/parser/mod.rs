@@ -17,4 +17,5 @@ mod statements;
 mod structs;
 
 pub use grammar::parse;
+use state::identifier_text;
 pub use state::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
