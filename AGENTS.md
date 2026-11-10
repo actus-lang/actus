@@ -82,6 +82,24 @@ The following generic filenames are forbidden:
 
 Files must be named after their primary responsibility.
 
+## Source layout
+
+The source-layout contract is defined by
+[ADR-0106](docs/decisions/ADR-0106-source-layout-and-module-facades.md).
+
+- A directory is a module and `mod.rs` is a facade containing declarations,
+  attributes, documentation, and imports/re-exports only.
+- `X.rs` and `X/` must not coexist; a submodule requires at least two related
+  files, and a one-file directory is not created.
+- Do not use generic names (`utils`, `common`, `helpers`, `misc`, `support`,
+  `implementation`, `entry`, `core`, `base`, `impl`, or `stuff`), parent-name
+  duplicates, or Rust keywords as source filenames.
+- Private source unit tests belong in the owning module's `tests.rs`; mirrored
+  integration tests belong in `tests/`. Existing public paths stay stable via
+  deliberate `pub use` facades.
+- Layout-only changes must preserve logic, ABI, diagnostics, snapshots, and
+  CLI output.
+
 ## 3. File Size Limits
 
 File size limits are architectural guardrails and must be treated as mandatory review rules.

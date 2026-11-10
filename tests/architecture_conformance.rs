@@ -6,11 +6,97 @@ const FORBIDDEN_FILENAMES: &[&str] = &[
     "helpers.rs",
     "common.rs",
     "misc.rs",
+    "support.rs",
+    "implementation.rs",
+    "entry.rs",
+    "core.rs",
+    "base.rs",
+    "impl.rs",
+    "stuff.rs",
     "utils.act",
     "helpers.act",
     "common.act",
     "misc.act",
 ];
+
+const RUST_KEYWORD_FILENAMES: &[&str] = &[
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
+    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
+    "ref", "return", "self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use",
+    "where", "while", "yield",
+];
+
+const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
+    "src/cli/mod.rs",
+    "src/cli/test_runner/mod.rs",
+    "src/codegen/mod.rs",
+    "src/codegen/contract/mod.rs",
+    "src/codegen/cranelift/case/mod.rs",
+    "src/codegen/cranelift/contract/mod.rs",
+    "src/codegen/cranelift/expressions/mod.rs",
+    "src/codegen/cranelift/function_definition/mod.rs",
+    "src/codegen/cranelift/layout/mod.rs",
+    "src/codegen/cranelift/lowering/statements/mod.rs",
+    "src/codegen/cranelift/lowering/mod.rs",
+    "src/codegen/cranelift/performance/mod.rs",
+    "src/codegen/llvm/packed/mod.rs",
+    "src/codegen/result_constructors/mod.rs",
+    "src/codegen/symbols/mod.rs",
+    "src/diagnostics/renderer/mod.rs",
+    "src/formatter/mod.rs",
+    "src/lexer/mod.rs",
+    "src/lexer/scanner/mod.rs",
+    "src/lsp/hover/mod.rs",
+    "src/parser/mod.rs",
+    "src/registry/mod.rs",
+    "src/runtime/mod.rs",
+    "src/runtime/fs/mod.rs",
+    "src/runtime/path/mod.rs",
+    "src/semantic/analyzer/mod.rs",
+    "src/semantic/calls/mod.rs",
+    "src/semantic/enum_constructors/mod.rs",
+    "src/semantic/errors/mod.rs",
+    "src/semantic/mod.rs",
+    "src/semantic/ownership/mod.rs",
+    "src/semantic/patterns/mod.rs",
+];
+
+const ALLOWED_RS_PAIRS: &[&str] = &[
+    "src/codegen/body.rs",
+    "src/codegen/body/case.rs",
+    "src/codegen/body/case_value.rs",
+    "src/codegen/body/loops.rs",
+    "src/codegen/cranelift/calls.rs",
+    "src/codegen/llvm/cleanup.rs",
+    "src/codegen/llvm/cleanup/bridge.rs",
+    "src/codegen/llvm/shim.rs",
+    "src/codegen/shared_lowering/expression.rs",
+    "src/codegen/shared_lowering/expression/aggregate.rs",
+    "src/codegen/shared_lowering/expression/calls.rs",
+    "src/codegen/shared_lowering/layout.rs",
+    "src/modules/aggregation/visibility.rs",
+    "src/runtime/region.rs",
+    "src/target.rs",
+];
+
+const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[
+    "src/codegen/cranelift/performance",
+    "src/codegen/llvm/packed",
+    "src/codegen/result_constructors",
+    "src/codegen/symbols",
+    "src/semantic/enum_constructors",
+    "src/semantic/errors",
+    "src/semantic/ownership",
+];
+
+const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &["src/parser/parser.rs"];
+
+const ALLOWED_FORBIDDEN_FILES: &[&str] =
+    &["src/codegen/shared_lowering/support.rs", "src/semantic/enum_constructors/support.rs"];
+
+fn source_relative(path: &Path) -> String {
+    path.strip_prefix(repository_path(".")).unwrap_or(path).to_string_lossy().replace('\\', "/")
+}
 
 fn repository_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
@@ -58,11 +144,184 @@ fn assert_no_forbidden_filenames(directory: &Path) {
             continue;
         }
         let name = path.file_name().unwrap_or_default().to_string_lossy();
-        assert!(
-            !FORBIDDEN_FILENAMES.contains(&name.as_ref()),
-            "forbidden generic file: {}",
-            path.display()
-        );
+        if path.extension().is_some_and(|extension| extension == "rs") && name != "mod.rs" {
+            let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+            assert!(
+                !RUST_KEYWORD_FILENAMES.contains(&stem.as_ref()),
+                "Rust keyword used as source filename: {}",
+                path.display()
+            );
+        }
+        if FORBIDDEN_FILENAMES.contains(&name.as_ref()) {
+            let relative = source_relative(&path);
+            assert!(
+                ALLOWED_FORBIDDEN_FILES.contains(&relative.as_str()),
+                "forbidden generic file: {}",
+                path.display()
+            );
+        }
+    }
+}
+
+fn strip_rust_prefixes(mut line: &str) -> &str {
+    loop {
+        line = line.trim_start();
+        if line.starts_with("#[") {
+            let end = line.find(']').expect("Rust attribute should be closed");
+            line = &line[end + 1..];
+            continue;
+        }
+        let mut removed_visibility = false;
+        for visibility in ["pub(crate)", "pub(super)", "pub(self)", "pub(in "] {
+            if line.starts_with(visibility) {
+                let end = line.find(')').expect("Rust visibility should be closed");
+                line = &line[end + 1..];
+                removed_visibility = true;
+                break;
+            }
+        }
+        if removed_visibility {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("pub ") {
+            line = rest;
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("const ") {
+            if rest.starts_with("fn ")
+                || rest.starts_with("unsafe fn ")
+                || rest.starts_with("async fn ")
+            {
+                line = rest;
+                continue;
+            }
+            return line;
+        }
+        let mut removed_modifier = false;
+        for modifier in ["unsafe ", "async "] {
+            if let Some(rest) = line.strip_prefix(modifier) {
+                line = rest;
+                removed_modifier = true;
+                break;
+            }
+        }
+        if removed_modifier {
+            continue;
+        }
+        if line.starts_with("extern ") {
+            let Some(end_quote) = line[7..].find('"') else { return line };
+            let after_quote = 7 + end_quote + 1;
+            line = line[after_quote..].trim_start();
+            continue;
+        }
+        return line;
+    }
+}
+
+fn rust_item_starts(source: &str) -> Vec<String> {
+    source
+        .lines()
+        .map(strip_rust_prefixes)
+        .filter(|line| {
+            [
+                "fn ",
+                "struct ",
+                "enum ",
+                "union ",
+                "impl ",
+                "impl<",
+                "trait ",
+                "const ",
+                "static ",
+                "type ",
+                "macro_rules!",
+                "mod ",
+            ]
+            .iter()
+            .any(|prefix| line.starts_with(prefix))
+                && if line.starts_with("mod ") { line.contains('{') } else { true }
+        })
+        .map(str::to_owned)
+        .collect()
+}
+
+fn assert_facade_shape(directory: &Path) {
+    for path in rust_sources(directory) {
+        if path.file_name().and_then(|name| name.to_str()) != Some("mod.rs") {
+            continue;
+        }
+        let relative = source_relative(&path);
+        let source = fs::read_to_string(&path).expect("module facade should be readable");
+        let items = rust_item_starts(&source);
+        if !items.is_empty() {
+            assert!(
+                ALLOWED_NON_FACADE_MOD_RS.contains(&relative.as_str()),
+                "non-facade item in new module facade {relative}: {items:?}"
+            );
+        }
+    }
+}
+
+fn assert_no_source_pairs(directory: &Path) {
+    for path in rust_sources(directory) {
+        if path.file_name().and_then(|name| name.to_str()) == Some("mod.rs") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let sibling_directory = path.with_file_name(stem);
+        if sibling_directory.is_dir() {
+            let relative = source_relative(&path);
+            assert!(
+                ALLOWED_RS_PAIRS.contains(&relative.as_str()),
+                "new X.rs + X/ pair: {relative} and {}",
+                sibling_directory.display()
+            );
+        }
+    }
+}
+
+fn assert_no_single_file_modules(directory: &Path) {
+    for path in rust_sources(directory) {
+        if path.file_name().and_then(|name| name.to_str()) != Some("mod.rs") {
+            continue;
+        }
+        let module_directory = path.parent().expect("module facade parent");
+        let files = fs::read_dir(module_directory)
+            .expect("module directory should be readable")
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name() != "mod.rs")
+            .count();
+        if files == 1 {
+            let relative = source_relative(module_directory);
+            assert!(
+                ALLOWED_SINGLE_FILE_MODULES.contains(&relative.as_str()),
+                "new one-file module directory: {relative}"
+            );
+        }
+    }
+}
+
+fn assert_no_parent_name_duplicates(directory: &Path) {
+    for path in rust_sources(directory) {
+        if path.file_name().and_then(|name| name.to_str()) == Some("mod.rs") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let Some(parent) = path.parent().and_then(Path::file_name).and_then(|name| name.to_str())
+        else {
+            continue;
+        };
+        if stem == parent {
+            let relative = source_relative(&path);
+            assert!(
+                ALLOWED_PARENT_NAME_DUPLICATES.contains(&relative.as_str()),
+                "file repeats its parent module name: {relative}"
+            );
+        }
     }
 }
 
@@ -118,6 +377,15 @@ fn standard_library_directories_have_canonical_facades() {
 fn generic_implementation_filenames_are_rejected() {
     assert_no_forbidden_filenames(&repository_path("src"));
     assert_no_forbidden_filenames(&repository_path("library/std/src"));
+}
+
+#[test]
+fn source_layout_facades_and_boundaries_are_enforced() {
+    let source = repository_path("src");
+    assert_facade_shape(&source);
+    assert_no_source_pairs(&source);
+    assert_no_single_file_modules(&source);
+    assert_no_parent_name_duplicates(&source);
 }
 
 #[test]
