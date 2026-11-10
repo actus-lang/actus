@@ -1,6 +1,6 @@
-use super::super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 use crate::ast::MetaAttribute;
 use crate::lexer::SourceSpan;
+use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 
 impl Parser {
     pub(in crate::parser) fn reject_duplicate_basic_metadata(

@@ -1,6 +1,6 @@
-use super::super::{ParseError, ParseErrorCode, ParseErrorKind};
 use crate::ast::TestFault;
 use crate::lexer::{SourceSpan, TokenKind};
+use crate::parser::{ParseError, ParseErrorCode, ParseErrorKind};
 
 pub(super) fn unexpected_metadata_token(
     expected: &str,

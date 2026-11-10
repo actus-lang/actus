@@ -49,15 +49,14 @@ introduced in PR 0 and its exact allowlist shrinks after every PR.
 ```text
 parser/
   mod.rs
-  state.rs
-  case.rs conditional.rs contracts.rs declarations.rs enums.rs
-  expressions.rs generics.rs packs.rs roles.rs serialization.rs spans.rs
-  statements.rs structs.rs
-  metadata/mod.rs metadata/{bounded,capability,declaration,deterministic,
+  case.rs conditional.rs contracts.rs cursor.rs declarations.rs enums.rs
+  expressions.rs generics.rs grammar.rs packs.rs roles.rs serialization.rs
+  spans.rs state.rs statements.rs structs.rs
+  metadata/{bounded,capability,declaration,deterministic,
     dispatch,duplicates,effect,fault,limitless,must_use,realtime,repr,
     stack_limit,syntax,target,test}.rs
 lexer/
-  mod.rs token.rs scanner/mod.rs scanner/{cursor,identifiers,literals,tokens}.rs
+  mod.rs scan.rs token.rs scanner/{mod,state,cursor,identifiers,literals,tokens}.rs
 ast/
   mod.rs abi.rs expr.rs intrinsic.rs pattern.rs registry.rs stmt.rs types.rs
   decl/{mod,builtins,callable,data,top_level,types}.rs
@@ -66,14 +65,48 @@ ast/
 | Old | New | Type |
 | --- | --- | --- |
 | `parser/parser.rs` | `parser/state.rs` | rename |
-| `parser/parser.rs` nested modules | `parser/*.rs` | move |
+| `parser/mod.rs` `parse` | `parser/grammar.rs` | extract |
 | `parser/metadata/*` | `parser/metadata/*` | unchanged |
+| `lexer/mod.rs` `scan` | `lexer/scan.rs` | extract |
+| `lexer/scanner/mod.rs` `LexErrorKind`, `Scanner` | `lexer/scanner/state.rs` | extract |
 | `lexer/scanner/*` | `lexer/scanner/*` | unchanged |
 | `ast/decl/*` | `ast/decl/*` | unchanged |
 | `ast/{abi,expr,intrinsic,pattern,registry,stmt,types}.rs` | same paths | unchanged |
 
-`Parser` is the primary type in `parser/state.rs`; `parser/mod.rs` currently
-loads it with `#[path = "parser.rs"]` (`src/parser/mod.rs:1-3`).
+`Parser` is the primary type in `parser/state.rs`; the parser and lexer roots
+now expose the unchanged public paths through `parser/mod.rs` and
+`lexer/mod.rs`.
+
+The remaining `#[path]` declarations are explicit temporary exceptions for
+later PRs. `src/codegen/body/case.rs` and
+`src/codegen/body/case_value.rs` are removed in PR 4; their case lowering
+children become ordinary module children. `src/runtime/fs/walk.rs` is removed
+in PR 7 when its tests move to `runtime/fs/tests.rs`.
+`src/conformance/source_limits.rs` extracts `diagnostics.rs`, `policy.rs`, and
+`scan.rs`, while `src/ffi/abi.rs` extracts `abi_errors.rs` and `aggregate.rs`;
+both are PR 9 work. `src/diagnostics/renderer/codes/mod.rs` is removed in PR 9
+when `pack_codes.rs` becomes the codes facade's regular child.
+
+### PR 1 evidence
+
+- [x] Parser, lexer, and AST layout work is implemented in commits
+  [`5866cdc1`](https://github.com/actus-lang/actus/commit/5866cdc1) and
+  [`17cdfd44`](https://github.com/actus-lang/actus/commit/17cdfd44); AST files
+  remain unchanged as required by this map.
+- [x] Architecture allowlist entries for the parser and lexer facades were
+  removed in [`ebdd03af`](https://github.com/actus-lang/actus/commit/ebdd03af);
+  the no-new-`#[path]` guard and its six exact temporary exceptions were added
+  in [`aaebe75b`](https://github.com/actus-lang/actus/commit/aaebe75b).
+- [x] `cargo test --all-features -- --list` reports 1,988 tests before and
+  after; after excluding Cargo timing lines, the test-name diff is empty.
+- [x] `target/debug/actus --version` and
+  `target/debug/actus check examples/hello.act --strict` are byte-identical
+  before and after the layout change.
+- [x] Snapshot files are unchanged; formatting and the architecture test pass.
+- [x] The body audit used `git diff 4ff355ca -- src/parser src/lexer` with
+  `grep '^[+-]'` filtering. After excluding pure move/extract hunks, the
+  remaining semantic changes are limited to `pub(super)` visibility and
+  module/import lines; the filtered body-change output is empty.
 
 ## 2. Target and configuration
 
@@ -331,6 +364,7 @@ formatter/declarations/{mod,render,widths}.rs
 diagnostics/renderer/{mod,render,json,module,codes/{mod,packing,extended,mapping,messages}}.rs
 documentation/{mod,contract,language,model,rules}.rs
 conformance/{mod,diagnostics,exceptions,policy,scan,source_limits,tree_policy}.rs
+ffi/{mod,abi,abi_errors,aggregate}.rs
 ```
 
 `formatter/declarations.rs` and `diagnostics/renderer/mod.rs` receive separate
@@ -346,6 +380,13 @@ file at its current path.
 | `diagnostics/strict_codes.rs` | same path | unchanged |
 | documentation files | same paths | unchanged |
 | conformance files | same paths | unchanged |
+| `conformance/source_limits.rs` | `conformance/{diagnostics,policy,scan}.rs` | extract (`#[path]` removal) |
+| `ffi/abi.rs` | `ffi/{abi_errors,aggregate}.rs` | extract (`#[path]` removal) |
+| `diagnostics/renderer/codes/mod.rs` | `diagnostics/renderer/codes/packing.rs` | extract (`#[path]` removal) |
+| `runtime/fs/walk.rs` | `runtime/fs/walk.rs` | unchanged (`#[path]` removal; child moves with `walk_tests.rs`) |
+
+The two body exceptions are tracked with the codegen map: `body/case.rs` and
+`body/case_value.rs` each lose their `#[path]` child declaration in PR 4.
 
 `diagnostics/strict_codes.rs` stays in place because it would otherwise create
 a one-file directory. Likewise `llvm/calls.rs` stays at the LLVM root.
@@ -440,15 +481,16 @@ facade-plus-extract rule applies to every other true pair in the mapping.
 
 ## Current allowlist and planned PR
 
-The architecture test has five exact-path allowlists. Their current sizes are:
+The architecture test has six exact-path allowlists. Their current sizes are:
 
 | List | Count | Current entries move in |
 | --- | ---: | --- |
 | non-facade `mod.rs` | 32 | PRs 1, 3, 4, 5, 6, 7, 8, 9 |
 | X.rs + X/ pairs | 15 | PRs 2, 4, 5, 6, 7 |
 | one-file module directories | 7 | PRs 4, 5, 7 |
-| parent-name duplicates | 1 | PR 1 |
+| parent-name duplicates | 0 | none |
 | generic/forbidden filenames | 2 | PRs 3 and 4 |
+| `#[path]` module redirections | 6 | PRs 4, 7, and 9 |
 
 ### Allowlist entry → PR
 
@@ -486,7 +528,6 @@ The architecture test has five exact-path allowlists. Their current sizes are:
 | `src/semantic/mod.rs` | 3 |
 | `src/semantic/ownership/mod.rs` | 3 |
 | `src/semantic/patterns/mod.rs` | 3 |
-| `src/parser/parser.rs` | 1 |
 | `src/modules/aggregation/visibility.rs` | 7 |
 | `src/codegen/body.rs` | 4 |
 | `src/codegen/body/case.rs` | 4 |
@@ -511,6 +552,12 @@ The architecture test has five exact-path allowlists. Their current sizes are:
 | `src/semantic/ownership` | 3 |
 | `src/codegen/shared_lowering/support.rs` | 4 |
 | `src/semantic/enum_constructors/support.rs` | 3 |
+| `src/codegen/body/case.rs` | 4 |
+| `src/codegen/body/case_value.rs` | 4 |
+| `src/runtime/fs/walk.rs` | 7 |
+| `src/conformance/source_limits.rs` | 9 |
+| `src/diagnostics/renderer/codes/mod.rs` | 9 |
+| `src/ffi/abi.rs` | 9 |
 
 The full exact paths are the constants in
 `tests/architecture_conformance.rs`; this table assigns every entry to the

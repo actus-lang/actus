@@ -1,22 +1,7 @@
+use super::contracts;
 use crate::ast::{DispatchMode, LimitlessScope, MetaAttribute, Param, Program, Role, VerbDecl};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 use std::collections::HashSet;
-
-mod case;
-mod conditional;
-mod contracts;
-mod cursor;
-mod declarations;
-mod enums;
-mod expressions;
-mod generics;
-mod metadata;
-mod packs;
-mod roles;
-mod serialization;
-mod spans;
-mod statements;
-mod structs;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParseErrorKind {
@@ -96,10 +81,10 @@ fn contract_error_message(error: contracts::ContractParseError) -> String {
 }
 
 pub struct Parser {
-    tokens: Vec<Token>,
-    cursor: usize,
-    enum_names: HashSet<String>,
-    case_subject: bool,
+    pub(super) tokens: Vec<Token>,
+    pub(super) cursor: usize,
+    pub(super) enum_names: HashSet<String>,
+    pub(super) case_subject: bool,
 }
 
 struct VerbSignature {
@@ -319,7 +304,7 @@ impl Parser {
         Some(doc)
     }
 
-    fn take_doc_string_group(&mut self) -> Option<String> {
+    pub(super) fn take_doc_string_group(&mut self) -> Option<String> {
         let mut documents = Vec::new();
         while let Some(document) = self.take_doc_string() {
             documents.push(document);
@@ -327,7 +312,7 @@ impl Parser {
         (!documents.is_empty()).then(|| documents.join("\n\n"))
     }
 
-    fn skip_doc_strings(&mut self) {
+    pub(super) fn skip_doc_strings(&mut self) {
         while self.peek().is_some_and(|token| matches!(token.kind, TokenKind::DocString(_))) {
             self.cursor += 1;
         }
@@ -359,7 +344,9 @@ impl Parser {
         })
     }
 
-    fn parse_return_type(&mut self) -> Result<Option<crate::ast::ReturnType>, ParseError> {
+    pub(super) fn parse_return_type(
+        &mut self,
+    ) -> Result<Option<crate::ast::ReturnType>, ParseError> {
         if !self.match_simple(TokenKind::Arrow) {
             return Ok(None);
         }
@@ -374,7 +361,7 @@ impl Parser {
         Ok(Some(crate::ast::ReturnType { access, ty, span }))
     }
 
-    fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {
+    pub(super) fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {
         let mut params = Vec::new();
 
         if self.check_simple(&TokenKind::RightParen) {
@@ -422,7 +409,7 @@ impl Parser {
     }
 }
 
-fn identifier_text(kind: &TokenKind) -> String {
+pub(super) fn identifier_text(kind: &TokenKind) -> String {
     match kind {
         TokenKind::Identifier(name) => name.clone(),
         TokenKind::Drop => "drop".to_owned(),
@@ -439,5 +426,3 @@ fn parameter_role_from_token(kind: &TokenKind) -> Option<Role> {
         _ => None,
     }
 }
-
-pub(super) use spans::expression_span;

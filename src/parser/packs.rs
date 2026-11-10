@@ -1,7 +1,8 @@
 use crate::ast::{LayoutEndianness, PackDecl, PackField, PackStorage, Role, TypeName};
 use crate::lexer::{SourceSpan, TokenKind};
 
-use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
+use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
+use crate::parser::state::identifier_text;
 
 impl Parser {
     pub(super) fn parse_pack_decl(

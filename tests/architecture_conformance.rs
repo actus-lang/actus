@@ -44,10 +44,7 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/codegen/symbols/mod.rs",
     "src/diagnostics/renderer/mod.rs",
     "src/formatter/mod.rs",
-    "src/lexer/mod.rs",
-    "src/lexer/scanner/mod.rs",
     "src/lsp/hover/mod.rs",
-    "src/parser/mod.rs",
     "src/registry/mod.rs",
     "src/runtime/mod.rs",
     "src/runtime/fs/mod.rs",
@@ -89,10 +86,19 @@ const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[
     "src/semantic/ownership",
 ];
 
-const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &["src/parser/parser.rs"];
+const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
 
 const ALLOWED_FORBIDDEN_FILES: &[&str] =
     &["src/codegen/shared_lowering/support.rs", "src/semantic/enum_constructors/support.rs"];
+
+const ALLOWED_PATH_MODULES: &[&str] = &[
+    "src/codegen/body/case.rs",
+    "src/codegen/body/case_value.rs",
+    "src/conformance/source_limits.rs",
+    "src/diagnostics/renderer/codes/mod.rs",
+    "src/ffi/abi.rs",
+    "src/runtime/fs/walk.rs",
+];
 
 fn source_relative(path: &Path) -> String {
     path.strip_prefix(repository_path(".")).unwrap_or(path).to_string_lossy().replace('\\', "/")
@@ -303,6 +309,19 @@ fn assert_no_single_file_modules(directory: &Path) {
     }
 }
 
+fn assert_no_path_module_redirection(directory: &Path) {
+    for path in rust_sources(directory) {
+        let source = fs::read_to_string(&path).expect("Rust source should be readable");
+        if source.contains("#[path") {
+            let relative = source_relative(&path);
+            assert!(
+                ALLOWED_PATH_MODULES.contains(&relative.as_str()),
+                "#[path] module redirection is not allowed: {relative}"
+            );
+        }
+    }
+}
+
 fn assert_no_parent_name_duplicates(directory: &Path) {
     for path in rust_sources(directory) {
         if path.file_name().and_then(|name| name.to_str()) == Some("mod.rs") {
@@ -383,6 +402,7 @@ fn generic_implementation_filenames_are_rejected() {
 fn source_layout_facades_and_boundaries_are_enforced() {
     let source = repository_path("src");
     assert_facade_shape(&source);
+    assert_no_path_module_redirection(&source);
     assert_no_source_pairs(&source);
     assert_no_single_file_modules(&source);
     assert_no_parent_name_duplicates(&source);

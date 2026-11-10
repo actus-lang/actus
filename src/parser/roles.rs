@@ -1,7 +1,8 @@
 use crate::ast::{MetaAttribute, PerformDecl, RoleDecl, RoleMethod};
 use crate::lexer::{SourceSpan, TokenKind};
 
-use super::{ParseError, Parser, identifier_text};
+use super::{ParseError, Parser};
+use crate::parser::state::identifier_text;
 
 impl Parser {
     pub(super) fn parse_role_decl(

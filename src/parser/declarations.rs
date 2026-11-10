@@ -1,7 +1,8 @@
 use crate::ast::{ExternalVerbDecl, ForeignAbi, TopLevelDecl};
 use crate::lexer::{SourceSpan, Token, TokenKind};
 
-use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, identifier_text};
+use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
+use crate::parser::state::identifier_text;
 
 struct ExternalVerbSignature {
     name: String,

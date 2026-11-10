@@ -1,7 +1,9 @@
 use crate::ast::{Block, CompoundAssignmentOp, Expr, ForBinding, Place, Role, Stmt};
 use crate::lexer::{SourceSpan, TokenKind};
 
-use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser, expression_span, identifier_text};
+use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
+use crate::parser::spans::expression_span;
+use crate::parser::state::identifier_text;
 
 impl Parser {
     pub(super) fn parse_block(&mut self) -> Result<Block, ParseError> {

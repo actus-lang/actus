@@ -1,11 +1,21 @@
-#[path = "parser.rs"]
-mod implementation;
+mod case;
+mod conditional;
+mod contracts;
+mod cursor;
+mod declarations;
+mod enums;
+mod expressions;
+mod generics;
+mod grammar;
+mod metadata;
+mod packs;
+mod roles;
+mod serialization;
+mod spans;
+mod state;
+mod statements;
+mod structs;
 
-pub use implementation::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
-
-use crate::ast::Program;
-use crate::lexer::Token;
-
-pub fn parse(tokens: Vec<Token>) -> Result<Program, ParseError> {
-    Parser::new(tokens).parse()
-}
+pub use grammar::parse;
+use state::identifier_text;
+pub use state::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
