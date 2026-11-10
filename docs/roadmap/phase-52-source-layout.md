@@ -52,7 +52,7 @@ parser/
   case.rs conditional.rs contracts.rs cursor.rs declarations.rs enums.rs
   expressions.rs generics.rs grammar.rs packs.rs roles.rs serialization.rs
   spans.rs state.rs statements.rs structs.rs
-  metadata/{bounded,capability,declaration,deterministic,
+  metadata/{mod,bounded,capability,declaration,deterministic,
     dispatch,duplicates,effect,fault,limitless,must_use,realtime,repr,
     stack_limit,syntax,target,test}.rs
 lexer/
@@ -130,6 +130,28 @@ configuration/{mod,accessors,checksum,dependencies,loading,lockfile,manifest,
 
 The target split follows the accepted grouping `target → model/contracts/
 resolution`; `arm`, `counter`, and `provider` remain separate domains.
+
+### PR 2 evidence
+
+- [x] `target.rs` was moved as a 100% rename to `target/model.rs` in
+  [`025d897f`](https://github.com/actus-lang/actus/commit/025d897f).
+- [x] The target root was split into the `model`, `contracts`, and
+  `resolution` modules in [`7c00c1d3`](https://github.com/actus-lang/actus/commit/7c00c1d3);
+  the public `actus::target` exports remain in `target/mod.rs`.
+- [x] The target architecture allowlist entry was removed in
+  [`11a174f4`](https://github.com/actus-lang/actus/commit/11a174f4). The
+  temporary `target/mod.rs` probe was rejected by the architecture test with
+  `non-facade item in new module facade src/target/mod.rs: ["fn probe() {}"]`.
+- [x] `cargo fmt --all -- --check` and `cargo check --all-features` pass after
+  the split.
+- [x] The complete PR validation passed: `cargo test --all-features --
+  --list` reports 1,988 entries before and after; the only four name changes
+  are `target::tests::*` to `target::resolution::tests::*`. Snapshot diff is
+  empty, and formatting, clippy, and all-target tests pass.
+- [x] The filtered source diff from base contains only target extraction and
+  module/import lines plus the internal visibility required by sibling target
+  modules (`pub(in crate::target)` for `TargetSpec` internals and
+  `TargetSpecError` construction); no function body behavior changed.
 
 ## 3. Semantic
 
