@@ -6,7 +6,7 @@ use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
-use super::expression_rules::{
+use super::rules::{
     binary_operator_name, cast_literal_fits, equality_types_match, expected_unary_type,
     integer_literal, is_cast_integer_type, is_integer_primitive, is_integer_type_name,
     is_unsigned_integer_type_name, parse_integer_magnitude, relational_types_match,
@@ -238,7 +238,7 @@ impl Analyzer {
         self.validate_binary_operator(*operator, left, right)
     }
 
-    pub(super) fn validate_binary_operator(
+    pub(in crate::semantic::analyzer) fn validate_binary_operator(
         &self,
         operator: BinaryOp,
         left: &Expr,

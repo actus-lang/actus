@@ -32,7 +32,10 @@ impl Cost {
 }
 
 impl Analyzer {
-    pub(super) fn validate_bounded_contract(&self, verb: &VerbDecl) -> Result<(), SemanticError> {
+    pub(in crate::semantic::analyzer) fn validate_bounded_contract(
+        &self,
+        verb: &VerbDecl,
+    ) -> Result<(), SemanticError> {
         let Some(contract) = bounded_metadata(&verb.metadata) else { return Ok(()) };
         let cost = self.bounded_block_cost(&verb.body)?;
         validate_limit(

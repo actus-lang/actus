@@ -1,7 +1,7 @@
 use crate::ast::{Argument, Expr, PrimitiveType, lookup_builtin_type, primitive_type};
 use crate::lexer::SourceSpan;
 
-pub(super) fn is_scalar_name(name: &str) -> bool {
+pub(in crate::semantic) fn is_scalar_name(name: &str) -> bool {
     matches!(
         lookup_builtin_type(name),
         Some(
@@ -15,7 +15,11 @@ pub(super) fn is_scalar_name(name: &str) -> bool {
     )
 }
 
-pub(super) fn argument_type_matches(expected: &str, found: &str, expression: &Expr) -> bool {
+pub(in crate::semantic) fn argument_type_matches(
+    expected: &str,
+    found: &str,
+    expression: &Expr,
+) -> bool {
     let expected = strip_reference_role(expected);
     if strip_reference_role(found) == expected {
         return true;
@@ -65,11 +69,11 @@ fn strip_reference_role(type_name: &str) -> &str {
         .unwrap_or(type_name)
 }
 
-pub(super) fn argument_span(argument: &Argument) -> SourceSpan {
+pub(in crate::semantic) fn argument_span(argument: &Argument) -> SourceSpan {
     expression_span(&argument.expression)
 }
 
-pub(super) fn expression_span(expression: &Expr) -> SourceSpan {
+pub(in crate::semantic) fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Identifier { span, .. }
         | Expr::Integer { span, .. }

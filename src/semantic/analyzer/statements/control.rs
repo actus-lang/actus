@@ -5,7 +5,10 @@ use super::super::errors::SemanticError;
 use super::Analyzer;
 
 impl Analyzer {
-    pub(super) fn visit_loop(&mut self, block: &Block) -> Result<(), SemanticError> {
+    pub(in crate::semantic::analyzer) fn visit_loop(
+        &mut self,
+        block: &Block,
+    ) -> Result<(), SemanticError> {
         if self.current_realtime {
             return Err(SemanticError {
                 kind: super::super::errors::SemanticErrorKind::RealtimeUnboundedLoop,
@@ -20,7 +23,7 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn visit_loop_control(
+    pub(in crate::semantic::analyzer) fn visit_loop_control(
         &mut self,
         is_break: bool,
         span: SourceSpan,
@@ -33,7 +36,10 @@ impl Analyzer {
         self.plan_loop_unwind(kind, if is_break { "break" } else { "continue" }, span)
     }
 
-    pub(super) fn visit_nested_block(&mut self, block: &Block) -> Result<(), SemanticError> {
+    pub(in crate::semantic::analyzer) fn visit_nested_block(
+        &mut self,
+        block: &Block,
+    ) -> Result<(), SemanticError> {
         self.enter_scope(block.span);
         self.visit_block(block)?;
         self.leave_scope();

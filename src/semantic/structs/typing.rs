@@ -1,7 +1,7 @@
 use crate::ast::{Expr, TypeName};
 
 use super::super::analyzer::Analyzer;
-use super::super::type_substitution::TypeSubstitution;
+use crate::semantic::TypeSubstitution;
 
 impl Analyzer {
     pub(crate) fn expression_struct_type(&self, expression: &Expr) -> Option<String> {

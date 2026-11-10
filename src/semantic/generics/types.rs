@@ -2,19 +2,19 @@ use crate::ast::{GenericParam, GenericParamKind, TypeName, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
-use super::generic_errors::arity_error;
-use super::type_substitution::TypeSubstitution;
+use super::arity_error;
+use super::substitution::TypeSubstitution;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum ResolvedType {
+pub(in crate::semantic) enum ResolvedType {
     GenericParameter(String),
     Concrete(String),
     Applied { name: String, arguments: Vec<ResolvedType> },
 }
 
 impl Analyzer {
-    pub(super) fn with_generic_scope<T>(
+    pub(in crate::semantic) fn with_generic_scope<T>(
         &mut self,
         parameters: &[GenericParam],
         validate: impl FnOnce(&mut Analyzer) -> Result<T, SemanticError>,
@@ -93,7 +93,7 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn validate_type_reference(
+    pub(in crate::semantic) fn validate_type_reference(
         &mut self,
         type_name: &TypeName,
     ) -> Result<(), SemanticError> {
@@ -218,7 +218,7 @@ impl Analyzer {
         Ok(ResolvedType::Applied { name: "Region".to_owned(), arguments: vec![resolved_element] })
     }
 
-    pub(super) fn validate_fixed_size_type(
+    pub(in crate::semantic) fn validate_fixed_size_type(
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
@@ -304,11 +304,11 @@ impl Analyzer {
         Err(SemanticError { kind, span: type_name.span })
     }
 
-    pub(super) fn is_generic_parameter(&self, name: &str) -> bool {
+    pub(in crate::semantic) fn is_generic_parameter(&self, name: &str) -> bool {
         self.generic_scopes.iter().rev().any(|scope| scope.contains(name))
     }
 
-    pub(super) fn is_const_generic_parameter(&self, name: &str) -> bool {
+    pub(in crate::semantic) fn is_const_generic_parameter(&self, name: &str) -> bool {
         self.const_generic_scopes.iter().rev().any(|scope| scope.contains(name))
     }
 
@@ -378,7 +378,7 @@ impl Analyzer {
             || type_name.arguments.iter().any(|argument| self.contains_generic_parameter(argument))
     }
 
-    pub(super) fn validate_type_arguments(
+    pub(in crate::semantic) fn validate_type_arguments(
         &self,
         parameters: &[GenericParam],
         arguments: &[TypeName],
@@ -435,7 +435,7 @@ impl Analyzer {
 }
 
 impl Analyzer {
-    pub(super) fn has_performance(&self, role: &str, target: &TypeName) -> bool {
+    pub(in crate::semantic) fn has_performance(&self, role: &str, target: &TypeName) -> bool {
         self.performances.contains(&(role.to_owned(), canonical_type_name(target)))
     }
 }

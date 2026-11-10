@@ -1,7 +1,4 @@
-mod kinds;
-
-pub use kinds::SemanticErrorKind;
-
+use super::kinds::SemanticErrorKind;
 use crate::lexer::SourceSpan;
 
 #[derive(Clone, Debug, Eq, PartialEq)]

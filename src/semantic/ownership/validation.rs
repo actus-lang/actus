@@ -1,14 +1,12 @@
 use crate::ast::{Expr, Role};
 use crate::lexer::SourceSpan;
 
-use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
-use super::state::{AccessState, OwnershipState};
-
-mod returns;
+use crate::semantic::analyzer::Analyzer;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::state::{AccessState, OwnershipState};
 
 impl Analyzer {
-    pub(super) fn consume_case_subject(
+    pub(in crate::semantic) fn consume_case_subject(
         &mut self,
         subject: &Expr,
         span: SourceSpan,
@@ -66,7 +64,7 @@ impl Analyzer {
         Ok((index, name.clone()))
     }
 
-    pub(super) fn initialize_owner(
+    pub(in crate::semantic) fn initialize_owner(
         &mut self,
         expression: &Expr,
         span: SourceSpan,
@@ -123,7 +121,7 @@ impl Analyzer {
         Ok(Some((index, name.clone())))
     }
 
-    pub(super) fn ensure_readable(
+    pub(in crate::semantic) fn ensure_readable(
         &self,
         index: usize,
         name: &str,
@@ -147,7 +145,7 @@ impl Analyzer {
         }
     }
 
-    pub(super) fn ensure_access_available(
+    pub(in crate::semantic) fn ensure_access_available(
         &self,
         index: usize,
         name: &str,
@@ -162,7 +160,7 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn ensure_mutable(
+    pub(in crate::semantic) fn ensure_mutable(
         &self,
         index: usize,
         name: &str,
@@ -187,7 +185,7 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn drop_binding(
+    pub(in crate::semantic) fn drop_binding(
         &mut self,
         name: &str,
         span: SourceSpan,
@@ -261,7 +259,7 @@ impl Analyzer {
 }
 
 impl Analyzer {
-    pub(super) fn blocking_borrow_ids(&self, index: usize) -> Vec<usize> {
+    pub(in crate::semantic) fn blocking_borrow_ids(&self, index: usize) -> Vec<usize> {
         match &self.model.bindings[index].access {
             AccessState::Frozen { borrow_ids } => borrow_ids.clone(),
             AccessState::Mutable => Vec::new(),

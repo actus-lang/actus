@@ -1,9 +1,9 @@
 use crate::ast::{Expr, PrimitiveType, Role, primitive_type};
 use crate::lexer::SourceSpan;
 
-use super::super::analyzer::Analyzer;
-use super::super::errors::{SemanticError, SemanticErrorKind};
-use super::super::state::OwnershipState;
+use crate::semantic::analyzer::Analyzer;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::state::OwnershipState;
 
 impl Analyzer {
     pub(crate) fn visit_return(

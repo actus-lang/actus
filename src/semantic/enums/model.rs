@@ -1,8 +1,8 @@
 use crate::ast::{EnumPayload, Expr, TypeName};
 use crate::lexer::SourceSpan;
 
-use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::analyzer::Analyzer;
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
 fn receiver_name<'a>(analyzer: &Analyzer, expression: &'a Expr) -> Option<&'a str> {
     let name = match expression {
@@ -19,11 +19,14 @@ fn receiver_name<'a>(analyzer: &Analyzer, expression: &'a Expr) -> Option<&'a st
 }
 
 impl Analyzer {
-    pub(super) fn enum_receiver_name<'a>(&self, expression: &'a Expr) -> Option<&'a str> {
+    pub(in crate::semantic) fn enum_receiver_name<'a>(
+        &self,
+        expression: &'a Expr,
+    ) -> Option<&'a str> {
         receiver_name(self, expression)
     }
 
-    pub(super) fn validate_enum_unit_variant(
+    pub(in crate::semantic) fn validate_enum_unit_variant(
         &mut self,
         receiver: &Expr,
         variant: &str,
@@ -57,7 +60,7 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn expression_enum_type(&self, expression: &Expr) -> Option<String> {
+    pub(in crate::semantic) fn expression_enum_type(&self, expression: &Expr) -> Option<String> {
         if let Some(type_name) = self.resolved_type_name(expression)
             && self.enum_types.contains_key(&self.normalize_imported_type_name(&type_name).name)
         {
@@ -89,11 +92,14 @@ impl Analyzer {
         }
     }
 
-    pub(super) fn expression_enum_type_application(&self, expression: &Expr) -> Option<String> {
+    pub(in crate::semantic) fn expression_enum_type_application(
+        &self,
+        expression: &Expr,
+    ) -> Option<String> {
         self.enum_type_application(expression).map(|type_name| canonical_type_name(&type_name))
     }
 
-    pub(super) fn record_enum_binding(
+    pub(in crate::semantic) fn record_enum_binding(
         &mut self,
         name: &str,
         type_name: &TypeName,
@@ -111,7 +117,7 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn record_initializer_enum_type(
+    pub(in crate::semantic) fn record_initializer_enum_type(
         &mut self,
         name: &str,
         initializer: &Expr,
@@ -126,7 +132,10 @@ impl Analyzer {
         Ok(())
     }
 
-    pub(super) fn enum_type_application(&self, expression: &Expr) -> Option<crate::ast::TypeName> {
+    pub(in crate::semantic) fn enum_type_application(
+        &self,
+        expression: &Expr,
+    ) -> Option<crate::ast::TypeName> {
         if let Some(type_name) = self.resolved_type_name(expression)
             && self.enum_types.contains_key(&self.normalize_imported_type_name(&type_name).name)
         {

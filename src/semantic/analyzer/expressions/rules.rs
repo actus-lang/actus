@@ -1,10 +1,10 @@
 use crate::ast::{BinaryOp, Expr, PrimitiveType, UnaryOp, primitive_type};
 
-pub(super) fn is_integer_primitive(primitive: PrimitiveType) -> bool {
+pub(in crate::semantic::analyzer) fn is_integer_primitive(primitive: PrimitiveType) -> bool {
     matches!(primitive, PrimitiveType::Integer { .. })
 }
 
-pub(super) fn relational_types_match(left: &str, right: &str) -> bool {
+pub(in crate::semantic::analyzer) fn relational_types_match(left: &str, right: &str) -> bool {
     let left_primitive = primitive_for_comparison(left);
     let right_primitive = primitive_for_comparison(right);
     match (left_primitive, right_primitive) {
@@ -28,22 +28,22 @@ fn primitive_for_comparison(name: &str) -> Option<PrimitiveType> {
     }
 }
 
-pub(super) fn equality_types_match(left: &str, right: &str) -> bool {
+pub(in crate::semantic::analyzer) fn equality_types_match(left: &str, right: &str) -> bool {
     (left == "Bool" && right == "Bool") || relational_types_match(left, right)
 }
 
-pub(super) fn is_integer_type_name(name: &str) -> bool {
+pub(in crate::semantic::analyzer) fn is_integer_type_name(name: &str) -> bool {
     name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
 }
 
-pub(super) fn is_unsigned_integer_type_name(name: &str) -> bool {
+pub(in crate::semantic::analyzer) fn is_unsigned_integer_type_name(name: &str) -> bool {
     name == "Usize"
         || primitive_type(name).is_some_and(|primitive| {
             matches!(primitive, PrimitiveType::Integer { signed: false, .. })
         })
 }
 
-pub(super) fn binary_operator_name(operator: BinaryOp) -> &'static str {
+pub(in crate::semantic::analyzer) fn binary_operator_name(operator: BinaryOp) -> &'static str {
     match operator {
         BinaryOp::Equals => "equality operator",
         BinaryOp::NotEquals => "inequality operator",
@@ -59,7 +59,7 @@ pub(super) fn binary_operator_name(operator: BinaryOp) -> &'static str {
     }
 }
 
-pub(super) fn unary_operator_name(operator: UnaryOp) -> &'static str {
+pub(in crate::semantic::analyzer) fn unary_operator_name(operator: UnaryOp) -> &'static str {
     match operator {
         UnaryOp::LogicalNot => "logical not operator",
         UnaryOp::BitwiseNot => "bitwise not operator",
@@ -67,7 +67,7 @@ pub(super) fn unary_operator_name(operator: UnaryOp) -> &'static str {
     }
 }
 
-pub(super) fn expected_unary_type(operator: UnaryOp) -> &'static str {
+pub(in crate::semantic::analyzer) fn expected_unary_type(operator: UnaryOp) -> &'static str {
     match operator {
         UnaryOp::LogicalNot => "Bool",
         UnaryOp::BitwiseNot => "integer",
@@ -75,7 +75,7 @@ pub(super) fn expected_unary_type(operator: UnaryOp) -> &'static str {
     }
 }
 
-pub(super) fn is_cast_integer_type(name: &str) -> bool {
+pub(in crate::semantic::analyzer) fn is_cast_integer_type(name: &str) -> bool {
     is_integer_type_name(name)
 }
 
@@ -99,7 +99,7 @@ pub(crate) fn cast_literal_fits(literal: &str, negative: bool, target: &str) -> 
     }
 }
 
-pub(super) fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
+pub(in crate::semantic::analyzer) fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
     match expression {
         Expr::Integer { value, .. } => Some((value.clone(), false)),
         Expr::Grouping { expression, .. } => integer_literal(expression),
@@ -112,14 +112,14 @@ pub(super) fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
     }
 }
 
-pub(super) fn parse_integer_magnitude(literal: &str) -> Option<u128> {
+pub(in crate::semantic::analyzer) fn parse_integer_magnitude(literal: &str) -> Option<u128> {
     literal
         .strip_prefix("0x")
         .or_else(|| literal.strip_prefix("0X"))
         .map_or_else(|| literal.parse().ok(), |digits| u128::from_str_radix(digits, 16).ok())
 }
 
-pub(super) fn type_names_match(expected: &str, found: &str) -> bool {
+pub(in crate::semantic::analyzer) fn type_names_match(expected: &str, found: &str) -> bool {
     strip_reference_role(expected) == strip_reference_role(found)
 }
 

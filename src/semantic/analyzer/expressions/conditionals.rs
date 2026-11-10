@@ -2,10 +2,13 @@ use crate::ast::{Expr, IfBranch, Stmt};
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
-use super::validation::expression_span;
+use crate::semantic::analyzer::validation::expression_span;
 
 impl Analyzer {
-    pub(super) fn visit_if_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
+    pub(in crate::semantic::analyzer) fn visit_if_expression(
+        &mut self,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
         let Expr::If { condition, then_branch, else_branch, .. } = expression else {
             unreachable!("conditional visitor received a non-conditional expression")
         };
@@ -54,9 +57,18 @@ impl Analyzer {
 
     fn join_if_states(
         &mut self,
-        initial_state: &[(super::super::state::OwnershipState, super::super::state::AccessState)],
-        then_state: &[(super::super::state::OwnershipState, super::super::state::AccessState)],
-        else_state: &[(super::super::state::OwnershipState, super::super::state::AccessState)],
+        initial_state: &[(
+            crate::semantic::state::OwnershipState,
+            crate::semantic::state::AccessState,
+        )],
+        then_state: &[(
+            crate::semantic::state::OwnershipState,
+            crate::semantic::state::AccessState,
+        )],
+        else_state: &[(
+            crate::semantic::state::OwnershipState,
+            crate::semantic::state::AccessState,
+        )],
         then_branch: &crate::ast::Block,
         else_branch: Option<&IfBranch>,
         expression: &Expr,

@@ -6,7 +6,7 @@ use crate::lexer::SourceSpan;
 use super::super::analyzer::Analyzer;
 use super::super::analyzer::cast_literal_fits;
 use super::super::errors::{SemanticError, SemanticErrorKind};
-use super::super::pattern_support::{
+use super::diagnostics::{
     duplicate_pattern, is_wildcard, non_exhaustive, pattern_type_mismatch, variant_key,
 };
 

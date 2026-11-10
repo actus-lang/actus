@@ -4,12 +4,12 @@ use crate::ast::{Argument, GenericParam, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
-use super::argument_shapes::argument_span;
-use super::calls::{VerbSignature, parse_type_name_key};
-use super::errors::{SemanticError, SemanticErrorKind};
+use crate::semantic::calls::shapes::argument_span;
+use crate::semantic::calls::{VerbSignature, parse_type_name_key};
+use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
-    pub(super) fn instantiate_generic_signature(
+    pub(in crate::semantic) fn instantiate_generic_signature(
         &mut self,
         name: &str,
         signature: &VerbSignature,

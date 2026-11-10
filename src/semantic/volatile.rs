@@ -1,7 +1,7 @@
 use super::analyzer::Analyzer;
 use super::errors::{SemanticError, SemanticErrorKind};
-use super::generic_errors::arity_error;
 use super::generics::ResolvedType;
+use super::generics::arity_error;
 use crate::ast::TypeName;
 
 impl Analyzer {
