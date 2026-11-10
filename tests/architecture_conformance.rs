@@ -44,10 +44,7 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/codegen/symbols/mod.rs",
     "src/diagnostics/renderer/mod.rs",
     "src/formatter/mod.rs",
-    "src/lexer/mod.rs",
-    "src/lexer/scanner/mod.rs",
     "src/lsp/hover/mod.rs",
-    "src/parser/mod.rs",
     "src/registry/mod.rs",
     "src/runtime/mod.rs",
     "src/runtime/fs/mod.rs",
@@ -89,7 +86,7 @@ const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[
     "src/semantic/ownership",
 ];
 
-const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &["src/parser/parser.rs"];
+const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
 
 const ALLOWED_FORBIDDEN_FILES: &[&str] =
     &["src/codegen/shared_lowering/support.rs", "src/semantic/enum_constructors/support.rs"];
