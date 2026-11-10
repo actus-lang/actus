@@ -39,8 +39,8 @@ snapshots, `actus --version`, CLI output, `cargo fmt --all -- --check`, and
 10. Remove the final architecture allowlist
 
 Each module PR performs its complete map, facade conversion, domain grouping,
-name corrections, and `tests.rs` relocation once. The architecture gate is
-introduced in PR 0 and its exact allowlist shrinks after every PR.
+and name corrections once. The architecture gate is introduced in PR 0 and
+its exact allowlist shrinks after every PR.
 
 ## 1. Parser, lexer, and AST
 
