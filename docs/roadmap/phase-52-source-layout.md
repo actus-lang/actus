@@ -166,10 +166,10 @@ resolution`; `arm`, `counter`, and `provider` remain separate domains.
 semantic/
   mod.rs target_filter.rs stack_limit.rs
   generics/{mod,types,cache,calls,errors,substitution}.rs
-  enums/{mod,model,registry,constructors/{mod,arguments,type_parsing}}.rs
-  patterns/{mod,bindings,validation,moves,diagnostics}.rs
+  enums/{mod,model,registry,constructors/{mod,type_parsing,validation,variants}}.rs
+  patterns/{mod,bindings,coverage,validation,moves,diagnostics}.rs
   calls/{mod,effects,ownership,parsing,paths,signatures,arguments,shapes}.rs
-  analyzer/{mod,analysis,expressions/{mod,conditionals,context,rules},
+  analyzer/{mod,analysis,expressions/{mod,analysis,conditionals,context,rules},
     statements/{mod,control},bounded/{mod,recursion,graph},constants,
     declarations,for_loops,lifecycle,operator_validation,state,validation,verb}.rs
 ```
@@ -190,18 +190,89 @@ semantic/
 | `pattern_support.rs` | `patterns/diagnostics.rs` | rename |
 | `call_arguments.rs` | `calls/arguments.rs` | group |
 | `argument_shapes.rs` | `calls/shapes.rs` | group |
+| `enum_constructors/support.rs` | `enums/constructors/variants.rs` | rename |
 | `analyzer/mod.rs` `analyze` | `analyzer/analysis.rs` | extract |
 | `analyzer/expression_*.rs` | `analyzer/expressions/*.rs` | group |
 | `analyzer/statement_*.rs` | `analyzer/statements/*.rs` | group |
 | `analyzer/{bounded,bounded_graph}.rs` | `analyzer/bounded/{recursion,graph}.rs` | group |
 | remaining semantic files | same paths | unchanged |
 
-Imports prove the groups: generic calls use `argument_shapes` and `calls`
-(`src/semantic/generic_calls.rs:7-8`), enum lowering calls
-`enum_constructors::generic_receiver_type` (`src/semantic/enums.rs:33,156`),
-pattern validation uses `pattern_support` (`src/semantic/patterns/validation.rs:9`),
+Imports prove the groups: generic calls use the calls and argument-shape
+modules (`src/semantic/generics/calls.rs:1-8`), enum lowering calls
+`enum_constructors::generic_receiver_type` (`src/semantic/enums/model.rs:33,156`),
+pattern validation uses the diagnostics module (`src/semantic/patterns/validation.rs:7`),
 and analyzer state stores both call signatures and generic cache
 (`src/semantic/analyzer/state.rs:26,64`).
+
+### PR 3 evidence
+
+The semantic refactor preserves the base visibility boundary. The test-list
+comparison was run from an archive of `3527c493`, in a temporary directory
+separate from the working tree. The archived checkout used the already
+installed bundled LLVM prefix only to satisfy `llvm-sys`; no source or build
+output was taken from the working tree.
+
+```text
+$ repo=$PWD
+$ tmp=$(mktemp -d)
+$ git archive 3527c493 | tar -x -C "$tmp"
+$ (cd "$tmp" && LLVM_SYS_231_PREFIX="$repo/.actus-toolchain/llvm-23.1.2" cargo test --all-features -- --list)
+$ cargo test --all-features -- --list
+base test names: 1988
+working-tree test names: 1988
+```
+
+The complete name-only diff was:
+
+```diff
+-semantic::generic_cache::tests::deduplicates_by_structural_identity_within_a_toolchain
+-semantic::generic_cache::tests::different_toolchain_caches_are_independent
++semantic::generics::cache::tests::deduplicates_by_structural_identity_within_a_toolchain
++semantic::generics::cache::tests::different_toolchain_caches_are_independent
++semantic::generics::substitution::tests::exposes_const_arguments_for_expression_specialization
++semantic::generics::substitution::tests::preserves_reference_role_when_substituting_a_generic_root
++semantic::generics::substitution::tests::substitutes_nested_type_applications
+-semantic::type_substitution::tests::exposes_const_arguments_for_expression_specialization
+-semantic::type_substitution::tests::preserves_reference_role_when_substituting_a_generic_root
+-semantic::type_substitution::tests::substitutes_nested_type_applications
+```
+
+Thus the count is unchanged and the only changes are the two requested module
+path moves. The checker command and complete output are:
+
+```text
+$ python3 scripts/check_layout_bodies.py 1d8e3a03^ src/semantic
+ambiguous: src/semantic/enums/constructors/variants.rs:64: fn argument_span
+differences:
+visibility changes:
+visibility expansions:
+```
+
+The ambiguity is intentional: `argument_span` is the name of two different
+functions, so the checker reports both-name ambiguity rather than treating
+them as one function.
+
+The base and working trees both contain 168 `pub(crate)` declarations:
+
+```text
+$ git grep -h 'pub(crate)' 1d8e3a03^ -- src/semantic | wc -l
+168
+$ rg -n 'pub\(crate\)' src/semantic | wc -l
+168
+```
+
+The checker was also run with a deliberately widened item in
+`src/semantic/analyzer/verb.rs`, a widened `semantic/mod.rs` module, and a
+widened untracked facade; each run failed with `visibility expansions`, and
+all three changes were reverted. `constructors/support.rs` is now named
+`constructors/variants.rs` because it resolves enum variants and argument
+spans.
+
+The pre-correction analyzer visibility proof widened the requested 18 items
+and exited 1; after restoring their `crate::semantic::analyzer` boundary, the
+clean checker output above has zero expansions. `cargo test --all-targets
+--all-features -- --test-threads=1` and `cargo clippy --all-targets
+--all-features -- -D warnings` both passed.
 
 ## 4. Shared lowering, body, and contract
 
@@ -548,13 +619,6 @@ The architecture test has six exact-path allowlists. Their current sizes are:
 | `src/runtime/mod.rs` | 7 |
 | `src/runtime/fs/mod.rs` | 7 |
 | `src/runtime/path/mod.rs` | 7 |
-| `src/semantic/analyzer/mod.rs` | 3 |
-| `src/semantic/calls/mod.rs` | 3 |
-| `src/semantic/enum_constructors/mod.rs` | 3 |
-| `src/semantic/errors/mod.rs` | 3 |
-| `src/semantic/mod.rs` | 3 |
-| `src/semantic/ownership/mod.rs` | 3 |
-| `src/semantic/patterns/mod.rs` | 3 |
 | `src/modules/aggregation/visibility.rs` | 7 |
 | `src/codegen/body.rs` | 4 |
 | `src/codegen/body/case.rs` | 4 |
@@ -574,11 +638,7 @@ The architecture test has six exact-path allowlists. Their current sizes are:
 | `src/codegen/llvm/packed` | 6 |
 | `src/codegen/result_constructors` | 4 |
 | `src/codegen/symbols` | 4 |
-| `src/semantic/enum_constructors` | 3 |
-| `src/semantic/errors` | 3 |
-| `src/semantic/ownership` | 3 |
 | `src/codegen/shared_lowering/support.rs` | 4 |
-| `src/semantic/enum_constructors/support.rs` | 3 |
 | `src/codegen/body/case.rs` | 4 |
 | `src/codegen/body/case_value.rs` | 4 |
 | `src/runtime/fs/walk.rs` | 7 |
@@ -707,7 +767,11 @@ PY
 
 ### Non-facade `mod.rs` extraction map
 
-| Current file | Primary items | Destination | PR |
+The following map uses the base-tree paths as its source column. Facade
+declarations and re-exports remain in the corresponding `mod.rs` files and
+are listed separately below; they are not extraction rows.
+
+| Base file | Extracted contents | Destination | PR |
 | --- | --- | --- | ---: |
 | `src/cli/mod.rs` | `run`, dispatch, command parsing | `cli/dispatch.rs` | 8 |
 | `src/cli/test_runner/mod.rs` | `TestOptions`, `test_command` | `cli/test_runner/runner.rs` | 8 |
@@ -733,13 +797,22 @@ PY
 | `src/runtime/mod.rs` | `runtime_archive_path` | `runtime/archive.rs` | 7 |
 | `src/runtime/fs/mod.rs` | filesystem mode constants and path helpers | `runtime/fs/mode.rs` | 7 |
 | `src/runtime/path/mod.rs` | path model and separators | `runtime/path/model.rs` | 7 |
-| `src/semantic/analyzer/mod.rs` | `analyze`, stack validators | `semantic/analyzer/analysis.rs` | 3 |
-| `src/semantic/calls/mod.rs` | `Analyzer` call validation impls | `semantic/calls/validation.rs` | 3 |
-| `src/semantic/enum_constructors/mod.rs` | constructor validation impls | `semantic/enums/constructors/validation.rs` | 3 |
-| `src/semantic/errors/mod.rs` | `SemanticError` | `semantic/errors/model.rs` | 3 |
-| `src/semantic/mod.rs` | target filtering and stack-limit validation | `semantic/target_filter.rs`, `semantic/stack_limit.rs` | 3 |
-| `src/semantic/ownership/mod.rs` | ownership `Analyzer` impls | `semantic/ownership/validation.rs` | 3 |
-| `src/semantic/patterns/mod.rs` | pattern `Analyzer` impls | `semantic/patterns/validation.rs` | 3 |
+| `src/semantic/analyzer/mod.rs` | `analyze`, bounded and stack-limit validators | `src/semantic/analyzer/analysis.rs` | 3 |
+| `src/semantic/calls/mod.rs` | call validation `Analyzer` impls | `src/semantic/calls/validation.rs` | 3 |
+| `src/semantic/enum_constructors/mod.rs` | constructor validation `Analyzer` impls | `src/semantic/enums/constructors/validation.rs` | 3 |
+| `src/semantic/enum_constructors/support.rs` | variant lookup, argument diagnostics and type parsing helpers | `src/semantic/enums/constructors/variants.rs`, `src/semantic/enums/constructors/type_parsing.rs` | 3 |
+| `src/semantic/errors/mod.rs` | `SemanticError` model | `src/semantic/errors/model.rs` | 3 |
+| `src/semantic/mod.rs` | target filtering functions | `src/semantic/target_filter.rs` | 3 |
+| `src/semantic/mod.rs` | stack-limit validation | `src/semantic/stack_limit.rs` | 3 |
+| `src/semantic/ownership/mod.rs` | ownership validation `Analyzer` impls | `src/semantic/ownership/validation.rs` | 3 |
+| `src/semantic/ownership/mod.rs` | ownership return cleanup impls | `src/semantic/ownership/returns.rs` | 3 |
+| `src/semantic/patterns/mod.rs` | pattern coverage impls | `src/semantic/patterns/coverage.rs` | 3 |
+
+The facade-only files are `src/semantic/mod.rs`,
+`src/semantic/analyzer/mod.rs`, `src/semantic/calls/mod.rs`,
+`src/semantic/enums/constructors/mod.rs`, `src/semantic/errors/mod.rs`,
+`src/semantic/ownership/mod.rs`, and `src/semantic/patterns/mod.rs`; their
+remaining declarations and re-exports stay in place.
 
 ## Architecture protection
 
