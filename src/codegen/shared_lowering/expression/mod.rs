@@ -1,0 +1,23 @@
+mod aggregate;
+mod arena;
+mod arithmetic;
+mod array_ops;
+mod buffer;
+mod calls;
+mod case;
+mod cast;
+mod cleanup;
+mod compare;
+mod dispatch;
+mod drop;
+mod layout;
+mod literals;
+mod lowering;
+mod model;
+mod packed;
+mod parameter_state;
+mod state;
+
+pub(crate) use cleanup::descriptor_applies;
+pub(super) use lowering::lower_unit_call;
+pub(crate) use model::SharedExpressionProvider;

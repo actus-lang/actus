@@ -4,7 +4,7 @@ use super::super::super::{
     BackendCleanupAction, BackendCleanupOrigin, BackendContractError, BackendInstruction,
     BackendValueId,
 };
-use super::super::support::unsupported;
+use super::super::errors::unsupported;
 use super::SharedExpressionProvider;
 
 pub(super) fn lower_binding(

@@ -1,9 +1,9 @@
 use crate::ast::Stmt;
 use crate::lexer::SourceSpan;
 
-use super::{BackendContractError, BackendInstruction, BackendTargetContext};
+use super::super::{BackendContractError, BackendInstruction, BackendTargetContext};
 
-pub(super) fn terminates(instruction: Option<&BackendInstruction>) -> bool {
+pub(in crate::codegen) fn terminates(instruction: Option<&BackendInstruction>) -> bool {
     matches!(
         instruction,
         Some(BackendInstruction::Branch { .. })
@@ -14,9 +14,9 @@ pub(super) fn terminates(instruction: Option<&BackendInstruction>) -> bool {
     )
 }
 
-pub(super) fn terminates_without_continuation(
+pub(in crate::codegen) fn terminates_without_continuation(
     instruction: Option<&BackendInstruction>,
-    continuation: super::BackendBlockId,
+    continuation: super::super::BackendBlockId,
 ) -> bool {
     match instruction {
         Some(BackendInstruction::Jump { target, .. }) if *target == continuation => false,
@@ -24,18 +24,18 @@ pub(super) fn terminates_without_continuation(
     }
 }
 
-pub(super) fn ensure_jump(
-    mut block: super::BackendBlock,
-    target: super::BackendBlockId,
+pub(in crate::codegen) fn ensure_jump(
+    mut block: super::super::BackendBlock,
+    target: super::super::BackendBlockId,
     span: SourceSpan,
-) -> super::BackendBlock {
+) -> super::super::BackendBlock {
     if !terminates(block.instructions.last()) {
         block.instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
     }
     block
 }
 
-pub(super) fn statement_span(statement: &Stmt) -> SourceSpan {
+pub(in crate::codegen) fn statement_span(statement: &Stmt) -> SourceSpan {
     match statement {
         Stmt::OwnerDecl { span, .. }
         | Stmt::Assignment { span, .. }
@@ -52,7 +52,7 @@ pub(super) fn statement_span(statement: &Stmt) -> SourceSpan {
     }
 }
 
-pub(super) fn unsupported_name(statement: &Stmt) -> &'static str {
+pub(in crate::codegen) fn unsupported_name(statement: &Stmt) -> &'static str {
     match statement {
         Stmt::OwnerDecl { .. } => "owner declaration",
         Stmt::Assignment { .. } => "assignment",
@@ -70,8 +70,11 @@ pub(super) fn unsupported_name(statement: &Stmt) -> &'static str {
     }
 }
 
-pub(super) fn unsupported(span: SourceSpan, name: impl Into<String>) -> BackendContractError {
-    BackendContractError::Unsupported(super::BackendUnsupportedOperation::new(
+pub(in crate::codegen) fn unsupported(
+    span: SourceSpan,
+    name: impl Into<String>,
+) -> BackendContractError {
+    BackendContractError::Unsupported(super::super::BackendUnsupportedOperation::new(
         "body-lowering",
         span,
         BackendTargetContext {

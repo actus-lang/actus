@@ -1,7 +1,7 @@
 // Structured control-flow lowering for the body backend.
 
-use super::case_value::CaseOwnerInput;
-use super::loop_support::collect_assignment_names;
+use super::case::value::CaseOwnerInput;
+use super::loops::carried::collect_assignment_names;
 use super::{BackendBlock, BackendBlockId, BackendContractError, BackendInstruction, BodyLowering};
 use crate::ast::{Block, CaseBody, Expr, Stmt};
 

@@ -17,10 +17,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         instructions: Vec<BackendInstruction>,
     ) -> Result<(BackendBlock, Vec<BackendBlockParameter>), BackendContractError> {
         let Expr::Case { mode, subject, branches, .. } = expression else {
-            return Err(super::super::super::body_contract::unsupported(
-                span,
-                "enum case expression expected",
-            ));
+            return Err(super::super::contract::unsupported(span, "enum case expression expected"));
         };
         let continuation_values = carried
             .iter()
@@ -144,7 +141,7 @@ fn lower_carried_case_branches<P: BackendExpressionProvider>(
             ));
         }
     }
-    Err(super::super::super::body_contract::unsupported(span, "empty enum case"))
+    Err(super::super::contract::unsupported(span, "empty enum case"))
 }
 
 fn finish_carried_case<P: BackendExpressionProvider>(

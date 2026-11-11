@@ -5,6 +5,7 @@ mod aggregate_assignment;
 mod constructors;
 mod declarations;
 mod enum_payload;
+mod errors;
 mod expression;
 mod functions;
 mod layout;
@@ -13,7 +14,7 @@ mod performance;
 mod returns;
 mod runtime;
 mod runtime_externals;
-mod support;
+mod scalar_types;
 
 pub(super) use super::{
     BackendBlockId, BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,

@@ -1,10 +1,10 @@
 // Loop statement lowering for body control flow.
 
-use super::loops::{replace_jump_arguments, replace_jump_arguments_in_block};
-use super::{
+use super::super::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendContractError, BackendEdgeArgument,
     BackendInstruction, BackendValueId, BodyLowering, LoopTargets,
 };
+use super::{replace_jump_arguments, replace_jump_arguments_in_block};
 use crate::ast::Block;
 
 struct LoopState {
@@ -21,13 +21,13 @@ struct LoopBodyInput<'a> {
     header_id: BackendBlockId,
     continuation_id: BackendBlockId,
     nested: &'a Block,
-    carried: &'a [super::loops::CarriedBinding],
+    carried: &'a [super::CarriedBinding],
     body_values: &'a [BackendValueId],
     span: crate::lexer::SourceSpan,
 }
 
-impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
-    pub(super) fn lower_loop_statement(
+impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
+    pub(in crate::codegen::body) fn lower_loop_statement(
         &mut self,
         id: BackendBlockId,
         block: &Block,
@@ -87,7 +87,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
 
     fn prepare_loop(
         &mut self,
-        carried: &[super::loops::CarriedBinding],
+        carried: &[super::CarriedBinding],
         span: crate::lexer::SourceSpan,
     ) -> LoopState {
         let header_id = self.allocate_block();

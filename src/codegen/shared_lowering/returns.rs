@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::ast::{ExternalVerbDecl, PerformDecl, TypeName, VerbDecl};
 
-use super::support::backend_value_type;
+use super::scalar_types::backend_value_type;
 use super::{BackendLayoutProvider, BackendSignature, BackendValueType};
 
 pub(crate) fn shared_return_types(

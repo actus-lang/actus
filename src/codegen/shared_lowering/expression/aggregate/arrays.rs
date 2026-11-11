@@ -6,7 +6,7 @@ use crate::codegen::{
 use crate::lexer::SourceSpan;
 
 use super::super::super::SharedExpressionProvider;
-use super::super::super::support::unsupported;
+use super::super::super::errors::unsupported;
 
 pub(super) fn lower_array_element(
     provider: &mut SharedExpressionProvider<'_>,
@@ -140,7 +140,7 @@ fn lower_array_element_location_from_values(
         .layout_for(&element_type_name)
         .ok_or_else(|| unsupported(span, "array element has no neutral layout"))?;
     let element_type =
-        super::super::super::support::backend_value_type(provider.layouts, &element_type_name)
+        super::super::super::scalar_types::backend_value_type(provider.layouts, &element_type_name)
             .ok_or_else(|| unsupported(span, "array element has no backend type"))?;
     validate_array_layouts(aggregate_layout, element_layout, capacity, span)?;
     if !matches!(provider.value_type(index), Some(BackendValueType::Integer { .. })) {

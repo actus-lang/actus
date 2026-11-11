@@ -1,4 +1,4 @@
-use super::super::body_contract::unsupported;
+use super::contract::unsupported;
 use super::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendContractError, BackendEdgeArgument,
     BackendExpressionProvider, BackendInstruction, BodyLowering,

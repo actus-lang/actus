@@ -1,19 +1,13 @@
-mod arguments;
-mod constructors;
-mod loan;
-mod print;
-mod resolution;
-mod runtime;
-
-use super::super::super::{
+use super::super::super::super::{
     BackendContractError, BackendExpressionProvider, BackendInstruction, BackendValueId,
 };
-use super::super::support::expression_span;
-use super::SharedExpressionProvider;
+use super::super::super::errors::{expression_span, unsupported};
+use super::super::SharedExpressionProvider;
+use super::{arguments, constructors, loan, print, resolution, runtime};
 use crate::ast::{Expr, IntrinsicKind, lookup_call_intrinsic};
 use crate::lexer::SourceSpan;
 
-pub(super) fn callee_for(
+pub(in crate::codegen::shared_lowering::expression) fn callee_for(
     provider: &SharedExpressionProvider<'_>,
     callee: &str,
     span: SourceSpan,
@@ -21,18 +15,17 @@ pub(super) fn callee_for(
     resolution::callee_for(provider, callee, span)
 }
 
-pub(super) fn lower_call(
+pub(in crate::codegen::shared_lowering::expression) fn lower_call(
     provider: &mut SharedExpressionProvider<'_>,
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
     let Expr::Call { callee, arguments, span } = expression else {
-        return Err(super::super::support::unsupported(
-            expression_span(expression),
-            "call expression expected",
-        ));
+        return Err(unsupported(expression_span(expression), "call expression expected"));
     };
-    if let Some(value) = super::layout::lower_intrinsic(provider, callee, *span, instructions)? {
+    if let Some(value) =
+        super::super::layout::lower_intrinsic(provider, callee, *span, instructions)?
+    {
         return Ok(value);
     }
     if is_scalar_copy_intrinsic(provider, callee) {
@@ -42,7 +35,7 @@ pub(super) fn lower_call(
         return constructors::lower_array_constructor(provider, callee, *span, instructions);
     }
     if arguments.is_empty() && callee.starts_with("Arena[") {
-        return super::arena::lower_constructor(provider, callee, *span, instructions);
+        return super::super::arena::lower_constructor(provider, callee, *span, instructions);
     }
     let lowered = arguments::lower_arguments(provider, callee, arguments, *span, instructions)?;
     let arguments = lowered.values;
@@ -106,8 +99,7 @@ fn lower_user_call(
         span,
     });
     loan::append_scalar_loan_writebacks(provider, writebacks, span, instructions);
-    result
-        .ok_or_else(|| super::super::support::unsupported(span, "unit call cannot produce a value"))
+    result.ok_or_else(|| unsupported(span, "unit call cannot produce a value"))
 }
 
 fn expression_arguments(expression: &Expr) -> &[crate::ast::Argument] {
@@ -129,7 +121,7 @@ fn lower_copy_call(
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
     let [argument] = arguments else {
-        return Err(super::super::support::unsupported(span, "copy requires one value"));
+        return Err(unsupported(span, "copy requires one value"));
     };
     provider.lower_expression(&argument.expression, instructions)
 }
@@ -157,16 +149,13 @@ fn remember_return_metadata(
     }
 }
 
-pub(super) fn lower_unit_call(
+pub(in crate::codegen::shared_lowering::expression) fn lower_unit_call(
     provider: &mut SharedExpressionProvider<'_>,
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
     let Expr::Call { callee, arguments, span } = expression else {
-        return Err(super::super::support::unsupported(
-            expression_span(expression),
-            "unit call expected",
-        ));
+        return Err(unsupported(expression_span(expression), "unit call expected"));
     };
     let lowered = arguments::lower_arguments(provider, callee, arguments, *span, instructions)?;
     instructions.push(BackendInstruction::Call {

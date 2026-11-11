@@ -5,14 +5,12 @@ use crate::ast::{
     TypeName, primitive_type,
 };
 
-use super::super::symbols::{SymbolIdentity, SymbolKind};
-use super::{
+use super::super::super::symbols::{SymbolIdentity, SymbolKind};
+use super::super::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
     BackendCleanupResult, BackendContractError, BackendLayout,
 };
-
-mod generic_struct;
 
 /// Program-backed layouts used by the backend-neutral signature contract.
 ///
@@ -20,7 +18,7 @@ mod generic_struct;
 /// from the Actus declarations and uses the host pointer width only for
 /// reference roles and runtime handles, matching the existing neutral ABI.
 pub(crate) struct ProgramLayouts<'program> {
-    structs: BTreeMap<&'program str, &'program StructDef>,
+    pub(super) structs: BTreeMap<&'program str, &'program StructDef>,
     enums: BTreeMap<&'program str, &'program EnumDef>,
     packs: BTreeMap<&'program str, &'program PackDecl>,
     imported_namespaces: BTreeMap<String, String>,
@@ -28,10 +26,13 @@ pub(crate) struct ProgramLayouts<'program> {
     pointer_bytes: u32,
 }
 
-include!("layout/options.rs");
+include!("options.rs");
 
 impl<'program> ProgramLayouts<'program> {
-    pub(super) fn new(program: &'program Program, namespace: &str) -> Self {
+    pub(in crate::codegen::shared_lowering) fn new(
+        program: &'program Program,
+        namespace: &str,
+    ) -> Self {
         let structs = program
             .declarations
             .iter()
@@ -216,7 +217,7 @@ impl<'program> ProgramLayouts<'program> {
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
-    ) -> Option<super::super::abi::BackendEnumLayout> {
+    ) -> Option<super::super::super::abi::BackendEnumLayout> {
         let key = type_name.canonical_key();
         if visiting.iter().any(|candidate| candidate == &key) {
             return None;
@@ -245,7 +246,7 @@ impl<'program> ProgramLayouts<'program> {
             payload_offset.checked_add(payload.map_or(0, |layout| layout.size))?,
             alignment,
         )?;
-        Some(super::super::abi::BackendEnumLayout {
+        Some(super::super::super::abi::BackendEnumLayout {
             layout: BackendLayout { size, alignment },
             discriminant_offset: 0,
             discriminant_size: 4,
@@ -324,14 +325,14 @@ impl<'program> ProgramLayouts<'program> {
         Some(Self::scalar_layout(size))
     }
 
-    fn align_up(value: u32, alignment: u32) -> Option<u32> {
+    pub(super) fn align_up(value: u32, alignment: u32) -> Option<u32> {
         if alignment == 0 || !alignment.is_power_of_two() {
             return None;
         }
         value.checked_add(alignment - 1).map(|rounded| rounded & !(alignment - 1))
     }
 
-    fn field_storage_layout(
+    pub(super) fn field_storage_layout(
         &self,
         role: &StructFieldRole,
         type_name: &TypeName,
@@ -437,6 +438,6 @@ fn collect_imported_namespaces(program: &Program) -> BTreeMap<String, String> {
         .collect()
 }
 
-include!("layout/provider.rs");
+include!("provider.rs");
 
-include!("layout/cleanup.rs");
+include!("cleanup.rs");

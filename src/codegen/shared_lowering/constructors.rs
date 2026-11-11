@@ -6,8 +6,8 @@ use super::super::{
     BackendIntegerCompareOp, BackendValueId, BackendValueType,
 };
 use super::enum_payload::lower_named_enum_constructor;
+use super::errors::{expression_span, unsupported};
 use super::expression::SharedExpressionProvider;
-use super::support::{expression_span, unsupported};
 
 pub(super) fn lower_method_call(
     provider: &mut SharedExpressionProvider<'_>,

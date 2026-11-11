@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::ast::{ExternalVerbDecl, PerformDecl, Program, TopLevelDecl, TypeName, VerbDecl};
 
+use super::errors::unsupported;
 use super::performance;
-use super::support::unsupported;
 use super::{
     BackendContractError, BackendExternal, BackendLayoutProvider, BackendPassingMode,
     BackendSignature, BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind,

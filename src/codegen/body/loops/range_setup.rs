@@ -1,9 +1,9 @@
-use super::super::super::body_contract::unsupported;
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendValueId, BackendValueType,
 };
 use super::super::BodyLowering;
-use super::super::loop_support::range_binding_type;
+use super::super::contract::unsupported;
+use super::carried::range_binding_type;
 use super::{LoopBlocks, LoopValues, initial_loop_arguments};
 use crate::ast::{Block, Expr, ForBinding};
 use crate::lexer::SourceSpan;

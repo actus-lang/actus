@@ -1,4 +1,4 @@
-use super::support::unsupported;
+use super::errors::unsupported;
 use super::{
     BackendContractError, BackendExternal, BackendFunction, BackendInstruction, BackendParameter,
     BackendPassingMode, BackendReturn, BackendReturnMode, BackendValueType, SymbolIdentity,

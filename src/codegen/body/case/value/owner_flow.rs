@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use super::super::super::body_contract::unsupported;
-use super::super::loops::CarriedBinding;
+use super::super::super::contract::unsupported;
+use super::super::super::loops::CarriedBinding;
 use super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendExpressionProvider,
     BackendInstruction, BackendValueId, BodyLowering, CaseBranchValue,

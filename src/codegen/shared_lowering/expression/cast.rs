@@ -1,8 +1,9 @@
 use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 
-use super::super::support::{
-    integer_value_fits, parse_integer, scalar_backend_type, scalar_integer_type, unsupported,
+use super::super::errors::unsupported;
+use super::super::scalar_types::{
+    integer_value_fits, parse_integer, scalar_backend_type, scalar_integer_type,
 };
 use super::SharedExpressionProvider;
 use crate::codegen::{

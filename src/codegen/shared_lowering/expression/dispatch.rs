@@ -1,9 +1,8 @@
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendValueId, BackendValueType,
 };
-use super::super::support::{
-    expression_kind, expression_span, parse_integer, unsupported, unsupported_operation,
-};
+use super::super::errors::{expression_kind, expression_span, unsupported, unsupported_operation};
+use super::super::scalar_types::parse_integer;
 use super::SharedExpressionProvider;
 use crate::ast::Expr;
 use crate::codegen::body::BackendExpressionProvider;

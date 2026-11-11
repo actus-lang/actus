@@ -1,5 +1,5 @@
-use super::super::body_contract::unsupported;
-use super::{
+use super::super::contract::unsupported;
+use super::super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendExpressionProvider,
     BackendInstruction, BackendValueId, BodyLowering,
 };
@@ -7,19 +7,14 @@ use crate::ast::{CaseMode, Expr, LiteralPattern, Pattern, VariantPayload};
 use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
 
-mod carried;
-#[path = "case_return.rs"]
-mod case_return;
-mod context;
-
-use case_return::case_return_block;
-use context::{
+use super::context::{
     BoundCaseInput, CaseBodyInput, CaseBranchBlocks, CaseBranchInput, CaseBranchesInput,
     GuardedCaseInput,
 };
+use super::returns::case_return_block;
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
-    pub(super) fn lower_case_return(
+    pub(in crate::codegen::body) fn lower_case_return(
         &mut self,
         id: BackendBlockId,
         expression: &Expr,
@@ -29,7 +24,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.lower_case_control_flow(id, expression, span, None, instructions)
     }
 
-    pub(super) fn lower_case_statement(
+    pub(in crate::codegen::body) fn lower_case_statement(
         &mut self,
         id: BackendBlockId,
         expression: &Expr,
@@ -117,7 +112,7 @@ fn lower_case_branches<P: BackendExpressionProvider>(
     Err(unsupported(span, "empty enum case"))
 }
 
-fn lower_case_branch<P: BackendExpressionProvider>(
+pub(super) fn lower_case_branch<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
     input: CaseBranchInput<'_>,
     instructions: &mut Vec<BackendInstruction>,
@@ -159,7 +154,7 @@ fn lower_case_branch<P: BackendExpressionProvider>(
 }
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
-    fn prepare_case_branch(
+    pub(super) fn prepare_case_branch(
         &mut self,
         index: usize,
         branch_count: usize,
@@ -392,7 +387,7 @@ fn lower_guarded_case_branch<P: BackendExpressionProvider>(
     lowering.blocks.push(body);
     Ok(BackendBlock { parameters: Vec::new(), id, instructions: guard_instructions })
 }
-pub(super) fn lower_case_condition<P: BackendExpressionProvider>(
+pub(in crate::codegen::body) fn lower_case_condition<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
     subject: &Expr,
     branch: &crate::ast::CaseBranch,
@@ -429,7 +424,7 @@ pub(super) fn lower_case_condition<P: BackendExpressionProvider>(
             let condition = lowering.provider.allocate_value(BackendValueType::Bool);
             instructions.push(BackendInstruction::IntegerCompare {
                 result: condition,
-                operation: super::super::BackendIntegerCompareOp::Equals,
+                operation: super::super::super::BackendIntegerCompareOp::Equals,
                 left: subject_value,
                 right: expected_value,
                 signed: true,

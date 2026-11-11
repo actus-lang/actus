@@ -28,7 +28,7 @@ pub(super) fn lower_print_call(
     }
     if source_arguments.first().and_then(|argument| argument.name.as_deref()) == Some("format") {
         let [format, value] = arguments.as_slice() else {
-            return Err(super::super::super::support::unsupported(
+            return Err(super::super::super::errors::unsupported(
                 span,
                 "formatted print requires a format and one value",
             ));
@@ -45,7 +45,7 @@ pub(super) fn lower_print_call(
         return emit_print_call(provider, symbol, vec![*format, *value], span, instructions);
     }
     let [value] = arguments.as_slice() else {
-        return Err(super::super::super::support::unsupported(span, "print requires one value"));
+        return Err(super::super::super::errors::unsupported(span, "print requires one value"));
     };
     let label = source_arguments.first().and_then(|argument| argument.name.as_deref());
     let symbol = print_symbol(provider, callee, *value, label, span)?;
@@ -60,10 +60,7 @@ fn normalize_bool_argument(
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
     let Some(source) = arguments.get(index).copied() else {
-        return Err(super::super::super::support::unsupported(
-            span,
-            "boolean output value missing",
-        ));
+        return Err(super::super::super::errors::unsupported(span, "boolean output value missing"));
     };
     if provider.value_type(source) != Some(BackendValueType::Bool) {
         return Ok(());
@@ -93,7 +90,7 @@ fn emit_print_call(
     let ty = BackendValueType::Integer { signed: true, width: 32 };
     provider.remember_value(result, ty);
     let callee = SymbolIdentity::external_raw(symbol)
-        .map_err(|error| super::super::super::support::unsupported(span, error.to_string()))?;
+        .map_err(|error| super::super::super::errors::unsupported(span, error.to_string()))?;
     instructions.push(BackendInstruction::Call { callee, arguments, result: Some(result), span });
     Ok(result)
 }
@@ -142,6 +139,6 @@ fn print_symbol(
         } else {
             crate::runtime::PRINT_STRING_SYMBOL
         }),
-        _ => Err(super::super::super::support::unsupported(span, "print value type")),
+        _ => Err(super::super::super::errors::unsupported(span, "print value type")),
     }
 }

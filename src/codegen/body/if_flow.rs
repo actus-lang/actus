@@ -1,8 +1,8 @@
 // Conditional control-flow lowering for body blocks.
 
-use super::super::body_contract::{ensure_jump, terminates_without_continuation, unsupported};
-use super::loop_support::collect_assignment_names;
+use super::contract::{ensure_jump, terminates_without_continuation, unsupported};
 use super::loops;
+use super::loops::carried::collect_assignment_names;
 use super::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendContractError, BackendEdgeArgument,
     BackendInstruction, BackendValueId, BodyLowering,

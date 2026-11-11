@@ -1,26 +1,14 @@
-use super::body_contract::{statement_span, terminates, unsupported, unsupported_name};
-use super::{
-    BackendBlock, BackendBlockId, BackendBlockParameter, BackendContractError, BackendEdgeArgument,
-    BackendFailure, BackendInstruction, BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
+use super::super::{
+    BackendBlock, BackendBlockId, BackendContractError, BackendEdgeArgument, BackendFailure,
+    BackendInstruction, BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
 };
+use super::contract::{statement_span, terminates, unsupported, unsupported_name};
+use super::provider::{BackendBodyProvider, BackendExpressionProvider};
+use super::statements::lower_expression_statement;
 use crate::ast::{Block, CompoundAssignmentOp, Expr, Place, Stmt, VerbDecl};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
-mod case;
-mod case_value;
-mod control_flow;
-mod if_flow;
-mod loop_flow;
-mod loop_support;
-mod loops;
-mod nested_case;
-mod provider;
-mod statements;
-mod try_value;
-mod value;
-pub use provider::{BackendBodyProvider, BackendExpressionProvider};
-use statements::lower_expression_statement;
 
 pub fn lower_verb_body(
     verb: &VerbDecl,
@@ -84,22 +72,23 @@ fn order_blocks(blocks: Vec<BackendBlock>, entry: BackendBlockId) -> Vec<Backend
     ids.into_iter().filter_map(|id| blocks.iter().find(|block| block.id == id).cloned()).collect()
 }
 
-pub(super) struct BodyLowering<'a, P> {
-    pub(super) provider: &'a mut P,
-    next_block: u32,
-    pub(super) blocks: Vec<BackendBlock>,
-    pub(super) block_bindings: BTreeMap<BackendBlockId, BTreeMap<String, BackendValueId>>,
-    loop_targets: Vec<LoopTargets>,
-    carried_scopes: Vec<Vec<String>>,
+pub(in crate::codegen) struct BodyLowering<'a, P> {
+    pub(in crate::codegen) provider: &'a mut P,
+    pub(super) next_block: u32,
+    pub(in crate::codegen) blocks: Vec<BackendBlock>,
+    pub(in crate::codegen) block_bindings:
+        BTreeMap<BackendBlockId, BTreeMap<String, BackendValueId>>,
+    pub(super) loop_targets: Vec<LoopTargets>,
+    pub(super) carried_scopes: Vec<Vec<String>>,
     implicit_unit_return: bool,
 }
 
 #[derive(Clone)]
-struct LoopTargets {
-    continue_target: BackendBlockId,
-    break_target: BackendBlockId,
-    continue_values: Vec<String>,
-    break_values: Vec<String>,
+pub(super) struct LoopTargets {
+    pub(super) continue_target: BackendBlockId,
+    pub(super) break_target: BackendBlockId,
+    pub(super) continue_values: Vec<String>,
+    pub(super) break_values: Vec<String>,
 }
 
 struct LegacyExpressionProvider<'a, P> {
@@ -132,11 +121,11 @@ impl<P: BackendBodyProvider> BackendExpressionProvider for LegacyExpressionProvi
 }
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
-    pub(super) fn returns_unit(&self) -> bool {
+    pub(in crate::codegen) fn returns_unit(&self) -> bool {
         self.implicit_unit_return
     }
 
-    fn snapshot_loop_bindings(&self) -> Vec<(String, BackendValueId)> {
+    pub(super) fn snapshot_loop_bindings(&self) -> Vec<(String, BackendValueId)> {
         self.loop_targets
             .last()
             .into_iter()
@@ -145,13 +134,13 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             .collect()
     }
 
-    fn restore_loop_bindings(&mut self, bindings: Vec<(String, BackendValueId)>) {
+    pub(super) fn restore_loop_bindings(&mut self, bindings: Vec<(String, BackendValueId)>) {
         for (name, value) in bindings {
             self.provider.set_binding_value(&name, value);
         }
     }
 
-    pub(super) fn lower_block(
+    pub(in crate::codegen) fn lower_block(
         &mut self,
         id: BackendBlockId,
         block: &Block,
@@ -180,14 +169,14 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         }
     }
 
-    fn lower_block_in_scope(
+    pub(super) fn lower_block_in_scope(
         &mut self,
         id: BackendBlockId,
         block: &Block,
         fallthrough: Option<BackendBlockId>,
     ) -> Result<BackendBlock, BackendContractError> {
         self.block_bindings.insert(id, self.provider.snapshot_bindings());
-        let normalized = nested_case::normalize_block(block);
+        let normalized = super::case::nested::normalize_block(block);
         let block = &normalized;
         let mut instructions = Vec::new();
         for (index, statement) in block.statements.iter().enumerate() {
@@ -248,7 +237,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         BackendBlock { parameters: Vec::new(), id, instructions }
     }
 
-    pub(super) fn distribute_scope_cleanup(
+    pub(in crate::codegen) fn distribute_scope_cleanup(
         &mut self,
         span: SourceSpan,
         start: usize,
@@ -256,7 +245,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.provider.distribute_scope_cleanup(span, &mut self.blocks, start, &self.block_bindings)
     }
 
-    fn lower_statement(
+    pub(super) fn lower_statement(
         &mut self,
         statement: &Stmt,
         instructions: &mut Vec<BackendInstruction>,
@@ -328,7 +317,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(())
     }
 
-    fn loop_edge_arguments(
+    pub(super) fn loop_edge_arguments(
         &mut self,
         names: &[String],
         span: SourceSpan,

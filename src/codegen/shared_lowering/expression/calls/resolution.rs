@@ -35,5 +35,5 @@ pub(super) fn callee_for(
                 .and_then(Result::ok)
         })
         .map_or_else(|| SymbolIdentity::new(provider.namespace, SymbolKind::Verb, callee), Ok)
-        .map_err(|error| super::super::super::support::unsupported(span, error.to_string()))
+        .map_err(|error| super::super::super::errors::unsupported(span, error.to_string()))
 }

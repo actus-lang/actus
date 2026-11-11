@@ -3,6 +3,7 @@ use crate::target::{EntryContract, TargetSpec};
 use std::collections::BTreeSet;
 
 use super::declarations::{SharedDeclarations, build_backend_externals, scalar_external_symbols};
+use super::errors::unsupported;
 use super::layout::ProgramLayouts;
 use super::performance::lower_shared_functions;
 use super::runtime::{
@@ -10,7 +11,6 @@ use super::runtime::{
     append_performance_externals, append_print_externals, referenced_runtime_symbols,
 };
 use super::runtime_externals;
-use super::support::unsupported;
 use super::{
     BackendContractError, BackendLayoutProvider, BackendModule, BackendSymbolBindings,
     BackendValueType,
