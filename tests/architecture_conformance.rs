@@ -29,8 +29,6 @@ const RUST_KEYWORD_FILENAMES: &[&str] = &[
 const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/cli/mod.rs",
     "src/cli/test_runner/mod.rs",
-    "src/codegen/mod.rs",
-    "src/codegen/contract/mod.rs",
     "src/codegen/cranelift/case/mod.rs",
     "src/codegen/cranelift/contract/mod.rs",
     "src/codegen/cranelift/expressions/mod.rs",
@@ -40,8 +38,6 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/codegen/cranelift/lowering/mod.rs",
     "src/codegen/cranelift/performance/mod.rs",
     "src/codegen/llvm/packed/mod.rs",
-    "src/codegen/result_constructors/mod.rs",
-    "src/codegen/symbols/mod.rs",
     "src/diagnostics/renderer/mod.rs",
     "src/formatter/mod.rs",
     "src/lsp/hover/mod.rs",
@@ -52,37 +48,22 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
 ];
 
 const ALLOWED_RS_PAIRS: &[&str] = &[
-    "src/codegen/body.rs",
-    "src/codegen/body/case.rs",
-    "src/codegen/body/case_value.rs",
-    "src/codegen/body/loops.rs",
     "src/codegen/cranelift/calls.rs",
     "src/codegen/llvm/cleanup.rs",
     "src/codegen/llvm/cleanup/bridge.rs",
     "src/codegen/llvm/shim.rs",
-    "src/codegen/shared_lowering/expression.rs",
-    "src/codegen/shared_lowering/expression/aggregate.rs",
-    "src/codegen/shared_lowering/expression/calls.rs",
-    "src/codegen/shared_lowering/layout.rs",
     "src/modules/aggregation/visibility.rs",
     "src/runtime/region.rs",
 ];
 
-const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[
-    "src/codegen/cranelift/performance",
-    "src/codegen/llvm/packed",
-    "src/codegen/result_constructors",
-    "src/codegen/symbols",
-];
+const ALLOWED_SINGLE_FILE_MODULES: &[&str] =
+    &["src/codegen/cranelift/performance", "src/codegen/llvm/packed"];
 
 const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
 
-const ALLOWED_FORBIDDEN_FILES: &[&str] =
-    &["src/codegen/shared_lowering/support.rs", "src/semantic/enum_constructors/support.rs"];
+const ALLOWED_FORBIDDEN_FILES: &[&str] = &["src/semantic/enum_constructors/support.rs"];
 
 const ALLOWED_PATH_MODULES: &[&str] = &[
-    "src/codegen/body/case.rs",
-    "src/codegen/body/case_value.rs",
     "src/conformance/source_limits.rs",
     "src/diagnostics/renderer/codes/mod.rs",
     "src/ffi/abi.rs",
