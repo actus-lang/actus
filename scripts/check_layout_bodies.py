@@ -962,18 +962,29 @@ def check_mod_visibility(old, new, images, paths):
 
 
 def mod_candidates(decl, origins, old_decls):
-    """Base `mod` declarations whose code the new module now holds."""
+    """Base `mod` declarations whose code the new module now holds.
+
+    When all of that code came from one base module that is not an ancestor of
+    the new module (a moved or renamed module), that module's declaration is
+    the counterpart. Otherwise (a new grouping directory) every source module's
+    own declaration is.
+    """
     declared = decl.module + (decl.name,)
     sources = {old for new_module, olds in origins.items()
                if new_module[:len(declared)] == declared for old in olds}
     if declared in old_decls:
         sources.add(declared)
+    if not sources:
+        return []
+    common = tuple(os.path.commonprefix([list(s) for s in sources]))
+    if common in old_decls and declared[:len(common)] != common:
+        return [old_decls[common]]
     candidates = []
     for source in sorted(sources):
-        prefixes = [source[:depth] for depth in range(len(source), 0, -1)]
-        same_level = [old_decls[p] for p in prefixes if len(p) >= len(declared) and p in old_decls]
-        nearest = next((old_decls[p] for p in prefixes if p in old_decls), None)
-        candidates.extend(same_level or ([nearest] if nearest else []))
+        nearest = next((old_decls[source[:depth]] for depth in range(len(source), 0, -1)
+                        if source[:depth] in old_decls), None)
+        if nearest is not None:
+            candidates.append(nearest)
     return candidates
 
 
