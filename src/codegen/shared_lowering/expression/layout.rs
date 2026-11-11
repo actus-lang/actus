@@ -4,7 +4,7 @@ use crate::lexer::SourceSpan;
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendLayout, BackendValueId, BackendValueType,
 };
-use super::super::support::unsupported;
+use super::super::errors::unsupported;
 use super::SharedExpressionProvider;
 
 pub(super) fn lower_intrinsic(

@@ -3,7 +3,7 @@ use super::super::super::{
     BackendValueType,
 };
 use super::super::SharedExpressionProvider;
-use super::super::support::{expression_span, unsupported};
+use super::super::errors::{expression_span, unsupported};
 use crate::ast::{Expr, TypeName};
 use crate::lexer::SourceSpan;
 

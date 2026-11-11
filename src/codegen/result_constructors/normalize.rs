@@ -1,5 +1,3 @@
-mod spans;
-
 use crate::ast::{
     Argument, ArgumentRoleResolution, Block, CaseBody, DispatchMode, Expr, Param, Program,
     ReturnAccess, ReturnType, Role, SerializeDecl, SerializeSection, Stmt, TopLevelDecl, TypeName,
@@ -8,17 +6,17 @@ use crate::ast::{
 use crate::lexer::SourceSpan;
 use std::collections::HashMap;
 
-use self::spans::initializer_span;
+use super::spans::initializer_span;
 /// Rewrites contextual `Ok` and `Err` calls into the existing enum-constructor
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.
 pub(crate) fn normalize_program(program: &Program) -> Program {
     let mut normalized = crate::semantic::normalize_generated_locals(program);
-    super::serialization::append_builtin_serialization_error(&mut normalized);
+    super::super::serialization::append_builtin_serialization_error(&mut normalized);
     append_generated_serialization_validators(&mut normalized);
-    super::serialization::append_generated_serialization_encoders(&mut normalized);
-    super::serialization::append_generated_serialization_decoders(&mut normalized);
-    super::serialization::append_generated_serialization_migrations(&mut normalized);
+    super::super::serialization::append_generated_serialization_encoders(&mut normalized);
+    super::super::serialization::append_generated_serialization_decoders(&mut normalized);
+    super::super::serialization::append_generated_serialization_migrations(&mut normalized);
     let signatures = collect_signatures(&normalized);
     for declaration in &mut normalized.declarations {
         match declaration {
@@ -31,7 +29,7 @@ pub(crate) fn normalize_program(program: &Program) -> Program {
             _ => {}
         }
     }
-    super::constants::inline_constants(&mut normalized);
+    super::super::constants::inline_constants(&mut normalized);
     normalized
 }
 fn append_generated_serialization_validators(program: &mut Program) {

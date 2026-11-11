@@ -1,12 +1,12 @@
 // Shared helpers for bounded loop lowering.
 
-use super::super::BackendValueType;
-use super::super::body_contract::unsupported;
-use super::BackendContractError;
+use super::super::super::BackendValueType;
+use super::super::BackendContractError;
+use super::super::contract::unsupported;
 use crate::ast::{Argument, Block, CaseBody, Expr, ForBinding, IfBranch, Place, Role, Stmt};
 use crate::lexer::SourceSpan;
 
-pub(super) fn is_loop_carried_type(ty: BackendValueType) -> bool {
+pub(in crate::codegen::body) fn is_loop_carried_type(ty: BackendValueType) -> bool {
     matches!(
         ty,
         BackendValueType::Bool
@@ -15,7 +15,7 @@ pub(super) fn is_loop_carried_type(ty: BackendValueType) -> bool {
     )
 }
 
-pub(super) fn range_binding_type(
+pub(in crate::codegen::body) fn range_binding_type(
     binding: &ForBinding,
     span: SourceSpan,
 ) -> Result<BackendValueType, BackendContractError> {
@@ -37,17 +37,17 @@ fn integer_width(name: &str) -> u8 {
     }
 }
 
-pub(super) fn index_type_signed(ty: BackendValueType) -> bool {
+pub(in crate::codegen::body) fn index_type_signed(ty: BackendValueType) -> bool {
     matches!(ty, BackendValueType::Integer { signed: true, .. })
 }
 
-pub(super) fn collect_assignment_names(block: &Block, names: &mut Vec<String>) {
+pub(in crate::codegen::body) fn collect_assignment_names(block: &Block, names: &mut Vec<String>) {
     for statement in &block.statements {
         collect_statement_assignment_names(statement, names);
     }
 }
 
-pub(super) fn collect_ins_argument_names(block: &Block, names: &mut Vec<String>) {
+pub(in crate::codegen::body) fn collect_ins_argument_names(block: &Block, names: &mut Vec<String>) {
     for statement in &block.statements {
         collect_statement_ins_argument_names(statement, names);
     }
@@ -188,7 +188,10 @@ fn collect_statement_assignment_names(statement: &Stmt, names: &mut Vec<String>)
     }
 }
 
-pub(super) fn collect_expression_assignment_names(expression: &Expr, names: &mut Vec<String>) {
+pub(in crate::codegen::body) fn collect_expression_assignment_names(
+    expression: &Expr,
+    names: &mut Vec<String>,
+) {
     match expression {
         Expr::Case { branches, .. } => {
             for branch in branches {

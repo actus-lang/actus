@@ -1,63 +1,17 @@
-use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload, VerbDecl};
+use super::super::super::{
+    BackendBlockId, BackendCleanupOrigin, BackendContractError, BackendExpressionProvider,
+    BackendInstruction, BackendIntegerBinaryOp, BackendIntegerUnaryOp, BackendValueId,
+    BackendValueType, SymbolIdentity,
+};
+use super::super::errors::{expression_span, unsupported};
+use super::SharedExpressionProvider;
+use super::{aggregate, arena, array_ops, calls, case, cleanup, dispatch, drop, state};
+use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;
-mod aggregate;
-mod arena;
-mod arithmetic;
-mod array_ops;
-mod buffer;
-mod calls;
-mod case;
-mod cast;
-mod cleanup;
-mod compare;
-pub(crate) use cleanup::descriptor_applies;
-mod dispatch;
-mod drop;
-mod layout;
-mod literals;
-mod packed;
-mod parameter_state;
-mod state;
-use super::super::{
-    BackendBlockId, BackendCleanupOrigin, BackendContractError, BackendExpressionProvider,
-    BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp,
-    BackendPassingMode, BackendSymbolBindings, BackendValueId, BackendValueType, SymbolIdentity,
-};
-use super::support::{expression_span, unsupported};
-pub(crate) struct SharedExpressionProvider<'a> {
-    namespace: &'a str,
-    pub(super) current_symbol: SymbolIdentity,
-    layouts: &'a dyn super::super::BackendLayoutProvider,
-    parameters: BTreeMap<String, BackendValueId>,
-    scalar_loan_parameters: Vec<(String, BackendValueId, BackendValueId, BackendValueType)>,
-    aggregate_loan_parameters: BTreeMap<String, (BackendValueId, super::super::BackendLayout)>,
-    owned_parameters: std::collections::BTreeSet<String>,
-    locals: Vec<BTreeMap<String, BackendValueId>>,
-    verb_name: String,
-    return_types: &'a BTreeMap<String, Option<BackendValueType>>,
-    return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
-    return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
-    parameter_modes: &'a BTreeMap<String, Vec<BackendPassingMode>>,
-    parameter_types: &'a BTreeMap<String, Vec<BackendValueType>>,
-    performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
-    performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
-    performance_return_nominal_types: &'a BTreeMap<(String, String), Option<crate::ast::TypeName>>,
-    external_symbols: &'a BTreeMap<String, SymbolIdentity>,
-    bindings: Option<&'a BackendSymbolBindings>,
-    cleanup_plans: &'a [super::super::BackendCleanupPlan],
-    value_types: BTreeMap<BackendValueId, BackendValueType>,
-    nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
-    array_big_endian: BTreeMap<BackendValueId, bool>,
-    aggregate_places: std::collections::BTreeSet<BackendValueId>,
-    heap_owned_aggregate_values: std::collections::BTreeSet<BackendValueId>,
-    enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
-    next_value: u32,
-    loop_depth: usize,
-}
 
-pub(super) fn lower_unit_call(
+pub(in crate::codegen::shared_lowering) fn lower_unit_call(
     provider: &mut SharedExpressionProvider<'_>,
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
@@ -65,236 +19,23 @@ pub(super) fn lower_unit_call(
     calls::lower_unit_call(provider, expression, instructions)
 }
 
-impl<'a> SharedExpressionProvider<'a> {
-    pub(super) fn new(
-        namespace: &'a str,
-        verb: &VerbDecl,
-        current_symbol: SymbolIdentity,
-        layouts: &'a impl super::super::BackendLayoutProvider,
-        return_types: &'a BTreeMap<String, Option<BackendValueType>>,
-        return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
-        return_payload_types: &'a BTreeMap<String, [Option<BackendValueType>; 2]>,
-        parameter_modes: &'a BTreeMap<String, Vec<BackendPassingMode>>,
-        call_parameter_types: &'a BTreeMap<String, Vec<BackendValueType>>,
-        performance_symbols: &'a BTreeMap<(String, String), SymbolIdentity>,
-        performance_return_types: &'a BTreeMap<(String, String), Option<BackendValueType>>,
-        performance_return_nominal_types: &'a BTreeMap<
-            (String, String),
-            Option<crate::ast::TypeName>,
-        >,
-        external_symbols: &'a BTreeMap<String, SymbolIdentity>,
-        bindings: Option<&'a BackendSymbolBindings>,
-        cleanup_plans: &'a [super::super::BackendCleanupPlan],
-    ) -> Self {
-        let parameter_state = parameter_state::initialize(verb, layouts);
-        Self {
-            namespace,
-            current_symbol,
-            layouts,
-            parameters: parameter_state.parameters,
-            scalar_loan_parameters: parameter_state.scalar_loan_parameters,
-            aggregate_loan_parameters: parameter_state.aggregate_loan_parameters,
-            owned_parameters: parameter_state.owned_parameters,
-            locals: Vec::new(),
-            verb_name: verb.name.clone(),
-            return_types,
-            return_nominal_types,
-            return_payload_types,
-            parameter_modes,
-            parameter_types: call_parameter_types,
-            performance_symbols,
-            performance_return_types,
-            performance_return_nominal_types,
-            external_symbols,
-            bindings,
-            cleanup_plans,
-            value_types: parameter_state.value_types,
-            nominal_types: parameter_state.nominal_types,
-            array_big_endian: BTreeMap::new(),
-            aggregate_places: std::collections::BTreeSet::new(),
-            heap_owned_aggregate_values: std::collections::BTreeSet::new(),
-            enum_payload_types: parameter_state.enum_payload_types,
-            next_value: parameter_state.next_value,
-            loop_depth: 0,
-        }
-    }
-    pub(super) fn allocate(&mut self) -> BackendValueId {
-        let result = BackendValueId(self.next_value);
-        self.next_value += 1;
-        result
-    }
-    pub(super) fn parameter_value(&self, name: &str) -> Option<BackendValueId> {
-        self.parameters.get(name).copied()
-    }
-    pub(super) fn parameter_is_owned(&self, name: &str) -> bool {
-        self.owned_parameters.contains(name)
-    }
-    pub(super) fn aggregate_loan_parameter(
-        &self,
-        name: &str,
-    ) -> Option<(BackendValueId, super::super::BackendLayout)> {
-        self.aggregate_loan_parameters.get(name).copied()
-    }
-    pub(super) fn materialize_aggregate_assignment(
-        &mut self,
-        value: BackendValueId,
-        span: crate::lexer::SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<BackendValueId, super::super::BackendContractError> {
-        if !self.is_aggregate_place(value) {
-            return Ok(value);
-        }
-        let BackendValueType::Aggregate { layout } = self.value_type(value).ok_or_else(|| {
-            super::support::unsupported(span, "aggregate assignment value has no layout")
-        })?
-        else {
-            return Err(super::support::unsupported(
-                span,
-                "aggregate assignment value has an invalid type",
-            ));
-        };
-        let copy = self.allocate_value(BackendValueType::Aggregate { layout });
-        if let Some(type_name) = self.nominal_type(value).cloned() {
-            self.remember_nominal_type(copy, type_name);
-        }
-        instructions.push(BackendInstruction::AggregateCopy {
-            result: copy,
-            source: value,
-            layout,
-            span,
-        });
-        self.remember_heap_owned_aggregate(copy, layout);
-        Ok(copy)
-    }
-    pub(super) fn scalar_loan_prologue(&self) -> Vec<BackendInstruction> {
-        self.scalar_loan_parameters
-            .iter()
-            .map(|(_, address, loaded, ty)| BackendInstruction::ScalarLoanLoad {
-                result: *loaded,
-                address: *address,
-                ty: *ty,
-                span: crate::lexer::SourceSpan::new(0, 0),
-            })
-            .collect()
-    }
-
-    pub(super) fn scalar_loan_writebacks(&self) -> Vec<BackendInstruction> {
-        self.scalar_loan_parameters
-            .iter()
-            .filter_map(|(name, address, _, ty)| {
-                self.binding_value(name).map(|value| BackendInstruction::ScalarLoanStore {
-                    address: *address,
-                    value,
-                    ty: *ty,
-                    span: crate::lexer::SourceSpan::new(0, 0),
-                })
-            })
-            .collect()
-    }
-    pub(super) fn binding_value(&self, name: &str) -> Option<BackendValueId> {
-        self.locals
-            .iter()
-            .rev()
-            .find_map(|scope| scope.get(name).copied())
-            .or_else(|| self.parameters.get(name).copied())
-    }
-    pub(super) fn value_type(&self, value: BackendValueId) -> Option<BackendValueType> {
-        self.value_types.get(&value).copied()
-    }
-    pub(super) fn remember_value(&mut self, value: BackendValueId, ty: BackendValueType) {
-        self.value_types.insert(value, ty);
-    }
-    pub(super) fn nominal_type(&self, value: BackendValueId) -> Option<&crate::ast::TypeName> {
-        self.nominal_types.get(&value)
-    }
-    pub(super) fn enum_layout(
-        &self,
-        type_name: &crate::ast::TypeName,
-    ) -> Option<super::super::BackendEnumLayout> {
-        self.layouts.enum_layout_for(type_name)
-    }
-    pub(super) fn enum_variant(
-        &self,
-        type_name: &crate::ast::TypeName,
-        variant: &str,
-    ) -> Option<(u32, bool)> {
-        self.layouts.enum_variant(type_name, variant)
-    }
-    pub(super) fn enum_variant_payload_fields(
-        &self,
-        type_name: &crate::ast::TypeName,
-        variant: &str,
-    ) -> Option<Vec<super::super::BackendEnumPayloadField>> {
-        self.layouts.enum_variant_payload_fields(type_name, variant)
-    }
-
-    pub(super) fn backend_value_type(
-        &self,
-        type_name: &crate::ast::TypeName,
-    ) -> Option<super::super::BackendValueType> {
-        super::support::backend_value_type(self.layouts, type_name)
-    }
-    pub(super) fn enum_variant_for_layout(
-        &self,
-        layout: super::super::BackendEnumLayout,
-        variant: &str,
-    ) -> Option<(u32, bool)> {
-        self.layouts.enum_variant_for_layout(layout, variant)
-    }
-    pub(super) fn remember_nominal_type(
-        &mut self,
-        value: BackendValueId,
-        type_name: crate::ast::TypeName,
-    ) {
-        self.nominal_types.insert(value, type_name);
-    }
-    pub(super) fn remember_array_endianness(&mut self, value: BackendValueId, big_endian: bool) {
-        self.array_big_endian.insert(value, big_endian);
-    }
-    pub(super) fn array_is_big_endian(&self, value: BackendValueId) -> bool {
-        self.array_big_endian.get(&value).copied().unwrap_or(false)
-    }
-    pub(super) fn remember_aggregate_place(&mut self, value: BackendValueId) {
-        self.aggregate_places.insert(value);
-    }
-    pub(super) fn is_aggregate_place(&self, value: BackendValueId) -> bool {
-        self.aggregate_places.contains(&value)
-    }
-    pub(super) fn remember_heap_owned_aggregate(
-        &mut self,
-        value: BackendValueId,
-        layout: super::super::BackendLayout,
-    ) {
-        if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
-            self.heap_owned_aggregate_values.insert(value);
-        }
-    }
-    pub(super) fn is_heap_owned_aggregate(&self, value: BackendValueId) -> bool {
-        self.heap_owned_aggregate_values.contains(&value)
-    }
-    pub(super) fn remember_enum_payload(
-        &mut self,
-        value: BackendValueId,
-        discriminant: u32,
-        ty: BackendValueType,
-    ) {
-        self.enum_payload_types.insert((value, discriminant), ty);
-    }
-}
-include!("expression/provider.rs");
+include!("provider.rs");
 
 impl SharedExpressionProvider<'_> {
-    pub(super) fn return_type_for(&self, callee: &str) -> Option<Option<BackendValueType>> {
+    pub(in crate::codegen::shared_lowering) fn return_type_for(
+        &self,
+        callee: &str,
+    ) -> Option<Option<BackendValueType>> {
         self.return_types.get(callee).copied().or_else(|| {
             callee.rsplit_once("::").and_then(|(_, member)| self.return_types.get(member).copied())
         })
     }
 
-    pub(super) fn call_returns_unit(&self, callee: &str) -> bool {
+    pub(in crate::codegen::shared_lowering) fn call_returns_unit(&self, callee: &str) -> bool {
         self.return_type_for(callee).is_some_and(|return_type| return_type.is_none())
     }
 
-    fn lower_method_call(
+    pub(super) fn lower_method_call(
         &mut self,
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
@@ -307,7 +48,7 @@ impl SharedExpressionProvider<'_> {
         };
         let receiver_is_binding = self.is_binding_receiver(receiver);
         if !receiver_is_binding {
-            return super::constructors::lower_method_call(self, expression, instructions);
+            return super::super::constructors::lower_method_call(self, expression, instructions);
         }
         let receiver_value = if let Some(address) = self.scalar_loan_parameter_address(receiver) {
             address
@@ -430,7 +171,7 @@ impl SharedExpressionProvider<'_> {
         }
     }
 
-    fn lower_unary(
+    pub(super) fn lower_unary(
         &mut self,
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
@@ -462,7 +203,7 @@ impl SharedExpressionProvider<'_> {
         Ok(result)
     }
 
-    fn lower_binary(
+    pub(super) fn lower_binary(
         &mut self,
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,

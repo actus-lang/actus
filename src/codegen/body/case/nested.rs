@@ -3,7 +3,7 @@ use crate::ast::{Block, Expr, Role, Stmt};
 use crate::lexer::SourceSpan;
 
 /// Hoist value-producing cases and conditionals nested inside scalar expressions.
-pub(super) fn normalize_block(block: &Block) -> Block {
+pub(in crate::codegen::body) fn normalize_block(block: &Block) -> Block {
     let mut statements = Vec::new();
     for statement in &block.statements {
         normalize_statement(statement, &mut statements);

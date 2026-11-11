@@ -1,14 +1,9 @@
-mod arrays;
-mod compound;
-mod fields;
-mod metadata;
-mod structs;
-
+use super::{arrays, compound, fields, metadata, structs};
 use crate::ast::{Expr, TypeName};
 use crate::codegen::{BackendContractError, BackendInstruction, BackendValueId};
 
-use super::super::SharedExpressionProvider;
-use super::super::support::{expression_span, unsupported};
+use super::super::super::SharedExpressionProvider;
+use super::super::super::errors::{expression_span, unsupported};
 
 type ArrayElementLocationParts = (
     BackendValueId,
@@ -21,14 +16,14 @@ type ArrayElementLocationParts = (
     bool,
 );
 
-pub(super) fn parameter_nominal_types(
+pub(in crate::codegen::shared_lowering::expression) fn parameter_nominal_types(
     verb: &crate::ast::VerbDecl,
     layouts: &dyn crate::codegen::BackendLayoutProvider,
 ) -> std::collections::BTreeMap<BackendValueId, TypeName> {
     metadata::parameter_nominal_types(verb, layouts)
 }
 
-pub(super) fn lower_array_element(
+pub(in crate::codegen::shared_lowering::expression) fn lower_array_element(
     provider: &mut SharedExpressionProvider<'_>,
     collection: &Expr,
     index: &Expr,
@@ -38,7 +33,7 @@ pub(super) fn lower_array_element(
     arrays::lower_array_element(provider, collection, index, span, instructions)
 }
 
-pub(super) fn lower_array_element_assignment(
+pub(in crate::codegen::shared_lowering::expression) fn lower_array_element_assignment(
     provider: &mut SharedExpressionProvider<'_>,
     collection: &Expr,
     index: &Expr,
@@ -49,7 +44,7 @@ pub(super) fn lower_array_element_assignment(
     arrays::lower_array_element_assignment(provider, collection, index, value, span, instructions)
 }
 
-pub(super) fn lower_array_element_location(
+pub(in crate::codegen::shared_lowering::expression) fn lower_array_element_location(
     provider: &mut SharedExpressionProvider<'_>,
     collection: &Expr,
     index: &Expr,
@@ -70,7 +65,7 @@ pub(super) fn lower_array_element_location(
     ))
 }
 
-pub(super) fn lower_field_assignment(
+pub(in crate::codegen::shared_lowering::expression) fn lower_field_assignment(
     provider: &mut SharedExpressionProvider<'_>,
     object: &Expr,
     field: &str,
@@ -81,7 +76,7 @@ pub(super) fn lower_field_assignment(
     fields::lower_field_assignment(provider, object, field, value, span, instructions)
 }
 
-pub(super) fn lower_field_compound_assignment(
+pub(in crate::codegen::shared_lowering::expression) fn lower_field_compound_assignment(
     provider: &mut SharedExpressionProvider<'_>,
     object: &Expr,
     field: &str,
@@ -101,7 +96,7 @@ pub(super) fn lower_field_compound_assignment(
     )
 }
 
-pub(super) fn lower_aggregate_expression(
+pub(in crate::codegen::shared_lowering::expression) fn lower_aggregate_expression(
     provider: &mut SharedExpressionProvider<'_>,
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
@@ -114,7 +109,7 @@ pub(super) fn lower_aggregate_expression(
             if let Some(type_name) = parse_receiver_type_name(object, *span)
                 && provider.enum_variant(&type_name, field).is_some()
             {
-                return super::super::constructors::lower_named_unit_enum(
+                return super::super::super::constructors::lower_named_unit_enum(
                     provider,
                     &type_name,
                     field,

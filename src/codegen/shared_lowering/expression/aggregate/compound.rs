@@ -6,7 +6,7 @@ use crate::codegen::{
 use crate::lexer::SourceSpan;
 
 use super::super::super::SharedExpressionProvider;
-use super::super::super::support::unsupported;
+use super::super::super::errors::unsupported;
 use super::super::packed;
 
 pub(super) fn lower_field_compound_assignment(
@@ -73,7 +73,7 @@ fn lower_plain_field_compound_assignment(
     let ty = if metadata.indirect {
         BackendValueType::Pointer
     } else {
-        super::super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+        super::super::super::scalar_types::backend_value_type(provider.layouts, &metadata.ty)
             .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?
     };
     let current = provider.allocate();

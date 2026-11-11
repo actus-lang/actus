@@ -5,8 +5,9 @@ use crate::ast::VerbDecl;
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendValueId, BackendValueType,
 };
-use super::super::support::{
-    backend_value_type, integer_value_fits, scalar_backend_type_name, unsupported,
+use super::super::errors::unsupported;
+use super::super::scalar_types::{
+    backend_value_type, integer_value_fits, scalar_backend_type_name,
 };
 use super::SharedExpressionProvider;
 

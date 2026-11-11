@@ -19,7 +19,7 @@ pub(super) fn lower_runtime_call(
     let result = provider.allocate();
     provider.remember_value(result, result_type);
     let callee = SymbolIdentity::external_raw(symbol)
-        .map_err(|error| super::super::super::support::unsupported(span, error.to_string()))?;
+        .map_err(|error| super::super::super::errors::unsupported(span, error.to_string()))?;
     instructions.push(BackendInstruction::Call { callee, arguments, result: Some(result), span });
     Ok(result)
 }
@@ -60,7 +60,7 @@ fn normalize_runtime_arguments(
     match lookup_call_intrinsic(callee) {
         Some(IntrinsicKind::Append) => {
             let byte = arguments.get(1).copied().ok_or_else(|| {
-                super::super::super::support::unsupported(span, "append requires a byte")
+                super::super::super::errors::unsupported(span, "append requires a byte")
             })?;
             arguments[1] = coerce_runtime_integer(
                 provider,
@@ -100,7 +100,7 @@ fn coerce_runtime_integer(
 ) -> Result<BackendValueId, BackendContractError> {
     let source_type = provider
         .value_type(value)
-        .ok_or_else(|| super::super::super::support::unsupported(span, missing_type_message))?;
+        .ok_or_else(|| super::super::super::errors::unsupported(span, missing_type_message))?;
     if source_type == target_type {
         return Ok(value);
     }

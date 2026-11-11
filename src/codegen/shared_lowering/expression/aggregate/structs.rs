@@ -6,7 +6,7 @@ use crate::codegen::{
 use crate::lexer::SourceSpan;
 
 use super::super::super::SharedExpressionProvider;
-use super::super::super::support::{expression_span, unsupported};
+use super::super::super::errors::{expression_span, unsupported};
 
 pub(super) fn lower_struct_literal_expression(
     provider: &mut SharedExpressionProvider<'_>,
@@ -70,7 +70,7 @@ fn lower_field(
         unsupported(field.span, format!("aggregate field `{}` has no neutral layout", field.name))
     })?;
     let declared_ty =
-        super::super::super::support::backend_value_type(provider.layouts, &metadata.ty)
+        super::super::super::scalar_types::backend_value_type(provider.layouts, &metadata.ty)
             .ok_or_else(|| unsupported(field.span, "aggregate field type has no neutral layout"))?;
     let ty = indirect_field_type(metadata.indirect, declared_ty);
     let value = provider.lower_expression(&field.value, instructions)?;

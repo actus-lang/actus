@@ -1,4 +1,11 @@
-use super::*;
+use super::super::super::{
+    BackendContractError, BackendInstruction, BackendIntegerCompareOp, BackendValueId,
+    BackendValueType,
+};
+use super::super::errors::unsupported;
+use super::SharedExpressionProvider;
+use crate::ast::BinaryOp;
+use crate::lexer::SourceSpan;
 
 impl SharedExpressionProvider<'_> {
     pub(super) fn lower_compare(

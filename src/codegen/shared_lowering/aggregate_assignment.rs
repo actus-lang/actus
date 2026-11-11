@@ -3,8 +3,8 @@ use crate::lexer::SourceSpan;
 use super::super::{
     BackendContractError, BackendInstruction, BackendLayout, BackendValueId, SymbolIdentity,
 };
+use super::errors::unsupported;
 use super::expression::SharedExpressionProvider;
-use super::support::unsupported;
 
 pub(super) fn assign_aggregate_loan(
     provider: &mut SharedExpressionProvider<'_>,

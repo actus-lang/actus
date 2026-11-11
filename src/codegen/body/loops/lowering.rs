@@ -1,25 +1,22 @@
 // Structured loop lowering carries the explicit block, binding, and edge state
 // required to preserve Actus control-flow contracts.
-use super::super::body_contract::unsupported;
-use super::super::{
+use super::super::super::{
     BackendBlock, BackendBlockId, BackendBlockParameter, BackendContractError, BackendEdgeArgument,
     BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendValueType,
 };
-use super::loop_support::{
+use super::super::contract::unsupported;
+use super::super::{BodyLowering, LoopTargets};
+use super::carried::{
     collect_assignment_names, collect_ins_argument_names, index_type_signed, is_loop_carried_type,
     range_binding_type,
 };
-use super::{BodyLowering, LoopTargets};
 use crate::ast::{Block, Expr, ForBinding, Stmt};
 use crate::lexer::SourceSpan;
 
-mod range_setup;
-mod state;
-use range_setup::{RangeBodyInput, RangeSetup};
-pub(crate) use state::CarriedBinding;
-use state::LoopValues;
+use super::range_setup::{RangeBodyInput, RangeSetup};
+use super::state::{CarriedBinding, LoopValues};
 
-pub(super) struct ForArrayInput<'a> {
+pub(in crate::codegen::body) struct ForArrayInput<'a> {
     id: BackendBlockId,
     block: &'a Block,
     index: usize,
@@ -31,7 +28,7 @@ pub(super) struct ForArrayInput<'a> {
     instructions: Vec<BackendInstruction>,
 }
 
-pub(super) struct ForRangeInput<'a> {
+pub(in crate::codegen::body) struct ForRangeInput<'a> {
     id: BackendBlockId,
     block: &'a Block,
     index: usize,
@@ -44,8 +41,8 @@ pub(super) struct ForRangeInput<'a> {
     instructions: Vec<BackendInstruction>,
 }
 
-impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
-    pub(super) fn lower_for_statement(
+impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
+    pub(in crate::codegen::body) fn lower_for_statement(
         &mut self,
         id: BackendBlockId,
         block: &Block,
@@ -86,7 +83,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         }
     }
 
-    pub(super) fn lower_for_array_statement(
+    pub(in crate::codegen::body) fn lower_for_array_statement(
         &mut self,
         input: ForArrayInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
@@ -123,7 +120,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         })
     }
 
-    pub(super) fn lower_for_range_statement(
+    pub(in crate::codegen::body) fn lower_for_range_statement(
         &mut self,
         input: ForRangeInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
@@ -180,7 +177,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
-    pub(super) fn allocate_loop_values(
+    pub(in crate::codegen::body) fn allocate_loop_values(
         &mut self,
         ty: BackendValueType,
         carried: &[CarriedBinding],
@@ -211,7 +208,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         }
     }
 
-    pub(super) fn collect_carried_bindings(
+    pub(in crate::codegen::body) fn collect_carried_bindings(
         &mut self,
         body: &Block,
         span: SourceSpan,
@@ -240,7 +237,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             .collect()
     }
 
-    pub(super) fn allocate_loop_blocks(&mut self) -> LoopBlocks {
+    pub(in crate::codegen::body) fn allocate_loop_blocks(&mut self) -> LoopBlocks {
         LoopBlocks {
             header: self.allocate_block(),
             body: self.allocate_block(),
@@ -328,15 +325,15 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct LoopBlocks {
-    header: BackendBlockId,
+pub(in crate::codegen::body) struct LoopBlocks {
+    pub(super) header: BackendBlockId,
     body: BackendBlockId,
     increment: BackendBlockId,
     continuation: BackendBlockId,
 }
 
-pub(super) fn initial_loop_arguments(
-    start: super::super::BackendValueId,
+pub(in crate::codegen::body) fn initial_loop_arguments(
+    start: super::super::super::BackendValueId,
     index_type: BackendValueType,
     carried: &[CarriedBinding],
     span: SourceSpan,
@@ -351,7 +348,7 @@ pub(super) fn initial_loop_arguments(
 }
 
 fn body_parameters(
-    index: super::super::BackendValueId,
+    index: super::super::super::BackendValueId,
     binding: &ForBinding,
     ids: &LoopValues,
     carried: &[CarriedBinding],
@@ -373,7 +370,7 @@ fn body_parameters(
 fn header_block(
     blocks: LoopBlocks,
     ids: &LoopValues,
-    end_value: super::super::BackendValueId,
+    end_value: super::super::super::BackendValueId,
     index_type: BackendValueType,
     carried: &[CarriedBinding],
     span: SourceSpan,
@@ -463,7 +460,7 @@ fn increment_block(
     }
 }
 
-pub(super) fn replace_jump_arguments(
+pub(in crate::codegen::body) fn replace_jump_arguments(
     mut block: BackendBlock,
     target: BackendBlockId,
     edge_arguments: Vec<BackendEdgeArgument>,
@@ -478,7 +475,7 @@ pub(super) fn replace_jump_arguments(
     block
 }
 
-pub(super) fn replace_jump_arguments_in_block(
+pub(in crate::codegen::body) fn replace_jump_arguments_in_block(
     block: &mut BackendBlock,
     target: BackendBlockId,
     edge_arguments: &[BackendEdgeArgument],

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::super::BackendBlockParameter;
-use super::super::body_contract::unsupported;
-use super::{
+use super::super::super::super::BackendBlockParameter;
+use super::super::super::contract::unsupported;
+use super::super::super::{
     BackendBlock, BackendBlockId, BackendContractError, BackendEdgeArgument,
     BackendExpressionProvider, BackendInstruction, BackendValueId, BodyLowering,
 };
@@ -10,15 +10,12 @@ use crate::ast::{Block, CaseBody, Expr, Pattern, Stmt};
 use crate::codegen::BackendValueType;
 use crate::lexer::SourceSpan;
 
-use super::loop_support::collect_assignment_names;
-use super::loops::CarriedBinding;
+use super::super::super::loops::CarriedBinding;
+use super::super::super::loops::carried::collect_assignment_names;
 
-#[path = "case_value/owner_flow.rs"]
-mod owner_flow;
-
-struct CaseBranchValue {
+pub(super) struct CaseBranchValue {
     block: BackendBlockId,
-    value: BackendValueId,
+    pub(super) value: BackendValueId,
     carried_values: Vec<BackendValueId>,
 }
 
@@ -35,16 +32,16 @@ struct CaseOwnerBranches {
     instructions: Vec<BackendInstruction>,
 }
 
-pub(super) struct CaseOwnerInput<'a> {
-    pub(super) id: BackendBlockId,
-    pub(super) block: &'a Block,
-    pub(super) index: usize,
-    pub(super) name: &'a str,
-    pub(super) declared_type: Option<&'a str>,
-    pub(super) expression: &'a Expr,
-    pub(super) span: SourceSpan,
-    pub(super) fallthrough: Option<BackendBlockId>,
-    pub(super) instructions: Vec<BackendInstruction>,
+pub(in crate::codegen::body) struct CaseOwnerInput<'a> {
+    pub(in crate::codegen::body) id: BackendBlockId,
+    pub(in crate::codegen::body) block: &'a Block,
+    pub(in crate::codegen::body) index: usize,
+    pub(in crate::codegen::body) name: &'a str,
+    pub(in crate::codegen::body) declared_type: Option<&'a str>,
+    pub(in crate::codegen::body) expression: &'a Expr,
+    pub(in crate::codegen::body) span: SourceSpan,
+    pub(in crate::codegen::body) fallthrough: Option<BackendBlockId>,
+    pub(in crate::codegen::body) instructions: Vec<BackendInstruction>,
 }
 
 struct CaseOwnerContinuationInput<'a> {
@@ -89,7 +86,7 @@ type CaseOwnerBranchResult = (
 );
 
 impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
-    pub(super) fn lower_case_owner(
+    pub(in crate::codegen::body) fn lower_case_owner(
         &mut self,
         input: CaseOwnerInput<'_>,
     ) -> Result<BackendBlock, BackendContractError> {
@@ -311,7 +308,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         let is_last = index + 1 == branch_count;
         let following_id = (!is_last).then(|| self.allocate_block());
         let (subject_value, condition) =
-            super::case::lower_case_condition(self, subject, branch, is_last, instructions)?;
+            super::super::lower_case_condition(self, subject, branch, is_last, instructions)?;
         let else_id = following_id.unwrap_or_else(|| self.allocate_block());
         instructions.push(BackendInstruction::Branch {
             condition,
@@ -331,10 +328,12 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         id: BackendBlockId,
         branch: &crate::ast::CaseBranch,
         mode: crate::ast::CaseMode,
-        subject: super::BackendValueId,
+        subject: super::super::super::BackendValueId,
         span: SourceSpan,
-    ) -> Result<(BackendBlock, Option<(BackendBlockId, super::BackendValueId)>), BackendContractError>
-    {
+    ) -> Result<
+        (BackendBlock, Option<(BackendBlockId, super::super::super::BackendValueId)>),
+        BackendContractError,
+    > {
         self.provider.enter_scope(branch.span);
         let mut instructions = Vec::new();
         if let Pattern::Variant { variant, payload, .. } = &branch.pattern {

@@ -6,7 +6,7 @@ use super::super::super::{
     BackendValueId, BackendValueType,
 };
 use super::super::constructors;
-use super::super::support::unsupported;
+use super::super::errors::unsupported;
 use super::SharedExpressionProvider;
 
 pub(super) fn lower_enum_variant_condition_value(

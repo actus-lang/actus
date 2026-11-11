@@ -1,7 +1,6 @@
 mod abi;
 mod backend;
 mod body;
-mod body_contract;
 mod constants;
 mod contract;
 #[cfg(feature = "cranelift")]
@@ -19,7 +18,7 @@ mod symbols;
 
 pub use abi::{
     BackendAggregateFragment, BackendAggregateLocation, BackendDirectAggregateAbi,
-    BackendEnumLayout,
+    BackendEnumLayout, LARGE_AGGREGATE_THRESHOLD,
 };
 pub use backend::{BackendKind, BackendTargetError};
 pub use body::{
@@ -41,9 +40,6 @@ pub use contract::{
     validate_edge_arguments,
 };
 
-/// Aggregates at or above this size use explicit runtime storage instead of a
-/// native function stack slot.
-pub const LARGE_AGGREGATE_THRESHOLD: u32 = 64 * 1024;
 pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};
 pub use model::{
     LoweredCleanupInstruction, LoweredCleanupPlan, LoweredLoopUnwindPlan, LoweredUnwindPlan,

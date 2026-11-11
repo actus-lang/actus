@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use crate::ast::{TypeName, VerbDecl};
 
+use super::errors::unsupported;
 use super::expression::SharedExpressionProvider;
 use super::performance;
-use super::support::unsupported;
 use super::{
     BackendBlockId, BackendContractError, BackendLayoutProvider, BackendPassingMode,
     BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind,

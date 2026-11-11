@@ -145,7 +145,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn distribute_scope_cleanup(
         &mut self,
         span: SourceSpan,
-        blocks: &mut Vec<super::super::BackendBlock>,
+        blocks: &mut Vec<super::super::super::BackendBlock>,
         start: usize,
         block_bindings: &std::collections::BTreeMap<BackendBlockId, std::collections::BTreeMap<String, BackendValueId>>,
     ) -> Result<(), BackendContractError> {
@@ -339,7 +339,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         if let Expr::MethodCall { receiver, method, arguments, span } = expression
-            && let Some(result_type) = super::constructors::parse_constructor_receiver_type(
+            && let Some(result_type) = super::super::constructors::parse_constructor_receiver_type(
                 receiver.as_ref(),
                 *span,
             )

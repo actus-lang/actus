@@ -1,5 +1,9 @@
 use super::super::contract::{BackendContractError, BackendLayout};
 
+/// Aggregates at or above this size use explicit runtime storage instead of a
+/// native function stack slot.
+pub const LARGE_AGGREGATE_THRESHOLD: u32 = 64 * 1024;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendAggregateLocation {
     Register { index: u16 },

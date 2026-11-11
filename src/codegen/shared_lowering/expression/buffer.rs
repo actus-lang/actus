@@ -4,7 +4,7 @@ use crate::lexer::SourceSpan;
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendValueId, BackendValueType,
 };
-use super::super::support::unsupported;
+use super::super::errors::unsupported;
 use super::SharedExpressionProvider;
 use crate::codegen::BackendExpressionProvider;
 

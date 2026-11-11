@@ -55,7 +55,7 @@ pub(super) fn lower_aggregate_loan_argument(
         _ => false,
     };
     if !caller_owned_storage {
-        return Err(super::super::super::support::unsupported(
+        return Err(super::super::super::errors::unsupported(
             span,
             format!(
                 "aggregate `ins` call argument for `{callee}` must resolve to caller-owned storage (value type: {:?}, nominal type: {:?}, expected layout: {:?})",
@@ -93,7 +93,7 @@ pub(super) fn lower_scalar_loan_argument(
             lower_field_loan(provider, object, field, ty, span, instructions)?
         }
         _ => {
-            return Err(super::super::super::support::unsupported(
+            return Err(super::super::super::errors::unsupported(
                 span,
                 "scalar `ins` call arguments require an addressable place",
             ));
@@ -165,13 +165,13 @@ fn lower_field_loan(
 ) -> Result<(BackendValueId, Option<ScalarLoanWriteback>), BackendContractError> {
     let base = provider.lower_expression(object, instructions)?;
     let type_name = provider.nominal_type(base).cloned().ok_or_else(|| {
-        super::super::super::support::unsupported(span, "ins field place has no aggregate type")
+        super::super::super::errors::unsupported(span, "ins field place has no aggregate type")
     })?;
     let aggregate_layout = provider.layouts.layout_for(&type_name).ok_or_else(|| {
-        super::super::super::support::unsupported(span, "ins field place has no aggregate layout")
+        super::super::super::errors::unsupported(span, "ins field place has no aggregate layout")
     })?;
     let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
-        super::super::super::support::unsupported(span, "ins field place has no field layout")
+        super::super::super::errors::unsupported(span, "ins field place has no field layout")
     })?;
     let value = provider.allocate();
     provider.remember_value(value, ty);

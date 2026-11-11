@@ -1,32 +1,16 @@
-mod cleanup;
-mod dominance;
-mod errors;
-mod flow;
-mod instruction;
-mod semantic_cleanup;
-mod validation;
-
+use super::validation;
+use super::{
+    BackendBlockParameter, BackendCleanupBridgeDescriptor, BackendCleanupResolvedDescriptor,
+    BackendContractError, BackendInstruction,
+};
 use crate::ast::Role;
 use crate::lexer::SourceSpan;
 use std::collections::BTreeSet;
 
-use super::abi::BackendDirectAggregateAbi;
-use super::abi::BackendEnumLayout;
-pub use super::backend::BackendIntegerBinaryOp;
-pub use super::backend::BackendIntegerCompareOp;
-pub use super::backend::BackendIntegerUnaryOp;
-use super::model::LoweredCleanupInstruction;
-use super::symbols::{SymbolIdentity, SymbolKind};
-
-pub use cleanup::{
-    BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
-    BackendCleanupField, BackendCleanupOperand, BackendCleanupProvider,
-    BackendCleanupResolvedDescriptor, BackendCleanupResult,
-};
-pub use errors::{BackendContractError, BackendTargetContext, BackendUnsupportedOperation};
-pub use flow::{BackendBlockParameter, BackendEdgeArgument, validate_edge_arguments};
-pub use instruction::{BackendAggregateField, BackendInstruction};
-pub use semantic_cleanup::lower_semantic_cleanup_with_provider;
+use super::super::abi::BackendDirectAggregateAbi;
+use super::super::abi::BackendEnumLayout;
+use super::super::model::LoweredCleanupInstruction;
+use super::super::symbols::{SymbolIdentity, SymbolKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BackendEmitError(pub String);
@@ -138,7 +122,7 @@ pub enum BackendPassingMode {
 }
 
 impl BackendPassingMode {
-    pub(super) fn layout(&self) -> Option<BackendLayout> {
+    pub(in crate::codegen) fn layout(&self) -> Option<BackendLayout> {
         match self {
             Self::Direct => None,
             Self::DirectAggregate { abi } => Some(abi.layout),
@@ -203,16 +187,16 @@ pub struct BackendCleanupPlan {
 pub fn lower_semantic_cleanup(
     model: &crate::semantic::SemanticModel,
 ) -> Result<Vec<BackendCleanupPlan>, BackendContractError> {
-    super::model::validate_cleanup_plans(model)
+    super::super::model::validate_cleanup_plans(model)
         .map_err(BackendContractError::InvalidCleanupContract)?;
-    Ok(super::model::lower_cleanup_plans(model)
+    Ok(super::super::model::lower_cleanup_plans(model)
         .into_iter()
         .map(|plan| {
             let action_count = plan.instructions.len();
             let bridges = plan
                 .instructions
                 .iter()
-                .map(|action| super::model::cleanup_bridge_descriptor(action, model))
+                .map(|action| super::super::model::cleanup_bridge_descriptor(action, model))
                 .collect();
             BackendCleanupPlan {
                 depth: plan.depth,
@@ -450,7 +434,9 @@ fn validate_direct_aggregate_type(
     }
 }
 
-pub(super) fn validate_value_type(ty: BackendValueType) -> Result<(), BackendContractError> {
+pub(in crate::codegen) fn validate_value_type(
+    ty: BackendValueType,
+) -> Result<(), BackendContractError> {
     match ty {
         BackendValueType::Integer { width: 0, .. } | BackendValueType::Float { width: 0 } => {
             Err(BackendContractError::InvalidValueType)

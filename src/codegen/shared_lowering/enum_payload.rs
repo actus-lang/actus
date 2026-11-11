@@ -5,8 +5,8 @@ use super::super::{
     BackendAggregateField, BackendContractError, BackendEnumLayout, BackendExpressionProvider,
     BackendInstruction, BackendValueId, BackendValueType,
 };
+use super::errors::unsupported;
 use super::expression::SharedExpressionProvider;
-use super::support::unsupported;
 
 pub(super) fn lower_named_enum_constructor(
     provider: &mut SharedExpressionProvider<'_>,

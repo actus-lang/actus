@@ -5,7 +5,7 @@ use crate::lexer::SourceSpan;
 use super::super::super::{
     BackendContractError, BackendInstruction, BackendValueId, BackendValueType, SymbolIdentity,
 };
-use super::super::support::unsupported;
+use super::super::errors::unsupported;
 use super::SharedExpressionProvider;
 
 pub(super) fn integer_literal_type(suffix: Option<&str>) -> BackendValueType {

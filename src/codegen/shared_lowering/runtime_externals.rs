@@ -3,7 +3,7 @@ use crate::codegen::{
     BackendReturnMode, BackendValueType, SymbolIdentity,
 };
 
-use super::support::unsupported;
+use super::errors::unsupported;
 
 pub(super) fn append_buffer_runtime_externals(
     externals: &mut Vec<BackendExternal>,
