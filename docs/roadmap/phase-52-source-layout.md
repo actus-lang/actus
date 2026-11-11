@@ -645,6 +645,34 @@ remain under `runtime/fs/walk/` rather than being placed directly under
 `visibility/imports.rs` owns `validate_import_visibility`; the separate
 `expression_checks.rs` family remains in place.
 
+### PR 7 evidence
+
+- [x] The runtime, modules, and registry layout checker passed against
+  `146cdabf`:
+
+  ```text
+  compared items: 1068 matched
+  path-only changes (prefix rewrites, targets verified):
+    super::capabilities -> super::super::super::capabilities  x8
+    super::contract -> super::super::contract  x1
+    super::plan -> super::super::plan  x4
+    super::region -> (bare)  x3
+    super::unit -> super::super::unit  x13
+    super::validation -> super::super::validation  x1
+  result: OK
+  ```
+
+- [x] The seven PR 7 architecture allowlist entries were removed from
+  `tests/architecture_conformance.rs`: four non-facade roots, two facade
+  pairs, and `src/runtime/fs/walk.rs` from the `#[path]` list.
+- [x] `cargo test --all-features -- --list` reported 1,988 tests, matching
+  the 1,988-test PR 5 baseline. The only moved unit-test paths are
+  `runtime::region_bridge_tests::*` to `runtime::region::bridge::tests::*`;
+  the filesystem walk tests remain under `runtime::fs::walk::tests::*`.
+- [x] `cargo test --all-targets --all-features` passed. The runtime region,
+  filesystem walk, module aggregation, and registry behavior remained
+  covered without logic or public API changes.
+
 ## 8. CLI and LSP
 
 | Old | New | Type |
