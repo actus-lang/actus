@@ -344,6 +344,59 @@ aggregate contract. `loop_flow.rs` performs loop lowering and `loop_support.rs`
 contains loop-carried analysis; `integer_values.rs` would contain only two
 functions, so those functions remain in `scalar_types.rs`.
 
+### PR 4 evidence
+
+PR 4 split the shared codegen facades and implementations. The `expression.rs`
+implementation was additionally split into `expression/lowering.rs` and
+`expression/model.rs`; the struct and accessor items moved to `model.rs` to
+keep both files below the 500-line source limit. The `include!` paths in
+`layout/` and `expression/` were updated. Converting those included files into
+ordinary modules is deferred.
+
+The checker command and complete output were:
+
+```text
+compared items: 2127 matched
+path-only changes (prefix rewrites, targets verified):
+  (bare) -> super  x1
+  nested_case -> super::case::nested  x1
+  super -> super::super  x8
+  super -> super::super::super  x2
+  super -> super::arena  x1
+  super -> super::super::arena  x1
+  super -> super::case  x1
+  super -> super::super  x1
+  super -> super::constants  x1
+  super -> super::super::constants  x1
+  super -> super::constructors  x2
+  super -> super::super::constructors  x2
+  super -> super::layout  x1
+  super -> super::super::layout  x1
+  super -> super::loops  x2
+  super -> super::model  x3
+  super -> super::super::model  x3
+  super -> super::serialization  x4
+  super -> super::super::serialization  x4
+  super::super -> (bare)  x1
+  super::super -> super::super::super  x25
+  super::super::abi -> super::super::super::abi  x10
+  super::super::constructors -> super::super::super::constructors  x1
+  super::super::super::body_contract -> super::super::contract  x2
+  super::super::super::support -> super::super::super::errors  x22
+  super::super::super::support -> super::super::super::scalar_types  x5
+  super::super::support -> (bare)  x4
+  super::support -> super::super::errors  x2
+  super::support -> super::super::scalar_types  x1
+result: OK
+```
+
+`cargo test --all-features -- --list` produced 1,988 entries on the working
+tree. The same command against the `ca0f2994` archive could not complete
+because the local linker terminated with `Bus error`, so no base name diff is
+claimed here. `cargo clippy --all-targets --all-features -- -D warnings`
+passed. The all-target test run reached 172 passed tests and then stopped on
+11 temporary-file tests with `Disk quota exceeded`.
+
 ## 5. Cranelift
 
 ### Final tree and map
