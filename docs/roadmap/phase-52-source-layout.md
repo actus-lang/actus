@@ -460,16 +460,52 @@ The former `lowering/mod.rs` owns `Flow` and `LoopTargets`, so it is named
 current domains; similarly named backend-specific `enum_layout` files are not
 merged.
 
-### PR 5 evidence plan
+### PR 5 evidence
 
-- [ ] Move the 16 files above with `git mv` only; the move-only commit must
-  contain 16 `R100` renames.
-- [ ] Convert the listed roots into facades, preserving module paths,
-  visibility boundaries, function bodies, diagnostics, ABI, and output.
-- [ ] Remove the ten Cranelift entries from the architecture allowlist after
-  the facade and directory checks pass.
-- [ ] Record the full layout-check output, the base-versus-head test-list
-  comparison, and all required quality-gate results in the final evidence.
+- [x] The move-only commit contains 16 `R100` renames (`bf440755`). The
+  facade and implementation split is recorded in `e35c192d`, and the ten
+  Cranelift architecture-allowlist entries were removed in `04419a4f`.
+- [x] `python3 scripts/check_layout_bodies.py 09eeca0f src/codegen`:
+
+  ```text
+  compared items: 2127 matched
+  path-only changes (prefix rewrites, targets verified):
+    branches -> super::branches  x1
+    super -> super::super::numeric  x5
+    super::arrays -> super::super::arrays  x1
+    super::buffer_index -> super::super::buffer_index  x1
+    super::contract -> super::super::contract  x1
+    super::declarations -> super::super::emission  x1
+    super::dependencies -> super::super::dependencies  x1
+    super::generic -> super::super::generic  x1
+    super::ir_audit -> super::super::ir_audit  x1
+    super::literals -> super::super::literals  x1
+    super::loops -> super::super::loops  x1
+    super::lowering -> super::super::lowering  x1
+    super::performance -> super::super::performance  x6
+    super::super::case -> super::super::super::case  x1
+    super::super::expressions -> super::super::super::expressions  x1
+    super::super::float_ops -> super::super::numeric  x1
+    super::vtable -> super::dispatch  x1
+    super::vtable -> super::super::dispatch  x4
+  result: OK
+  ```
+
+- [x] The `include!` path changes are confined to the `layout/` and
+  `expression/` trees. Converting those `include!` inputs into Rust modules
+  is deferred to the relevant later layout PR.
+- [ ] The required base-archive test-list comparison was attempted with
+  `git archive 09eeca0f | tar -x -C <temp>` and
+  `CARGO_BUILD_JOBS=1 CXXFLAGS=-w LLVM_SYS_231_PREFIX=<verified-prefix>
+  cargo test --all-features -- --list`. The current branch listed 1,988
+  tests; the base archive could not finish linking because the runner
+  returned `Disk quota exceeded (os error 122)`, so no base name diff is
+  claimed here.
+- [x] `cargo fmt --all -- --check`, `CXXFLAGS=-w cargo check --lib
+  --all-features`, `CXXFLAGS=-w cargo clippy --all-targets --all-features
+  -- -D warnings`, `cargo test --all-targets --all-features`,
+  `scripts/check_source_limits.sh`, `scripts/check_architecture.sh`,
+  `scripts/check_documentation.sh`, and `scripts/check_secrets.sh` passed.
 
 ## 6. LLVM
 
