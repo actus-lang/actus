@@ -279,16 +279,29 @@ clean checker output above has zero expansions. `cargo test --all-targets
 ### Final tree
 
 ```text
-codegen/body/{mod,lowering,contract,case/{mod,carried,context,returns,nested,
-  value/{mod,values,owner_flow}},loops/{mod,lowering,exits,range_setup,state},control_flow,if_flow,
-  provider,statements,try_value,value}.rs
-codegen/shared_lowering/expression/{mod,aggregate/{mod,arrays,compound,fields,
-  metadata,structs},calls/{mod,arguments,constructors,loan,print,resolution,
-  runtime},arena,arithmetic,array_ops,buffer,case,cast,cleanup,compare,dispatch,
-  drop,layout,literals,packed,parameter_state,provider,state}.rs
-codegen/shared_lowering/layout/{mod,registry,cleanup,generic_struct,options,provider}.rs
+codegen/mod.rs                                      # facade only
+codegen/abi/aggregate.rs                            # LARGE_AGGREGATE_THRESHOLD
+codegen/body/{mod,lowering,contract,control_flow,if_flow,provider,
+  statements,try_value,value}.rs
+codegen/body/case/{mod,branches,carried,context,returns,nested}.rs
+codegen/body/case/value/{mod,values,owner_flow}.rs
+codegen/body/loops/{mod,lowering,loop_statement,carried,range_setup,state}.rs
+codegen/shared_lowering/{mod,aggregate_assignment,constructors,declarations,
+  enum_payload,errors,functions,orchestration,performance,returns,runtime,
+  runtime_externals,scalar_types,tests}.rs
+codegen/shared_lowering/expression/{mod,lowering,arena,arithmetic,array_ops,
+  buffer,case,cast,cleanup,compare,dispatch,drop,layout,literals,packed,
+  parameter_state,provider,state}.rs
+codegen/shared_lowering/expression/aggregate/{mod,values,arrays,compound,
+  fields,metadata,structs}.rs
+codegen/shared_lowering/expression/calls/{mod,lowering,arguments,constructors,
+  loan,print,resolution,runtime}.rs
+codegen/shared_lowering/layout/{mod,registry,cleanup,generic_struct,options,
+  provider}.rs
 codegen/contract/{mod,types,cleanup,dominance,errors,flow,instruction,
   semantic_cleanup,validation}.rs
+codegen/result_constructors/{mod,normalize,spans}.rs
+codegen/symbols/{mod,model,bindings}.rs
 ```
 
 | Old | New | Type |
@@ -297,23 +310,39 @@ codegen/contract/{mod,types,cleanup,dominance,errors,flow,instruction,
 | `body.rs` `BodyLowering` | `body/lowering.rs` | extract |
 | `body_contract.rs` | `body/contract.rs` | move |
 | `body/case.rs` | `body/case/mod.rs` | pair→facade |
+| `body/case.rs` case lowering items | `body/case/branches.rs` | extract |
 | `body/case_return.rs` | `body/case/returns.rs` | rename |
 | `body/nested_case.rs` | `body/case/nested.rs` | rename |
-| `body/case_value.rs` | `body/case/value/mod.rs` | group + extract |
-| `body/loop_flow.rs` | `body/loops/exits.rs` | group |
-| `body/loop_support.rs` | `body/loops/targets.rs` | rename |
+| `body/case_value.rs` | `body/case/value/mod.rs` | pair→facade |
+| `body/case_value.rs` case value items | `body/case/value/values.rs` | extract |
+| `body/case_value/owner_flow.rs` | `body/case/value/owner_flow.rs` | move; remove `#[path]` |
 | `body/loops.rs` | `body/loops/mod.rs` | pair→facade |
+| `body/loops.rs` loop lowering items | `body/loops/lowering.rs` | extract |
+| `body/loop_flow.rs` | `body/loops/loop_statement.rs` | rename |
+| `body/loop_support.rs` | `body/loops/carried.rs` | rename |
 | `shared_lowering/expression.rs` | `expression/mod.rs` | pair→facade |
+| `shared_lowering/expression.rs` expression lowering items | `expression/lowering.rs` | extract |
 | `expression/aggregate.rs` | `expression/aggregate/mod.rs` | pair→facade |
+| `expression/aggregate.rs` aggregate lowering items | `expression/aggregate/values.rs` | extract |
 | `expression/calls.rs` | `expression/calls/mod.rs` | pair→facade |
-| `shared_lowering/layout.rs` `LayoutRegistry` | `layout/registry.rs` | extract |
-| `shared_lowering/support.rs` | `scalar_types.rs`, `integer_values.rs` | rename |
+| `expression/calls.rs` call lowering items | `expression/calls/lowering.rs` | extract |
+| `shared_lowering/layout.rs` | `layout/mod.rs` | pair→facade |
+| `shared_lowering/layout.rs` `LayoutRegistry` and layout helpers | `layout/registry.rs` | extract |
+| `shared_lowering/support.rs` | `scalar_types.rs` | extract scalar type functions |
+| `shared_lowering/support.rs` | `errors.rs` | extract expression span/kind and unsupported-operation errors in COMMIT 4 |
 | `contract/mod.rs` backend types | `contract/types.rs` | extract |
+| `result_constructors/mod.rs` | `result_constructors/normalize.rs` | extract |
+| `symbols/mod.rs` | `symbols/model.rs` | extract |
+| `codegen/mod.rs` `LARGE_AGGREGATE_THRESHOLD` | `abi/aggregate.rs` | extract in COMMIT 4 |
 | existing contract children | same paths | unchanged |
 
-`body.rs:10-20` imports the case/loop families; aggregate and call modules
-are imported through the expression modules. `LayoutRegistry` is the primary
-type in `shared_lowering/layout.rs`.
+`body.rs:10-20` imports the case and loop families; aggregate and call
+modules are imported through the expression facades. `LayoutRegistry` is the
+primary type in `shared_lowering/layout.rs`. `constants.rs` already contains
+the inline-constants pass, so the aggregate threshold belongs with the ABI
+aggregate contract. `loop_flow.rs` performs loop lowering and `loop_support.rs`
+contains loop-carried analysis; `integer_values.rs` would contain only two
+functions, so those functions remain in `scalar_types.rs`.
 
 ## 5. Cranelift
 
@@ -535,9 +564,11 @@ facade-plus-extract rule applies to every other true pair in the mapping.
 | `llvm/scalar.rs` | scalar selection, guards, constants | `llvm/scalar/values.rs` | group + extract |
 | `formatter/declarations.rs` | declaration formatting functions | `formatter/declarations/render.rs` | group + extract |
 | `runtime/region_bridge.rs` | region bridge operations | `region/bridge/access.rs` | group + extract |
-| `body/loop_flow.rs` | loop exit and flow transitions | `body/loops/exits.rs` | group + extract |
+| `body/loop_flow.rs` | loop exit and flow transitions | `body/loops/loop_statement.rs` | group + extract |
 | `modules/aggregation/plan.rs` | `ModuleCompilationPlan` and plan builders | `modules/aggregation/plan/compilation.rs` | group + extract |
 | `modules/aggregation/plan_validation.rs` | plan validation functions | `modules/aggregation/plan/validation.rs` | group + extract |
+| `shared_lowering/support.rs` | scalar type functions | `scalar_types.rs` | group + extract |
+| `shared_lowering/support.rs` | expression span/kind and unsupported-operation errors | `errors.rs` | group + extract in COMMIT 4 |
 
 ## Exact LLVM map
 
@@ -775,7 +806,7 @@ are listed separately below; they are not extraction rows.
 | --- | --- | --- | ---: |
 | `src/cli/mod.rs` | `run`, dispatch, command parsing | `cli/dispatch.rs` | 8 |
 | `src/cli/test_runner/mod.rs` | `TestOptions`, `test_command` | `cli/test_runner/runner.rs` | 8 |
-| `src/codegen/mod.rs` | `LARGE_AGGREGATE_THRESHOLD` | `codegen/constants.rs` | 4 |
+| `src/codegen/mod.rs` | `LARGE_AGGREGATE_THRESHOLD` | `codegen/abi/aggregate.rs` | 4 |
 | `src/codegen/contract/mod.rs` | `Backend*` types | `codegen/contract/types.rs` | 4 |
 | `src/codegen/cranelift/case/mod.rs` | case lowering functions | `cranelift/case/lowering.rs` | 5 |
 | `src/codegen/cranelift/contract/mod.rs` | `emit_contract_module_object` | `cranelift/contract/emission.rs` | 5 |
