@@ -8,7 +8,7 @@ use crate::codegen::{
     BackendEmitError, BackendInstruction, BackendIntegerCompareOp, BackendValueId, BackendValueType,
 };
 
-pub(super) fn lower_float_compare(
+pub(in crate::codegen::cranelift) fn lower_float_compare(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,

@@ -402,33 +402,110 @@ passed. The all-target test run reached 172 passed tests and then stopped on
 ### Final tree and map
 
 ```text
-cranelift/numeric/{mod,float.rs,integer.rs}
-cranelift/dispatch/{mod,dynamic.rs,vtable.rs}
-cranelift/emission.rs and its extracted emission responsibilities
-cranelift/calls/{mod,arguments,context,lower,method,returns}.rs
-cranelift/case/*  cranelift/contract/*  cranelift/expressions/*
-cranelift/function_definition/*  cranelift/layout/*  cranelift/lowering/*
-cranelift/performance/*  cranelift/generic/*  cranelift/structs/*
+cranelift/
+  mod.rs abi.rs aggregate.rs arenas.rs arrays.rs buffer_index.rs cleanup.rs
+  control_flow.rs dependencies.rs enum_layout.rs enums/ generic/ ir_audit.rs
+  isa.rs literals.rs native.rs object.rs runtime.rs structs/ types.rs
+  numeric/{mod,float.rs,integer.rs}
+  dispatch/{mod,dynamic.rs,vtable.rs}
+  emission/{mod,output.rs,verbs.rs,declarations.rs}
+  calls/{mod,arguments.rs,context.rs,lower.rs,method.rs,returns.rs}
+  case/{mod,lowering.rs,branches.rs,context.rs,matching.rs,payload.rs,types.rs}
+  contract/{mod,emission.rs,aggregate.rs,arena.rs,arrays.rs,cleanup.rs,
+    control_flow.rs,declarations.rs,dispatch.rs,enums.rs,functions.rs,packed.rs,
+    returns.rs,scalar.rs}
+  expressions/{mod,lowering.rs,buffer.rs,cast.rs,construct.rs,if_lowering.rs,
+    initializer_types.rs,literals.rs,operations.rs,short_circuit.rs,try_lowering.rs}
+  function_definition/{mod,definition.rs,flow.rs,parameters.rs}
+  layout/{mod,registry.rs,arrays.rs,packs.rs,structs.rs}
+  lowering/{mod,flow.rs,body.rs,loops.rs,scopes.rs,
+    statements/{mod,lowering.rs,compound.rs,control_flow.rs,dispatch.rs,owners.rs,
+      structured_control.rs,try_lowering.rs}}
+  performance/{mod,registry.rs,emit.rs}
 ```
 
 | Old | New | Type |
 | --- | --- | --- |
-| `float_ops.rs` | `numeric/float.rs` | group |
-| `integer_ops.rs` | `numeric/integer.rs` | group |
-| `dynamic_call.rs` | `dispatch/dynamic.rs` | group |
-| `vtable.rs` | `dispatch/vtable.rs` | group |
-| `emission.rs` | `emission/output.rs` | group + extract |
-| `emitter_declarations.rs` | `emission/externals.rs` | rename |
-| `declarations.rs` | `emission/declarations.rs` | group |
+| `float_ops.rs` | `numeric/float.rs` | move |
+| `integer_ops.rs` | `numeric/integer.rs` | move |
+| `dynamic_call.rs` | `dispatch/dynamic.rs` | move |
+| `vtable.rs` | `dispatch/vtable.rs` | move |
+| `emission.rs` | `emission/output.rs` | move |
+| `emitter_declarations.rs` | `emission/verbs.rs` | move |
+| `declarations.rs` | `emission/declarations.rs` | move |
 | `calls.rs` | `calls/mod.rs` | pair→facade |
-| `calls/*` | `calls/*` | unchanged |
-| `case/*`, `contract/*`, `expressions/*` | same subtrees | unchanged |
-| `function_definition/*`, `layout/*`, `lowering/*`, `performance/*`, `generic/*`, `structs/*` | same subtrees | unchanged |
-| remaining `cranelift/*.rs` | same paths | unchanged |
+| `case/mod.rs` | `case/lowering.rs` | move |
+| `contract/mod.rs` | `contract/emission.rs` | move |
+| `expressions/mod.rs` | `expressions/lowering.rs` | move |
+| `function_definition/mod.rs` | `function_definition/definition.rs` | move |
+| `layout/mod.rs` | `layout/registry.rs` | move |
+| `lowering/mod.rs` | `lowering/flow.rs` | move |
+| `lowering/statements/mod.rs` | `lowering/statements/lowering.rs` | move |
+| `performance/mod.rs` | `performance/registry.rs` | move |
+| `calls/{arguments,context,lower,method,returns}.rs` | same paths | unchanged |
+| `case/{branches,context,matching,payload,types}.rs` | same paths | unchanged |
+| `contract/{aggregate,arena,arrays,cleanup,control_flow,declarations,dispatch,enums,functions,packed,returns,scalar}.rs` | same paths | unchanged |
+| `expressions/{buffer,cast,construct,if_lowering,initializer_types,literals,operations,short_circuit,try_lowering}.rs` | same paths | unchanged |
+| `function_definition/{flow,parameters}.rs` | same paths | unchanged |
+| `layout/{arrays,packs,structs}.rs` | same paths | unchanged |
+| `lowering/{body,loops,scopes}.rs` | same paths | unchanged |
+| `lowering/statements/{compound,control_flow,dispatch,owners,structured_control,try_lowering}.rs` | same paths | unchanged |
+| `performance/emit.rs` | same path | unchanged |
+| remaining `cranelift/*.rs` and subtrees (`enums`, `generic`, `structs`) | same paths | unchanged |
 
-`cranelift` `float_ops`/`integer_ops` share numeric lowering; `dynamic_call`
-and `vtable` share dispatch. The similarly named `enum_layout` files remain
-backend-specific and are not merged.
+The `emitter_declarations.rs` implementation declares and defines generated
+verbs rather than external declarations, so it is named `emission/verbs.rs`.
+The former `lowering/mod.rs` owns `Flow` and `LoopTargets`, so it is named
+`lowering/flow.rs`. The remaining Cranelift files and subtrees stay in their
+current domains; similarly named backend-specific `enum_layout` files are not
+merged.
+
+### PR 5 evidence
+
+- [x] The move-only commit contains 16 `R100` renames (`bf440755`). The
+  facade and implementation split is recorded in `e35c192d`, and the ten
+  Cranelift architecture-allowlist entries were removed in `04419a4f`.
+- [x] `python3 scripts/check_layout_bodies.py 09eeca0f src/codegen`:
+
+  ```text
+  compared items: 2127 matched
+  path-only changes (prefix rewrites, targets verified):
+    branches -> super::branches  x1
+    super -> super::super::numeric  x5
+    super::arrays -> super::super::arrays  x1
+    super::buffer_index -> super::super::buffer_index  x1
+    super::contract -> super::super::contract  x1
+    super::declarations -> super::super::emission  x1
+    super::dependencies -> super::super::dependencies  x1
+    super::generic -> super::super::generic  x1
+    super::ir_audit -> super::super::ir_audit  x1
+    super::literals -> super::super::literals  x1
+    super::loops -> super::super::loops  x1
+    super::lowering -> super::super::lowering  x1
+    super::performance -> super::super::performance  x6
+    super::super::case -> super::super::super::case  x1
+    super::super::expressions -> super::super::super::expressions  x1
+    super::super::float_ops -> super::super::numeric  x1
+    super::vtable -> super::dispatch  x1
+    super::vtable -> super::super::dispatch  x4
+  result: OK
+  ```
+
+- [x] The `include!` path changes are confined to the `layout/` and
+  `expression/` trees. Converting those `include!` inputs into Rust modules
+  is deferred to the relevant later layout PR.
+- [ ] The required base-archive test-list comparison was attempted with
+  `git archive 09eeca0f | tar -x -C <temp>` and
+  `CARGO_BUILD_JOBS=1 CXXFLAGS=-w LLVM_SYS_231_PREFIX=<verified-prefix>
+  cargo test --all-features -- --list`. The current branch listed 1,988
+  tests; the base archive could not finish linking because the runner
+  returned `Disk quota exceeded (os error 122)`, so no base name diff is
+  claimed here.
+- [x] `cargo fmt --all -- --check`, `CXXFLAGS=-w cargo check --lib
+  --all-features`, `CXXFLAGS=-w cargo clippy --all-targets --all-features
+  -- -D warnings`, `cargo test --all-targets --all-features`,
+  `scripts/check_source_limits.sh`, `scripts/check_architecture.sh`,
+  `scripts/check_documentation.sh`, and `scripts/check_secrets.sh` passed.
 
 ## 6. LLVM
 
@@ -866,8 +943,12 @@ are listed separately below; they are not extraction rows.
 | `src/codegen/cranelift/expressions/mod.rs` | expression lowering functions | `cranelift/expressions/lowering.rs` | 5 |
 | `src/codegen/cranelift/function_definition/mod.rs` | `define_function` | `cranelift/function_definition/definition.rs` | 5 |
 | `src/codegen/cranelift/layout/mod.rs` | `LayoutRegistry`, layout types | `cranelift/layout/registry.rs` | 5 |
+| `src/codegen/cranelift/lowering/mod.rs` | `Flow`, `LoopTargets` | `cranelift/lowering/flow.rs` | 5 |
 | `src/codegen/cranelift/lowering/statements/mod.rs` | `lower_statements` | `cranelift/lowering/statements/lowering.rs` | 5 |
-| `src/codegen/cranelift/performance/mod.rs` | performance registry/emission | `cranelift/performance/registry.rs` | 5 |
+| `src/codegen/cranelift/performance/mod.rs` | performance registry | `cranelift/performance/registry.rs` | 5 |
+| `src/codegen/cranelift/emission.rs` | emission entry points | `cranelift/emission/output.rs` | 5 |
+| `src/codegen/cranelift/emitter_declarations.rs` | generated verb declarations and definitions | `cranelift/emission/verbs.rs` | 5 |
+| `src/codegen/cranelift/declarations.rs` | Cranelift declaration emission | `cranelift/emission/declarations.rs` | 5 |
 | `src/codegen/llvm/packed/mod.rs` | packed field load/store | `llvm/aggregate/packed/fields.rs` | 6 |
 | `src/codegen/result_constructors/mod.rs` | `normalize_program` | `codegen/result_constructors/normalize.rs` | 4 |
 | `src/codegen/symbols/mod.rs` | `SymbolKind`, `SymbolIdentity`, registry | `codegen/symbols/model.rs` | 4 |

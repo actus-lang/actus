@@ -9,7 +9,7 @@ use crate::codegen::{
     BackendIntegerUnaryOp, BackendValueId, BackendValueType,
 };
 
-pub(super) fn lower_integer_binary(
+pub(in crate::codegen::cranelift) fn lower_integer_binary(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -63,7 +63,7 @@ pub(super) fn lower_integer_binary(
     Ok(())
 }
 
-pub(super) fn lower_integer_cast(
+pub(in crate::codegen::cranelift) fn lower_integer_cast(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -163,7 +163,7 @@ fn integer_ir_type(ty: BackendValueType) -> Result<types::Type, BackendEmitError
     }
 }
 
-pub(super) fn lower_trap_if_zero(
+pub(in crate::codegen::cranelift) fn lower_trap_if_zero(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -188,7 +188,7 @@ pub(super) fn lower_trap_if_zero(
     Ok(())
 }
 
-pub(super) fn lower_trap_if_shift_count_out_of_range(
+pub(in crate::codegen::cranelift) fn lower_trap_if_shift_count_out_of_range(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -213,7 +213,7 @@ pub(super) fn lower_trap_if_shift_count_out_of_range(
     Ok(())
 }
 
-pub(super) fn lower_trap_if_array_index_out_of_bounds(
+pub(in crate::codegen::cranelift) fn lower_trap_if_array_index_out_of_bounds(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -239,7 +239,7 @@ pub(super) fn lower_trap_if_array_index_out_of_bounds(
     Ok(())
 }
 
-pub(super) fn lower_trap_if_signed_division_overflow(
+pub(in crate::codegen::cranelift) fn lower_trap_if_signed_division_overflow(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -275,7 +275,7 @@ fn is_signed(ty: BackendValueType) -> bool {
     matches!(ty, BackendValueType::Integer { signed: true, .. })
 }
 
-pub(super) fn lower_integer_compare(
+pub(in crate::codegen::cranelift) fn lower_integer_compare(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -308,7 +308,7 @@ pub(super) fn lower_integer_compare(
     Ok(())
 }
 
-pub(super) fn lower_scalar_select(
+pub(in crate::codegen::cranelift) fn lower_scalar_select(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -347,7 +347,7 @@ fn coerce_integer_width(
     }
 }
 
-pub(super) fn lower_integer_unary(
+pub(in crate::codegen::cranelift) fn lower_integer_unary(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,

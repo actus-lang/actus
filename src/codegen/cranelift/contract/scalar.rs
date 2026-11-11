@@ -5,11 +5,11 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
-use super::super::integer_ops::{
+use super::super::native::BackendEmitError;
+use super::super::numeric::{
     lower_trap_if_array_index_out_of_bounds, lower_trap_if_shift_count_out_of_range,
     lower_trap_if_signed_division_overflow, lower_trap_if_zero,
 };
-use super::super::native::BackendEmitError;
 use crate::codegen::{BackendInstruction, BackendValueId};
 
 pub(super) fn lower_guard(

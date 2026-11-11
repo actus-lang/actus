@@ -5,20 +5,20 @@ use crate::target::TargetSpec;
 
 use cranelift_module::Module;
 
-use super::super::contract::lower_semantic_cleanup_with_provider;
-use super::super::cranelift::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
-use super::super::model::{LoweredCleanupSchedule, validate_cleanup_plans};
-use super::super::result_constructors::normalize_program;
-use super::emitter_declarations::{
+use super::super::super::contract::lower_semantic_cleanup_with_provider;
+use super::super::super::model::{LoweredCleanupSchedule, validate_cleanup_plans};
+use super::super::super::result_constructors::normalize_program;
+use super::super::generic::GenericLayoutRegistry;
+use super::super::layout::LayoutRegistry;
+use super::super::literals::define_string_data;
+use super::super::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
+use super::super::object::create_module;
+use super::super::performance::PerformanceRegistry;
+use super::super::performance::define_performances;
+use super::verbs::{
     DeclarationContext, declaration_external_verb, declaration_verb, declare_all_functions,
     define_verbs, function_metadata, validate_native_program,
 };
-use super::generic::GenericLayoutRegistry;
-use super::layout::LayoutRegistry;
-use super::literals::define_string_data;
-use super::object::create_module;
-use super::performance::PerformanceRegistry;
-use super::performance::define_performances;
 
 pub(crate) struct NativeRootSelection<'a> {
     pub(crate) symbol: Option<&'a str>,
@@ -42,7 +42,7 @@ pub(crate) fn emit_program_object_for_target(
 ) -> Result<Vec<u8>, BackendEmitError> {
     let (program, semantic) = prepare_program(program, target, additional_instances)?;
     let (all_verbs, all_external_verbs) = collect_declarations(&program);
-    let (verbs, external_verbs) = super::dependencies::reachable_declarations_with_roots(
+    let (verbs, external_verbs) = super::super::dependencies::reachable_declarations_with_roots(
         &all_verbs,
         &all_external_verbs,
         roots.symbol,
@@ -104,7 +104,7 @@ fn prepare_program(
     );
     let specialized_program =
         crate::codegen::specialize_program(&normalized_program, &generic_instances)?;
-    for instance in super::generic::collect_concrete_type_instances(&specialized_program) {
+    for instance in super::super::generic::collect_concrete_type_instances(&specialized_program) {
         if !generic_instances.iter().any(|known| known.identity() == instance.identity()) {
             generic_instances.push(instance);
         }
@@ -184,7 +184,7 @@ struct VerbEmission<'items, 'program> {
     verbs: &'items [&'program VerbDecl],
     external_verbs: &'items [&'program ExternalVerbDecl],
     generic_instances: &'items [GenericInstance],
-    performance_definitions: &'items [super::performance::PerformanceDefinition<'program>],
+    performance_definitions: &'items [super::super::performance::PerformanceDefinition<'program>],
     symbol: Option<&'items str>,
     namespace_prefix: &'items str,
     bindings: &'items BackendSymbolBindings,
@@ -232,7 +232,7 @@ fn build_layouts_and_metadata(
     inputs: &VerbEmission<'_, '_>,
 ) -> Result<LayoutMetadata, BackendEmitError> {
     let layouts = build_layouts(module, inputs.program, inputs.generic_instances)?;
-    let cleanup_provider = super::contract::LayoutCleanupProvider { layouts: &layouts };
+    let cleanup_provider = super::super::contract::LayoutCleanupProvider { layouts: &layouts };
     let resolved_plans = lower_semantic_cleanup_with_provider(inputs.semantic, &cleanup_provider)
         .map_err(|error| {
         BackendEmitError(format!("cleanup descriptor lowering failed: {error}"))
@@ -253,12 +253,12 @@ fn build_layouts_and_metadata(
 
 fn define_vtable_data(
     module: &mut cranelift_object::ObjectModule,
-    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
+    performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
     functions: &std::collections::HashMap<String, FunctionMeta>,
     layouts: &LayoutRegistry,
     namespace_prefix: &str,
-) -> Result<super::vtable::VtableDataIds, BackendEmitError> {
-    super::vtable::define_vtables(
+) -> Result<super::super::dispatch::VtableDataIds, BackendEmitError> {
+    super::super::dispatch::define_vtables(
         module,
         performance_definitions,
         functions,
@@ -272,7 +272,7 @@ fn declare_emission_functions(
     module: &mut cranelift_object::ObjectModule,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
-    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
+    performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
     symbol: Option<&str>,
     namespace_prefix: &str,
     layouts: &LayoutRegistry,
@@ -292,12 +292,12 @@ fn declare_emission_functions(
 struct EmissionDefinitions<'items, 'program> {
     module: &'items mut cranelift_object::ObjectModule,
     verbs: &'items [&'program VerbDecl],
-    performance_definitions: &'items [super::performance::PerformanceDefinition<'program>],
+    performance_definitions: &'items [super::super::performance::PerformanceDefinition<'program>],
     functions: &'items std::collections::HashMap<String, FunctionMeta>,
     cleanup_schedule: &'items LoweredCleanupSchedule,
-    string_data: &'items super::literals::StringDataIds,
+    string_data: &'items super::super::literals::StringDataIds,
     layouts: &'items LayoutRegistry,
-    vtable_data: &'items super::vtable::VtableDataIds,
+    vtable_data: &'items super::super::dispatch::VtableDataIds,
     namespace_prefix: &'items str,
     entry_symbol: Option<&'items str>,
     target: &'items TargetSpec,

@@ -6,10 +6,10 @@ use cranelift_object::ObjectModule;
 
 use crate::ast::{DispatchMode, ExternalVerbDecl, VerbDecl};
 
-use super::super::symbols::{SymbolIdentity, SymbolKind};
-use super::layout::LayoutRegistry;
-use super::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
-use super::types::NativeType;
+use super::super::super::symbols::{SymbolIdentity, SymbolKind};
+use super::super::layout::LayoutRegistry;
+use super::super::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
+use super::super::types::NativeType;
 
 pub(crate) struct FunctionDeclarationContext<'a> {
     pub(super) entry_symbol: Option<&'a str>,

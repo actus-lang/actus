@@ -29,7 +29,7 @@ impl StringDataValues {
         role: &str,
         native_type: crate::codegen::cranelift::types::NativeType,
     ) -> String {
-        super::vtable::vtable_symbol_for_native_in_namespace(
+        super::dispatch::vtable_symbol_for_native_in_namespace(
             &self.namespace_prefix,
             role,
             native_type,

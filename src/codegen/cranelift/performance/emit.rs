@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_object::ObjectModule;
 
+use super::super::dispatch::VtableDataIds;
 use super::super::literals::StringDataIds;
 use super::super::native::{BackendEmitError, FunctionMeta};
 use super::super::types::NativeType;
-use super::super::vtable::VtableDataIds;
 use super::{PerformanceDefinition, dispatch_key};
 use crate::codegen::cranelift::function_definition::define_function;
 use crate::codegen::cranelift::layout::LayoutRegistry;
