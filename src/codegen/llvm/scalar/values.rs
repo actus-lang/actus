@@ -1,21 +1,21 @@
 use std::collections::BTreeMap;
 
-use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
-use super::enums::{emit_enum_construct, emit_enum_discriminant, emit_enum_payload};
-use super::float::{emit_float_cast, emit_float_compare, emit_float_constant};
-use super::guards::{
+use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+use super::super::enums::{emit_enum_construct, emit_enum_discriminant, emit_enum_payload};
+use super::super::guards::{
     emit_trap_if_array_index_out_of_bounds, emit_trap_if_shift_count_out_of_range,
     emit_trap_if_signed_division_overflow, emit_trap_if_zero,
 };
+use super::super::literals::emit_string_literal;
+use super::float::{emit_float_cast, emit_float_compare, emit_float_constant};
 use super::integer::{
     emit_integer_binary, emit_integer_cast, emit_integer_compare, emit_integer_unary,
 };
-use super::literals::emit_string_literal;
-use super::scalar_loan::emit_scalar_loan;
+use super::loan::emit_scalar_loan;
 use llvm_sys::core::LLVMConstInt;
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
-pub(super) fn emit_scalar_instruction(
+pub(in crate::codegen::llvm) fn emit_scalar_instruction(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
     function: LLVMValueRef,
@@ -138,7 +138,7 @@ fn emit_constant(
     value: u64,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    let llvm_type = super::values::llvm_type(context, ty)?;
+    let llvm_type = super::super::values::llvm_type(context, ty)?;
     let constant = unsafe { LLVMConstInt(llvm_type, value, 0) };
     if constant.is_null() {
         return Err(BackendEmitError("LLVM failed to create integer constant".to_owned()));

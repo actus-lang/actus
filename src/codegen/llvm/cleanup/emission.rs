@@ -1,12 +1,10 @@
-mod bridge;
-
-use super::super::model::LoweredCleanupInstruction;
-use super::super::{BackendCleanupOperand, BackendEmitError, BackendValueId};
-use super::declarations::FunctionDeclaration;
+use super::super::super::model::LoweredCleanupInstruction;
+use super::super::super::{BackendCleanupOperand, BackendEmitError, BackendValueId};
+use super::super::declarations::FunctionDeclaration;
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 use std::collections::BTreeMap;
 
-pub(super) fn emit_cleanup(
+pub(in crate::codegen::llvm) fn emit_cleanup(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     pointer_width: u8,
@@ -20,5 +18,12 @@ pub(super) fn emit_cleanup(
     }
     let operand =
         operand.ok_or_else(|| BackendEmitError("LLVM cleanup operand is missing".to_owned()))?;
-    bridge::emit_runtime_bridge(context, builder, pointer_width, operand, declarations, values)
+    super::bridge::emit_runtime_bridge(
+        context,
+        builder,
+        pointer_width,
+        operand,
+        declarations,
+        values,
+    )
 }

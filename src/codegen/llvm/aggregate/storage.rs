@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::declarations::FunctionDeclaration;
+use super::super::declarations::FunctionDeclaration;
 use llvm_sys::core::{
     LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMemSet,
     LLVMBuildStore, LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt, LLVMGetIntTypeWidth,
@@ -8,7 +8,7 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
-use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
 
 pub(super) fn emit_aggregate_construct(
     context: LLVMContextRef,
@@ -21,7 +21,7 @@ pub(super) fn emit_aggregate_construct(
         return Err(BackendEmitError("LLVM aggregate construction expected".to_owned()));
     };
     let aggregate_type =
-        super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
+        super::super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
     let address =
         allocate_aggregate_storage(context, builder, *layout, aggregate_type, declarations)?;
     if address.is_null() {
@@ -46,7 +46,7 @@ pub(super) fn emit_aggregate_copy(
         BackendEmitError(format!("LLVM aggregate copy source {} is unavailable", source.0))
     })?;
     let aggregate_type =
-        super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
+        super::super::values::llvm_type(context, BackendValueType::Aggregate { layout: *layout })?;
     let destination =
         allocate_aggregate_storage(context, builder, *layout, aggregate_type, declarations)?;
     if destination.is_null() {
@@ -199,7 +199,7 @@ fn initialize_aggregate_field(
     Ok(())
 }
 
-pub(super) fn emit_aggregate_instruction(
+pub(in crate::codegen::llvm) fn emit_aggregate_instruction(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     pointer_width: u8,
@@ -209,7 +209,7 @@ pub(super) fn emit_aggregate_instruction(
 ) -> Result<bool, BackendEmitError> {
     match instruction {
         BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } => {
-            super::arena::emit(context, builder, pointer_width, instruction, values)
+            super::super::arena::emit(context, builder, pointer_width, instruction, values)
         }
         BackendInstruction::AggregateConstruct { .. } => {
             emit_aggregate_construct(context, builder, instruction, declarations, values)
@@ -236,7 +236,7 @@ pub(super) fn emit_aggregate_instruction(
     }
 }
 
-pub(super) fn emit_aggregate_field_load(
+pub(in crate::codegen::llvm) fn emit_aggregate_field_load(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
@@ -262,7 +262,7 @@ pub(super) fn emit_aggregate_field_load(
         // mutations update the owning aggregate instead of a detached copy.
         values.insert(*result, address);
     } else {
-        let value_type = super::values::llvm_type(context, *ty)?;
+        let value_type = super::super::values::llvm_type(context, *ty)?;
         let value = unsafe {
             LLVMBuildLoad2(builder, value_type, address, c"aggregate.field.load".as_ptr().cast())
         };
@@ -277,7 +277,7 @@ pub(super) fn emit_aggregate_field_load(
     Ok(false)
 }
 
-pub(super) fn emit_aggregate_field_store(
+pub(in crate::codegen::llvm) fn emit_aggregate_field_store(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
@@ -346,7 +346,7 @@ fn coerce_scalar_value(
     value: LLVMValueRef,
     ty: BackendValueType,
 ) -> Result<LLVMValueRef, BackendEmitError> {
-    let target = super::values::llvm_type(context, ty)?;
+    let target = super::super::values::llvm_type(context, ty)?;
     let source_width = unsafe { LLVMGetIntTypeWidth(LLVMTypeOf(value)) };
     let target_width = unsafe { LLVMGetIntTypeWidth(target) };
     if source_width == 0 || target_width == 0 || source_width == target_width {

@@ -65,7 +65,7 @@ fn emit_non_control_instruction(
     instruction: &BackendInstruction,
 ) -> Result<bool, BackendEmitError> {
     if is_aggregate_instruction(instruction) {
-        return super::aggregates::emit_aggregate_instruction(
+        return super::aggregate::emit_aggregate_instruction(
             context.context,
             context.builder,
             context.pointer_width,
@@ -156,7 +156,7 @@ fn emit_runtime_instruction(
             context.values,
         ),
         BackendInstruction::AggregateFieldStore { .. } => {
-            super::aggregates::emit_aggregate_field_store(
+            super::aggregate::emit_aggregate_field_store(
                 context.context,
                 context.builder,
                 instruction,
