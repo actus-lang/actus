@@ -1,5 +1,3 @@
-mod wide;
-
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
@@ -9,18 +7,20 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
-use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+use super::super::super::super::{
+    BackendEmitError, BackendInstruction, BackendValueId, BackendValueType,
+};
 
 #[derive(Clone, Copy)]
-pub(super) struct PackedField {
-    pub(super) storage_layout: super::super::BackendLayout,
+pub(in crate::codegen::llvm) struct PackedField {
+    pub(super) storage_layout: super::super::super::super::BackendLayout,
     pub(super) bit_offset: u16,
     pub(super) width: u8,
     pub(super) big_endian: bool,
     pub(super) ty: BackendValueType,
 }
 
-pub(super) fn emit_packed_field_load(
+pub(in crate::codegen::llvm) fn emit_packed_field_load(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
@@ -43,7 +43,7 @@ pub(super) fn emit_packed_field_load(
         BackendEmitError(format!("LLVM packed field base {} is unavailable", base.0))
     })?;
     if storage_layout.size > 8 {
-        return wide::emit_wide_packed_field_load(
+        return super::wide::emit_wide_packed_field_load(
             context,
             builder,
             base,
@@ -74,7 +74,7 @@ pub(super) fn emit_packed_field_load(
     )
 }
 
-pub(super) fn emit_packed_field_store(
+pub(in crate::codegen::llvm) fn emit_packed_field_store(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
@@ -97,7 +97,7 @@ pub(super) fn emit_packed_field_store(
         BackendEmitError(format!("LLVM packed field base {} is unavailable", base.0))
     })?;
     if storage_layout.size > 8 {
-        return wide::emit_wide_packed_field_store(
+        return super::wide::emit_wide_packed_field_store(
             context,
             builder,
             base,
@@ -159,7 +159,7 @@ fn emit_scalar_packed_field_load(
         builder,
         extracted,
         storage_bits,
-        super::values::llvm_type(context, field.ty)?,
+        super::super::super::values::llvm_type(context, field.ty)?,
         integer_width(field.ty)?,
         "packed.field.result",
     )?;
@@ -363,7 +363,7 @@ fn update_packed_value(
 
 fn packed_storage_type(
     context: LLVMContextRef,
-    layout: super::super::BackendLayout,
+    layout: super::super::super::super::BackendLayout,
 ) -> Result<LLVMTypeRef, BackendEmitError> {
     let ty = unsafe {
         match layout.size {
@@ -379,7 +379,9 @@ fn packed_storage_type(
     })
 }
 
-pub(super) fn integer_width(ty: BackendValueType) -> Result<u32, BackendEmitError> {
+pub(in crate::codegen::llvm) fn integer_width(
+    ty: BackendValueType,
+) -> Result<u32, BackendEmitError> {
     match ty {
         BackendValueType::Integer { width: 8, .. } => Ok(8),
         BackendValueType::Integer { width: 16, .. } => Ok(16),
@@ -407,7 +409,7 @@ fn packed_shift(
     Ok(if big_endian { storage_bits - end } else { u32::from(bit_offset) })
 }
 
-pub(super) fn cast_integer(
+pub(in crate::codegen::llvm) fn cast_integer(
     builder: LLVMBuilderRef,
     value: LLVMValueRef,
     source_width: u32,
@@ -440,7 +442,7 @@ pub(super) fn cast_integer(
         .ok_or_else(|| BackendEmitError("LLVM integer cast failed".to_owned()))
 }
 
-pub(super) fn field_address(
+pub(in crate::codegen::llvm) fn field_address(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     base: LLVMValueRef,

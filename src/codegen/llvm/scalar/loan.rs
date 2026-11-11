@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use super::super::{BackendEmitError, BackendInstruction, BackendValueId};
+use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId};
 use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildLoad2, LLVMBuildStore};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
-pub(super) fn emit_scalar_loan(
+pub(in crate::codegen::llvm) fn emit_scalar_loan(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
@@ -29,13 +29,13 @@ fn emit_scalar_loan_load(
     builder: LLVMBuilderRef,
     result: BackendValueId,
     address_id: BackendValueId,
-    ty: super::super::BackendValueType,
+    ty: super::super::super::BackendValueType,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     let address = values.get(&address_id).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM scalar loan address {} is unavailable", address_id.0))
     })?;
-    let value_type = super::values::llvm_type(context, ty)?;
+    let value_type = super::super::values::llvm_type(context, ty)?;
     let value =
         unsafe { LLVMBuildLoad2(builder, value_type, address, c"scalar.loan.load".as_ptr()) };
     if value.is_null() {
@@ -68,7 +68,7 @@ fn emit_scalar_loan_materialize(
     builder: LLVMBuilderRef,
     result: BackendValueId,
     value_id: BackendValueId,
-    ty: super::super::BackendValueType,
+    ty: super::super::super::BackendValueType,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     let value = values.get(&value_id).copied().ok_or_else(|| {
@@ -77,7 +77,7 @@ fn emit_scalar_loan_materialize(
             value_id.0
         ))
     })?;
-    let value_type = super::values::llvm_type(context, ty)?;
+    let value_type = super::super::values::llvm_type(context, ty)?;
     let name = std::ffi::CString::new(format!("scalar.loan.slot{}", result.0))
         .map_err(|_| BackendEmitError("LLVM scalar loan slot name contains NUL".to_owned()))?;
     let address = unsafe { LLVMBuildAlloca(builder, value_type, name.as_ptr()) };

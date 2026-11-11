@@ -1,20 +1,18 @@
-mod address;
-
-use super::super::super::BackendEmitError;
-use super::super::super::{BackendCleanupBridge, BackendCleanupOperand};
-use super::super::declarations::FunctionDeclaration;
+use super::super::super::super::BackendEmitError;
+use super::super::super::super::{BackendCleanupBridge, BackendCleanupOperand};
+use super::super::super::declarations::FunctionDeclaration;
 use llvm_sys::core::{LLVMBuildCall2, LLVMConstInt};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 
-pub(super) fn emit_runtime_bridge(
+pub(in crate::codegen::llvm::cleanup) fn emit_runtime_bridge(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     pointer_width: u8,
     operand: BackendCleanupOperand,
     declarations: &BTreeMap<String, FunctionDeclaration>,
-    values: &BTreeMap<super::super::super::BackendValueId, LLVMValueRef>,
+    values: &BTreeMap<super::super::super::super::BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     let symbol = operand.performance_symbol.as_ref().map_or_else(
         || bridge_symbol(operand.bridge).to_owned(),
@@ -26,7 +24,7 @@ pub(super) fn emit_runtime_bridge(
     let value = values.get(&operand.value).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM cleanup value {} is unavailable", operand.value.0))
     })?;
-    let value = address::cleanup_argument(context, builder, operand.clone(), value)?;
+    let value = super::address::cleanup_argument(context, builder, operand.clone(), value)?;
     let mut arguments = vec![value];
     append_bridge_arguments(context, pointer_width, operand.bridge, &mut arguments)?;
     let name = CString::new(if declaration.returns_void { "" } else { "cleanup_call" })

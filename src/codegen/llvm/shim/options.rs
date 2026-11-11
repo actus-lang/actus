@@ -1,12 +1,15 @@
 use llvm_sys::target_machine::LLVMTargetMachineRef;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct TargetMachineOptions {
-    pub(super) emit_stack_size_section: bool,
-    pub(super) function_sections: bool,
+pub(in crate::codegen::llvm) struct TargetMachineOptions {
+    pub(in crate::codegen::llvm) emit_stack_size_section: bool,
+    pub(in crate::codegen::llvm) function_sections: bool,
 }
 
-pub(super) fn apply(target_machine: LLVMTargetMachineRef, options: TargetMachineOptions) {
+pub(in crate::codegen::llvm) fn apply(
+    target_machine: LLVMTargetMachineRef,
+    options: TargetMachineOptions,
+) {
     unsafe {
         actus_llvm_set_target_options(
             target_machine,
@@ -16,7 +19,7 @@ pub(super) fn apply(target_machine: LLVMTargetMachineRef, options: TargetMachine
     }
 }
 
-pub(super) fn disable_x86_call_frame_optimization() {
+pub(in crate::codegen::llvm) fn disable_x86_call_frame_optimization() {
     unsafe { actus_llvm_disable_x86_call_frame_optimization() }
 }
 

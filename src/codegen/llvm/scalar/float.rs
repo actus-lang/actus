@@ -4,11 +4,11 @@ use llvm_sys::LLVMRealPredicate;
 use llvm_sys::core::{LLVMBuildFCmp, LLVMBuildFPExt, LLVMBuildFPTrunc, LLVMConstReal};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
-use super::super::{
+use super::super::super::{
     BackendEmitError, BackendInstruction, BackendIntegerCompareOp, BackendValueId, BackendValueType,
 };
 
-pub(super) fn emit_float_constant(
+pub(in crate::codegen::llvm) fn emit_float_constant(
     context: LLVMContextRef,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
@@ -34,7 +34,7 @@ pub(super) fn emit_float_constant(
     Ok(false)
 }
 
-pub(super) fn emit_float_compare(
+pub(in crate::codegen::llvm) fn emit_float_compare(
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
@@ -69,7 +69,7 @@ pub(super) fn emit_float_compare(
     Ok(false)
 }
 
-pub(super) fn emit_float_cast(
+pub(in crate::codegen::llvm) fn emit_float_cast(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     instruction: &BackendInstruction,

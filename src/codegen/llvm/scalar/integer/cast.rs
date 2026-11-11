@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::super::guards::emit_llvm_trap;
+use super::super::super::guards::emit_llvm_trap;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildSExt,
@@ -8,7 +8,9 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
-use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+use super::super::super::super::{
+    BackendEmitError, BackendInstruction, BackendValueId, BackendValueType,
+};
 
 pub(in crate::codegen::llvm) fn emit_integer_cast(
     context: llvm_sys::prelude::LLVMContextRef,

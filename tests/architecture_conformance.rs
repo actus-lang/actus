@@ -29,7 +29,6 @@ const RUST_KEYWORD_FILENAMES: &[&str] = &[
 const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/cli/mod.rs",
     "src/cli/test_runner/mod.rs",
-    "src/codegen/llvm/packed/mod.rs",
     "src/diagnostics/renderer/mod.rs",
     "src/formatter/mod.rs",
     "src/lsp/hover/mod.rs",
@@ -39,15 +38,10 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/runtime/path/mod.rs",
 ];
 
-const ALLOWED_RS_PAIRS: &[&str] = &[
-    "src/codegen/llvm/cleanup.rs",
-    "src/codegen/llvm/cleanup/bridge.rs",
-    "src/codegen/llvm/shim.rs",
-    "src/modules/aggregation/visibility.rs",
-    "src/runtime/region.rs",
-];
+const ALLOWED_RS_PAIRS: &[&str] =
+    &["src/modules/aggregation/visibility.rs", "src/runtime/region.rs"];
 
-const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &["src/codegen/llvm/packed"];
+const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[];
 
 const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
 

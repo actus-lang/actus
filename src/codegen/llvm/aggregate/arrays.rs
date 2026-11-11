@@ -7,7 +7,7 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
-use super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
 
 pub(super) fn emit_array_element_load(
     context: LLVMContextRef,
@@ -45,7 +45,7 @@ pub(super) fn emit_array_element_load(
         values.insert(*result, address);
         return Ok(false);
     }
-    let value_type = super::values::llvm_type(context, *element_type)?;
+    let value_type = super::super::values::llvm_type(context, *element_type)?;
     let value = unsafe {
         LLVMBuildLoad2(builder, value_type, address, c"array.element.load".as_ptr().cast())
     };
@@ -144,7 +144,7 @@ fn store_array_element_value(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     address: LLVMValueRef,
-    element_layout: super::super::BackendLayout,
+    element_layout: super::super::super::BackendLayout,
     element_type: BackendValueType,
     value: LLVMValueRef,
 ) -> Result<(), BackendEmitError> {
@@ -172,7 +172,7 @@ fn store_array_element_value(
             return Err(BackendEmitError("LLVM failed to copy array aggregate element".to_owned()));
         }
     } else {
-        let value_type = super::values::llvm_type(context, element_type)?;
+        let value_type = super::super::values::llvm_type(context, element_type)?;
         if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
             return Err(BackendEmitError("LLVM failed to store array element".to_owned()));
         }
@@ -186,7 +186,7 @@ fn array_element_address(
     builder: LLVMBuilderRef,
     base: LLVMValueRef,
     index: LLVMValueRef,
-    element_layout: super::super::BackendLayout,
+    element_layout: super::super::super::BackendLayout,
 ) -> Result<LLVMValueRef, BackendEmitError> {
     let index_type = unsafe { LLVMInt64TypeInContext(context) };
     let index = unsafe {

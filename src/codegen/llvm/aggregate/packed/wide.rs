@@ -6,7 +6,7 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
-use super::super::super::{BackendEmitError, BackendValueId};
+use super::super::super::super::{BackendEmitError, BackendValueId};
 use super::{PackedField, cast_integer, field_address, integer_width};
 
 pub(super) fn emit_wide_packed_field_load(
@@ -47,7 +47,7 @@ pub(super) fn emit_wide_packed_field_load(
         builder,
         combined,
         64,
-        super::super::values::llvm_type(context, field.ty)?,
+        super::super::super::values::llvm_type(context, field.ty)?,
         integer_width(field.ty)?,
         "packed.wide.result",
     )?;

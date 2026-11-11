@@ -9,7 +9,7 @@ use llvm_sys::core::{
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
-use super::super::super::{
+use super::super::super::super::{
     BackendEmitError, BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp,
     BackendIntegerUnaryOp, BackendValueId,
 };
@@ -30,13 +30,14 @@ pub(in crate::codegen::llvm) fn emit_integer_binary(
     let right = values.get(right).copied().ok_or_else(|| {
         BackendEmitError(format!("LLVM binary right operand {} is unavailable", right.0))
     })?;
-    let signed = matches!(ty, super::super::super::BackendValueType::Integer { signed: true, .. });
+    let signed =
+        matches!(ty, super::super::super::super::BackendValueType::Integer { signed: true, .. });
     let (left, right) = normalize_integer_pair(builder, left, right, signed)?;
     let value = build_integer_binary(builder, *operation, *ty, left, right);
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to emit integer binary operation".to_owned()));
     }
-    let value = if matches!(ty, super::super::super::BackendValueType::Bool) {
+    let value = if matches!(ty, super::super::super::super::BackendValueType::Bool) {
         unsafe {
             LLVMBuildICmp(
                 builder,
@@ -56,7 +57,7 @@ pub(in crate::codegen::llvm) fn emit_integer_binary(
 fn build_integer_binary(
     builder: LLVMBuilderRef,
     operation: BackendIntegerBinaryOp,
-    ty: super::super::super::BackendValueType,
+    ty: super::super::super::super::BackendValueType,
     left: LLVMValueRef,
     right: LLVMValueRef,
 ) -> LLVMValueRef {
@@ -74,7 +75,7 @@ fn build_integer_binary(
             BackendIntegerBinaryOp::Divide | BackendIntegerBinaryOp::Remainder
                 if matches!(
                     ty,
-                    super::super::super::BackendValueType::Integer { signed: true, .. }
+                    super::super::super::super::BackendValueType::Integer { signed: true, .. }
                 ) =>
             {
                 build_signed_division_or_remainder(builder, operation, left, right)
@@ -88,7 +89,7 @@ fn build_integer_binary(
             BackendIntegerBinaryOp::ShiftRight
                 if matches!(
                     ty,
-                    super::super::super::BackendValueType::Integer { signed: true, .. }
+                    super::super::super::super::BackendValueType::Integer { signed: true, .. }
                 ) =>
             {
                 LLVMBuildAShr(builder, left, right, c"actus.ashr".as_ptr())
