@@ -554,6 +554,41 @@ call implementation file and moving it into a one-file `call/` directory is
 explicitly disallowed. `returns.rs` also remains `returns.rs`; the keyword
 correction applies only to the proposed `body/case/returns.rs` destination.
 
+### PR 6 evidence
+
+- [x] The layout checker passed against `9cbf5ece` after the module-declaration
+  matching fix in `d6359d70` (`bacf0263...`):
+
+  ```text
+  compared items: 2127 matched
+  path-only changes (prefix rewrites, targets verified):
+    address -> super::address  x1
+    bridge -> super::bridge  x1
+    super::aggregates -> super::aggregate  x2
+    super::arena -> super::super::arena  x1
+    super::super -> super::super::super  x4
+    super::super -> super::super::super::super  x2
+    super::super::super -> super::super::super::super  x6
+    super::super::values -> super::super::super::values  x1
+    super::values -> super::super::super::values  x1
+    super::values -> super::super::values  x9
+    wide -> super::wide  x2
+  result: OK
+  ```
+
+- [x] `cargo test --all-features -- --list` produced 1,988 tests on the
+  branch. PR 5 evidence records 1,988 tests for base `9cbf5ece`. None of the
+  13 moved LLVM files contains an inline unit-test module, so no test name
+  changes were expected.
+- [x] `cargo fmt --all -- --check`, `cargo check --all-targets
+  --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+  `cargo test --all-targets --all-features`, `scripts/check_source_limits.sh`,
+  `scripts/check_architecture.sh`, `scripts/check_documentation.sh`, and
+  `scripts/check_secrets.sh` passed.
+- [x] The checker fix is included as `d6359d70`: the old `integer` module is
+  now matched to its new nested destination `scalar/integer` rather than to an
+  unrelated declaration.
+
 ## 7. Runtime, modules, and registry
 
 ### Final tree and map
