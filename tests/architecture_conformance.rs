@@ -29,14 +29,6 @@ const RUST_KEYWORD_FILENAMES: &[&str] = &[
 const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/cli/mod.rs",
     "src/cli/test_runner/mod.rs",
-    "src/codegen/cranelift/case/mod.rs",
-    "src/codegen/cranelift/contract/mod.rs",
-    "src/codegen/cranelift/expressions/mod.rs",
-    "src/codegen/cranelift/function_definition/mod.rs",
-    "src/codegen/cranelift/layout/mod.rs",
-    "src/codegen/cranelift/lowering/statements/mod.rs",
-    "src/codegen/cranelift/lowering/mod.rs",
-    "src/codegen/cranelift/performance/mod.rs",
     "src/codegen/llvm/packed/mod.rs",
     "src/diagnostics/renderer/mod.rs",
     "src/formatter/mod.rs",
@@ -48,7 +40,6 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
 ];
 
 const ALLOWED_RS_PAIRS: &[&str] = &[
-    "src/codegen/cranelift/calls.rs",
     "src/codegen/llvm/cleanup.rs",
     "src/codegen/llvm/cleanup/bridge.rs",
     "src/codegen/llvm/shim.rs",
@@ -56,8 +47,7 @@ const ALLOWED_RS_PAIRS: &[&str] = &[
     "src/runtime/region.rs",
 ];
 
-const ALLOWED_SINGLE_FILE_MODULES: &[&str] =
-    &["src/codegen/cranelift/performance", "src/codegen/llvm/packed"];
+const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &["src/codegen/llvm/packed"];
 
 const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
 
