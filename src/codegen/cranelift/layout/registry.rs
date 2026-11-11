@@ -10,71 +10,66 @@ use crate::ast::{
 use crate::codegen::BackendCleanupField;
 use crate::semantic::GenericInstance;
 
-use super::enum_layout::EnumLayout;
-use super::generic::{canonical_type_name, specialized_enums, specialized_structs};
-use super::native::BackendEmitError;
-use super::types::NativeType;
-
-mod arrays;
-mod packs;
-mod structs;
-
-pub(super) use arrays::array_definitions;
+use super::super::enum_layout::EnumLayout;
+use super::super::generic::{canonical_type_name, specialized_enums, specialized_structs};
+use super::super::native::BackendEmitError;
+use super::super::types::NativeType;
+use super::array_definitions;
 
 #[derive(Clone, Debug)]
-pub(super) struct FieldLayout {
-    pub(super) name: String,
-    pub(super) offset: u32,
-    pub(super) ty: NativeType,
-    pub(super) owned: bool,
-    pub(super) indirect: bool,
+pub(in crate::codegen::cranelift) struct FieldLayout {
+    pub(in crate::codegen::cranelift) name: String,
+    pub(in crate::codegen::cranelift) offset: u32,
+    pub(in crate::codegen::cranelift) ty: NativeType,
+    pub(in crate::codegen::cranelift) owned: bool,
+    pub(in crate::codegen::cranelift) indirect: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct StructLayout {
-    pub(super) size: u32,
-    pub(super) alignment: u32,
-    pub(super) fields: Vec<FieldLayout>,
+    pub(in crate::codegen::cranelift) size: u32,
+    pub(in crate::codegen::cranelift) alignment: u32,
+    pub(in crate::codegen::cranelift) fields: Vec<FieldLayout>,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct PackFieldLayout {
-    pub(super) name: String,
-    pub(super) role: StructFieldRole,
-    pub(super) ty: NativeType,
-    pub(super) offset: u16,
-    pub(super) width: u8,
-    pub(super) indexed_count: Option<u32>,
+pub(in crate::codegen::cranelift) struct PackFieldLayout {
+    pub(in crate::codegen::cranelift) name: String,
+    pub(in crate::codegen::cranelift) role: StructFieldRole,
+    pub(in crate::codegen::cranelift) ty: NativeType,
+    pub(in crate::codegen::cranelift) offset: u16,
+    pub(in crate::codegen::cranelift) width: u8,
+    pub(in crate::codegen::cranelift) indexed_count: Option<u32>,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct PackLayout {
-    pub(super) storage: NativeType,
-    pub(super) endianness: LayoutEndianness,
-    pub(super) fields: Vec<PackFieldLayout>,
+pub(in crate::codegen::cranelift) struct PackLayout {
+    pub(in crate::codegen::cranelift) storage: NativeType,
+    pub(in crate::codegen::cranelift) endianness: LayoutEndianness,
+    pub(in crate::codegen::cranelift) fields: Vec<PackFieldLayout>,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct ArrayLayout {
-    pub(super) element: NativeType,
-    pub(super) capacity: u32,
-    pub(super) size: u32,
-    pub(super) alignment: u32,
+pub(in crate::codegen::cranelift) struct ArrayLayout {
+    pub(in crate::codegen::cranelift) element: NativeType,
+    pub(in crate::codegen::cranelift) capacity: u32,
+    pub(in crate::codegen::cranelift) size: u32,
+    pub(in crate::codegen::cranelift) alignment: u32,
 }
 
 pub struct LayoutRegistry {
-    pub(super) pointer_type: Type,
-    pub(super) pointer_size: u32,
+    pub(in crate::codegen::cranelift) pointer_type: Type,
+    pub(in crate::codegen::cranelift) pointer_size: u32,
     frontend_config: Option<TargetFrontendConfig>,
-    definitions: Vec<StructDef>,
+    pub(super) definitions: Vec<StructDef>,
     layouts: Vec<StructLayout>,
     ids: HashMap<String, usize>,
-    pub(super) enum_definitions: Vec<EnumDef>,
-    pub(super) enum_layouts: Vec<EnumLayout>,
-    pub(super) enum_ids: HashMap<String, usize>,
-    pub(super) pack_definitions: Vec<PackDecl>,
-    pub(super) pack_layouts: Vec<PackLayout>,
-    pack_ids: HashMap<String, usize>,
+    pub(in crate::codegen::cranelift) enum_definitions: Vec<EnumDef>,
+    pub(in crate::codegen::cranelift) enum_layouts: Vec<EnumLayout>,
+    pub(in crate::codegen::cranelift) enum_ids: HashMap<String, usize>,
+    pub(in crate::codegen::cranelift) pack_definitions: Vec<PackDecl>,
+    pub(in crate::codegen::cranelift) pack_layouts: Vec<PackLayout>,
+    pub(super) pack_ids: HashMap<String, usize>,
     array_definitions: Vec<TypeName>,
     array_layouts: Vec<ArrayLayout>,
     array_ids: HashMap<String, usize>,
@@ -83,14 +78,14 @@ pub struct LayoutRegistry {
 impl LayoutRegistry {
     // Retained for layout unit tests and non-generic callers.
     #[allow(dead_code)]
-    pub(super) fn from_program(
+    pub(in crate::codegen::cranelift) fn from_program(
         program: &Program,
         pointer_type: Type,
     ) -> Result<Self, BackendEmitError> {
         Self::from_program_with_instances(program, pointer_type, &[])
     }
 
-    pub(super) fn from_program_with_instances(
+    pub(in crate::codegen::cranelift) fn from_program_with_instances(
         program: &Program,
         pointer_type: Type,
         instances: &[GenericInstance],
@@ -139,11 +134,16 @@ impl LayoutRegistry {
         }
     }
 
-    pub(super) fn set_frontend_config(&mut self, frontend_config: TargetFrontendConfig) {
+    pub(in crate::codegen::cranelift) fn set_frontend_config(
+        &mut self,
+        frontend_config: TargetFrontendConfig,
+    ) {
         self.frontend_config = Some(frontend_config);
     }
 
-    pub(super) fn frontend_config(&self) -> Result<TargetFrontendConfig, BackendEmitError> {
+    pub(in crate::codegen::cranelift) fn frontend_config(
+        &self,
+    ) -> Result<TargetFrontendConfig, BackendEmitError> {
         self.frontend_config.ok_or_else(|| {
             BackendEmitError(
                 "native layout registry is missing target frontend configuration".to_owned(),
@@ -170,11 +170,11 @@ impl LayoutRegistry {
         Ok(())
     }
 
-    pub(super) fn id_for(&self, name: &str) -> Option<usize> {
+    pub(in crate::codegen::cranelift) fn id_for(&self, name: &str) -> Option<usize> {
         self.ids.get(name).copied()
     }
 
-    pub(super) fn get(&self, id: usize) -> Option<&StructLayout> {
+    pub(in crate::codegen::cranelift) fn get(&self, id: usize) -> Option<&StructLayout> {
         self.layouts.get(id)
     }
 
@@ -228,19 +228,22 @@ impl LayoutRegistry {
         }
     }
 
-    pub(super) fn pack(&self, id: usize) -> Option<&PackLayout> {
+    pub(in crate::codegen::cranelift) fn pack(&self, id: usize) -> Option<&PackLayout> {
         self.pack_layouts.get(id)
     }
 
-    pub(super) fn pack_id(&self, name: &str) -> Option<usize> {
+    pub(in crate::codegen::cranelift) fn pack_id(&self, name: &str) -> Option<usize> {
         self.pack_ids.get(name).copied()
     }
 
-    pub(super) fn array(&self, id: usize) -> Option<&ArrayLayout> {
+    pub(in crate::codegen::cranelift) fn array(&self, id: usize) -> Option<&ArrayLayout> {
         self.array_layouts.get(id)
     }
 
-    pub(super) fn array_layout_value(&self, id: usize) -> Option<ArrayLayout> {
+    pub(in crate::codegen::cranelift) fn array_layout_value(
+        &self,
+        id: usize,
+    ) -> Option<ArrayLayout> {
         self.array_layouts.get(id).cloned().or_else(|| {
             self.array_definitions
                 .get(id)
@@ -248,7 +251,7 @@ impl LayoutRegistry {
         })
     }
 
-    pub(super) fn array_id(&self, canonical: &str) -> Option<usize> {
+    pub(in crate::codegen::cranelift) fn array_id(&self, canonical: &str) -> Option<usize> {
         self.array_ids.get(canonical).copied().or_else(|| {
             let normalized = canonical
                 .chars()
@@ -258,7 +261,10 @@ impl LayoutRegistry {
         })
     }
 
-    pub(super) fn ir_type(&self, ty: NativeType) -> Result<Type, BackendEmitError> {
+    pub(in crate::codegen::cranelift) fn ir_type(
+        &self,
+        ty: NativeType,
+    ) -> Result<Type, BackendEmitError> {
         match ty {
             NativeType::Pack(id) => self
                 .pack(id)
@@ -271,14 +277,17 @@ impl LayoutRegistry {
         }
     }
 
-    pub(super) fn type_for_name(&self, name: &str) -> Option<NativeType> {
+    pub(in crate::codegen::cranelift) fn type_for_name(&self, name: &str) -> Option<NativeType> {
         self.id_for(name)
             .map(NativeType::Struct)
             .or_else(|| self.enum_id_for(name).map(NativeType::Enum))
             .or_else(|| self.pack_ids.get(name).copied().map(NativeType::Pack))
     }
 
-    pub(super) fn type_for_type_name(&self, type_name: &TypeName) -> Option<NativeType> {
+    pub(in crate::codegen::cranelift) fn type_for_type_name(
+        &self,
+        type_name: &TypeName,
+    ) -> Option<NativeType> {
         let canonical = canonical_type_name(type_name);
         self.type_for_name(&canonical)
             .or_else(|| self.array_ids.get(&canonical).copied().map(NativeType::Array))
@@ -286,7 +295,7 @@ impl LayoutRegistry {
             .or_else(|| NativeType::from_name(&type_name.name))
     }
 
-    pub(super) fn stack_slot(&self, layout: &StructLayout) -> StackSlotData {
+    pub(in crate::codegen::cranelift) fn stack_slot(&self, layout: &StructLayout) -> StackSlotData {
         StackSlotData::new(
             StackSlotKind::ExplicitSlot,
             layout.size,
@@ -294,20 +303,20 @@ impl LayoutRegistry {
         )
     }
 
-    pub(super) fn uses_return_slot(&self, ty: NativeType) -> bool {
+    pub(in crate::codegen::cranelift) fn uses_return_slot(&self, ty: NativeType) -> bool {
         ty.uses_sret() || self.is_inline_pack(ty) || self.is_borrowed_view_option(ty)
     }
 
-    pub(super) fn is_inline_pack(&self, ty: NativeType) -> bool {
+    pub(in crate::codegen::cranelift) fn is_inline_pack(&self, ty: NativeType) -> bool {
         let NativeType::Pack(id) = ty else { return false };
         self.pack(id).is_some_and(|pack| matches!(pack.storage, NativeType::Array(_)))
     }
 
-    pub(super) fn returns_borrowed_view(&self, ty: NativeType) -> bool {
+    pub(in crate::codegen::cranelift) fn returns_borrowed_view(&self, ty: NativeType) -> bool {
         self.is_borrowed_view_option(ty)
     }
 
-    pub(super) fn return_slot_size(&self, ty: NativeType) -> Option<u32> {
+    pub(in crate::codegen::cranelift) fn return_slot_size(&self, ty: NativeType) -> Option<u32> {
         if let NativeType::Enum(id) = ty
             && self.is_borrowed_view_option(ty)
         {
@@ -344,7 +353,7 @@ impl LayoutRegistry {
     }
 }
 
-pub(super) fn integer_storage_bytes(width: u8) -> Option<u32> {
+pub(in crate::codegen::cranelift) fn integer_storage_bytes(width: u8) -> Option<u32> {
     match width {
         1..=8 => Some(1),
         9..=16 => Some(2),
@@ -410,7 +419,7 @@ fn named_ids<T>(definitions: &[T], name: impl Fn(&T) -> &String) -> HashMap<Stri
     definitions.iter().enumerate().map(|(id, definition)| (name(definition).clone(), id)).collect()
 }
 
-fn align_up(offset: u32, alignment: u32) -> Option<u32> {
+pub(super) fn align_up(offset: u32, alignment: u32) -> Option<u32> {
     if alignment == 0 {
         return None;
     }

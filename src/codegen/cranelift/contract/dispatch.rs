@@ -154,10 +154,10 @@ fn lower_scalar(
             lower_string_literal(module, builder, function, *result, value, values)
         }
         BackendInstruction::IntegerBinary { .. } => {
-            super::lower_integer_binary(builder, instruction, values)
+            super::super::numeric::lower_integer_binary(builder, instruction, values)
         }
         BackendInstruction::IntegerCast { .. } => {
-            super::lower_integer_cast(builder, instruction, values)
+            super::super::numeric::lower_integer_cast(builder, instruction, values)
         }
         BackendInstruction::FloatCast { .. } => {
             super::scalar::lower_float_cast(builder, instruction, values)
@@ -169,16 +169,16 @@ fn lower_scalar(
             super::scalar::lower_guard(builder, instruction, values)
         }
         BackendInstruction::IntegerCompare { .. } => {
-            super::lower_integer_compare(builder, instruction, values)
+            super::super::numeric::lower_integer_compare(builder, instruction, values)
         }
         BackendInstruction::ScalarSelect { .. } => {
-            super::lower_scalar_select(builder, instruction, values)
+            super::super::numeric::lower_scalar_select(builder, instruction, values)
         }
         BackendInstruction::FloatCompare { .. } => {
-            super::super::float_ops::lower_float_compare(builder, instruction, values)
+            super::super::numeric::lower_float_compare(builder, instruction, values)
         }
         BackendInstruction::IntegerUnary { .. } => {
-            super::lower_integer_unary(builder, instruction, values)
+            super::super::numeric::lower_integer_unary(builder, instruction, values)
         }
         BackendInstruction::MemoryCopy { .. } => {
             super::scalar::lower_memory_copy(module, builder, instruction, values)

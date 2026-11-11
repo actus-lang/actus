@@ -3,13 +3,13 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, ArgumentRoleResolution, Expr};
 
-use super::super::dynamic_call::lower_dynamic_call;
 use super::super::expressions::lower_expression;
 use super::super::native::BackendEmitError;
-use super::super::performance::dispatch_key;
 use super::super::types::NativeType;
 use super::context::CallLoweringContext;
 use super::lower::lower_call;
+use crate::codegen::cranelift::dispatch::lower_dynamic_call;
+use crate::codegen::cranelift::performance::dispatch_key;
 
 pub(crate) fn lower_method_call(
     function: &mut FunctionBuilder<'_>,

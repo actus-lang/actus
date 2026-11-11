@@ -1,6 +1,3 @@
-mod flow;
-mod parameters;
-
 use std::collections::HashMap;
 
 use cranelift_codegen::isa::TargetFrontendConfig;
@@ -11,17 +8,16 @@ use cranelift_object::ObjectModule;
 use crate::ast::VerbDecl;
 use crate::configuration::NativeBackendConfiguration;
 
-use super::declarations::{native_signature_for_definition, native_signature_for_entry};
-use super::literals::{StringDataIds, StringDataValues, declare_string_values};
-use super::native::{BackendEmitError, FunctionMeta, FunctionRef};
-use super::types::NativeType;
-use super::vtable::{VtableDataIds, declare_vtable_values};
+use super::super::dispatch::{VtableDataIds, declare_vtable_values};
+use super::super::emission::{native_signature_for_definition, native_signature_for_entry};
+use super::super::literals::{StringDataIds, StringDataValues, declare_string_values};
+use super::super::native::{BackendEmitError, FunctionMeta, FunctionRef};
+use super::super::types::NativeType;
+use super::flow::emit_flow;
+use super::parameters::{BoundParameters, bind_parameters, declare_function_refs};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::lowering::lower_body;
 use crate::codegen::model::LoweredCleanupSchedule;
-use flow::emit_flow;
-pub(crate) use flow::emit_value_return;
-use parameters::{BoundParameters, bind_parameters, declare_function_refs};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn define_function(
@@ -61,7 +57,7 @@ pub(crate) fn define_function(
         BackendEmitError(format!("native function `{}` lowering failed: {error}", verb.name))
     })?;
     if configuration.verifies_no_float_ir() {
-        let floating = super::ir_audit::floating_point_instructions(&context.func);
+        let floating = super::super::ir_audit::floating_point_instructions(&context.func);
         if !floating.is_empty() {
             return Err(BackendEmitError(format!(
                 "native function `{}` contains floating-point IR instructions: {floating:?}",

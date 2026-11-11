@@ -5,35 +5,17 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::super::model::LoweredCleanupSchedule;
-use super::calls::CallLoweringContext;
-use super::case::lower_case;
-use super::layout::LayoutRegistry;
-use super::literals::StringDataValues;
-use super::native::{BackendEmitError, FunctionRef};
-use super::types::NativeType;
-
-mod buffer;
-mod cast;
-mod construct;
-mod if_lowering;
-mod initializer_types;
-mod literals;
-mod operations;
-mod short_circuit;
-mod try_lowering;
-
-pub(crate) use buffer::emit_buffer_drop;
-pub(crate) use construct::lower_construct;
-pub(crate) use if_lowering::lower_statement_if;
-pub(crate) use initializer_types::initializer_type;
-pub(crate) use literals::{
-    coerce_to_ir_type, lower_float, lower_float_as, lower_identifier, lower_integer, lower_string,
-    lower_wide_integer,
+use super::super::super::model::LoweredCleanupSchedule;
+use super::super::calls::CallLoweringContext;
+use super::super::case::lower_case;
+use super::super::layout::LayoutRegistry;
+use super::super::literals::StringDataValues;
+use super::super::native::{BackendEmitError, FunctionRef};
+use super::super::types::NativeType;
+use super::{
+    cast, coerce_to_ir_type, if_lowering, lower_construct, lower_float, lower_float_as,
+    lower_identifier, lower_integer, lower_operation, lower_string, lower_try_expression,
 };
-pub(crate) use operations::lower_compound_integer_operation;
-pub(crate) use operations::lower_operation;
-pub(crate) use try_lowering::lower_try_expression;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_expression(
@@ -69,7 +51,7 @@ pub(crate) fn lower_expression_with_targets(
     cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
-    loop_targets: Option<super::lowering::LoopTargets>,
+    loop_targets: Option<super::super::lowering::LoopTargets>,
 ) -> Result<Value, BackendEmitError> {
     let context = CallLoweringContext::new(
         locals,
@@ -83,7 +65,7 @@ pub(crate) fn lower_expression_with_targets(
     lower_expression_with_context(function, expression, &context)
 }
 
-fn lower_expression_with_context(
+pub(super) fn lower_expression_with_context(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     context: &CallLoweringContext<'_, '_>,
@@ -137,8 +119,8 @@ fn lower_index_expression(
         context.local_types,
         context.layouts,
     ) {
-        Some(NativeType::Buffer) => super::buffer_index::lower_buffer_index,
-        _ => super::arrays::lower_array_index,
+        Some(NativeType::Buffer) => super::super::buffer_index::lower_buffer_index,
+        _ => super::super::arrays::lower_array_index,
     };
     lower(
         function,

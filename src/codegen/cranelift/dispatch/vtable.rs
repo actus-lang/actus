@@ -4,24 +4,24 @@ use cranelift_module::DataId;
 use cranelift_module::{DataDescription, Linkage, Module};
 use cranelift_object::ObjectModule;
 
-use super::super::symbols::{SymbolIdentity, SymbolKind};
+use super::super::super::symbols::{SymbolIdentity, SymbolKind};
 
-use super::layout::LayoutRegistry;
-use super::native::{BackendEmitError, FunctionMeta};
-use super::performance::{PerformanceDefinition, dispatch_key};
-use super::types::NativeType;
+use super::super::layout::LayoutRegistry;
+use super::super::native::{BackendEmitError, FunctionMeta};
+use super::super::performance::{PerformanceDefinition, dispatch_key};
+use super::super::types::NativeType;
 
 pub(crate) type VtableDataIds = HashMap<String, DataId>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct VtableDefinition {
-    pub(super) role_name: String,
-    pub(super) target_type: String,
-    pub(super) symbol: String,
-    pub(super) method_symbols: Vec<String>,
+pub(in crate::codegen::cranelift) struct VtableDefinition {
+    pub(in crate::codegen::cranelift) role_name: String,
+    pub(in crate::codegen::cranelift) target_type: String,
+    pub(in crate::codegen::cranelift) symbol: String,
+    pub(in crate::codegen::cranelift) method_symbols: Vec<String>,
 }
 
-pub(super) fn define_vtables(
+pub(in crate::codegen::cranelift) fn define_vtables(
     module: &mut ObjectModule,
     definitions: &[PerformanceDefinition<'_>],
     functions: &HashMap<String, FunctionMeta>,
@@ -91,7 +91,7 @@ fn group_definitions(
     Ok(grouped.into_values().collect())
 }
 
-pub(super) fn vtable_symbol_for_native_in_namespace(
+pub(in crate::codegen::cranelift) fn vtable_symbol_for_native_in_namespace(
     namespace_prefix: &str,
     role: &str,
     target: NativeType,

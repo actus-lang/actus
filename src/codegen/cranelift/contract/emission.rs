@@ -1,28 +1,9 @@
-mod aggregate;
-mod arena;
-mod arrays;
-mod cleanup;
-mod control_flow;
-mod declarations;
-mod dispatch;
-mod enums;
-mod functions;
-mod packed;
-mod returns;
-mod scalar;
-
-use super::integer_ops::{
-    lower_integer_binary, lower_integer_cast, lower_integer_compare, lower_integer_unary,
-    lower_scalar_select,
-};
-use super::native::BackendEmitError;
-use super::object::create_module;
+use super::super::native::BackendEmitError;
+use super::super::object::create_module;
+use super::{declarations, functions};
 use crate::codegen::BackendModule;
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
-
-pub(super) use cleanup::LayoutCleanupProvider;
-pub(crate) use declarations::{parameter_types, scalar_type};
 
 pub fn emit_contract_module_object(
     backend_module: &BackendModule,

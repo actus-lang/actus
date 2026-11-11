@@ -6,23 +6,15 @@ use cranelift_frontend::FunctionBuilder;
 use crate::ast::{Expr, Stmt};
 use crate::semantic::LoopExitKind;
 
-use super::super::cleanup::{CleanupContext, emit_loop_cleanup, emit_return_cleanup};
-use super::super::expressions::lower_expression;
-use super::super::literals::StringDataValues;
-use super::super::native::{BackendEmitError, FunctionRef};
-use super::super::types::NativeType;
-use super::{Flow, LoopTargets, LoweredCleanupSchedule};
+use super::super::super::cleanup::{CleanupContext, emit_loop_cleanup, emit_return_cleanup};
+use super::super::super::expressions::lower_expression;
+use super::super::super::literals::StringDataValues;
+use super::super::super::native::{BackendEmitError, FunctionRef};
+use super::super::super::types::NativeType;
+use super::super::{Flow, LoopTargets, LoweredCleanupSchedule};
+use super::{dispatch, try_lowering};
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::cranelift::structs::emit_binding_drop;
-
-mod compound;
-mod control_flow;
-mod dispatch;
-mod owners;
-mod structured_control;
-mod try_lowering;
-
-pub(crate) use compound::lower_compound_assignment;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_statements<'source>(
@@ -56,7 +48,7 @@ pub(crate) fn lower_statements<'source>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_return_statement(
+pub(super) fn lower_return_statement(
     function: &mut FunctionBuilder<'_>,
     expression: Option<&Expr>,
     span: crate::lexer::SourceSpan,
@@ -100,7 +92,7 @@ fn lower_void_return(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_expression_statement(
+pub(super) fn lower_expression_statement(
     function: &mut FunctionBuilder<'_>,
     expression: &Expr,
     span: crate::lexer::SourceSpan,
@@ -151,7 +143,7 @@ fn lower_plain_expression_statement(
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
     if let Expr::Case { subject, branches, .. } = expression {
-        super::super::case::lower_case(
+        super::super::super::case::lower_case(
             function,
             subject,
             branches,
@@ -166,7 +158,7 @@ fn lower_plain_expression_statement(
         )?;
         return Ok(Flow::Fallthrough);
     }
-    super::super::expressions::lower_expression_with_targets(
+    super::super::super::expressions::lower_expression_with_targets(
         function,
         expression,
         locals,
@@ -206,7 +198,7 @@ fn lower_try_expression_statement(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_loop_control(
+pub(super) fn lower_loop_control(
     function: &mut FunctionBuilder<'_>,
     span: crate::lexer::SourceSpan,
     targets: Option<LoopTargets>,
@@ -220,11 +212,11 @@ fn lower_loop_control(
     let exit_kind = if continue_loop { LoopExitKind::Continue } else { LoopExitKind::Break };
     let mut cleanup = CleanupContext::new(function, locals, types, functions, layouts);
     emit_loop_cleanup(&mut cleanup, cleanup_schedule, span, exit_kind)?;
-    super::loops::emit_loop_jump(function, targets, locals, continue_loop)
+    super::super::loops::emit_loop_jump(function, targets, locals, continue_loop)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lower_assignment<'source>(
+pub(super) fn lower_assignment<'source>(
     function: &mut FunctionBuilder<'_>,
     name: &'source String,
     expression: &Expr,
@@ -293,7 +285,7 @@ fn store_assignment_value(
     Ok(true)
 }
 
-fn lower_drop(
+pub(super) fn lower_drop(
     function: &mut FunctionBuilder<'_>,
     name: &str,
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,

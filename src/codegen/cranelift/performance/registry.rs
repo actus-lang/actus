@@ -4,39 +4,35 @@ use crate::semantic::ReachablePerformance;
 
 use crate::ast::{Program, TopLevelDecl, TypeName, VerbDecl};
 
-use super::native::{BackendEmitError, FunctionMeta};
-use super::types::NativeType;
+use super::super::native::{BackendEmitError, FunctionMeta};
+use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 use crate::codegen::symbols::{SymbolIdentity, SymbolKind};
 use cranelift_module::{Linkage, Module};
 use cranelift_object::ObjectModule;
 
-mod emit;
-
-pub(super) use emit::define_performances;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct PerformanceImplementation {
-    pub(super) role_name: String,
-    pub(super) target_type: String,
-    pub(super) method_name: String,
-    pub(super) symbol: String,
+pub(in crate::codegen::cranelift) struct PerformanceImplementation {
+    pub(in crate::codegen::cranelift) role_name: String,
+    pub(in crate::codegen::cranelift) target_type: String,
+    pub(in crate::codegen::cranelift) method_name: String,
+    pub(in crate::codegen::cranelift) symbol: String,
 }
 
 #[derive(Default)]
-pub(super) struct PerformanceRegistry {
+pub(in crate::codegen::cranelift) struct PerformanceRegistry {
     implementations: Vec<PerformanceImplementation>,
 }
 
-pub(super) struct PerformanceDefinition<'a> {
-    pub(super) role_name: String,
-    pub(super) target: &'a TypeName,
-    pub(super) method: &'a VerbDecl,
-    pub(super) symbol: String,
+pub(in crate::codegen::cranelift) struct PerformanceDefinition<'a> {
+    pub(in crate::codegen::cranelift) role_name: String,
+    pub(in crate::codegen::cranelift) target: &'a TypeName,
+    pub(in crate::codegen::cranelift) method: &'a VerbDecl,
+    pub(in crate::codegen::cranelift) symbol: String,
 }
 
 impl PerformanceRegistry {
-    pub(super) fn from_reachable_in_namespace(
+    pub(in crate::codegen::cranelift) fn from_reachable_in_namespace(
         reachable: &[ReachablePerformance],
         namespace_prefix: &str,
     ) -> Self {
@@ -58,7 +54,7 @@ impl PerformanceRegistry {
         Self { implementations }
     }
 
-    pub(super) fn from_program_in_namespace(
+    pub(in crate::codegen::cranelift) fn from_program_in_namespace(
         program: &Program,
         reachable: &[ReachablePerformance],
         namespace_prefix: &str,
@@ -86,7 +82,7 @@ impl PerformanceRegistry {
         registry
     }
 
-    pub(super) fn validate(&self) -> Result<(), String> {
+    pub(in crate::codegen::cranelift) fn validate(&self) -> Result<(), String> {
         let mut symbols = HashSet::new();
         for implementation in &self.implementations {
             if !symbols.insert(&implementation.symbol) {
@@ -96,7 +92,7 @@ impl PerformanceRegistry {
         Ok(())
     }
 
-    pub(super) fn definitions<'a>(
+    pub(in crate::codegen::cranelift) fn definitions<'a>(
         &self,
         program: &'a Program,
     ) -> Result<Vec<PerformanceDefinition<'a>>, BackendEmitError> {
@@ -140,7 +136,7 @@ fn find_definition<'a>(
     })
 }
 
-pub(super) fn declare_performance_functions(
+pub(in crate::codegen::cranelift) fn declare_performance_functions(
     module: &mut ObjectModule,
     definitions: &[PerformanceDefinition<'_>],
     layouts: &LayoutRegistry,
@@ -159,8 +155,11 @@ fn declare_performance_function(
     definition: &PerformanceDefinition<'_>,
     layouts: &LayoutRegistry,
 ) -> Result<FunctionMeta, BackendEmitError> {
-    let signature =
-        super::declarations::native_signature_for_definition(module, definition.method, layouts)?;
+    let signature = super::super::emission::native_signature_for_definition(
+        module,
+        definition.method,
+        layouts,
+    )?;
     let id = module
         .declare_function(&definition.symbol, Linkage::Local, &signature)
         .map_err(|error| BackendEmitError(error.to_string()))?;
@@ -232,7 +231,7 @@ fn performance_symbol(namespace_prefix: &str, role: &str, target: &str, method: 
         .to_owned()
 }
 
-pub(super) fn dispatch_key(target: NativeType, method: &str) -> String {
+pub(in crate::codegen::cranelift) fn dispatch_key(target: NativeType, method: &str) -> String {
     format!("actus_dispatch_{}_{}", native_type_key(target), encode_component(method))
 }
 

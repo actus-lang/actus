@@ -4,21 +4,14 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::Expr;
 
-use super::expressions::{initializer_type, lower_expression};
-use super::literals::StringDataValues;
-use super::native::{BackendEmitError, FunctionRef};
-use super::types::NativeType;
+use super::super::expressions::{initializer_type, lower_expression};
+use super::super::literals::StringDataValues;
+use super::super::native::{BackendEmitError, FunctionRef};
+use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
-mod branches;
-mod context;
-mod matching;
-mod payload;
-mod types;
-
-use self::context::CaseLoweringContext;
-use self::types::branch_type;
-pub(crate) use types::infer_case_type;
+use super::context::CaseLoweringContext;
+use super::types::branch_type;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_case(
@@ -63,7 +56,7 @@ pub(crate) fn lower_case(
     let result_type =
         branch_type(branches, subject_type, local_types, functions, layouts, value_producing)?;
     function.append_block_param(merge, layouts.ir_type(result_type)?);
-    branches::emit_case_branches(
+    super::branches::emit_case_branches(
         function,
         branches,
         subject_value,

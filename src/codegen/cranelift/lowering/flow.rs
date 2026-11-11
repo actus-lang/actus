@@ -1,12 +1,4 @@
-mod body;
-mod loops;
-mod scopes;
-mod statements;
-
-use super::types::NativeType;
-pub(super) use crate::codegen::model::LoweredCleanupSchedule;
-pub(super) use body::{lower_body, lower_case_block};
-pub(super) use statements::lower_statements;
+use super::super::types::NativeType;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Flow {

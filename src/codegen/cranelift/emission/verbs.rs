@@ -6,45 +6,49 @@ use crate::ast::{ExternalVerbDecl, TopLevelDecl, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
 use crate::target::TargetSpec;
 
-use super::super::model::LoweredCleanupSchedule;
-use super::abi::{validate_external_native_signature, validate_native_signature};
-use super::declarations::{FunctionDeclarationContext, declare_functions};
-use super::function_definition::define_function;
-use super::layout::LayoutRegistry;
-use super::literals::StringDataIds;
-use super::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
-use super::runtime::{
+use super::super::super::model::LoweredCleanupSchedule;
+use super::super::abi::{validate_external_native_signature, validate_native_signature};
+use super::super::function_definition::define_function;
+use super::super::layout::LayoutRegistry;
+use super::super::literals::StringDataIds;
+use super::super::native::{BackendEmitError, BackendSymbolBindings, FunctionMeta};
+use super::super::runtime::{
     declare_buffer_cleanup_function, declare_enum_cleanup_function,
     declare_region_cleanup_function, declare_runtime_functions,
 };
+use super::declarations::{FunctionDeclarationContext, declare_functions};
 
-pub(super) fn declaration_verb(declaration: &TopLevelDecl) -> Option<&VerbDecl> {
+pub(in crate::codegen::cranelift) fn declaration_verb(
+    declaration: &TopLevelDecl,
+) -> Option<&VerbDecl> {
     match declaration {
         TopLevelDecl::Verb(verb) if verb.generic_parameters.is_empty() => Some(verb),
         _ => None,
     }
 }
 
-pub(super) fn declaration_external_verb(declaration: &TopLevelDecl) -> Option<&ExternalVerbDecl> {
+pub(in crate::codegen::cranelift) fn declaration_external_verb(
+    declaration: &TopLevelDecl,
+) -> Option<&ExternalVerbDecl> {
     match declaration {
         TopLevelDecl::ExternalVerb(verb) => Some(verb),
         _ => None,
     }
 }
 
-pub(super) struct DeclarationContext<'a> {
-    pub(super) entry_symbol: Option<&'a str>,
-    pub(super) namespace_prefix: &'a str,
-    pub(super) layouts: &'a LayoutRegistry,
-    pub(super) target: &'a TargetSpec,
-    pub(super) bindings: &'a BackendSymbolBindings,
+pub(in crate::codegen::cranelift) struct DeclarationContext<'a> {
+    pub(in crate::codegen::cranelift) entry_symbol: Option<&'a str>,
+    pub(in crate::codegen::cranelift) namespace_prefix: &'a str,
+    pub(in crate::codegen::cranelift) layouts: &'a LayoutRegistry,
+    pub(in crate::codegen::cranelift) target: &'a TargetSpec,
+    pub(in crate::codegen::cranelift) bindings: &'a BackendSymbolBindings,
 }
 
-pub(super) fn declare_all_functions(
+pub(in crate::codegen::cranelift) fn declare_all_functions(
     module: &mut ObjectModule,
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
-    performance_definitions: &[super::performance::PerformanceDefinition<'_>],
+    performance_definitions: &[super::super::performance::PerformanceDefinition<'_>],
     context: DeclarationContext<'_>,
 ) -> Result<HashMap<String, FunctionMeta>, BackendEmitError> {
     let force_entry_return = target_requires_host_runtime(context.target)
@@ -67,7 +71,7 @@ pub(super) fn declare_all_functions(
             force_entry_return,
         },
     )?;
-    metadata.extend(super::performance::declare_performance_functions(
+    metadata.extend(super::super::performance::declare_performance_functions(
         module,
         performance_definitions,
         context.layouts,
@@ -138,11 +142,11 @@ fn type_name_uses_buffer(type_name: &crate::ast::TypeName) -> bool {
     type_name.name == "Buffer" || type_name.arguments.iter().any(type_name_uses_buffer)
 }
 
-pub(super) fn target_requires_host_runtime(target: &TargetSpec) -> bool {
+pub(in crate::codegen::cranelift) fn target_requires_host_runtime(target: &TargetSpec) -> bool {
     matches!(target.entry_contract(), crate::target::EntryContract::Hosted)
 }
 
-pub(super) fn validate_native_program(
+pub(in crate::codegen::cranelift) fn validate_native_program(
     verbs: &[&VerbDecl],
     external_verbs: &[&ExternalVerbDecl],
     layouts: &LayoutRegistry,
@@ -158,7 +162,7 @@ pub(super) fn validate_native_program(
     Ok(())
 }
 
-pub(super) fn function_metadata(
+pub(in crate::codegen::cranelift) fn function_metadata(
     metadata: &HashMap<String, FunctionMeta>,
 ) -> HashMap<String, FunctionMeta> {
     metadata
@@ -181,7 +185,7 @@ pub(super) fn function_metadata(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn define_verbs(
+pub(in crate::codegen::cranelift) fn define_verbs(
     module: &mut ObjectModule,
     frontend_config: cranelift_codegen::isa::TargetFrontendConfig,
     verbs: &[&VerbDecl],
@@ -189,7 +193,7 @@ pub(super) fn define_verbs(
     cleanup_schedule: &LoweredCleanupSchedule,
     string_data: &StringDataIds,
     layouts: &LayoutRegistry,
-    vtable_data: &super::vtable::VtableDataIds,
+    vtable_data: &super::super::dispatch::VtableDataIds,
     namespace_prefix: &str,
     entry_symbol: Option<&str>,
     target: &TargetSpec,
