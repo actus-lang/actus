@@ -47,6 +47,8 @@ QUALIFIERS = {"unsafe", "async", "default", "extern"}
 ANCHORS = {"crate", "self", "super"}
 OPEN = {"(": ")", "[": "]", "{": "}"}
 CLOSERS = (")", "]", "}", ">")
+NESTING = {"(": 1, "[": 1, "{": 1, "<": 1, ")": -1, "]": -1, "}": -1, ">": -1, ">>": -2}
+INCLUDES = {"include", "include_str", "include_bytes"}
 NOT_REFERENCE_AFTER = {".", "::", "fn", "struct", "enum", "type", "trait", "const", "static",
                        "mod", "let", "mut"}
 MAX_DEPTH = 12
@@ -306,12 +308,9 @@ def copy_field(tokens, k, end, kept):
         t = tokens[k][0]
         kept.append(tokens[k])
         k += 1
-        if t in OPEN or t == "<":
-            depth += 1
-        elif t in (")", "]", "}") or (t == ">" and depth > 0):
-            depth -= 1
-        elif t == "," and depth == 0:
+        if t == "," and depth == 0:
             break
+        depth = max(0, depth + NESTING.get(t, 0))
     return k
 
 
@@ -410,6 +409,8 @@ class Crate:
             return close
         if IDENT.fullmatch(head.word) and token_at(tokens, j + 1) == "!":
             stop = statement_end(tokens, matching(tokens, j + 2), scope.end)
+            if head.word in INCLUDES:
+                scope = scope._replace(tokens=resolved_include(tokens, j, stop, scope.path))
             self.add_item(scope, head, "macro_call", head.word, stop, False)
             return stop
         return max(j, start) + 1
@@ -473,6 +474,17 @@ class Crate:
         self.items.append(item)
         if item.owner is None and kind not in ("impl", "macro_call"):
             self.module(scope.module).defs[name].append(item)
+
+
+def resolved_include(tokens, j, stop, path):
+    """Replace an include!("relative") literal with the path it resolves to."""
+    resolved = list(tokens)
+    for k in range(j, stop):
+        literal = tokens[k][0]
+        if literal.startswith('"'):
+            target = os.path.normpath(path.rsplit("/", 1)[0] + "/" + literal[1:-1])
+            resolved[k] = ('"%s"' % target.replace(os.sep, "/"), tokens[k][1])
+    return resolved
 
 
 def skip_qualifiers(tokens, j, end):
@@ -569,10 +581,23 @@ def file_modules(files):
         if path in result or path not in files:
             continue
         result[path] = module
-        for name, attribute_path in declared_modules(lex(files[path])):
+        tokens = lex(files[path])
+        for name, attribute_path in declared_modules(tokens):
             child, child_mod_rs = child_location(files, path, mod_rs, name, attribute_path)
             pending.append((child, module + (name,), child_mod_rs))
+        for included in included_files(tokens, path):
+            pending.append((included, module, mod_rs))
     return result
+
+
+def included_files(tokens, path):
+    """Files pasted into this module by `include!("...")`; they share its module."""
+    directory = path.rsplit("/", 1)[0]
+    for k in range(len(tokens) - 3):
+        if (tokens[k][0] == "include" and tokens[k + 1][0] == "!"
+                and tokens[k + 3][0].startswith('"')):
+            target = directory + "/" + tokens[k + 3][0][1:-1]
+            yield os.path.normpath(target).replace(os.sep, "/")
 
 
 def declared_modules(tokens):
