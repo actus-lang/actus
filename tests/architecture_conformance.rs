@@ -32,14 +32,9 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
     "src/diagnostics/renderer/mod.rs",
     "src/formatter/mod.rs",
     "src/lsp/hover/mod.rs",
-    "src/registry/mod.rs",
-    "src/runtime/mod.rs",
-    "src/runtime/fs/mod.rs",
-    "src/runtime/path/mod.rs",
 ];
 
-const ALLOWED_RS_PAIRS: &[&str] =
-    &["src/modules/aggregation/visibility.rs", "src/runtime/region.rs"];
+const ALLOWED_RS_PAIRS: &[&str] = &[];
 
 const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[];
 
@@ -51,7 +46,6 @@ const ALLOWED_PATH_MODULES: &[&str] = &[
     "src/conformance/source_limits.rs",
     "src/diagnostics/renderer/codes/mod.rs",
     "src/ffi/abi.rs",
-    "src/runtime/fs/walk.rs",
 ];
 
 fn source_relative(path: &Path) -> String {
