@@ -1,8 +1,8 @@
 //! Hosted C-ABI bridges for bounded Region range access.
 
-use super::region::RegionError;
-use super::region_bridge::{REGION_STORE, error_result, result_u64, validate_descriptor};
-use super::types::ActusBuffer;
+use super::super::super::types::ActusBuffer;
+use super::super::descriptor::{RegionDescriptor, RegionError};
+use super::access::{REGION_STORE, error_result, result_u64, validate_descriptor};
 
 const RESULT_U64_SIZE: usize = 16;
 
@@ -23,7 +23,7 @@ fn buffer_slice_mut<'buffer>(buffer: *mut ActusBuffer) -> Result<&'buffer mut [u
 }
 
 fn read_range(
-    descriptor: &super::region::RegionDescriptor,
+    descriptor: &RegionDescriptor,
     start_index: u64,
     element_count: u64,
     destination: *mut ActusBuffer,
@@ -36,7 +36,7 @@ fn read_range(
 }
 
 fn write_range(
-    descriptor: &mut super::region::RegionDescriptor,
+    descriptor: &mut RegionDescriptor,
     start_index: u64,
     element_count: u64,
     source: *const ActusBuffer,
@@ -89,7 +89,7 @@ pub unsafe extern "C" fn actus_region_write_range(
     if validate_descriptor(region).is_err() {
         return error_result(RESULT_U64_SIZE, RegionError::InvalidDescriptor);
     }
-    let descriptor = unsafe { &mut *region.cast::<super::region::RegionDescriptor>() };
+    let descriptor = unsafe { &mut *region.cast::<RegionDescriptor>() };
     match write_range(descriptor, start_index, element_count, source) {
         Ok(count) => result_u64(count),
         Err(error) => error_result(RESULT_U64_SIZE, error),

@@ -3,12 +3,11 @@ use std::collections::HashSet;
 use crate::ast::{Program, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
-use super::types::ModuleError;
-use super::unit::ModuleUnit;
+use super::super::types::ModuleError;
+use super::super::unit::ModuleUnit;
+use super::expression_checks;
 
-mod expression_checks;
-
-pub(super) fn validate_import_visibility(
+pub(in crate::modules::aggregation) fn validate_import_visibility(
     program: &Program,
     module_path: &str,
     unit: &ModuleUnit,
@@ -52,7 +51,7 @@ fn private_names(unit: &ModuleUnit, kinds: &[&str]) -> HashSet<String> {
     unit.implementation()
         .declarations
         .iter()
-        .filter_map(|declaration| super::validation::export_identity(declaration))
+        .filter_map(|declaration| super::super::validation::export_identity(declaration))
         .filter(|(declaration_kind, name)| {
             kinds.contains(declaration_kind) && !unit.exports().contains(declaration_kind, name)
         })
@@ -60,7 +59,7 @@ fn private_names(unit: &ModuleUnit, kinds: &[&str]) -> HashSet<String> {
         .collect()
 }
 
-fn check_type_name(
+pub(super) fn check_type_name(
     name: &str,
     private_types: &HashSet<String>,
     module_path: &str,
@@ -70,7 +69,7 @@ fn check_type_name(
     reject_private(name, private_types, module_path, unit, span)
 }
 
-fn reject_private(
+pub(super) fn reject_private(
     name: &str,
     private_names: &HashSet<String>,
     module_path: &str,

@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use crate::ast::TopLevelDecl;
 
-use super::collision::{ExternalContract, external_contract};
-use super::types::ModuleError;
-use super::unit::ModuleUnit;
-use super::validation::{export_identity, target_scopes_are_disjoint, target_selector};
+use super::super::collision::{ExternalContract, external_contract};
+use super::super::types::ModuleError;
+use super::super::unit::ModuleUnit;
+use super::super::validation::{export_identity, target_scopes_are_disjoint, target_selector};
 
 pub(super) fn validate_symbol_collisions(
     local_declarations: &[TopLevelDecl],

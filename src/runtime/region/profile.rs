@@ -1,5 +1,5 @@
-use super::contract::REGION_MAX_BULK_BYTES;
-use super::region::RegionError;
+use super::super::contract::REGION_MAX_BULK_BYTES;
+use super::descriptor::RegionError;
 
 /// Checked logical-index, byte-offset, and bulk-copy limits for one target.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,5 +1,5 @@
-use super::region::RegionError;
-use super::serialization::crc32;
+use super::super::serialization::crc32;
+use super::descriptor::RegionError;
 
 /// Fixed-width request shared by every Region storage provider.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
