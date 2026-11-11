@@ -519,28 +519,31 @@ llvm/
   verification.rs calls.rs
   scalar/{mod,values,loan,float}.rs
   scalar/integer/{mod,cast,ops}.rs
-  aggregate/{mod,storage,arrays,packed/fields}.rs
-  cleanup/{mod,emission,bridge/{mod,address}}.rs
+  aggregate/{mod,storage,arrays}.rs
+  aggregate/packed/{mod,fields,wide}.rs
+  cleanup/{mod,emission}.rs
+  cleanup/bridge/{mod,runtime,address}.rs
   shim/{mod,options}.rs
 ```
 
 | Old | New | Type |
 | --- | --- | --- |
-| `llvm/scalar.rs` | `llvm/scalar/values.rs` | group + extract |
-| `llvm/scalar_loan.rs` | `llvm/scalar/loan.rs` | rename |
+| `llvm/scalar.rs` | `llvm/scalar/values.rs` | pair→facade + extract |
+| `llvm/scalar_loan.rs` | `llvm/scalar/loan.rs` | group |
 | `llvm/float.rs` | `llvm/scalar/float.rs` | group |
-| `llvm/integer/mod.rs` | `llvm/scalar/integer/mod.rs` | move |
-| `llvm/integer/cast.rs` | `llvm/scalar/integer/cast.rs` | move |
-| `llvm/integer/ops.rs` | `llvm/scalar/integer/ops.rs` | move |
-| `llvm/aggregates.rs` | `llvm/aggregate/storage.rs` | group |
+| `llvm/integer/mod.rs` | `llvm/scalar/integer/mod.rs` | group |
+| `llvm/integer/cast.rs` | `llvm/scalar/integer/cast.rs` | group |
+| `llvm/integer/ops.rs` | `llvm/scalar/integer/ops.rs` | group |
+| `llvm/aggregates.rs` | `llvm/aggregate/storage.rs` | pair→facade + extract |
 | `llvm/arrays.rs` | `llvm/aggregate/arrays.rs` | group |
-| `llvm/packed/mod.rs` | `llvm/aggregate/packed/fields.rs` | extract |
+| `llvm/packed/mod.rs` | `llvm/aggregate/packed/fields.rs` | pair→facade + extract |
+| `llvm/packed/wide.rs` | `llvm/aggregate/packed/wide.rs` | unchanged |
 | `llvm/calls.rs` | `llvm/calls.rs` | unchanged |
 | `llvm/returns.rs` | `llvm/returns.rs` | unchanged |
-| `llvm/cleanup.rs` | `llvm/cleanup/mod.rs` | pair→facade |
-| `llvm/cleanup/bridge.rs` | `llvm/cleanup/bridge/mod.rs` | pair→facade |
+| `llvm/cleanup.rs` | `llvm/cleanup/emission.rs` | pair→facade + extract |
+| `llvm/cleanup/bridge.rs` | `llvm/cleanup/bridge/runtime.rs` | pair→facade + extract |
 | `llvm/cleanup/bridge/address.rs` | same path | unchanged |
-| `llvm/shim.rs` | `llvm/shim/mod.rs` | pair→facade |
+| `llvm/shim.rs` | `llvm/shim/options.rs` | pair→facade + extract |
 | `llvm/shim/target_options.cpp` | same path | unchanged |
 | `llvm/{arena,branches,context,control_flow,declarations,emission,enums,failures,guards,identity,instruction,literals,memory,module,object,values,verification}.rs` | same paths | unchanged |
 
@@ -709,8 +712,8 @@ facade-plus-extract rule applies to every other true pair in the mapping.
 | `llvm/arrays.rs` | `llvm/aggregate/arrays.rs` | group | aggregate representation/lowering family |
 | `llvm/branches.rs` | `llvm/branches.rs` | unchanged | branch emission domain |
 | `llvm/calls.rs` | `llvm/calls.rs` | unchanged | one file; no one-file `call/` directory |
-| `llvm/cleanup.rs` | `llvm/cleanup/mod.rs` | pair→facade | existing cleanup directory |
-| `llvm/cleanup/bridge.rs` | `llvm/cleanup/bridge/mod.rs` | pair→facade | existing bridge directory |
+| `llvm/cleanup.rs` | `llvm/cleanup/emission.rs` | pair→facade + extract | cleanup emission is separated from the facade |
+| `llvm/cleanup/bridge.rs` | `llvm/cleanup/bridge/runtime.rs` | pair→facade + extract | runtime bridge-call emission is separated from the bridge facade |
 | `llvm/cleanup/bridge/address.rs` | same path | unchanged | address bridge domain |
 | `llvm/context.rs` | `llvm/context.rs` | unchanged | LLVM context ownership |
 | `llvm/control_flow.rs` | `llvm/control_flow.rs` | unchanged | control-flow emission |
@@ -729,11 +732,12 @@ facade-plus-extract rule applies to every other true pair in the mapping.
 | `llvm/memory.rs` | `llvm/memory.rs` | unchanged | memory operations |
 | `llvm/module.rs` | `llvm/module.rs` | unchanged | module construction |
 | `llvm/object.rs` | `llvm/object.rs` | unchanged | object emission |
-| `llvm/packed/mod.rs` | `llvm/aggregate/packed/fields.rs` | extract | packed field load/store implementation |
+| `llvm/packed/mod.rs` | `llvm/aggregate/packed/fields.rs` | pair→facade + extract | packed field load/store implementation |
+| `llvm/packed/wide.rs` | `llvm/aggregate/packed/wide.rs` | unchanged | wide packed-field operations remain in the packed family |
 | `llvm/returns.rs` | `llvm/returns.rs` | unchanged | single return implementation |
-| `llvm/scalar.rs` | `llvm/scalar/values.rs` | extract | no current scalar/ directory; scalar family is grouped by content |
+| `llvm/scalar.rs` | `llvm/scalar/values.rs` | pair→facade + extract | scalar values and selection implementation |
 | `llvm/scalar_loan.rs` | `llvm/scalar/loan.rs` | group | scalar loan operations |
-| `llvm/shim.rs` | `llvm/shim/mod.rs` | pair→facade | existing C++ shim directory |
+| `llvm/shim.rs` | `llvm/shim/options.rs` | pair→facade + extract | Rust shim options are separated from the facade |
 | `llvm/shim/target_options.cpp` | same path | unchanged | C++ shim implementation |
 | `llvm/values.rs` | `llvm/values.rs` | unchanged | LLVM value wrapper |
 | `llvm/verification.rs` | `llvm/verification.rs` | unchanged | IR verification |
@@ -768,6 +772,10 @@ The architecture test has six exact-path allowlists. Their current sizes are:
 | `src/codegen/cranelift/lowering/mod.rs` | 5 |
 | `src/codegen/cranelift/performance/mod.rs` | 5 |
 | `src/codegen/llvm/packed/mod.rs` | 6 |
+| `src/codegen/llvm/cleanup.rs` | 6 |
+| `src/codegen/llvm/cleanup/bridge.rs` | 6 |
+| `src/codegen/llvm/shim.rs` | 6 |
+| `src/codegen/llvm/packed` | 6 |
 | `src/codegen/result_constructors/mod.rs` | 4 |
 | `src/codegen/symbols/mod.rs` | 4 |
 | `src/diagnostics/renderer/mod.rs` | 9 |
