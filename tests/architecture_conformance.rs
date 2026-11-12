@@ -230,6 +230,17 @@ fn assert_no_path_module_redirection(directory: &Path) {
     }
 }
 
+fn assert_no_include_modules(directory: &Path) {
+    for path in rust_sources(directory) {
+        let source = fs::read_to_string(&path).expect("Rust source should be readable");
+        assert!(
+            !source.contains("include!("),
+            "include! module input is not allowed: {}",
+            source_relative(&path)
+        );
+    }
+}
+
 fn assert_no_parent_name_duplicates(directory: &Path) {
     for path in rust_sources(directory) {
         if path.file_name().and_then(|name| name.to_str()) == Some("mod.rs") {
@@ -305,6 +316,7 @@ fn source_layout_facades_and_boundaries_are_enforced() {
     let source = repository_path("src");
     assert_facade_shape(&source);
     assert_no_path_module_redirection(&source);
+    assert_no_include_modules(&source);
     assert_no_source_pairs(&source);
     assert_no_single_file_modules(&source);
     assert_no_parent_name_duplicates(&source);

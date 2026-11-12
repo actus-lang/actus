@@ -1,5 +1,4 @@
-use super::super::super::BackendFieldLayout;
-use super::super::BackendLayoutProvider;
+use super::*;
 
 impl BackendLayoutProvider for ProgramLayouts<'_> {
     fn layout_for(&self, type_name: &TypeName) -> Option<BackendLayout> {
@@ -9,7 +8,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
     fn enum_layout_for(
         &self,
         type_name: &TypeName,
-    ) -> Option<super::super::super::abi::BackendEnumLayout> {
+    ) -> Option<super::super::super::super::abi::BackendEnumLayout> {
         let normalized = self.normalize_type_name(type_name);
         let type_name = &normalized;
         if let Some(layout) = self.niche_option_layout(type_name) {
@@ -50,7 +49,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         &self,
         type_name: &TypeName,
         variant: &str,
-    ) -> Option<Vec<super::super::super::BackendEnumPayloadField>> {
+    ) -> Option<Vec<super::super::super::super::BackendEnumPayloadField>> {
         let normalized = self.normalize_type_name(type_name);
         if let Some(fields) = builtin_enum_payload_fields(self, &normalized, variant) {
             return fields;
@@ -60,7 +59,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
 
     fn enum_variant_for_layout(
         &self,
-        layout: super::super::super::abi::BackendEnumLayout,
+        layout: super::super::super::super::abi::BackendEnumLayout,
         variant: &str,
     ) -> Option<(u32, bool)> {
         if layout.niche_pointer {
@@ -108,7 +107,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         &self,
         type_name: &TypeName,
         field_name: &str,
-    ) -> Option<super::super::super::BackendPackedFieldLayout> {
+    ) -> Option<super::super::super::super::BackendPackedFieldLayout> {
         let pack = self.packs.get(type_name.name.as_str())?;
         let field = pack.fields.iter().find(|field| field.name == field_name)?;
         let primitive = if field.ty.name == "Array" && field.ty.arguments.len() == 2 {
@@ -129,12 +128,12 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
                     33..=64 => 64,
                     _ => return None,
                 };
-                super::super::super::BackendValueType::Integer { signed, width }
+                super::super::super::super::BackendValueType::Integer { signed, width }
             }
             _ => return None,
         };
         let storage = self.type_layout(pack.storage.type_name(), &mut Vec::new())?;
-        Some(super::super::super::BackendPackedFieldLayout {
+        Some(super::super::super::super::BackendPackedFieldLayout {
             storage,
             bit_offset: field.offset,
             width,
@@ -151,9 +150,8 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             return self.pack_field_for(type_name, field_name);
         }
         let definition = self.structs.get(type_name.name.as_str())?;
-        let packed = definition
-            .repr()
-            .is_some_and(|repr| repr.is_packed() || repr.is_transparent());
+        let packed =
+            definition.repr().is_some_and(|repr| repr.is_packed() || repr.is_transparent());
         let substitution = (!definition.generic_parameters.is_empty())
             .then(|| {
                 crate::semantic::TypeSubstitution::for_type(
@@ -185,14 +183,13 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         }
         None
     }
-
 }
 
 fn builtin_enum_payload_fields(
     layouts: &ProgramLayouts<'_>,
     type_name: &TypeName,
     variant: &str,
-) -> Option<Option<Vec<super::super::super::BackendEnumPayloadField>>> {
+) -> Option<Option<Vec<super::super::super::super::BackendEnumPayloadField>>> {
     let index = match type_name.name.as_str() {
         "Option" if type_name.arguments.len() == 1 => match variant {
             "None" => return Some(Some(Vec::new())),
@@ -208,7 +205,7 @@ fn builtin_enum_payload_fields(
     };
     let ty = type_name.arguments[index].clone();
     let layout = layouts.type_layout(&ty, &mut Vec::new())?;
-    Some(Some(vec![super::super::super::BackendEnumPayloadField {
+    Some(Some(vec![super::super::super::super::BackendEnumPayloadField {
         name: "0".to_owned(),
         offset: 0,
         layout,
@@ -220,7 +217,7 @@ fn named_enum_payload_fields(
     layouts: &ProgramLayouts<'_>,
     type_name: &TypeName,
     variant: &str,
-) -> Option<Vec<super::super::super::BackendEnumPayloadField>> {
+) -> Option<Vec<super::super::super::super::BackendEnumPayloadField>> {
     let definition = layouts.enums.get(type_name.name.as_str())?;
     let variant = definition.variants.iter().find(|candidate| candidate.name == variant)?;
     let substitution = (!definition.generic_parameters.is_empty())
@@ -241,10 +238,9 @@ fn named_enum_payload_fields(
             .enumerate()
             .map(|(index, ty)| (index.to_string(), ty.clone()))
             .collect::<Vec<_>>(),
-        EnumPayload::Struct(fields) => fields
-            .iter()
-            .map(|field| (field.name.clone(), field.ty.clone()))
-            .collect::<Vec<_>>(),
+        EnumPayload::Struct(fields) => {
+            fields.iter().map(|field| (field.name.clone(), field.ty.clone())).collect::<Vec<_>>()
+        }
     };
     let mut offset = 0u32;
     let mut result = Vec::new();
@@ -254,7 +250,12 @@ fn named_enum_payload_fields(
             .map_or_else(|| ty.clone(), |substitution| substitution.apply(&ty));
         let layout = layouts.type_layout(&ty, &mut Vec::new())?;
         offset = ProgramLayouts::align_up(offset, layout.alignment)?;
-        result.push(super::super::super::BackendEnumPayloadField { name, offset, layout, ty });
+        result.push(super::super::super::super::BackendEnumPayloadField {
+            name,
+            offset,
+            layout,
+            ty,
+        });
         offset = offset.checked_add(layout.size)?;
     }
     Some(result)
@@ -287,7 +288,7 @@ impl ProgramLayouts<'_> {
     fn result_layout(
         &self,
         type_name: &TypeName,
-    ) -> Option<super::super::super::abi::BackendEnumLayout> {
+    ) -> Option<super::super::super::super::abi::BackendEnumLayout> {
         let payload = type_name
             .arguments
             .iter()
@@ -299,7 +300,7 @@ impl ProgramLayouts<'_> {
             None => 4,
         };
         let alignment = payload.as_ref().map_or(4, |layout| 4u32.max(layout.alignment));
-        Some(super::super::super::abi::BackendEnumLayout {
+        Some(super::super::super::super::abi::BackendEnumLayout {
             layout: BackendLayout {
                 size: Self::align_up(
                     payload_offset.checked_add(payload.as_ref().map_or(0, |layout| layout.size))?,

@@ -33,6 +33,7 @@ import subprocess
 import sys
 import tarfile
 from collections import defaultdict
+from itertools import zip_longest
 from typing import NamedTuple, Optional
 
 PUNCT = [
@@ -48,6 +49,7 @@ ANCHORS = {"crate", "self", "super"}
 OPEN = {"(": ")", "[": "]", "{": "}"}
 CLOSERS = (")", "]", "}", ">")
 NESTING = {"(": 1, "[": 1, "{": 1, "<": 1, ")": -1, "]": -1, "}": -1, ">": -1, ">>": -2}
+BRACKETS = {"(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1}
 INCLUDES = {"include", "include_str", "include_bytes"}
 NOT_REFERENCE_AFTER = {".", "::", "fn", "struct", "enum", "type", "trait", "const", "static",
                        "mod", "let", "mut"}
@@ -248,6 +250,51 @@ def prefix_end(tokens, i, names):
            and (tokens[j][0] in ANCHORS or tokens[j][0] in names)):
         j += 2
     return j
+
+
+def rustfmt_equivalent(text):
+    """Collapse spellings rustfmt chooses between when it first formats a file.
+
+    `>>` closing two generic lists may be split across lines, and a match arm
+    may be written `=> expr,` or `=> { expr }`.
+    """
+    split = [part for t in text for part in ((">", ">") if t == ">>" else (t,))]
+    unwrapped = unwrap_arm_blocks(split)
+    return [t for k, t in enumerate(unwrapped)
+            if not (t == "," and k + 1 < len(unwrapped) and unwrapped[k + 1] in CLOSERS)]
+
+
+def unwrap_arm_blocks(text):
+    out: list[str] = []
+    i = 0
+    while i < len(text):
+        close = arm_block_close(text, i)
+        if close < 0:
+            out.append(text[i])
+            i += 1
+            continue
+        out.append("=>")
+        out.extend(unwrap_arm_blocks(text[i + 2:close]))
+        out.append(",")
+        i = close + 1
+        if i < len(text) and text[i] == ",":
+            i += 1
+    return out
+
+
+def arm_block_close(text, i):
+    """Index of the `}` of a `=> { expr }` arm whose block holds no statement, or -1."""
+    if text[i] != "=>" or i + 2 >= len(text) or text[i + 1] != "{":
+        return -1
+    depth = 0
+    for k in range(i + 1, len(text)):
+        t = text[k]
+        depth += BRACKETS.get(t, 0)
+        if depth == 0:
+            return k if k > i + 2 else -1
+        if depth == 1 and t == ";":
+            return -1
+    return -1
 
 
 def normalize(tokens, names):
@@ -828,6 +875,9 @@ def item_key(item, names):
 def grouped(crate, paths, names):
     groups = defaultdict(list)
     for item in crate.items:
+        # An include! call is module structure, like `mod`; the included items are compared.
+        if item.kind == "macro_call" and item.name == "include":
+            continue
         if in_paths(item.path, paths):
             groups[item_key(item, names)].append(item)
     return groups
@@ -867,10 +917,12 @@ class PathChecker:
         self.rewrites: defaultdict[str, int] = defaultdict(int)
 
     def check(self, o, n):
-        old_sites = path_sites(o.tokens, self.old.module_names)
-        new_sites = path_sites(n.tokens, self.new.module_names)
-        for index in sorted(set(old_sites) | set(new_sites)):
-            self.check_site(o, n, old_sites.get(index), new_sites.get(index))
+        # Paired items have equal normalized text, so their sites correspond in order
+        # even where rustfmt_equivalent shifted token positions.
+        old_sites = sorted(path_sites(o.tokens, self.old.module_names).items())
+        new_sites = sorted(path_sites(n.tokens, self.new.module_names).items())
+        for before, after in zip_longest(old_sites, new_sites):
+            self.check_site(o, n, before[1] if before else None, after[1] if after else None)
 
     def check_site(self, o, n, before, after):
         site = before or after
@@ -1058,7 +1110,7 @@ def main():
     names = old.module_names | new.module_names
     old.module_names = new.module_names = names
     for item in old.items + new.items:
-        item.text = normalize(item.tokens, names)
+        item.text = rustfmt_equivalent(normalize(item.tokens, names))
     pairs, differences = match_items(grouped(old, paths, names), grouped(new, paths, names))
     changes, rewrites = check_paths(pairs, old, new)
     images = module_images(pairs, old, new)

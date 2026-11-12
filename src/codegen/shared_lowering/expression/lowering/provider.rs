@@ -1,3 +1,5 @@
+use super::*;
+
 impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn lower_unit_call(
         &mut self,
@@ -52,11 +54,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         self.nominal_type(value).cloned()
     }
 
-    fn remember_nominal_type(
-        &mut self,
-        value: BackendValueId,
-        type_name: crate::ast::TypeName,
-    ) {
+    fn remember_nominal_type(&mut self, value: BackendValueId, type_name: crate::ast::TypeName) {
         self.remember_nominal_type(value, type_name);
     }
 
@@ -126,10 +124,8 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
         binding_values: &std::collections::BTreeMap<String, BackendValueId>,
     ) -> Result<(), BackendContractError> {
-        let skip_scope_cleanup = matches!(
-            instructions.last(),
-            Some(BackendInstruction::Jump { .. })
-        );
+        let skip_scope_cleanup =
+            matches!(instructions.last(), Some(BackendInstruction::Jump { .. }));
         if !skip_scope_cleanup {
             cleanup::emit_scope_cleanup(self, span, instructions, Some(binding_values));
         }
@@ -145,15 +141,17 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn distribute_scope_cleanup(
         &mut self,
         span: SourceSpan,
-        blocks: &mut Vec<super::super::super::BackendBlock>,
+        blocks: &mut Vec<super::super::super::super::BackendBlock>,
         start: usize,
-        block_bindings: &std::collections::BTreeMap<BackendBlockId, std::collections::BTreeMap<String, BackendValueId>>,
+        block_bindings: &std::collections::BTreeMap<
+            BackendBlockId,
+            std::collections::BTreeMap<String, BackendValueId>,
+        >,
     ) -> Result<(), BackendContractError> {
         for block in blocks.iter_mut().skip(start) {
             if matches!(
                 block.instructions.last(),
-                Some(BackendInstruction::Return { .. })
-                    | Some(BackendInstruction::Fail { .. })
+                Some(BackendInstruction::Return { .. }) | Some(BackendInstruction::Fail { .. })
             ) {
                 cleanup::emit_scope_cleanup(
                     self,
@@ -268,12 +266,12 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             return Ok(());
         }
         if let Some(scope_index) = self
-                .locals
-                .iter()
-                .enumerate()
-                .rev()
-                .skip(1)
-                .find_map(|(index, scope)| scope.contains_key(name).then_some(index))
+            .locals
+            .iter()
+            .enumerate()
+            .rev()
+            .skip(1)
+            .find_map(|(index, scope)| scope.contains_key(name).then_some(index))
         {
             self.locals[scope_index].insert(name.to_owned(), value);
             return Ok(());
@@ -339,10 +337,11 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         if let Expr::MethodCall { receiver, method, arguments, span } = expression
-            && let Some(result_type) = super::super::constructors::parse_constructor_receiver_type(
-                receiver.as_ref(),
-                *span,
-            )
+            && let Some(result_type) =
+                super::super::super::constructors::parse_constructor_receiver_type(
+                    receiver.as_ref(),
+                    *span,
+                )
             && result_type.name == "Result"
             && result_type.arguments.len() == 2
             && matches!(method.as_str(), "Ok" | "Err")
@@ -422,7 +421,6 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn call_produces_value(&self, callee: &str) -> bool {
         self.return_types.get(callee).is_some_and(Option::is_some)
     }
-
 
     fn lower_array_element(
         &mut self,
