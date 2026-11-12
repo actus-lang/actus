@@ -1,5 +1,7 @@
 use super::walker::*;
-use crate::runtime::{ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
+use crate::runtime::ABI_STATUS_END_OF_STREAM;
+#[cfg(unix)]
+use crate::runtime::ABI_STATUS_FAILURE;
 use std::path::PathBuf;
 
 fn test_root(name: &str) -> PathBuf {
