@@ -45,5 +45,7 @@ harder to audit.
 The migration is staged by module family. Each migration records the old to
 new path map, preserves test names where possible, and verifies that source
 logic is unchanged. The architecture conformance test uses an explicit,
-shrinking allowlist for violations that exist before each migration PR.
+shrinking allowlist for violations that exist before each migration PR. The
+allowlist was emptied and removed in Phase 52 PR 10; all rules now apply
+without exceptions.
 
