@@ -182,9 +182,7 @@ fn assert_facade_shape(directory: &Path) {
         let relative = source_relative(&path);
         let source = fs::read_to_string(&path).expect("module facade should be readable");
         let items = rust_item_starts(&source);
-        if !items.is_empty() {
-            assert!(items.is_empty(), "non-facade item in module facade {relative}: {items:?}");
-        }
+        assert!(items.is_empty(), "non-facade item in module facade {relative}: {items:?}");
     }
 }
 
@@ -197,14 +195,12 @@ fn assert_no_source_pairs(directory: &Path) {
             continue;
         };
         let sibling_directory = path.with_file_name(stem);
-        if sibling_directory.is_dir() {
-            let relative = source_relative(&path);
-            assert!(
-                !sibling_directory.is_dir(),
-                "X.rs + X/ pair: {relative} and {}",
-                sibling_directory.display()
-            );
-        }
+        assert!(
+            !sibling_directory.is_dir(),
+            "X.rs + X/ pair: {} and {}",
+            source_relative(&path),
+            sibling_directory.display()
+        );
     }
 }
 
@@ -219,23 +215,18 @@ fn assert_no_single_file_modules(directory: &Path) {
             .filter_map(Result::ok)
             .filter(|entry| entry.file_name() != "mod.rs")
             .count();
-        if files == 1 {
-            let relative = source_relative(module_directory);
-            assert!(files != 1, "one-file module directory: {relative}");
-        }
+        assert!(files != 1, "one-file module directory: {}", source_relative(module_directory));
     }
 }
 
 fn assert_no_path_module_redirection(directory: &Path) {
     for path in rust_sources(directory) {
         let source = fs::read_to_string(&path).expect("Rust source should be readable");
-        if source.contains("#[path") {
-            let relative = source_relative(&path);
-            assert!(
-                !source.contains("#[path"),
-                "#[path] module redirection is not allowed: {relative}"
-            );
-        }
+        assert!(
+            !source.contains("#[path"),
+            "#[path] module redirection is not allowed: {}",
+            source_relative(&path)
+        );
     }
 }
 
@@ -251,10 +242,7 @@ fn assert_no_parent_name_duplicates(directory: &Path) {
         else {
             continue;
         };
-        if stem == parent {
-            let relative = source_relative(&path);
-            assert!(stem != parent, "file repeats its parent module name: {relative}");
-        }
+        assert!(stem != parent, "file repeats its parent module name: {}", source_relative(&path));
     }
 }
 
