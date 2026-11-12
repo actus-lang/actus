@@ -1169,3 +1169,31 @@ remaining declarations and re-exports stay in place.
 `tests/architecture_conformance.rs` records the current violations by exact
 path and rejects any new violation. The allowlist is removed progressively as
 PRs 1–9 land.
+
+### PR 9 evidence
+
+- [x] The formatter, diagnostics, conformance source-limit, and FFI ABI
+  facades were split without changing public paths. The pure move commit is
+  `abd7d5bf`; the facade and implementation commit is `3640bd0d`; and the
+  five requested formatter/diagnostics/FFI allowlist entries were removed in
+  `dc45f5fe`. The selected `ffi/abi/` layout leaves `src/ffi` with one child
+  module, so the architecture test keeps that exact path in its one-file
+  allowlist (`119b4dbb`) rather than permitting a new unlisted violation.
+- [x] The complete layout checker output against `ab684161` was:
+
+  ```text
+  compared items: 315 matched
+  path-only changes (prefix rewrites, targets verified):
+    pack_codes -> packing  x2
+  result: OK
+  ```
+
+- [x] `cargo test --all-features -- --list` listed 1,988 tests, matching the
+  PR 5 baseline of 1,988. No unit-test modules are present in the moved PR 9
+  source files, so there are no PR 9 test-name path changes.
+- [x] `cargo fmt --all -- --check`, all three clippy configurations
+  (`--all-features`, `cranelift`, and `llvm`), `check_source_limits.sh`,
+  `check_architecture.sh`, `check_documentation.sh`, and
+  `check_secrets.sh` completed successfully. The full
+  `cargo test --all-targets --all-features` run completed with exit 0 after
+  the exact `src/ffi` allowlist entry was added.
