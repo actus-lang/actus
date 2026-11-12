@@ -37,6 +37,7 @@ snapshots, `actus --version`, CLI output, `cargo fmt --all -- --check`, and
 8. CLI and LSP
 9. Formatter, diagnostics, documentation, and conformance
 10. Remove the final architecture allowlist
+11. Convert the shared-lowering `include!` inputs into modules
 
 Each module PR performs its complete map, facade conversion, domain grouping,
 and name corrections once. The architecture gate is introduced in PR 0 and
@@ -1206,3 +1207,17 @@ PRs 1–9 land.
   the `include!` inputs in `shared_lowering/layout` and
   `shared_lowering/expression/provider.rs` into ordinary modules.
 - [x] The architecture assertions are unconditional from `924e78a4` onward.
+
+### PR 11 map
+
+The former `include!` host becomes a directory so that the extracted children
+retain the exact visibility scope of the base module:
+
+| Current file | Final path |
+| --- | --- |
+| `shared_lowering/expression/lowering.rs` | `shared_lowering/expression/lowering/inherent.rs` |
+| `shared_lowering/expression/provider.rs` | `shared_lowering/expression/lowering/provider.rs` |
+| `shared_lowering/layout/registry.rs` | `shared_lowering/layout/registry/program_layouts.rs` |
+| `shared_lowering/layout/options.rs` | `shared_lowering/layout/registry/options.rs` |
+| `shared_lowering/layout/provider.rs` | `shared_lowering/layout/registry/provider.rs` |
+| `shared_lowering/layout/cleanup.rs` | `shared_lowering/layout/registry/cleanup.rs` |
