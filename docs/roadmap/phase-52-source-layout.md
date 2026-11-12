@@ -1,6 +1,6 @@
 # Phase 52: Source Layout Audit
 
-## Status: Proposed
+## Status: Complete
 
 ## Scope and invariants
 
@@ -351,8 +351,8 @@ PR 4 split the shared codegen facades and implementations. The `expression.rs`
 implementation was additionally split into `expression/lowering.rs` and
 `expression/model.rs`; the struct and accessor items moved to `model.rs` to
 keep both files below the 500-line source limit. The `include!` paths in
-`layout/` and `expression/` were updated. Converting those included files into
-ordinary modules is deferred.
+`layout/` and `expression/` were updated. The included files were converted
+into ordinary modules in PR 11 (`7285068e`).
 
 The checker command and complete output were:
 
@@ -1203,9 +1203,9 @@ PRs 1–9 land.
   --nocapture` failed with `forbidden generic file`; the temporary file was
   then removed.
 - [x] The architecture rules are now unconditional; no allowlist constants or
-  conditional exemptions remain. The only deferred layout work is converting
-  the `include!` inputs in `shared_lowering/layout` and
-  `shared_lowering/expression/provider.rs` into ordinary modules.
+  conditional exemptions remain. The `include!` inputs in
+  `shared_lowering/layout` and `shared_lowering/expression/provider.rs` were
+  converted into ordinary modules in PR 11 (`7285068e`).
 - [x] The architecture assertions are unconditional from `924e78a4` onward.
 
 ### PR 11 map
@@ -1221,3 +1221,32 @@ retain the exact visibility scope of the base module:
 | `shared_lowering/layout/options.rs` | `shared_lowering/layout/registry/options.rs` |
 | `shared_lowering/layout/provider.rs` | `shared_lowering/layout/registry/provider.rs` |
 | `shared_lowering/layout/cleanup.rs` | `shared_lowering/layout/registry/cleanup.rs` |
+
+### PR 11 evidence
+
+- [x] The shared-lowering `include!` inputs were moved in `2270c42b`, the
+  checker was made rustfmt/include-aware in `1be49ed0`, the ordinary module
+  facades and implementations were completed in `7285068e`, and the
+  architecture rule was added in `521a2c59`. The checker update normalizes
+  rustfmt-only token spacing, treats former `include!` sites as structural
+  declarations, and pairs path sites in order.
+- [x] The complete checker output against `25e392db` was:
+
+  ```text
+  compared items: 5800 matched
+  path-only changes (prefix rewrites, targets verified):
+    super::super::constructors -> super::super::super::constructors  x2
+    super::super::super -> super::super::super::super  x9
+    super::super::super::abi -> super::super::super::super::abi  x10
+  result: OK
+  ```
+
+- [x] The existing `source_layout_facades_and_boundaries_are_enforced` test
+  now also rejects `include!` module inputs, so the test-list count remains
+  1,988.
+- [x] The negative check appended `include!("aggregate.rs");` to
+  `src/ffi/errors.rs`; the architecture test failed with
+  `include! module input is not allowed: src/ffi/errors.rs`. The temporary
+  line was removed afterward.
+- [x] Phase 52 source-layout work is complete: all planned layout rules are
+  enforced, including conversion of the shared-lowering `include!` inputs.
