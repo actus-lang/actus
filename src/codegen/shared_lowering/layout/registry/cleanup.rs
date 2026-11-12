@@ -1,3 +1,5 @@
+use super::*;
+
 impl BackendCleanupProvider for ProgramLayouts<'_> {
     fn resolve_binding(
         &self,
@@ -110,8 +112,10 @@ impl ProgramLayouts<'_> {
     ) {
         let Some(definition) = self.structs.get(type_name.name.as_str()) else { return };
         for field in &definition.fields {
-            if matches!(field.role, crate::ast::StructFieldRole::Abs | crate::ast::StructFieldRole::Ins)
-            {
+            if matches!(
+                field.role,
+                crate::ast::StructFieldRole::Abs | crate::ast::StructFieldRole::Ins
+            ) {
                 continue;
             }
             let path = if prefix.is_empty() {
@@ -122,9 +126,8 @@ impl ProgramLayouts<'_> {
             if moved_fields.iter().any(|moved| moved == &path) {
                 continue;
             }
-            let has_nested_move = moved_fields
-                .iter()
-                .any(|moved| moved.starts_with(&format!("{path}.")));
+            let has_nested_move =
+                moved_fields.iter().any(|moved| moved.starts_with(&format!("{path}.")));
             if has_nested_move {
                 self.collect_cleanup_paths(&field.ty, &path, moved_fields, paths);
                 continue;
@@ -145,7 +148,10 @@ impl ProgramLayouts<'_> {
                 .is_some_and(|layout| layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
     }
 
-    fn resolve_region_result(&self, type_name: Option<&TypeName>) -> Option<BackendCleanupResolvedDescriptor> {
+    fn resolve_region_result(
+        &self,
+        type_name: Option<&TypeName>,
+    ) -> Option<BackendCleanupResolvedDescriptor> {
         let type_name = type_name?;
         let payload = type_name.arguments.first()?;
         if type_name.name != "Result" || payload.name != "Region" {
@@ -179,10 +185,7 @@ impl ProgramLayouts<'_> {
             return Ok(None);
         }
         Ok(Some(self.cleanup_descriptor(
-            BackendCleanupBridge::AggregateDrop {
-                size: layout.size,
-                alignment: layout.alignment,
-            },
+            BackendCleanupBridge::AggregateDrop { size: layout.size, alignment: layout.alignment },
             layout,
             None,
         )))

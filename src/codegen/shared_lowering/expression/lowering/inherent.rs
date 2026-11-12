@@ -1,15 +1,4 @@
-use super::super::super::{
-    BackendBlockId, BackendCleanupOrigin, BackendContractError, BackendExpressionProvider,
-    BackendInstruction, BackendIntegerBinaryOp, BackendIntegerUnaryOp, BackendValueId,
-    BackendValueType, SymbolIdentity,
-};
-use super::super::errors::{expression_span, unsupported};
-use super::SharedExpressionProvider;
-use super::{aggregate, arena, array_ops, calls, case, cleanup, dispatch, drop, state};
-use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload};
-use crate::lexer::SourceSpan;
-use crate::semantic::LoopExitKind;
-use std::collections::BTreeMap;
+use super::*;
 
 pub(in crate::codegen::shared_lowering) fn lower_unit_call(
     provider: &mut SharedExpressionProvider<'_>,
@@ -18,8 +7,6 @@ pub(in crate::codegen::shared_lowering) fn lower_unit_call(
 ) -> Result<(), BackendContractError> {
     calls::lower_unit_call(provider, expression, instructions)
 }
-
-include!("provider.rs");
 
 impl SharedExpressionProvider<'_> {
     pub(in crate::codegen::shared_lowering) fn return_type_for(
@@ -35,7 +22,7 @@ impl SharedExpressionProvider<'_> {
         self.return_type_for(callee).is_some_and(|return_type| return_type.is_none())
     }
 
-    pub(super) fn lower_method_call(
+    pub(in crate::codegen::shared_lowering::expression) fn lower_method_call(
         &mut self,
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
@@ -48,7 +35,11 @@ impl SharedExpressionProvider<'_> {
         };
         let receiver_is_binding = self.is_binding_receiver(receiver);
         if !receiver_is_binding {
-            return super::super::constructors::lower_method_call(self, expression, instructions);
+            return super::super::super::constructors::lower_method_call(
+                self,
+                expression,
+                instructions,
+            );
         }
         let receiver_value = if let Some(address) = self.scalar_loan_parameter_address(receiver) {
             address
@@ -171,7 +162,7 @@ impl SharedExpressionProvider<'_> {
         }
     }
 
-    pub(super) fn lower_unary(
+    pub(in crate::codegen::shared_lowering::expression) fn lower_unary(
         &mut self,
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
@@ -203,7 +194,7 @@ impl SharedExpressionProvider<'_> {
         Ok(result)
     }
 
-    pub(super) fn lower_binary(
+    pub(in crate::codegen::shared_lowering::expression) fn lower_binary(
         &mut self,
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,

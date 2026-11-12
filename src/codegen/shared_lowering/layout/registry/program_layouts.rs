@@ -1,16 +1,4 @@
-use std::collections::BTreeMap;
-
-use crate::ast::{
-    BuiltinType, EnumDef, EnumPayload, PackDecl, Program, StructDef, StructFieldRole, TopLevelDecl,
-    TypeName, primitive_type,
-};
-
-use super::super::super::symbols::{SymbolIdentity, SymbolKind};
-use super::super::{
-    BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
-    BackendCleanupField, BackendCleanupProvider, BackendCleanupResolvedDescriptor,
-    BackendCleanupResult, BackendContractError, BackendLayout,
-};
+use super::*;
 
 /// Program-backed layouts used by the backend-neutral signature contract.
 ///
@@ -18,15 +6,14 @@ use super::super::{
 /// from the Actus declarations and uses the host pointer width only for
 /// reference roles and runtime handles, matching the existing neutral ABI.
 pub(crate) struct ProgramLayouts<'program> {
-    pub(super) structs: BTreeMap<&'program str, &'program StructDef>,
-    enums: BTreeMap<&'program str, &'program EnumDef>,
-    packs: BTreeMap<&'program str, &'program PackDecl>,
+    pub(in crate::codegen::shared_lowering::layout) structs:
+        BTreeMap<&'program str, &'program StructDef>,
+    pub(super) enums: BTreeMap<&'program str, &'program EnumDef>,
+    pub(super) packs: BTreeMap<&'program str, &'program PackDecl>,
     imported_namespaces: BTreeMap<String, String>,
-    drop_symbols: BTreeMap<String, SymbolIdentity>,
+    pub(super) drop_symbols: BTreeMap<String, SymbolIdentity>,
     pointer_bytes: u32,
 }
-
-include!("options.rs");
 
 impl<'program> ProgramLayouts<'program> {
     pub(in crate::codegen::shared_lowering) fn new(
@@ -88,7 +75,7 @@ impl<'program> ProgramLayouts<'program> {
         }
     }
 
-    fn normalize_type_name(&self, type_name: &TypeName) -> TypeName {
+    pub(super) fn normalize_type_name(&self, type_name: &TypeName) -> TypeName {
         TypeName {
             name: type_name
                 .name
@@ -111,7 +98,7 @@ impl<'program> ProgramLayouts<'program> {
         }
     }
 
-    fn type_layout(
+    pub(super) fn type_layout(
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
@@ -213,11 +200,11 @@ impl<'program> ProgramLayouts<'program> {
         })
     }
 
-    fn named_enum_layout(
+    pub(super) fn named_enum_layout(
         &self,
         type_name: &TypeName,
         visiting: &mut Vec<String>,
-    ) -> Option<super::super::super::abi::BackendEnumLayout> {
+    ) -> Option<super::super::super::super::abi::BackendEnumLayout> {
         let key = type_name.canonical_key();
         if visiting.iter().any(|candidate| candidate == &key) {
             return None;
@@ -246,7 +233,7 @@ impl<'program> ProgramLayouts<'program> {
             payload_offset.checked_add(payload.map_or(0, |layout| layout.size))?,
             alignment,
         )?;
-        Some(super::super::super::abi::BackendEnumLayout {
+        Some(super::super::super::super::abi::BackendEnumLayout {
             layout: BackendLayout { size, alignment },
             discriminant_offset: 0,
             discriminant_size: 4,
@@ -305,7 +292,7 @@ impl<'program> ProgramLayouts<'program> {
         Some(BackendLayout { size: Self::align_up(size, alignment)?, alignment })
     }
 
-    fn pointer_layout(&self) -> BackendLayout {
+    pub(super) fn pointer_layout(&self) -> BackendLayout {
         Self::scalar_layout(self.pointer_bytes)
     }
 
@@ -325,14 +312,17 @@ impl<'program> ProgramLayouts<'program> {
         Some(Self::scalar_layout(size))
     }
 
-    pub(super) fn align_up(value: u32, alignment: u32) -> Option<u32> {
+    pub(in crate::codegen::shared_lowering::layout) fn align_up(
+        value: u32,
+        alignment: u32,
+    ) -> Option<u32> {
         if alignment == 0 || !alignment.is_power_of_two() {
             return None;
         }
         value.checked_add(alignment - 1).map(|rounded| rounded & !(alignment - 1))
     }
 
-    pub(super) fn field_storage_layout(
+    pub(in crate::codegen::shared_lowering::layout) fn field_storage_layout(
         &self,
         role: &StructFieldRole,
         type_name: &TypeName,
@@ -344,7 +334,7 @@ impl<'program> ProgramLayouts<'program> {
         }
     }
 
-    fn cleanup_field(
+    pub(super) fn cleanup_field(
         &self,
         root_type: &TypeName,
         path: &str,
@@ -386,7 +376,7 @@ impl<'program> ProgramLayouts<'program> {
         None
     }
 
-    fn cleanup_descriptor(
+    pub(super) fn cleanup_descriptor(
         &self,
         bridge: BackendCleanupBridge,
         layout: BackendLayout,
@@ -437,7 +427,3 @@ fn collect_imported_namespaces(program: &Program) -> BTreeMap<String, String> {
         })
         .collect()
 }
-
-include!("provider.rs");
-
-include!("cleanup.rs");
