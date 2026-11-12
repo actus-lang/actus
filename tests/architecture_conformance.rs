@@ -26,13 +26,8 @@ const RUST_KEYWORD_FILENAMES: &[&str] = &[
     "where", "while", "yield",
 ];
 
-const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[
-    "src/cli/mod.rs",
-    "src/cli/test_runner/mod.rs",
-    "src/diagnostics/renderer/mod.rs",
-    "src/formatter/mod.rs",
-    "src/lsp/hover/mod.rs",
-];
+const ALLOWED_NON_FACADE_MOD_RS: &[&str] =
+    &["src/diagnostics/renderer/mod.rs", "src/formatter/mod.rs"];
 
 const ALLOWED_RS_PAIRS: &[&str] = &[];
 

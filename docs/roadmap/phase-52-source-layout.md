@@ -689,6 +689,87 @@ remain under `runtime/fs/walk/` rather than being placed directly under
 protocol/query/editor dependency direction (`src/lsp/server.rs:6-16`,
 `src/lsp/query_handlers.rs:5-20`).
 
+### Final tree and exact map
+
+```text
+cli/
+  mod.rs dispatch.rs check.rs conformance.rs diagnostics.rs fmt.rs input.rs
+  lock.rs lsp.rs project.rs publish.rs run.rs version.rs watch.rs
+  build/{mod,artifacts,loading,module_type_context,object_manifest,options}.rs
+  build/emission/{mod,objects,llvm,cranelift,shared}.rs
+  test_runner/{mod,runner,collection,execution,output,process}.rs
+lsp/
+  mod.rs
+  protocol/{mod,messages,session,transport,dispatch,server,progress,cancellation}.rs
+  queries/{mod,bounds,cache,handlers,model,semantic,semantic_tokens,source,memory_graph}.rs
+  editor/{mod,code_lens,completion,definition,diagnostics,formatting,navigation,rename,signature_help,workflow}.rs
+  editor/hover/{mod,formatting,lookup,model,tokens}.rs
+  workspace/{mod,documents,state,uri,position,module_scope}.rs
+```
+
+| Base file | New | Type |
+| --- | --- | --- |
+| `src/cli/mod.rs` | `src/cli/dispatch.rs` | pair→facade + extract |
+| `src/cli/test_runner/mod.rs` | `src/cli/test_runner/runner.rs` | pair→facade + extract |
+| `src/cli/build/emission.rs` | `src/cli/build/emission/objects.rs` | group + extract |
+| `src/cli/build/llvm_emission.rs` | `src/cli/build/emission/llvm.rs` | group |
+| `src/cli/build/cranelift_shared.rs` | `src/cli/build/emission/cranelift.rs` | group |
+| `src/cli/build/shared_emission.rs` | `src/cli/build/emission/shared.rs` | group |
+| `src/cli/build/{artifacts,loading,module_type_context,object_manifest,options}.rs` | same paths | unchanged |
+| `src/cli/{check,conformance,diagnostics,fmt,input,lock,lsp,project,publish,run,version,watch}.rs` | same paths | unchanged |
+| `src/lsp/protocol.rs` | `src/lsp/protocol/messages.rs` | group |
+| `src/lsp/protocol_contract.rs` | `src/lsp/protocol/session.rs` | group |
+| `src/lsp/transport.rs` | `src/lsp/protocol/transport.rs` | group |
+| `src/lsp/request_dispatch.rs` | `src/lsp/protocol/dispatch.rs` | group |
+| `src/lsp/server.rs` | `src/lsp/protocol/server.rs` | group |
+| `src/lsp/progress.rs` | `src/lsp/protocol/progress.rs` | group |
+| `src/lsp/cancellation.rs` | `src/lsp/protocol/cancellation.rs` | group |
+| `src/lsp/{query_bounds,query_cache,query_handlers,semantic_model,semantic_query,semantic_tokens,source_queries,memory_graph}.rs` | `src/lsp/queries/{bounds,cache,handlers,model,semantic,semantic_tokens,source,memory_graph}.rs` | group |
+| `src/lsp/{code_lens,completion,definition,diagnostics,formatting,navigation,rename,signature_help,workflow}.rs` | `src/lsp/editor/{code_lens,completion,definition,diagnostics,formatting,navigation,rename,signature_help,workflow}.rs` | group |
+| `src/lsp/hover/{mod,formatting,lookup,model,tokens}.rs` | `src/lsp/editor/hover/{mod,formatting,lookup,model,tokens}.rs` | group |
+| `src/lsp/documents.rs` | `src/lsp/workspace/documents.rs` | group |
+| `src/lsp/workspace.rs` | `src/lsp/workspace/state.rs` | rename |
+| `src/lsp/uri.rs` | `src/lsp/workspace/uri.rs` | group |
+| `src/lsp/position.rs` | `src/lsp/workspace/position.rs` | group |
+| `src/lsp/module_scope.rs` | `src/lsp/workspace/module_scope.rs` | group |
+| `src/lsp/mod.rs` | four child facades | facade |
+
+`workspace.rs` becomes `workspace/state.rs`, not
+`workspace/workspace.rs`, because it owns workspace state. Existing imports
+in `src/lsp/server.rs:6-16` and `src/lsp/query_handlers.rs:5-20` establish
+the protocol/query/editor dependency direction. The editor family is explicit:
+completion, definition, navigation, rename, code lens, signature help,
+formatting, diagnostics, and workflow. Hover remains a five-file family under
+`editor/hover/`.
+
+### PR 8 evidence
+
+The implementation preserves `crate::cli::{run,run_with_args}` and
+`crate::lsp::{analyze_document,run_stdio}`. The PR 8 architecture allowlist
+entries `src/cli/mod.rs`, `src/cli/test_runner/mod.rs`, and
+`src/lsp/hover/mod.rs` were removed in the architecture-test commit. The
+`packs.rs` extraction was allowed in the preliminary map, but the file stayed
+at 500 lines and no extraction was needed.
+
+The complete layout-check evidence is:
+
+```text
+$ python3 scripts/check_layout_bodies.py 14ff2ff0 src/cli src/lsp
+compared items: 657 matched
+path-only changes (prefix rewrites, targets verified):
+  (bare) -> crate::lsp::workspace::position  x1
+  crate::lsp::position -> crate::lsp::workspace::position  x1
+  formatting -> (bare)  x2
+  super::cranelift_shared -> super::cranelift  x2
+  super::llvm_emission -> super::llvm  x1
+  super::shared_emission -> super::shared  x5
+result: OK
+```
+
+`cargo test --all-features -- --list` completed with 1,988 tests, matching the
+PR 5 baseline. `cargo test --all-targets --all-features` completed with exit 0;
+all test result lines were `ok` with zero failures.
+
 ## 9. Formatter, diagnostics, documentation, conformance
 
 ### Final tree
