@@ -1205,3 +1205,4 @@ PRs 1–9 land.
   conditional exemptions remain. The only deferred layout work is converting
   the `include!` inputs in `shared_lowering/layout` and
   `shared_lowering/expression/provider.rs` into ordinary modules.
+- [x] The architecture assertions are unconditional from `924e78a4` onward.
