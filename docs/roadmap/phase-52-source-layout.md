@@ -701,7 +701,7 @@ cli/
 lsp/
   mod.rs
   protocol/{mod,messages,session,transport,dispatch,server,progress,cancellation}.rs
-  queries/{mod,bounds,cache,handlers,model,packs,semantic,semantic_tokens,source,memory_graph}.rs
+  queries/{mod,bounds,cache,handlers,model,semantic,semantic_tokens,source,memory_graph}.rs
   editor/{mod,code_lens,completion,definition,diagnostics,formatting,navigation,rename,signature_help,workflow}.rs
   editor/hover/{mod,formatting,lookup,model,tokens}.rs
   workspace/{mod,documents,state,uri,position,module_scope}.rs
@@ -746,8 +746,29 @@ formatting, diagnostics, and workflow. Hover remains a five-file family under
 
 The implementation preserves `crate::cli::{run,run_with_args}` and
 `crate::lsp::{analyze_document,run_stdio}`. The PR 8 architecture allowlist
-entries are `src/cli/mod.rs`, `src/cli/test_runner/mod.rs`, and
-`src/lsp/hover/mod.rs`.
+entries `src/cli/mod.rs`, `src/cli/test_runner/mod.rs`, and
+`src/lsp/hover/mod.rs` were removed in the architecture-test commit. The
+`packs.rs` extraction was allowed in the preliminary map, but the file stayed
+at 500 lines and no extraction was needed.
+
+The complete layout-check evidence is:
+
+```text
+$ python3 scripts/check_layout_bodies.py 14ff2ff0 src/cli src/lsp
+compared items: 657 matched
+path-only changes (prefix rewrites, targets verified):
+  (bare) -> crate::lsp::workspace::position  x1
+  crate::lsp::position -> crate::lsp::workspace::position  x1
+  formatting -> (bare)  x2
+  super::cranelift_shared -> super::cranelift  x2
+  super::llvm_emission -> super::llvm  x1
+  super::shared_emission -> super::shared  x5
+result: OK
+```
+
+`cargo test --all-features -- --list` completed with 1,988 tests, matching the
+PR 5 baseline. `cargo test --all-targets --all-features` completed with exit 0;
+all test result lines were `ok` with zero failures.
 
 ## 9. Formatter, diagnostics, documentation, conformance
 
