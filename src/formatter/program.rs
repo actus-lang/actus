@@ -1,12 +1,6 @@
 use crate::ast::{Program, Role, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
-mod declaration_widths;
-mod declarations;
-mod expressions;
-mod imports;
-mod statements;
-
 pub fn format_program(program: &Program) -> String {
     format_program_with_comments(program, &[])
 }
@@ -33,12 +27,12 @@ pub fn format_program_with_comments(program: &Program, comments: &[SourceComment
     formatter.output
 }
 
-struct Formatter<'comments> {
-    output: String,
-    indent: usize,
-    comments: &'comments [SourceComment],
-    next_comment: usize,
-    render_ast_docs: bool,
+pub(super) struct Formatter<'comments> {
+    pub(in crate::formatter) output: String,
+    pub(in crate::formatter) indent: usize,
+    pub(in crate::formatter) comments: &'comments [SourceComment],
+    pub(in crate::formatter) next_comment: usize,
+    pub(in crate::formatter) render_ast_docs: bool,
 }
 
 impl Formatter<'_> {
@@ -276,7 +270,7 @@ fn declaration_doc(declaration: &TopLevelDecl) -> Option<&str> {
     }
 }
 
-fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
+pub(super) fn meta_name(metadata: &crate::ast::MetaAttribute) -> String {
     match metadata {
         crate::ast::MetaAttribute::Test => "test".to_owned(),
         crate::ast::MetaAttribute::Target(selector) => format!("target(\"{selector}\")"),

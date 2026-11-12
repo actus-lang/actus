@@ -3,7 +3,7 @@ use crate::ast::{
     lookup_builtin_type, primitive_type,
 };
 
-use super::{
+use super::signature::{
     CAbiAggregate, CAbiAggregateField, CAbiError, CAbiLayout, CAbiTaggedUnion,
     CAbiTaggedUnionVariant, CAbiTarget, CAbiType,
 };

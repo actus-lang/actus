@@ -2,7 +2,7 @@ use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::ParseErrorCode;
 use crate::semantic::SemanticErrorKind;
 
-use super::pack_codes;
+use super::packing;
 
 pub(crate) fn lex_code(error: &LexError) -> u8 {
     match error.kind {
@@ -42,7 +42,7 @@ pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
 }
 
 pub(crate) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
-    if let Some(code) = pack_codes::code(kind) {
+    if let Some(code) = packing::code(kind) {
         return code;
     }
     if let Some(code) = role_semantic_code(kind) {

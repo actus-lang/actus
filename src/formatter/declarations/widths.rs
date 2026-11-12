@@ -1,4 +1,4 @@
-use super::role_name;
+use super::super::role_name;
 
 pub(super) fn parameter_width(parameter: &crate::ast::Param) -> usize {
     role_name(&parameter.role).len() + parameter.name.len() + 4 + type_name_width(&parameter.ty)
