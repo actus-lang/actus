@@ -142,6 +142,23 @@ open verb start() -> Int {
 
 ## Ordered PRs
 
+## A0 evidence
+
+- `18d700bb` implements ADR-0107 SourceMap provenance: compilation-session
+  offsets start at 1, source identities are deterministic and canonicalized,
+  and diagnostics localize primary and related spans before rendering.
+- `c3ed40f1` adds check/build regression coverage for module lexical, parser,
+  and cross-file duplicate diagnostics. SourceMap unit tests cover EOF gaps,
+  canonical relative/absolute paths, and related-location localization.
+- `cargo fmt --check`, `cargo check --all-features`, Clippy for all-features,
+  Cranelift-only, and LLVM-only configurations, source limits, architecture,
+  documentation, secrets, and `cargo test --all-targets --all-features` pass.
+- The test list is `1,994`: the base list was `1,988`, with six new A0 tests
+  and no removed tests. Existing snapshots and tests were not modified.
+- On the neutral R1 reproduction, both base and A0 `check --strict` pass;
+  base build reports the entry path at `3:17`, while A0 reports the owning
+  module path `src/app/start.act` at `3:5` with E1027.
+
 1. **A0 — SourceMap and source provenance** (`ADR-0107`): give compilation
    units deterministic source identity and report unit diagnostics against
    their owning file.
