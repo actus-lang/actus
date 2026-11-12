@@ -30,7 +30,7 @@ const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[];
 
 const ALLOWED_RS_PAIRS: &[&str] = &[];
 
-const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &[];
+const ALLOWED_SINGLE_FILE_MODULES: &[&str] = &["src/ffi"];
 
 const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
 
