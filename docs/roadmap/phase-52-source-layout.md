@@ -910,16 +910,26 @@ facade-plus-extract rule applies to every other true pair in the mapping.
 
 ## Current allowlist and planned PR
 
-The architecture test has six exact-path allowlists. Their current sizes are:
+The architecture test still declares six exact-path allowlist constants. Five
+are empty after PRs 1–9; the only remaining entry is stale because the file it
+names no longer exists:
 
 | List | Count | Current entries move in |
 | --- | ---: | --- |
-| non-facade `mod.rs` | 32 | PRs 1, 3, 4, 5, 6, 7, 8, 9 |
-| X.rs + X/ pairs | 15 | PRs 2, 4, 5, 6, 7 |
-| one-file module directories | 7 | PRs 4, 5, 7 |
+| non-facade `mod.rs` | 0 | removed by PRs 1, 3, 4, 5, 6, 7, 8, 9 |
+| X.rs + X/ pairs | 0 | removed by PRs 2, 4, 5, 6, 7 |
+| one-file module directories | 0 | removed by PRs 4, 5, 7 |
 | parent-name duplicates | 0 | none |
-| generic/forbidden filenames | 2 | PRs 3 and 4 |
-| `#[path]` module redirections | 6 | PRs 4, 7, and 9 |
+| generic/forbidden filenames | 1 stale | PR 10 removes the stale entry |
+| `#[path]` module redirections | 0 | removed by PRs 4, 7, and 9 |
+
+### PR 10 plan
+
+PR 10 removes all six allowlist constants and their conditional exemptions
+from `tests/architecture_conformance.rs`. The sole remaining
+`ALLOWED_FORBIDDEN_FILES` entry, `src/semantic/enum_constructors/support.rs`,
+is stale because that file and directory no longer exist. Every architecture
+rule will then be asserted unconditionally.
 
 ### Allowlist entry → PR
 
