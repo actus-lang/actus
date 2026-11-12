@@ -1,4 +1,4 @@
-use super::CAbiError;
+use super::signature::CAbiError;
 
 impl std::fmt::Display for CAbiError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

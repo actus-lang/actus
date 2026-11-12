@@ -26,8 +26,7 @@ const RUST_KEYWORD_FILENAMES: &[&str] = &[
     "where", "while", "yield",
 ];
 
-const ALLOWED_NON_FACADE_MOD_RS: &[&str] =
-    &["src/diagnostics/renderer/mod.rs", "src/formatter/mod.rs"];
+const ALLOWED_NON_FACADE_MOD_RS: &[&str] = &[];
 
 const ALLOWED_RS_PAIRS: &[&str] = &[];
 
@@ -37,11 +36,7 @@ const ALLOWED_PARENT_NAME_DUPLICATES: &[&str] = &[];
 
 const ALLOWED_FORBIDDEN_FILES: &[&str] = &["src/semantic/enum_constructors/support.rs"];
 
-const ALLOWED_PATH_MODULES: &[&str] = &[
-    "src/conformance/source_limits.rs",
-    "src/diagnostics/renderer/codes/mod.rs",
-    "src/ffi/abi.rs",
-];
+const ALLOWED_PATH_MODULES: &[&str] = &[];
 
 fn source_relative(path: &Path) -> String {
     path.strip_prefix(repository_path(".")).unwrap_or(path).to_string_lossy().replace('\\', "/")

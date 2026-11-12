@@ -1,6 +1,6 @@
 use crate::semantic::SemanticErrorKind;
 
-use super::pack_codes;
+use super::packing;
 
 pub(super) fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     dynamic_role_message(kind)
@@ -8,7 +8,7 @@ pub(super) fn extended_semantic_message(kind: &SemanticErrorKind) -> Option<Stri
         .or_else(|| enum_semantic_message(kind))
         .or_else(|| guard_semantic_message(kind))
         .or_else(|| struct_semantic_message(kind))
-        .or_else(|| pack_codes::message(kind))
+        .or_else(|| packing::message(kind))
         .or_else(|| serialization_message(kind))
         .or_else(|| arena_semantic_message(kind))
         .or_else(|| array_semantic_message(kind))

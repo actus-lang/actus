@@ -1,4 +1,5 @@
-use super::{Formatter, declaration_widths::parameter_width, meta_name, role_name};
+use super::super::{Formatter, meta_name, role_name};
+use super::widths::parameter_width;
 
 impl Formatter<'_> {
     fn metadata(&mut self, metadata: &[crate::ast::MetaAttribute]) {
@@ -46,7 +47,10 @@ impl Formatter<'_> {
         }
     }
 
-    pub(super) fn serialize_definition(&mut self, definition: &crate::ast::SerializeDecl) {
+    pub(in crate::formatter) fn serialize_definition(
+        &mut self,
+        definition: &crate::ast::SerializeDecl,
+    ) {
         self.documentation(definition.doc.as_deref());
         if definition.is_open {
             self.output.push_str("open ");
@@ -90,7 +94,7 @@ impl Formatter<'_> {
         self.output.push('}');
     }
 
-    pub(super) fn role_definition(&mut self, role: &crate::ast::RoleDecl) {
+    pub(in crate::formatter) fn role_definition(&mut self, role: &crate::ast::RoleDecl) {
         self.documentation(role.doc.as_deref());
         if role.is_open {
             self.output.push_str("open ");
@@ -125,7 +129,7 @@ impl Formatter<'_> {
         }
     }
 
-    pub(super) fn perform_definition(&mut self, perform: &crate::ast::PerformDecl) {
+    pub(in crate::formatter) fn perform_definition(&mut self, perform: &crate::ast::PerformDecl) {
         self.documentation(perform.doc.as_deref());
         if perform.is_open {
             self.output.push_str("open ");
@@ -155,7 +159,7 @@ impl Formatter<'_> {
         self.output.push('}');
     }
 
-    pub(super) fn verb(&mut self, verb: &crate::ast::VerbDecl) {
+    pub(in crate::formatter) fn verb(&mut self, verb: &crate::ast::VerbDecl) {
         self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
         self.metadata(&verb.metadata);
         if self.indent > 0 {
@@ -173,7 +177,7 @@ impl Formatter<'_> {
         self.block(&verb.body);
     }
 
-    pub(super) fn external_verb(&mut self, verb: &crate::ast::ExternalVerbDecl) {
+    pub(in crate::formatter) fn external_verb(&mut self, verb: &crate::ast::ExternalVerbDecl) {
         self.verb_documentation(verb.doc.as_deref(), verb.contract.as_ref());
         self.metadata(&verb.metadata);
         if verb.is_open {
@@ -273,7 +277,7 @@ impl Formatter<'_> {
                 > 80
     }
 
-    pub(super) fn current_line_width(&self) -> usize {
+    pub(in crate::formatter) fn current_line_width(&self) -> usize {
         self.output.rsplit('\n').next().map_or(0, str::len)
     }
 
@@ -287,7 +291,7 @@ impl Formatter<'_> {
         }
     }
 
-    pub(super) fn struct_definition(&mut self, definition: &crate::ast::StructDef) {
+    pub(in crate::formatter) fn struct_definition(&mut self, definition: &crate::ast::StructDef) {
         self.documentation(definition.doc.as_deref());
         self.metadata(&definition.metadata);
         if definition.is_open {
@@ -325,7 +329,7 @@ impl Formatter<'_> {
         self.output.push('}');
     }
 
-    pub(super) fn enum_definition(&mut self, definition: &crate::ast::EnumDef) {
+    pub(in crate::formatter) fn enum_definition(&mut self, definition: &crate::ast::EnumDef) {
         self.documentation(definition.doc.as_deref());
         self.metadata(&definition.metadata);
         if definition.is_open {
@@ -388,7 +392,7 @@ impl Formatter<'_> {
         self.output.push('}');
     }
 
-    pub(super) fn pack_definition(&mut self, definition: &crate::ast::PackDecl) {
+    pub(in crate::formatter) fn pack_definition(&mut self, definition: &crate::ast::PackDecl) {
         self.documentation(definition.doc.as_deref());
         self.metadata(&definition.metadata);
         self.line_indent();
@@ -464,7 +468,7 @@ impl Formatter<'_> {
         }
     }
 
-    pub(super) fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {
+    pub(in crate::formatter) fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {
         self.documentation(sibling.doc.as_deref());
         self.output.push_str("open ");
         self.output.push_str(&sibling.name);

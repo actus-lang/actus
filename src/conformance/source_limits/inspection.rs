@@ -9,16 +9,9 @@ use crate::lexer::SourceSpan;
 use crate::lexer::scan;
 use crate::parser::parse;
 
-#[path = "diagnostics.rs"]
-mod diagnostics;
-#[path = "policy.rs"]
-mod policy;
-#[path = "scan.rs"]
-mod scan;
-
-use diagnostics::{file_diagnostics, function_diagnostics, suppression_diagnostics};
-pub use policy::SourceLimitPolicy;
-use scan::{code_line_count, find_functions};
+use super::diagnostics::{file_diagnostics, function_diagnostics, suppression_diagnostics};
+use super::policy::SourceLimitPolicy;
+use super::scan::{code_line_count, find_functions};
 
 /// Records why a source-limit exception was accepted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

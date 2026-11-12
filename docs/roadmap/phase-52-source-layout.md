@@ -775,21 +775,16 @@ all test result lines were `ok` with zero failures.
 ### Final tree
 
 ```text
-cli/
-  mod.rs build/{mod,emission/{mod,llvm,cranelift,shared},loading,options,
-    artifacts,module_type_context,object_manifest}.rs test_runner/{mod,runner,
-    collection,execution,output,process}.rs
-lsp/
-  mod.rs protocol/{mod,messages,session,transport,dispatch,server,progress,
-    cancellation}.rs queries/{mod,bounds,cache,handlers,model,semantic,
-    semantic_tokens,source}.rs editor/{completion,definition,navigation,rename,
-    code_lens,signature_help,formatting,hover}.rs workspace/{documents,state,
-    uri,position,module_scope}.rs
-formatter/declarations/{mod,render,widths}.rs
-diagnostics/renderer/{mod,render,json,module,codes/{mod,packing,extended,mapping,messages}}.rs
+formatter/{mod,program,expressions,imports,statements}.rs
+formatter/declarations/{mod,render,widths,types}.rs
+diagnostics/{mod,model,strict_codes}.rs
+diagnostics/renderer/{mod,render,json,module}.rs
+diagnostics/renderer/codes/{mod,packing,extended,mapping,messages}.rs
 documentation/{mod,contract,language,model,rules}.rs
-conformance/{mod,diagnostics,exceptions,policy,scan,source_limits,tree_policy}.rs
-ffi/{mod,abi,abi_errors,aggregate}.rs
+conformance/{mod,exceptions,tree_policy}.rs
+conformance/source_limits/{mod,inspection,diagnostics,policy,scan}.rs
+ffi/mod.rs
+ffi/{mod,signature,errors,aggregate}.rs
 ```
 
 `formatter/declarations.rs` and `diagnostics/renderer/mod.rs` receive separate
@@ -798,17 +793,23 @@ file at its current path.
 
 | Old | New | Type |
 | --- | --- | --- |
-| `formatter/declarations.rs` | `formatter/declarations/render.rs` | group + extract |
+| `formatter/mod.rs` | `formatter/program.rs` | pair→facade + extract |
+| `formatter/declarations.rs` | `formatter/declarations/render.rs` | pair→facade + extract |
 | `formatter/declaration_widths.rs` | `formatter/declarations/widths.rs` | group |
-| `diagnostics/renderer/pack_codes.rs` | `renderer/codes/packing.rs` | rename |
-| `diagnostics/renderer/codes/*` | same codes subtree | unchanged |
-| `diagnostics/strict_codes.rs` | same path | unchanged |
-| documentation files | same paths | unchanged |
-| conformance files | same paths | unchanged |
-| `conformance/source_limits.rs` | `conformance/{diagnostics,policy,scan}.rs` | extract (`#[path]` removal) |
-| `ffi/abi.rs` | `ffi/{abi_errors,aggregate}.rs` | extract (`#[path]` removal) |
-| `diagnostics/renderer/codes/mod.rs` | `diagnostics/renderer/codes/packing.rs` | extract (`#[path]` removal) |
-| `runtime/fs/walk.rs` | `runtime/fs/walk.rs` | unchanged (`#[path]` removal; child moves with `walk_tests.rs`) |
+| `diagnostics/renderer/mod.rs` | `diagnostics/renderer/render.rs` | pair→facade + extract |
+| `diagnostics/renderer/pack_codes.rs` | `diagnostics/renderer/codes/packing.rs` | rename |
+| `diagnostics/renderer/codes/mod.rs` | `diagnostics/renderer/codes/mod.rs` | facade; remove `#[path]` |
+| `diagnostics/{mod,strict_codes}.rs` | same paths | unchanged |
+| `diagnostics/model.rs` | same path | unchanged |
+| `diagnostics/renderer/{json,module}.rs` | same paths | unchanged |
+| `documentation/` | same paths | unchanged |
+| `conformance/mod.rs` | same path | unchanged |
+| `conformance/source_limits.rs` | `conformance/source_limits/inspection.rs` | pair→facade + extract |
+| `conformance/{diagnostics,policy,scan}.rs` | `conformance/source_limits/{diagnostics,policy,scan}.rs` | group |
+| `conformance/{exceptions,tree_policy}.rs` | same paths | unchanged |
+| `ffi/abi.rs` | `ffi/signature.rs` | pair→facade + extract |
+| `ffi/abi_errors.rs` | `ffi/errors.rs` | group |
+| `ffi/aggregate.rs` | `ffi/aggregate.rs` | group; path unchanged |
 
 The two body exceptions are tracked with the codegen map: `body/case.rs` and
 `body/case_value.rs` each lose their `#[path]` child declaration in PR 4.
@@ -979,6 +980,13 @@ The architecture test has six exact-path allowlists. Their current sizes are:
 | `src/conformance/source_limits.rs` | 9 |
 | `src/diagnostics/renderer/codes/mod.rs` | 9 |
 | `src/ffi/abi.rs` | 9 |
+
+`conformance/source_limits.rs` and `ffi/abi.rs` are hidden module pairs: each
+uses `#[path]` to declare child implementations. Converting those children to
+siblings would widen `pub(super)` items to the parent module boundary, which
+Rust cannot express without changing their visibility. They therefore become
+directories so their module paths and visibility boundaries remain unchanged;
+`abi_errors.rs` is named `errors.rs` to avoid the `abi/abi_errors` repetition.
 
 The full exact paths are the constants in
 `tests/architecture_conformance.rs`; this table assigns every entry to the
@@ -1161,3 +1169,34 @@ remaining declarations and re-exports stay in place.
 `tests/architecture_conformance.rs` records the current violations by exact
 path and rejects any new violation. The allowlist is removed progressively as
 PRs 1–9 land.
+
+### PR 9 evidence
+
+- [x] The formatter, diagnostics, conformance source-limit, and FFI ABI
+  facades were split without changing public paths. The pure move commit is
+  `abd7d5bf`; the facade and implementation commit is `3640bd0d`; and the
+  five requested formatter/diagnostics/FFI allowlist entries were removed in
+  `dc45f5fe`. The final FFI layout is
+  `src/ffi/{mod.rs,signature.rs,errors.rs,aggregate.rs}`. The temporary
+  `src/ffi` exception was added in `119b4dbb` and removed in `6fbb5de9`.
+  After PR 9, `ALLOWED_NON_FACADE_MOD_RS`, `ALLOWED_RS_PAIRS`,
+  `ALLOWED_SINGLE_FILE_MODULES`, and `ALLOWED_PATH_MODULES` are all empty;
+  only the pre-existing `ALLOWED_FORBIDDEN_FILES` entry remains for PR 10.
+- [x] The complete layout checker output against `ab684161` was:
+
+  ```text
+  compared items: 315 matched
+  path-only changes (prefix rewrites, targets verified):
+    pack_codes -> packing  x2
+  result: OK
+  ```
+
+- [x] `cargo test --all-features -- --list` listed 1,988 tests, matching the
+  PR 5 baseline of 1,988. No unit-test modules are present in the moved PR 9
+  source files, so there are no PR 9 test-name path changes.
+- [x] `cargo fmt --all -- --check`, all three clippy configurations
+  (`--all-features`, `cranelift`, and `llvm`), `check_source_limits.sh`,
+  `check_architecture.sh`, `check_documentation.sh`, and
+  `check_secrets.sh` completed successfully. The full
+  `cargo test --all-targets --all-features` run completed with exit 0 after
+  the exact `src/ffi` allowlist entry was added.

@@ -3,10 +3,7 @@ use crate::ast::{
     lookup_builtin_type,
 };
 
-#[path = "abi_errors.rs"]
-mod abi_errors;
-#[path = "aggregate.rs"]
-mod aggregate;
+use super::aggregate;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CAbiType {
