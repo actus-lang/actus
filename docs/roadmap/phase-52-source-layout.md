@@ -784,7 +784,7 @@ documentation/{mod,contract,language,model,rules}.rs
 conformance/{mod,exceptions,tree_policy}.rs
 conformance/source_limits/{mod,inspection,diagnostics,policy,scan}.rs
 ffi/mod.rs
-ffi/abi/{mod,signature,errors,aggregate}.rs
+ffi/{mod,signature,errors,aggregate}.rs
 ```
 
 `formatter/declarations.rs` and `diagnostics/renderer/mod.rs` receive separate
@@ -807,9 +807,9 @@ file at its current path.
 | `conformance/source_limits.rs` | `conformance/source_limits/inspection.rs` | pair→facade + extract |
 | `conformance/{diagnostics,policy,scan}.rs` | `conformance/source_limits/{diagnostics,policy,scan}.rs` | group |
 | `conformance/{exceptions,tree_policy}.rs` | same paths | unchanged |
-| `ffi/abi.rs` | `ffi/abi/signature.rs` | pair→facade + extract |
-| `ffi/abi_errors.rs` | `ffi/abi/errors.rs` | group |
-| `ffi/aggregate.rs` | `ffi/abi/aggregate.rs` | group; path unchanged |
+| `ffi/abi.rs` | `ffi/signature.rs` | pair→facade + extract |
+| `ffi/abi_errors.rs` | `ffi/errors.rs` | group |
+| `ffi/aggregate.rs` | `ffi/aggregate.rs` | group; path unchanged |
 
 The two body exceptions are tracked with the codegen map: `body/case.rs` and
 `body/case_value.rs` each lose their `#[path]` child declaration in PR 4.
@@ -1176,9 +1176,12 @@ PRs 1–9 land.
   facades were split without changing public paths. The pure move commit is
   `abd7d5bf`; the facade and implementation commit is `3640bd0d`; and the
   five requested formatter/diagnostics/FFI allowlist entries were removed in
-  `dc45f5fe`. The selected `ffi/abi/` layout leaves `src/ffi` with one child
-  module, so the architecture test keeps that exact path in its one-file
-  allowlist (`119b4dbb`) rather than permitting a new unlisted violation.
+  `dc45f5fe`. The final FFI layout is
+  `src/ffi/{mod.rs,signature.rs,errors.rs,aggregate.rs}`. The temporary
+  `src/ffi` exception was added in `119b4dbb` and removed in `6fbb5de9`.
+  After PR 9, `ALLOWED_NON_FACADE_MOD_RS`, `ALLOWED_RS_PAIRS`,
+  `ALLOWED_SINGLE_FILE_MODULES`, and `ALLOWED_PATH_MODULES` are all empty;
+  only the pre-existing `ALLOWED_FORBIDDEN_FILES` entry remains for PR 10.
 - [x] The complete layout checker output against `ab684161` was:
 
   ```text
