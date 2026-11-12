@@ -3,13 +3,9 @@ mod collision;
 mod declarations;
 mod exports;
 mod identity;
-mod object_plan;
-mod object_types;
-mod object_units;
+mod objects;
 mod parsing;
 mod plan;
-mod plan_validation;
-mod signature_visibility;
 mod types;
 mod unit;
 mod validation;
@@ -22,7 +18,7 @@ pub use analysis::{
 };
 pub use exports::{exports_module, exports_module_with_overlays};
 pub use identity::ModuleNamespace;
-pub use object_plan::{ModuleObjectOwner, ModuleObjectPlan, ModuleObjectUnit};
+pub use objects::{ModuleObjectOwner, ModuleObjectPlan, ModuleObjectUnit};
 pub use parsing::parse_module;
 pub use plan::{
     ModuleCompilationPlan, build_compilation_plan, build_compilation_plan_with_overlays,

@@ -594,35 +594,84 @@ correction applies only to the proposed `body/case/returns.rs` destination.
 ### Final tree and map
 
 ```text
+runtime/{mod,archive,allocation,capabilities,console,contract,input,process,
+  serialization,stream,time,types,volatile}.rs
 runtime/region/{mod,descriptor,access,profile,provider,tests}.rs
 runtime/region/bridge/{mod,access,pinning,range,volatile,tests}.rs
-runtime/fs/{walk.rs,tests.rs}
+runtime/fs/{mod,mode,buffers,copy,directory,file,identity,locking,operations,
+  path_bridge,path_open,publication,temporary,test_faults}.rs
+runtime/fs/walk/{mod,walker,tests}.rs
+runtime/path/{mod,model,abi,ascii,builders,c_abi_views,component_views,
+  components,normalize,predicates,validation}.rs
+registry/{mod,local,cache,index,trust}.rs
 modules/aggregation/objects/{mod,plan,types,units}.rs
 modules/aggregation/plan/{mod,compilation,validation}.rs
-modules/aggregation/visibility/{mod,signature}.rs
+modules/aggregation/visibility/{mod,imports,signature,expression_checks}.rs
 ```
 
 | Old | New | Type |
 | --- | --- | --- |
-| `runtime/region.rs` | `region/mod.rs` | pair→facade |
-| region descriptor/access items | `region/{descriptor,access}.rs` | extract |
-| `region_profile.rs` | `region/profile.rs` | group |
-| `region_provider.rs` | `region/provider.rs` | group |
-| `region_bridge.rs` | `region/bridge/access.rs` | group + extract |
-| `region_pinning_bridge.rs` | `region/bridge/pinning.rs` | group |
-| `region_range_bridge.rs` | `region/bridge/range.rs` | group |
-| `region_volatile_bridge.rs` | `region/bridge/volatile.rs` | group |
-| `region_bridge_tests.rs` | `region/bridge/tests.rs` | rename |
-| `region/tests.rs` | same path | unchanged |
-| `runtime/fs/walk_tests.rs` | `runtime/fs/tests.rs` | rename |
-| `aggregation/object_*.rs` | `aggregation/objects/*.rs` | group |
-| `aggregation/plan.rs` | `aggregation/plan/compilation.rs` | group + extract |
-| `aggregation/plan_validation.rs` | `aggregation/plan/validation.rs` | group |
-| `aggregation/{visibility,signature_visibility}.rs` | `aggregation/visibility/*.rs` | group |
+| `runtime/region.rs` | `runtime/region/descriptor.rs` | pair→facade + extract |
+| `runtime/region.rs` | `runtime/region/access.rs` | extract |
+| `runtime/region_profile.rs` | `runtime/region/profile.rs` | group |
+| `runtime/region_provider.rs` | `runtime/region/provider.rs` | group |
+| `runtime/region_bridge.rs` | `runtime/region/bridge/access.rs` | group |
+| `runtime/region_pinning_bridge.rs` | `runtime/region/bridge/pinning.rs` | group |
+| `runtime/region_range_bridge.rs` | `runtime/region/bridge/range.rs` | group |
+| `runtime/region_volatile_bridge.rs` | `runtime/region/bridge/volatile.rs` | group |
+| `runtime/region_bridge_tests.rs` | `runtime/region/bridge/tests.rs` | rename |
+| `runtime/region/tests.rs` | same path | unchanged |
+| `runtime/fs/walk.rs` | `runtime/fs/walk/walker.rs` | pair→facade + extract |
+| `runtime/fs/walk_tests.rs` | `runtime/fs/walk/tests.rs` | rename |
+| `runtime/fs/{buffers,copy,directory,file,identity,locking,operations,path_bridge,path_open,publication,temporary,test_faults}.rs` | same paths | unchanged |
+| `runtime/fs/mod.rs` | `runtime/fs/mode.rs` | extract |
+| `runtime/path/mod.rs` | `runtime/path/model.rs` | extract |
+| `runtime/path/{abi,ascii,builders,c_abi_views,component_views,components,normalize,predicates,validation}.rs` | same paths | unchanged |
+| `registry/mod.rs` | `registry/local.rs` | extract |
 | `registry/{cache,index,trust}.rs` | same paths | unchanged |
+| `modules/aggregation/{object_plan,object_types,object_units}.rs` | `modules/aggregation/objects/{plan,types,units}.rs` | group |
+| `modules/aggregation/plan.rs` | `modules/aggregation/plan/compilation.rs` | pair→facade + extract |
+| `modules/aggregation/plan_validation.rs` | `modules/aggregation/plan/validation.rs` | group |
+| `modules/aggregation/visibility.rs` | `modules/aggregation/visibility/imports.rs` | pair→facade + extract |
+| `modules/aggregation/signature_visibility.rs` | `modules/aggregation/visibility/signature.rs` | group |
+| `modules/aggregation/visibility/expression_checks.rs` | same path | unchanged |
 
 `runtime/mod.rs` currently re-exports all region bridge APIs
 (`src/runtime/mod.rs:110-120`), proving that they belong to the region domain.
+
+The walk tests use `use super::*` for private walker items. They therefore
+remain under `runtime/fs/walk/` rather than being placed directly under
+`runtime/fs/`, where the required visibility would cross the walk boundary.
+`visibility/imports.rs` owns `validate_import_visibility`; the separate
+`expression_checks.rs` family remains in place.
+
+### PR 7 evidence
+
+- [x] The runtime, modules, and registry layout checker passed against
+  `146cdabf`:
+
+  ```text
+  compared items: 1068 matched
+  path-only changes (prefix rewrites, targets verified):
+    super::capabilities -> super::super::super::capabilities  x8
+    super::contract -> super::super::contract  x1
+    super::plan -> super::super::plan  x4
+    super::region -> (bare)  x3
+    super::unit -> super::super::unit  x13
+    super::validation -> super::super::validation  x1
+  result: OK
+  ```
+
+- [x] The seven PR 7 architecture allowlist entries were removed from
+  `tests/architecture_conformance.rs`: four non-facade roots, two facade
+  pairs, and `src/runtime/fs/walk.rs` from the `#[path]` list.
+- [x] `cargo test --all-features -- --list` reported 1,988 tests, matching
+  the 1,988-test PR 5 baseline. The only moved unit-test paths are
+  `runtime::region_bridge_tests::*` to `runtime::region::bridge::tests::*`;
+  the filesystem walk tests remain under `runtime::fs::walk::tests::*`.
+- [x] `cargo test --all-targets --all-features` passed. The runtime region,
+  filesystem walk, module aggregation, and registry behavior remained
+  covered without logic or public API changes.
 
 ## 8. CLI and LSP
 
@@ -1004,7 +1053,11 @@ are listed separately below; they are not extraction rows.
 | `src/registry/mod.rs` | `RegistryError`, `LocalRegistry` | `registry/local.rs` | 7 |
 | `src/runtime/mod.rs` | `runtime_archive_path` | `runtime/archive.rs` | 7 |
 | `src/runtime/fs/mod.rs` | filesystem mode constants and path helpers | `runtime/fs/mode.rs` | 7 |
+| `src/runtime/fs/walk.rs` | walker implementation and private walk helpers | `runtime/fs/walk/walker.rs` | 7 |
 | `src/runtime/path/mod.rs` | path model and separators | `runtime/path/model.rs` | 7 |
+| `src/modules/aggregation/plan.rs` | `ModuleCompilationPlan` and plan builders | `modules/aggregation/plan/compilation.rs` | 7 |
+| `src/modules/aggregation/plan_validation.rs` | plan validation functions | `modules/aggregation/plan/validation.rs` | 7 |
+| `src/modules/aggregation/visibility.rs` | `validate_import_visibility` | `modules/aggregation/visibility/imports.rs` | 7 |
 | `src/semantic/analyzer/mod.rs` | `analyze`, bounded and stack-limit validators | `src/semantic/analyzer/analysis.rs` | 3 |
 | `src/semantic/calls/mod.rs` | call validation `Analyzer` impls | `src/semantic/calls/validation.rs` | 3 |
 | `src/semantic/enum_constructors/mod.rs` | constructor validation `Analyzer` impls | `src/semantic/enums/constructors/validation.rs` | 3 |

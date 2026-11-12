@@ -8,8 +8,8 @@ use crate::parser::parse;
 
 use super::super::resolver::{ModuleResolver, ResolvedModule};
 use super::identity::ModuleNamespace;
-use super::signature_visibility::validate_exported_signatures;
 use super::types::{ModuleError, ModuleExports};
+use super::visibility::validate_exported_signatures;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleIdentity {

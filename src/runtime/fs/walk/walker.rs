@@ -3,27 +3,29 @@ use std::fs::ReadDir;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
-use super::super::contract::{ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE};
-use super::super::path::ActusPath;
-use super::path_bridge::{replace_output_path, with_host_path};
+use super::super::super::contract::{
+    ABI_HANDLE_FAILURE, ABI_STATUS_END_OF_STREAM, ABI_STATUS_FAILURE,
+};
+use super::super::super::path::ActusPath;
+use super::super::path_bridge::{replace_output_path, with_host_path};
 
-const WALK_KIND_ENTER_DIRECTORY: i32 = 0;
-const WALK_KIND_FILE: i32 = 1;
-const WALK_KIND_SYMLINK: i32 = 2;
-const WALK_KIND_LEAVE_DIRECTORY: i32 = 3;
-const WALK_KIND_ERROR: i32 = 4;
-const WALK_ERROR_FAILED: i32 = 0;
-const WALK_ERROR_NOT_FOUND: i32 = 1;
-const WALK_ERROR_PERMISSION_DENIED: i32 = 2;
-const WALK_ERROR_UNSUPPORTED: i32 = 4;
-const WALK_STATUS_NOT_FOUND: i32 = -4;
-const WALK_STATUS_PERMISSION_DENIED: i32 = -5;
-const WALK_STATUS_UNSUPPORTED: i32 = -6;
-const WALK_MAX_DEPTH: u32 = 256;
-const WALK_MAX_VISITED_DIRECTORIES: usize = 4096;
-const WALK_MAX_ENTRIES_PER_DIRECTORY: usize = 4096;
-const WALK_MAX_ENTRY_NAME_BYTES: usize = 4095;
-const WALK_STATUS_BUFFER_TOO_SMALL: i32 = -3;
+pub(super) const WALK_KIND_ENTER_DIRECTORY: i32 = 0;
+pub(super) const WALK_KIND_FILE: i32 = 1;
+pub(super) const WALK_KIND_SYMLINK: i32 = 2;
+pub(super) const WALK_KIND_LEAVE_DIRECTORY: i32 = 3;
+pub(super) const WALK_KIND_ERROR: i32 = 4;
+pub(super) const WALK_ERROR_FAILED: i32 = 0;
+pub(super) const WALK_ERROR_NOT_FOUND: i32 = 1;
+pub(super) const WALK_ERROR_PERMISSION_DENIED: i32 = 2;
+pub(super) const WALK_ERROR_UNSUPPORTED: i32 = 4;
+pub(super) const WALK_STATUS_NOT_FOUND: i32 = -4;
+pub(super) const WALK_STATUS_PERMISSION_DENIED: i32 = -5;
+pub(super) const WALK_STATUS_UNSUPPORTED: i32 = -6;
+pub(super) const WALK_MAX_DEPTH: u32 = 256;
+pub(super) const WALK_MAX_VISITED_DIRECTORIES: usize = 4096;
+pub(super) const WALK_MAX_ENTRIES_PER_DIRECTORY: usize = 4096;
+pub(super) const WALK_MAX_ENTRY_NAME_BYTES: usize = 4095;
+pub(super) const WALK_STATUS_BUFFER_TOO_SMALL: i32 = -3;
 
 #[repr(C)]
 pub struct ActusWalkEvent {
@@ -32,15 +34,15 @@ pub struct ActusWalkEvent {
     pub error: i32,
 }
 
-struct WalkOptions {
-    max_depth: u32,
-    follow_symlinks: bool,
-    include_hidden: bool,
-    order: i32,
-    error_policy: i32,
+pub(super) struct WalkOptions {
+    pub(super) max_depth: u32,
+    pub(super) follow_symlinks: bool,
+    pub(super) include_hidden: bool,
+    pub(super) order: i32,
+    pub(super) error_policy: i32,
 }
 
-enum WalkFrame {
+pub(super) enum WalkFrame {
     Native { path: PathBuf, depth: u32, entries: Box<ReadDir> },
     Ordered { path: PathBuf, depth: u32, entries: Vec<PathBuf>, next: usize },
 }
@@ -72,18 +74,18 @@ impl WalkFrame {
     }
 }
 
-struct PendingEvent {
-    path: PathBuf,
-    depth: u32,
-    kind: i32,
-    error: i32,
+pub(super) struct PendingEvent {
+    pub(super) path: PathBuf,
+    pub(super) depth: u32,
+    pub(super) kind: i32,
+    pub(super) error: i32,
 }
 
-struct WalkerState {
-    options: WalkOptions,
-    frames: Vec<WalkFrame>,
-    visited: Vec<PathBuf>,
-    pending: Option<PendingEvent>,
+pub(super) struct WalkerState {
+    pub(super) options: WalkOptions,
+    pub(super) frames: Vec<WalkFrame>,
+    pub(super) visited: Vec<PathBuf>,
+    pub(super) pending: Option<PendingEvent>,
 }
 
 static WALKERS: OnceLock<Mutex<HashMap<i32, WalkerState>>> = OnceLock::new();
@@ -187,7 +189,7 @@ fn allocate_walker(state: WalkerState) -> i32 {
     handle
 }
 
-fn prepare_root(path: &Path, options: WalkOptions) -> Result<WalkerState, i32> {
+pub(super) fn prepare_root(path: &Path, options: WalkOptions) -> Result<WalkerState, i32> {
     if options.max_depth > WALK_MAX_DEPTH
         || !matches!(options.order, 0 | 1)
         || !matches!(options.error_policy, 0 | 1)
@@ -255,7 +257,7 @@ fn next_frame_step(state: &mut WalkerState) -> Result<FrameStep, i32> {
     Ok(FrameStep::Candidate { path, depth: frame_depth + 1 })
 }
 
-fn report_io_error(
+pub(super) fn report_io_error(
     state: &WalkerState,
     path: PathBuf,
     depth: u32,
@@ -361,7 +363,7 @@ fn process_candidate(
     }))
 }
 
-fn next_event(state: &mut WalkerState) -> Result<Option<PendingEvent>, i32> {
+pub(super) fn next_event(state: &mut WalkerState) -> Result<Option<PendingEvent>, i32> {
     if let Some(event) = state.pending.take() {
         return Ok(Some(event));
     }
@@ -465,7 +467,3 @@ pub unsafe extern "C" fn actus_walker_close(handle: i32) -> i32 {
     let Ok(mut table) = walkers().lock() else { return ABI_STATUS_FAILURE };
     table.remove(&handle).map_or(ABI_STATUS_FAILURE, |_| 0)
 }
-
-#[cfg(test)]
-#[path = "walk_tests.rs"]
-mod tests;

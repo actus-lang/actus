@@ -1,8 +1,8 @@
 //! Hosted C-ABI bridges for explicit volatile Region memory access.
 
-use super::region::RegionError;
-use super::region_bridge::{REGION_STORE, error_result, result_u64, validate_descriptor};
-use super::types::ActusBuffer;
+use super::super::super::types::ActusBuffer;
+use super::super::descriptor::RegionError;
+use super::access::{REGION_STORE, error_result, result_u64, validate_descriptor};
 
 const RESULT_U64_SIZE: usize = 16;
 

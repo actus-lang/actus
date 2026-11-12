@@ -2,16 +2,16 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{Program, TopLevelDecl};
 
-use super::super::resolver::ModuleResolver;
-use super::declarations::{append_internal_declarations, append_public_declarations};
-use super::object_plan::{ModuleObjectPlan, build_object_plan};
-use super::plan_validation::validate_symbol_collisions;
-use super::types::ModuleError;
-use super::unit::ModuleUnit;
-use super::validation::{declaration_import_binding, validate_import_bindings};
-use super::visibility::validate_import_visibility;
+use super::super::super::resolver::ModuleResolver;
+use super::super::declarations::{append_internal_declarations, append_public_declarations};
+use super::super::objects::{ModuleObjectPlan, build_object_plan};
+use super::super::types::ModuleError;
+use super::super::unit::ModuleUnit;
+use super::super::validation::{declaration_import_binding, validate_import_bindings};
+use super::super::visibility::validate_import_visibility;
+use super::validation::validate_symbol_collisions;
 
-pub(super) use super::declarations::qualify_import_path;
+pub(super) use super::super::declarations::qualify_import_path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleCompilationPlan {
@@ -157,7 +157,7 @@ pub fn build_test_compilation_plan(
     )
 }
 
-pub(super) fn build_module_compilation_plan_with_overlays(
+pub(in crate::modules::aggregation) fn build_module_compilation_plan_with_overlays(
     module_path: &str,
     program: &Program,
     resolver: &ModuleResolver,
@@ -288,7 +288,7 @@ fn collect_unit(
     selected: &[String],
     friend_modules: &HashSet<String>,
 ) -> Result<(), ModuleError> {
-    let unit = super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
+    let unit = super::super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
     let friend = friend_modules
         .iter()
         .any(|friend| module_path == friend || module_path.starts_with(&format!("{friend}::")));

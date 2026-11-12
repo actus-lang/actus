@@ -1,6 +1,7 @@
 use std::mem::{align_of, offset_of, size_of};
 
-use super::{InMemoryRegion, RegionAddressProfile, RegionDescriptor, RegionError, copy_bulk_bytes};
+use super::profile::copy_bulk_bytes;
+use super::{InMemoryRegion, RegionAddressProfile, RegionDescriptor, RegionError};
 
 #[test]
 fn bounded_views_read_write_and_publish() {

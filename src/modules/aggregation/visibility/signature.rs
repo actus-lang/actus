@@ -4,16 +4,18 @@ use crate::ast::{
 };
 use std::collections::HashSet;
 
-use super::types::{ModuleError, ModuleExports};
-use super::unit::ModuleUnit;
-use super::validation::export_identity;
+use super::super::types::{ModuleError, ModuleExports};
+use super::super::unit::ModuleUnit;
+use super::super::validation::export_identity;
 
 struct PrivateNames {
     declarations: HashSet<String>,
     roles: HashSet<String>,
 }
 
-pub(super) fn validate_exported_signatures(unit: &ModuleUnit) -> Result<(), ModuleError> {
+pub(in crate::modules::aggregation) fn validate_exported_signatures(
+    unit: &ModuleUnit,
+) -> Result<(), ModuleError> {
     let private = collect_private_names(unit);
     for declaration in &unit.implementation().declarations {
         if !is_exported(declaration, unit.exports()) {

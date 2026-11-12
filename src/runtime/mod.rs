@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 mod allocation;
+mod archive;
 mod capabilities;
 mod console;
 mod contract;
@@ -9,14 +8,6 @@ mod input;
 mod path;
 mod process;
 mod region;
-mod region_bridge;
-#[cfg(test)]
-mod region_bridge_tests;
-mod region_pinning_bridge;
-mod region_profile;
-mod region_provider;
-mod region_range_bridge;
-mod region_volatile_bridge;
 mod serialization;
 mod stream;
 mod time;
@@ -108,17 +99,12 @@ pub use path::{
 };
 pub use process::{actus_process_arg, actus_process_arg_count};
 pub use region::{
-    InMemoryRegion, MutableRegionView, RegionAddressProfile, RegionDescriptor, RegionError,
-    RegionGeneration, RegionHandle, RegionView, UNINITIALIZED_REGION_GENERATION,
-};
-pub use region_bridge::actus_region_drop;
-pub use region_pinning_bridge::{actus_region_pin, actus_region_pinned, actus_region_unpin};
-pub use region_provider::{
-    MemoryRegionProvider, RegionProvider, RegionProviderError, RegionProviderRequest,
-};
-pub use region_range_bridge::{actus_region_read_range, actus_region_write_range};
-pub use region_volatile_bridge::{
-    actus_region_volatile_read_range, actus_region_volatile_write_range,
+    InMemoryRegion, MemoryRegionProvider, MutableRegionView, RegionAddressProfile,
+    RegionDescriptor, RegionError, RegionGeneration, RegionHandle, RegionProvider,
+    RegionProviderError, RegionProviderRequest, RegionView, UNINITIALIZED_REGION_GENERATION,
+    actus_region_drop, actus_region_pin, actus_region_pinned, actus_region_read_range,
+    actus_region_unpin, actus_region_volatile_read_range, actus_region_volatile_write_range,
+    actus_region_write_range,
 };
 pub use serialization::{
     actus_buffer_crc32, actus_buffer_crc32_matches, actus_buffer_validate_fixed_frame, crc32,
@@ -139,42 +125,4 @@ pub use volatile::{
     actus_volatile_write_u16, actus_volatile_write_u32, actus_volatile_write_u64,
 };
 
-pub fn runtime_archive_path() -> Result<Option<PathBuf>, String> {
-    if let Ok(executable) = std::env::current_exe()
-        && let Some(parent) = executable.parent()
-    {
-        let install_root = parent.join("..").canonicalize().ok();
-        if let Some(install_root) = install_root {
-            let marker = install_root.join("share/actus/toolchain.json");
-            if marker.is_file() {
-                let installed = install_root.join("lib/actus/runtime").join(runtime_host_triple());
-                let archive = std::fs::read_dir(&installed)
-                    .ok()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(Result::ok)
-                    .map(|entry| entry.path())
-                    .find(|path| {
-                        path.is_file()
-                            && path.file_stem().is_some_and(|name| name == "libactus_runtime")
-                    });
-                return archive.map(Some).ok_or_else(|| {
-                    format!(
-                        "E1880: installed runtime archive is missing under `{}`",
-                        installed.display()
-                    )
-                });
-            }
-        }
-    }
-    Ok(option_env!("ACTUS_RUNTIME_ARCHIVE").map(PathBuf::from))
-}
-
-fn runtime_host_triple() -> &'static str {
-    match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
-        ("macos", "aarch64") => "aarch64-apple-darwin",
-        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
-        _ => "unknown",
-    }
-}
+pub use archive::runtime_archive_path;

@@ -2,12 +2,12 @@ use std::collections::HashSet;
 
 use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 
-use super::identity::ModuleNamespace;
-use super::object_types::{declaration_type_dependencies, type_declaration_identity};
-pub use super::object_units::{ModuleObjectOwner, ModuleObjectUnit};
-use super::plan::ModuleCompilationPlan;
-use super::types::ModuleError;
-use super::validation::export_identity;
+use super::super::identity::ModuleNamespace;
+use super::super::plan::ModuleCompilationPlan;
+use super::super::types::ModuleError;
+use super::super::validation::export_identity;
+use super::types::{declaration_type_dependencies, type_declaration_identity};
+pub use super::units::{ModuleObjectOwner, ModuleObjectUnit};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleObjectPlan {
@@ -20,7 +20,7 @@ impl ModuleObjectPlan {
     }
 }
 
-pub(super) fn build_object_plan(
+pub(in crate::modules::aggregation) fn build_object_plan(
     compilation: &ModuleCompilationPlan,
     generic_types: &[crate::ast::TypeName],
 ) -> Result<ModuleObjectPlan, ModuleError> {
@@ -54,7 +54,7 @@ pub(super) fn build_object_plan(
 
 fn module_is_reachable_from_friend_scope(
     compilation: &ModuleCompilationPlan,
-    module: &super::unit::ModuleUnit,
+    module: &super::super::unit::ModuleUnit,
 ) -> bool {
     let target = module.identity().module_path();
     let mut pending = compilation.friend_modules().iter().cloned().collect::<Vec<_>>();
@@ -73,14 +73,14 @@ fn module_is_reachable_from_friend_scope(
         };
         for declaration in &unit.implementation().declarations {
             let crate::ast::TopLevelDecl::Import(import) = declaration else { continue };
-            pending.push(super::plan::qualify_import_path(&current, &import.path));
+            pending.push(super::super::plan::qualify_import_path(&current, &import.path));
         }
     }
     false
 }
 
 fn exported_implementation_names(
-    module: &super::unit::ModuleUnit,
+    module: &super::super::unit::ModuleUnit,
     internal_scope: bool,
 ) -> Vec<String> {
     module
@@ -95,7 +95,7 @@ fn exported_implementation_names(
 }
 
 fn implementation_declarations(
-    module: &super::unit::ModuleUnit,
+    module: &super::super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
     generic_types: &[crate::ast::TypeName],
 ) -> Program {
@@ -155,7 +155,7 @@ fn implementation_declarations(
 }
 
 fn append_friend_import_aliases(
-    module: &super::unit::ModuleUnit,
+    module: &super::super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
     declaration_identities: &mut HashSet<(String, String)>,
     declarations: &mut Vec<TopLevelDecl>,
@@ -173,7 +173,8 @@ fn append_friend_import_aliases(
         if import.is_open {
             return None;
         }
-        let path = super::plan::qualify_import_path(module.identity().module_path(), &import.path);
+        let path =
+            super::super::plan::qualify_import_path(module.identity().module_path(), &import.path);
         let friend = compilation
             .friend_modules()
             .iter()
@@ -279,7 +280,7 @@ fn append_generic_type_declaration(
 }
 
 fn append_imported_declarations(
-    module: &super::unit::ModuleUnit,
+    module: &super::super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
     imported_paths: &mut HashSet<String>,
     declaration_identities: &mut HashSet<(String, String)>,
@@ -313,9 +314,9 @@ fn append_imported_declarations(
 
 #[allow(clippy::too_many_arguments)]
 fn append_dependency_declarations(
-    module: &super::unit::ModuleUnit,
+    module: &super::super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
-    dependency: &super::unit::ModuleUnit,
+    dependency: &super::super::unit::ModuleUnit,
     namespace: Option<&str>,
     open_import: bool,
     selected: &[String],
@@ -349,7 +350,7 @@ fn append_dependency_declarations(
 
 #[allow(clippy::too_many_arguments)]
 fn append_dependency_declaration(
-    dependency: &super::unit::ModuleUnit,
+    dependency: &super::super::unit::ModuleUnit,
     declaration: &TopLevelDecl,
     namespace: Option<&str>,
     open_import: bool,
@@ -393,7 +394,7 @@ fn append_declaration_if_new(
 }
 
 fn append_dependency_imports(
-    dependency: &super::unit::ModuleUnit,
+    dependency: &super::super::unit::ModuleUnit,
     declarations: &mut Vec<TopLevelDecl>,
 ) {
     for declaration in &dependency.implementation().declarations {
@@ -402,8 +403,10 @@ fn append_dependency_imports(
             continue;
         }
         let mut imported = import.clone();
-        imported.path =
-            super::plan::qualify_import_path(dependency.identity().module_path(), &import.path);
+        imported.path = super::super::plan::qualify_import_path(
+            dependency.identity().module_path(),
+            &import.path,
+        );
         let already_present = declarations.iter().any(|declaration| {
             let TopLevelDecl::Import(existing) = declaration else { return false };
             import_binding(existing) == import_binding(&imported)
@@ -416,17 +419,19 @@ fn append_dependency_imports(
 }
 
 fn imported_dependencies<'a>(
-    module: &super::unit::ModuleUnit,
+    module: &super::super::unit::ModuleUnit,
     compilation: &'a ModuleCompilationPlan,
-) -> Vec<(&'a super::unit::ModuleUnit, Option<String>, bool, Vec<String>)> {
+) -> Vec<(&'a super::super::unit::ModuleUnit, Option<String>, bool, Vec<String>)> {
     module
         .implementation()
         .declarations
         .iter()
         .filter_map(|declaration| {
             let TopLevelDecl::Import(import) = declaration else { return None };
-            let import_path =
-                super::plan::qualify_import_path(module.identity().module_path(), &import.path);
+            let import_path = super::super::plan::qualify_import_path(
+                module.identity().module_path(),
+                &import.path,
+            );
             let unit = compilation
                 .units()
                 .iter()
@@ -448,7 +453,7 @@ fn import_binding(import: &crate::ast::ImportDecl) -> String {
 }
 
 fn exported_dependency_declaration(
-    dependency: &super::unit::ModuleUnit,
+    dependency: &super::super::unit::ModuleUnit,
     declaration: &TopLevelDecl,
     friend: bool,
     namespace: Option<&str>,

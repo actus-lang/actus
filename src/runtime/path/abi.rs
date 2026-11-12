@@ -2,9 +2,9 @@ use super::super::types::BufferHandle;
 
 use super::validation::{path_length, path_units, valid_buffer, validate_windows_units};
 use super::{
-    ActusPath, PosixRoot, is_ascii_drive, is_windows_separator, posix_is_separator, posix_root,
-    validate_posix, windows_is_separator,
+    ActusPath, PosixRoot, posix_is_separator, posix_root, validate_posix, windows_is_separator,
 };
+use super::{is_ascii_drive, is_windows_separator};
 
 #[unsafe(no_mangle)]
 /// Validates raw POSIX bytes or native-endian UTF-16 units in an Actus buffer.

@@ -4,6 +4,7 @@ mod directory;
 mod file;
 mod identity;
 mod locking;
+mod mode;
 mod operations;
 mod path_bridge;
 mod path_open;
@@ -28,6 +29,7 @@ pub use file::{
     actus_file_open, actus_file_read, actus_file_seek, actus_file_seek_buffer, actus_file_sync_all,
     actus_file_sync_data, actus_file_try_lock, actus_file_unlock, actus_file_write,
 };
+use mode::{MODE_CREATE, actus_handle, handle_to_actus, with_file};
 pub use operations::{
     actus_file_canonicalize_path, actus_file_create_dir_all_path, actus_file_create_dir_buffer,
     actus_file_create_dir_path, actus_file_metadata_buffer, actus_file_metadata_handle_buffer,
@@ -45,6 +47,3 @@ pub use publication::{
 pub use temporary::{actus_directory_create_temporary_path, actus_file_open_temporary_path};
 #[allow(unused_imports)]
 pub use walk::{ActusWalkEvent, actus_walker_close, actus_walker_next, actus_walker_open};
-
-pub(super) use file::{actus_handle, handle_to_actus, with_file};
-pub(super) const MODE_CREATE: u32 = 1;

@@ -1,6 +1,6 @@
 use crate::ast::Program;
 
-use super::identity::ModuleNamespace;
+use super::super::identity::ModuleNamespace;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ModuleObjectOwner {

@@ -1,7 +1,7 @@
 //! Hosted bridges for explicit resident-window pinning.
 
-use super::region::RegionError;
-use super::region_bridge::{REGION_STORE, error_result, result_int, validate_descriptor};
+use super::super::descriptor::RegionError;
+use super::access::{REGION_STORE, error_result, result_int, validate_descriptor};
 
 /// Pins a resident window until the matching unpin or terminal cleanup.
 ///

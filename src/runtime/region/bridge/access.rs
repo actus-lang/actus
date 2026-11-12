@@ -2,11 +2,12 @@
 
 use std::ptr;
 
-use super::actus_enum_allocate;
-use super::allocation::take_buffer;
-use super::capabilities::decode_region_handle;
-use super::region::{InMemoryRegion, RegionDescriptor, RegionError, RegionHandle};
-use super::types::ActusBuffer;
+use super::super::super::actus_enum_allocate;
+use super::super::super::allocation::take_buffer;
+use super::super::super::capabilities::decode_region_handle;
+use super::super::super::types::ActusBuffer;
+use super::super::access::InMemoryRegion;
+use super::super::descriptor::{RegionDescriptor, RegionError, RegionHandle};
 
 const RESULT_OK: u32 = 0;
 const RESULT_ERR: u32 = 1;
@@ -25,17 +26,17 @@ pub(crate) static REGION_STORE: std::sync::Mutex<RegionStore> =
     std::sync::Mutex::new(RegionStore::new());
 
 pub(super) struct RegionStore {
-    slots: [Option<InMemoryRegion>; super::capabilities::REGION_CAPABILITY_CAPACITY],
-    generations: [u32; super::capabilities::REGION_CAPABILITY_CAPACITY],
-    descriptors: [Option<usize>; super::capabilities::REGION_CAPABILITY_CAPACITY],
+    slots: [Option<InMemoryRegion>; super::super::super::capabilities::REGION_CAPABILITY_CAPACITY],
+    generations: [u32; super::super::super::capabilities::REGION_CAPABILITY_CAPACITY],
+    descriptors: [Option<usize>; super::super::super::capabilities::REGION_CAPABILITY_CAPACITY],
 }
 
 impl RegionStore {
     const fn new() -> Self {
         Self {
-            slots: [const { None }; super::capabilities::REGION_CAPABILITY_CAPACITY],
-            generations: [0; super::capabilities::REGION_CAPABILITY_CAPACITY],
-            descriptors: [None; super::capabilities::REGION_CAPABILITY_CAPACITY],
+            slots: [const { None }; super::super::super::capabilities::REGION_CAPABILITY_CAPACITY],
+            generations: [0; super::super::super::capabilities::REGION_CAPABILITY_CAPACITY],
+            descriptors: [None; super::super::super::capabilities::REGION_CAPABILITY_CAPACITY],
         }
     }
 
@@ -59,7 +60,7 @@ impl RegionStore {
         let generation = self.generations[index]
             .checked_add(1)
             .ok_or(RegionError::CapabilityGenerationExhausted)?;
-        let handle = super::capabilities::encode_region_handle(index, generation);
+        let handle = super::super::super::capabilities::encode_region_handle(index, generation);
         let region = InMemoryRegion::from_backing(
             handle,
             backing,
@@ -149,7 +150,7 @@ fn decode_store_handle(handle: RegionHandle) -> Result<usize, RegionError> {
         return Err(RegionError::InvalidHandle);
     }
     let (index, _) = decode_region_handle(handle)?;
-    if index >= super::capabilities::REGION_CAPABILITY_CAPACITY {
+    if index >= super::super::super::capabilities::REGION_CAPABILITY_CAPACITY {
         return Err(RegionError::InvalidHandle);
     }
     Ok(index)

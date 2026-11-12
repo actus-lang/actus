@@ -1,6 +1,6 @@
+use super::super::descriptor::RegionError;
+use super::access::REGION_STORE;
 use super::actus_region_drop;
-use super::region::RegionError;
-use super::region_bridge::REGION_STORE;
 
 #[test]
 fn native_drop_releases_a_descriptor_once() {
