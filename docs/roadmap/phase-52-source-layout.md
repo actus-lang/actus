@@ -775,21 +775,16 @@ all test result lines were `ok` with zero failures.
 ### Final tree
 
 ```text
-cli/
-  mod.rs build/{mod,emission/{mod,llvm,cranelift,shared},loading,options,
-    artifacts,module_type_context,object_manifest}.rs test_runner/{mod,runner,
-    collection,execution,output,process}.rs
-lsp/
-  mod.rs protocol/{mod,messages,session,transport,dispatch,server,progress,
-    cancellation}.rs queries/{mod,bounds,cache,handlers,model,semantic,
-    semantic_tokens,source}.rs editor/{completion,definition,navigation,rename,
-    code_lens,signature_help,formatting,hover}.rs workspace/{documents,state,
-    uri,position,module_scope}.rs
-formatter/declarations/{mod,render,widths}.rs
-diagnostics/renderer/{mod,render,json,module,codes/{mod,packing,extended,mapping,messages}}.rs
+formatter/{mod,program,expressions,imports,statements}.rs
+formatter/declarations/{mod,render,widths,types}.rs
+diagnostics/{mod,model,strict_codes}.rs
+diagnostics/renderer/{mod,render,json,module}.rs
+diagnostics/renderer/codes/{mod,packing,extended,mapping,messages}.rs
 documentation/{mod,contract,language,model,rules}.rs
-conformance/{mod,diagnostics,exceptions,policy,scan,source_limits,tree_policy}.rs
-ffi/{mod,abi,abi_errors,aggregate}.rs
+conformance/{mod,exceptions,tree_policy}.rs
+conformance/source_limits/{mod,inspection,diagnostics,policy,scan}.rs
+ffi/mod.rs
+ffi/abi/{mod,signature,errors,aggregate}.rs
 ```
 
 `formatter/declarations.rs` and `diagnostics/renderer/mod.rs` receive separate
@@ -798,17 +793,23 @@ file at its current path.
 
 | Old | New | Type |
 | --- | --- | --- |
-| `formatter/declarations.rs` | `formatter/declarations/render.rs` | group + extract |
+| `formatter/mod.rs` | `formatter/program.rs` | pair→facade + extract |
+| `formatter/declarations.rs` | `formatter/declarations/render.rs` | pair→facade + extract |
 | `formatter/declaration_widths.rs` | `formatter/declarations/widths.rs` | group |
-| `diagnostics/renderer/pack_codes.rs` | `renderer/codes/packing.rs` | rename |
-| `diagnostics/renderer/codes/*` | same codes subtree | unchanged |
-| `diagnostics/strict_codes.rs` | same path | unchanged |
-| documentation files | same paths | unchanged |
-| conformance files | same paths | unchanged |
-| `conformance/source_limits.rs` | `conformance/{diagnostics,policy,scan}.rs` | extract (`#[path]` removal) |
-| `ffi/abi.rs` | `ffi/{abi_errors,aggregate}.rs` | extract (`#[path]` removal) |
-| `diagnostics/renderer/codes/mod.rs` | `diagnostics/renderer/codes/packing.rs` | extract (`#[path]` removal) |
-| `runtime/fs/walk.rs` | `runtime/fs/walk.rs` | unchanged (`#[path]` removal; child moves with `walk_tests.rs`) |
+| `diagnostics/renderer/mod.rs` | `diagnostics/renderer/render.rs` | pair→facade + extract |
+| `diagnostics/renderer/pack_codes.rs` | `diagnostics/renderer/codes/packing.rs` | rename |
+| `diagnostics/renderer/codes/mod.rs` | `diagnostics/renderer/codes/mod.rs` | facade; remove `#[path]` |
+| `diagnostics/{mod,strict_codes}.rs` | same paths | unchanged |
+| `diagnostics/model.rs` | same path | unchanged |
+| `diagnostics/renderer/{json,module}.rs` | same paths | unchanged |
+| `documentation/` | same paths | unchanged |
+| `conformance/mod.rs` | same path | unchanged |
+| `conformance/source_limits.rs` | `conformance/source_limits/inspection.rs` | pair→facade + extract |
+| `conformance/{diagnostics,policy,scan}.rs` | `conformance/source_limits/{diagnostics,policy,scan}.rs` | group |
+| `conformance/{exceptions,tree_policy}.rs` | same paths | unchanged |
+| `ffi/abi.rs` | `ffi/abi/signature.rs` | pair→facade + extract |
+| `ffi/abi_errors.rs` | `ffi/abi/errors.rs` | group |
+| `ffi/aggregate.rs` | `ffi/abi/aggregate.rs` | group; path unchanged |
 
 The two body exceptions are tracked with the codegen map: `body/case.rs` and
 `body/case_value.rs` each lose their `#[path]` child declaration in PR 4.
@@ -979,6 +980,13 @@ The architecture test has six exact-path allowlists. Their current sizes are:
 | `src/conformance/source_limits.rs` | 9 |
 | `src/diagnostics/renderer/codes/mod.rs` | 9 |
 | `src/ffi/abi.rs` | 9 |
+
+`conformance/source_limits.rs` and `ffi/abi.rs` are hidden module pairs: each
+uses `#[path]` to declare child implementations. Converting those children to
+siblings would widen `pub(super)` items to the parent module boundary, which
+Rust cannot express without changing their visibility. They therefore become
+directories so their module paths and visibility boundaries remain unchanged;
+`abi_errors.rs` is named `errors.rs` to avoid the `abi/abi_errors` repetition.
 
 The full exact paths are the constants in
 `tests/architecture_conformance.rs`; this table assigns every entry to the
