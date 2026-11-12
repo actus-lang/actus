@@ -910,28 +910,10 @@ facade-plus-extract rule applies to every other true pair in the mapping.
 
 ## Current allowlist and planned PR
 
-The architecture test still declares six exact-path allowlist constants. Five
-are empty after PRs 1–9; the only remaining entry is stale because the file it
-names no longer exists:
+The architecture allowlist was removed in PR 10 (`5a1a1209`); all
+ADR-0106 source-layout rules now apply unconditionally.
 
-| List | Count | Current entries move in |
-| --- | ---: | --- |
-| non-facade `mod.rs` | 0 | removed by PRs 1, 3, 4, 5, 6, 7, 8, 9 |
-| X.rs + X/ pairs | 0 | removed by PRs 2, 4, 5, 6, 7 |
-| one-file module directories | 0 | removed by PRs 4, 5, 7 |
-| parent-name duplicates | 0 | none |
-| generic/forbidden filenames | 1 stale | PR 10 removes the stale entry |
-| `#[path]` module redirections | 0 | removed by PRs 4, 7, and 9 |
-
-### PR 10 plan
-
-PR 10 removes all six allowlist constants and their conditional exemptions
-from `tests/architecture_conformance.rs`. The sole remaining
-`ALLOWED_FORBIDDEN_FILES` entry, `src/semantic/enum_constructors/support.rs`,
-is stale because that file and directory no longer exist. Every architecture
-rule will then be asserted unconditionally.
-
-### Allowlist entry → PR
+### Historical allowlist entry → PR
 
 | Entry | PR |
 | --- | ---: |
@@ -1210,3 +1192,16 @@ PRs 1–9 land.
   `check_secrets.sh` completed successfully. The full
   `cargo test --all-targets --all-features` run completed with exit 0 after
   the exact `src/ffi` allowlist entry was added.
+
+### PR 10 evidence
+
+- [x] The stale `ALLOWED_FORBIDDEN_FILES` entry was removed together with all
+  other architecture allowlist constants in `5a1a1209`. The negative check
+  created `src/formatter/utils.rs` and `cargo test --test
+  architecture_conformance -- --exact generic_implementation_filenames_are_rejected
+  --nocapture` failed with `forbidden generic file`; the temporary file was
+  then removed.
+- [x] The architecture rules are now unconditional; no allowlist constants or
+  conditional exemptions remain. The only deferred layout work is converting
+  the `include!` inputs in `shared_lowering/layout` and
+  `shared_lowering/expression/provider.rs` into ordinary modules.
