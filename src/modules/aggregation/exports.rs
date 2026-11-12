@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ast::{Program, TopLevelDecl};
-use crate::lexer::scan;
+use crate::lexer::scan_at;
 use crate::parser::parse;
 
 use super::super::resolver::ModuleResolver;
@@ -26,7 +26,7 @@ pub fn exports_module_with_overlays(
 ) -> Result<ModuleExports, ModuleError> {
     let resolved =
         resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
-    let parsed = parse_sources(resolved.source_files(), overlays)?;
+    let parsed = parse_sources(resolver, resolved.source_files(), overlays)?;
     validate_open_siblings(
         module_path,
         resolved.facade(),
@@ -64,7 +64,7 @@ fn exports_child_module_with_overlays(
 ) -> Result<ModuleExports, ModuleError> {
     let child =
         resolver.resolve_child(parent_module_path, child_name).map_err(ModuleError::Resolution)?;
-    let parsed = parse_sources(child.source_files(), overlays)?;
+    let parsed = parse_sources(resolver, child.source_files(), overlays)?;
     validate_open_siblings(
         child.module_path(),
         child.facade(),
@@ -109,6 +109,7 @@ fn exports_child_module_with_overlays(
 }
 
 fn parse_sources<'a, I>(
+    resolver: &ModuleResolver,
     source_paths: I,
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<Vec<(PathBuf, Program)>, ModuleError>
@@ -124,7 +125,12 @@ where
                     message: error.to_string(),
                 })
             })?;
-            let (tokens, errors) = scan(&source);
+            let base = resolver
+                .source_map()
+                .as_ref()
+                .map(|map| map.lock().register(source_path, &source))
+                .unwrap_or(0);
+            let (tokens, errors) = scan_at(&source, base);
             if !errors.is_empty() {
                 return Err(ModuleError::Lex { path: source_path.to_owned(), errors });
             }

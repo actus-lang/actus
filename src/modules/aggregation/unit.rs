@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ast::Program;
-use crate::lexer::scan;
+use crate::lexer::scan_at;
 use crate::parser::parse;
 
 use super::super::resolver::{ModuleResolver, ResolvedModule};
@@ -135,7 +135,7 @@ fn load_sources(
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<Vec<ModuleSource>, ModuleError> {
     let mut sources = Vec::new();
-    load_module_sources(resolved, overlays, &mut sources, false)?;
+    load_module_sources(resolver, resolved, overlays, &mut sources, false)?;
     for child in resolved.children() {
         let child = resolver
             .resolve_child(
@@ -149,6 +149,7 @@ fn load_sources(
 }
 
 fn load_module_sources(
+    resolver: &ModuleResolver,
     resolved: &ResolvedModule,
     overlays: &HashMap<PathBuf, String>,
     sources: &mut Vec<ModuleSource>,
@@ -159,7 +160,7 @@ fn load_module_sources(
     } else {
         ModuleSourceKind::Facade
     };
-    sources.push(load_source(resolved.facade(), facade_kind, overlays)?);
+    sources.push(load_source(resolver, resolved.facade(), facade_kind, overlays)?);
     for sibling in resolved.siblings() {
         let name = sibling.file_stem().and_then(|stem| stem.to_str()).unwrap_or_default();
         let kind = if child {
@@ -170,7 +171,7 @@ fn load_module_sources(
         } else {
             ModuleSourceKind::Sibling { name: name.to_owned() }
         };
-        sources.push(load_source(sibling, kind, overlays)?);
+        sources.push(load_source(resolver, sibling, kind, overlays)?);
     }
     Ok(())
 }
@@ -181,7 +182,7 @@ fn load_child_sources(
     overlays: &HashMap<PathBuf, String>,
     sources: &mut Vec<ModuleSource>,
 ) -> Result<(), ModuleError> {
-    load_module_sources(resolved, overlays, sources, true)?;
+    load_module_sources(resolver, resolved, overlays, sources, true)?;
     for child in resolved.children() {
         let child_path = child.module_path().rsplit("::").next().unwrap_or_default();
         let nested = resolver
@@ -193,6 +194,7 @@ fn load_child_sources(
 }
 
 fn load_source(
+    resolver: &ModuleResolver,
     path: &Path,
     kind: ModuleSourceKind,
     overlays: &HashMap<PathBuf, String>,
@@ -203,7 +205,9 @@ fn load_source(
             message: error.to_string(),
         })
     })?;
-    let (tokens, errors) = scan(&source);
+    let base =
+        resolver.source_map().as_ref().map(|map| map.lock().register(path, &source)).unwrap_or(0);
+    let (tokens, errors) = scan_at(&source, base);
     if !errors.is_empty() {
         return Err(ModuleError::Lex { path: path.to_owned(), errors });
     }

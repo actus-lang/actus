@@ -25,13 +25,22 @@ impl LexError {
 pub struct Scanner<'source> {
     pub(super) source: &'source str,
     pub(super) cursor: usize,
+    pub(super) base_offset: usize,
     pub(super) tokens: Vec<Token>,
     pub(super) errors: Vec<LexError>,
 }
 
 impl<'source> Scanner<'source> {
     pub fn new(source: &'source str) -> Self {
-        Self { source, cursor: 0, tokens: Vec::new(), errors: Vec::new() }
+        Self::new_at(source, 0)
+    }
+
+    pub(crate) fn new_at(source: &'source str, base_offset: usize) -> Self {
+        Self { source, cursor: 0, base_offset, tokens: Vec::new(), errors: Vec::new() }
+    }
+
+    pub(super) fn span(&self, start: usize) -> SourceSpan {
+        SourceSpan::new(start + self.base_offset, self.cursor + self.base_offset)
     }
 
     pub fn scan(mut self) -> (Vec<Token>, Vec<LexError>) {
@@ -43,7 +52,7 @@ impl<'source> Scanner<'source> {
             self.scan_token();
         }
         let end = self.cursor;
-        self.tokens.push(Token::new(TokenKind::Eof, SourceSpan::new(end, end)));
+        self.tokens.push(Token::new(TokenKind::Eof, self.span(end)));
         (self.tokens, self.errors)
     }
 

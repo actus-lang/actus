@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::SharedSourceMap;
+
 #[derive(Debug)]
 pub enum ModuleResolutionError {
     InvalidPath(String),
@@ -127,6 +129,7 @@ pub struct ModuleResolver {
     dependency_roots: BTreeMap<String, PathBuf>,
     runtime_source_root: Option<PathBuf>,
     runtime_module_roots: BTreeMap<String, PathBuf>,
+    source_map: Option<SharedSourceMap>,
 }
 
 impl ModuleResolver {
@@ -136,6 +139,7 @@ impl ModuleResolver {
             dependency_roots: BTreeMap::new(),
             runtime_source_root: None,
             runtime_module_roots: BTreeMap::new(),
+            source_map: None,
         }
     }
 
@@ -148,6 +152,7 @@ impl ModuleResolver {
             dependency_roots: dependency_roots.clone(),
             runtime_source_root: None,
             runtime_module_roots: BTreeMap::new(),
+            source_map: None,
         }
     }
 
@@ -162,7 +167,17 @@ impl ModuleResolver {
             dependency_roots: dependency_roots.clone(),
             runtime_source_root: runtime_source_root.map(Path::to_owned),
             runtime_module_roots: runtime_module_roots.clone(),
+            source_map: None,
         }
+    }
+
+    pub(crate) fn with_source_map(mut self, source_map: SharedSourceMap) -> Self {
+        self.source_map = Some(source_map);
+        self
+    }
+
+    pub(crate) fn source_map(&self) -> Option<SharedSourceMap> {
+        self.source_map.clone()
     }
 
     pub fn resolve(&self, module_path: &str) -> Result<ResolvedModule, ModuleResolutionError> {

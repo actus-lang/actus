@@ -45,7 +45,7 @@ fn build_file_with_report(
     report_output: bool,
     mode: ConformanceMode,
 ) -> i32 {
-    let Some((source, plan)) = load_build_program(input, configuration) else {
+    let Some((source, plan, source_map)) = load_build_program(input, configuration) else {
         return 1;
     };
     if mode.is_strict()
@@ -67,7 +67,9 @@ fn build_file_with_report(
             return 1;
         }
     };
-    if mode.is_strict() && !validate_strict_plan(input, &source, &plan, configuration.target()) {
+    if mode.is_strict()
+        && !validate_strict_plan(input, &source, &plan, configuration.target(), &source_map)
+    {
         return 1;
     }
     let Some(fallback_symbol) = first_defined_verb(&caller) else {

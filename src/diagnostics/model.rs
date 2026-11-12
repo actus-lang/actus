@@ -223,6 +223,18 @@ impl Diagnostic {
         &self.related
     }
 
+    pub(crate) fn with_localized_locations(
+        mut self,
+        source_path: Option<String>,
+        span: SourceSpan,
+        related: Vec<DiagnosticRelatedLocation>,
+    ) -> Self {
+        self.source_path = source_path;
+        self.span = span;
+        self.related = related;
+        self
+    }
+
     fn new(
         code: impl Into<String>,
         severity: DiagnosticSeverity,

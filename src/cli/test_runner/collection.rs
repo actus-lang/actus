@@ -1,12 +1,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::SharedSourceMap;
 use crate::ast::{MetaAttribute, Program, TestFault, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnostic};
-use crate::lexer::{TokenKind, scan};
+use crate::lexer::TokenKind;
 use crate::modules::{
-    ModuleCompilationPlan, ModuleResolver, build_test_compilation_plan, parse_module,
+    ModuleCompilationPlan, ModuleError, ModuleResolver, build_test_compilation_plan, parse_module,
 };
 use crate::parser::parse;
 use crate::semantic::filter_program_for_target_checked;
@@ -93,6 +94,8 @@ fn collect_file_tests(
 ) -> Result<CollectedFile, String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
+    let source_map = SharedSourceMap::new();
+    let resolver = resolver.clone().with_source_map(source_map.clone());
     if options.mirror && path.starts_with(configuration.project_root().join("tests")) {
         validate_test_mirror(path, configuration)?;
     }
@@ -100,7 +103,8 @@ fn collect_file_tests(
     let Some((_source_program, program, compilation_plan, test_names)) = parse_source(
         path,
         &source,
-        resolver,
+        &source_map,
+        &resolver,
         configuration.source_root(),
         configuration.project_root(),
         options,
@@ -111,10 +115,15 @@ fn collect_file_tests(
     let declared = test_count(&program);
     let program =
         filter_program_for_target_checked(&program, configuration.target()).map_err(|error| {
-            format!("{}: {}", path.display(), render_diagnostic("", &semantic_diagnostic(&error)))
+            let diagnostic = semantic_diagnostic(&error);
+            if let Some((path, source, diagnostic)) = source_map.lock().localize(&diagnostic) {
+                format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
+            } else {
+                format!("{}: {}", path.display(), render_diagnostic("", &diagnostic))
+            }
         })?;
     let filtered = declared.saturating_sub(test_count(&program));
-    validate_semantics(path, &source, &program, options.mode)?;
+    validate_semantics(path, &source, &source_map, &program, options.mode)?;
     let module =
         module_path_for_test(path, configuration.source_root(), configuration.project_root());
     let relative_path =
@@ -173,12 +182,13 @@ fn validate_source(
 fn parse_source(
     path: &Path,
     source: &str,
+    source_map: &SharedSourceMap,
     resolver: &ModuleResolver,
     source_root: &Path,
     project_root: &Path,
     options: &TestOptions,
 ) -> Result<ParsedTestSource, String> {
-    let (tokens, errors) = scan(source);
+    let (tokens, errors) = source_map.scan(path, source);
     if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
         return Ok(None);
     }
@@ -186,7 +196,7 @@ fn parse_source(
         return Err(format!("cannot lex `{}`", path.display()));
     }
     let source_program =
-        parse(tokens).map_err(|error| format!("cannot parse `{}`: {error:?}", path.display()))?;
+        parse(tokens).map_err(|error| parse_source_error(path, source_map, error))?;
     let test_names = test_names(&source_program);
     if test_names.is_empty() {
         return Ok(None);
@@ -214,10 +224,36 @@ fn parse_source(
         .unwrap_or_else(|| source_program.clone());
     let resolved = build_test_compilation_plan(&compilation_source, resolver)
         .map(|plan| (plan.caller().clone(), Some(plan)));
-    resolved.map(|(program, plan)| Some((compilation_source, program, plan, test_names))).map_err(
-        |error| {
-            let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
-            format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
+    resolved
+        .map(|(program, plan)| Some((compilation_source, program, plan, test_names)))
+        .map_err(|error| module_source_error(path, source, source_map, error))
+}
+
+fn parse_source_error(
+    path: &Path,
+    source_map: &SharedSourceMap,
+    error: crate::parser::ParseError,
+) -> String {
+    let diagnostic = crate::diagnostics::parse_diagnostic(&error);
+    source_map.lock().localize(&diagnostic).map_or_else(
+        || format!("cannot parse `{}`: {error:?}", path.display()),
+        |(localized_path, source, diagnostic)| {
+            format!("{}: {}", localized_path.display(), render_diagnostic(&source, &diagnostic))
+        },
+    )
+}
+
+fn module_source_error(
+    path: &Path,
+    source: &str,
+    source_map: &SharedSourceMap,
+    error: ModuleError,
+) -> String {
+    let diagnostic = module_diagnostic(&error);
+    source_map.lock().localize(&diagnostic).map_or_else(
+        || format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic)),
+        |(path, source, diagnostic)| {
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
         },
     )
 }
@@ -298,6 +334,7 @@ fn module_source(path: &Path, source_root: &Path) -> Option<String> {
 fn validate_semantics(
     path: &Path,
     source: &str,
+    source_map: &SharedSourceMap,
     program: &Program,
     mode: ConformanceMode,
 ) -> Result<(), String> {
@@ -305,8 +342,13 @@ fn validate_semantics(
         return Ok(());
     }
     crate::semantic::analyze(program).map(|_| ()).map_err(|error| {
-        let diagnostic = semantic_diagnostic(&error).with_source_path(path.display().to_string());
-        format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
+        let diagnostic = semantic_diagnostic(&error);
+        if let Some((path, source, diagnostic)) = source_map.lock().localize(&diagnostic) {
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
+        } else {
+            let diagnostic = diagnostic.with_source_path(path.display().to_string());
+            format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
+        }
     })
 }
 
