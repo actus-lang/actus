@@ -8,7 +8,7 @@ use super::position::{LineIndex, LspPosition, LspRange};
 
 const MAX_RENAME_EDITS: usize = 1024;
 
-pub(super) fn prepare(params: &Value, store: &DocumentStore) -> Value {
+pub(in crate::lsp) fn prepare(params: &Value, store: &DocumentStore) -> Value {
     let Some((uri, source, position)) = request_context(params, store) else {
         return Value::Null;
     };
@@ -21,7 +21,7 @@ pub(super) fn prepare(params: &Value, store: &DocumentStore) -> Value {
     json!({"range": identifier_range(source, &name, &position), "placeholder": name})
 }
 
-pub(super) fn rename(params: &Value, store: &DocumentStore) -> Value {
+pub(in crate::lsp) fn rename(params: &Value, store: &DocumentStore) -> Value {
     let Some(new_name) = params.get("newName").and_then(Value::as_str) else {
         return Value::Null;
     };

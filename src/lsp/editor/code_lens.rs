@@ -13,7 +13,7 @@ use super::uri::file_uri_to_path;
 
 const MAX_CODE_LENSES: usize = 16;
 
-pub(super) fn entry_lenses(
+pub(in crate::lsp) fn entry_lenses(
     uri: &str,
     source: &str,
     version: i64,

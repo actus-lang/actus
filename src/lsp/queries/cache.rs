@@ -4,11 +4,11 @@ use crate::ast::Program;
 use crate::lexer::scan;
 use crate::parser::parse;
 
-pub(super) const MAX_PARSED_PROGRAMS: usize = 256;
+pub(in crate::lsp) const MAX_PARSED_PROGRAMS: usize = 256;
 const MAX_SEMANTIC_SNAPSHOTS: usize = 256;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum ParseSnapshot {
+pub(in crate::lsp) enum ParseSnapshot {
     Valid(Program),
     Invalid,
 }
@@ -21,7 +21,7 @@ struct CachedProgram {
 }
 
 #[derive(Debug, Default)]
-pub(super) struct QueryCache {
+pub(in crate::lsp) struct QueryCache {
     parsed: BTreeMap<String, CachedProgram>,
     semantic: BTreeMap<(String, String), CachedSemantic>,
     clock: u64,
@@ -34,7 +34,7 @@ struct CachedSemantic {
 }
 
 impl QueryCache {
-    pub(super) fn parse(&mut self, uri: &str, version: i64, source: &str) -> ParseSnapshot {
+    pub(in crate::lsp) fn parse(&mut self, uri: &str, version: i64, source: &str) -> ParseSnapshot {
         self.clock = self.clock.saturating_add(1);
         if let Some(entry) = self.parsed.get_mut(uri)
             && entry.version == version
@@ -56,12 +56,12 @@ impl QueryCache {
         snapshot
     }
 
-    pub(super) fn invalidate(&mut self, uri: &str) {
+    pub(in crate::lsp) fn invalidate(&mut self, uri: &str) {
         self.parsed.remove(uri);
         self.semantic.retain(|(cached_uri, _), _| cached_uri != uri);
     }
 
-    pub(super) fn semantic(
+    pub(in crate::lsp) fn semantic(
         &self,
         uri: &str,
         target: &str,
@@ -72,7 +72,7 @@ impl QueryCache {
             .and_then(|entry| (entry.version == version).then(|| entry.result.clone()))
     }
 
-    pub(super) fn store_semantic(
+    pub(in crate::lsp) fn store_semantic(
         &mut self,
         uri: &str,
         target: &str,

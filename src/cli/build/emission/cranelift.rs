@@ -1,4 +1,4 @@
-use super::emission::EmittedObject;
+use super::EmittedObject;
 use crate::codegen::{BackendEmitError, BackendSymbolBindings};
 use crate::configuration::CompilerConfiguration;
 use crate::modules::ModuleObjectPlan;
@@ -9,7 +9,7 @@ pub(super) fn emit_shared_scalar_units(
     configuration: &CompilerConfiguration,
     bindings: &BackendSymbolBindings,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let modules = super::shared_emission::lower_shared_modules(
+    let modules = super::shared::lower_shared_modules(
         object_plan,
         symbol,
         configuration,
@@ -45,7 +45,7 @@ pub(super) fn emit_shared_specialized_units(
     bindings: &BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let modules = super::shared_emission::lower_shared_modules(
+    let modules = super::shared::lower_shared_modules(
         object_plan,
         symbol,
         configuration,

@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
+use super::super::queries::cache::{ParseSnapshot, QueryCache};
 use super::position::{LspRange, byte_range};
-use super::query_cache::{ParseSnapshot, QueryCache};
-use super::workspace::{MAX_DOCUMENT_BYTES, MAX_OPEN_DOCUMENTS, WorkspaceModel};
+use super::state::{MAX_DOCUMENT_BYTES, MAX_OPEN_DOCUMENTS, WorkspaceModel};
 use crate::target::TargetSpec;
 
 #[derive(Clone, Debug)]
@@ -90,7 +90,7 @@ impl DocumentStore {
         self.documents.get(uri)
     }
 
-    pub(super) fn documents_snapshot(&self) -> Vec<(String, Document)> {
+    pub(in crate::lsp) fn documents_snapshot(&self) -> Vec<(String, Document)> {
         self.documents.iter().map(|(uri, document)| (uri.clone(), document.clone())).collect()
     }
 
@@ -106,12 +106,12 @@ impl DocumentStore {
         self.workspace.overlays(&self.documents)
     }
 
-    pub(super) fn parse_snapshot(&self, uri: &str) -> Option<ParseSnapshot> {
+    pub(in crate::lsp) fn parse_snapshot(&self, uri: &str) -> Option<ParseSnapshot> {
         let document = self.documents.get(uri)?;
         Some(self.cache.borrow_mut().parse(uri, document.version, &document.text))
     }
 
-    pub(super) fn cached_semantic(
+    pub(in crate::lsp) fn cached_semantic(
         &self,
         uri: &str,
         target: &str,
@@ -120,7 +120,7 @@ impl DocumentStore {
         self.cache.borrow().semantic(uri, target, version)
     }
 
-    pub(super) fn cache_semantic(
+    pub(in crate::lsp) fn cache_semantic(
         &self,
         uri: &str,
         target: &str,

@@ -1,6 +1,6 @@
 use crate::lexer::{SourceSpan, Token, TokenKind, scan};
 
-use super::super::position::{LineIndex, LspRange};
+use crate::lsp::workspace::position::{LineIndex, LspRange};
 
 pub(super) fn identifier_at(tokens: &[Token], offset: usize) -> Option<(String, SourceSpan)> {
     tokens.iter().find_map(|token| {

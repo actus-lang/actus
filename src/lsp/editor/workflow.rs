@@ -12,7 +12,7 @@ use super::uri::file_uri_to_path;
 use crate::configuration::CompilerConfiguration;
 use crate::target::TargetSpec;
 
-pub(super) fn run(
+pub(in crate::lsp) fn run(
     params: &Value,
     store: &DocumentStore,
     target: &TargetSpec,

@@ -5,20 +5,13 @@ use crate::diagnostics::{render_lex_error, render_parse_error, render_semantic_e
 use crate::lexer::scan;
 use crate::parser::parse;
 
-mod build;
-mod check;
-mod conformance;
-mod diagnostics;
-mod fmt;
-mod input;
-mod lock;
-mod lsp;
-mod project;
-mod publish;
-mod run;
-mod test_runner;
-mod version;
-mod watch;
+use super::{
+    build, check, conformance, fmt, lock, lsp, project, publish, test_runner, version, watch,
+};
+
+mod run {
+    pub(super) use super::super::run::run_command;
+}
 
 pub fn run() -> i32 {
     run_with_args(env::args().skip(1))

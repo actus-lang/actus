@@ -4,22 +4,22 @@ use std::sync::{Arc, Mutex};
 use serde_json::Value;
 
 #[derive(Clone, Default)]
-pub(super) struct CancellationRegistry {
+pub(in crate::lsp) struct CancellationRegistry {
     canceled: Arc<Mutex<HashSet<String>>>,
 }
 
 #[derive(Clone)]
-pub(super) struct CancellationToken {
+pub(in crate::lsp) struct CancellationToken {
     key: String,
     registry: CancellationRegistry,
 }
 
 impl CancellationRegistry {
-    pub(super) fn token(&self, id: Option<&Value>) -> Option<CancellationToken> {
+    pub(in crate::lsp) fn token(&self, id: Option<&Value>) -> Option<CancellationToken> {
         id.map(|id| CancellationToken { key: id.to_string(), registry: self.clone() })
     }
 
-    pub(super) fn cancel(&self, id: &Value) {
+    pub(in crate::lsp) fn cancel(&self, id: &Value) {
         if let Ok(mut canceled) = self.canceled.lock() {
             canceled.insert(id.to_string());
         }
@@ -33,11 +33,11 @@ impl CancellationRegistry {
 }
 
 impl CancellationToken {
-    pub(super) fn is_canceled(&self) -> bool {
+    pub(in crate::lsp) fn is_canceled(&self) -> bool {
         self.registry.canceled.lock().map(|canceled| canceled.contains(&self.key)).unwrap_or(true)
     }
 
-    pub(super) fn checkpoint(&self) -> bool {
+    pub(in crate::lsp) fn checkpoint(&self) -> bool {
         self.is_canceled()
     }
 }

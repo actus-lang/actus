@@ -9,15 +9,15 @@ use super::protocol::ResponseMetadata;
 use super::query_handlers::stale_version;
 use crate::target::TargetSpec;
 
-pub(super) struct Context<'a, W> {
-    pub(super) store: &'a DocumentStore,
-    pub(super) target: &'a TargetSpec,
-    pub(super) output: &'a mut W,
-    pub(super) metadata: ResponseMetadata,
-    pub(super) cancellation: Option<&'a CancellationToken>,
+pub(in crate::lsp) struct Context<'a, W> {
+    pub(in crate::lsp) store: &'a DocumentStore,
+    pub(in crate::lsp) target: &'a TargetSpec,
+    pub(in crate::lsp) output: &'a mut W,
+    pub(in crate::lsp) metadata: ResponseMetadata,
+    pub(in crate::lsp) cancellation: Option<&'a CancellationToken>,
 }
 
-pub(super) fn dispatch<W: Write>(
+pub(in crate::lsp) fn dispatch<W: Write>(
     method: &str,
     id: Option<Value>,
     params: Value,
@@ -69,7 +69,7 @@ fn code_action(
     super::server::respond(output, id, Value::Array(actions), metadata, cancellation)
 }
 
-pub(super) fn rename(
+pub(in crate::lsp) fn rename(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,

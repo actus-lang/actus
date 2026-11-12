@@ -11,14 +11,14 @@ use crate::ast::TopLevelDecl;
 use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::target::TargetSpec;
 
-pub(super) struct Context<'a> {
-    pub(super) target: &'a TargetSpec,
-    pub(super) document_version: Option<i64>,
-    pub(super) store: &'a DocumentStore,
-    pub(super) cancellation: Option<&'a CancellationToken>,
+pub(in crate::lsp) struct Context<'a> {
+    pub(in crate::lsp) target: &'a TargetSpec,
+    pub(in crate::lsp) document_version: Option<i64>,
+    pub(in crate::lsp) store: &'a DocumentStore,
+    pub(in crate::lsp) cancellation: Option<&'a CancellationToken>,
 }
 
-pub(super) fn items(
+pub(in crate::lsp) fn items(
     uri: &str,
     source: Option<&str>,
     overlays: &HashMap<PathBuf, String>,
@@ -248,7 +248,7 @@ fn access_name(state: &crate::semantic::AccessState) -> &'static str {
     }
 }
 
-pub(super) fn resolve_item(
+pub(in crate::lsp) fn resolve_item(
     item: &mut serde_json::Value,
     store: &super::documents::DocumentStore,
     target: &TargetSpec,

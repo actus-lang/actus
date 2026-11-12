@@ -1,14 +1,10 @@
-mod collection;
-mod execution;
-mod output;
-mod process;
-
 use crate::configuration::CompilerConfiguration;
 
-use super::conformance::{ConformanceMode, parse_strict_option};
+use super::super::conformance::{ConformanceMode, parse_strict_option};
+use super::{collection, execution};
 
 #[derive(Clone)]
-pub(super) struct TestOptions {
+pub(in crate::cli) struct TestOptions {
     pub(super) mode: ConformanceMode,
     pub(super) filter: Option<String>,
     pub(super) module: Option<String>,
@@ -19,7 +15,7 @@ pub(super) struct TestOptions {
     pub(super) test_threads: usize,
 }
 
-pub(super) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
+pub(in crate::cli) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_test_options(arguments) {
         Ok(options) => options,
         Err(error) => {

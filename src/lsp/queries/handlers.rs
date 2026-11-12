@@ -20,7 +20,7 @@ use super::query_cache::ParseSnapshot;
 use super::semantic_tokens::full as semantic_tokens;
 use crate::target::TargetSpec;
 
-pub(super) fn completion(
+pub(in crate::lsp) fn completion(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
@@ -72,7 +72,7 @@ pub(super) fn completion(
     super::server::respond(output, id, result, metadata, cancellation)
 }
 
-pub(super) fn resolve_completion(
+pub(in crate::lsp) fn resolve_completion(
     id: Option<Value>,
     mut params: Value,
     store: &DocumentStore,
@@ -87,7 +87,7 @@ pub(super) fn resolve_completion(
     super::server::respond(output, id, params, metadata, cancellation)
 }
 
-pub(super) fn resolve_completion_item(
+pub(in crate::lsp) fn resolve_completion_item(
     item: &mut Value,
     store: &DocumentStore,
     target: &TargetSpec,
@@ -95,7 +95,7 @@ pub(super) fn resolve_completion_item(
     super::completion::resolve_item(item, store, target)
 }
 
-pub(super) fn semantic_tokens_full(
+pub(in crate::lsp) fn semantic_tokens_full(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
@@ -137,7 +137,7 @@ pub(super) fn semantic_tokens_full(
     super::server::respond(output, id, result, metadata, cancellation)
 }
 
-pub(super) fn definition(
+pub(in crate::lsp) fn definition(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
@@ -172,7 +172,7 @@ pub(super) fn definition(
     super::server::respond(output, id, result, metadata, cancellation)
 }
 
-pub(super) fn hover(
+pub(in crate::lsp) fn hover(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
@@ -209,7 +209,7 @@ pub(super) fn hover(
     super::server::respond(output, id, result, metadata, cancellation)
 }
 
-pub(super) fn formatting(
+pub(in crate::lsp) fn formatting(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,
@@ -244,7 +244,7 @@ pub(super) fn formatting(
     )
 }
 
-pub(super) fn range_formatting(
+pub(in crate::lsp) fn range_formatting(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,

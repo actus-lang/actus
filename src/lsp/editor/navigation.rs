@@ -13,7 +13,7 @@ use super::protocol::ResponseMetadata;
 
 const MAX_NAVIGATION_RESULTS: usize = 512;
 
-pub(super) fn dispatch<W: Write>(
+pub(in crate::lsp) fn dispatch<W: Write>(
     method: &str,
     id: Option<Value>,
     params: Value,

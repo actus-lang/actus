@@ -4,10 +4,10 @@ use crate::build_graph::invalidate_stale_artifact;
 use crate::codegen::BackendEmitError;
 use crate::configuration::{CompilerConfiguration, EntryContract};
 
-use super::super::conformance::{ConformanceMode, validate_source_limits};
-use super::artifacts::{default_output, write_artifact};
-use super::loading::{load_build_program, validate_strict_plan};
-use super::options::EmitKind;
+use super::super::super::conformance::{ConformanceMode, validate_source_limits};
+use super::super::artifacts::{default_output, write_artifact};
+use super::super::loading::{load_build_program, validate_strict_plan};
+use super::super::options::EmitKind;
 
 pub(crate) fn build_file(
     input: &str,
@@ -156,7 +156,7 @@ pub(crate) fn emit_objects(
         crate::codegen::BackendKind::Llvm => {
             #[cfg(feature = "llvm")]
             {
-                super::llvm_emission::emit_objects_llvm(plan, symbol, configuration)
+                super::llvm::emit_objects_llvm(plan, symbol, configuration)
             }
             #[cfg(not(feature = "llvm"))]
             {
@@ -175,8 +175,7 @@ fn emit_objects_cranelift(
     symbol: &str,
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let (generic_types, generic_instances) =
-        super::shared_emission::generic_inputs(plan, configuration)?;
+    let (generic_types, generic_instances) = super::shared::generic_inputs(plan, configuration)?;
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
@@ -194,14 +193,14 @@ fn emit_shared_cranelift(
     generic_instances: &[crate::semantic::GenericInstance],
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
     if generic_instances.is_empty() {
-        return super::cranelift_shared::emit_shared_scalar_units(
+        return super::cranelift::emit_shared_scalar_units(
             object_plan,
             symbol,
             configuration,
             bindings,
         );
     }
-    super::cranelift_shared::emit_shared_specialized_units(
+    super::cranelift::emit_shared_specialized_units(
         object_plan,
         symbol,
         configuration,

@@ -293,6 +293,21 @@ pub(crate) fn contract_documentation(
     Some(rendered)
 }
 
+pub(in crate::lsp) fn contract_documentation_for_name(
+    program: &crate::ast::Program,
+    name: &str,
+) -> Option<String> {
+    program.declarations.iter().find_map(|declaration| match declaration {
+        crate::ast::TopLevelDecl::Verb(verb) if verb.name == name => {
+            contract_documentation(verb.doc.as_deref(), verb.contract.as_ref())
+        }
+        crate::ast::TopLevelDecl::ExternalVerb(verb) if verb.name == name => {
+            contract_documentation(verb.doc.as_deref(), verb.contract.as_ref())
+        }
+        _ => None,
+    })
+}
+
 fn contract_section_name(kind: crate::ast::VerbContractSectionKind) -> &'static str {
     match kind {
         crate::ast::VerbContractSectionKind::Purpose => "purpose",

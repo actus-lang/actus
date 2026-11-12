@@ -9,7 +9,6 @@ use crate::parser::parse;
 use crate::semantic::{AccessState, OwnershipState};
 use crate::target::TargetSpec;
 
-use super::super::position::{LineIndex, LspPosition};
 use super::super::uri::file_uri_to_path;
 use super::formatting::{
     block_info, declaration_documentation, declaration_signature, format_markdown, pack_field_info,
@@ -17,8 +16,9 @@ use super::formatting::{
 };
 use super::model::SymbolInfo;
 use super::tokens::{identifier_at, operator_at, range};
+use crate::lsp::workspace::position::{LineIndex, LspPosition};
 
-pub(crate) fn find_hover(
+pub(in crate::lsp) fn find_hover(
     uri: &str,
     source: &str,
     position: &LspPosition,

@@ -8,7 +8,7 @@ use super::protocol::ResponseMetadata;
 use super::query_handlers::stale_version;
 use crate::target::TargetSpec;
 
-pub(super) fn dispatch(
+pub(in crate::lsp) fn dispatch(
     id: Option<Value>,
     params: Value,
     store: &DocumentStore,

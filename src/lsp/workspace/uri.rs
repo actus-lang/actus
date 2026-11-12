@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-pub(super) fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
+pub(in crate::lsp) fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
     let remainder = uri.strip_prefix("file://")?;
     let (authority, path) = if remainder.starts_with('/') {
         (None, remainder)
@@ -32,7 +32,7 @@ pub(super) fn file_uri_to_path(uri: &str) -> Option<PathBuf> {
     Some(PathBuf::from(value))
 }
 
-pub(super) fn path_to_file_uri(path: &Path) -> String {
+pub(in crate::lsp) fn path_to_file_uri(path: &Path) -> String {
     let normalized = path.to_string_lossy().replace('\\', "/");
     let uri_path = if normalized.starts_with("//") {
         normalized.trim_start_matches('/').to_owned()

@@ -13,7 +13,7 @@ use super::position::{LineIndex, LspPosition};
 use super::protocol::ResponseMetadata;
 use crate::target::TargetSpec;
 
-pub(super) fn dispatch<W: Write>(
+pub(in crate::lsp) fn dispatch<W: Write>(
     params: Value,
     store: &DocumentStore,
     target: &TargetSpec,

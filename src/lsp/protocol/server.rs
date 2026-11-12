@@ -102,7 +102,7 @@ fn canceled_request(
     Ok(true)
 }
 
-pub(super) fn open_document(
+pub(in crate::lsp) fn open_document(
     params: Value,
     store: &mut DocumentStore,
     target: &TargetSpec,
@@ -120,7 +120,7 @@ pub(super) fn open_document(
     publish(output, &params.text_document.uri, store, target)
 }
 
-pub(super) fn change_document(
+pub(in crate::lsp) fn change_document(
     params: Value,
     store: &mut DocumentStore,
     target: &TargetSpec,
@@ -137,7 +137,7 @@ pub(super) fn change_document(
     publish(output, &params.text_document.uri, store, target)
 }
 
-pub(super) fn close_document(
+pub(in crate::lsp) fn close_document(
     params: Value,
     store: &mut DocumentStore,
     output: &mut impl Write,
@@ -189,7 +189,11 @@ fn publish(
     )
 }
 
-pub(super) fn configure_target(params: &Value, target: &mut TargetSpec, store: &mut DocumentStore) {
+pub(in crate::lsp) fn configure_target(
+    params: &Value,
+    target: &mut TargetSpec,
+    store: &mut DocumentStore,
+) {
     let requested = params
         .get("initializationOptions")
         .and_then(|options| options.get("target"))
@@ -202,7 +206,7 @@ pub(super) fn configure_target(params: &Value, target: &mut TargetSpec, store: &
     }
 }
 
-pub(super) fn respond(
+pub(in crate::lsp) fn respond(
     output: &mut impl Write,
     id: Option<Value>,
     result: Value,
@@ -229,7 +233,7 @@ pub(super) fn respond(
     write_message(output, &response)
 }
 
-pub(super) fn write_error(
+pub(in crate::lsp) fn write_error(
     output: &mut impl Write,
     id: Value,
     code: i32,
@@ -247,7 +251,7 @@ pub(super) fn write_error(
     write_message(output, &serde_json::to_value(response).map_err(invalid_params)?)
 }
 
-pub(super) fn write_lifecycle_error(
+pub(in crate::lsp) fn write_lifecycle_error(
     output: &mut impl Write,
     id: Option<Value>,
     message: &str,
@@ -259,6 +263,6 @@ pub(super) fn write_lifecycle_error(
     Ok(false)
 }
 
-pub(super) fn invalid_params(error: serde_json::Error) -> io::Error {
+pub(in crate::lsp) fn invalid_params(error: serde_json::Error) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, error)
 }

@@ -1,4 +1,4 @@
-use super::emission::EmittedObject;
+use super::EmittedObject;
 use crate::codegen::{BackendEmitError, BackendSymbolBindings, SymbolIdentity, SymbolKind};
 use crate::configuration::CompilerConfiguration;
 use crate::modules::{ModuleCompilationPlan, ModuleObjectPlan};
@@ -8,8 +8,7 @@ pub(super) fn emit_objects_llvm(
     symbol: &str,
     configuration: &CompilerConfiguration,
 ) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let (generic_types, generic_instances) =
-        super::shared_emission::generic_inputs(plan, configuration)?;
+    let (generic_types, generic_instances) = super::shared::generic_inputs(plan, configuration)?;
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
@@ -18,7 +17,7 @@ pub(super) fn emit_objects_llvm(
     } else {
         llvm_module_bindings(&object_plan, &generic_instances)?
     };
-    let modules = super::shared_emission::lower_shared_modules(
+    let modules = super::shared::lower_shared_modules(
         &object_plan,
         symbol,
         configuration,

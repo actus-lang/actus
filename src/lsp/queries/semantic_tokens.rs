@@ -4,7 +4,7 @@ use crate::target::TargetSpec;
 pub(super) fn full(source: &str, target: &TargetSpec) -> serde_json::Value {
     let tokens = scan(source).0;
     let inactive = inactive_spans(source, target);
-    let index = crate::lsp::position::LineIndex::new(source);
+    let index = crate::lsp::workspace::position::LineIndex::new(source);
     let mut previous_line = 0;
     let mut previous_start = 0;
     let mut data = Vec::new();
