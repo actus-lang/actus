@@ -4,7 +4,10 @@ use crate::ast::{ExternalVerbDecl, ForeignAbi, TopLevelDecl};
 
 use super::collision::external_contract;
 use super::unit::ModuleUnit;
-use super::validation::{export_identity, target_scopes_are_disjoint, target_selector};
+use super::validation::{
+    declarations_are_identical_without_spans, export_identity, target_scopes_are_disjoint,
+    target_selector,
+};
 
 pub(super) fn append_internal_declarations(
     target: &mut Vec<TopLevelDecl>,
@@ -112,7 +115,7 @@ fn has_identical_imported_declaration(
     let Some(candidate_identity) = export_identity(candidate) else { return false };
     declarations.iter().any(|declaration| {
         export_identity(declaration).as_ref() == Some(&candidate_identity)
-            && declaration == candidate
+            && declarations_are_identical_without_spans(declaration, candidate)
     })
 }
 

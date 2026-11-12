@@ -9,6 +9,21 @@ use super::types::{DuplicateDeclaration, ModuleError, ModuleLocation};
 
 type DeclarationLocation = (ModuleLocation, Option<String>);
 
+pub(super) fn declarations_are_identical_without_spans(
+    first: &TopLevelDecl,
+    second: &TopLevelDecl,
+) -> bool {
+    let first = crate::formatter::format_program(&Program {
+        file_metadata: Vec::new(),
+        declarations: vec![first.clone()],
+    });
+    let second = crate::formatter::format_program(&Program {
+        file_metadata: Vec::new(),
+        declarations: vec![second.clone()],
+    });
+    first == second
+}
+
 pub(super) fn validate_import_bindings(program: &Program) -> Result<(), ModuleError> {
     let mut bindings = HashMap::new();
     for declaration in &program.declarations {
@@ -197,5 +212,39 @@ fn runtime_declaration(declaration: &TopLevelDecl) -> Option<(&'static str, Sour
         | TopLevelDecl::Enum(_)
         | TopLevelDecl::OpenSibling(_)
         | TopLevelDecl::Import(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::declarations_are_identical_without_spans;
+    use crate::ast::TopLevelDecl;
+
+    fn declaration(source: &str, base_offset: usize) -> TopLevelDecl {
+        let (tokens, errors) = crate::lexer::scan_at(source, base_offset);
+        assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+        crate::parser::parse(tokens)
+            .unwrap_or_else(|error| panic!("{source}: declaration should parse: {error:?}"))
+            .declarations
+            .into_iter()
+            .next()
+            .expect("source should contain a declaration")
+    }
+
+    #[test]
+    fn declaration_identity_ignores_source_spans_but_keeps_structure() {
+        let first = declaration("enum Shared { Missing, }", 1);
+        let second = declaration("enum Shared { Missing, }", 101);
+        assert!(declarations_are_identical_without_spans(&first, &second));
+
+        let verb = declaration("verb shared() -> Int { return 0; }", 1);
+        let with_meta = declaration("meta deterministic verb shared() -> Int { return 0; }", 1);
+        assert!(!declarations_are_identical_without_spans(&verb, &with_meta));
+
+        let open = declaration("open verb shared() -> Int { return 0; }", 1);
+        assert!(!declarations_are_identical_without_spans(&verb, &open));
+
+        let targeted = declaration("meta target(\"unix\") verb shared() -> Int { return 0; }", 1);
+        assert!(!declarations_are_identical_without_spans(&verb, &targeted));
     }
 }

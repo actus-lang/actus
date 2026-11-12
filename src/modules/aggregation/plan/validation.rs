@@ -5,7 +5,10 @@ use crate::ast::TopLevelDecl;
 use super::super::collision::{ExternalContract, external_contract};
 use super::super::types::ModuleError;
 use super::super::unit::ModuleUnit;
-use super::super::validation::{export_identity, target_scopes_are_disjoint, target_selector};
+use super::super::validation::{
+    declarations_are_identical_without_spans, export_identity, target_scopes_are_disjoint,
+    target_selector,
+};
 
 pub(super) fn validate_symbol_collisions(
     local_declarations: &[TopLevelDecl],
@@ -46,7 +49,7 @@ fn record_symbols(
             {
                 continue;
             }
-            if first.declaration == *declaration {
+            if declarations_are_identical_without_spans(&first.declaration, declaration) {
                 continue;
             }
             if first.external_contract.is_some()

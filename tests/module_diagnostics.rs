@@ -81,6 +81,30 @@ fn duplicate_project() -> PathBuf {
     root
 }
 
+fn duplicate_facade_project() -> PathBuf {
+    let root = std::env::temp_dir()
+        .join(format!("actus-provenance-identical-facades-{}", std::process::id()));
+    fs::create_dir_all(root.join("src/left")).expect("create left facade");
+    fs::create_dir_all(root.join("src/right")).expect("create right facade");
+    fs::create_dir_all(root.join("target")).expect("create duplicate output");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"provenance-identical-facades\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
+    )
+    .expect("write duplicate manifest");
+    fs::write(
+        root.join("src/main.act"),
+        "import left; import right; verb main() -> Int { return 0; }\n",
+    )
+    .expect("write duplicate entry");
+    fs::write(root.join("src/left/left.act"), "open api;\n").expect("write left facade");
+    fs::write(root.join("src/right/right.act"), "open api;\n").expect("write right facade");
+    let api = "open enum SharedError { Missing, } unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;\n";
+    fs::write(root.join("src/left/api.act"), api).expect("write left declarations");
+    fs::write(root.join("src/right/api.act"), api).expect("write right declarations");
+    root
+}
+
 #[test]
 fn check_and_build_report_module_lexical_provenance() {
     let root = provenance_project("lex", "@\n", &[]);
@@ -108,6 +132,25 @@ fn check_and_build_preserve_cross_file_duplicate_provenance() {
         assert!(stderr.contains("src/demo/other.act"), "stderr was: {stderr}");
     }
     fs::remove_dir_all(root).expect("remove duplicate fixture");
+}
+
+#[test]
+fn check_and_build_accept_identical_declarations_with_distinct_source_spans() {
+    let root = duplicate_facade_project();
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", "--strict", "src/main.act"])
+        .current_dir(&root)
+        .output()
+        .expect("run duplicate facade check");
+    assert!(check.status.success(), "check stderr: {}", String::from_utf8_lossy(&check.stderr));
+
+    let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["build", "--strict", "--emit", "obj", "-o", "target/identical.o"])
+        .current_dir(&root)
+        .output()
+        .expect("run duplicate facade build");
+    assert!(build.status.success(), "build stderr: {}", String::from_utf8_lossy(&build.stderr));
+    fs::remove_dir_all(root).expect("remove duplicate facade fixture");
 }
 
 #[test]
