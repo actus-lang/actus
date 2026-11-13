@@ -204,10 +204,11 @@ open verb start() -> Int {
    test use the same plan validation without changing buildable behavior.
    Normalization, including generated serialization verbs, is part of
    validation; generic specialization is not.
-3. **B — Canonical type identity in generic specialization**: generic
-   instances must be keyed by the canonical declaration identity, not by the
-   spelling of the path through re-exports. The R1 test changes to build and
-   run successfully.
+3. **B — Canonical declaration identity** (`ADR-0108`): generic instances and
+   all downstream consumers use `package + module path + declaration name +
+   ordered arguments`, independent of import aliases and re-export spellings.
+   The timing gate is release-versus-release, with PR B overhead no more than
+   10% relative to PR A. The R1 test must check, build, and run successfully.
 4. **C — R2 const-generic resolution**: resolve the re-exported
    const-generic struct type-parameter path exposed by the minimal R2
    reproduction.
