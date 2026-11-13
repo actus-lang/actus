@@ -4,7 +4,9 @@ use std::path::Path;
 use crate::SharedSourceMap;
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{lex_diagnostic, module_diagnostic, parse_diagnostic};
-use crate::modules::{ModuleCompilationPlan, ModuleResolver, build_compilation_plan};
+use crate::modules::{
+    ModuleCompilationPlan, ModuleResolver, build_compilation_plan, validate_compilation_plan,
+};
 use crate::parser::parse;
 
 use super::super::diagnostics::{report_mapped_diagnostic, report_mapped_diagnostics};
@@ -85,83 +87,16 @@ fn resolve_build_program(
     }
 }
 
-pub(super) fn validate_strict_program(
-    input: &str,
-    source: &str,
-    source_map: &SharedSourceMap,
-    program: &crate::ast::Program,
-) -> bool {
-    match crate::semantic::analyze(program) {
-        Ok(_) => true,
-        Err(error) => {
-            report_mapped_diagnostic(
-                source_map,
-                Path::new(input),
-                source,
-                crate::diagnostics::semantic_diagnostic(&error),
-            );
-            false
-        }
-    }
-}
-
-pub(super) fn validate_strict_plan(
+pub(super) fn validate_plan(
     input: &str,
     source: &str,
     plan: &ModuleCompilationPlan,
     target: &crate::target::TargetSpec,
     source_map: &SharedSourceMap,
 ) -> bool {
-    let caller = match crate::semantic::filter_program_for_target_checked(plan.caller(), target) {
-        Ok(program) => program,
-        Err(error) => {
-            report_mapped_diagnostic(
-                source_map,
-                Path::new(input),
-                source,
-                crate::diagnostics::semantic_diagnostic(&error),
-            );
-            return false;
-        }
-    };
-    if !validate_strict_program(input, source, source_map, &caller) {
+    if let Err(error) = validate_compilation_plan(plan, target) {
+        report_mapped_diagnostic(source_map, Path::new(input), source, module_diagnostic(&error));
         return false;
-    }
-    let object_plan = match plan.object_plan() {
-        Ok(object_plan) => object_plan,
-        Err(error) => {
-            report_mapped_diagnostic(
-                source_map,
-                Path::new(input),
-                source,
-                module_diagnostic(&error),
-            );
-            return false;
-        }
-    };
-    for unit in object_plan.units() {
-        let targeted =
-            match crate::semantic::filter_program_for_target_checked(unit.program(), target) {
-                Ok(program) => program,
-                Err(error) => {
-                    report_mapped_diagnostic(
-                        source_map,
-                        Path::new(input),
-                        source,
-                        crate::diagnostics::semantic_diagnostic(&error),
-                    );
-                    return false;
-                }
-            };
-        if let Err(error) = crate::semantic::analyze(&targeted) {
-            report_mapped_diagnostic(
-                source_map,
-                Path::new(input),
-                source,
-                crate::diagnostics::semantic_diagnostic(&error),
-            );
-            return false;
-        }
     }
     true
 }

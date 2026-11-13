@@ -17,6 +17,7 @@ use super::TestOptions;
 
 pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
+    pub(super) source_map: SharedSourceMap,
     pub(super) module: String,
     pub(super) display_module: String,
     pub(super) relative_path: PathBuf,
@@ -115,27 +116,53 @@ fn collect_file_tests(
     let declared = test_count(&program);
     let program =
         filter_program_for_target_checked(&program, configuration.target()).map_err(|error| {
-            let diagnostic = semantic_diagnostic(&error);
-            if let Some((path, source, diagnostic)) = source_map.lock().localize(&diagnostic) {
-                format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
-            } else {
-                format!("{}: {}", path.display(), render_diagnostic("", &diagnostic))
-            }
+            localized_test_diagnostic(path, "", &source_map, semantic_diagnostic(&error))
         })?;
     let filtered = declared.saturating_sub(test_count(&program));
-    validate_semantics(path, &source, &source_map, &program, options.mode)?;
+    if let Err(error) = crate::semantic::analyze(&program) {
+        let diagnostic = semantic_diagnostic(&error);
+        return Err(localized_test_diagnostic(path, &source, &source_map, diagnostic));
+    }
     let module =
         module_path_for_test(path, configuration.source_root(), configuration.project_root());
     let relative_path =
         path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
-    let discovered =
-        discover_tests(path, &module, &relative_path, program, compilation_plan, &test_names);
+    let discovered = discover_tests(
+        path,
+        &module,
+        &relative_path,
+        program,
+        compilation_plan,
+        &test_names,
+        source_map,
+    );
     let selected = discovered.iter().filter(|test| test_matches(test, options)).count();
     let selection_filtered = discovered.len().saturating_sub(selected);
     Ok(CollectedFile {
         tests: discovered.into_iter().filter(|test| test_matches(test, options)).collect(),
         filtered: filtered + selection_filtered,
     })
+}
+
+fn localized_test_diagnostic(
+    fallback_path: &Path,
+    fallback_source: &str,
+    source_map: &SharedSourceMap,
+    diagnostic: crate::diagnostics::Diagnostic,
+) -> String {
+    source_map
+        .lock()
+        .localize(&diagnostic)
+        .map(|(path, source, diagnostic)| {
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
+        })
+        .unwrap_or_else(|| {
+            format!(
+                "{}: {}",
+                fallback_path.display(),
+                render_diagnostic(fallback_source, &diagnostic)
+            )
+        })
 }
 
 fn validate_test_mirror(path: &Path, configuration: &CompilerConfiguration) -> Result<(), String> {
@@ -331,27 +358,6 @@ fn module_source(path: &Path, source_root: &Path) -> Option<String> {
     }
 }
 
-fn validate_semantics(
-    path: &Path,
-    source: &str,
-    source_map: &SharedSourceMap,
-    program: &Program,
-    mode: ConformanceMode,
-) -> Result<(), String> {
-    if !mode.is_strict() {
-        return Ok(());
-    }
-    crate::semantic::analyze(program).map(|_| ()).map_err(|error| {
-        let diagnostic = semantic_diagnostic(&error);
-        if let Some((path, source, diagnostic)) = source_map.lock().localize(&diagnostic) {
-            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
-        } else {
-            let diagnostic = diagnostic.with_source_path(path.display().to_string());
-            format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
-        }
-    })
-}
-
 fn discover_tests(
     path: &Path,
     module: &str,
@@ -359,6 +365,7 @@ fn discover_tests(
     program: Program,
     compilation_plan: Option<ModuleCompilationPlan>,
     names: &[String],
+    source_map: SharedSourceMap,
 ) -> Vec<DiscoveredTest> {
     program
         .declarations
@@ -369,6 +376,7 @@ fn discover_tests(
             {
                 Some(DiscoveredTest {
                     path: path.to_path_buf(),
+                    source_map: source_map.clone(),
                     module: if module.is_empty() { "<root>".to_owned() } else { module.to_owned() },
                     display_module: display_module(module, relative_path),
                     relative_path: relative_path.to_path_buf(),

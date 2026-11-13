@@ -1,10 +1,9 @@
 use crate::SharedSourceMap;
-use crate::diagnostics::{
-    lex_diagnostic, module_diagnostic, parse_diagnostic, render_diagnostic, semantic_diagnostic,
+use crate::diagnostics::{lex_diagnostic, module_diagnostic, parse_diagnostic, render_diagnostic};
+use crate::modules::{
+    ModuleError, ModuleResolver, build_compilation_plan, parse_module, validate_compilation_plan,
 };
-use crate::modules::{ModuleError, ModuleResolver, parse_module, resolve_imports};
 use crate::parser::parse;
-use crate::semantic::filter_program_for_target_checked;
 use std::fs;
 
 use super::conformance::{ConformanceMode, parse_strict_option, validate_source_limits};
@@ -81,12 +80,12 @@ fn check_source(
         return 1;
     }
     let Some(program) = parse_check_source(&input, &source_map, &source) else { return 1 };
-    let Some(program) =
+    let Some(plan) =
         resolve_check_program(configuration, &input, &source, program, source_map.clone())
     else {
         return 1;
     };
-    analyze_check_program(&input, &source, &source_map, configuration, mode, program)
+    analyze_check_program(&input, &source, &source_map, configuration, mode, plan)
 }
 
 fn read_check_source(input: &std::path::Path) -> Option<String> {
@@ -129,7 +128,7 @@ fn resolve_check_program(
     source: &str,
     program: crate::ast::Program,
     source_map: SharedSourceMap,
-) -> Option<crate::ast::Program> {
+) -> Option<crate::modules::ModuleCompilationPlan> {
     let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
@@ -137,8 +136,8 @@ fn resolve_check_program(
         configuration.runtime_module_roots(),
     )
     .with_source_map(source_map.clone());
-    match resolve_imports(&program, &resolver) {
-        Ok(program) => Some(program),
+    match build_compilation_plan(&program, &resolver) {
+        Ok(plan) => Some(plan),
         Err(error) => {
             let diagnostic = module_diagnostic(&error);
             report_mapped_diagnostic(&source_map, input, source, diagnostic);
@@ -153,29 +152,18 @@ fn analyze_check_program(
     source_map: &SharedSourceMap,
     configuration: &crate::configuration::CompilerConfiguration,
     mode: ConformanceMode,
-    program: crate::ast::Program,
+    plan: crate::modules::ModuleCompilationPlan,
 ) -> i32 {
-    let program = match filter_program_for_target_checked(&program, configuration.target()) {
-        Ok(program) => program,
-        Err(error) => {
-            report_mapped_diagnostic(source_map, input, source, semantic_diagnostic(&error));
-            return 1;
-        }
-    };
-    match crate::semantic::analyze(&program) {
-        Ok(_) => {
-            if mode.is_strict() {
-                println!("checked `{}` successfully (strict)", input.display());
-            } else {
-                println!("checked `{}` successfully", input.display());
-            }
-            0
-        }
-        Err(error) => {
-            report_mapped_diagnostic(source_map, input, source, semantic_diagnostic(&error));
-            1
-        }
+    if let Err(error) = validate_compilation_plan(&plan, configuration.target()) {
+        report_mapped_diagnostic(source_map, input, source, module_diagnostic(&error));
+        return 1;
     }
+    if mode.is_strict() {
+        println!("checked `{}` successfully (strict)", input.display());
+    } else {
+        println!("checked `{}` successfully", input.display());
+    }
+    0
 }
 
 fn check_module(
@@ -196,31 +184,20 @@ fn check_module(
         Ok(program) => program,
         Err(error) => return report_module_error(module_path, error, &source_map),
     };
-    let program = match resolve_imports(&program, &resolver) {
-        Ok(program) => program,
+    let plan = match build_compilation_plan(&program, &resolver) {
+        Ok(plan) => plan,
         Err(error) => return report_module_error(module_path, error, &source_map),
     };
-    let program = match filter_program_for_target_checked(&program, configuration.target()) {
-        Ok(program) => program,
-        Err(error) => {
-            report_mapped_diagnostic(&source_map, input_path, "", semantic_diagnostic(&error));
-            return 1;
-        }
-    };
-    match crate::semantic::analyze(&program) {
-        Ok(_) => {
-            if mode.is_strict() {
-                println!("checked `{}` successfully (strict)", input_path.display());
-            } else {
-                println!("checked `{}` successfully", input_path.display());
-            }
-            0
-        }
-        Err(error) => {
-            report_mapped_diagnostic(&source_map, input_path, "", semantic_diagnostic(&error));
-            1
-        }
+    if let Err(error) = validate_compilation_plan(&plan, configuration.target()) {
+        report_mapped_diagnostic(&source_map, input_path, "", module_diagnostic(&error));
+        return 1;
     }
+    if mode.is_strict() {
+        println!("checked `{}` successfully (strict)", input_path.display());
+    } else {
+        println!("checked `{}` successfully", input_path.display());
+    }
+    0
 }
 
 fn report_module_error(module_path: &str, error: ModuleError, source_map: &SharedSourceMap) -> i32 {

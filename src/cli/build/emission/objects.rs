@@ -6,7 +6,7 @@ use crate::configuration::{CompilerConfiguration, EntryContract};
 
 use super::super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::super::artifacts::{default_output, write_artifact};
-use super::super::loading::{load_build_program, validate_strict_plan};
+use super::super::loading::{load_build_program, validate_plan};
 use super::super::options::EmitKind;
 
 pub(crate) fn build_file(
@@ -67,9 +67,7 @@ fn build_file_with_report(
             return 1;
         }
     };
-    if mode.is_strict()
-        && !validate_strict_plan(input, &source, &plan, configuration.target(), &source_map)
-    {
+    if !validate_plan(input, &source, &plan, configuration.target(), &source_map) {
         return 1;
     }
     let Some(fallback_symbol) = first_defined_verb(&caller) else {

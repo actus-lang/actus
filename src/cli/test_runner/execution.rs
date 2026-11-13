@@ -10,6 +10,7 @@ use crate::ast::{
 use crate::ast::{DispatchMode, ExternalVerbDecl, ForeignAbi, Param};
 use crate::codegen::link_objects;
 use crate::configuration::CompilerConfiguration;
+use crate::diagnostics::{render_diagnostic, semantic_diagnostic};
 use crate::lexer::SourceSpan;
 use crate::modules::{ModuleResolver, build_test_compilation_plan};
 
@@ -163,6 +164,13 @@ fn run_test(
     let verb = test_verb(test)?;
     validate_test_verb(verb)?;
     let plan = test_compilation_plan(test, configuration)?;
+    let caller =
+        crate::semantic::filter_program_for_target_checked(plan.caller(), configuration.target())
+            .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
+    crate::semantic::analyze(&caller)
+        .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
+    crate::modules::validate_compilation_plan(&plan, configuration.target())
+        .map_err(|error| test_diagnostic(test, crate::diagnostics::module_diagnostic(&error)))?;
     let objects = crate::cli::build::emit_objects(&plan, "main", configuration)
         .map_err(|error| error.to_string())?;
     let mut paths = TestArtifactPaths::new(index)?;
@@ -181,6 +189,18 @@ fn run_test(
         (Ok(_), Err(error)) => Err(error),
         (Err(run_error), Err(cleanup_error)) => Err(format!("{run_error}; {cleanup_error}")),
     }
+}
+
+fn test_diagnostic(test: &DiscoveredTest, diagnostic: crate::diagnostics::Diagnostic) -> String {
+    test.source_map
+        .lock()
+        .localize(&diagnostic)
+        .map(|(path, source, diagnostic)| {
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
+        })
+        .unwrap_or_else(|| {
+            format!("{}: {}", test.path.display(), render_diagnostic("", &diagnostic))
+        })
 }
 
 fn test_verb(test: &DiscoveredTest) -> Result<&crate::ast::VerbDecl, String> {

@@ -1,4 +1,5 @@
 mod compilation;
+mod performance_context;
 mod validation;
 
 pub(super) use super::declarations::qualify_import_path;
@@ -7,3 +8,5 @@ pub use compilation::{
     ModuleCompilationPlan, build_compilation_plan, build_compilation_plan_with_overlays,
     build_test_compilation_plan,
 };
+pub(crate) use performance_context::program_with_performance_context;
+pub(crate) use validation::validate_compilation_plan;

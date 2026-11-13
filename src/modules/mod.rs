@@ -12,4 +12,5 @@ pub use aggregation::{
     exports_module_with_overlays, load_module_unit, load_module_unit_with_overlays, parse_module,
     resolve_imports,
 };
+pub(crate) use aggregation::{program_with_performance_context, validate_compilation_plan};
 pub use resolver::{ModuleResolutionError, ModuleResolver, ResolvedChildModule, ResolvedModule};

@@ -1,6 +1,5 @@
 use crate::ast::{Program, TopLevelDecl, TypeName};
 use crate::target::{EntryContract, TargetSpec};
-use std::collections::BTreeSet;
 
 use super::declarations::{SharedDeclarations, build_backend_externals, scalar_external_symbols};
 use super::errors::unsupported;
@@ -65,12 +64,17 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
 ) -> Result<BackendModule, BackendContractError> {
     let layouts = ProgramLayouts::new(program, namespace);
     let analysis_program = performance_context
-        .map(|(_, context)| program_with_performance_context(program, context))
+        .map(|(_, context)| crate::modules::program_with_performance_context(program, context))
         .unwrap_or_else(|| program.clone());
     let semantic = crate::semantic::analyze(&analysis_program).map_err(|error| {
+        let diagnostic = crate::diagnostics::semantic_diagnostic(&error);
         unsupported(
             crate::lexer::SourceSpan::new(0, 0),
-            format!("semantic analysis failed: {error:?}"),
+            format!(
+                "internal compiler error: semantic validation invariant violated: {} {}",
+                diagnostic.code(),
+                diagnostic.message()
+            ),
         )
     })?;
     reject_floating_point_on_freestanding(&analysis_program, &semantic, target, entry_contract)?;
@@ -96,49 +100,6 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
     }
     module.validate()?;
     Ok(module)
-}
-
-fn program_with_performance_context(program: &Program, context: &Program) -> Program {
-    let mut declarations = program.declarations.clone();
-    declarations.extend(
-        context
-            .declarations
-            .iter()
-            .filter(|declaration| matches!(declaration, TopLevelDecl::Import(_)))
-            .cloned(),
-    );
-    let mut known: BTreeSet<String> =
-        declarations.iter().filter_map(context_declaration_identity).collect();
-    declarations.extend(
-        context
-            .declarations
-            .iter()
-            .filter(|declaration| context_declaration_identity(declaration).is_some())
-            .filter(|declaration| {
-                context_declaration_identity(declaration)
-                    .is_some_and(|identity| known.insert(identity))
-            })
-            .cloned(),
-    );
-    Program { file_metadata: program.file_metadata.clone(), declarations }
-}
-
-fn context_declaration_identity(declaration: &TopLevelDecl) -> Option<String> {
-    let (kind, name) = match declaration {
-        TopLevelDecl::Constant(value) => ("constant", value.name.clone()),
-        TopLevelDecl::Verb(value) => ("verb", value.name.clone()),
-        TopLevelDecl::ExternalVerb(value) => ("verb", value.name.clone()),
-        TopLevelDecl::Struct(value) => ("struct", value.name.clone()),
-        TopLevelDecl::Pack(value) => ("pack", value.name.clone()),
-        TopLevelDecl::Serialize(value) => ("serialize", value.name.clone()),
-        TopLevelDecl::Enum(value) => ("enum", value.name.clone()),
-        TopLevelDecl::Role(value) => ("role", value.name.clone()),
-        TopLevelDecl::Perform(value) => {
-            return Some(format!("perform:{}:{}", value.role_name, value.target.canonical_key()));
-        }
-        TopLevelDecl::OpenSibling(_) | TopLevelDecl::Import(_) => return None,
-    };
-    Some(format!("{kind}:{name}"))
 }
 
 fn reject_floating_point_on_freestanding(
@@ -269,12 +230,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
     let declaration_layouts = ProgramLayouts::new(analysis_program, namespace);
     let declarations =
         SharedDeclarations::new(namespace, program, &declaration_layouts, performance_context)?;
-    let semantic = crate::semantic::analyze(analysis_program).map_err(|error| {
-        unsupported(
-            crate::lexer::SourceSpan::new(0, 0),
-            format!("semantic analysis failed: {error:?}"),
-        )
-    })?;
+    let semantic = analyze_after_validation(analysis_program)?;
     let cleanup_provider = ProgramLayouts::new(analysis_program, namespace);
     let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
     let external_symbols = scalar_external_symbols(namespace, &declarations.externals, bindings)?;
@@ -312,6 +268,22 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
     remove_defined_function_externals(&mut module);
     module.validate()?;
     Ok(module)
+}
+
+fn analyze_after_validation(
+    program: &Program,
+) -> Result<crate::semantic::SemanticModel, BackendContractError> {
+    crate::semantic::analyze(program).map_err(|error| {
+        let diagnostic = crate::diagnostics::semantic_diagnostic(&error);
+        unsupported(
+            crate::lexer::SourceSpan::new(0, 0),
+            format!(
+                "internal compiler error: semantic validation invariant violated: {} {}",
+                diagnostic.code(),
+                diagnostic.message()
+            ),
+        )
+    })
 }
 
 fn remove_defined_function_externals(module: &mut BackendModule) {
