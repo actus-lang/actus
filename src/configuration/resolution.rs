@@ -194,12 +194,15 @@ pub(super) fn runtime_source_root(
     if runtime != RuntimeProfile::Std {
         return Ok(None);
     }
-    let candidates = builtin_root_candidates();
-    candidates.into_iter().find(|path| path.is_dir()).map(Some).ok_or_else(|| {
+    compiler_owned_std_source_root().map(Some).ok_or_else(|| {
         ConfigurationError::new(
             "runtime profile `std` cannot locate the compiler-owned standard library".to_owned(),
         )
     })
+}
+
+pub(super) fn compiler_owned_std_source_root() -> Option<PathBuf> {
+    builtin_root_candidates().into_iter().find(|path| path.is_dir())
 }
 
 pub(super) fn runtime_identity(
@@ -212,7 +215,8 @@ pub(super) fn runtime_identity(
     let package_root = source_root.parent().ok_or_else(|| {
         ConfigurationError::new("builtin standard-library root has no package parent".to_owned())
     })?;
-    let manifest = super::manifest::read(&package_root.join("Actus.toml"))?;
+    let manifest_path = package_root.join("Actus.toml");
+    let manifest = super::manifest::read_with_compiler_std(&manifest_path, Some(&manifest_path))?;
     let checksum = super::checksum::content_checksum(package_root)?;
     if runtime != RuntimeProfile::Std {
         return Ok((None, None));
@@ -230,7 +234,8 @@ pub(super) fn runtime_module_roots(
     let package_root = source_root.parent().ok_or_else(|| {
         ConfigurationError::new("builtin standard-library root has no package parent".to_owned())
     })?;
-    let manifest = super::manifest::read(&package_root.join("Actus.toml"))?;
+    let manifest_path = package_root.join("Actus.toml");
+    let manifest = super::manifest::read_with_compiler_std(&manifest_path, Some(&manifest_path))?;
     let Some(runtime_manifest) = manifest.runtime else {
         return Err(ConfigurationError::new(
             "builtin standard library is missing its runtime registry".to_owned(),

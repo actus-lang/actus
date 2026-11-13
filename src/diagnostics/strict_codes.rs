@@ -29,6 +29,9 @@ pub const STRICT_CODE_RANGE_END: u16 = 1899;
 /// specific classification.
 pub const STRICT_CONFIGURATION_FAILURE: &str = "E1800";
 
+/// A package manifest name is not a valid, unique identity namespace.
+pub const STRICT_PACKAGE_IDENTITY_INVALID: &str = "E1801";
+
 /// An LLVM strict build selected an unverified toolchain override.
 pub const STRICT_LLVM_UNVERIFIED: &str = "E1806";
 

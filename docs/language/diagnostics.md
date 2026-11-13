@@ -40,6 +40,7 @@ edition.
 | `E1880` | Required bundled linker or compiler-rt component is missing |
 | `E1881` | Selected linker identity or target does not match the bundled contract |
 | `E1882` | Strict mode rejects a manually selected freestanding linker |
+| `E1801` | Package manifest name is not a valid or unique identity namespace |
 
 Diagnostics are represented independently from terminal rendering. Every
 diagnostic carries a source span, and the CLI renderer converts it to a

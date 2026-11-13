@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use super::ActusLock;
@@ -60,6 +61,13 @@ impl CompilerConfiguration {
     ) -> Result<Self, ConfigurationError> {
         let manifest = manifest::read(path)?;
         let dependency_graph = super::dependencies::resolve(path)?;
+        let compiler_std_source_root = super::resolution::compiler_owned_std_source_root();
+        validate_package_identities(
+            path,
+            &manifest,
+            &dependency_graph,
+            compiler_std_source_root.as_deref(),
+        )?;
         validate_lockfile(path, sync_missing_lockfile)?;
         let environment = Self::from_environment();
         build_from_manifest(path, manifest, dependency_graph, environment)
@@ -249,7 +257,52 @@ pub(crate) fn manifest_path_in_directory(path: &Path) -> Option<PathBuf> {
 
 pub fn package_identity(path: &Path) -> Result<PackageIdentity, ConfigurationError> {
     let manifest = manifest::read(path)?;
-    Ok(PackageIdentity { name: manifest.package.name, version: manifest.package.version })
+    let name = manifest::package_identity_name(
+        &manifest.package.name,
+        manifest::is_compiler_owned_std_manifest(path, &manifest),
+    )?;
+    Ok(PackageIdentity { name, version: manifest.package.version })
+}
+
+fn validate_package_identities(
+    path: &Path,
+    manifest: &manifest::ActusManifest,
+    dependency_graph: &super::dependencies::DependencyGraph,
+    compiler_std_source_root: Option<&Path>,
+) -> Result<(), ConfigurationError> {
+    let mut identities = BTreeMap::new();
+    let root_source_root = std::fs::canonicalize(manifest::source_root(
+        manifest,
+        path.parent().unwrap_or_else(|| Path::new(".")),
+    ))
+    .ok();
+    let root_is_compiler_std = root_source_root
+        .as_deref()
+        .zip(compiler_std_source_root)
+        .is_some_and(|(root, compiler)| root == compiler);
+    let root_identity =
+        manifest::package_identity_name(&manifest.package.name, root_is_compiler_std)?;
+    identities.insert(root_identity, root_source_root);
+    for package in &dependency_graph.packages {
+        let is_compiler_std = package
+            .source_root
+            .as_deref()
+            .zip(compiler_std_source_root)
+            .is_some_and(|(package_root, compiler_root)| package_root == compiler_root);
+        let identity = manifest::package_identity_name(&package.identity_name, is_compiler_std)?;
+        let source_root = package.source_root.clone();
+        if let Some(previous_path) = identities.get(&identity) {
+            if previous_path != &source_root {
+                return Err(ConfigurationError::coded(
+                    crate::diagnostics::STRICT_PACKAGE_IDENTITY_INVALID,
+                    format!("package identity namespace `{identity}` is declared more than once"),
+                ));
+            }
+        } else {
+            identities.insert(identity, source_root);
+        }
+    }
+    Ok(())
 }
 
 fn validate_lockfile(path: &Path, sync_missing_lockfile: bool) -> Result<(), ConfigurationError> {
