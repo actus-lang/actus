@@ -127,21 +127,21 @@ pub(in crate::codegen::shared_lowering::expression) fn lower_aggregate_expressio
     }
 }
 
-fn parse_type_name(name: &str, span: crate::lexer::SourceSpan) -> TypeName {
-    crate::semantic::parse_type_name_key(name, span).unwrap_or(TypeName {
-        name: name.to_owned(),
-        arguments: Vec::new(),
-        reference_role: None,
-        span,
-    })
-}
-
 fn parse_receiver_type_name(
     expression: &crate::ast::Expr,
     span: crate::lexer::SourceSpan,
 ) -> Option<TypeName> {
     match expression {
-        crate::ast::Expr::Identifier { name, .. } => Some(parse_type_name(name, span)),
+        crate::ast::Expr::Identifier { name, .. } => {
+            Some(crate::semantic::parse_type_name_key(name, span).unwrap_or_else(|| {
+                crate::ast::parse_type_name_with_mode(
+                    name,
+                    span,
+                    crate::ast::TypeNameParseMode::Plain,
+                )
+                .expect("plain type names always parse")
+            }))
+        }
         crate::ast::Expr::Index { target, index, .. } => {
             let crate::ast::Expr::Identifier { name, .. } = target.as_ref() else { return None };
             let crate::ast::Expr::Identifier { name: argument, .. } = index.as_ref() else {
@@ -149,7 +149,15 @@ fn parse_receiver_type_name(
             };
             Some(TypeName {
                 name: name.clone(),
-                arguments: vec![parse_type_name(argument, span)],
+                arguments: vec![crate::semantic::parse_type_name_key(argument, span).or_else(
+                    || {
+                        crate::ast::parse_type_name_with_mode(
+                            argument,
+                            span,
+                            crate::ast::TypeNameParseMode::Plain,
+                        )
+                    },
+                )?],
                 reference_role: None,
                 span,
             })

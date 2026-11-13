@@ -274,8 +274,13 @@ fn normalize_owner_declaration(
     signatures: &HashMap<String, Vec<(String, TypeName)>>,
     locals: &mut HashMap<String, TypeName>,
 ) {
-    let expected =
-        declared_type.and_then(|name| parse_type_name(name, initializer_span(initializer)));
+    let expected = declared_type.and_then(|name| {
+        crate::ast::parse_type_name_with_mode(
+            name,
+            initializer_span(initializer),
+            crate::ast::TypeNameParseMode::Plain,
+        )
+    });
     normalize_expression(initializer, expected.as_ref(), signatures, locals);
     if let Some(expected) = expected {
         locals.insert(name.to_owned(), expected);
@@ -445,26 +450,6 @@ fn normalize_arguments(
             locals,
         );
     }
-}
-
-fn parse_type_name(input: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {
-    let Some(open) = input.find('[') else {
-        return Some(TypeName {
-            name: input.to_owned(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span,
-        });
-    };
-    if !input.ends_with(']') {
-        return None;
-    }
-    let inner = &input[open + 1..input.len() - 1];
-    let arguments = inner
-        .split(',')
-        .map(|argument| parse_type_name(argument.trim(), span))
-        .collect::<Option<Vec<_>>>()?;
-    Some(TypeName { name: input[..open].to_owned(), arguments, reference_role: None, span })
 }
 
 fn canonical_type_name(type_name: &TypeName) -> String {

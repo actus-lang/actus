@@ -17,6 +17,7 @@ pub use decl::{
     StructFieldRole, TestFault, TopLevelDecl, TypeIdentity, TypeName, VerbContract,
     VerbContractSection, VerbContractSectionKind, VerbDecl, builtin_enum_definitions,
 };
+pub(crate) use decl::{TypeNameParseMode, parse_type_name_key, parse_type_name_with_mode};
 pub use expr::{
     Argument, ArgumentRoleResolution, BinaryOp, CaseBody, CaseBranch, CaseMode, Expr, IfBranch,
     StructFieldInit, UnaryOp,

@@ -65,15 +65,26 @@ pub(super) fn parse_constructor_receiver_type(
 ) -> Option<TypeName> {
     match expression {
         Expr::Identifier { name, .. } => {
-            crate::semantic::parse_type_name_key(name, span).or_else(|| parse_type_name(name, span))
+            crate::semantic::parse_type_name_key(name, span).or_else(|| {
+                crate::ast::parse_type_name_with_mode(
+                    name,
+                    span,
+                    crate::ast::TypeNameParseMode::Plain,
+                )
+            })
         }
         Expr::Index { target, index, .. } => {
             let mut type_name = parse_constructor_receiver_type(target, span)?;
             let Expr::Identifier { name, .. } = index.as_ref() else {
                 return None;
             };
-            let argument = crate::semantic::parse_type_name_key(name, span)
-                .or_else(|| parse_type_name(name, span))?;
+            let argument = crate::semantic::parse_type_name_key(name, span).or_else(|| {
+                crate::ast::parse_type_name_with_mode(
+                    name,
+                    span,
+                    crate::ast::TypeNameParseMode::Plain,
+                )
+            })?;
             type_name.arguments.push(argument);
             Some(type_name)
         }
@@ -403,23 +414,4 @@ fn enum_case_discriminant(
             .map(|(id, _)| id)
             .ok_or_else(|| unsupported(span, "unknown enum case variant")),
     }
-}
-
-fn parse_type_name(input: &str, span: SourceSpan) -> Option<TypeName> {
-    let Some(open) = input.find('[') else {
-        return Some(TypeName {
-            name: input.to_owned(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span,
-        });
-    };
-    if !input.ends_with(']') {
-        return None;
-    }
-    let arguments = input[open + 1..input.len() - 1]
-        .split(',')
-        .map(|argument| parse_type_name(argument.trim(), span))
-        .collect::<Option<Vec<_>>>()?;
-    Some(TypeName { name: input[..open].to_owned(), arguments, reference_role: None, span })
 }

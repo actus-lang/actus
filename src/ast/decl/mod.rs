@@ -2,6 +2,7 @@ mod builtins;
 mod callable;
 mod data;
 mod top_level;
+mod type_keys;
 mod types;
 
 pub use builtins::builtin_enum_definitions;
@@ -18,6 +19,7 @@ pub use top_level::{
     ConstantDecl, ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod,
     TopLevelDecl,
 };
+pub(crate) use type_keys::{TypeNameParseMode, parse_type_name_key, parse_type_name_with_mode};
 pub use types::{
     GenericParam, GenericParamKind, ReturnAccess, ReturnType, Role, TypeIdentity, TypeName,
 };
