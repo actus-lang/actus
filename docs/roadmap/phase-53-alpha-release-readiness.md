@@ -19,10 +19,11 @@ consistent.
   `src/semantic/generics/cache.rs:34`, and `src/semantic/analyzer/state.rs:84`)
   and synthetic names depend on file-local offsets, so cross-file collisions
   are possible; this is a possible R2 cause to verify after A0.
-- R1: the same enum is available through two re-export paths
-  (`config::ParseError` versus `app::ParseError`) and build
-  resolves them as two types (E1027). The direct struct reproduction without
-  `Result` does not reproduce the failure.
+- R1: source-level validation accepts the program after normalization;
+  generic specialization (`specialize_program`) creates distinct instances
+  for `Result[Int, ParseError]` and `Result[Int, config::ParseError]`, so
+  orchestration fails. PR A reports this as an internal compiler error instead
+  of a misleading entry-file E1027.
 - R2: a re-exported const-generic struct with a `meta limitless` performance
   context reaches build as raw `UnknownTypeParameter`; the minimal
   reproduction reports E1052 for `N`.
@@ -158,29 +159,85 @@ open verb start() -> Int {
 - On the neutral R1 reproduction, both base and A0 `check --strict` pass;
   base build reports the entry path at `3:17`, while A0 reports the owning
   module path `src/app/start.act` at `3:5` with E1027.
+- Regression fixed in `2392c401`: duplicate-declaration identity no longer
+  depends on source spans (std test suite E1110).
+
+## PR A evidence
+
+- The R1 test is `reexported_type_identity_passes_validation_and_fails_in_specialization`:
+  check passes; build fails with the expected internal compiler error and E1027.
+- The distinct-enum negative test passes with E1027 attributed to
+  `src/app/start.act`.
+- Reproduction matrix, base `964a83fb` versus PR A:
+
+  | Reproduction | Base | PR A |
+  |---|---|---|
+  | `repro-r1` | check PASS; build E1027 at `3:6` | check PASS; build ICE containing E1027 |
+  | `repro-r1-struct` | check PASS; build E1027 at `3:6` | check PASS; build ICE containing E1027 |
+  | `q1-one-open-clean` | check PASS; build E1069 at `5:1` | check/build E1069 at `3:54` |
+  | `repro-r2-min` | check/build unavailable: E1803 compiler-owned stdlib | check/build E1052 in an imported module |
+
+- Private downstream application: base check passes and build reports E1027;
+  the snapshot build reports E1052 for `N`. PR A check, build, and snapshot
+  build report E1052 for a re-exported const-generic struct; base `test --strict --list`
+  produced a list, while the PR A invocation did not complete in this
+  environment.
+- The measured PR A test list is `2,002`; module diagnostics are `8/8`, the
+  standard-library suite is `112/112`, serialization is `10/10`, and the full
+  all-targets suite passes. Formatting, all three Clippy configurations,
+  source limits, architecture, documentation, and secrets checks pass.
+- Release timing (base `964a83fb` | PR A | overhead): private-app check
+  `3,475 ms | 4,205 ms | +21.0%`; phase23 non-strict build
+  `8 ms | 9 ms | +12.5%`; std suite `2,213 ms | 2,636 ms | +19.1%`.
+  Check and build now share validation; the cost is approximately 20% on the
+  largest program. A parse cache (28,616 scans/parses of the same files per
+  check) and grouped test binaries (PR T) are the planned reductions.
+- The release examples matrix remained `33/33 identical` for LLVM and
+  Cranelift against the Phase 53 audit baseline. The generated-serialization
+  validation test passes with normalization and fails with E1069 when
+  normalization is temporarily removed.
 
 1. **A0 — SourceMap and source provenance** (`ADR-0107`): give compilation
    units deterministic source identity and report unit diagnostics against
    their owning file.
 2. **A — Unified compilation-plan validation**: make check, build, run, and
    test use the same plan validation without changing buildable behavior.
-3. **B — R1 canonical type identity across re-exports**: one declaration
-   reached through different `open` re-export paths must resolve to one type
-   in every unit.
+   Normalization, including generated serialization verbs, is part of
+   validation; generic specialization is not.
+3. **B — Canonical type identity in generic specialization**: generic
+   instances must be keyed by the canonical declaration identity, not by the
+   spelling of the path through re-exports. The R1 test changes to build and
+   run successfully.
 4. **C — R2 const-generic resolution**: resolve the re-exported
    const-generic struct type-parameter path exposed by the minimal R2
    reproduction.
-5. **D — Diagnostic rendering**: replace backend raw `Debug` errors with the
+5. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
+   module (all tests of the module's `tests/` files), runs each test in its own
+   process selected by name (isolation, timeouts and expected faults unchanged),
+   and validates the compilation plan once per group. A group compile error
+   fails every test in that group with one diagnostic.
+6. **P — Session parse cache**: parse each canonical source once per
+   compilation session (SourceMap-owned), removing repeated scan/parse of the
+   same file.
+7. **D — Diagnostic rendering**: replace backend raw `Debug` errors with the
    stable diagnostic contract and an explicit internal-error boundary.
-6. **E — `actus new` formatting**: make generated projects pass the formatter
-   contract and add regression evidence.
-7. **F — Documentation reconciliation**: correct README examples, alpha guide
+8. **E — Formatter layout rule and `actus new`** (new ADR): verb bodies are
+   always multi-line; call arguments, verb parameters, struct fields,
+   struct-literal fields and enum variants are placed one per line when there
+   are two or more, and stay on one line when there is one. Type arguments,
+   generic parameters and array literals keep the width rule. The formatter
+   must never emit a line over the configured width (today two std call sites
+   are joined to ~103 columns). Reformat library/std, examples and fixtures,
+   make `actus new` output pass `actus fmt --check`, and fix the three std files
+   that are not fmt-clean (`fs/directory.act`,
+   `wire/fragment/reassembly.act`, `volatile/volatile.act`).
+9. **F — Documentation reconciliation**: correct README examples, alpha guide
    commands, ADR statuses, root-manifest documentation, and add the E1800
    `actus lock` hint.
-8. **F2 — Neutral fixtures and documentation**: replace downstream-application
+10. **F2 — Neutral fixtures and documentation**: replace downstream-application
    names and private implementation terms in docs, tests, examples, and std
    comments with neutral names without changing test behavior.
-9. **G — Version and release note**: reconcile the compiler version, alpha tag,
+11. **G — Version and release note**: reconcile the compiler version, alpha tag,
    release notes, and final release evidence.
 
 ## Evidence gates
