@@ -56,6 +56,61 @@ sentinel currently used by `src/semantic/analyzer/verb.rs:70`.
 The E1110 namespace rule is unchanged. Relaxing or changing that rule is a
 separate language decision.
 
+## Data flow
+
+Package provenance starts with the normalized manifest identity and the
+canonical source root. Configuration passes that pair, together with the
+dependency and runtime-standard-library roots, into `ModuleResolver`. The
+resolver attaches the owning package to every `ModuleIdentity`; the module
+path is computed relative to that package's source root. Root packages,
+dependencies, runtime `std`, and a standard-library file reached through more
+than one alias therefore share an identity whenever their canonical source
+root is the same. The relevant implementation locations are
+`src/configuration/types.rs:18`, `src/configuration/loading.rs:110-149`,
+`src/modules/resolver.rs:127-174`, and
+`src/modules/aggregation/unit.rs:14-19,103-129`.
+
+The compilation-plan declaration registry is built from those module units.
+It records every declaration as `Declaration { package, module_path, name }`,
+compiler declarations as `Builtin { name }`, and active generic parameters as
+`GenericParameter { owner, name }`. Alias imports, open re-exports, root
+imports, and `std::` paths are lookup spellings only; the registry resolves
+each spelling to the same declaration identity. Resolution is cached by
+`(module identity, spelling)` and returns the canonical identity in a
+deterministic order.
+
+Every `TypeName` entering semantic analysis has `resolved = Some(...)`.
+Compilation-plan paths annotate the AST before semantic analysis and assert
+this invariant at the semantic boundary. Standalone parsing and LSP analysis
+use an explicit `resolve_standalone(program)` registry for the one-file
+program; there is no silent unresolved fallback. Normalization, generic
+specialization, performance-context merging, generic substitution, and
+serialization-generated declarations preserve or explicitly resolve the
+annotation. Generated declarations inherit the identity of their source
+module.
+
+`TypeName` retains source spelling and span for diagnostics, formatting, and
+LSP display. `TypeName` equality and hashing use the identity key, the ordered
+arguments, and the reference role, and never the source span. The identity key
+is `Resolved(DeclarationIdentity)` when the name has been resolved and
+`Unresolved(spelling)` otherwise; a resolved and an unresolved name are never
+equal. Two spellings of one declaration are therefore equal after resolution,
+two declarations with the same short name are not, and unresolved names
+(parser, formatter, standalone tooling) keep spelling-based equality. `Hash`
+is derived from the same key, so it always agrees with equality. The span-free
+declaration comparison used by the A0 regression remains a separate
+comparison: identical declarations with different spans remain equal, while
+changes to metadata, `open` exports, or target selection remain unequal. Unit
+tests cover both the identity-sensitive type comparison and the existing
+span-independent declaration comparison.
+
+The `builtin::` identity is the only builtin marker. It replaces the former
+span sentinel and remains deterministic even when a user declaration has the
+same short name. Diagnostics, formatter output, and LSP hover/definition
+continue to use source spelling; canonical identity is used only for semantic
+resolution, generic caches, specialization, layout, object dependencies, and
+internal mangling.
+
 ## Consequences
 
 - Generic specialization, generic caches, layout lookup, object dependencies,
