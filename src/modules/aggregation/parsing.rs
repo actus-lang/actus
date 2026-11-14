@@ -3,8 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ast::Program;
-use crate::lexer::scan_at;
-use crate::parser::parse;
+use crate::session::CompilationSession;
 
 use super::super::resolver::ModuleResolver;
 use super::types::ModuleError;
@@ -29,7 +28,7 @@ pub fn parse_module(resolver: &ModuleResolver, module_path: &str) -> Result<Prog
         resolved.facade(),
         resolved.siblings(),
         resolved.children(),
-        resolver.source_map(),
+        resolver.session(),
     )?;
     append_open_child_implementations(resolver, &HashMap::new(), &resolved, program)
 }
@@ -49,7 +48,7 @@ pub fn parse_module_with_overlays(
         resolved.facade(),
         resolved.siblings(),
         resolved.children(),
-        resolver.source_map(),
+        resolver.session(),
     )?;
     append_open_child_implementations(resolver, overlays, &resolved, program)
 }
@@ -61,7 +60,7 @@ fn parse_sources<I, F>(
     facade: &Path,
     siblings: &[PathBuf],
     children: &[super::super::resolver::ResolvedChildModule],
-    source_map: Option<crate::SharedSourceMap>,
+    session: Option<&CompilationSession>,
 ) -> Result<Program, ModuleError>
 where
     I: IntoIterator<Item = PathBuf>,
@@ -71,16 +70,9 @@ where
     let mut locations = HashMap::new();
     for (source_index, source_path) in source_paths.into_iter().enumerate() {
         let source = read_source(&source_path)?;
-        let base =
-            source_map.as_ref().map(|map| map.lock().register(&source_path, &source)).unwrap_or(0);
-        let (tokens, errors) = scan_at(&source, base);
-        if !errors.is_empty() {
-            return Err(ModuleError::Lex { path: source_path, errors });
-        }
-        let program = parse(tokens).map_err(|error| ModuleError::Parse {
-            path: source_path.clone(),
-            error: Box::new(error),
-        })?;
+        let program = crate::session::parse_source(session, &source_path, &source)
+            .program()
+            .map_err(|error| ModuleError::frontend(&source_path, error))?;
         validate_import_bindings(&program)?;
         validate_configuration_source(module_path, &source_path, &program)?;
         if source_index == 0 {
@@ -139,7 +131,7 @@ fn parse_child_module_with_overlays(
         child.facade(),
         child.siblings(),
         child.children(),
-        resolver.source_map(),
+        resolver.session(),
     )?;
     append_open_child_implementations(resolver, overlays, &child, program)
 }

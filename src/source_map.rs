@@ -44,23 +44,17 @@ impl SharedSourceMap {
     pub(crate) fn lock(&self) -> MutexGuard<'_, SourceMap> {
         self.0.lock().expect("source map lock poisoned")
     }
-
-    pub(crate) fn scan(
-        &self,
-        path: impl Into<PathBuf>,
-        source: &str,
-    ) -> (Vec<crate::lexer::Token>, Vec<crate::lexer::LexError>) {
-        let base = self.lock().register(path, source);
-        crate::lexer::scan_at(source, base)
-    }
 }
 
 impl SourceMap {
     pub(crate) fn register(&mut self, path: impl Into<PathBuf>, source: &str) -> usize {
         let path = path.into();
         let identity = canonical_path(&path);
-        if let Some(file) = self.files.iter().find(|file| file.identity == identity) {
-            debug_assert_eq!(file.source, source);
+        // A changed source for the same canonical path is a new revision with
+        // its own base, so spans produced from earlier revisions stay valid.
+        if let Some(file) =
+            self.files.iter().find(|file| file.identity == identity && file.source == source)
+        {
             return file.base;
         }
         let base = self.next_offset.max(1);
@@ -115,7 +109,7 @@ impl SourceMap {
     }
 }
 
-fn canonical_path(path: &std::path::Path) -> PathBuf {
+pub(crate) fn canonical_path(path: &std::path::Path) -> PathBuf {
     let path = path.to_owned();
     if let Ok(path) = std::fs::canonicalize(&path) {
         return path;

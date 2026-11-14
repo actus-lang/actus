@@ -3,8 +3,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ast::Program;
-use crate::lexer::scan_at;
-use crate::parser::parse;
 
 use super::super::resolver::{ModuleResolver, ResolvedModule};
 use super::identity::ModuleNamespace;
@@ -205,14 +203,9 @@ fn load_source(
             message: error.to_string(),
         })
     })?;
-    let base =
-        resolver.source_map().as_ref().map(|map| map.lock().register(path, &source)).unwrap_or(0);
-    let (tokens, errors) = scan_at(&source, base);
-    if !errors.is_empty() {
-        return Err(ModuleError::Lex { path: path.to_owned(), errors });
-    }
-    let program = parse(tokens)
-        .map_err(|error| ModuleError::Parse { path: path.to_owned(), error: Box::new(error) })?;
+    let program = crate::session::parse_source(resolver.session(), path, &source)
+        .program()
+        .map_err(|error| ModuleError::frontend(path, error))?;
     Ok(ModuleSource {
         path: path.to_owned(),
         kind,

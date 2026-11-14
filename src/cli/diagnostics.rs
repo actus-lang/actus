@@ -2,7 +2,10 @@ use std::io::{self, IsTerminal};
 use std::path::Path;
 
 use crate::SharedSourceMap;
-use crate::diagnostics::{Diagnostic, render_colored_diagnostic, sort_diagnostics};
+use crate::diagnostics::{
+    Diagnostic, lex_diagnostic, parse_diagnostic, render_colored_diagnostic, sort_diagnostics,
+};
+use crate::session::FrontendError;
 
 pub(super) fn report_diagnostics(path: &Path, source: &str, mut diagnostics: Vec<Diagnostic>) {
     let source_path = path.display().to_string();
@@ -61,5 +64,24 @@ pub(super) fn report_mapped_diagnostics(
             .expect("localized diagnostic must retain its source");
         let (path, source, diagnostic) = localized.remove(index);
         report_diagnostic(&path, &source, diagnostic);
+    }
+}
+
+pub(super) fn report_frontend_error(
+    source_map: &SharedSourceMap,
+    path: &Path,
+    source: &str,
+    error: &FrontendError,
+) {
+    match error {
+        FrontendError::Lex(errors) => report_mapped_diagnostics(
+            source_map,
+            path,
+            source,
+            errors.iter().map(lex_diagnostic).collect(),
+        ),
+        FrontendError::Parse(error) => {
+            report_mapped_diagnostic(source_map, path, source, parse_diagnostic(error));
+        }
     }
 }

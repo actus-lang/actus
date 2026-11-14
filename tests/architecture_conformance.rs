@@ -323,6 +323,32 @@ fn source_layout_facades_and_boundaries_are_enforced() {
 }
 
 #[test]
+fn plan_frontend_parses_only_through_the_compilation_session() {
+    // ADR-0109: plan construction scans and parses through the session.
+    // Standalone tools (formatter, AST dump, LSP) keep their own entry points.
+    let forbidden = ["crate::parser::parse", "crate::lexer::scan", "scan_at("];
+    let mut sources = rust_sources(&repository_path("src/modules"));
+    sources.extend(
+        ["src/cli/check.rs", "src/cli/build/loading.rs", "src/cli/test_runner/collection.rs"]
+            .map(repository_path),
+    );
+    for path in sources {
+        if path.file_name().is_some_and(|name| name == "tests.rs") {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("Rust source should be readable");
+        let production = source.split("#[cfg(test)]").next().unwrap_or_default();
+        for token in forbidden {
+            assert!(
+                !production.contains(token),
+                "{} parses outside the compilation session: `{token}`",
+                source_relative(&path)
+            );
+        }
+    }
+}
+
+#[test]
 fn compiler_layers_do_not_import_reverse_pipeline_or_backend_logic() {
     assert_layer_excludes(
         "src/lexer",

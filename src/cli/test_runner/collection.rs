@@ -9,8 +9,8 @@ use crate::lexer::TokenKind;
 use crate::modules::{
     ModuleCompilationPlan, ModuleError, ModuleResolver, build_test_compilation_plan, parse_module,
 };
-use crate::parser::parse;
 use crate::semantic::filter_program_for_target_checked;
+use crate::session::{CompilationSession, FrontendError};
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::TestOptions;
@@ -51,22 +51,29 @@ pub(super) fn collect_tests(
         std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(files.len());
     let chunk_size = files.len().div_ceil(worker_count);
     let chunks = files.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
+    // One session for the complete test run (ADR-0109): every worker shares
+    // source provenance and memoized parse results.
+    let session = CompilationSession::new();
     let results = std::thread::scope(|scope| {
         chunks
             .into_iter()
             .map(|chunk| {
                 let configuration = configuration.clone();
                 let options = options.clone();
+                let session = session.clone();
                 scope.spawn(move || {
                     let resolver = ModuleResolver::with_dependencies_and_runtime(
                         configuration.source_root(),
                         configuration.dependency_roots(),
                         configuration.runtime_source_root(),
                         configuration.runtime_module_roots(),
-                    );
+                    )
+                    .with_session(session.clone());
                     chunk
                         .into_iter()
-                        .map(|path| collect_file_tests(&path, &configuration, &options, &resolver))
+                        .map(|path| {
+                            collect_file_tests(&path, &configuration, &options, &resolver, &session)
+                        })
                         .collect::<Result<Vec<_>, _>>()
                 })
             })
@@ -92,11 +99,11 @@ fn collect_file_tests(
     configuration: &CompilerConfiguration,
     options: &TestOptions,
     resolver: &ModuleResolver,
+    session: &CompilationSession,
 ) -> Result<CollectedFile, String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
-    let source_map = SharedSourceMap::new();
-    let resolver = resolver.clone().with_source_map(source_map.clone());
+    let source_map = session.source_map().clone();
     if options.mirror && path.starts_with(configuration.project_root().join("tests")) {
         validate_test_mirror(path, configuration)?;
     }
@@ -104,8 +111,8 @@ fn collect_file_tests(
     let Some((_source_program, program, compilation_plan, test_names)) = parse_source(
         path,
         &source,
-        &source_map,
-        &resolver,
+        session,
+        resolver,
         configuration.source_root(),
         configuration.project_root(),
         options,
@@ -209,21 +216,21 @@ fn validate_source(
 fn parse_source(
     path: &Path,
     source: &str,
-    source_map: &SharedSourceMap,
+    session: &CompilationSession,
     resolver: &ModuleResolver,
     source_root: &Path,
     project_root: &Path,
     options: &TestOptions,
 ) -> Result<ParsedTestSource, String> {
-    let (tokens, errors) = source_map.scan(path, source);
-    if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
+    let source_map = session.source_map();
+    let parsed = session.parse(path, source);
+    if !parsed.tokens().iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
         return Ok(None);
     }
-    if !errors.is_empty() {
-        return Err(format!("cannot lex `{}`", path.display()));
-    }
-    let source_program =
-        parse(tokens).map_err(|error| parse_source_error(path, source_map, error))?;
+    let source_program = parsed.program().map_err(|error| match error {
+        FrontendError::Lex(_) => format!("cannot lex `{}`", path.display()),
+        FrontendError::Parse(error) => parse_source_error(path, source_map, error),
+    })?;
     let test_names = test_names(&source_program);
     if test_names.is_empty() {
         return Ok(None);

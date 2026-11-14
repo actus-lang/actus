@@ -3,24 +3,23 @@ use std::path::Path;
 
 use crate::SharedSourceMap;
 use crate::configuration::CompilerConfiguration;
-use crate::diagnostics::{lex_diagnostic, module_diagnostic, parse_diagnostic};
+use crate::diagnostics::module_diagnostic;
 use crate::modules::{
     ModuleCompilationPlan, ModuleResolver, build_compilation_plan, validate_compilation_plan,
 };
-use crate::parser::parse;
+use crate::session::CompilationSession;
 
-use super::super::diagnostics::{report_mapped_diagnostic, report_mapped_diagnostics};
+use super::super::diagnostics::{report_frontend_error, report_mapped_diagnostic};
 
 pub(super) fn load_build_program(
     input: &str,
     configuration: &CompilerConfiguration,
 ) -> Option<(String, ModuleCompilationPlan, SharedSourceMap)> {
-    let source_map = SharedSourceMap::new();
+    let session = CompilationSession::new();
     let source = read_build_source(input)?;
-    let program = parse_build_source(input, &source_map, &source)?;
-    let program =
-        resolve_build_program(input, &source, program, configuration, source_map.clone())?;
-    Some((source, program, source_map))
+    let program = parse_build_source(input, &session, &source)?;
+    let program = resolve_build_program(input, &source, program, configuration, &session)?;
+    Some((source, program, session.source_map().clone()))
 }
 
 fn read_build_source(input: &str) -> Option<String> {
@@ -35,31 +34,15 @@ fn read_build_source(input: &str) -> Option<String> {
 
 fn parse_build_source(
     input: &str,
-    source_map: &SharedSourceMap,
+    session: &CompilationSession,
     source: &str,
 ) -> Option<crate::ast::Program> {
-    let (tokens, lex_errors) = source_map.scan(input, source);
-    if lex_errors.is_empty() {
-        match parse(tokens) {
-            Ok(program) => Some(program),
-            Err(error) => {
-                report_mapped_diagnostic(
-                    source_map,
-                    Path::new(input),
-                    source,
-                    parse_diagnostic(&error),
-                );
-                None
-            }
+    match session.parse(input, source).program() {
+        Ok(program) => Some(program),
+        Err(error) => {
+            report_frontend_error(session.source_map(), Path::new(input), source, &error);
+            None
         }
-    } else {
-        report_mapped_diagnostics(
-            source_map,
-            Path::new(input),
-            source,
-            lex_errors.iter().map(lex_diagnostic).collect(),
-        );
-        None
     }
 }
 
@@ -68,7 +51,7 @@ fn resolve_build_program(
     source: &str,
     program: crate::ast::Program,
     configuration: &CompilerConfiguration,
-    source_map: SharedSourceMap,
+    session: &CompilationSession,
 ) -> Option<ModuleCompilationPlan> {
     let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
@@ -76,12 +59,12 @@ fn resolve_build_program(
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
     )
-    .with_source_map(source_map.clone());
+    .with_session(session.clone());
     match build_compilation_plan(&program, &resolver) {
         Ok(plan) => Some(plan),
         Err(error) => {
             let diagnostic = module_diagnostic(&error);
-            report_mapped_diagnostic(&source_map, Path::new(input), source, diagnostic);
+            report_mapped_diagnostic(session.source_map(), Path::new(input), source, diagnostic);
             None
         }
     }

@@ -196,6 +196,12 @@ open verb start() -> Int {
   Cranelift against the Phase 53 audit baseline. The generated-serialization
   validation test passes with normalization and fails with E1069 when
   normalization is temporarily removed.
+- PR S replaces the former PR P parse-cache item and precedes PR B. Release
+  evidence against PR A: private check `2379 -> 1542 ms (-35.2%)`; std suite
+  `2363 -> 2365 ms (+0.1%)`; phase23 build, interleaved, 100 pairs
+  `10.97 +/- 5.01 -> 11.11 +/- 4.90 ms`, pairwise `B-A 0.14 +/- 4.57 ms`;
+  VmHWM private `130348-131112 -> 135980-136828 KiB`, std
+  `691248-698020 -> 690384-693344 KiB`; parse `18372/80`, `18754/151`.
 
 1. **A0 — SourceMap and source provenance** (`ADR-0107`): give compilation
    units deterministic source identity and report unit diagnostics against
@@ -204,25 +210,32 @@ open verb start() -> Int {
    test use the same plan validation without changing buildable behavior.
    Normalization, including generated serialization verbs, is part of
    validation; generic specialization is not.
-3. **B — Canonical declaration identity** (`ADR-0108`): generic instances and
+3. **S — Compilation session and memoized frontend queries** (`ADR-0109`):
+   one session owns source provenance and memoized parse results for each CLI
+   operation and for the complete test run. Plan construction parses only
+   through the session; a changed source is a new revision. The former PR P
+   parse-cache item is replaced by S. PR B adds the declaration registry and
+   annotated units as further session queries.
+4. **B — Canonical declaration identity** (`ADR-0108`): generic instances and
    all downstream consumers use `package + module path + declaration name +
    ordered arguments`, independent of import aliases and re-export spellings.
    The timing gate is release-versus-release, with PR B overhead no more than
    10% relative to PR A. The R1 test must check, build, and run successfully.
-4. **C — R2 const-generic resolution**: resolve the re-exported
+5. **B2 — Generic verb canonical identity**: remove spelling-based generic
+   verb identity from specialization and emission.
+6. **B3 — Semantic type representation**: move semantic type comparisons to
+   resolved `TypeName` identity while preserving source spelling in diagnostics.
+7. **C — R2 const-generic resolution**: resolve the re-exported
    const-generic struct type-parameter path exposed by the minimal R2
    reproduction.
-5. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
+8. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
    module (all tests of the module's `tests/` files), runs each test in its own
    process selected by name (isolation, timeouts and expected faults unchanged),
    and validates the compilation plan once per group. A group compile error
    fails every test in that group with one diagnostic.
-6. **P — Session parse cache**: parse each canonical source once per
-   compilation session (SourceMap-owned), removing repeated scan/parse of the
-   same file.
-7. **D — Diagnostic rendering**: replace backend raw `Debug` errors with the
+9. **D — Diagnostic rendering**: replace backend raw `Debug` errors with the
    stable diagnostic contract and an explicit internal-error boundary.
-8. **E — Formatter layout rule and `actus new`** (new ADR): verb bodies are
+10. **E — Formatter layout rule and `actus new`** (new ADR): verb bodies are
    always multi-line; call arguments, verb parameters, struct fields,
    struct-literal fields and enum variants are placed one per line when there
    are two or more, and stay on one line when there is one. Type arguments,
@@ -232,13 +245,16 @@ open verb start() -> Int {
    make `actus new` output pass `actus fmt --check`, and fix the three std files
    that are not fmt-clean (`fs/directory.act`,
    `wire/fragment/reassembly.act`, `volatile/volatile.act`).
-9. **F — Documentation reconciliation**: correct README examples, alpha guide
+11. **F — Documentation reconciliation**: correct README examples, alpha guide
    commands, ADR statuses, root-manifest documentation, and add the E1800
    `actus lock` hint.
-10. **F2 — Neutral fixtures and documentation**: replace downstream-application
+12. **F2 — Neutral fixtures and documentation**: replace downstream-application
    names and private implementation terms in docs, tests, examples, and std
    comments with neutral names without changing test behavior.
-11. **G — Version and release note**: reconcile the compiler version, alpha tag,
+13. **L — LSP workspace session** (`ADR-0109`): the language server keeps one
+   compilation session per workspace, routes overlay parsing through it, and
+   invalidates memoized results by document version.
+14. **G — Version and release note**: reconcile the compiler version, alpha tag,
    release notes, and final release evidence.
 
 ## Evidence gates

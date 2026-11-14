@@ -149,6 +149,19 @@ impl Display for ModuleError {
 
 impl std::error::Error for ModuleError {}
 
+impl ModuleError {
+    pub(crate) fn frontend(path: &std::path::Path, error: crate::session::FrontendError) -> Self {
+        match error {
+            crate::session::FrontendError::Lex(errors) => {
+                Self::Lex { path: path.to_owned(), errors }
+            }
+            crate::session::FrontendError::Parse(error) => {
+                Self::Parse { path: path.to_owned(), error: Box::new(error) }
+            }
+        }
+    }
+}
+
 #[allow(clippy::ptr_arg)]
 fn write_read_error(
     formatter: &mut Formatter<'_>,
