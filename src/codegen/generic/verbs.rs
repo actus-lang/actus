@@ -18,6 +18,7 @@ pub(crate) fn specialize_program(
     let call_bindings = unique_generic_call_bindings(program, &instances);
     let call_site_bindings = generic_call_site_bindings(&instances);
     let mut declarations = Vec::with_capacity(program.declarations.len());
+    let mut external_instances = std::collections::HashSet::new();
     for declaration in &program.declarations {
         match declaration {
             TopLevelDecl::Verb(verb) if !verb.generic_parameters.is_empty() => {
@@ -27,6 +28,7 @@ pub(crate) fn specialize_program(
             }
             TopLevelDecl::ExternalVerb(verb) if !verb.generic_parameters.is_empty() => {
                 for specialized in specialize_external_verbs(verb, &instances, &call_bindings)? {
+                    external_instances.insert(specialized.name.clone());
                     declarations.push(TopLevelDecl::ExternalVerb(specialized));
                 }
             }
@@ -51,6 +53,7 @@ pub(crate) fn specialize_program(
             other => declarations.push(other.clone()),
         }
     }
+    let declarations = super::specializations::unique_instances(declarations, &external_instances);
     Ok(Program { file_metadata: program.file_metadata.clone(), declarations })
 }
 
@@ -70,7 +73,7 @@ fn generic_call_site_bindings(
         .map(|instance| {
             (
                 (instance.name.clone(), instance.call_span.start, instance.call_span.end),
-                specialized_name(instance),
+                specialized_generic_name(instance),
             )
         })
         .collect()
@@ -103,7 +106,10 @@ fn unique_generic_call_bindings(
                     .all(|argument| !contains_generic_parameter(argument, parameters))
             });
         if generic_names.contains(instance.name.as_str()) && is_concrete {
-            candidates.entry(instance.name.clone()).or_default().push(specialized_name(instance));
+            candidates
+                .entry(instance.name.clone())
+                .or_default()
+                .push(specialized_generic_name(instance));
         }
     }
     candidates
@@ -235,7 +241,7 @@ fn specialize_external_verbs(
     let mut specialized = Vec::new();
     let mut names = std::collections::HashSet::new();
     for instance in instances.iter().filter(|instance| instance_matches_external(instance, verb)) {
-        if names.insert(specialized_name(instance)) {
+        if names.insert(specialized_generic_name(instance)) {
             specialized.push(specialize_external_verb(verb, instance, instances, call_bindings)?);
         }
     }
@@ -263,7 +269,7 @@ fn specialize_external_verb(
         call_bindings,
     )?;
     let substitution = substitution.with_call_bindings(&call_bindings);
-    let specialized_name = specialized_name(instance);
+    let specialized_name = specialized_generic_name(instance);
     let native_symbol = if verb.module_import {
         Some(specialized_name.rsplit("::").next().unwrap_or(&specialized_name).to_owned())
     } else {
@@ -369,7 +375,7 @@ fn nested_call_bindings(
             .collect::<Vec<_>>();
         let identity = TypeIdentity::from_verb_application(&template.name, &arguments);
         if let Some(concrete) = instances.iter().find(|instance| instance.identity() == identity) {
-            bindings.insert(template.name.clone(), specialized_name(concrete));
+            bindings.insert(template.name.clone(), specialized_generic_name(concrete));
         }
     }
     Ok(bindings)
@@ -377,10 +383,6 @@ fn nested_call_bindings(
 
 pub(crate) fn specialized_generic_name(instance: &GenericInstance) -> String {
     format!("{}__{}", instance.name, encode_specialization_arguments(&instance.arguments))
-}
-
-fn specialized_name(instance: &GenericInstance) -> String {
-    specialized_generic_name(instance)
 }
 
 fn specialized_local_name(name: &str, arguments: &[TypeName]) -> String {
