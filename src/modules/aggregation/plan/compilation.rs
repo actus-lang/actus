@@ -17,12 +17,12 @@ pub(super) use super::super::declarations::qualify_import_path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleCompilationPlan {
-    local: Program,
-    caller: Program,
-    units: Vec<ModuleUnit>,
+    pub(super) local: Program,
+    pub(super) caller: Program,
+    pub(super) units: Vec<ModuleUnit>,
     friend_modules: HashSet<String>,
     package_identity: String,
-    registry: Arc<super::super::registry::DeclarationRegistry>,
+    pub(super) registry: Arc<super::super::registry::DeclarationRegistry>,
 }
 
 impl ModuleCompilationPlan {
@@ -36,10 +36,6 @@ impl ModuleCompilationPlan {
 
     pub fn package_identity(&self) -> &str {
         &self.package_identity
-    }
-
-    pub(crate) fn declaration_registry(&self) -> Arc<DeclarationRegistry> {
-        Arc::clone(&self.registry)
     }
 
     pub fn with_caller_program(&self, caller: Program) -> Self {
@@ -235,14 +231,7 @@ fn build_compilation_plan_with_overlays_and_scope_check(
         package_identity: resolver.package_identity().identity().to_owned(),
         registry: Arc::new(DeclarationRegistry::default()),
     };
-    let registry = Arc::new(DeclarationRegistry::from_plan(&plan));
-    plan.registry = Arc::clone(&registry);
-    let annotation_scope = importer_module_path.unwrap_or(super::super::registry::ROOT_MODULE_PATH);
-    registry.annotate_program_headers(annotation_scope, &mut plan.local);
-    registry.annotate_program_headers(annotation_scope, &mut plan.caller);
-    for unit in &mut plan.units {
-        unit.annotate_types(&registry);
-    }
+    super::annotation::annotate_plan(&mut plan, importer_module_path, resolver.session());
     Ok(plan)
 }
 

@@ -167,7 +167,7 @@ fn run_test(
     let caller =
         crate::semantic::filter_program_for_target_checked(plan.caller(), configuration.target())
             .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
-    crate::semantic::analyze(&caller)
+    crate::semantic::analyze_resolved(&caller)
         .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
     crate::modules::validate_compilation_plan(&plan, configuration.target())
         .map_err(|error| test_diagnostic(test, crate::diagnostics::module_diagnostic(&error)))?;

@@ -11,7 +11,7 @@ pub(crate) struct ProgramLayouts<'program> {
     pub(super) enums: BTreeMap<&'program str, &'program EnumDef>,
     pub(super) packs: BTreeMap<&'program str, &'program PackDecl>,
     imported_namespaces: BTreeMap<String, String>,
-    declaration_identities: BTreeMap<String, crate::ast::DeclarationIdentity>,
+    declaration_identities: BTreeMap<String, crate::ast::DeclarationId>,
     pub(super) drop_symbols: BTreeMap<String, SymbolIdentity>,
     pointer_bytes: u32,
 }
@@ -49,18 +49,8 @@ impl<'program> ProgramLayouts<'program> {
             .collect();
         let imported_namespaces = collect_imported_namespaces(program);
         let drop_symbols = collect_drop_symbols(program, namespace);
-        let declaration_registry =
-            crate::modules::DeclarationRegistry::for_program(package, module_path, program);
-        let declaration_identities = program
-            .declarations
-            .iter()
-            .filter_map(crate::modules::aggregation::registry::declaration_name)
-            .filter_map(|name| {
-                declaration_registry
-                    .identity_for(module_path, name)
-                    .map(|identity| (name.to_owned(), identity))
-            })
-            .collect();
+        let declaration_identities =
+            crate::modules::DeclarationRegistry::declaration_ids(package, module_path, program);
         Self {
             structs,
             enums,
@@ -77,10 +67,10 @@ impl<'program> ProgramLayouts<'program> {
         name: &str,
         span: crate::lexer::SourceSpan,
     ) -> TypeName {
-        TypeName::resolved(
+        TypeName::resolved_id(
             self.declaration_identities
                 .get(name)
-                .cloned()
+                .copied()
                 .unwrap_or_else(|| panic!("missing declaration identity for `{name}`")),
             name.to_owned(),
             Vec::new(),
@@ -101,12 +91,7 @@ impl<'program> ProgramLayouts<'program> {
                 .then(|| member.to_owned())
             })
             .unwrap_or_else(|| type_name.name.clone());
-        let resolved = type_name.resolved.clone().or_else(|| {
-            if is_builtin_layout_name(&name) {
-                return Some(crate::ast::DeclarationIdentity::Builtin { name: name.clone() });
-            }
-            self.declaration_identities.get(&name).cloned()
-        });
+        let resolved = type_name.resolved;
         TypeName {
             name,
             arguments: type_name
@@ -434,67 +419,4 @@ impl<'program> ProgramLayouts<'program> {
             performance_symbol: None,
         }
     }
-}
-
-fn is_builtin_layout_name(name: &str) -> bool {
-    matches!(
-        name,
-        "Array"
-            | "Arena"
-            | "Bool"
-            | "Buffer"
-            | "F32"
-            | "F64"
-            | "Int"
-            | "Option"
-            | "Region"
-            | "Result"
-            | "String"
-            | "Usize"
-            | "VolatileAddress"
-            | "VolatileWriteAddress"
-            | "SerializationError"
-    ) || primitive_type(name).is_some()
-}
-
-fn collect_drop_symbols(program: &Program, namespace: &str) -> BTreeMap<String, SymbolIdentity> {
-    program
-        .declarations
-        .iter()
-        .filter_map(|declaration| match declaration {
-            TopLevelDecl::Perform(perform) if perform.role_name == "Drop" => {
-                let lookup_key = perform.target.canonical_lookup_key();
-                let symbol_target = perform.target.stable_symbol_name();
-                let symbol_namespace =
-                    perform.module_import_namespace.as_deref().unwrap_or(namespace);
-                let symbol = SymbolIdentity::specialized(
-                    symbol_namespace,
-                    SymbolKind::Performance,
-                    "drop",
-                    &["Drop", &symbol_target],
-                )
-                .ok()?;
-                Some((lookup_key, symbol))
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-fn collect_imported_namespaces(program: &Program) -> BTreeMap<String, String> {
-    program
-        .declarations
-        .iter()
-        .filter_map(|declaration| {
-            let TopLevelDecl::Import(import) = declaration else { return None };
-            (!import.is_open).then(|| {
-                let binding = import
-                    .alias
-                    .clone()
-                    .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
-                    .unwrap_or_else(|| import.path.clone());
-                (binding, import.path.clone())
-            })
-        })
-        .collect()
 }

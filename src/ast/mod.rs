@@ -9,13 +9,14 @@ mod types;
 
 pub use abi::ForeignAbi;
 pub use decl::{
-    BoundedContract, Capability, ConstantDecl, DeclarationIdentity, DeclarationPath, DispatchMode,
-    Effect, EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl, GenericParam,
-    GenericParamKind, ImportDecl, LayoutEndianness, LimitlessScope, MetaAttribute, OpenSiblingDecl,
-    PackDecl, PackField, PackStorage, Param, PerformDecl, Program, Repr, ReturnAccess, ReturnType,
-    Role, RoleDecl, RoleMethod, SerializeDecl, SerializeSection, StackLimitContract, StructDef,
-    StructField, StructFieldRole, TestFault, TopLevelDecl, TypeIdentity, TypeName, VerbContract,
-    VerbContractSection, VerbContractSectionKind, VerbDecl, builtin_enum_definitions,
+    BoundedContract, Capability, ConstantDecl, DeclarationId, DeclarationIdentity, DeclarationPath,
+    DispatchMode, Effect, EnumDef, EnumField, EnumPayload, EnumVariant, ExternalVerbDecl,
+    GenericParam, GenericParamKind, ImportDecl, LayoutEndianness, LimitlessScope, MetaAttribute,
+    OpenSiblingDecl, PackDecl, PackField, PackStorage, Param, PerformDecl, Program, Repr,
+    ReturnAccess, ReturnType, Role, RoleDecl, RoleMethod, SerializeDecl, SerializeSection,
+    StackLimitContract, StructDef, StructField, StructFieldRole, TestFault, TopLevelDecl,
+    TypeIdentity, TypeName, VerbContract, VerbContractSection, VerbContractSectionKind, VerbDecl,
+    builtin_enum_definitions,
 };
 pub(crate) use decl::{TypeNameParseMode, parse_type_name_key, parse_type_name_with_mode};
 pub use decl::{decode_type_key, encode_type_key};

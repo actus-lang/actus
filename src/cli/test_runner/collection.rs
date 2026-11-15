@@ -126,7 +126,7 @@ fn collect_file_tests(
             localized_test_diagnostic(path, "", &source_map, semantic_diagnostic(&error))
         })?;
     let filtered = declared.saturating_sub(test_count(&program));
-    if let Err(error) = crate::semantic::analyze(&program) {
+    if let Err(error) = crate::semantic::analyze_resolved(&program) {
         let diagnostic = semantic_diagnostic(&error);
         return Err(localized_test_diagnostic(path, &source, &source_map, diagnostic));
     }

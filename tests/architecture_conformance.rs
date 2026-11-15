@@ -372,6 +372,32 @@ fn source_layout_facades_and_boundaries_are_enforced() {
 }
 
 #[test]
+fn standalone_resolution_stays_at_planless_entry_points() {
+    // ADR-0108: plan-based compilation annotates once through the plan's
+    // registry. Standalone resolution is reserved for entry points that
+    // receive a program without a compilation plan.
+    let allowed = [
+        "src/modules/aggregation/registry/declarations.rs",
+        "src/semantic/analyzer/analysis.rs",
+        "src/lsp/editor/completion.rs",
+        "src/codegen/shared_lowering/orchestration.rs",
+        "src/codegen/cranelift/emission/output.rs",
+    ];
+    for path in rust_sources(&repository_path("src")) {
+        if path.file_name().is_some_and(|name| name == "tests.rs") {
+            continue;
+        }
+        let relative = source_relative(&path);
+        let source = fs::read_to_string(&path).expect("Rust source should be readable");
+        let production = source.split("#[cfg(test)]").next().unwrap_or_default();
+        assert!(
+            !production.contains("resolve_standalone(") || allowed.contains(&relative.as_str()),
+            "{relative} resolves a program standalone outside the planless entry points"
+        );
+    }
+}
+
+#[test]
 fn plan_frontend_parses_only_through_the_compilation_session() {
     // ADR-0109: plan construction scans and parses through the session.
     // Standalone tools (formatter, AST dump, LSP) keep their own entry points.

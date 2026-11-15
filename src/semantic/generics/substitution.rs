@@ -94,7 +94,7 @@ impl TypeSubstitution {
             arguments: type_name.arguments.iter().map(|argument| self.apply(argument)).collect(),
             reference_role: type_name.reference_role.clone(),
             span: type_name.span,
-            resolved: type_name.resolved.clone(),
+            resolved: type_name.resolved,
         }
     }
 
@@ -195,7 +195,10 @@ mod tests {
                 .expect("arity should match");
         assert_eq!(substitution.apply_const("N"), Some("4"));
         let applied = substitution.apply(&ty("N"));
-        assert_eq!(applied.resolved, Some(crate::ast::DeclarationIdentity::constant("4")));
+        assert_eq!(
+            applied.resolved_identity(),
+            Some(&crate::ast::DeclarationIdentity::constant("4")),
+        );
 
         let array_parameters = vec![GenericParam {
             name: "N".to_owned(),

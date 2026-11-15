@@ -369,7 +369,7 @@ fn specialize_type(type_name: &TypeName, generic_names: &HashSet<String>) -> Typ
         arguments: Vec::new(),
         reference_role: type_name.reference_role.clone(),
         span: type_name.span,
-        resolved: type_name.resolved.clone(),
+        resolved: type_name.resolved,
     }
 }
 

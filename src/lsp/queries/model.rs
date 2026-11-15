@@ -6,7 +6,7 @@ use crate::ast::{
 };
 use crate::lexer::SourceSpan;
 use crate::semantic::{
-    AccessState, CleanupAction, OwnershipState, SemanticModel, analyze_standalone,
+    AccessState, CleanupAction, OwnershipState, SemanticModel, analyze,
     filter_program_for_target_checked,
 };
 use crate::target::{EntryContract, TargetSpec};
@@ -42,7 +42,7 @@ pub(super) fn query(
     let Ok(target_program) = filter_program_for_target_checked(&program, target) else {
         return json!({"state":"invalid","facts":[]});
     };
-    let Ok(model) = analyze_standalone(&target_program) else {
+    let Ok(model) = analyze(&target_program) else {
         return json!({"state":"invalid","facts":[]});
     };
     if cancellation.is_some_and(CancellationToken::checkpoint) {

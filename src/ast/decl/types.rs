@@ -3,6 +3,8 @@ use std::hash::{Hash, Hasher};
 
 use crate::lexer::SourceSpan;
 
+use super::interning::DeclarationId;
+
 use crate::modules::aggregation::registry::RegistryToken;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -92,7 +94,7 @@ pub struct TypeName {
     pub arguments: Vec<TypeName>,
     pub reference_role: Option<Role>,
     pub span: SourceSpan,
-    pub resolved: Option<DeclarationIdentity>,
+    pub resolved: Option<DeclarationId>,
 }
 
 impl fmt::Debug for TypeName {
@@ -119,6 +121,22 @@ impl TypeName {
 
     pub fn resolved(
         identity: DeclarationIdentity,
+        spelling: impl Into<String>,
+        arguments: Vec<TypeName>,
+        reference_role: Option<Role>,
+        span: SourceSpan,
+    ) -> Self {
+        Self::resolved_id(
+            DeclarationId::intern(identity),
+            spelling,
+            arguments,
+            reference_role,
+            span,
+        )
+    }
+
+    pub fn resolved_id(
+        identity: DeclarationId,
         spelling: impl Into<String>,
         arguments: Vec<TypeName>,
         reference_role: Option<Role>,
@@ -200,7 +218,7 @@ impl TypeName {
 
 #[derive(PartialEq, Eq, Hash)]
 enum TypeNameKey<'a> {
-    Resolved(&'a DeclarationIdentity),
+    Resolved(&'a DeclarationId),
     Unresolved(&'a str),
 }
 
@@ -210,7 +228,7 @@ enum TypeNameKey<'a> {
 /// intentionally excluded from this value.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeIdentity {
-    identity: Option<DeclarationIdentity>,
+    identity: Option<DeclarationId>,
     name: String,
     arguments: Vec<TypeIdentity>,
 }
@@ -218,7 +236,7 @@ pub struct TypeIdentity {
 impl TypeIdentity {
     pub fn from_type_name(type_name: &TypeName) -> Self {
         Self {
-            identity: type_name.resolved.clone(),
+            identity: type_name.resolved,
             name: type_name.name.clone(),
             arguments: type_name.arguments.iter().map(Self::from_type_name).collect(),
         }
@@ -233,31 +251,20 @@ impl TypeIdentity {
     }
 
     pub fn key(&self) -> String {
-        let name = self
-            .identity
-            .as_ref()
-            .unwrap_or_else(|| {
-                panic!(
-                    "internal compiler error: unresolved type identity `{}` reached type key",
-                    self.name
-                )
-            })
-            .key();
-        if self.arguments.is_empty() {
-            return name;
-        }
-        format!("{}[{}]", name, self.arguments.iter().map(Self::key).collect::<Vec<_>>().join(","))
+        let mut key = String::new();
+        self.write_key(&mut key);
+        key
+    }
+
+    fn write_key(&self, output: &mut String) {
+        write_canonical_key(self.identity, &self.name, &self.arguments, output, Self::write_key);
     }
 
     pub fn verb_key(&self) -> String {
         if self.arguments.is_empty() {
-            return self
-                .identity
-                .as_ref()
-                .map_or_else(|| self.name.clone(), DeclarationIdentity::key);
+            return self.identity.map_or_else(|| self.name.clone(), DeclarationId::key);
         }
-        let name =
-            self.identity.as_ref().map_or_else(|| self.name.clone(), DeclarationIdentity::key);
+        let name = self.identity.map_or_else(|| self.name.clone(), DeclarationId::key);
         format!(
             "{}[{}]",
             name,
@@ -266,9 +273,46 @@ impl TypeIdentity {
     }
 }
 
+/// Writes `identity[argument,...]` without intermediate allocations.
+fn write_canonical_key<T>(
+    identity: Option<DeclarationId>,
+    name: &str,
+    arguments: &[T],
+    output: &mut String,
+    write_argument: fn(&T, &mut String),
+) {
+    let identity = identity.unwrap_or_else(|| {
+        panic!("internal compiler error: unresolved type identity `{name}` reached type key")
+    });
+    output.push_str(identity.canonical_key());
+    if arguments.is_empty() {
+        return;
+    }
+    output.push('[');
+    for (index, argument) in arguments.iter().enumerate() {
+        if index > 0 {
+            output.push(',');
+        }
+        write_argument(argument, output);
+    }
+    output.push(']');
+}
+
 impl TypeName {
     pub fn canonical_key(&self) -> String {
-        self.identity().key()
+        let mut key = String::new();
+        self.write_canonical_key(&mut key);
+        key
+    }
+
+    fn write_canonical_key(&self, output: &mut String) {
+        write_canonical_key(
+            self.resolved,
+            &self.name,
+            &self.arguments,
+            output,
+            Self::write_canonical_key,
+        );
     }
 
     pub fn spelling_key(&self) -> String {
@@ -294,9 +338,10 @@ impl TypeName {
 
     /// Stable declaration-based name for ABI and runtime symbol contracts.
     pub fn stable_symbol_name(&self) -> String {
-        let identity = self.resolved.as_ref().unwrap_or_else(|| {
+        let identity = self.resolved.unwrap_or_else(|| {
             panic!("unresolved type `{}` reached stable symbol naming", self.name)
         });
+        let identity = identity.identity();
         let name = match identity {
             DeclarationIdentity::Declaration(path) => path.name(),
             DeclarationIdentity::Builtin { name }
@@ -316,6 +361,10 @@ impl TypeName {
 
     pub fn identity(&self) -> TypeIdentity {
         TypeIdentity::from_type_name(self)
+    }
+
+    pub fn resolved_identity(&self) -> Option<&'static DeclarationIdentity> {
+        self.resolved.map(DeclarationId::identity)
     }
 }
 

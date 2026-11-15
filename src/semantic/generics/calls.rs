@@ -175,6 +175,6 @@ fn substitute_type(type_name: &TypeName, bindings: &HashMap<String, TypeName>) -
             .collect(),
         reference_role: type_name.reference_role.clone(),
         span: type_name.span,
-        resolved: type_name.resolved.clone(),
+        resolved: type_name.resolved,
     }
 }

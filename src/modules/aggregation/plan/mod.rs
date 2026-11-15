@@ -1,3 +1,4 @@
+mod annotation;
 mod compilation;
 mod performance_context;
 mod validation;

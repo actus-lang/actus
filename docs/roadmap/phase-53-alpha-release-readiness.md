@@ -202,6 +202,13 @@ open verb start() -> Int {
   `10.97 +/- 5.01 -> 11.11 +/- 4.90 ms`, pairwise `B-A 0.14 +/- 4.57 ms`;
   VmHWM private `130348-131112 -> 135980-136828 KiB`, std
   `691248-698020 -> 690384-693344 KiB`; parse `18372/80`, `18754/151`.
+- PR B release evidence against PR S, interleaved, 3 warm-up and 20 pairs:
+  private check `2365.8 -> 2513.7 ms (+6.25%)`; std suite
+  `2170.6 -> 2289.4 ms (+5.47%)`; phase23 build `15.16 -> 16.19 ms (+6.79%)`;
+  VmHWM private `166 -> 257 MiB`, std `684 -> 816 MiB`. The full suite passes
+  (82 targets, 2,039 tests), std `112/112`, the examples matrix is `33/33`
+  against PR S and between LLVM and Cranelift, `nm` symbol names match PR S,
+  and repeated builds produce bit-identical objects on both backends.
 
 1. **A0 — SourceMap and source provenance** (`ADR-0107`): give compilation
    units deterministic source identity and report unit diagnostics against
@@ -220,23 +227,46 @@ open verb start() -> Int {
    all downstream consumers use `package + module path + declaration name +
    ordered arguments`, independent of import aliases and re-export spellings.
    The timing gate is release-versus-release, with PR B overhead no more than
-   10% relative to PR A. The R1 test must check, build, and run successfully.
+   10% relative to its parent PR S. The R1 test must check, build, and run
+   successfully.
 5. **B2 — Generic verb canonical identity**: generic verb specialization still
    contains spelling-based handling in `src/codegen/generic/verb_body.rs`
    (`specialize_call`, `callee.contains('[')`), and related generic-verb name
    matching in `src/codegen/generic/verbs.rs`,
    `src/cli/build/emission/llvm.rs`, and `src/cli/build/emission/objects.rs`.
-   This is a known defect: two modules with same-named generic verbs can be
-   resolved incorrectly. It is fixed by PR B2.
+   This is a latent defect: two modules with same-named generic verbs would be
+   matched by short name. It is not observable today, because E1110 rejects
+   same-named declarations across the modules of one program; PR B2 removes it
+   before any change to the E1110 rule.
 6. **B3 — Semantic type representation**: replace the remaining semantic
    string representation with `expression_type_name -> Option<TypeName>`,
    consolidate the `canonical_type_name` variants into one display function,
    and use identity for semantic comparisons, including checks currently
    expressed as `expected.name == "Result"`. PR B3 empties the explicit
-   `pr_b3_allowlisted` entries in `tests/architecture_conformance.rs`.
-7. **C — R2 const-generic resolution**: resolve the re-exported
-   const-generic struct type-parameter path exposed by the minimal R2
-   reproduction.
+   `pr_b3_allowlisted` entries in `tests/architecture_conformance.rs`. The
+   spelling-based comparison is not observable today for the same E1110 reason.
+7. **C — Hierarchical module scope and R2** (`ADR-0110`): an import written
+   inside a unit that names one of the unit's own directories (for example
+   `import pkg::runtime` in `pkg/runtime/training/helper.act`) loaded that
+   directory again as a second, incomplete unit, so a const-generic struct of
+   a sibling directory was missing and resolution failed with `E1052` (the
+   minimal R2 reproduction). C binds such imports to the loaded unit and
+   enforces ADR-0018's module boundaries hierarchically: a directory module
+   sees its own and its ancestors' declarations, the exports of the children
+   it opens, and its own imports; sibling directories need an import and
+   imports are not inherited. Out-of-scope references report `E1119`.
+   Related defects found on the same path are fixed in C: a `case` block
+   branch that leaves through `return` no longer types the `case`, a
+   qualified call to another unit's verb is typed in assignments and lowered
+   when generic, and named values compare by declaration identity. PR B
+   already rejects private type arguments of an imported unit at `check`
+   (`E1109`, `tests/declaration_identity.rs`); the earlier "second
+   reproduction" was a malformed fixture and is withdrawn.
+   Follow-up within C's scope, not yet implemented: an import of another
+   unit's child directory from outside that unit (for example
+   `import pkg::store::cache` in a different unit) still loads the
+   directory as its own unit; it should bind to the owning unit or be
+   rejected as the alpha guide states.
 8. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
    module (all tests of the module's `tests/` files), runs each test in its own
    process selected by name (isolation, timeouts and expected faults unchanged),

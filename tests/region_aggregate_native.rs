@@ -151,7 +151,7 @@ fn aggregate_region_fixture_passes_semantic_analysis_separately() {
     let (tokens, errors) = actus::lexer::scan(source);
     assert!(errors.is_empty(), "semantic fixture lexing failed: {errors:?}");
     let program = actus::parser::parse(tokens).expect("semantic fixture should parse");
-    actus::semantic::analyze_standalone(&program).expect("semantic fixture should analyze");
+    actus::semantic::analyze(&program).expect("semantic fixture should analyze");
 }
 
 #[test]

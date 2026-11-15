@@ -32,15 +32,17 @@ fn check_block_with_context(
 ) -> Result<(), ModuleError> {
     for statement in &block.statements {
         match statement {
-            Stmt::OwnerDecl { initializer, ty, span, .. } => {
-                if let Some(type_name) = ty {
-                    super::check_type_name(
+            Stmt::OwnerDecl { initializer, ty, resolved_type, span, .. } => {
+                match (resolved_type, ty) {
+                    (Some(type_name), _) => check_type(type_name, context, *span)?,
+                    (None, Some(type_name)) => super::check_type_name(
                         type_name,
                         context.private_types,
                         context.module_path,
                         context.unit,
                         *span,
-                    )?;
+                    )?,
+                    (None, None) => {}
                 }
                 check_expr_with_context(initializer, context)?;
             }
@@ -113,9 +115,33 @@ fn check_expr_with_context(
     Ok(())
 }
 
+/// Rejects a private type of the imported unit anywhere in `type_name`,
+/// including nested type arguments such as `Array[Private, 4]`.
+fn check_type(
+    type_name: &crate::ast::TypeName,
+    context: &VisibilityContext<'_>,
+    span: crate::lexer::SourceSpan,
+) -> Result<(), ModuleError> {
+    super::check_type_name(
+        &type_name.name,
+        context.private_types,
+        context.module_path,
+        context.unit,
+        span,
+    )?;
+    type_name.arguments.iter().try_for_each(|argument| check_type(argument, context, span))
+}
+
 fn check_call(expression: &Expr, context: &VisibilityContext<'_>) -> Result<(), ModuleError> {
-    let Expr::Call { callee, span, arguments, .. } = expression else { unreachable!() };
-    super::reject_private(callee, context.private_verbs, context.module_path, context.unit, *span)?;
+    let Expr::Call { callee, generic_arguments, resolved_type, span, arguments } = expression
+    else {
+        unreachable!()
+    };
+    let verb = callee.split_once('[').map_or(callee.as_str(), |(verb, _)| verb);
+    super::reject_private(verb, context.private_verbs, context.module_path, context.unit, *span)?;
+    for type_name in generic_arguments.iter().chain(resolved_type) {
+        check_type(type_name, context, *span)?;
+    }
     for argument in arguments {
         check_expr_with_context(&argument.expression, context)?;
     }
@@ -136,13 +162,7 @@ fn check_struct_literal(
 
 fn check_cast(expression: &Expr, context: &VisibilityContext<'_>) -> Result<(), ModuleError> {
     let Expr::Cast { expression, target, span } = expression else { unreachable!() };
-    super::check_type_name(
-        &target.name,
-        context.private_types,
-        context.module_path,
-        context.unit,
-        *span,
-    )?;
+    check_type(target, context, *span)?;
     check_expr_with_context(expression, context)
 }
 

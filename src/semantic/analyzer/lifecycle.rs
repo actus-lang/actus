@@ -17,7 +17,7 @@ impl Analyzer {
             .map(str::to_owned)
             .or_else(|| type_name.name.rsplit_once("::").map(|(_, member)| member.to_owned()))
             .unwrap_or_else(|| type_name.name.clone());
-        let resolved = type_name.resolved.clone().unwrap_or_else(|| {
+        let resolved = type_name.resolved.unwrap_or_else(|| {
             panic!(
                 "internal compiler error: type `{}` reached semantic analysis unresolved",
                 type_name.name

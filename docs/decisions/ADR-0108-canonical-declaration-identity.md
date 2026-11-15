@@ -100,6 +100,14 @@ serialization-generated declarations preserve or explicitly resolve the
 annotation. Generated declarations inherit the identity of their source
 module.
 
+The compilation session exposes two frontend queries for this flow:
+`unit_declarations(unit)` returns an `Arc` declaration view keyed by the unit's
+canonical identity, source revision, and import-closure revisions;
+`annotated_unit(unit)` returns an `Arc<Program>` keyed by the same dependency
+fingerprint after AST annotation. Plan construction shares these results for
+standard-library units and reuses them for later plans; a changed imported
+unit invalidates dependents while an unrelated unit does not.
+
 `TypeName` retains source spelling and span for diagnostics, formatting, and
 LSP display. `TypeName` equality and hashing use the identity key, the ordered
 arguments, and the reference role, and never the source span. The identity key
@@ -132,6 +140,37 @@ declaration resolution, `GenericInstance` identity, generic substitution and
 caches, specialization, layout lookup, drop and performance registries,
 object dependencies, and internal (non-ABI) mangling. Semantic type
 representation and identity-based comparisons are deferred to PR B3.
+
+## Representation
+
+A resolved `TypeName` stores a `DeclarationId`: a copyable handle to one
+immutable interned entry that holds the `DeclarationIdentity` and its
+precomputed canonical key. One identity has exactly one entry for the
+lifetime of the process, so memory grows only with the number of distinct
+identities.
+
+- Reading the identity or its canonical key takes no lock; only interning a
+  new identity does.
+- Equality compares entries; hashing uses a stable hash of the canonical key.
+- Ordering and every output (symbol names, layout order, cache keys,
+  diagnostics) use the canonical key and never the handle or its address, so
+  parallel interning order cannot change compiler output.
+- Canonical type keys are written directly from the handles without
+  intermediate identity values.
+
+## Plan annotation
+
+Each compilation plan builds its declaration registry and annotates its
+programs once. With a compilation session (ADR-0109), the annotated programs
+of each module unit are a memoized query keyed by the unit's identity and
+revision together with the revisions of the plan's units, so plans of one run
+that contain the same unit revisions share one annotation. Emission and code
+generation never annotate.
+
+A generic parameter is resolved only inside the declaration that declares it.
+Its owner is that declaration's canonical key, so two declarations of one
+module that both name a parameter `T` have distinct parameter identities, and
+`T` outside a generic declaration is an ordinary type spelling.
 
 ## Consequences
 

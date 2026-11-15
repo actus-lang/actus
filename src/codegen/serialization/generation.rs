@@ -100,7 +100,7 @@ fn generated_encoder(
     span: SourceSpan,
 ) -> VerbDecl {
     let pack_type =
-        type_name_with_identity(source_type, contract.source_type.resolved.as_ref(), span);
+        type_name_with_identity(source_type, contract.source_type.resolved_identity(), span);
     let output_type = type_name("Buffer", span);
     let return_type = result_type("u32", span);
     let mut statements = Vec::new();
@@ -147,7 +147,7 @@ fn generated_decoder(
     span: SourceSpan,
 ) -> VerbDecl {
     let mut statements =
-        decoder_prefix(source_type, contract.source_type.resolved.as_ref(), capacity, span);
+        decoder_prefix(source_type, contract.source_type.resolved_identity(), capacity, span);
     statements.push(version_guard(contract, span));
     statements.push(checksum_guard(contract, span));
     append_decoder_assignments(&mut statements, capacity, span);
@@ -181,7 +181,11 @@ fn generated_decoder(
         return_type: Some(ReturnType {
             access: ReturnAccess::Owned,
             ty: result_type_with_value(
-                &type_name_with_identity(source_type, contract.source_type.resolved.as_ref(), span),
+                &type_name_with_identity(
+                    source_type,
+                    contract.source_type.resolved_identity(),
+                    span,
+                ),
                 span,
             ),
             span,
@@ -424,7 +428,15 @@ fn pack_zero_value(
             name: "storage".to_owned(),
             value: Expr::Call {
                 callee: format!("Array[u8,{capacity}]"),
-                resolved_type: None,
+                resolved_type: Some(TypeName::builtin(
+                    "Array",
+                    vec![
+                        TypeName::builtin("u8", Vec::new(), None, span),
+                        TypeName::constant(capacity.to_string(), capacity.to_string(), span),
+                    ],
+                    None,
+                    span,
+                )),
                 generic_arguments: Vec::new(),
                 arguments: Vec::new(),
                 span,

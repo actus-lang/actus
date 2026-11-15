@@ -1,6 +1,7 @@
 mod builtins;
 mod callable;
 mod data;
+mod interning;
 mod top_level;
 mod type_keys;
 mod types;
@@ -15,6 +16,7 @@ pub use data::{
     EnumDef, EnumField, EnumPayload, EnumVariant, LayoutEndianness, PackDecl, PackField,
     PackStorage, SerializeDecl, SerializeSection, StructDef, StructField, StructFieldRole,
 };
+pub use interning::DeclarationId;
 pub use top_level::{
     ConstantDecl, ImportDecl, OpenSiblingDecl, PerformDecl, Program, RoleDecl, RoleMethod,
     TopLevelDecl,

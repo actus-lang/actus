@@ -73,16 +73,7 @@ pub(super) fn generic_inputs(
             configuration.target(),
         )
         .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
-        let mut expansion_program = crate::codegen::normalize_program(&targeted);
-        let module_path = match unit.owner() {
-            crate::modules::ModuleObjectOwner::Root => {
-                crate::modules::aggregation::registry::ROOT_MODULE_PATH
-            }
-            crate::modules::ModuleObjectOwner::Imported { module_path } => module_path.as_str(),
-        };
-        object_plan
-            .declaration_registry()
-            .annotate_program_headers(module_path, &mut expansion_program);
+        let expansion_program = crate::codegen::normalize_program(&targeted);
         combined_program.declarations.extend(expansion_program.declarations.clone());
         let generic_instances = crate::semantic::analyze_resolved(&expansion_program)
             .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
@@ -172,22 +163,10 @@ fn lower_unit_module(
     )
     .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
     let targeted = crate::codegen::normalize_program(&targeted_program);
-    let mut program = crate::codegen::specialize_program(&targeted, context.generic_instances)?;
-    let module_path = match unit.owner() {
-        crate::modules::ModuleObjectOwner::Root => "",
-        crate::modules::ModuleObjectOwner::Imported { module_path } => module_path.as_str(),
-    };
-    object_plan.declaration_registry().annotate_program_headers(module_path, &mut program);
-    let mut root_context = (index != 0).then(|| object_plan.units()[0].program().clone());
-    if let Some(root_context) = &mut root_context {
-        object_plan.declaration_registry().annotate_program_headers(
-            crate::modules::aggregation::registry::ROOT_MODULE_PATH,
-            root_context,
-        );
-    }
-    let performance_context = root_context
-        .as_ref()
-        .map(|root_context| (object_plan.units()[0].namespace().symbol_prefix(), root_context));
+    let program = crate::codegen::specialize_program(&targeted, context.generic_instances)?;
+    let performance_context = (index != 0).then(|| {
+        (object_plan.units()[0].namespace().symbol_prefix(), object_plan.units()[0].program())
+    });
     let module =
         lower_unit_backend_module(object_plan, index, &program, performance_context, context)?;
     Ok(LoweredSharedModule { object_name: unit_object_name(unit, index), module })

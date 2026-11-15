@@ -262,7 +262,7 @@ mod tests {
     use super::GenericLayoutRegistry;
     use crate::lexer::scan;
     use crate::parser::parse;
-    use crate::semantic::analyze_standalone;
+    use crate::semantic::analyze;
 
     #[test]
     fn calculates_substituted_struct_offsets() {
@@ -270,7 +270,7 @@ mod tests {
             scan("struct Box[T] { item: T, } verb main(erg value: Box[Int]) { }");
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze_standalone(&program).expect("source should analyze");
+        let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
         let key = semantic
@@ -293,7 +293,7 @@ mod tests {
         );
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze_standalone(&program).expect("source should analyze");
+        let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
         let key = semantic
@@ -316,7 +316,7 @@ mod tests {
         );
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze_standalone(&program).expect("source should analyze");
+        let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
         let key = semantic
@@ -337,7 +337,7 @@ mod tests {
         );
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze_standalone(&program).expect("source should analyze");
+        let semantic = analyze(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic pack-array layout should pass");
         let key = semantic

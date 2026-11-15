@@ -101,6 +101,20 @@ impl ModuleUnit {
             registry.annotate_program_headers(self.identity.module_path(), &mut source.program);
         }
     }
+
+    /// Replaces this unit's programs with the session's annotated revision.
+    pub(crate) fn replace_with_annotated(&mut self, annotated: &crate::session::AnnotatedUnit) {
+        assert_eq!(
+            self.sources.len(),
+            annotated.sources.len(),
+            "internal compiler error: annotated unit `{}` has a different source count",
+            self.identity.module_path()
+        );
+        self.implementation.clone_from(&annotated.implementation);
+        for (source, program) in self.sources.iter_mut().zip(&annotated.sources) {
+            source.program.clone_from(program);
+        }
+    }
 }
 
 pub fn load_module_unit(

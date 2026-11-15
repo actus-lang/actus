@@ -22,7 +22,7 @@ pub fn encode_type_key(type_name: &TypeName) -> String {
         Some(Role::Ins) => 'i',
     });
     match &type_name.resolved {
-        Some(identity) => encode_identity(identity, &mut encoded),
+        Some(identity) => encode_identity(identity.identity(), &mut encoded),
         None => {
             encoded.push('U');
         }

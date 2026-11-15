@@ -56,6 +56,31 @@ fn frontend_failures_are_memoized_with_their_errors() {
 }
 
 #[test]
+fn declaration_and_annotation_queries_share_revisions() {
+    let session = CompilationSession::new();
+    let first = session.unit_declarations("std::io@revision-1", Default::default);
+    let second = session.unit_declarations("std::io@revision-1", Default::default);
+    assert!(Arc::ptr_eq(&first, &second));
+
+    let program = || super::AnnotatedUnit {
+        implementation: parse_source(
+            None,
+            std::path::Path::new("annotated.act"),
+            "verb main() { }",
+        )
+        .program()
+        .expect("test program parses"),
+        sources: Vec::new(),
+    };
+    let annotated = session.annotated_unit("std::io@revision-1#std", program);
+    let repeated = session.annotated_unit("std::io@revision-1#std", program);
+    assert!(Arc::ptr_eq(&annotated, &repeated));
+
+    let changed = session.annotated_unit("std::io@revision-2#std", program);
+    assert!(!Arc::ptr_eq(&annotated, &changed));
+}
+
+#[test]
 fn planless_parse_uses_file_relative_spans() {
     let parsed = parse_source(None, std::path::Path::new("planless.act"), "verb main() { }");
     assert_eq!(parsed.tokens()[0].span.start, 0);

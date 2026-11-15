@@ -22,7 +22,6 @@ mod roles;
 mod scopes;
 mod serialization;
 mod stack_limit;
-mod standalone;
 mod state;
 mod structs;
 mod target_filter;
@@ -48,7 +47,6 @@ pub use model::{
     SemanticModel, SerializationContract,
 };
 pub use stack_limit::validate_stack_limit_backend_target;
-pub use standalone::analyze_standalone;
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use target_filter::{filter_program_for_target, filter_program_for_target_checked};
 pub use types::{SemanticType, TypeRegistry};

@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::SharedSourceMap;
+use crate::ast::Program;
+use crate::modules::aggregation::registry::DeclarationRegistry;
 use crate::source_map::canonical_path;
 
 use super::parsed::ParsedSource;
@@ -18,6 +20,16 @@ pub(crate) struct CompilationSession {
 struct SessionState {
     source_map: SharedSourceMap,
     parsed: QueryCache<PathBuf, Arc<ParsedSource>>,
+    unit_declarations: QueryCache<String, Arc<DeclarationRegistry>>,
+    annotated_units: QueryCache<String, Arc<AnnotatedUnit>>,
+}
+
+/// Annotated programs of one module unit: the merged implementation and each
+/// source file, in source order (ADR-0108 annotation, ADR-0109 query).
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) struct AnnotatedUnit {
+    pub(crate) implementation: Program,
+    pub(crate) sources: Vec<Program>,
 }
 
 impl CompilationSession {
@@ -26,12 +38,32 @@ impl CompilationSession {
             state: Arc::new(SessionState {
                 source_map: SharedSourceMap::new(),
                 parsed: QueryCache::new(),
+                unit_declarations: QueryCache::new(),
+                annotated_units: QueryCache::new(),
             }),
         }
     }
 
     pub(crate) fn source_map(&self) -> &SharedSourceMap {
         &self.state.source_map
+    }
+
+    /// Memoizes the declaration view for one unit revision and import closure.
+    pub(crate) fn unit_declarations(
+        &self,
+        key: impl Into<String>,
+        compute: impl FnOnce() -> DeclarationRegistry,
+    ) -> Arc<DeclarationRegistry> {
+        self.state.unit_declarations.get_or_compute(&key.into(), |_| true, || Arc::new(compute()))
+    }
+
+    /// Memoizes one annotated unit for one unit revision and import closure.
+    pub(crate) fn annotated_unit(
+        &self,
+        key: impl Into<String>,
+        compute: impl FnOnce() -> AnnotatedUnit,
+    ) -> Arc<AnnotatedUnit> {
+        self.state.annotated_units.get_or_compute(&key.into(), |_| true, || Arc::new(compute()))
     }
 
     /// Memoized `parse(unit)`, keyed by canonical source identity. A hit

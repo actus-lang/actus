@@ -60,7 +60,7 @@ impl Analyzer {
         self.current_return_type = self.current_return_type_name.as_ref().and_then(|type_name| {
             matches!(
                 type_name.resolved.as_ref(),
-                Some(crate::ast::DeclarationIdentity::Builtin { .. })
+                Some(identity) if matches!(identity.identity(), crate::ast::DeclarationIdentity::Builtin { .. })
             )
             .then(|| lookup_builtin_type(&type_name.name))
             .flatten()
@@ -69,7 +69,8 @@ impl Analyzer {
             self.current_return_type_name.as_ref().is_some_and(|type_name| {
                 matches!(
                     type_name.resolved.as_ref(),
-                    Some(crate::ast::DeclarationIdentity::Builtin { name }) if name == "Result"
+                    Some(identity)
+                        if matches!(identity.identity(), crate::ast::DeclarationIdentity::Builtin { name } if name == "Result")
                 )
             });
     }

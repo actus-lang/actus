@@ -1,11 +1,9 @@
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use crate::ast::{Program, TopLevelDecl};
 
 use super::super::identity::ModuleNamespace;
 use super::super::plan::ModuleCompilationPlan;
-use super::super::registry::DeclarationRegistry;
 use super::super::types::ModuleError;
 use super::super::validation::export_identity;
 use super::types::{declaration_type_dependencies, type_declaration_identity};
@@ -15,16 +13,11 @@ pub use super::units::{ModuleObjectOwner, ModuleObjectUnit};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleObjectPlan {
     units: Vec<ModuleObjectUnit>,
-    registry: Arc<DeclarationRegistry>,
     package_identity: String,
 }
 impl ModuleObjectPlan {
     pub fn units(&self) -> &[ModuleObjectUnit] {
         &self.units
-    }
-
-    pub(crate) fn declaration_registry(&self) -> &DeclarationRegistry {
-        &self.registry
     }
 
     pub(crate) fn package_identity(&self) -> &str {
@@ -35,7 +28,6 @@ pub(in crate::modules::aggregation) fn build_object_plan(
     compilation: &ModuleCompilationPlan,
     generic_types: &[crate::ast::TypeName],
 ) -> Result<ModuleObjectPlan, ModuleError> {
-    let registry = compilation.declaration_registry();
     let mut owners = HashSet::new();
     owners.insert(String::new());
     let mut units = vec![ModuleObjectUnit {
@@ -54,8 +46,7 @@ pub(in crate::modules::aggregation) fn build_object_plan(
         }
         let internal_scope = module_is_reachable_from_friend_scope(compilation, module);
         let exported_verbs = exported_implementation_names(module, internal_scope);
-        let mut program = implementation_declarations(module, compilation, generic_types);
-        registry.annotate_program_headers(module.identity().module_path(), &mut program);
+        let program = implementation_declarations(module, compilation, generic_types);
         units.push(ModuleObjectUnit {
             owner: ModuleObjectOwner::Imported { module_path },
             namespace: module.identity().namespace().clone(),
@@ -63,11 +54,7 @@ pub(in crate::modules::aggregation) fn build_object_plan(
             exported_verbs,
         });
     }
-    Ok(ModuleObjectPlan {
-        units,
-        registry,
-        package_identity: compilation.package_identity().to_owned(),
-    })
+    Ok(ModuleObjectPlan { units, package_identity: compilation.package_identity().to_owned() })
 }
 
 fn module_is_reachable_from_friend_scope(

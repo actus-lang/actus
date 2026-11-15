@@ -20,10 +20,8 @@ pub(crate) fn validate_compilation_plan(
     plan: &super::compilation::ModuleCompilationPlan,
     target: &TargetSpec,
 ) -> Result<(), ModuleError> {
-    let registry = plan.declaration_registry();
-    let _ = registry.resolve("", "Int");
     let caller = filter_program(plan.caller(), target)?;
-    validate_program(&registry, ROOT_MODULE_PATH, &caller)?;
+    validate_program(&caller)?;
     let object_plan = plan.object_plan()?;
     let root_context = object_plan
         .units()
@@ -32,17 +30,13 @@ pub(crate) fn validate_compilation_plan(
         .transpose()?;
     for (index, unit) in object_plan.units().iter().enumerate() {
         let targeted = filter_program(unit.program(), target)?;
-        let module_path = match unit.owner() {
-            super::super::objects::ModuleObjectOwner::Root => ROOT_MODULE_PATH,
-            super::super::objects::ModuleObjectOwner::Imported { module_path } => module_path,
-        };
-        validate_program(&registry, module_path, &targeted)?;
+        validate_program(&targeted)?;
         if index != 0 {
             let contextual = super::performance_context::program_with_performance_context(
                 &targeted,
                 root_context.as_ref().expect("object plan has a root unit"),
             );
-            validate_program(&registry, module_path, &contextual)?;
+            validate_program(&contextual)?;
         }
     }
     Ok(())
@@ -53,13 +47,10 @@ fn filter_program(program: &Program, target: &TargetSpec) -> Result<Program, Mod
         .map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
-fn validate_program(
-    registry: &super::super::registry::DeclarationRegistry,
-    module_path: &str,
-    program: &Program,
-) -> Result<(), ModuleError> {
-    let mut normalized = crate::codegen::normalize_program(program);
-    registry.annotate_program_headers(module_path, &mut normalized);
+/// The plan already annotated `program` (ADR-0108); normalization preserves
+/// the annotation, so validation analyzes it without resolving again.
+fn validate_program(program: &Program) -> Result<(), ModuleError> {
+    let normalized = crate::codegen::normalize_program(program);
     crate::semantic::analyze_resolved(&normalized)
         .map(|_| ())
         .map_err(|error| ModuleError::Semantic(Box::new(error)))

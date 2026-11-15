@@ -9,7 +9,7 @@ use crate::diagnostics::{
 use crate::lexer::{SourceSpan, TokenKind, scan};
 use crate::modules::{ModuleError, ModuleResolver};
 use crate::parser::{ParseError, ParseErrorKind, parse};
-use crate::semantic::{analyze_standalone, filter_program_for_target_checked};
+use crate::semantic::{analyze, filter_program_for_target_checked};
 use crate::target::TargetSpec;
 
 use super::position::{LineIndex, LspRange};
@@ -80,7 +80,7 @@ fn collect_diagnostics(
         Ok(program) => program,
         Err(error) => return vec![semantic_diagnostic(&error)],
     };
-    if let Err(error) = analyze_standalone(&program) {
+    if let Err(error) = analyze(&program) {
         return vec![semantic_diagnostic(&error)];
     }
     Vec::new()

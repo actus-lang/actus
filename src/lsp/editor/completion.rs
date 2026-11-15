@@ -187,7 +187,7 @@ fn pack_storage_detail(storage: &crate::ast::PackStorage) -> String {
 }
 
 fn binding_items(program: &crate::ast::Program) -> Vec<serde_json::Value> {
-    let Ok(model) = crate::semantic::analyze_standalone(program) else { return Vec::new() };
+    let Ok(model) = crate::semantic::analyze(program) else { return Vec::new() };
     model
         .bindings
         .iter()

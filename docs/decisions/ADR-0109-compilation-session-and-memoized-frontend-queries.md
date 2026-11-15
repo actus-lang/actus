@@ -36,6 +36,18 @@ The first query is:
 parse(unit) -> Arc<ParsedSource>
 ```
 
+The PR B integration adds two session queries on the same generic
+`QueryCache`: `unit_declarations(unit) -> Arc<DeclarationRegistry>` and
+`annotated_unit(unit) -> Arc<AnnotatedUnit>`, where `AnnotatedUnit` holds the
+unit's annotated implementation and source programs. Their keys contain the
+unit's canonical identity and source revision together with the revisions of
+every unit in the plan, a conservative dependency fingerprint that can only
+cause a recomputation, never a stale result. The declaration registry used by
+a plan is a lightweight view merged from the cached unit declaration tables;
+declaration bodies are retained through shared `Arc` ownership rather than
+copied into each view. A unit is copied only when its annotation is computed;
+a hit reuses the published result.
+
 `ParsedSource` holds the source text, the tokens, and exactly one outcome:
 the program, the lexical errors, or the parse error. Callers receive an owned
 program because normalization and annotation modify their copy.
@@ -78,8 +90,8 @@ cache.
 
 ### Follow-up integration
 
-- PR B adds the ADR-0108 declaration registry and annotated module units as
-  session queries on the same `QueryCache`.
+- A per-unit import-closure fingerprint can replace the plan-wide fingerprint
+  when profiling shows plans of one run that differ only in unrelated units.
 - The language server currently parses through its planless entry point with
   overlays. A workspace session with document-version invalidation is a
   separate roadmap item (Phase 53, item L).
