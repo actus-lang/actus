@@ -1,5 +1,6 @@
 #[cfg(feature = "cranelift")]
 mod cranelift;
+mod linkage;
 #[cfg(feature = "llvm")]
 mod llvm;
 mod objects;

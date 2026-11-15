@@ -20,8 +20,9 @@ pub(super) fn emit_shared_scalar_units(
     modules
         .into_iter()
         .map(|lowered| {
-            let bytes = crate::codegen::cranelift::emit_contract_module_object(
+            let bytes = crate::codegen::cranelift::emit_contract_module_object_with_local_symbols(
                 &lowered.module,
+                &lowered.local_symbols,
                 configuration.native_backend(),
                 configuration.target(),
             )?;
@@ -56,8 +57,9 @@ pub(super) fn emit_shared_specialized_units(
     modules
         .into_iter()
         .map(|lowered| {
-            let bytes = crate::codegen::cranelift::emit_contract_module_object(
+            let bytes = crate::codegen::cranelift::emit_contract_module_object_with_local_symbols(
                 &lowered.module,
+                &lowered.local_symbols,
                 configuration.native_backend(),
                 configuration.target(),
             )?;

@@ -32,7 +32,7 @@ pub(super) mod types;
 pub(super) use isa::build_isa_with_optimization;
 
 pub use abi::{validate_external_native_signature, validate_native_signature};
-pub use contract::emit_contract_module_object;
+pub use contract::{emit_contract_module_object, emit_contract_module_object_with_local_symbols};
 pub use native::{
     emit_module_object_for_target_in_namespace,
     emit_module_object_for_target_in_namespace_with_bindings,

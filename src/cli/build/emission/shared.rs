@@ -55,6 +55,8 @@ fn retain_reachable_functions(
 pub(super) struct LoweredSharedModule {
     pub(super) object_name: String,
     pub(super) module: BackendModule,
+    /// Functions emitted with local linkage (ADR-0112).
+    pub(super) local_symbols: std::collections::BTreeSet<String>,
 }
 
 pub(super) fn generic_inputs(
@@ -134,6 +136,7 @@ pub(super) fn lower_shared_modules(
     for module in &mut modules {
         retain_referenced_externals(&mut module.module);
     }
+    super::linkage::assign_local_symbols(&mut modules, object_plan, symbol)?;
     Ok(modules)
 }
 
@@ -169,7 +172,11 @@ fn lower_unit_module(
     });
     let module =
         lower_unit_backend_module(object_plan, index, &program, performance_context, context)?;
-    Ok(LoweredSharedModule { object_name: unit_object_name(unit, index), module })
+    Ok(LoweredSharedModule {
+        object_name: unit_object_name(unit, index),
+        module,
+        local_symbols: std::collections::BTreeSet::new(),
+    })
 }
 
 fn lower_unit_backend_module(

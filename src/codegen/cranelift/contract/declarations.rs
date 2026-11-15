@@ -13,6 +13,7 @@ use crate::codegen::{BackendModule, BackendPassingMode, BackendValueType};
 pub(super) fn declare_functions(
     module: &mut ObjectModule,
     backend_module: &BackendModule,
+    local_symbols: &std::collections::BTreeSet<String>,
 ) -> Result<BTreeMap<String, Declaration>, BackendEmitError> {
     let mut declarations = BTreeMap::new();
     for external in &backend_module.externals {
@@ -40,7 +41,15 @@ pub(super) fn declare_functions(
             false,
         )?;
         let id = module
-            .declare_function(function.symbol.as_str(), Linkage::Export, &signature)
+            .declare_function(
+                function.symbol.as_str(),
+                if local_symbols.contains(function.symbol.as_str()) {
+                    Linkage::Local
+                } else {
+                    Linkage::Export
+                },
+                &signature,
+            )
             .map_err(|error| BackendEmitError(error.to_string()))?;
         let lowered = declaration(module, id, &function.parameters, &function.return_value)?;
         declarations.insert(function.symbol.as_str().to_owned(), lowered);

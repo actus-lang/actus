@@ -274,14 +274,22 @@ open verb start() -> Int {
    satisfy ADR-0110 can keep them inside the unit. New diagnostic `E1137`
    (one name opened both ways). Narrowing the symbol linkage of non-public
    verbs remains a separate decision.
-9. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
+9. **K — Symbol linkage** (`ADR-0112`): linkage follows declaration reach.
+   Level 1 (this item): only the entry, public verbs of imported units and
+   symbols another object names stay global; private and `open unit` verbs
+   get local linkage in both backends, and test plans keep every symbol
+   global. The `nm` baseline changes once. Levels 2 and 3 (hidden
+   visibility for public verbs, and one localized relocatable object for a
+   host with the host ABI as its only global symbols) follow as a separate
+   item.
+10. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
    module (all tests of the module's `tests/` files), runs each test in its own
    process selected by name (isolation, timeouts and expected faults unchanged),
    and validates the compilation plan once per group. A group compile error
    fails every test in that group with one diagnostic.
-10. **D — Diagnostic rendering**: replace backend raw `Debug` errors with the
+11. **D — Diagnostic rendering**: replace backend raw `Debug` errors with the
    stable diagnostic contract and an explicit internal-error boundary.
-11. **E — Formatter layout rule and `actus new`** (new ADR): verb bodies are
+12. **E — Formatter layout rule and `actus new`** (new ADR): verb bodies are
    always multi-line; call arguments, verb parameters, struct fields,
    struct-literal fields and enum variants are placed one per line when there
    are two or more, and stay on one line when there is one. Type arguments,
@@ -291,16 +299,16 @@ open verb start() -> Int {
    make `actus new` output pass `actus fmt --check`, and fix the three std files
    that are not fmt-clean (`fs/directory.act`,
    `wire/fragment/reassembly.act`, `volatile/volatile.act`).
-12. **F — Documentation reconciliation**: correct README examples, alpha guide
+13. **F — Documentation reconciliation**: correct README examples, alpha guide
    commands, ADR statuses, root-manifest documentation, and add the E1800
    `actus lock` hint.
-13. **F2 — Neutral fixtures and documentation**: replace downstream-application
+14. **F2 — Neutral fixtures and documentation**: replace downstream-application
    names and private implementation terms in docs, tests, examples, and std
    comments with neutral names without changing test behavior.
-14. **L — LSP workspace session** (`ADR-0109`): the language server keeps one
+15. **L — LSP workspace session** (`ADR-0109`): the language server keeps one
    compilation session per workspace, routes overlay parsing through it, and
    invalidates memoized results by document version.
-15. **G — Version and release note**: reconcile the compiler version, alpha tag,
+16. **G — Version and release note**: reconcile the compiler version, alpha tag,
    release notes, and final release evidence.
 
 ## Evidence gates
