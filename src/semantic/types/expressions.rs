@@ -183,6 +183,13 @@ impl Analyzer {
 
     fn call_type_name(&self, expression: &Expr) -> Option<String> {
         let (name, span) = match expression {
+            Expr::Call { callee, resolved_type: Some(type_name), .. }
+                if Self::is_type_constructor_callee(callee) =>
+            {
+                let mut type_name = type_name.clone();
+                self.normalize_array_capacities(&mut type_name).ok();
+                return Some(super::super::analyzer::canonical_type_name(&type_name));
+            }
             Expr::Call { callee, span, .. } => (callee, span),
             Expr::MethodCall { method, span, .. } => (method, span),
             _ => return None,
@@ -195,9 +202,15 @@ impl Analyzer {
             .map(super::super::analyzer::canonical_type_name)
     }
 
-    fn literal_type_name(&self, expression: &Expr) -> Option<String> {
+    fn is_type_constructor_callee(callee: &str) -> bool {
+        let Some((name, _)) = callee.split_once('[') else { return false };
+        matches!(name, "Array" | "Arena" | "Buffer" | "Box" | "Map" | "Option" | "Result")
+    }
+
+    pub(crate) fn literal_type_name(&self, expression: &Expr) -> Option<String> {
         match expression {
             Expr::BoolLiteral { .. } => Some("Bool".to_owned()),
+            Expr::BufferLiteral { .. } => Some("Buffer".to_owned()),
             Expr::Integer { suffix: Some(suffix), .. }
                 if matches!(
                     primitive_type(suffix),
@@ -206,9 +219,11 @@ impl Analyzer {
             {
                 Some(suffix.clone())
             }
+            Expr::Integer { suffix: None, .. } => Some("Int".to_owned()),
             Expr::FloatLiteral { suffix, .. } => {
                 Some(suffix.as_deref().unwrap_or("f64").to_owned())
             }
+            Expr::StringLiteral { .. } => Some("String".to_owned()),
             Expr::Grouping { expression, .. } => self.expression_type_name(expression),
             _ => None,
         }

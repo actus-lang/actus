@@ -265,7 +265,8 @@ fn test_compilation_plan(
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
-    );
+    )
+    .with_package_identity(configuration.package_identity(), configuration.source_root());
     build_test_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
 }
 
@@ -364,22 +365,12 @@ fn test_fault_declaration() -> TopLevelDecl {
             role: Role::Abs,
             name: "code".to_owned(),
             dispatch: DispatchMode::Static,
-            ty: TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
+            ty: TypeName::builtin("Int", Vec::new(), None, span),
             span,
         }],
         return_type: Some(crate::ast::ReturnType {
             access: crate::ast::ReturnAccess::Owned,
-            ty: TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
+            ty: TypeName::builtin("Int", Vec::new(), None, span),
             span,
         }),
         span,
@@ -397,6 +388,8 @@ fn test_main(
         statements.push(Stmt::Expression {
             expression: Expr::Call {
                 callee: "actus_test_publication_fault".to_owned(),
+                resolved_type: None,
+                generic_arguments: Vec::new(),
                 arguments: vec![Argument {
                     name: None,
                     role: Some(Role::Abs),
@@ -414,7 +407,13 @@ fn test_main(
         });
     }
     statements.push(Stmt::Return {
-        value: Some(Expr::Call { callee: name.to_owned(), arguments: Vec::new(), span }),
+        value: Some(Expr::Call {
+            callee: name.to_owned(),
+            resolved_type: None,
+            generic_arguments: Vec::new(),
+            arguments: Vec::new(),
+            span,
+        }),
         span,
     });
     TopLevelDecl::Verb(VerbDecl {
@@ -427,12 +426,7 @@ fn test_main(
         params: Vec::new(),
         return_type: Some(crate::ast::ReturnType {
             access: crate::ast::ReturnAccess::Owned,
-            ty: TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
+            ty: TypeName::builtin("Int", Vec::new(), None, span),
             span,
         }),
         body: Block { statements, span },

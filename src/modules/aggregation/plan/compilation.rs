@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::ast::{Program, TopLevelDecl};
 
 use super::super::super::resolver::ModuleResolver;
 use super::super::declarations::{append_internal_declarations, append_public_declarations};
 use super::super::objects::{ModuleObjectPlan, build_object_plan};
+use super::super::registry::DeclarationRegistry;
 use super::super::types::ModuleError;
 use super::super::unit::ModuleUnit;
 use super::super::validation::{declaration_import_binding, validate_import_bindings};
@@ -19,6 +21,8 @@ pub struct ModuleCompilationPlan {
     caller: Program,
     units: Vec<ModuleUnit>,
     friend_modules: HashSet<String>,
+    package_identity: String,
+    registry: Arc<super::super::registry::DeclarationRegistry>,
 }
 
 impl ModuleCompilationPlan {
@@ -30,9 +34,19 @@ impl ModuleCompilationPlan {
         &self.caller
     }
 
+    pub fn package_identity(&self) -> &str {
+        &self.package_identity
+    }
+
+    pub(crate) fn declaration_registry(&self) -> Arc<DeclarationRegistry> {
+        Arc::clone(&self.registry)
+    }
+
     pub fn with_caller_program(&self, caller: Program) -> Self {
         let mut plan = self.clone();
         plan.caller = caller;
+        plan.registry
+            .annotate_program_headers(super::super::registry::ROOT_MODULE_PATH, &mut plan.caller);
         plan
     }
 
@@ -207,7 +221,7 @@ fn build_compilation_plan_with_overlays_and_scope_check(
         &friend_modules,
     )?;
     validate_symbol_collisions(&local_declarations, &units)?;
-    Ok(ModuleCompilationPlan {
+    let mut plan = ModuleCompilationPlan {
         local: Program {
             file_metadata: program.file_metadata.clone(),
             declarations: local_declarations,
@@ -218,7 +232,18 @@ fn build_compilation_plan_with_overlays_and_scope_check(
         },
         units,
         friend_modules,
-    })
+        package_identity: resolver.package_identity().identity().to_owned(),
+        registry: Arc::new(DeclarationRegistry::default()),
+    };
+    let registry = Arc::new(DeclarationRegistry::from_plan(&plan));
+    plan.registry = Arc::clone(&registry);
+    let annotation_scope = importer_module_path.unwrap_or(super::super::registry::ROOT_MODULE_PATH);
+    registry.annotate_program_headers(annotation_scope, &mut plan.local);
+    registry.annotate_program_headers(annotation_scope, &mut plan.caller);
+    for unit in &mut plan.units {
+        unit.annotate_types(&registry);
+    }
+    Ok(plan)
 }
 
 #[allow(clippy::too_many_arguments)]

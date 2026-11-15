@@ -221,10 +221,19 @@ open verb start() -> Int {
    ordered arguments`, independent of import aliases and re-export spellings.
    The timing gate is release-versus-release, with PR B overhead no more than
    10% relative to PR A. The R1 test must check, build, and run successfully.
-5. **B2 — Generic verb canonical identity**: remove spelling-based generic
-   verb identity from specialization and emission.
-6. **B3 — Semantic type representation**: move semantic type comparisons to
-   resolved `TypeName` identity while preserving source spelling in diagnostics.
+5. **B2 — Generic verb canonical identity**: generic verb specialization still
+   contains spelling-based handling in `src/codegen/generic/verb_body.rs`
+   (`specialize_call`, `callee.contains('[')`), and related generic-verb name
+   matching in `src/codegen/generic/verbs.rs`,
+   `src/cli/build/emission/llvm.rs`, and `src/cli/build/emission/objects.rs`.
+   This is a known defect: two modules with same-named generic verbs can be
+   resolved incorrectly. It is fixed by PR B2.
+6. **B3 — Semantic type representation**: replace the remaining semantic
+   string representation with `expression_type_name -> Option<TypeName>`,
+   consolidate the `canonical_type_name` variants into one display function,
+   and use identity for semantic comparisons, including checks currently
+   expressed as `expected.name == "Result"`. PR B3 empties the explicit
+   `pr_b3_allowlisted` entries in `tests/architecture_conformance.rs`.
 7. **C — R2 const-generic resolution**: resolve the re-exported
    const-generic struct type-parameter path exposed by the minimal R2
    reproduction.

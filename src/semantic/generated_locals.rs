@@ -224,7 +224,7 @@ fn normalize_place(place: &mut Place, generated: &mut Vec<Stmt>) {
         normalize_place(target, generated);
         let (prefix, expression) = normalize_nested_expression(index);
         generated.extend(prefix);
-        *index = expression;
+        **index = expression;
     } else if let Place::Field { object, .. } = place {
         normalize_place(object, generated);
     }
@@ -234,7 +234,7 @@ fn normalize_expression(
     expression: &mut Expr,
     context: &mut NormalizationContext<'_>,
 ) -> (Vec<Stmt>, Expr) {
-    let Expr::Call { callee, arguments, span } = expression else {
+    let Expr::Call { callee, arguments, span, .. } = expression else {
         return (Vec::new(), expression.clone());
     };
     let mut prefix = Vec::new();
@@ -277,6 +277,7 @@ fn materialize_arguments(
             role: Role::Erg,
             name: name.clone(),
             ty: Some(parameter.ty.clone()),
+            resolved_type: None,
             initializer,
             span,
         });
@@ -398,7 +399,8 @@ mod tests {
             arguments[0].expression,
             Expr::Identifier { ref name, .. } if name == "__actus_generated_0"
         ));
-        crate::semantic::analyze(&program).expect("generated scalar call should remain valid");
+        crate::semantic::analyze_standalone(&program)
+            .expect("generated scalar call should remain valid");
     }
 
     #[test]
@@ -419,7 +421,7 @@ mod tests {
         assert!(
             matches!(arguments[0].expression, Expr::Call { ref callee, .. } if callee == "make")
         );
-        assert!(crate::semantic::analyze(&program).is_err());
+        assert!(crate::semantic::analyze_standalone(&program).is_err());
     }
 
     #[test]
@@ -428,13 +430,13 @@ mod tests {
             "verb read(abs value: u32) { return; } verb main() { erg source: u32 = 1u32; read(value: abs ref source); }",
         );
         assert_eq!(normalize_program(&borrowed), borrowed);
-        assert!(crate::semantic::analyze(&borrowed).is_ok());
+        assert!(crate::semantic::analyze_standalone(&borrowed).is_ok());
 
         let aggregate = parse_source(
             "verb read(abs value: Array[u32, 2]) { return; } verb main() { erg values: Array[u32, 2] = Array[u32, 2](); read(value: abs values); }",
         );
         assert_eq!(normalize_program(&aggregate), aggregate);
-        assert!(crate::semantic::analyze(&aggregate).is_ok());
+        assert!(crate::semantic::analyze_standalone(&aggregate).is_ok());
     }
 
     #[test]
@@ -457,6 +459,6 @@ mod tests {
         let program = parse_source(
             "verb consume(dat value: u32) { return; } verb read(abs value: u32) { return; } verb main() { erg source: u32 = 1u32; consume(value: dat source); read(value: abs (source + 1u32)); }",
         );
-        assert!(crate::semantic::analyze(&program).is_err());
+        assert!(crate::semantic::analyze_standalone(&program).is_err());
     }
 }

@@ -25,48 +25,31 @@ impl Analyzer {
         arguments: &[Argument],
         span: SourceSpan,
     ) -> Result<bool, SemanticError> {
+        self.visit_intrinsic_call_with_types(callee, arguments, span, &[])
+    }
+
+    pub(super) fn visit_intrinsic_call_with_types(
+        &mut self,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+        generic_arguments: &[TypeName],
+    ) -> Result<bool, SemanticError> {
         let Some(kind) = lookup_call_intrinsic(callee) else { return Ok(false) };
+        self.dispatch_intrinsic(kind, callee, arguments, span, generic_arguments)
+    }
+
+    fn dispatch_intrinsic(
+        &mut self,
+        kind: IntrinsicKind,
+        callee: &str,
+        arguments: &[Argument],
+        span: SourceSpan,
+        generic_arguments: &[TypeName],
+    ) -> Result<bool, SemanticError> {
         match kind {
-            IntrinsicKind::Append => {
-                let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
-                for argument in &arguments {
-                    self.visit_expression(&argument.expression)?;
-                }
-                let handle = &arguments[0].expression;
-                let parameters = IntrinsicKind::Append.spec().parameters;
-                if !self.is_owner_argument(handle)
-                    || self.expression_type(handle) != Some(crate::ast::BuiltinType::Buffer)
-                {
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::InvalidArgumentRole {
-                            callee: callee.to_owned(),
-                            parameter: parameters[0].to_owned(),
-                        },
-                        span: expression_span(handle),
-                    });
-                }
-                self.require_append_byte_type(callee, parameters[1], &arguments[1].expression)?;
-                Ok(true)
-            }
-            IntrinsicKind::BufferLength => {
-                let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
-                for argument in &arguments {
-                    self.visit_expression(&argument.expression)?;
-                }
-                let buffer = &arguments[0].expression;
-                if self.expression_type(buffer) != Some(crate::ast::BuiltinType::Buffer)
-                    || !self.is_readable_owner(buffer)
-                {
-                    return Err(SemanticError {
-                        kind: SemanticErrorKind::InvalidIntrinsicArgument {
-                            callee: callee.to_owned(),
-                            parameter: "buffer".to_owned(),
-                        },
-                        span: expression_span(buffer),
-                    });
-                }
-                Ok(true)
-            }
+            IntrinsicKind::Append => self.validate_append(arguments, callee, span),
+            IntrinsicKind::BufferLength => self.validate_buffer_length(arguments, callee, span),
             IntrinsicKind::Crc32 => self.validate_crc32(arguments, callee, span),
             IntrinsicKind::Crc32Matches => self.validate_crc32_matches(arguments, callee, span),
             IntrinsicKind::ValidateFixedFrame => self.validate_fixed_frame(arguments, callee, span),
@@ -74,15 +57,72 @@ impl Analyzer {
             IntrinsicKind::Print => self.validate_print(callee, arguments, span),
             IntrinsicKind::Eprint => self.validate_print(callee, arguments, span),
             IntrinsicKind::Drop => unreachable!("call lookup excludes statement intrinsics"),
-            IntrinsicKind::SizeOf => self.validate_size_of(callee, arguments, span),
-            IntrinsicKind::AlignOf => self.validate_align_of(callee, arguments, span),
+            IntrinsicKind::SizeOf => {
+                self.validate_size_of(callee, arguments, generic_arguments, span)
+            }
+            IntrinsicKind::AlignOf => {
+                self.validate_align_of(callee, arguments, generic_arguments, span)
+            }
         }
+    }
+
+    fn validate_append(
+        &mut self,
+        arguments: &[Argument],
+        callee: &str,
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
+        for argument in &arguments {
+            self.visit_expression(&argument.expression)?;
+        }
+        let handle = &arguments[0].expression;
+        let parameters = IntrinsicKind::Append.spec().parameters;
+        if !self.is_owner_argument(handle)
+            || self.expression_type(handle) != Some(crate::ast::BuiltinType::Buffer)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidArgumentRole {
+                    callee: callee.to_owned(),
+                    parameter: parameters[0].to_owned(),
+                },
+                span: expression_span(handle),
+            });
+        }
+        self.require_append_byte_type(callee, parameters[1], &arguments[1].expression)?;
+        Ok(true)
+    }
+
+    fn validate_buffer_length(
+        &mut self,
+        arguments: &[Argument],
+        callee: &str,
+        span: SourceSpan,
+    ) -> Result<bool, SemanticError> {
+        let arguments = self.bind_intrinsic_arguments(callee, arguments, span)?;
+        for argument in &arguments {
+            self.visit_expression(&argument.expression)?;
+        }
+        let buffer = &arguments[0].expression;
+        if self.expression_type(buffer) != Some(crate::ast::BuiltinType::Buffer)
+            || !self.is_readable_owner(buffer)
+        {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::InvalidIntrinsicArgument {
+                    callee: callee.to_owned(),
+                    parameter: "buffer".to_owned(),
+                },
+                span: expression_span(buffer),
+            });
+        }
+        Ok(true)
     }
 
     fn validate_size_of(
         &mut self,
         callee: &str,
         arguments: &[Argument],
+        generic_arguments: &[TypeName],
         span: SourceSpan,
     ) -> Result<bool, SemanticError> {
         if !arguments.is_empty() {
@@ -91,11 +131,7 @@ impl Analyzer {
                 span,
             });
         }
-        let Some(type_name) = callee
-            .strip_prefix("size_of[")
-            .and_then(|name| name.strip_suffix(']'))
-            .and_then(|name| super::calls::parse_type_name_key(name, span))
-        else {
+        let Some(type_name) = generic_arguments.first().cloned() else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidIntrinsicArgument {
                     callee: callee.to_owned(),
@@ -108,7 +144,7 @@ impl Analyzer {
         self.validate_type_reference(&type_name)?;
         self.inferred_expression_types.insert(
             self.expression_cache_key(span),
-            TypeName { name: "u64".to_owned(), arguments: Vec::new(), reference_role: None, span },
+            TypeName::builtin("u64", Vec::new(), None, span),
         );
         Ok(true)
     }
@@ -117,6 +153,7 @@ impl Analyzer {
         &mut self,
         callee: &str,
         arguments: &[Argument],
+        generic_arguments: &[TypeName],
         span: SourceSpan,
     ) -> Result<bool, SemanticError> {
         if !arguments.is_empty() {
@@ -125,11 +162,7 @@ impl Analyzer {
                 span,
             });
         }
-        let Some(type_name) = callee
-            .strip_prefix("align_of[")
-            .and_then(|name| name.strip_suffix(']'))
-            .and_then(|name| super::calls::parse_type_name_key(name, span))
-        else {
+        let Some(type_name) = generic_arguments.first().cloned() else {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidIntrinsicArgument {
                     callee: callee.to_owned(),
@@ -142,7 +175,7 @@ impl Analyzer {
         self.validate_type_reference(&type_name)?;
         self.inferred_expression_types.insert(
             self.expression_cache_key(span),
-            TypeName { name: "u64".to_owned(), arguments: Vec::new(), reference_role: None, span },
+            TypeName::builtin("u64", Vec::new(), None, span),
         );
         Ok(true)
     }
@@ -292,7 +325,7 @@ impl Analyzer {
         if let Some(name) = type_name {
             self.inferred_expression_types.insert(
                 self.expression_cache_key(span),
-                TypeName { name, arguments: Vec::new(), reference_role: None, span },
+                TypeName::builtin(name, Vec::new(), None, span),
             );
         }
         Ok(true)

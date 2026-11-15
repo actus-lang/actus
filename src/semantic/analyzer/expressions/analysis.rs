@@ -45,14 +45,7 @@ impl Analyzer {
             }
             Expr::Grouping { expression, .. } => self.visit_expression(expression),
             Expr::Unary { operator, expression, span } => {
-                self.visit_consumed_expression(expression)?;
-                self.validate_unary_operator(*operator, expression)?;
-                let unary = Expr::Unary {
-                    operator: *operator,
-                    expression: expression.clone(),
-                    span: *span,
-                };
-                self.validate_typed_integer_expression(&unary)
+                self.visit_unary_expression(*operator, expression, *span)
             }
             Expr::Cast { expression, target, span } => {
                 self.visit_consumed_expression(expression)?;
@@ -60,14 +53,15 @@ impl Analyzer {
             }
             Expr::Borrow { expression, .. } => self.visit_consumed_expression(expression),
             Expr::Try { expression, span } => self.visit_try_expression(expression, *span),
-            Expr::Call { callee, arguments, span } => self.visit_call(callee, arguments, *span),
-            Expr::MethodCall { receiver, method, arguments, span } => {
-                self.visit_method_call(receiver, method, arguments, *span)
+            Expr::Call { callee, resolved_type, generic_arguments, arguments, span } => {
+                self.visit_call(callee, arguments, resolved_type.as_ref(), generic_arguments, *span)
             }
-            Expr::StructLit { name, type_arguments, fields, span } => {
-                self.visit_struct_literal(name, type_arguments, fields, *span)
+            Expr::MethodCall { receiver, method, arguments, resolved_type, span } => {
+                self.visit_method_call(receiver, method, arguments, resolved_type.as_ref(), *span)
             }
-            Expr::FieldAccess { object, field, span } => {
+            Expr::StructLit { name, type_arguments, resolved_type, fields, span } => self
+                .visit_struct_literal(name, type_arguments, resolved_type.as_ref(), fields, *span),
+            Expr::FieldAccess { object, field, span, .. } => {
                 self.visit_field_access(object, field, *span)
             }
             Expr::Index { target, index, .. } => {
@@ -92,6 +86,18 @@ impl Analyzer {
             }
             Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+
+    fn visit_unary_expression(
+        &mut self,
+        operator: UnaryOp,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        self.visit_consumed_expression(expression)?;
+        self.validate_unary_operator(operator, expression)?;
+        let unary = Expr::Unary { operator, expression: Box::new(expression.clone()), span };
+        self.validate_typed_integer_expression(&unary)
     }
 
     fn visit_bool_literal(&mut self, value: bool, span: SourceSpan) -> Result<(), SemanticError> {
@@ -138,12 +144,7 @@ impl Analyzer {
             })?;
         if target_type.name == "Buffer" && target_type.arguments.is_empty() {
             self.validate_integer_index(index)?;
-            return Ok(TypeName {
-                name: "u8".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span: expression_span(index),
-            });
+            return Ok(TypeName::builtin("u8", Vec::new(), None, expression_span(index)));
         }
         if target_type.name != "Array" || target_type.arguments.len() != 2 {
             return Err(SemanticError {
@@ -250,12 +251,12 @@ impl Analyzer {
             if is_unsuffixed_integer_literal(right) && is_integer_type_name(&left_type) {
                 self.validate_expected_literal(
                     right,
-                    &crate::ast::TypeName {
-                        name: left_type.clone(),
-                        arguments: Vec::new(),
-                        reference_role: None,
-                        span: expression_span(right),
-                    },
+                    &crate::ast::TypeName::builtin(
+                        left_type.clone(),
+                        Vec::new(),
+                        None,
+                        expression_span(right),
+                    ),
                 )?;
                 true
             } else {
@@ -339,6 +340,7 @@ impl Analyzer {
         &mut self,
         name: &str,
         type_arguments: &[crate::ast::TypeName],
+        resolved_type: Option<&crate::ast::TypeName>,
         fields: &[crate::ast::StructFieldInit],
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
@@ -346,7 +348,7 @@ impl Analyzer {
         if self.pack_types.contains_key(name) {
             self.validate_pack_literal(name, fields, span)
         } else {
-            self.validate_struct_literal(name, type_arguments, fields, span)
+            self.validate_struct_literal(name, type_arguments, resolved_type, fields, span)
         }
     }
 

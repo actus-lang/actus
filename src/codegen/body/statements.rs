@@ -9,7 +9,7 @@ pub(super) fn lower_expression_statement(
     _statement_span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
-    if let Expr::Call { callee, arguments, span: _ } = expression {
+    if let Expr::Call { callee, arguments, .. } = expression {
         if lookup_call_intrinsic(callee).is_some_and(|kind| {
             matches!(
                 kind,

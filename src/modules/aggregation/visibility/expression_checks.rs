@@ -114,7 +114,7 @@ fn check_expr_with_context(
 }
 
 fn check_call(expression: &Expr, context: &VisibilityContext<'_>) -> Result<(), ModuleError> {
-    let Expr::Call { callee, span, arguments } = expression else { unreachable!() };
+    let Expr::Call { callee, span, arguments, .. } = expression else { unreachable!() };
     super::reject_private(callee, context.private_verbs, context.module_path, context.unit, *span)?;
     for argument in arguments {
         check_expr_with_context(&argument.expression, context)?;

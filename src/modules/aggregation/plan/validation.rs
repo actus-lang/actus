@@ -4,6 +4,7 @@ use crate::ast::{Program, TopLevelDecl};
 use crate::target::TargetSpec;
 
 use super::super::collision::{ExternalContract, external_contract};
+use super::super::registry::ROOT_MODULE_PATH;
 use super::super::types::ModuleError;
 use super::super::unit::ModuleUnit;
 use super::super::validation::{
@@ -19,8 +20,10 @@ pub(crate) fn validate_compilation_plan(
     plan: &super::compilation::ModuleCompilationPlan,
     target: &TargetSpec,
 ) -> Result<(), ModuleError> {
+    let registry = plan.declaration_registry();
+    let _ = registry.resolve("", "Int");
     let caller = filter_program(plan.caller(), target)?;
-    validate_program(&caller)?;
+    validate_program(&registry, ROOT_MODULE_PATH, &caller)?;
     let object_plan = plan.object_plan()?;
     let root_context = object_plan
         .units()
@@ -29,13 +32,17 @@ pub(crate) fn validate_compilation_plan(
         .transpose()?;
     for (index, unit) in object_plan.units().iter().enumerate() {
         let targeted = filter_program(unit.program(), target)?;
-        validate_program(&targeted)?;
+        let module_path = match unit.owner() {
+            super::super::objects::ModuleObjectOwner::Root => ROOT_MODULE_PATH,
+            super::super::objects::ModuleObjectOwner::Imported { module_path } => module_path,
+        };
+        validate_program(&registry, module_path, &targeted)?;
         if index != 0 {
             let contextual = super::performance_context::program_with_performance_context(
                 &targeted,
                 root_context.as_ref().expect("object plan has a root unit"),
             );
-            validate_program(&contextual)?;
+            validate_program(&registry, module_path, &contextual)?;
         }
     }
     Ok(())
@@ -46,9 +53,14 @@ fn filter_program(program: &Program, target: &TargetSpec) -> Result<Program, Mod
         .map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
-fn validate_program(program: &Program) -> Result<(), ModuleError> {
-    let normalized = crate::codegen::normalize_program(program);
-    crate::semantic::analyze(&normalized)
+fn validate_program(
+    registry: &super::super::registry::DeclarationRegistry,
+    module_path: &str,
+    program: &Program,
+) -> Result<(), ModuleError> {
+    let mut normalized = crate::codegen::normalize_program(program);
+    registry.annotate_program_headers(module_path, &mut normalized);
+    crate::semantic::analyze_resolved(&normalized)
         .map(|_| ())
         .map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
@@ -58,7 +70,7 @@ pub(super) fn validate_symbol_collisions(
     units: &[ModuleUnit],
 ) -> Result<(), ModuleError> {
     let mut symbols = HashMap::new();
-    record_symbols("<root>", local_declarations, &mut symbols)?;
+    record_symbols(ROOT_MODULE_PATH, local_declarations, &mut symbols)?;
     for unit in units {
         record_symbols(
             unit.identity().module_path(),

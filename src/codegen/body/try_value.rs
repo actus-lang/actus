@@ -483,6 +483,7 @@ fn synthetic_try_assignment_block(
         role: Role::Erg,
         name: name.clone(),
         ty: None,
+        resolved_type: None,
         initializer: value.clone(),
         span,
     };

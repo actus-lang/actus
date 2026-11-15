@@ -71,7 +71,17 @@ mod tests {
                 arguments: Vec::new(),
                 reference_role: None,
                 span: SourceSpan::new(argument_span, argument_span + 3),
+                resolved: None,
             }],
+            identity: TypeIdentity::from_verb_application(
+                "Box",
+                &[TypeName::unresolved(
+                    "Int",
+                    Vec::new(),
+                    None,
+                    SourceSpan::new(argument_span, argument_span + 3),
+                )],
+            ),
             canonical_key: key.to_owned(),
             caller: None,
             call_span: SourceSpan::new(0, 3),
@@ -90,9 +100,11 @@ mod tests {
                 arguments: Vec::new(),
                 reference_role: None,
                 span: SourceSpan::new(40, 43),
+                resolved: None,
             }],
             reference_role: None,
             span: SourceSpan::new(40, 51),
+            resolved: None,
         });
         assert!(cache.contains(&identity));
         assert_eq!(cache.into_instances().len(), 1);

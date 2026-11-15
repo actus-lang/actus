@@ -28,6 +28,9 @@ pub(crate) fn validate_stack_limit_dynamic_dispatch(
 use super::errors::SemanticError;
 use super::model::SemanticModel;
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
-    let normalized = super::normalize_generated_locals(program);
-    Analyzer::new().analyze(&normalized)
+    analyze_resolved(program)
+}
+
+pub(crate) fn analyze_resolved(program: &Program) -> Result<SemanticModel, SemanticError> {
+    Analyzer::new().analyze(program)
 }

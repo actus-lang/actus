@@ -62,7 +62,7 @@ impl Analyzer {
         subject: &Expr,
     ) -> Result<(), SemanticError> {
         for (binding, ty) in bindings.iter().zip(types) {
-            let type_name = self.specialize_pattern_type(enum_name, &ty.name, subject)?;
+            let type_name = self.specialize_pattern_type(enum_name, &ty, subject)?;
             self.bind_pattern_binding(binding, &type_name, mode)?;
         }
         Ok(())
@@ -88,7 +88,7 @@ impl Analyzer {
                     span: pattern.span,
                 });
             };
-            let type_name = self.specialize_pattern_type(enum_name, &field.ty.name, subject)?;
+            let type_name = self.specialize_pattern_type(enum_name, &field.ty, subject)?;
             self.bind_pattern_binding(&pattern.binding, &type_name, mode)?;
         }
         Ok(())
@@ -97,18 +97,18 @@ impl Analyzer {
     fn specialize_pattern_type(
         &self,
         enum_name: &str,
-        type_name: &str,
+        type_name: &crate::ast::TypeName,
         subject: &Expr,
-    ) -> Result<String, SemanticError> {
+    ) -> Result<crate::ast::TypeName, SemanticError> {
         let Some(application) = self.resolved_type_name(subject) else {
-            return Ok(type_name.to_owned());
+            return Ok(type_name.clone());
         };
         let Some(parameter) = self.enum_types[enum_name]
             .generic_parameters
             .iter()
-            .position(|parameter| parameter.name == type_name)
+            .position(|parameter| parameter.name == type_name.name)
         else {
-            return Ok(type_name.to_owned());
+            return Ok(type_name.clone());
         };
         let argument = application.arguments.get(parameter).ok_or_else(|| SemanticError {
             kind: SemanticErrorKind::GenericArityMismatch {
@@ -118,27 +118,23 @@ impl Analyzer {
             },
             span: application.span,
         })?;
-        Ok(pattern_type_name(argument))
+        Ok(argument.clone())
     }
 
     fn bind_pattern_binding(
         &mut self,
         binding: &PatternBinding,
-        type_name: &str,
+        type_name: &crate::ast::TypeName,
         mode: crate::ast::CaseMode,
     ) -> Result<(), SemanticError> {
         if binding.name == "_" {
             return Ok(());
         }
-        let parsed_type = super::super::calls::parse_type_name_key(type_name, binding.span)
-            .ok_or_else(|| SemanticError {
-                kind: SemanticErrorKind::MalformedTypeName { name: type_name.to_owned() },
-                span: binding.span,
-            })?;
+        let parsed_type = self.normalize_imported_type_name(type_name);
         let is_generic_payload = self.enum_types.values().any(|definition| {
-            definition.generic_parameters.iter().any(|parameter| parameter.name == type_name)
+            definition.generic_parameters.iter().any(|parameter| parameter.name == type_name.name)
         });
-        if !self.is_generic_parameter(type_name) && !is_generic_payload {
+        if !self.is_generic_parameter(&type_name.name) && !is_generic_payload {
             self.validate_type_reference(&parsed_type)?;
         }
         self.bind(
@@ -148,29 +144,21 @@ impl Analyzer {
                 crate::ast::CaseMode::Dat => Role::Dat,
             },
             binding.name.clone(),
-            crate::ast::lookup_builtin_type(type_name),
+            crate::ast::lookup_builtin_type(&type_name.name),
             binding.span,
         )?;
         let index = self.binding(&binding.name, binding.span)?;
         self.binding_type_names.insert(index, parsed_type.clone());
         if self.struct_types.contains_key(&parsed_type.name) {
-            self.binding_struct_types.insert(index, parsed_type.name.clone());
+            self.binding_struct_types.insert(index, parsed_type.clone());
+            self.binding_struct_type_names.insert(index, parsed_type.clone());
         }
         if self.enum_types.contains_key(&parsed_type.name) {
-            self.binding_enum_types.insert(index, parsed_type.name.clone());
+            self.binding_enum_types.insert(index, parsed_type.clone());
             if !parsed_type.arguments.is_empty() {
                 self.binding_enum_type_applications.insert(index, parsed_type);
             }
         }
         Ok(())
     }
-}
-
-fn pattern_type_name(type_name: &crate::ast::TypeName) -> String {
-    let canonical = super::super::analyzer::canonical_type_name(type_name);
-    canonical
-        .strip_prefix("abs ")
-        .or_else(|| canonical.strip_prefix("ins "))
-        .unwrap_or(&canonical)
-        .to_owned()
 }

@@ -20,6 +20,8 @@ pub use top_level::{
     TopLevelDecl,
 };
 pub(crate) use type_keys::{TypeNameParseMode, parse_type_name_key, parse_type_name_with_mode};
+pub use type_keys::{decode_type_key, encode_type_key};
 pub use types::{
-    GenericParam, GenericParamKind, ReturnAccess, ReturnType, Role, TypeIdentity, TypeName,
+    DeclarationIdentity, DeclarationPath, GenericParam, GenericParamKind, ReturnAccess, ReturnType,
+    Role, TypeIdentity, TypeName,
 };

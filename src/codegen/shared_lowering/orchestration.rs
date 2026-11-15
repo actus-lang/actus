@@ -30,9 +30,17 @@ pub(crate) fn lower_program_to_backend_module(
     entry_name: Option<&str>,
     bindings: Option<&BackendSymbolBindings>,
 ) -> Result<BackendModule, BackendContractError> {
+    let mut standalone = program.clone();
+    crate::modules::DeclarationRegistry::resolve_standalone(&mut standalone);
     let target = TargetSpec::host()
         .map_err(|error| BackendContractError::InvalidCleanupContract(error.to_string()))?;
-    lower_program_to_backend_module_for_target(namespace, program, entry_name, bindings, &target)
+    lower_program_to_backend_module_for_target(
+        namespace,
+        &standalone,
+        entry_name,
+        bindings,
+        &target,
+    )
 }
 
 pub(crate) fn lower_program_to_backend_module_for_target(
@@ -50,6 +58,8 @@ pub(crate) fn lower_program_to_backend_module_for_target(
         target,
         target.entry_contract(),
         None,
+        crate::modules::aggregation::registry::STANDALONE_PACKAGE_IDENTITY,
+        crate::modules::aggregation::registry::standalone_module_path(),
     )
 }
 
@@ -61,12 +71,14 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
     target: &TargetSpec,
     entry_contract: EntryContract,
     performance_context: Option<(&str, &Program)>,
+    package: &str,
+    module_path: &str,
 ) -> Result<BackendModule, BackendContractError> {
-    let layouts = ProgramLayouts::new(program, namespace);
+    let layouts = ProgramLayouts::new(program, namespace, package, module_path);
     let analysis_program = performance_context
         .map(|(_, context)| crate::modules::program_with_performance_context(program, context))
         .unwrap_or_else(|| program.clone());
-    let semantic = crate::semantic::analyze(&analysis_program).map_err(|error| {
+    let semantic = crate::semantic::analyze_resolved(&analysis_program).map_err(|error| {
         let diagnostic = crate::diagnostics::semantic_diagnostic(&error);
         unsupported(
             crate::lexer::SourceSpan::new(0, 0),
@@ -80,7 +92,7 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
     reject_floating_point_on_freestanding(&analysis_program, &semantic, target, entry_contract)?;
     reject_implicit_large_aggregate_allocation(
         &semantic,
-        &ProgramLayouts::new(&analysis_program, namespace),
+        &ProgramLayouts::new(&analysis_program, namespace, package, module_path),
         target,
         entry_contract,
     )?;
@@ -92,6 +104,8 @@ pub(crate) fn lower_program_to_backend_module_for_target_with_context(
         &layouts,
         performance_context,
         &analysis_program,
+        package,
+        module_path,
     )?;
     for function in &mut module.functions {
         function.hosted_entry_return = entry_contract == EntryContract::Hosted
@@ -213,8 +227,18 @@ pub(crate) fn lower_program_to_backend_module_with_layouts(
     bindings: Option<&BackendSymbolBindings>,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendModule, BackendContractError> {
+    let mut standalone = program.clone();
+    crate::modules::DeclarationRegistry::resolve_standalone(&mut standalone);
     lower_program_to_backend_module_with_layouts_and_context(
-        namespace, program, entry_name, bindings, layouts, None, program,
+        namespace,
+        &standalone,
+        entry_name,
+        bindings,
+        layouts,
+        None,
+        &standalone,
+        crate::modules::aggregation::registry::STANDALONE_PACKAGE_IDENTITY,
+        crate::modules::aggregation::registry::standalone_module_path(),
     )
 }
 
@@ -226,12 +250,15 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
     layouts: &impl BackendLayoutProvider,
     performance_context: Option<(&str, &Program)>,
     analysis_program: &Program,
+    package: &str,
+    module_path: &str,
 ) -> Result<BackendModule, BackendContractError> {
-    let declaration_layouts = ProgramLayouts::new(analysis_program, namespace);
+    let declaration_layouts =
+        ProgramLayouts::new(analysis_program, namespace, package, module_path);
     let declarations =
         SharedDeclarations::new(namespace, program, &declaration_layouts, performance_context)?;
     let semantic = analyze_after_validation(analysis_program)?;
-    let cleanup_provider = ProgramLayouts::new(analysis_program, namespace);
+    let cleanup_provider = ProgramLayouts::new(analysis_program, namespace, package, module_path);
     let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
     let external_symbols = scalar_external_symbols(namespace, &declarations.externals, bindings)?;
     let functions = lower_shared_functions(
@@ -273,7 +300,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
 fn analyze_after_validation(
     program: &Program,
 ) -> Result<crate::semantic::SemanticModel, BackendContractError> {
-    crate::semantic::analyze(program).map_err(|error| {
+    crate::semantic::analyze_resolved(program).map_err(|error| {
         let diagnostic = crate::diagnostics::semantic_diagnostic(&error);
         unsupported(
             crate::lexer::SourceSpan::new(0, 0),

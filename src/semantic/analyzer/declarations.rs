@@ -50,11 +50,16 @@ impl Analyzer {
         &mut self,
         registration: SignatureRegistration<'_>,
     ) -> Result<(), SemanticError> {
-        self.validate_signature_types(
+        let previous_owner = self.current_generic_owner.take();
+        self.current_generic_owner =
+            (!registration.generic_parameters.is_empty()).then(|| registration.name.to_owned());
+        let result = self.validate_signature_types(
             registration.params,
             registration.return_type,
             registration.generic_parameters,
-        )?;
+        );
+        self.current_generic_owner = previous_owner;
+        result?;
         if super::super::intrinsics::is_reserved_name(registration.name) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::ReservedIntrinsicName {
@@ -127,9 +132,12 @@ impl Analyzer {
                 }
                 for method in &perform.methods {
                     let parameters = method.generic_parameters.clone();
+                    self.current_generic_owner =
+                        (!parameters.is_empty()).then(|| method.name.clone());
                     self.with_generic_scope(&parameters, |analyzer| {
                         analyzer.analyze_verb_body(method)
                     })?;
+                    self.current_generic_owner = None;
                 }
             }
         }

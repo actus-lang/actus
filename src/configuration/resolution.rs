@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::manifest::{
@@ -202,7 +203,9 @@ pub(super) fn runtime_source_root(
 }
 
 pub(super) fn compiler_owned_std_source_root() -> Option<PathBuf> {
-    builtin_root_candidates().into_iter().find(|path| path.is_dir())
+    builtin_root_candidates()
+        .into_iter()
+        .find_map(|path| fs::canonicalize(path).ok().filter(|root| root.is_dir()))
 }
 
 pub(super) fn runtime_identity(

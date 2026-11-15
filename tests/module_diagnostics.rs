@@ -85,8 +85,7 @@ fn neutral_reexport_project() -> PathBuf {
 }
 
 #[test]
-// Known defect R1: generic specialization treats one type reached through two re-exports as two instances. PR B changes this test to build and run successfully.
-fn reexported_type_identity_passes_validation_and_fails_in_specialization() {
+fn check_build_and_run_accept_one_type_through_two_reexports() {
     let root = neutral_reexport_project();
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["check", "--strict", "src/main.act"])
@@ -103,13 +102,12 @@ fn reexported_type_identity_passes_validation_and_fails_in_specialization() {
         .current_dir(&root)
         .output()
         .expect("run neutral re-export build");
-    assert!(!build.status.success());
-    let stderr = String::from_utf8_lossy(&build.stderr);
-    assert!(
-        stderr.contains("internal compiler error: semantic validation invariant violated"),
-        "stderr was: {stderr}"
-    );
-    assert!(stderr.contains("E1027"), "stderr was: {stderr}");
+    assert!(build.status.success(), "build stderr: {}", String::from_utf8_lossy(&build.stderr));
+    let run = Command::new(&executable)
+        .current_dir(&root)
+        .output()
+        .expect("run neutral re-export executable");
+    assert_eq!(run.status.code(), Some(0), "run stderr: {}", String::from_utf8_lossy(&run.stderr));
     fs::remove_dir_all(root).expect("remove neutral re-export fixture");
 }
 

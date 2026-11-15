@@ -18,6 +18,7 @@ pub(crate) fn lower_struct_literal(
     function: &mut FunctionBuilder<'_>,
     name: &str,
     type_arguments: &[TypeName],
+    resolved_type: Option<&TypeName>,
     fields: &[StructFieldInit],
     locals: &HashMap<&String, cranelift_codegen::ir::Value>,
     local_types: &HashMap<&String, NativeType>,
@@ -26,7 +27,7 @@ pub(crate) fn lower_struct_literal(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
-    let layout = resolve_struct_layout(name, type_arguments, layouts)?;
+    let layout = resolve_struct_layout(name, type_arguments, resolved_type, layouts)?;
     let address = if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
         let allocator =
             functions.get(&format!("__{}", crate::runtime::AGGREGATE_ALLOCATE_SYMBOL)).ok_or_else(
@@ -57,15 +58,13 @@ pub(crate) fn lower_struct_literal(
 
 fn resolve_struct_layout<'a>(
     name: &str,
-    type_arguments: &[TypeName],
+    _type_arguments: &[TypeName],
+    resolved_type: Option<&TypeName>,
     layouts: &'a LayoutRegistry,
 ) -> Result<&'a crate::codegen::cranelift::layout::StructLayout, BackendEmitError> {
-    let type_name = TypeName {
-        name: name.to_owned(),
-        arguments: type_arguments.to_vec(),
-        reference_role: None,
-        span: crate::lexer::SourceSpan::new(0, 0),
-    };
+    let type_name = resolved_type.cloned().expect(
+        "internal compiler error: struct literal reached Cranelift construction without a resolved type",
+    );
     let id = layouts
         .type_for_type_name(&type_name)
         .and_then(|ty| match ty {

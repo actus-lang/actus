@@ -149,19 +149,17 @@ impl Analyzer {
         if let Some(type_name) = self.binding_struct_type_applications.get(&index) {
             return Some(type_name.clone());
         }
+        if let Some(type_name) = self.binding_struct_type_names.get(&index) {
+            return Some(type_name.clone());
+        }
         if let Some(type_name) = self.binding_enum_type_applications.get(&index) {
             return Some(type_name.clone());
         }
-        let name = self
+        let type_name = self
             .binding_struct_types
             .get(&index)
             .or_else(|| self.binding_enum_types.get(&index))?;
-        Some(TypeName {
-            name: name.clone(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span: SourceSpan::new(0, 0),
-        })
+        Some(type_name.clone())
     }
 
     fn validate_named_value_type(

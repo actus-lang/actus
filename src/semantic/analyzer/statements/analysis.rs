@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, Block, Expr, Place, Role, Stmt};
+use crate::ast::{BinaryOp, Block, Expr, Place, Role, Stmt, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
@@ -15,7 +15,7 @@ impl Analyzer {
 
     fn visit_statement(&mut self, statement: &Stmt) -> Result<(), SemanticError> {
         match statement {
-            Stmt::OwnerDecl { role, name, ty, initializer, span } => {
+            Stmt::OwnerDecl { role, name, ty, resolved_type, initializer, span } => {
                 if (self.current_realtime || self.current_deterministic)
                     && ty.as_ref().is_some_and(|name| type_name_text_contains_float(name))
                 {
@@ -28,7 +28,7 @@ impl Analyzer {
                         span: *span,
                     });
                 }
-                self.visit_owner_decl(role, name, ty.as_deref(), initializer, *span)
+                self.visit_owner_decl(role, name, resolved_type.as_ref(), initializer, *span)
             }
             Stmt::Assignment { target, value, span } => {
                 self.visit_place_assignment(target, value, *span)
@@ -96,6 +96,7 @@ impl Analyzer {
                 let left = Expr::FieldAccess {
                     object: Box::new(object_expression.clone()),
                     field: field.clone(),
+                    resolved_type: None,
                     span,
                 };
                 self.validate_field_assignment(&object_expression, field, value, span)?;
@@ -105,7 +106,7 @@ impl Analyzer {
                 let target_expression = target.to_expr();
                 let left = Expr::Index {
                     target: Box::new(target_expression.clone()),
-                    index: Box::new(index.clone()),
+                    index: index.clone(),
                     span,
                 };
                 self.visit_index_assignment(&target_expression, index, value)?;
@@ -212,7 +213,7 @@ impl Analyzer {
                 let binding = self.binding(name, *span)?;
                 self.ensure_mutable(binding, name, *span)
             }
-            Expr::FieldAccess { object, field, span } => {
+            Expr::FieldAccess { object, field, span, .. } => {
                 self.validate_index_assignment_owner(object)?;
                 if let Some(pack_name) = self.expression_pack_type(object) {
                     let Some(pack_field) = self.pack_field(&pack_name, field) else {
@@ -240,12 +241,11 @@ impl Analyzer {
         &mut self,
         role: &Role,
         name: &str,
-        declared_type: Option<&str>,
+        declared_type: Option<&TypeName>,
         initializer: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let mut declared_type_name =
-            declared_type.and_then(|name| super::super::calls::parse_type_name_key(name, span));
+        let mut declared_type_name = declared_type.cloned();
         if let Some(type_name) = &mut declared_type_name {
             self.normalize_array_capacities(type_name)?;
         }
@@ -377,19 +377,6 @@ impl Analyzer {
         } else {
             self.record_initializer_enum_type(name, initializer, span)
         }
-    }
-
-    fn record_inferred_binding_type(
-        &mut self,
-        binding_index: usize,
-        initializer: &Expr,
-        span: SourceSpan,
-    ) {
-        let Some(type_name) = self.expression_type_name(initializer) else { return };
-        let Some(type_name) = super::super::calls::parse_type_name_key(&type_name, span) else {
-            return;
-        };
-        self.binding_type_names.insert(binding_index, type_name);
     }
 
     fn plan_try_unwind(&mut self, expression: &Expr) {

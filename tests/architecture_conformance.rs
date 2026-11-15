@@ -300,6 +300,55 @@ fn assert_shared_codegen_excludes_backend_crates() {
     }
 }
 
+fn pr_b3_allowlisted(relative: &str, function: &str) -> bool {
+    matches!(
+        (relative, function),
+        ("src/semantic/patterns/coverage.rs", "validate_case_branches")
+            | ("src/semantic/analyzer/for_loops.rs", "for_range_type")
+            | (
+                "src/semantic/analyzer/statements/inferred_types.rs",
+                "record_inferred_binding_type"
+            )
+    )
+}
+
+#[test]
+fn canonical_identity_boundaries_are_explicit() {
+    let forbidden = [
+        "parse_type_name_key(",
+        "parse_type_name_with_mode(",
+        "DeclarationIdentity::GenericParameter {",
+        "DeclarationIdentity::Declaration(",
+        "DeclarationPath::",
+        "is_builtin_name",
+        "ROOT_MODULE_PATH",
+    ];
+    let mut violations = Vec::new();
+    for root in ["src/semantic", "src/codegen"] {
+        for path in rust_sources(&repository_path(root)) {
+            if path.file_name().and_then(|name| name.to_str()) == Some("tests.rs") {
+                continue;
+            }
+            let relative = source_relative(&path);
+            let source = fs::read_to_string(&path).expect("Rust source should be readable");
+            let mut function = String::new();
+            for line in source.lines() {
+                let trimmed = line.trim_start();
+                if let Some(start) = trimmed.find("fn ") {
+                    let name = &trimmed[start + 3..];
+                    function = name.split(['(', '<', ' ']).next().unwrap_or_default().to_owned();
+                }
+                for token in forbidden {
+                    if line.contains(token) && !pr_b3_allowlisted(&relative, &function) {
+                        violations.push(format!("{relative}::{function}: {token}"));
+                    }
+                }
+            }
+        }
+    }
+    assert!(violations.is_empty(), "PR B production identity violations: {violations:?}");
+}
+
 #[test]
 fn standard_library_directories_have_canonical_facades() {
     assert_canonical_facades(&repository_path("library/std/src"));

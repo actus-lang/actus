@@ -19,7 +19,7 @@ fn normalize_statement(statement: &Stmt, output: &mut Vec<Stmt>) {
             output.extend(owners);
             output.push(Stmt::Return { value: Some(expression), span: *span });
         }
-        Stmt::OwnerDecl { role, name, ty, initializer, span } => {
+        Stmt::OwnerDecl { role, name, ty, resolved_type, initializer, span } => {
             let mut owners = Vec::new();
             let initializer = extract_nested_cases(initializer, &mut owners, true);
             output.extend(owners);
@@ -27,6 +27,7 @@ fn normalize_statement(statement: &Stmt, output: &mut Vec<Stmt>) {
                 role: role.clone(),
                 name: name.clone(),
                 ty: ty.clone(),
+                resolved_type: resolved_type.clone(),
                 initializer,
                 span: *span,
             });
@@ -160,6 +161,7 @@ fn extract_nested_owner(expression: &Expr, owners: &mut Vec<Stmt>, root: bool) -
         role: Role::Erg,
         name: name.clone(),
         ty: None,
+        resolved_type: None,
         initializer: expression.clone(),
         span,
     });
@@ -201,6 +203,7 @@ fn extract_logical_expression(
         role: Role::Erg,
         name: name.clone(),
         ty: None,
+        resolved_type: None,
         initializer: lowered,
         span,
     });

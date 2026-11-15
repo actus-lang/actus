@@ -48,7 +48,15 @@ impl Analyzer {
     }
 
     pub(crate) fn struct_field(&self, struct_name: &str, field: &str) -> Option<&StructField> {
-        let base_name = struct_name.split('[').next().unwrap_or(struct_name);
+        let base_name = struct_name
+            .strip_prefix("abs ")
+            .or_else(|| struct_name.strip_prefix("ins "))
+            .or_else(|| struct_name.strip_prefix("erg "))
+            .or_else(|| struct_name.strip_prefix("dat "))
+            .unwrap_or(struct_name)
+            .split('[')
+            .next()
+            .unwrap_or(struct_name);
         self.struct_types.get(base_name).and_then(|definition| {
             definition.fields.iter().find(|candidate| candidate.name == field)
         })

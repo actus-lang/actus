@@ -1,5 +1,5 @@
 use crate::ast::{Block, Expr, Param, ReturnType, Stmt};
-use crate::semantic::{GenericInstance, TypeSubstitution};
+use crate::semantic::TypeSubstitution;
 
 use super::definitions::canonical_type_name;
 
@@ -58,7 +58,7 @@ fn specialize_statement(statement: &Stmt, substitution: &TypeSubstitution) -> St
         Stmt::ForRange { binding, start, end, body, span } => Stmt::ForRange {
             binding: binding.clone(),
             start: specialize_expression(start, substitution),
-            end: specialize_expression(end, substitution),
+            end: Box::new(specialize_expression(end, substitution)),
             body: specialize_block(body, substitution),
             span: *span,
         },
@@ -88,18 +88,21 @@ fn specialize_place(
         },
         crate::ast::Place::Index { target, index, span } => crate::ast::Place::Index {
             target: Box::new(specialize_place(target, substitution)),
-            index: specialize_expression(index, substitution),
+            index: Box::new(specialize_expression(index, substitution)),
             span: *span,
         },
     }
 }
 
 fn specialize_owner_declaration(statement: &Stmt, substitution: &TypeSubstitution) -> Stmt {
-    let Stmt::OwnerDecl { role, name, ty, span, initializer } = statement else { unreachable!() };
+    let Stmt::OwnerDecl { role, name, ty, resolved_type, span, initializer } = statement else {
+        unreachable!()
+    };
     Stmt::OwnerDecl {
         role: role.clone(),
         name: name.clone(),
         ty: ty.as_ref().map(|type_name| specialize_type_annotation(type_name, substitution)),
+        resolved_type: resolved_type.as_ref().map(|type_name| substitution.apply(type_name)),
         initializer: specialize_expression(initializer, substitution),
         span: *span,
     }
@@ -116,7 +119,7 @@ fn specialize_type_annotation(type_name: &str, substitution: &TypeSubstitution) 
         "{name}[{}]",
         split_type_arguments(arguments)
             .into_iter()
-            .map(|argument| specialize_type_argument(argument.trim(), substitution))
+            .map(|argument| argument.trim().to_owned())
             .collect::<Vec<_>>()
             .join(",")
     )
@@ -212,10 +215,21 @@ fn specialize_binary(expression: &Expr, substitution: &TypeSubstitution) -> Expr
 }
 
 fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
-    let Expr::Call { callee, arguments, span } = expression else { unreachable!() };
+    let Expr::Call { callee, generic_arguments, arguments, resolved_type, span } = expression
+    else {
+        unreachable!()
+    };
+    let generic_arguments =
+        generic_arguments.iter().map(|argument| substitution.apply(argument)).collect::<Vec<_>>();
     if callee.starts_with("size_of[") || callee.starts_with("align_of[") {
-        let specialized = specialize_size_of_callee(callee, substitution);
-        return Expr::Call { callee: specialized, arguments: Vec::new(), span: *span };
+        let specialized = specialize_size_of_callee(callee, &generic_arguments, substitution);
+        return Expr::Call {
+            callee: specialized,
+            resolved_type: resolved_type.as_ref().map(|type_name| substitution.apply(type_name)),
+            generic_arguments,
+            arguments: Vec::new(),
+            span: *span,
+        };
     }
     if (callee == "copy" || callee.starts_with("copy__"))
         && arguments.len() == 1
@@ -223,37 +237,54 @@ fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
     {
         return Expr::Call {
             callee: "copy".to_owned(),
+            resolved_type: resolved_type.as_ref().map(|type_name| substitution.apply(type_name)),
+            generic_arguments,
             arguments: specialize_arguments(arguments, substitution),
             span: *span,
         };
     }
     let callee = if callee.contains('[') {
-        specialize_callee_name(callee, substitution)
+        specialize_callee_name(callee, &generic_arguments, substitution)
     } else {
         substitution
             .apply_call_at(callee, *span)
             .or_else(|| substitution.apply_call(callee))
             .map_or_else(|| callee.clone(), str::to_owned)
     };
-    Expr::Call { callee, arguments: specialize_arguments(arguments, substitution), span: *span }
+    Expr::Call {
+        callee,
+        resolved_type: resolved_type.as_ref().map(|type_name| substitution.apply(type_name)),
+        generic_arguments: Vec::new(),
+        arguments: specialize_arguments(arguments, substitution),
+        span: *span,
+    }
 }
 
-fn specialize_size_of_callee(callee: &str, substitution: &TypeSubstitution) -> String {
-    let Some((name, arguments)) = callee.split_once('[') else { return callee.to_owned() };
-    let arguments = arguments.strip_suffix(']').unwrap_or(arguments);
-    let arguments = split_type_arguments(arguments)
-        .into_iter()
-        .map(|argument| specialize_type_argument(argument.trim(), substitution))
+fn specialize_size_of_callee(
+    callee: &str,
+    generic_arguments: &[crate::ast::TypeName],
+    substitution: &TypeSubstitution,
+) -> String {
+    let Some((name, _)) = callee.split_once('[') else { return callee.to_owned() };
+    let arguments = generic_arguments
+        .iter()
+        .map(|argument| canonical_type_name(&substitution.apply(argument)))
         .collect::<Vec<_>>();
     format!("{name}[{}]", arguments.join(","))
 }
 
-fn specialize_callee_name(callee: &str, substitution: &TypeSubstitution) -> String {
-    let Some((name, arguments)) = callee.split_once('[') else { return callee.to_owned() };
-    let arguments = arguments.strip_suffix(']').unwrap_or(arguments);
-    let arguments = split_type_arguments(arguments)
-        .into_iter()
-        .map(|argument| specialize_type_argument(argument.trim(), substitution))
+fn specialize_callee_name(
+    callee: &str,
+    generic_arguments: &[crate::ast::TypeName],
+    substitution: &TypeSubstitution,
+) -> String {
+    let Some((name, _)) = callee.split_once('[') else { return callee.to_owned() };
+    if generic_arguments.is_empty() {
+        return callee.to_owned();
+    }
+    let arguments = generic_arguments
+        .iter()
+        .map(|argument| canonical_type_name(&substitution.apply(argument)))
         .collect::<Vec<_>>();
     if !name.chars().next().is_some_and(|character| character.is_ascii_lowercase()) {
         return format!("{name}[{}]", arguments.join(","));
@@ -264,12 +295,6 @@ fn specialize_callee_name(callee: &str, substitution: &TypeSubstitution) -> Stri
         .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
         .collect::<String>();
     format!("{name}__{encoded}")
-}
-
-fn specialize_type_argument(argument: &str, substitution: &TypeSubstitution) -> String {
-    crate::semantic::parse_type_name_key(argument, crate::lexer::SourceSpan::new(0, 0))
-        .map(|type_name| canonical_type_name(&substitution.apply(&type_name)))
-        .unwrap_or_else(|| argument.to_owned())
 }
 
 fn split_type_arguments(arguments: &str) -> Vec<&str> {
@@ -292,20 +317,26 @@ fn split_type_arguments(arguments: &str) -> Vec<&str> {
 }
 
 fn specialize_method_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
-    let Expr::MethodCall { receiver, method, arguments, span } = expression else { unreachable!() };
+    let Expr::MethodCall { receiver, method, arguments, resolved_type, span } = expression else {
+        unreachable!()
+    };
     Expr::MethodCall {
         receiver: Box::new(specialize_expression(receiver, substitution)),
         method: method.clone(),
         arguments: specialize_arguments(arguments, substitution),
+        resolved_type: resolved_type.clone().map(|type_name| substitution.apply(&type_name)),
         span: *span,
     }
 }
 
 fn specialize_struct_literal(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
-    let Expr::StructLit { name, type_arguments, fields, span } = expression else { unreachable!() };
+    let Expr::StructLit { name, type_arguments, resolved_type, fields, span } = expression else {
+        unreachable!()
+    };
     Expr::StructLit {
         name: name.clone(),
         type_arguments: type_arguments.iter().map(|ty| substitution.apply(ty)).collect(),
+        resolved_type: resolved_type.as_ref().map(|type_name| substitution.apply(type_name)),
         fields: fields
             .iter()
             .map(|field| crate::ast::StructFieldInit {
@@ -318,10 +349,13 @@ fn specialize_struct_literal(expression: &Expr, substitution: &TypeSubstitution)
 }
 
 fn specialize_field_access(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
-    let Expr::FieldAccess { object, field, span } = expression else { unreachable!() };
+    let Expr::FieldAccess { object, field, resolved_type, span } = expression else {
+        unreachable!()
+    };
     Expr::FieldAccess {
         object: Box::new(specialize_expression(object, substitution)),
         field: field.clone(),
+        resolved_type: resolved_type.as_ref().map(|type_name| substitution.apply(type_name)),
         span: *span,
     }
 }
@@ -371,14 +405,4 @@ fn specialize_arguments(
             ..argument.clone()
         })
         .collect()
-}
-
-#[allow(dead_code)]
-fn _specialization_key(instance: &GenericInstance) -> String {
-    canonical_type_name(&crate::ast::TypeName {
-        name: instance.name.clone(),
-        arguments: instance.arguments.clone(),
-        reference_role: None,
-        span: crate::lexer::SourceSpan::new(0, 0),
-    })
 }

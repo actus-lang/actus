@@ -90,6 +90,8 @@ fn buffer_length_guard(capacity: u64, span: SourceSpan) -> Stmt {
         condition: Expr::Binary {
             left: Box::new(Expr::Call {
                 callee: "buffer_length".to_owned(),
+                resolved_type: None,
+                generic_arguments: Vec::new(),
                 arguments: vec![inferred(identifier("input", span))],
                 span,
             }),
@@ -108,6 +110,8 @@ fn empty_output_guard(span: SourceSpan) -> Stmt {
         condition: Expr::Binary {
             left: Box::new(Expr::Call {
                 callee: "buffer_length".to_owned(),
+                resolved_type: None,
+                generic_arguments: Vec::new(),
                 arguments: vec![inferred(identifier("output", span))],
                 span,
             }),
@@ -139,6 +143,8 @@ fn version_guard(contract: &SerializeDecl, span: SourceSpan) -> Stmt {
 fn checksum_guard(contract: &SerializeDecl, span: SourceSpan) -> Stmt {
     let call = Expr::Call {
         callee: format!("{}_validate", contract.name.to_ascii_lowercase()),
+        resolved_type: None,
+        generic_arguments: Vec::new(),
         arguments: vec![
             named("frame", Role::Abs, identifier("input", span)),
             named("expected_version", Role::Abs, identifier("from_version", span)),
@@ -162,6 +168,8 @@ fn append_copy_guards(statements: &mut Vec<Stmt>, capacity: u64, span: SourceSpa
     for index in 0..capacity {
         let append = Expr::Call {
             callee: "append".to_owned(),
+            resolved_type: None,
+            generic_arguments: Vec::new(),
             arguments: vec![
                 inferred(identifier("output", span)),
                 inferred(input_byte(index, span)),
@@ -217,9 +225,12 @@ fn append_checksum_write(statements: &mut Vec<Stmt>, contract: &SerializeDecl, s
         role: Role::Erg,
         name: "checksum".to_owned(),
         ty: Some("i64".to_owned()),
+        resolved_type: Some(crate::ast::TypeName::builtin("i64", Vec::new(), None, span)),
         initializer: cast_i64(
             Expr::Call {
                 callee: "crc32".to_owned(),
+                resolved_type: None,
+                generic_arguments: Vec::new(),
                 arguments: vec![
                     named("buffer", Role::Abs, identifier("output", span)),
                     named("start", Role::Abs, integer(i64::from(start) as u64, None, span)),
@@ -255,7 +266,7 @@ fn assign_output(index: u16, value: Expr, span: SourceSpan) -> Stmt {
     Stmt::Assignment {
         target: crate::ast::Place::Index {
             target: Box::new(crate::ast::Place::Binding { name: "output".to_owned(), span }),
-            index: integer(u64::from(index), None, span),
+            index: Box::new(integer(u64::from(index), None, span)),
             span,
         },
         value,
@@ -304,9 +315,16 @@ fn result_err(variant: &str, offset: usize, span: SourceSpan) -> Expr {
             Expr::FieldAccess {
                 object: Box::new(identifier("SerializationError", span)),
                 field: variant.to_owned(),
+                resolved_type: Some(crate::ast::TypeName::builtin(
+                    "SerializationError",
+                    Vec::new(),
+                    None,
+                    span,
+                )),
                 span: synthetic_span(span, offset),
             },
         )],
+        resolved_type: Some(result_type(span)),
         span: synthetic_span(span, offset),
     }
 }
@@ -317,6 +335,7 @@ fn result_ok(value: u64, span: SourceSpan) -> Expr {
         receiver: Box::new(identifier("Result[u32,SerializationError]", result_span)),
         method: "Ok".to_owned(),
         arguments: vec![argument(None, Role::Erg, integer(value, Some("u32"), result_span))],
+        resolved_type: Some(result_type(result_span)),
         span: result_span,
     }
 }
@@ -364,16 +383,16 @@ fn cast_i64(expression: Expr, span: SourceSpan) -> Expr {
 }
 
 fn result_type(span: SourceSpan) -> TypeName {
-    TypeName {
-        name: "Result".to_owned(),
-        arguments: vec![type_name("u32", span), type_name("SerializationError", span)],
-        reference_role: None,
+    TypeName::builtin(
+        "Result",
+        vec![type_name("u32", span), type_name("SerializationError", span)],
+        None,
         span,
-    }
+    )
 }
 
 fn type_name(name: &str, span: SourceSpan) -> TypeName {
-    TypeName { name: name.to_owned(), arguments: Vec::new(), reference_role: None, span }
+    TypeName::builtin(name, Vec::new(), None, span)
 }
 
 fn integer(value: u64, suffix: Option<&str>, span: SourceSpan) -> Expr {

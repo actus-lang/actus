@@ -63,6 +63,8 @@ pub enum Expr {
     },
     Call {
         callee: String,
+        resolved_type: Option<TypeName>,
+        generic_arguments: Vec<TypeName>,
         arguments: Vec<Argument>,
         span: SourceSpan,
     },
@@ -70,17 +72,20 @@ pub enum Expr {
         receiver: Box<Expr>,
         method: String,
         arguments: Vec<Argument>,
+        resolved_type: Option<TypeName>,
         span: SourceSpan,
     },
     StructLit {
         name: String,
         type_arguments: Vec<TypeName>,
+        resolved_type: Option<TypeName>,
         fields: Vec<StructFieldInit>,
         span: SourceSpan,
     },
     FieldAccess {
         object: Box<Expr>,
         field: String,
+        resolved_type: Option<TypeName>,
         span: SourceSpan,
     },
     Index {

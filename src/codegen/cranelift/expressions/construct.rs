@@ -18,11 +18,18 @@ pub(crate) fn lower_construct(
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     match expression {
-        Expr::Call { callee, arguments, .. } => {
-            lower_call_or_array_constructor(function, callee, arguments, context)
+        Expr::Call { callee, generic_arguments, arguments, .. } => {
+            lower_call_or_array_constructor(function, callee, generic_arguments, arguments, context)
         }
-        Expr::MethodCall { receiver, method, arguments, .. } => {
-            lower_method_construct(function, receiver, method, arguments, context)
+        Expr::MethodCall { receiver, method, arguments, resolved_type, .. } => {
+            lower_method_construct(
+                function,
+                receiver,
+                method,
+                arguments,
+                resolved_type.as_ref(),
+                context,
+            )
         }
         Expr::StructLit { .. } | Expr::FieldAccess { .. } => {
             lower_data_construct(function, expression, context)
@@ -34,6 +41,7 @@ pub(crate) fn lower_construct(
 fn lower_call_or_array_constructor(
     function: &mut FunctionBuilder<'_>,
     callee: &str,
+    generic_arguments: &[crate::ast::TypeName],
     arguments: &[Argument],
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -48,7 +56,7 @@ fn lower_call_or_array_constructor(
     {
         return lower_array_constructor(function, id, context.layouts, Some(context.functions));
     }
-    lower_call(function, callee, arguments, context)
+    lower_call(function, callee, arguments, generic_arguments, context)
 }
 
 fn lower_data_construct(
@@ -60,11 +68,16 @@ fn lower_data_construct(
         Expr::StructLit { name, fields, .. } if context.layouts.pack_id(name).is_some() => {
             lower_pack_data(function, name, fields, context)
         }
-        Expr::StructLit { name, type_arguments, fields, .. } => {
-            lower_struct_data(function, name, type_arguments, fields, context)
-        }
-        Expr::FieldAccess { object, field, .. } => {
-            lower_field_construct(function, object, field, context)
+        Expr::StructLit { name, type_arguments, resolved_type, fields, .. } => lower_struct_data(
+            function,
+            name,
+            type_arguments,
+            resolved_type.as_ref(),
+            fields,
+            context,
+        ),
+        Expr::FieldAccess { object, field, resolved_type, .. } => {
+            lower_field_construct(function, object, field, resolved_type.as_ref(), context)
         }
         _ => Err(BackendEmitError("unsupported data construct".to_owned())),
     }
@@ -93,6 +106,7 @@ fn lower_struct_data(
     function: &mut FunctionBuilder<'_>,
     name: &str,
     type_arguments: &[crate::ast::TypeName],
+    resolved_type: Option<&crate::ast::TypeName>,
     fields: &[crate::ast::StructFieldInit],
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
@@ -100,6 +114,7 @@ fn lower_struct_data(
         function,
         name,
         type_arguments,
+        resolved_type,
         fields,
         context.locals,
         context.local_types,
@@ -115,16 +130,17 @@ fn lower_method_construct(
     receiver: &Expr,
     method: &str,
     arguments: &[Argument],
+    resolved_type: Option<&crate::ast::TypeName>,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     if let Some(value) = lower_arena_method(function, receiver, method, arguments, context) {
         return value;
     }
-    if enum_receiver_name(receiver)
+    if enum_receiver_name(resolved_type)
         .and_then(|name| context.layouts.enum_constructor(&name, method))
         .is_some()
     {
-        lower_enum_constructor(function, receiver, method, arguments, context)
+        lower_enum_constructor(function, receiver, method, arguments, resolved_type, context)
     } else {
         lower_method_call(function, receiver, method, arguments, context)
     }
@@ -169,13 +185,14 @@ fn lower_field_construct(
     function: &mut FunctionBuilder<'_>,
     object: &Expr,
     field: &str,
+    resolved_type: Option<&crate::ast::TypeName>,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
-    if enum_receiver_name(object)
+    if enum_receiver_name(resolved_type)
         .and_then(|name| context.layouts.enum_constructor(&name, field))
         .is_some()
     {
-        lower_enum_constructor(function, object, field, &[], context)
+        lower_enum_constructor(function, object, field, &[], resolved_type, context)
     } else {
         lower_field_access(
             function,

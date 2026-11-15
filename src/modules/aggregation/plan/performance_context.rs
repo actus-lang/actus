@@ -38,7 +38,7 @@ fn context_declaration_identity(declaration: &TopLevelDecl) -> Option<String> {
         TopLevelDecl::Enum(value) => ("enum", value.name.clone()),
         TopLevelDecl::Role(value) => ("role", value.name.clone()),
         TopLevelDecl::Perform(value) => {
-            return Some(format!("perform:{}:{}", value.role_name, value.target.canonical_key()));
+            return Some(format!("perform:{}:{}", value.role_name, value.target.spelling_key()));
         }
         TopLevelDecl::OpenSibling(_) | TopLevelDecl::Import(_) => return None,
     };

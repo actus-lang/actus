@@ -3,11 +3,9 @@ use crate::ast::{
     ReturnAccess, Role, VerbDecl, lookup_builtin_type,
 };
 
-use super::super::analyzer::canonical_type_name;
-
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct VerbSignature {
-    pub(crate) params: Vec<(String, Role, String)>,
+    pub(crate) params: Vec<(String, Role, crate::ast::TypeName)>,
     pub(crate) dynamic_params: Vec<DispatchMode>,
     pub(crate) return_type: Option<BuiltinType>,
     pub(crate) return_type_name: Option<crate::ast::TypeName>,
@@ -42,11 +40,7 @@ impl VerbDecl {
                 .params
                 .iter()
                 .map(|parameter| {
-                    (
-                        parameter.name.clone(),
-                        parameter.role.clone(),
-                        canonical_type_name(&parameter.ty),
-                    )
+                    (parameter.name.clone(), parameter.role.clone(), parameter.ty.clone())
                 })
                 .collect(),
             dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),
@@ -78,11 +72,7 @@ impl ExternalVerbDecl {
                 .params
                 .iter()
                 .map(|parameter| {
-                    (
-                        parameter.name.clone(),
-                        parameter.role.clone(),
-                        canonical_type_name(&parameter.ty),
-                    )
+                    (parameter.name.clone(), parameter.role.clone(), parameter.ty.clone())
                 })
                 .collect(),
             dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),

@@ -162,10 +162,10 @@ fn collect_place_calls(place: &Place, calls: &mut Vec<NativeCall>) {
 
 fn collect_expression_calls(expression: &Expr, calls: &mut Vec<NativeCall>) {
     match expression {
-        Expr::Call { callee, arguments, span } => {
+        Expr::Call { callee, arguments, span, .. } => {
             collect_direct_call(callee, arguments, *span, calls)
         }
-        Expr::MethodCall { receiver, method, arguments, span } => {
+        Expr::MethodCall { receiver, method, arguments, span, .. } => {
             collect_method_call(receiver, method, arguments, *span, calls)
         }
         Expr::Grouping { expression, .. }

@@ -260,19 +260,9 @@ pub(super) fn align_up(offset: u32, alignment: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::GenericLayoutRegistry;
-    use crate::ast::{TypeIdentity, TypeName};
     use crate::lexer::scan;
     use crate::parser::parse;
-    use crate::semantic::analyze;
-
-    fn type_name(name: &str) -> TypeName {
-        TypeName {
-            name: name.to_owned(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span: crate::lexer::SourceSpan::new(0, 0),
-        }
-    }
+    use crate::semantic::analyze_standalone;
 
     #[test]
     fn calculates_substituted_struct_offsets() {
@@ -280,10 +270,15 @@ mod tests {
             scan("struct Box[T] { item: T, } verb main(erg value: Box[Int]) { }");
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze(&program).expect("source should analyze");
+        let semantic = analyze_standalone(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
-        let key = TypeIdentity::from_application("Box", &[type_name("Int")]);
+        let key = semantic
+            .generic_instances
+            .iter()
+            .find(|instance| instance.name == "Box")
+            .expect("Box instance should be recorded")
+            .identity();
         let layout = layouts.struct_layout(&key).expect("Box[Int] should be laid out");
         assert_eq!(layout.size, 4);
         assert_eq!(layout.alignment, 4);
@@ -298,16 +293,15 @@ mod tests {
         );
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze(&program).expect("source should analyze");
+        let semantic = analyze_standalone(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
-        let box_type = TypeName {
-            name: "Box".to_owned(),
-            arguments: vec![type_name("Int")],
-            reference_role: None,
-            span: crate::lexer::SourceSpan::new(0, 0),
-        };
-        let key = TypeIdentity::from_application("Result", &[box_type]);
+        let key = semantic
+            .generic_instances
+            .iter()
+            .find(|instance| instance.name == "Result")
+            .expect("Result instance should be recorded")
+            .identity();
         let layout = layouts.enum_layout(&key).expect("Result[Box[Int]] should be laid out");
         assert_eq!(layout.payload_offset, 4);
         assert_eq!(layout.max_payload_size, 4);
@@ -322,10 +316,15 @@ mod tests {
         );
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze(&program).expect("source should analyze");
+        let semantic = analyze_standalone(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic layout should pass");
-        let key = TypeIdentity::from_application("Fabric", &[type_name("8")]);
+        let key = semantic
+            .generic_instances
+            .iter()
+            .find(|instance| instance.name == "Fabric")
+            .expect("Fabric instance should be recorded")
+            .identity();
         let layout = layouts.struct_layout(&key).expect("Fabric[8] should be laid out");
         assert_eq!(layout.size, 8);
         assert_eq!(layout.fields[0].size, 8);
@@ -338,10 +337,15 @@ mod tests {
         );
         assert!(errors.is_empty());
         let program = parse(tokens).expect("source should parse");
-        let semantic = analyze(&program).expect("source should analyze");
+        let semantic = analyze_standalone(&program).expect("source should analyze");
         let layouts = GenericLayoutRegistry::from_program(&program, &semantic.generic_instances, 8)
             .expect("generic pack-array layout should pass");
-        let key = TypeIdentity::from_application("Fabric", &[type_name("2")]);
+        let key = semantic
+            .generic_instances
+            .iter()
+            .find(|instance| instance.name == "Fabric")
+            .expect("Fabric instance should be recorded")
+            .identity();
         let layout = layouts.struct_layout(&key).expect("Fabric[2] should be laid out");
         assert_eq!(layout.size, 8);
         assert_eq!(layout.fields[0].size, 8);

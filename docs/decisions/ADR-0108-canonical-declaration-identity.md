@@ -18,7 +18,11 @@ compilation-session resolution cache.
 
 A declaration identity is the owning package, the declaration's module path
 relative to that package's source root, the declaration name, and ordered type
-arguments.
+arguments. Resolution also produces `Unknown { spelling }` for an unresolved
+user type. Its key uses the `X` tag (`unknown::<spelling>`), it is unequal to
+every other identity, and it exists only long enough for semantic analysis to
+emit the existing unknown-type diagnostic. Specialization, layout, and code
+generation reject `Unknown` as an internal compiler error.
 
 The owning package is the package whose source root contains the declaring
 file; the module path is the file's module path relative to that source root.
@@ -73,7 +77,10 @@ root is the same. The relevant implementation locations are
 The compilation-plan declaration registry is built from those module units.
 It records every declaration as `Declaration { package, module_path, name }`,
 compiler declarations as `Builtin { name }`, and active generic parameters as
-`GenericParameter { owner, name }`. Alias imports, open re-exports, root
+`GenericParameter { owner, name }`. Const-generic literal arguments are
+`Const { value }`, with numeric spelling normalized before identity comparison;
+named constants remain declaration identities until constant inlining resolves
+them. Alias imports, open re-exports, root
 imports, and `std::` paths are lookup spellings only; the registry resolves
 each spelling to the same declaration identity. Resolution is cached by
 `(module identity, spelling)` and returns the canonical identity in a
@@ -83,7 +90,11 @@ Every `TypeName` entering semantic analysis has `resolved = Some(...)`.
 Compilation-plan paths annotate the AST before semantic analysis and assert
 this invariant at the semantic boundary. Standalone parsing and LSP analysis
 use an explicit `resolve_standalone(program)` registry for the one-file
-program; there is no silent unresolved fallback. Normalization, generic
+program. The reserved root module path is `<root>`, and a manifest-less
+standalone registry uses the reserved package identity `<standalone>`; manifest
+name validation rejects both because neither is an identifier. Neither name is
+used by compilation-plan package resolution. There is no silent unresolved
+fallback. Normalization, generic
 specialization, performance-context merging, generic substitution, and
 serialization-generated declarations preserve or explicitly resolve the
 annotation. Generated declarations inherit the identity of their source
@@ -110,6 +121,17 @@ same short name. Diagnostics, formatter output, and LSP hover/definition
 continue to use source spelling; canonical identity is used only for semantic
 resolution, generic caches, specialization, layout, object dependencies, and
 internal mangling.
+
+## Semantic type checking
+
+PR B deliberately preserves PR A's spelling-based semantic comparisons. The
+semantic checker continues to compare the normalized source spelling used by
+the existing diagnostics and type-mismatch rules; canonical identity is not
+used to change those comparisons in this PR. Identity is already used for
+declaration resolution, `GenericInstance` identity, generic substitution and
+caches, specialization, layout lookup, drop and performance registries,
+object dependencies, and internal (non-ABI) mangling. Semantic type
+representation and identity-based comparisons are deferred to PR B3.
 
 ## Consequences
 

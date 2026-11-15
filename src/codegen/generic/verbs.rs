@@ -179,8 +179,8 @@ fn append_specialized_nested_instance(
     if arguments.iter().any(|argument| contains_generic_parameter(argument, caller_parameters)) {
         return false;
     }
-    let identity = TypeIdentity::from_application(&nested_template.name, &arguments);
-    let canonical_key = identity.key();
+    let identity = TypeIdentity::from_verb_application(&nested_template.name, &arguments);
+    let canonical_key = identity.verb_key();
     if expanded.iter().any(|instance| {
         instance.identity() == identity && instance.caller == Some(caller_instance.name.clone())
     }) {
@@ -189,6 +189,7 @@ fn append_specialized_nested_instance(
     expanded.push(GenericInstance {
         name: nested_template.name.clone(),
         arguments,
+        identity: identity.clone(),
         canonical_key,
         caller: Some(caller_instance.name.clone()),
         call_span: nested_template.call_span,
@@ -366,7 +367,7 @@ fn nested_call_bindings(
             .iter()
             .map(|argument| substitution.apply(argument))
             .collect::<Vec<_>>();
-        let identity = TypeIdentity::from_application(&template.name, &arguments);
+        let identity = TypeIdentity::from_verb_application(&template.name, &arguments);
         if let Some(concrete) = instances.iter().find(|instance| instance.identity() == identity) {
             bindings.insert(template.name.clone(), specialized_name(concrete));
         }
@@ -424,6 +425,10 @@ mod tests {
     use super::*;
     use crate::codegen::generic::definitions::specialized_enums;
 
+    fn fixture_type(name: &str, role: Option<crate::ast::Role>, end: usize) -> TypeName {
+        TypeName::unresolved(name, Vec::new(), role, crate::lexer::SourceSpan::new(0, end))
+    }
+
     #[test]
     fn generic_specialization_preserves_structured_contracts() {
         let source = r#"
@@ -441,12 +446,11 @@ mod tests {
         let program = crate::parser::parse(tokens).expect("generic contract should parse");
         let instance = GenericInstance {
             name: "identity".to_owned(),
-            arguments: vec![TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span: crate::lexer::SourceSpan::new(0, 0),
-            }],
+            arguments: vec![fixture_type("Int", None, 0)],
+            identity: TypeIdentity::from_verb_application(
+                "identity",
+                &[fixture_type("Int", None, 0)],
+            ),
             canonical_key: "identity[Int]".to_owned(),
             caller: None,
             call_span: crate::lexer::SourceSpan::new(0, 0),
@@ -474,18 +478,17 @@ mod tests {
         let program = crate::parser::parse(tokens).expect("generic result should parse");
         let instance = GenericInstance {
             name: "Result".to_owned(),
-            arguments: vec![TypeName {
-                name: "Item".to_owned(),
-                arguments: Vec::new(),
-                reference_role: Some(crate::ast::Role::Abs),
-                span: crate::lexer::SourceSpan::new(0, 4),
-            }],
+            arguments: vec![fixture_type("Item", Some(crate::ast::Role::Abs), 4)],
+            identity: TypeIdentity::from_verb_application(
+                "Result",
+                &[fixture_type("Item", Some(crate::ast::Role::Abs), 4)],
+            ),
             canonical_key: "Result[abs Item]".to_owned(),
             caller: None,
             call_span: crate::lexer::SourceSpan::new(0, 4),
         };
 
-        assert_eq!(instance.identity().key(), "Result[Item]");
+        assert_eq!(instance.identity().verb_key(), "Result[Item]");
         assert_eq!(instance.canonical_key, "Result[abs Item]");
 
         let specialized = specialized_enums(&program, &[instance]).expect("specialization");

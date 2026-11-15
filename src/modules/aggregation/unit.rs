@@ -12,6 +12,7 @@ use super::visibility::validate_exported_signatures;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleIdentity {
     namespace: ModuleNamespace,
+    package: String,
     module_path: String,
     source_key: String,
 }
@@ -19,6 +20,10 @@ pub struct ModuleIdentity {
 impl ModuleIdentity {
     pub fn namespace(&self) -> &ModuleNamespace {
         &self.namespace
+    }
+
+    pub fn package(&self) -> &str {
+        &self.package
     }
 
     pub fn module_path(&self) -> &str {
@@ -89,6 +94,13 @@ impl ModuleUnit {
     pub fn exports(&self) -> &ModuleExports {
         &self.exports
     }
+
+    pub(crate) fn annotate_types(&mut self, registry: &super::registry::DeclarationRegistry) {
+        registry.annotate_program_headers(self.identity.module_path(), &mut self.implementation);
+        for source in &mut self.sources {
+            registry.annotate_program_headers(self.identity.module_path(), &mut source.program);
+        }
+    }
 }
 
 pub fn load_module_unit(
@@ -117,7 +129,12 @@ pub fn load_module_unit_with_overlays(
     let namespace =
         ModuleNamespace::from_module_path(module_path).map_err(ModuleError::Resolution)?;
     let unit = ModuleUnit {
-        identity: ModuleIdentity { namespace, module_path: module_path.to_owned(), source_key },
+        identity: ModuleIdentity {
+            package: resolver.module_package_identity(module_path),
+            namespace,
+            module_path: module_path.to_owned(),
+            source_key,
+        },
         facade: resolved.facade().to_owned(),
         sources,
         implementation,

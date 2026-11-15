@@ -83,7 +83,7 @@ fn target_program(tokens: &[Token], target: &TargetSpec) -> Option<Program> {
 }
 
 fn semantic_argument_role_info(program: &Program, offset: usize) -> Option<(String, SourceSpan)> {
-    let model = crate::semantic::analyze(program).ok()?;
+    let model = crate::semantic::analyze_standalone(program).ok()?;
     let fact = model
         .argument_roles
         .iter()
@@ -132,7 +132,7 @@ fn semantic_binding_info(
     name: &str,
     offset: usize,
 ) -> Option<SymbolInfo> {
-    let model = crate::semantic::analyze(program).ok()?;
+    let model = crate::semantic::analyze_standalone(program).ok()?;
     let (index, binding) = model
         .bindings
         .iter()

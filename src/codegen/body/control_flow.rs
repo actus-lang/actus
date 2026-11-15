@@ -31,6 +31,7 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             role: crate::ast::Role::Erg,
             name: name.clone(),
             ty: None,
+            resolved_type: None,
             initializer: condition.clone(),
             span: *span,
         };

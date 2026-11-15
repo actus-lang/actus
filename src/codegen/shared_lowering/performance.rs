@@ -34,7 +34,7 @@ pub(super) fn performance_dispatch_maps(
         .iter()
         .zip(signatures)
         .map(|((perform, method), signature)| {
-            ((perform.target.canonical_key(), method.name.clone()), signature.symbol.clone())
+            ((perform.target.canonical_lookup_key(), method.name.clone()), signature.symbol.clone())
         })
         .collect();
     let return_types = performances
@@ -42,7 +42,7 @@ pub(super) fn performance_dispatch_maps(
         .zip(signatures)
         .map(|((perform, method), signature)| {
             (
-                (perform.target.canonical_key(), method.name.clone()),
+                (perform.target.canonical_lookup_key(), method.name.clone()),
                 (signature.return_value.ty != BackendValueType::Unit)
                     .then_some(signature.return_value.ty),
             )
@@ -53,7 +53,7 @@ pub(super) fn performance_dispatch_maps(
         .zip(signatures)
         .map(|((perform, method), _)| {
             (
-                (perform.target.canonical_key(), method.name.clone()),
+                (perform.target.canonical_lookup_key(), method.name.clone()),
                 method.return_type.as_ref().map(|return_type| return_type.ty.clone()),
             )
         })

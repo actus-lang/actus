@@ -98,7 +98,7 @@ fn parse_file(path: &str, print_ast: bool) -> i32 {
             println!("{program:#?}");
             0
         }
-        Ok(program) => match crate::semantic::analyze(&program) {
+        Ok(program) => match crate::semantic::analyze_standalone(&program) {
             Ok(_) => {
                 println!("checked `{path}` successfully");
                 0

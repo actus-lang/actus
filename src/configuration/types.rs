@@ -130,6 +130,7 @@ impl NativeBackendConfiguration {
 pub struct CompilerConfiguration {
     pub(super) project_root: PathBuf,
     pub(super) source_root: PathBuf,
+    pub(super) package_identity: String,
     pub(super) dependency_roots: BTreeMap<String, PathBuf>,
     pub(super) target: TargetSpec,
     pub(super) target_spec_hash: String,

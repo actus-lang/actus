@@ -37,12 +37,7 @@ pub(super) fn scalar_backend_type(type_name: &TypeName) -> Option<super::super::
 }
 
 pub(super) fn scalar_backend_type_name(name: &str) -> Option<super::super::BackendValueType> {
-    let type_name = TypeName {
-        name: name.to_owned(),
-        arguments: Vec::new(),
-        reference_role: None,
-        span: crate::lexer::SourceSpan::new(0, 0),
-    };
+    let type_name = TypeName::builtin(name, Vec::new(), None, crate::lexer::SourceSpan::new(0, 0));
     scalar_backend_type(&type_name)
 }
 

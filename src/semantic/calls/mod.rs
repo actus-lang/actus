@@ -1,4 +1,5 @@
 pub(in crate::semantic) mod arguments;
+mod dispatch;
 mod effects;
 mod ownership;
 mod paths;

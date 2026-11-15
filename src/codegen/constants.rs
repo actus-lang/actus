@@ -285,7 +285,9 @@ fn inline_expression_node(expression: &mut Expr, constants: &HashMap<String, Exp
             inline_expression(left, constants);
             inline_expression(right, constants);
         }
-        Expr::Call { callee, arguments, span } => inline_call(callee, arguments, *span, constants),
+        Expr::Call { callee, resolved_type, arguments, .. } => {
+            inline_call(callee, resolved_type.as_mut(), arguments, constants)
+        }
         Expr::MethodCall { receiver, arguments, .. } => {
             inline_method_call(receiver, arguments, constants);
         }
@@ -320,11 +322,16 @@ fn inline_expression_node(expression: &mut Expr, constants: &HashMap<String, Exp
 
 fn inline_call(
     callee: &mut String,
+    resolved_type: Option<&mut TypeName>,
     arguments: &mut [crate::ast::Argument],
-    span: crate::lexer::SourceSpan,
     constants: &HashMap<String, Expr>,
 ) {
-    inline_array_callee(callee, span, constants);
+    if let Some(type_name) = resolved_type {
+        inline_type_name(type_name, constants);
+        if type_name.name == "Array" {
+            *callee = type_name.spelling_key();
+        }
+    }
     for argument in arguments {
         inline_expression(&mut argument.expression, constants);
     }
@@ -373,21 +380,6 @@ fn inline_case(
             CaseBody::Block(block) => inline_block(block, constants),
         }
     }
-}
-
-fn inline_array_callee(
-    callee: &mut String,
-    span: crate::lexer::SourceSpan,
-    constants: &HashMap<String, Expr>,
-) {
-    if !callee.starts_with("Array[") {
-        return;
-    }
-    let Some(mut type_name) = crate::semantic::parse_type_name_key(callee, span) else {
-        return;
-    };
-    inline_type_name(&mut type_name, constants);
-    *callee = type_name.canonical_key();
 }
 
 fn inline_type_name(type_name: &mut TypeName, constants: &HashMap<String, Expr>) {

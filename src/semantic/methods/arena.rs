@@ -50,6 +50,7 @@ impl Analyzer {
                 span: expression_span(argument),
             });
         };
+        let type_name = self.normalize_imported_type_name(&type_name);
         self.inferred_expression_types.insert(self.expression_cache_key(span), type_name);
         self.expression_arena_provenance.insert(self.expression_cache_key(span), arena_id);
         Ok(())

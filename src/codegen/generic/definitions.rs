@@ -202,6 +202,7 @@ fn collect_type_instances(
     instances.push(GenericInstance {
         name: type_name.name.clone(),
         arguments: type_name.arguments.clone(),
+        identity: identity.clone(),
         canonical_key: canonical_type_name(type_name),
         caller: None,
         call_span: type_name.span,
@@ -368,6 +369,7 @@ fn specialize_type(type_name: &TypeName, generic_names: &HashSet<String>) -> Typ
         arguments: Vec::new(),
         reference_role: type_name.reference_role.clone(),
         span: type_name.span,
+        resolved: type_name.resolved.clone(),
     }
 }
 

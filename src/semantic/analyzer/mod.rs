@@ -11,9 +11,9 @@ mod statements;
 mod validation;
 mod verb;
 
-use crate::semantic::normalize_generated_locals;
 use crate::semantic::{calls, cleanup, errors, model};
 pub use analysis::analyze;
+pub(crate) use analysis::analyze_resolved;
 pub(crate) use analysis::{
     validate_bounded_recursion, validate_stack_limit_dynamic_dispatch,
     validate_stack_limit_native_claims, validate_stack_limit_recursion,

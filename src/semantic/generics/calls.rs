@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-use crate::ast::{Argument, GenericParam, TypeName};
+use crate::ast::{Argument, GenericParam, TypeIdentity, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
-use crate::semantic::calls::shapes::argument_span;
-use crate::semantic::calls::{VerbSignature, parse_type_name_key};
+use crate::semantic::calls::VerbSignature;
 use crate::semantic::errors::{SemanticError, SemanticErrorKind};
 
 impl Analyzer {
@@ -23,14 +22,16 @@ impl Analyzer {
                 .generic_parameters
                 .iter()
                 .zip(explicit_arguments)
-                .map(|(parameter, argument)| (parameter.name.clone(), argument.clone()))
+                .map(|(parameter, argument)| {
+                    (parameter.name.clone(), self.normalize_imported_type_name(argument))
+                })
                 .collect()
         } else {
             self.infer_generic_bindings(signature, arguments)
         };
         self.record_generic_call_instance(name, signature, &bindings, span);
         let specialized = self.specialize_signature(signature, bindings, span)?;
-        self.record_specialized_signature_instances(&specialized, span)?;
+        self.record_specialized_signature_instances(&specialized)?;
         Ok(specialized)
     }
 
@@ -49,6 +50,7 @@ impl Analyzer {
         if arguments.len() != signature.generic_parameters.len() {
             return;
         }
+        let identity = TypeIdentity::from_verb_application(name, &arguments);
         let canonical_key = format!(
             "{name}[{}]",
             arguments
@@ -60,6 +62,7 @@ impl Analyzer {
         self.generic_instances.insert(super::model::GenericInstance {
             name: name.to_owned(),
             arguments,
+            identity,
             canonical_key,
             caller: self.current_generic_owner.clone(),
             call_span: span,
@@ -74,15 +77,10 @@ impl Analyzer {
         let mut bindings = HashMap::new();
         for (index, (_, _, parameter_type)) in signature.params.iter().enumerate() {
             let Some(argument) = arguments.get(index) else { continue };
-            let Some(found) = self
-                .expression_type_name(&argument.expression)
-                .and_then(|name| parse_type_name_key(&name, argument_span(argument)))
-            else {
+            let Some(found) = self.resolved_type_name(&argument.expression) else {
                 continue;
             };
-            let Some(pattern) = parse_type_name_key(parameter_type, argument_span(argument)) else {
-                continue;
-            };
+            let pattern = self.normalize_imported_type_name(parameter_type);
             unify_generic_type(&pattern, &found, &signature.generic_parameters, &mut bindings);
         }
         if let (Some(expected), Some(return_type)) =
@@ -96,12 +94,9 @@ impl Analyzer {
     fn record_specialized_signature_instances(
         &mut self,
         signature: &VerbSignature,
-        span: SourceSpan,
     ) -> Result<(), SemanticError> {
         for (_, _, parameter_type) in &signature.params {
-            let type_name = parse_type_name_key(parameter_type, span)
-                .ok_or_else(|| malformed_type_name(parameter_type, span))?;
-            self.validate_type_reference(&type_name)?;
+            self.validate_type_reference(parameter_type)?;
         }
         if let Some(return_type) = &signature.return_type_name {
             self.validate_type_reference(return_type)?;
@@ -125,22 +120,17 @@ impl Analyzer {
         }
         let mut params = Vec::with_capacity(signature.params.len());
         for (name, role, ty) in &signature.params {
-            let parsed =
-                parse_type_name_key(ty, span).ok_or_else(|| malformed_type_name(ty, span))?;
-            params.push((
-                name.clone(),
-                role.clone(),
-                super::analyzer::canonical_type_name(&substitute_type(&parsed, &bindings)),
-            ));
+            let parsed = self.normalize_imported_type_name(ty);
+            params.push((name.clone(), role.clone(), substitute_type(&parsed, &bindings)));
         }
         Ok(VerbSignature {
             params,
             dynamic_params: signature.dynamic_params.clone(),
             return_type: signature.return_type,
-            return_type_name: signature
-                .return_type_name
-                .as_ref()
-                .map(|return_type| substitute_type(return_type, &bindings)),
+            return_type_name: signature.return_type_name.as_ref().map(|return_type| {
+                let return_type = self.normalize_imported_type_name(return_type);
+                substitute_type(&return_type, &bindings)
+            }),
             return_access: signature.return_access,
             generic_parameters: Vec::new(),
             external: signature.external,
@@ -152,10 +142,6 @@ impl Analyzer {
             bounded: signature.bounded.clone(),
         })
     }
-}
-
-fn malformed_type_name(name: &str, span: SourceSpan) -> SemanticError {
-    SemanticError { kind: SemanticErrorKind::MalformedTypeName { name: name.to_owned() }, span }
 }
 
 fn unify_generic_type(
@@ -189,5 +175,6 @@ fn substitute_type(type_name: &TypeName, bindings: &HashMap<String, TypeName>) -
             .collect(),
         reference_role: type_name.reference_role.clone(),
         span: type_name.span,
+        resolved: type_name.resolved.clone(),
     }
 }

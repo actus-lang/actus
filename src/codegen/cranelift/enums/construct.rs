@@ -16,12 +16,14 @@ use crate::codegen::cranelift::structs::copy_bytes;
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn lower_enum_constructor(
     function: &mut FunctionBuilder<'_>,
-    receiver: &Expr,
+    _receiver: &Expr,
     variant: &str,
     arguments: &[Argument],
+    resolved_type: Option<&crate::ast::TypeName>,
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
-    let (enum_layout, variant_layout) = constructor_layouts(receiver, variant, context.layouts)?;
+    let (enum_layout, variant_layout) =
+        constructor_layouts(resolved_type, variant, context.layouts)?;
     if enum_layout.niche_pointer {
         return lower_niche_option_constructor(function, variant, arguments, context);
     }
@@ -29,11 +31,11 @@ pub(crate) fn lower_enum_constructor(
 }
 
 fn constructor_layouts<'a>(
-    receiver: &Expr,
+    type_name: Option<&crate::ast::TypeName>,
     variant: &str,
     layouts: &'a LayoutRegistry,
 ) -> Result<(&'a EnumLayout, &'a EnumVariantLayout), BackendEmitError> {
-    let enum_name = super::types::enum_receiver_name(receiver)
+    let enum_name = super::types::enum_receiver_name(type_name)
         .ok_or_else(|| BackendEmitError("enum constructor requires a type receiver".to_owned()))?;
     let (enum_id, variant_layout) =
         layouts.enum_constructor(&enum_name, variant).ok_or_else(|| {

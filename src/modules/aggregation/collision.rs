@@ -19,7 +19,7 @@ pub(super) fn external_contract(declaration: &TopLevelDecl) -> Option<ExternalCo
         generic_parameters: verb.generic_parameters.iter().map(generic_parameter_key).collect(),
         parameters: verb.params.iter().map(parameter_key).collect(),
         return_type: verb.return_type.as_ref().map(|return_type| {
-            format!("{}:{}", return_access_key(return_type.access), return_type.ty.canonical_key())
+            format!("{}:{}", return_access_key(return_type.access), return_type.ty.spelling_key())
         }),
     })
 }
@@ -27,14 +27,14 @@ pub(super) fn external_contract(declaration: &TopLevelDecl) -> Option<ExternalCo
 fn generic_parameter_key(parameter: &crate::ast::GenericParam) -> String {
     let kind = match &parameter.kind {
         GenericParamKind::Type => "type".to_owned(),
-        GenericParamKind::Const { domain } => format!("const:{}", domain.canonical_key()),
+        GenericParamKind::Const { domain } => format!("const:{}", domain.spelling_key()),
     };
     let bound =
-        parameter.bound.as_ref().map(crate::ast::TypeName::canonical_key).unwrap_or_default();
+        parameter.bound.as_ref().map(crate::ast::TypeName::spelling_key).unwrap_or_default();
     let bounds = parameter
         .bounds
         .iter()
-        .map(crate::ast::TypeName::canonical_key)
+        .map(crate::ast::TypeName::spelling_key)
         .collect::<Vec<_>>()
         .join(",");
     format!("{kind}:{bound}:{bounds}")
@@ -45,7 +45,7 @@ fn parameter_key(parameter: &Param) -> String {
         "{}:{}:{}",
         role_key(&parameter.role),
         dispatch_key(parameter.dispatch),
-        parameter.ty.canonical_key()
+        parameter.ty.spelling_key()
     )
 }
 

@@ -59,6 +59,7 @@ fn resolve_build_program(
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
     )
+    .with_package_identity(configuration.package_identity(), configuration.source_root())
     .with_session(session.clone());
     match build_compilation_plan(&program, &resolver) {
         Ok(plan) => Some(plan),

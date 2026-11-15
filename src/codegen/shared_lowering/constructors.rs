@@ -14,13 +14,12 @@ pub(super) fn lower_method_call(
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let Expr::MethodCall { receiver, method, arguments, span } = expression else {
+    let Expr::MethodCall { method, arguments, resolved_type, span, .. } = expression else {
         return Err(unsupported(expression_span(expression), "method call expected"));
     };
-    let result_type =
-        parse_constructor_receiver_type(receiver.as_ref(), *span).ok_or_else(|| {
-            unsupported(*span, "Result constructor receiver has an invalid type name")
-        })?;
+    let result_type = resolved_type.clone().ok_or_else(|| {
+        unsupported(*span, "Result constructor receiver has an invalid type name")
+    })?;
     if result_type.name == "Option" && result_type.arguments.len() == 1 {
         let layout = provider
             .enum_layout(&result_type)
@@ -57,39 +56,6 @@ pub(super) fn lower_method_call(
         );
     }
     lower_result_constructor(provider, &result_type, method, arguments, *span, instructions)
-}
-
-pub(super) fn parse_constructor_receiver_type(
-    expression: &Expr,
-    span: SourceSpan,
-) -> Option<TypeName> {
-    match expression {
-        Expr::Identifier { name, .. } => {
-            crate::semantic::parse_type_name_key(name, span).or_else(|| {
-                crate::ast::parse_type_name_with_mode(
-                    name,
-                    span,
-                    crate::ast::TypeNameParseMode::Plain,
-                )
-            })
-        }
-        Expr::Index { target, index, .. } => {
-            let mut type_name = parse_constructor_receiver_type(target, span)?;
-            let Expr::Identifier { name, .. } = index.as_ref() else {
-                return None;
-            };
-            let argument = crate::semantic::parse_type_name_key(name, span).or_else(|| {
-                crate::ast::parse_type_name_with_mode(
-                    name,
-                    span,
-                    crate::ast::TypeNameParseMode::Plain,
-                )
-            })?;
-            type_name.arguments.push(argument);
-            Some(type_name)
-        }
-        _ => None,
-    }
 }
 
 fn lower_regular_option_constructor(

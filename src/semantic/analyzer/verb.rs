@@ -53,21 +53,24 @@ impl Analyzer {
         self.current_verb_name = Some(verb.name.clone());
         self.current_return_access =
             verb.return_type.as_ref().map(|return_type| return_type.access);
-        self.current_return_type = verb
-            .return_type
-            .as_ref()
-            .and_then(|return_type| lookup_builtin_type(&return_type.ty.name));
         self.current_return_type_name = verb
             .return_type
             .as_ref()
             .map(|return_type| self.normalize_imported_type_name(&return_type.ty));
+        self.current_return_type = self.current_return_type_name.as_ref().and_then(|type_name| {
+            matches!(
+                type_name.resolved.as_ref(),
+                Some(crate::ast::DeclarationIdentity::Builtin { .. })
+            )
+            .then(|| lookup_builtin_type(&type_name.name))
+            .flatten()
+        });
         self.current_return_is_builtin_result =
-            verb.return_type.as_ref().is_some_and(|return_type| {
-                return_type.ty.name == "Result"
-                    && self
-                        .enum_types
-                        .get("Result")
-                        .is_some_and(|definition| definition.span.start == 0)
+            self.current_return_type_name.as_ref().is_some_and(|type_name| {
+                matches!(
+                    type_name.resolved.as_ref(),
+                    Some(crate::ast::DeclarationIdentity::Builtin { name }) if name == "Result"
+                )
             });
     }
 
@@ -104,16 +107,17 @@ impl Analyzer {
 
     fn bind_parameters(&mut self, parameters: &[crate::ast::Param]) -> Result<(), SemanticError> {
         for parameter in parameters {
-            let ty = lookup_builtin_type(&parameter.ty.name);
+            let parameter_type = self.normalize_imported_type_name(&parameter.ty);
+            let ty = lookup_builtin_type(&parameter_type.name);
             self.bind(parameter.role.clone(), parameter.name.clone(), ty, parameter.span)?;
             let index = self.binding(&parameter.name, parameter.span)?;
-            self.binding_type_names.insert(index, parameter.ty.clone());
+            self.binding_type_names.insert(index, parameter_type.clone());
             if parameter.dispatch == crate::ast::DispatchMode::Dynamic {
                 let index = self.binding(&parameter.name, parameter.span)?;
                 self.binding_dynamic_roles.insert(index, parameter.ty.name.clone());
             }
-            self.record_struct_binding(&parameter.name, &parameter.ty, parameter.span)?;
-            self.record_enum_binding(&parameter.name, &parameter.ty, parameter.span)?;
+            self.record_struct_binding(&parameter.name, &parameter_type, parameter.span)?;
+            self.record_enum_binding(&parameter.name, &parameter_type, parameter.span)?;
             if let Ok(index) = self.binding(&parameter.name, parameter.span)
                 && let Some(parameter_index) = self.current_abs_origins.get(&parameter.name)
             {

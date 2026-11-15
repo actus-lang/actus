@@ -91,6 +91,7 @@ pub struct ConditionalFact {
 pub struct GenericInstance {
     pub name: String,
     pub arguments: Vec<TypeName>,
+    pub identity: TypeIdentity,
     pub canonical_key: String,
     pub caller: Option<String>,
     pub call_span: SourceSpan,
@@ -104,12 +105,7 @@ pub struct ExplicitDrop {
 
 impl GenericInstance {
     pub fn identity(&self) -> TypeIdentity {
-        TypeIdentity::from_type_name(&TypeName {
-            name: self.name.clone(),
-            arguments: self.arguments.clone(),
-            reference_role: None,
-            span: self.call_span,
-        })
+        self.identity.clone()
     }
 }
 

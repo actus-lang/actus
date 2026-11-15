@@ -47,7 +47,7 @@ impl Analyzer {
                     })
                 }
             }
-            Expr::FieldAccess { object, field, span } => {
+            Expr::FieldAccess { object, field, span, .. } => {
                 self.validate_field_access(object, field, *span)?;
                 self.ensure_field_access_readable(object, field, *span)
             }

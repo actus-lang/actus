@@ -1,6 +1,8 @@
-mod aggregation;
+pub(crate) mod aggregation;
+mod package_sources;
 mod resolver;
 
+pub(crate) use aggregation::DeclarationRegistry;
 pub use aggregation::{
     DuplicateDeclaration, ExportedSymbol, ModuleCompilationPlan, ModuleError, ModuleExports,
     ModuleIdentity, ModuleLocation, ModuleNamespace, ModuleObjectOwner, ModuleObjectPlan,
@@ -13,4 +15,5 @@ pub use aggregation::{
     resolve_imports,
 };
 pub(crate) use aggregation::{program_with_performance_context, validate_compilation_plan};
+pub use package_sources::{PackageRole, PackageSourceIdentity};
 pub use resolver::{ModuleResolutionError, ModuleResolver, ResolvedChildModule, ResolvedModule};

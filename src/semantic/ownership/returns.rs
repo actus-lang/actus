@@ -173,10 +173,11 @@ impl Analyzer {
         let expected = super::super::analyzer::canonical_type_name(expected);
         match &branch.body {
             crate::ast::CaseBody::Expression(expression) => {
-                self.expression_type_name(expression)
+                let found = self
+                    .expression_type_name(expression)
                     .map(|name| self.normalize_imported_type_key(&name))
-                    .as_deref()
-                    == Some(expected.as_str())
+                    .unwrap_or_else(|| "<none>".to_owned());
+                found == expected
             }
             crate::ast::CaseBody::Block(block) => {
                 let Some(statement) = block.statements.last() else { return false };
@@ -185,10 +186,11 @@ impl Analyzer {
                     | crate::ast::Stmt::Return { value: Some(expression), .. } => expression,
                     _ => return false,
                 };
-                self.expression_type_name(expression)
+                let found = self
+                    .expression_type_name(expression)
                     .map(|name| self.normalize_imported_type_key(&name))
-                    .as_deref()
-                    == Some(expected.as_str())
+                    .unwrap_or_else(|| "<none>".to_owned());
+                found == expected
             }
         }
     }
