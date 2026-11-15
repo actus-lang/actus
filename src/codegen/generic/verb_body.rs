@@ -243,13 +243,14 @@ fn specialize_call(expression: &Expr, substitution: &TypeSubstitution) -> Expr {
             span: *span,
         };
     }
-    let callee = if callee.contains('[') {
-        specialize_callee_name(callee, &generic_arguments, substitution)
-    } else {
-        substitution
-            .apply_call_at(callee, *span)
-            .or_else(|| substitution.apply_call(callee))
-            .map_or_else(|| callee.clone(), str::to_owned)
+    // A call bound to a nested instance at this span names that exact
+    // specialization (ADR-0108); spelling-based renaming is the fallback.
+    let callee = match substitution.apply_call_at(callee, *span) {
+        Some(bound) => bound.to_owned(),
+        None if callee.contains('[') => {
+            specialize_callee_name(callee, &generic_arguments, substitution)
+        }
+        None => substitution.apply_call(callee).map_or_else(|| callee.clone(), str::to_owned),
     };
     Expr::Call {
         callee,

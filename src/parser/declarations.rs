@@ -393,6 +393,7 @@ impl Parser {
             params: signature.params,
             return_type: signature.return_type,
             span,
+            identity: None,
         })
     }
 

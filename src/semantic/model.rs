@@ -95,6 +95,10 @@ pub struct GenericInstance {
     pub canonical_key: String,
     pub caller: Option<String>,
     pub call_span: SourceSpan,
+    /// The generic verb this instance specializes (ADR-0108), when known.
+    pub verb: Option<crate::ast::DeclarationId>,
+    /// The generic verb whose body calls this instance, when known.
+    pub caller_verb: Option<crate::ast::DeclarationId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

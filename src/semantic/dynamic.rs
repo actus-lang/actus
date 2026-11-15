@@ -79,6 +79,7 @@ pub(super) fn role_method_signature(method: &RoleMethod) -> VerbSignature {
             MetaAttribute::Bounded(contract) => Some(contract.clone()),
             _ => None,
         }),
+        identity: None,
     }
 }
 

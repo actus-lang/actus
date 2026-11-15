@@ -85,6 +85,7 @@ fn generated_validator(contract: &SerializeDecl) -> VerbDecl {
         }),
         body: Block { statements: vec![Stmt::Return { value: Some(call), span }], span },
         span,
+        identity: None,
     }
 }
 fn validator_arguments(contract: &SerializeDecl, span: SourceSpan) -> Vec<Argument> {

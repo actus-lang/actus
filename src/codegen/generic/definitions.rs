@@ -206,6 +206,8 @@ fn collect_type_instances(
         canonical_key: canonical_type_name(type_name),
         caller: None,
         call_span: type_name.span,
+        verb: None,
+        caller_verb: None,
     });
 }
 

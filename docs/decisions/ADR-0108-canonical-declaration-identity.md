@@ -172,6 +172,27 @@ Its owner is that declaration's canonical key, so two declarations of one
 module that both name a parameter `T` have distinct parameter identities, and
 `T` outside a generic declaration is an ordinary type spelling.
 
+## Generic verbs
+
+A verb declaration carries its canonical identity (`VerbDecl.identity`,
+`ExternalVerbDecl.identity`), set by plan annotation. An imported verb is a
+binding, not a declaration of the importer: its alias carries the identity of
+the source verb, whatever its spelling (`a::pick`, or `pick` through an open
+import), and the registry does not index it as a declaration of the importing
+module. A spelling that resolves to no declared verb, or to several, gives no
+identity.
+
+Semantic analysis records on each generic verb instance the verb it
+specializes (`GenericInstance.verb`) and, for a call inside a generic verb
+body, the generic verb that calls it (`GenericInstance.caller_verb`). Code
+generation pairs instances with declarations, nested instances with their
+callers, and an imported unit's verbs with their specialized symbols by these
+identities only. A call bound to a nested instance at its source span names
+that exact specialization. Only compiler-generated declarations without an
+identity are matched by their exact name; the last segment of a spelling
+never selects a verb. The architecture check forbids matching an instance by
+its spelling's last segment in generic code generation and object emission.
+
 ## Consequences
 
 - Generic specialization, generic caches, layout lookup, object dependencies,

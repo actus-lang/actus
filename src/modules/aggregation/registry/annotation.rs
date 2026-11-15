@@ -39,12 +39,18 @@ impl DeclarationRegistry {
                 self.annotate_expr(scope, &mut value.initializer);
             }
             TopLevelDecl::Verb(value) => {
+                value.identity =
+                    value.identity.or_else(|| self.verb_id(scope.module_path, &value.name));
                 let owner = self.generic_owner(scope, &value.name, &value.generic_parameters);
                 let scope = scope.generic(&owner, &value.generic_parameters);
                 annotate_callable(self, scope, &mut value.params, &mut value.return_type);
                 self.annotate_block(scope, &mut value.body);
             }
             TopLevelDecl::ExternalVerb(value) => {
+                // An imported alias resolves its spelling (`ns::verb`) to the
+                // identity of its source verb.
+                value.identity =
+                    value.identity.or_else(|| self.verb_id(scope.module_path, &value.name));
                 let owner = self.generic_owner(scope, &value.name, &value.generic_parameters);
                 let scope = scope.generic(&owner, &value.generic_parameters);
                 annotate_callable(self, scope, &mut value.params, &mut value.return_type)
@@ -430,5 +436,14 @@ fn annotate_callable(
     }
     if let Some(return_type) = return_type {
         registry.resolve_scoped_type_name(scope, &mut return_type.ty);
+    }
+}
+
+impl super::declarations::DeclarationRegistry {
+    /// The canonical identity of the verb `spelling` names: only a declared
+    /// verb has one, an unresolved or ambiguous spelling has none.
+    fn verb_id(&self, module_path: &str, spelling: &str) -> Option<crate::ast::DeclarationId> {
+        self.resolve_id(module_path, spelling)
+            .filter(|id| matches!(id.identity(), crate::ast::DeclarationIdentity::Declaration(_)))
     }
 }

@@ -160,6 +160,7 @@ fn caller_declaration(
             params: verb.params.clone(),
             return_type: verb.return_type.clone(),
             span: verb.span,
+            identity: verb.identity,
         }),
         TopLevelDecl::ExternalVerb(verb) => {
             let mut imported = verb.clone();

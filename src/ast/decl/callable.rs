@@ -20,6 +20,9 @@ pub struct ExternalVerbDecl {
     pub params: Vec<Param>,
     pub return_type: Option<ReturnType>,
     pub span: SourceSpan,
+    /// Canonical identity of the verb this declaration names (ADR-0108);
+    /// an imported alias carries the identity of its source verb.
+    pub identity: Option<super::DeclarationId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -34,6 +37,8 @@ pub struct VerbDecl {
     pub return_type: Option<ReturnType>,
     pub body: Block,
     pub span: SourceSpan,
+    /// Canonical identity of the verb (ADR-0108), set by plan annotation.
+    pub identity: Option<super::DeclarationId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

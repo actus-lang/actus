@@ -64,6 +64,7 @@ pub(crate) struct Analyzer {
     pub(crate) generic_bounds: HashMap<String, Vec<String>>,
     pub(crate) generic_instances: super::super::generics::GenericInstanceCache,
     pub(crate) current_generic_owner: Option<String>,
+    pub(crate) current_generic_owner_verb: Option<crate::ast::DeclarationId>,
     pub(crate) current_expression_scope: usize,
     pub(crate) next_expression_scope: usize,
     pub(crate) expected_expression_type: Option<crate::ast::TypeName>,

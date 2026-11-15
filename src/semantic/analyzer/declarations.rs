@@ -119,9 +119,11 @@ impl Analyzer {
             if let TopLevelDecl::Verb(verb) = declaration {
                 let parameters = verb.generic_parameters.clone();
                 self.current_generic_owner = (!parameters.is_empty()).then(|| verb.name.clone());
+                self.current_generic_owner_verb = verb.identity.filter(|_| !parameters.is_empty());
                 let result = self
                     .with_generic_scope(&parameters, |analyzer| analyzer.analyze_verb_body(verb));
                 self.current_generic_owner = None;
+                self.current_generic_owner_verb = None;
                 result?;
             }
         }

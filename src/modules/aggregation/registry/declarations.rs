@@ -321,6 +321,12 @@ impl DeclarationRegistry {
         );
         let source = Arc::new(program.clone());
         for (declaration_index, declaration) in program.declarations.iter().enumerate() {
+            // An imported verb is a binding to its source declaration, which
+            // its own module registers; it is not a declaration of the
+            // importer (ADR-0108).
+            if matches!(declaration, TopLevelDecl::ExternalVerb(verb) if verb.module_import) {
+                continue;
+            }
             let Some((kind, name)) = export_identity(declaration) else { continue };
             let identity = DeclarationIdentity::Declaration(DeclarationPath::new(
                 super::RegistryToken::new(),

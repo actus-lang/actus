@@ -238,6 +238,10 @@ open verb start() -> Int {
    matched by short name. It is not observable today, because E1110 rejects
    same-named declarations across the modules of one program; PR B2 removes it
    before any change to the E1110 rule.
+   Done: verb declarations and generic instances carry canonical identity
+   (`ADR-0108`, "Generic verbs"), and matching uses it alone. B2 also fixed an
+   open-import verb binding that the registry indexed as a declaration of the
+   importer, which gave the binding an ambiguous identity.
 6. **B3 — Semantic type representation**: replace the remaining semantic
    string representation with `expression_type_name -> Option<TypeName>`,
    consolidate the `canonical_type_name` variants into one display function,

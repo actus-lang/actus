@@ -18,6 +18,8 @@ pub(crate) struct VerbSignature {
     pub(crate) deterministic: bool,
     pub(crate) realtime: bool,
     pub(crate) bounded: Option<crate::ast::BoundedContract>,
+    /// The verb this signature belongs to (ADR-0108), when annotated.
+    pub(crate) identity: Option<crate::ast::DeclarationId>,
 }
 
 pub(super) fn has_matching_named_signature(
@@ -61,6 +63,7 @@ impl VerbDecl {
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
             bounded: metadata_bounded(&self.metadata),
+            identity: self.identity,
         }
     }
 }
@@ -93,6 +96,7 @@ impl ExternalVerbDecl {
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
             bounded: metadata_bounded(&self.metadata),
+            identity: self.identity,
         }
     }
 }

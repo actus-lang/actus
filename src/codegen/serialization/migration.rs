@@ -82,6 +82,7 @@ fn generated_migration(contract: &SerializeDecl, capacity: u64, span: SourceSpan
         return_type: Some(ReturnType { access: ReturnAccess::Owned, ty: result_type(span), span }),
         body: Block { statements, span },
         span,
+        identity: None,
     }
 }
 

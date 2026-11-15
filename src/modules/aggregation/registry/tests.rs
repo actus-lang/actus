@@ -281,6 +281,7 @@ fn annotates_type_constructor_callee_arguments() {
                 span,
             },
             span,
+            identity: None,
         })],
     };
     DeclarationRegistry::resolve_standalone(&mut program);

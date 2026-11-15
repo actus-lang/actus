@@ -222,6 +222,7 @@ fn verb_with_signature() -> VerbDecl {
         }),
         body: Block { statements: Vec::new(), span: SourceSpan::new(0, 32) },
         span: SourceSpan::new(0, 32),
+        identity: None,
     }
 }
 

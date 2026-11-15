@@ -85,6 +85,8 @@ mod tests {
             canonical_key: key.to_owned(),
             caller: None,
             call_span: SourceSpan::new(0, 3),
+            verb: None,
+            caller_verb: None,
         }
     }
 

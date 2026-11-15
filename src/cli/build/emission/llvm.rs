@@ -95,9 +95,8 @@ fn llvm_module_bindings_with_policy(
                 name.clone(),
                 symbol.as_str().to_owned(),
             ));
-            for instance in generic_instances
-                .iter()
-                .filter(|instance| instance.name.rsplit("::").next() == Some(name.as_str()))
+            for instance in
+                crate::codegen::generic_instances_of_verb(unit.program(), name, generic_instances)
             {
                 let specialized_full = crate::codegen::specialized_generic_name(instance);
                 let specialized = specialized_full

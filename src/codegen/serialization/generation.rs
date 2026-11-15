@@ -137,6 +137,7 @@ fn generated_encoder(
         return_type: Some(ReturnType { access: ReturnAccess::Owned, ty: return_type, span }),
         body: Block { statements, span },
         span,
+        identity: None,
     }
 }
 
@@ -192,6 +193,7 @@ fn generated_decoder(
         }),
         body: Block { statements, span },
         span,
+        identity: None,
     }
 }
 

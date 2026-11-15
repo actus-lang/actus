@@ -177,6 +177,7 @@ fn module_scope_program(program: &Program) -> Program {
                 params: verb.params.clone(),
                 return_type: verb.return_type.clone(),
                 span: verb.span,
+                identity: verb.identity,
             }),
             _ => declaration.clone(),
         })

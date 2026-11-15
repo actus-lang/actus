@@ -66,6 +66,8 @@ impl Analyzer {
             canonical_key,
             caller: self.current_generic_owner.clone(),
             call_span: span,
+            verb: signature.identity,
+            caller_verb: self.current_generic_owner_verb,
         });
     }
 
@@ -140,6 +142,7 @@ impl Analyzer {
             deterministic: signature.deterministic,
             realtime: signature.realtime,
             bounded: signature.bounded.clone(),
+            identity: signature.identity,
         })
     }
 }

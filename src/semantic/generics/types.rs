@@ -371,6 +371,8 @@ impl Analyzer {
             canonical_key,
             caller: None,
             call_span: type_name.span,
+            verb: None,
+            caller_verb: None,
         });
     }
 

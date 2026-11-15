@@ -374,6 +374,7 @@ fn test_fault_declaration() -> TopLevelDecl {
             span,
         }),
         span,
+        identity: None,
     })
 }
 
@@ -431,5 +432,6 @@ fn test_main(
         }),
         body: Block { statements, span },
         span,
+        identity: None,
     })
 }
