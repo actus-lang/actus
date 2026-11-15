@@ -63,6 +63,13 @@ pub enum ModuleError {
         facade: PathBuf,
         span: SourceSpan,
     },
+    /// One facade opens a name both publicly and for its unit (ADR-0111).
+    ConflictingOpening {
+        module: String,
+        name: String,
+        facade: PathBuf,
+        span: SourceSpan,
+    },
     OutOfScopeReference {
         module: String,
         symbol: String,
@@ -158,11 +165,12 @@ impl Display for ModuleError {
             Self::DuplicateObjectOwner { module_path } => {
                 write!(formatter, "duplicate object ownership for module `{module_path}`")
             }
-            Self::PrivateDeclarationAccess { module, symbol, facade, .. } => write!(
-                formatter,
-                "private declaration `{symbol}` from module `{module}` is not exported by facade `{}`",
-                facade.display()
-            ),
+            Self::PrivateDeclarationAccess { module, symbol, facade, .. } => {
+                write_private_access(formatter, module, symbol, facade)
+            }
+            Self::ConflictingOpening { module, name, .. } => {
+                write_conflict(formatter, module, name)
+            }
             Self::OutOfScopeReference { module, symbol, reason, .. } => {
                 write_scope_violation(formatter, module, symbol, reason)
             }
@@ -215,6 +223,26 @@ fn write_parse_error(formatter: &mut Formatter<'_>, path: &PathBuf) -> std::fmt:
 
 fn write_import_binding_error(formatter: &mut Formatter<'_>, binding: &str) -> std::fmt::Result {
     write!(formatter, "import binding `{binding}` is declared more than once")
+}
+
+fn write_private_access(
+    formatter: &mut Formatter<'_>,
+    module: &str,
+    symbol: &str,
+    facade: &std::path::Path,
+) -> std::fmt::Result {
+    write!(
+        formatter,
+        "private declaration `{symbol}` from module `{module}` is not exported by facade `{}`",
+        facade.display()
+    )
+}
+
+fn write_conflict(formatter: &mut Formatter<'_>, module: &str, name: &str) -> std::fmt::Result {
+    write!(
+        formatter,
+        "facade of module `{module}` opens `{name}` both with `open {name};` and `open unit {name};`; keep one"
+    )
 }
 
 fn write_scope_violation(

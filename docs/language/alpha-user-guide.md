@@ -208,6 +208,19 @@ import control::runtime::runtime;  // the facade file itself
 A child directory that its parent facade does not open is private to the
 parent and cannot be imported from outside it.
 
+A facade can also open a file or child directory for its unit only:
+
+```act
+// src/control/runtime/runtime.act
+open safety;          // public: reachable from other units
+open unit checks;     // reachable from every module of `control`, not outside it
+```
+
+Other modules of `control` import `control::runtime` as usual and reach the
+declarations `checks.act` opens; another unit sees only `safety`
+(ADR-0111). `unit` is a modifier only between `open` and a name, so
+`open unit;` still opens a file named `unit.act`.
+
 Use responsibility-specific child directories and keep one stable parent
 facade for external consumers. The resolver, semantic analyzer, native linker,
 formatter, LSP, and test runner all consume the same hierarchy.

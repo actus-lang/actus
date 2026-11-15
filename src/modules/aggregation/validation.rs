@@ -156,14 +156,25 @@ pub(super) fn validate_open_siblings(
         .filter_map(|path| path.file_stem().and_then(|stem| stem.to_str()))
         .collect::<std::collections::HashSet<_>>();
     known.extend(children.iter().filter_map(|child| child.module_path().rsplit("::").next()));
+    let mut reach = std::collections::HashMap::new();
     for declaration in &program.declarations {
-        if let TopLevelDecl::OpenSibling(sibling) = declaration
-            && !known.contains(sibling.name.as_str())
-        {
+        let TopLevelDecl::OpenSibling(sibling) = declaration else { continue };
+        if !known.contains(sibling.name.as_str()) {
             return Err(ModuleError::UnknownSiblingModule {
                 module: module_path.to_owned(),
                 sibling: sibling.name.clone(),
                 facade: facade.to_owned(),
+            });
+        }
+        if reach
+            .insert(sibling.name.as_str(), sibling.unit)
+            .is_some_and(|unit| unit != sibling.unit)
+        {
+            return Err(ModuleError::ConflictingOpening {
+                module: module_path.to_owned(),
+                name: sibling.name.clone(),
+                facade: facade.to_owned(),
+                span: sibling.span,
             });
         }
     }

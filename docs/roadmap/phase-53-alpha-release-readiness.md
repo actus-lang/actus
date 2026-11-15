@@ -268,11 +268,12 @@ open verb start() -> Int {
    second unit.
 8. **U — Unit-scoped facade opening** (`ADR-0111`): a facade may write
    `open unit x;` to open a sibling file or child directory for its unit
-   only. Unit-scoped names follow ADR-0110 inside the unit, are not exports
-   of the unit, and are emitted with internal linkage. Downstream
-   applications that published internal helpers to satisfy ADR-0110 can
-   keep them inside the unit. New diagnostic `E1137` (one name opened both
-   ways); `E1119` gains the cause "opened for unit only".
+   only. Unit-scoped names follow ADR-0110 inside the unit and are not
+   exports of the unit (`E1109` from another unit, `E1119` through a child
+   import). Downstream applications that published internal helpers to
+   satisfy ADR-0110 can keep them inside the unit. New diagnostic `E1137`
+   (one name opened both ways). Narrowing the symbol linkage of non-public
+   verbs remains a separate decision.
 9. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
    module (all tests of the module's `tests/` files), runs each test in its own
    process selected by name (isolation, timeouts and expected faults unchanged),

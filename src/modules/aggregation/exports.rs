@@ -39,7 +39,8 @@ pub fn exports_module_with_overlays(
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::OpenSibling(open) => Some(open.name.as_str()),
+            // Unit-scoped openings are not exports of the unit (ADR-0111).
+            TopLevelDecl::OpenSibling(open) if !open.unit => Some(open.name.as_str()),
             _ => None,
         })
         .collect::<std::collections::HashSet<_>>();
@@ -82,7 +83,8 @@ fn exports_child_module_with_overlays(
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::OpenSibling(open) => Some(open.name.as_str()),
+            // Unit-scoped openings are not exports of the unit (ADR-0111).
+            TopLevelDecl::OpenSibling(open) if !open.unit => Some(open.name.as_str()),
             _ => None,
         })
         .collect::<std::collections::HashSet<_>>();
@@ -165,7 +167,7 @@ fn collect_exports(parsed: &[(PathBuf, Program)]) -> ModuleExports {
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::OpenSibling(sibling) => Some(sibling.name.as_str()),
+            TopLevelDecl::OpenSibling(sibling) if !sibling.unit => Some(sibling.name.as_str()),
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -202,7 +204,9 @@ fn collect_open_sibling_exports(
                 target: target_selector(declaration).map(str::to_owned),
             });
         }
-        if let TopLevelDecl::OpenSibling(open) = declaration {
+        if let TopLevelDecl::OpenSibling(open) = declaration
+            && !open.unit
+        {
             collect_open_sibling_exports(&open.name, parsed, visited, symbols);
         }
     }

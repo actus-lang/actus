@@ -53,7 +53,8 @@ fn reject_unopened_child(
             .program()
             .map_err(|error| ModuleError::frontend(facade, error))?;
         let opened = program.declarations.iter().any(|declaration| {
-            matches!(declaration, TopLevelDecl::OpenSibling(open) if open.name == segment)
+            // A child opened with `open unit` stays inside its unit (ADR-0111).
+            matches!(declaration, TopLevelDecl::OpenSibling(open) if open.name == segment && !open.unit)
         });
         if !opened {
             return Err(ModuleError::Resolution(

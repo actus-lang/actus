@@ -63,31 +63,29 @@ One facade may not open the same name both ways (`E1137`).
   names do: they are reachable through an import of the module that
   exports them, as exports of an opened child, and through qualification.
 - Outside the unit, unit-scoped names are not exports. A reference from
-  another unit, including through an import of the unit's child module
-  (ADR-0110), is `E1119` with the cause "opened for unit `<unit>` only".
+  another unit is a private declaration access (`E1109`), exactly as for a
+  declaration that no facade opens. An import of the unit's child module
+  (ADR-0110) reaches only public names: a unit-scoped name through it is
+  `E1119`, and a child directory opened with `open unit` cannot be imported
+  from another unit at all (`E1108`).
 - A test plan's friend modules see unit-scoped names of their unit, as they
   see its private declarations today.
 
-### Code generation
+### Code generation and tooling
 
-A unit-scoped verb is never called from another unit's object, so it needs
-no cross-object symbol: it is emitted with internal linkage. The public
-symbol surface (`nm`) of a unit is exactly its public API.
+Unit scope is a frontend rule: object planning, symbols and linkage are
+unchanged, as they already are for declarations that no facade opens.
+Narrowing the linkage of every non-public verb is a separate decision.
 
-### Tooling
-
-The formatter keeps `open unit x;` on one line among the facade's openings.
-The language server reports the reach of a name (public or unit) in hover
-and completion. Documentation lists the facade openings of a module in two
-groups.
+The formatter prints `open unit x;` among the facade's openings with the
+same spacing as `open x;`, and the language-server formatting edit keeps
+the modifier.
 
 ## Consequences
 
 - Internal helpers shared across branches of a unit stay out of its public
   API without moving them to a common ancestor.
 - The public surface of a unit can be read from its facades alone.
-- Unit-scoped verbs get internal linkage, which narrows the exported symbol
-  table and allows the backends to inline them.
-- `E1137` is a new diagnostic; `E1119` gains a cause.
+- `E1137` is a new diagnostic for a facade that opens one name both ways.
 - Existing sources are unchanged: `open x;` keeps its meaning, and no word
   becomes reserved.

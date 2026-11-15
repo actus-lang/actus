@@ -69,7 +69,10 @@ pub fn organize_imports(source: &str) -> Option<(LspRange, String)> {
                     import.alias.as_ref().map_or_else(String::new, |alias| format!(" as {alias}")),
                 ),
             )),
-            TopLevelDecl::OpenSibling(open) => Some((open.span, format!("open {};", open.name))),
+            TopLevelDecl::OpenSibling(open) => Some((
+                open.span,
+                format!("open {}{};", if open.unit { "unit " } else { "" }, open.name),
+            )),
             _ => None,
         })
         .collect::<Vec<_>>();

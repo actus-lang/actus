@@ -67,6 +67,12 @@ impl Parser {
         self.peek().is_some_and(|token| matches!(token.kind, TokenKind::Identifier(_)))
     }
 
+    pub(super) fn peek_next_is_identifier(&self) -> bool {
+        self.tokens
+            .get(self.cursor + 1)
+            .is_some_and(|token| matches!(token.kind, TokenKind::Identifier(_)))
+    }
+
     pub(super) fn peek_next_is(&self, expected: &TokenKind) -> bool {
         self.tokens.get(self.cursor + 1).is_some_and(|token| token.kind == *expected)
     }

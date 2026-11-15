@@ -20,6 +20,7 @@ edition.
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
 | `E1109` | Private module declaration or public-signature visibility violation |
 | `E1119` | Reference outside the hierarchical scope of its directory module |
+| `E1137` | Facade opens one name both publicly and for its unit |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |
 | `E1110` | Deterministic native symbol or ABI collision across module implementations |
 | `E1104` | Unknown sibling referenced by a module facade |
@@ -63,6 +64,10 @@ through an import of another unit's child module but is not exported by that
 child. Imports are not inherited by child modules. The
 diagnostic names the referencing module and, for an out-of-scope directory,
 the `import { open <module> }` that brings the declaration into scope.
+
+`E1137` is emitted when one facade opens the same sibling file or child
+directory both with `open x;` and with `open unit x;` (ADR-0111). Keep one of
+the two openings.
 
 New diagnostics must use a new stable code, include a focused positive or
 negative test, and document the code's category here. Strict-conformance codes
