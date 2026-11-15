@@ -2,7 +2,8 @@
 
 ## Status
 
-Proposed
+Proposed. Level 1 is implemented; ADR-0113 supersedes levels 2 and 3
+and the test-plan exception.
 
 ## Context
 
@@ -48,7 +49,11 @@ A test plan reaches private declarations of its module across objects
 Test binaries are not shipped. When grouped test binaries (roadmap T) build
 a test with its unit in one object, this exception can be removed.
 
-### Levels 2 and 3 (follow-up)
+### Levels 2 and 3 (superseded by ADR-0113)
+
+ADR-0113 emits one object per program instead, so no Actus symbol links
+between objects and the entry is the only global definition. The plan below
+is kept for the record.
 
 - Level 2: public verbs get hidden visibility, so they link between Actus
   objects without entering a shared library's export table.

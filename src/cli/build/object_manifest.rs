@@ -19,16 +19,14 @@ struct ObjectManifestEntry {
     symbols: Vec<String>,
 }
 
-pub(super) fn write(path: &Path, objects: &[EmittedObject]) -> Result<(), String> {
+/// The manifest keeps its list form; a program has one object (ADR-0113).
+pub(super) fn write(path: &Path, object: &EmittedObject) -> Result<(), String> {
     let manifest = ObjectManifest {
         format_version: OBJECT_MANIFEST_VERSION,
-        objects: objects
-            .iter()
-            .map(|object| ObjectManifestEntry {
-                name: object.name.clone(),
-                symbols: object.symbols.iter().cloned().collect(),
-            })
-            .collect(),
+        objects: vec![ObjectManifestEntry {
+            name: object.name.clone(),
+            symbols: object.symbols.iter().cloned().collect(),
+        }],
     };
     let source = toml::to_string(&manifest)
         .map_err(|error| format!("cannot encode `{}`: {error}", path.display()))?;

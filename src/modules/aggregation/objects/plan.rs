@@ -14,7 +14,6 @@ pub use super::units::{ModuleObjectOwner, ModuleObjectUnit};
 pub struct ModuleObjectPlan {
     units: Vec<ModuleObjectUnit>,
     package_identity: String,
-    friend_scope: bool,
 }
 impl ModuleObjectPlan {
     pub fn units(&self) -> &[ModuleObjectUnit] {
@@ -23,11 +22,6 @@ impl ModuleObjectPlan {
 
     pub(crate) fn package_identity(&self) -> &str {
         &self.package_identity
-    }
-
-    /// Test plans reach private declarations across objects (ADR-0112).
-    pub(crate) fn friend_scope(&self) -> bool {
-        self.friend_scope
     }
 }
 pub(in crate::modules::aggregation) fn build_object_plan(
@@ -41,7 +35,6 @@ pub(in crate::modules::aggregation) fn build_object_plan(
         namespace: ModuleNamespace::root(),
         program: compilation.caller().clone(),
         exported_verbs: Vec::new(),
-        public_verbs: Vec::new(),
     }];
     let mut imported = compilation.units().iter().collect::<Vec<_>>();
     imported
@@ -54,26 +47,14 @@ pub(in crate::modules::aggregation) fn build_object_plan(
         let internal_scope = module_is_reachable_from_friend_scope(compilation, module);
         let exported_verbs = exported_implementation_names(module, internal_scope);
         let program = implementation_declarations(module, compilation, generic_types);
-        let public_verbs = module
-            .exports()
-            .symbols
-            .iter()
-            .filter(|symbol| symbol.kind == "verb")
-            .map(|symbol| symbol.name.clone())
-            .collect();
         units.push(ModuleObjectUnit {
             owner: ModuleObjectOwner::Imported { module_path },
             namespace: module.identity().namespace().clone(),
             program,
             exported_verbs,
-            public_verbs,
         });
     }
-    Ok(ModuleObjectPlan {
-        units,
-        package_identity: compilation.package_identity().to_owned(),
-        friend_scope: compilation.has_friend_scope(),
-    })
+    Ok(ModuleObjectPlan { units, package_identity: compilation.package_identity().to_owned() })
 }
 
 fn module_is_reachable_from_friend_scope(

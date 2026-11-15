@@ -1,4 +1,5 @@
-//! ADR-0112: symbol linkage follows declaration reach.
+//! ADR-0112 and ADR-0113: one object per program, whose only global
+//! definition is the entry.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -47,8 +48,8 @@ fn check_build_run(root: &Path) -> Option<i32> {
     Command::new(root.join("main.bin")).output().expect("run built executable").status.code()
 }
 
-/// Symbols of the unit object `pkg`: name to "is global".
-fn unit_symbols(root: &Path) -> std::collections::BTreeMap<String, bool> {
+/// Defined symbols of the program object: name to "is global".
+fn program_symbols(root: &Path) -> std::collections::BTreeMap<String, bool> {
     use object::{Object, ObjectSymbol};
     let directory = root.join("capsula/debug");
     let target = fs::read_dir(&directory)
@@ -57,18 +58,20 @@ fn unit_symbols(root: &Path) -> std::collections::BTreeMap<String, bool> {
         .expect("one target directory")
         .expect("target entry")
         .path();
-    let object_path = fs::read_dir(&target)
+    let objects = fs::read_dir(&target)
         .expect("read target objects")
         .map(|entry| entry.expect("object entry").path())
-        .find(|path| path.to_string_lossy().ends_with("actus_mod_3_pkg.obj"))
-        .expect("unit object for `pkg`");
-    let bytes = fs::read(object_path).expect("read unit object");
-    let file = object::File::parse(bytes.as_slice()).expect("parse unit object");
+        .filter(|path| path.extension().is_some_and(|extension| extension == "obj"))
+        .collect::<Vec<_>>();
+    assert_eq!(objects.len(), 1, "one object per program: {objects:?}");
+    let bytes = fs::read(&objects[0]).expect("read program object");
+    let file = object::File::parse(bytes.as_slice()).expect("parse program object");
     file.symbols()
         .filter(|symbol| symbol.is_definition())
         .filter_map(|symbol| {
             let name = symbol.name().ok()?.to_owned();
-            name.contains("_verb_").then_some((name, symbol.is_global()))
+            (name.contains("_verb_") || name.trim_start_matches('_') == "main")
+                .then_some((name, symbol.is_global()))
         })
         .collect()
 }
@@ -88,31 +91,29 @@ fn linkage_sources() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
-fn global(symbols: &std::collections::BTreeMap<String, bool>, verb: &str) -> bool {
-    *symbols
-        .iter()
-        .find(|(name, _)| name.ends_with(&format!("_verb_{verb}")))
-        .unwrap_or_else(|| panic!("`{verb}` is defined in the unit object: {symbols:?}"))
-        .1
-}
-
-/// ADR-0112: only a public verb, the entry, and symbols other objects name
-/// stay global; private and unit-scoped verbs are local to their object.
+/// ADR-0113: the entry is the only global definition; public, private and
+/// unit-scoped verbs are all local to the program object.
 #[test]
-fn symbol_linkage_follows_declaration_reach() {
+fn program_object_keeps_only_the_entry_global() {
     let root = project("reach", &linkage_sources());
     assert_eq!(check_build_run(&root), Some(0));
     let build = actus(&root, &["build", "--strict", "src/main.act"]);
     assert!(build.status.success(), "build stderr: {}", stderr(&build));
-    let symbols = unit_symbols(&root);
-    assert!(global(&symbols, "public_5fvalue"), "{symbols:?}");
-    assert!(!global(&symbols, "hidden_5fvalue"), "{symbols:?}");
-    assert!(!global(&symbols, "shared_5fvalue"), "{symbols:?}");
+    let symbols = program_symbols(&root);
+    let global =
+        symbols.iter().filter(|(_, global)| **global).map(|(name, _)| name.trim_start_matches('_'));
+    assert_eq!(global.collect::<Vec<_>>(), ["main"], "{symbols:?}");
+    for verb in ["public_5fvalue", "hidden_5fvalue", "shared_5fvalue"] {
+        assert!(
+            symbols.keys().any(|name| name.ends_with(&format!("_verb_{verb}"))),
+            "`{verb}` is defined in the program object: {symbols:?}"
+        );
+    }
     fs::remove_dir_all(root).expect("remove reach fixture");
 }
 
-/// A test plan calls private verbs across objects, so its symbols stay
-/// global and the test links.
+/// A test plan calls private verbs of its module inside the one program
+/// object, with no linkage exception.
 #[test]
 fn test_plans_link_private_verbs_across_objects() {
     let mut sources = linkage_sources();

@@ -32,7 +32,7 @@ fn build_objects(root: &Path, input: &Path, output: &Path) {
 }
 
 #[test]
-fn repeated_multi_object_builds_have_identical_objects_and_symbol_manifests() {
+fn repeated_builds_have_identical_objects_and_symbol_manifests() {
     let root = std::env::temp_dir().join(format!("actus-reproducibility-{}", std::process::id()));
     fs::create_dir_all(&root).unwrap();
     write_fixture(&root);
@@ -50,15 +50,8 @@ fn repeated_multi_object_builds_have_identical_objects_and_symbol_manifests() {
     let manifest = fs::read_to_string(root.join("first.symbols")).unwrap();
     assert!(manifest.contains("actus_mod_5_alpha__verb_aye"));
     assert!(manifest.contains("actus_mod_4_zeta__verb_zed"));
-    assert!(
-        manifest.find("name = \"root\"").unwrap()
-            < manifest.find("name = \"actus_mod_5_alpha\"").unwrap()
-    );
-    assert!(
-        manifest.find("name = \"actus_mod_5_alpha\"").unwrap()
-            < manifest.find("name = \"actus_mod_4_zeta\"").unwrap()
-    );
-    assert!(root.join("first.module.actus_mod_5_alpha.obj").is_file());
-    assert!(root.join("first.module.actus_mod_4_zeta.obj").is_file());
+    assert_eq!(manifest.matches("[[objects]]").count(), 1, "manifest: {manifest}");
+    assert!(!root.join("first.module.actus_mod_5_alpha.obj").exists());
+    assert!(!root.join("first.module.actus_mod_4_zeta.obj").exists());
     fs::remove_dir_all(root).unwrap();
 }

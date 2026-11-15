@@ -3,50 +3,15 @@ use crate::codegen::{BackendEmitError, BackendSymbolBindings};
 use crate::configuration::CompilerConfiguration;
 use crate::modules::ModuleObjectPlan;
 
-pub(super) fn emit_shared_scalar_units(
-    object_plan: &ModuleObjectPlan,
-    symbol: &str,
-    configuration: &CompilerConfiguration,
-    bindings: &BackendSymbolBindings,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let modules = super::shared::lower_shared_modules(
-        object_plan,
-        symbol,
-        configuration,
-        bindings,
-        &[],
-        "Cranelift shared",
-    )?;
-    modules
-        .into_iter()
-        .map(|lowered| {
-            let bytes = crate::codegen::cranelift::emit_contract_module_object_with_local_symbols(
-                &lowered.module,
-                &lowered.local_symbols,
-                configuration.native_backend(),
-                configuration.target(),
-            )?;
-            Ok(EmittedObject {
-                name: lowered.object_name,
-                bytes,
-                symbols: lowered
-                    .module
-                    .functions
-                    .iter()
-                    .map(|function| function.symbol.as_str().to_owned())
-                    .collect(),
-            })
-        })
-        .collect()
-}
-pub(super) fn emit_shared_specialized_units(
+/// Emits the program as one Cranelift object (ADR-0113).
+pub(super) fn emit_program_object(
     object_plan: &ModuleObjectPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
     bindings: &BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    let modules = super::shared::lower_shared_modules(
+) -> Result<EmittedObject, BackendEmitError> {
+    let program = super::shared::lower_program(
         object_plan,
         symbol,
         configuration,
@@ -54,27 +19,20 @@ pub(super) fn emit_shared_specialized_units(
         generic_instances,
         "Cranelift shared",
     )?;
-    modules
-        .into_iter()
-        .map(|lowered| {
-            let bytes = crate::codegen::cranelift::emit_contract_module_object_with_local_symbols(
-                &lowered.module,
-                &lowered.local_symbols,
-                configuration.native_backend(),
-                configuration.target(),
-            )?;
-            Ok(EmittedObject {
-                name: lowered.object_name,
-                bytes,
-                symbols: lowered
-                    .module
-                    .functions
-                    .iter()
-                    .map(|function| function.symbol.as_str().to_owned())
-                    .collect(),
-            })
-        })
-        .collect()
+    let bytes = crate::codegen::cranelift::emit_contract_module_object_with_local_symbols(
+        &program.module,
+        &program.local_symbols,
+        configuration.native_backend(),
+        configuration.target(),
+    )?;
+    Ok(EmittedObject {
+        name: "root".to_owned(),
+        bytes,
+        symbols: program
+            .module
+            .functions
+            .iter()
+            .map(|function| function.symbol.as_str().to_owned())
+            .collect(),
+    })
 }
-
-// Legacy Cranelift compatibility remains isolated from shared emission.

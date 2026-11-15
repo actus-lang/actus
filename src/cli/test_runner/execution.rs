@@ -171,15 +171,13 @@ fn run_test(
         .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
     crate::modules::validate_compilation_plan(&plan, configuration.target())
         .map_err(|error| test_diagnostic(test, crate::diagnostics::module_diagnostic(&error)))?;
-    let objects = crate::cli::build::emit_objects(&plan, "main", configuration)
+    let object = crate::cli::build::emit_object(&plan, "main", configuration)
         .map_err(|error| error.to_string())?;
-    let mut paths = TestArtifactPaths::new(index)?;
-    let result = paths
-        .write_objects(&objects)
+    let paths = TestArtifactPaths::new(index)?;
+    let result = fs::write(&paths.object, &object.bytes)
+        .map_err(|error| format!("cannot write test object: {error}"))
         .and_then(|()| {
-            let references =
-                paths.objects.iter().map(std::path::PathBuf::as_path).collect::<Vec<_>>();
-            link_objects(&references, &paths.executable, configuration)
+            link_objects(&[paths.object.as_path()], &paths.executable, configuration)
                 .map_err(|error| error.to_string())
         })
         .and_then(|()| run_test_process(&paths.executable, &paths.working_directory));
@@ -284,7 +282,7 @@ fn test_program(source_program: &crate::ast::Program, test_name: &str) -> crate:
 }
 
 struct TestArtifactPaths {
-    objects: Vec<std::path::PathBuf>,
+    object: std::path::PathBuf,
     executable: std::path::PathBuf,
     working_directory: std::path::PathBuf,
 }
@@ -294,41 +292,15 @@ impl TestArtifactPaths {
         let root = std::env::temp_dir().join(format!("actus-test-{}-{index}", std::process::id()));
         fs::create_dir_all(&root)
             .map_err(|error| format!("cannot create test working directory: {error}"))?;
-        Ok(Self { objects: Vec::new(), executable: root.join("test.bin"), working_directory: root })
-    }
-
-    fn write_objects(
-        &mut self,
-        objects: &[crate::cli::build::EmittedObject],
-    ) -> Result<(), String> {
-        let root = self.executable.with_extension("root.o");
-        for (index, object) in objects.iter().enumerate() {
-            let path = if index == 0 {
-                root.clone()
-            } else {
-                self.executable.with_file_name(format!(
-                    "{}.module.{}.o",
-                    self.executable
-                        .file_stem()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("actus-test"),
-                    object.name.replace([':', '/', '\\'], "_")
-                ))
-            };
-            fs::write(&path, &object.bytes)
-                .map_err(|error| format!("cannot write test object: {error}"))?;
-            self.objects.push(path);
-        }
-        Ok(())
+        let executable = root.join("test.bin");
+        Ok(Self { object: executable.with_extension("o"), executable, working_directory: root })
     }
 
     fn cleanup(&self) -> Result<(), String> {
         if std::env::var("ACTUS_TEST_KEEP_ARTIFACTS").as_deref() == Ok("1") {
             return Ok(());
         }
-        for object in &self.objects {
-            remove_artifact(object)?;
-        }
+        remove_artifact(&self.object)?;
         remove_artifact(&self.executable)?;
         fs::remove_dir_all(&self.working_directory).map_err(|error| {
             format!(

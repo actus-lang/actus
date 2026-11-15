@@ -3,11 +3,11 @@ use crate::codegen::{BackendEmitError, BackendSymbolBindings, SymbolIdentity, Sy
 use crate::configuration::CompilerConfiguration;
 use crate::modules::{ModuleCompilationPlan, ModuleObjectPlan};
 
-pub(super) fn emit_objects_llvm(
+pub(super) fn emit_object_llvm(
     plan: &ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
+) -> Result<EmittedObject, BackendEmitError> {
     let (generic_types, generic_instances) = super::shared::generic_inputs(plan, configuration)?;
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
@@ -17,7 +17,7 @@ pub(super) fn emit_objects_llvm(
     } else {
         llvm_module_bindings(&object_plan, &generic_instances)?
     };
-    let modules = super::shared::lower_shared_modules(
+    let program = super::shared::lower_program(
         &object_plan,
         symbol,
         configuration,
@@ -25,23 +25,18 @@ pub(super) fn emit_objects_llvm(
         &generic_instances,
         "llvm",
     )?;
-    modules
-        .into_iter()
-        .map(|lowered| {
-            crate::codegen::reject_float_ir(
-                &lowered.module,
-                configuration.native_backend().verifies_no_float_ir(),
-            )?;
-            llvm_object(
-                &lowered.object_name,
-                &lowered.module,
-                &lowered.local_symbols,
-                configuration.target(),
-                configuration.native_backend().position_independent(),
-                configuration.native_backend().verifies_no_float_ir(),
-            )
-        })
-        .collect()
+    crate::codegen::reject_float_ir(
+        &program.module,
+        configuration.native_backend().verifies_no_float_ir(),
+    )?;
+    llvm_object(
+        "root",
+        &program.module,
+        &program.local_symbols,
+        configuration.target(),
+        configuration.native_backend().position_independent(),
+        configuration.native_backend().verifies_no_float_ir(),
+    )
 }
 
 fn llvm_object(

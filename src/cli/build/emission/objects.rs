@@ -114,14 +114,14 @@ fn emit_and_write(
         eprintln!("error: {error}");
         return 1;
     }
-    let objects = match emit_objects(plan, symbol, configuration) {
-        Ok(objects) => objects,
+    let object = match emit_object(plan, symbol, configuration) {
+        Ok(object) => object,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");
             return 1;
         }
     };
-    if let Err(error) = write_artifact(input, &output, objects, emit, configuration) {
+    if let Err(error) = write_artifact(input, &output, object, emit, configuration) {
         eprintln!("error: {error}");
         return 1;
     }
@@ -144,19 +144,20 @@ pub(crate) struct EmittedObject {
     pub(crate) symbols: std::collections::BTreeSet<String>,
 }
 
-pub(crate) fn emit_objects(
+/// Emits the program as one native object (ADR-0113).
+pub(crate) fn emit_object(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
+) -> Result<EmittedObject, BackendEmitError> {
     match configuration.native_backend().backend() {
         crate::codegen::BackendKind::Cranelift => {
-            emit_objects_cranelift(plan, symbol, configuration)
+            emit_object_cranelift(plan, symbol, configuration)
         }
         crate::codegen::BackendKind::Llvm => {
             #[cfg(feature = "llvm")]
             {
-                super::llvm::emit_objects_llvm(plan, symbol, configuration)
+                super::llvm::emit_object_llvm(plan, symbol, configuration)
             }
             #[cfg(not(feature = "llvm"))]
             {
@@ -170,51 +171,32 @@ pub(crate) fn emit_objects(
 }
 
 #[cfg(feature = "cranelift")]
-fn emit_objects_cranelift(
+fn emit_object_cranelift(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
+) -> Result<EmittedObject, BackendEmitError> {
     let (generic_types, generic_instances) = super::shared::generic_inputs(plan, configuration)?;
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
         .map_err(|error| BackendEmitError(error.to_string()))?;
     let bindings =
         module_bindings_with_policy(&object_plan, &generic_instances, plan.has_friend_scope())?;
-    emit_shared_cranelift(&object_plan, symbol, configuration, &bindings, &generic_instances)
-}
-
-#[cfg(feature = "cranelift")]
-fn emit_shared_cranelift(
-    object_plan: &crate::modules::ModuleObjectPlan,
-    symbol: &str,
-    configuration: &CompilerConfiguration,
-    bindings: &crate::codegen::BackendSymbolBindings,
-    generic_instances: &[crate::semantic::GenericInstance],
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
-    if generic_instances.is_empty() {
-        return super::cranelift::emit_shared_scalar_units(
-            object_plan,
-            symbol,
-            configuration,
-            bindings,
-        );
-    }
-    super::cranelift::emit_shared_specialized_units(
-        object_plan,
+    super::cranelift::emit_program_object(
+        &object_plan,
         symbol,
         configuration,
-        bindings,
-        generic_instances,
+        &bindings,
+        &generic_instances,
     )
 }
 
 #[cfg(not(feature = "cranelift"))]
-fn emit_objects_cranelift(
+fn emit_object_cranelift(
     _plan: &crate::modules::ModuleCompilationPlan,
     _symbol: &str,
     _configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
+) -> Result<EmittedObject, BackendEmitError> {
     Err(BackendEmitError(
         "backend `cranelift` is not enabled; rebuild with feature `cranelift`".to_owned(),
     ))

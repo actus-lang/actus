@@ -14,8 +14,6 @@ pub struct ModuleObjectUnit {
     pub(super) namespace: ModuleNamespace,
     pub(super) program: Program,
     pub(super) exported_verbs: Vec<String>,
-    /// Verbs every facade on their path opens publicly (ADR-0110, ADR-0111).
-    pub(super) public_verbs: Vec<String>,
 }
 
 pub(super) fn dependency_declaration(
@@ -69,9 +67,5 @@ impl ModuleObjectUnit {
 
     pub fn exported_verbs(&self) -> &[String] {
         &self.exported_verbs
-    }
-
-    pub fn public_verbs(&self) -> &[String] {
-        &self.public_verbs
     }
 }

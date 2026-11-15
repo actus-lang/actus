@@ -282,10 +282,13 @@ open verb start() -> Int {
    Level 1 (this item): only the entry, public verbs of imported units and
    symbols another object names stay global; private and `open unit` verbs
    get local linkage in both backends, and test plans keep every symbol
-   global. The `nm` baseline changes once. Levels 2 and 3 (hidden
-   visibility for public verbs, and one localized relocatable object for a
-   host with the host ABI as its only global symbols) follow as a separate
-   item.
+   global. The `nm` baseline changes once. Done.
+   Levels 2 and 3 (`ADR-0113`): the program is one native object, linked
+   from the lowered modules of every unit inside the compiler, whose only
+   global definition is the entry. `--emit obj` writes no `*.module.*`
+   sidecar objects, test plans need no linkage exception, and hidden
+   visibility is deferred until Actus emits shared libraries. A host ABI
+   beyond the entry needs its own language decision. Done.
 10. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
    module (all tests of the module's `tests/` files), runs each test in its own
    process selected by name (isolation, timeouts and expected faults unchanged),

@@ -1,8 +1,9 @@
 # Native builds
 
 A native build lowers a checked Actus program to a target object or executable.
-The build may include the root object, reachable module objects, runtime
-bridges, and linker arguments selected by the manifest and target.
+The build emits one program object containing the reachable code of every
+imported unit (ADR-0113), then adds runtime bridges and the linker arguments
+selected by the manifest and target.
 
 Use the strict build mode for repository validation. Native output must retain
 source ownership, bounds, layout, and typed failure contracts. The native
