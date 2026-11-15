@@ -174,31 +174,35 @@ fn resolves_qualified_call_through_an_open_nested_facade_import() {
         .expect("qualified calls should resolve through an open nested facade");
 }
 
+/// ADR-0110: a parent module reaches a child's declaration only through the
+/// child's exports; `import engine::runtime` inside `engine` binds to the loaded unit.
 #[test]
-fn preserves_private_runtime_sentinel_through_a_parent_package_scope() {
+fn parent_package_scope_uses_the_exported_runtime_sentinel() {
     let fixture = Fixture::new();
-    fixture.write("ie/ie.act", "open runtime; open resident;");
-    fixture.write("ie/runtime/runtime.act", "open fabric;");
-    fixture.write("ie/runtime/fabric.act", "verb marker() -> u32 { return 0u32; }");
-    fixture.write("ie/runtime/sentinels.act", "verb null_index() -> u32 { return 0u32; }");
-    fixture.write("runner/runner.act", "import ie;");
+    fixture.write("engine/engine.act", "open runtime; open resident;");
+    fixture.write("engine/runtime/runtime.act", "open fabric; open sentinels;");
+    fixture.write("engine/runtime/fabric.act", "verb marker() -> u32 { return 0u32; }");
+    fixture.write("engine/runtime/sentinels.act", "open verb null_index() -> u32 { return 0u32; }");
+    fixture.write("client/client.act", "import engine;");
     fixture.write(
-        "ie/resident.act",
-        "import ie::runtime; verb resident_marker() -> u32 { return runtime::null_index(); }",
+        "engine/resident.act",
+        "import engine::runtime; verb resident_marker() -> u32 { return runtime::null_index(); }",
     );
-    let program = parse_source("import { open runner }; verb main() -> Int { return 0; }");
+    let program = parse_source("import { open client }; verb main() -> Int { return 0; }");
     let plan =
         actus::modules::build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
             .expect("test compilation plan should build");
     let object_plan = plan.object_plan().expect("object plan should build");
     for unit in object_plan.units() {
         actus::semantic::analyze(unit.program())
-            .expect("object unit should resolve private sentinel");
+            .expect("object unit should resolve the exported sentinel");
     }
 }
 
+/// ADR-0110: a private declaration of a child module is not in the scope of
+/// its parent, in test plans as in build plans.
 #[test]
-fn test_scope_preserves_private_open_child_helpers_for_parent_siblings() {
+fn parent_package_scope_rejects_a_private_child_declaration() {
     let fixture = Fixture::new();
     fixture.write("pkg/pkg.act", "open child; open sibling;");
     fixture.write("pkg/sibling.act", "verb use_helper() -> Int { return helper(); }");
@@ -207,13 +211,18 @@ fn test_scope_preserves_private_open_child_helpers_for_parent_siblings() {
     let program = parse_source(
         "import { open pkg }; meta test\nverb smoke() -> Int { return use_helper() - 1; }",
     );
-    let plan =
+    let error =
         actus::modules::build_test_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
-            .expect("test plan should preserve the parent module scope");
-    for unit in plan.object_plan().expect("object plan should build").units() {
-        actus::semantic::analyze(unit.program())
-            .expect("private child helper should remain visible to parent siblings");
-    }
+            .expect_err("a private child helper is outside the parent scope");
+    assert!(matches!(
+        error,
+        actus::modules::ModuleError::OutOfScopeReference {
+            ref module,
+            ref symbol,
+            reason: actus::modules::ScopeViolation::PrivateToChild { ref declared_in },
+            ..
+        } if module == "pkg" && symbol == "helper" && declared_in == "pkg::child"
+    ));
 }
 
 #[test]
@@ -855,4 +864,72 @@ fn rejects_malformed_facade_source_before_external_type_resolution() {
         .expect_err("malformed facade exports must fail before import analysis");
     assert!(matches!(error, ModuleError::Parse { .. }));
     assert_eq!(actus::diagnostics::module_diagnostic(&error).code(), "E0004");
+}
+
+fn child_import_fixture() -> Fixture {
+    let fixture = Fixture::new();
+    fixture.write("engine/engine.act", "open store;");
+    fixture.write("engine/store/store.act", "open cache; open entry;");
+    fixture.write("engine/store/cache.act", "open verb cached() -> Int { return 3; }");
+    fixture.write("engine/store/entry.act", "verb hidden() -> Int { return 4; }");
+    fixture.write("engine/hidden/hidden.act", "open verb secret() -> Int { return 5; }");
+    fixture
+}
+
+fn unit_paths(plan: &actus::modules::ModuleCompilationPlan) -> Vec<String> {
+    plan.units().iter().map(|unit| unit.identity().module_path().to_owned()).collect()
+}
+
+/// ADR-0110: an import of another unit's opened child binds to the owning
+/// unit; the child is never loaded as a second unit.
+#[test]
+fn child_module_import_binds_to_the_owning_unit() {
+    let fixture = child_import_fixture();
+    let program = parse_source(
+        "import { engine::store, open engine }; verb main() -> Int { return store::cached() - cached(); }",
+    );
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("child import should bind to its owning unit");
+    assert_eq!(unit_paths(&plan), ["engine"]);
+    let object_plan = plan.object_plan().expect("object plan should build");
+    for unit in object_plan.units() {
+        actus::semantic::analyze(unit.program()).expect("object unit should analyze");
+    }
+}
+
+#[test]
+fn open_child_module_import_selects_the_child_exports() {
+    let fixture = child_import_fixture();
+    let program =
+        parse_source("import { open engine::store }; verb main() -> Int { return cached() - 3; }");
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect("open child import should bind to its owning unit");
+    assert_eq!(unit_paths(&plan), ["engine"]);
+}
+
+#[test]
+fn child_module_import_rejects_a_private_child_declaration() {
+    let fixture = child_import_fixture();
+    let program =
+        parse_source("import { engine::store }; verb main() -> Int { return store::hidden(); }");
+    let error = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("a private declaration is not reachable through the child binding");
+    assert!(matches!(
+        error,
+        ModuleError::OutOfScopeReference {
+            ref symbol,
+            reason: actus::modules::ScopeViolation::NotExported { ref module },
+            ..
+        } if symbol == "store::hidden" && module == "engine::store"
+    ));
+}
+
+#[test]
+fn import_of_an_unopened_child_module_is_rejected() {
+    let fixture = child_import_fixture();
+    let program =
+        parse_source("import { engine::hidden }; verb main() -> Int { return hidden::secret(); }");
+    let error = build_compilation_plan(&program, &ModuleResolver::new(&fixture.root))
+        .expect_err("a child that no facade opens is not part of the unit");
+    assert!(matches!(error, ModuleError::Resolution(_)), "{error:?}");
 }

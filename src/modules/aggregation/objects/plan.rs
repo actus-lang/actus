@@ -124,6 +124,7 @@ fn implementation_declarations(
         .collect::<HashSet<_>>();
     append_imported_declarations(
         module,
+        module,
         compilation,
         &mut imported_paths,
         &mut declaration_identities,
@@ -145,11 +146,7 @@ fn implementation_declarations(
         &mut declaration_identities,
         &mut declarations,
     );
-    for declaration in &declarations {
-        if let Some(identity) = type_declaration_identity(declaration) {
-            declaration_identities.insert(identity);
-        }
-    }
+    declaration_identities.extend(declarations.iter().filter_map(type_declaration_identity));
     append_generic_type_declarations(
         compilation,
         generic_types,
@@ -285,6 +282,7 @@ fn append_generic_type_declaration(
 }
 
 fn append_imported_declarations(
+    owner: &super::super::unit::ModuleUnit,
     module: &super::super::unit::ModuleUnit,
     compilation: &ModuleCompilationPlan,
     imported_paths: &mut HashSet<String>,
@@ -293,6 +291,13 @@ fn append_imported_declarations(
 ) {
     let imports = imported_dependencies(module, compilation);
     for (dependency, namespace, open_import, selected) in imports {
+        // A unit's binding of its own modules (ADR-0110) is internal to that
+        // unit; it neither reaches nor namespaces anything in a dependent.
+        if dependency.identity().module_path() == module.identity().module_path()
+            && !std::ptr::eq(module, owner)
+        {
+            continue;
+        }
         let first_visit = imported_paths.insert(dependency.identity().module_path().to_owned());
         append_dependency_imports(dependency, declarations);
         append_dependency_declarations(
@@ -307,6 +312,7 @@ fn append_imported_declarations(
         );
         if first_visit {
             append_imported_declarations(
+                owner,
                 dependency,
                 compilation,
                 imported_paths,
@@ -370,15 +376,17 @@ fn append_dependency_declaration(
     {
         return;
     }
-    let qualified_namespace =
-        if open_import { namespace } else { friend.then_some(namespace).flatten() };
+    // Every import binds its namespace, as the root caller's imports do, so a
+    // qualified call names the dependency's declaration (generic ones
+    // included). Performance bodies copied from the dependency still call
+    // its verbs unqualified, so a non-friend import keeps those names too.
     let Some(exported) =
-        exported_dependency_declaration(dependency, declaration, friend, qualified_namespace)
+        exported_dependency_declaration(dependency, declaration, friend, namespace)
     else {
         return;
     };
     append_declaration_if_new(exported, declaration_identities, declarations);
-    if open_import || !selected.is_empty() {
+    if open_import || !selected.is_empty() || !friend {
         let Some(opened) = exported_dependency_declaration(dependency, declaration, false, None)
         else {
             return;
@@ -412,6 +420,9 @@ fn append_dependency_imports(
             dependency.identity().module_path(),
             &import.path,
         );
+        if imported.path == dependency.identity().module_path() {
+            continue;
+        }
         let already_present = declarations.iter().any(|declaration| {
             let TopLevelDecl::Import(existing) = declaration else { return false };
             import_binding(existing) == import_binding(&imported)

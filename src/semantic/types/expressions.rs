@@ -1,5 +1,5 @@
 use crate::ast::{
-    BuiltinType, CaseBody, Expr, IntrinsicKind, Stmt, lookup_builtin_type, lookup_call_intrinsic,
+    BuiltinType, CaseBody, Expr, IntrinsicKind, lookup_builtin_type, lookup_call_intrinsic,
     primitive_type,
 };
 
@@ -90,7 +90,9 @@ impl Analyzer {
                 .get(&self.expression_cache_key(span))
                 .and_then(|type_name| lookup_builtin_type(&type_name.name))
                 .or_else(|| {
-                    self.signatures.get(callee).and_then(|signature| signature.return_type)
+                    self.call_signature_name(callee)
+                        .and_then(|name| self.signatures.get(&name))
+                        .and_then(|signature| signature.return_type)
                 }),
         }
     }
@@ -194,11 +196,18 @@ impl Analyzer {
             Expr::MethodCall { method, span, .. } => (method, span),
             _ => return None,
         };
-        self.inferred_expression_types
-            .get(&self.expression_cache_key(*span))
-            .or_else(|| {
-                self.signatures.get(name).and_then(|signature| signature.return_type_name.as_ref())
-            })
+        if let Some(type_name) =
+            self.inferred_expression_types.get(&self.expression_cache_key(*span))
+        {
+            return Some(super::super::analyzer::canonical_type_name(type_name));
+        }
+        let name = match expression {
+            Expr::Call { .. } => self.call_signature_name(name)?,
+            _ => name.clone(),
+        };
+        self.signatures
+            .get(&name)
+            .and_then(|signature| signature.return_type_name.as_ref())
             .map(super::super::analyzer::canonical_type_name)
     }
 
@@ -293,15 +302,11 @@ impl Analyzer {
         if let Some(expected) = self.expected_expression_type.as_ref() {
             return Some(super::super::analyzer::canonical_type_name(expected));
         }
-        branches.iter().find_map(|branch| match &branch.body {
-            CaseBody::Expression(expression) => self.expression_type_name(expression),
-            CaseBody::Block(block) => block.statements.iter().rev().find_map(|statement| {
-                let Stmt::Return { value: Some(expression), .. } = statement else {
-                    return None;
-                };
-                self.expression_type_name(expression)
-            }),
-        })
+        // A `return` inside a block branch leaves the verb; it is not the
+        // value of the `case`. Diverging branches contribute no type.
+        branches
+            .iter()
+            .find_map(|branch| super::super::analyzer::case_branch_type(self, &branch.body))
     }
 
     fn expression_if_type_name(&self, expression: &Expr) -> Option<String> {

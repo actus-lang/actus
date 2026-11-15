@@ -191,17 +191,20 @@ fn build_compilation_plan_with_overlays_and_scope_check(
     validate_root_import_bindings: bool,
     friend_modules: HashSet<String>,
 ) -> Result<ModuleCompilationPlan, ModuleError> {
+    let (program, friend_modules) = super::super::scope::bind_root_child_imports(
+        program,
+        importer_module_path,
+        resolver,
+        overlays,
+        friend_modules,
+    )?;
+    let program = &program;
     let mut caller_declarations = Vec::new();
     let mut local_declarations = Vec::new();
     let mut units = Vec::new();
     let mut imported_paths = HashSet::new();
     let mut appended_symbols = HashSet::new();
-    if validate_root_import_bindings
-        && !program
-            .declarations
-            .iter()
-            .any(|declaration| matches!(declaration, TopLevelDecl::OpenSibling(_)))
-    {
+    if validate_root_import_bindings && !opens_siblings(program) {
         validate_import_bindings(program)?;
     }
     collect_root_imports(
@@ -217,6 +220,7 @@ fn build_compilation_plan_with_overlays_and_scope_check(
         &friend_modules,
     )?;
     validate_symbol_collisions(&local_declarations, &units)?;
+    super::super::scope::validate_plan_scopes(&units)?;
     let mut plan = ModuleCompilationPlan {
         local: Program {
             file_metadata: program.file_metadata.clone(),
@@ -233,6 +237,14 @@ fn build_compilation_plan_with_overlays_and_scope_check(
     };
     super::annotation::annotate_plan(&mut plan, importer_module_path, resolver.session());
     Ok(plan)
+}
+
+/// A facade program (one that opens siblings) is not validated as a root.
+fn opens_siblings(program: &Program) -> bool {
+    program
+        .declarations
+        .iter()
+        .any(|declaration| matches!(declaration, TopLevelDecl::OpenSibling(_)))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -461,6 +473,10 @@ fn collect_imported_units(
     for declaration in &unit.implementation().declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
         let import_path = qualify_import_path(module_path, &import.path);
+        if import_path == module_path {
+            // A binding of the unit's own modules (ADR-0110): already loaded.
+            continue;
+        }
         let imported_namespace = import_namespace(import);
         collect_unit(
             &import_path,

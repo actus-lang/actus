@@ -63,7 +63,32 @@ pub enum ModuleError {
         facade: PathBuf,
         span: SourceSpan,
     },
+    OutOfScopeReference {
+        module: String,
+        symbol: String,
+        reason: ScopeViolation,
+        path: PathBuf,
+        span: SourceSpan,
+    },
     Semantic(Box<crate::semantic::SemanticError>),
+}
+
+/// Why a spelling does not name a declaration in its module's scope
+/// (ADR-0110).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ScopeViolation {
+    /// Declared by a module that is neither the referencing module, one of
+    /// its ancestors, nor one of its opened children.
+    NotInScope { declared_in: String },
+    /// Declared by a child module that does not export it.
+    PrivateToChild { declared_in: String },
+    /// Brought in by an import of another module; imports are not inherited.
+    ImportNotInherited { imported_by: String },
+    /// Qualified by a binding of a module of the unit that does not declare it.
+    NotDeclared { module: String },
+    /// Reached through an import of another unit's child module that does
+    /// not export it.
+    NotExported { module: String },
 }
 
 #[derive(Debug)]
@@ -138,6 +163,9 @@ impl Display for ModuleError {
                 "private declaration `{symbol}` from module `{module}` is not exported by facade `{}`",
                 facade.display()
             ),
+            Self::OutOfScopeReference { module, symbol, reason, .. } => {
+                write_scope_violation(formatter, module, symbol, reason)
+            }
             Self::Semantic(error) => write!(
                 formatter,
                 "module semantic error at {}..{}",
@@ -187,4 +215,34 @@ fn write_parse_error(formatter: &mut Formatter<'_>, path: &PathBuf) -> std::fmt:
 
 fn write_import_binding_error(formatter: &mut Formatter<'_>, binding: &str) -> std::fmt::Result {
     write!(formatter, "import binding `{binding}` is declared more than once")
+}
+
+fn write_scope_violation(
+    formatter: &mut Formatter<'_>,
+    module: &str,
+    symbol: &str,
+    reason: &ScopeViolation,
+) -> std::fmt::Result {
+    match reason {
+        ScopeViolation::NotInScope { declared_in } => write!(
+            formatter,
+            "`{symbol}` is declared in module `{declared_in}`, which is not in scope of module `{module}`; add `import {{ open {declared_in} }}` to a file of `{module}`"
+        ),
+        ScopeViolation::PrivateToChild { declared_in } => write!(
+            formatter,
+            "`{symbol}` is private to child module `{declared_in}`; declare it `open` and open its file in the `{declared_in}` facade to use it from `{module}`"
+        ),
+        ScopeViolation::NotDeclared { module: declaring } => write!(
+            formatter,
+            "`{symbol}` names no declaration of module `{declaring}` or its children; qualify it with the module that declares it in `{module}`"
+        ),
+        ScopeViolation::NotExported { module: child } => write!(
+            formatter,
+            "`{symbol}` is not exported by module `{child}`, which `{module}` imports; only the declarations its facade opens are reachable"
+        ),
+        ScopeViolation::ImportNotInherited { imported_by } => write!(
+            formatter,
+            "`{symbol}` is imported by module `{imported_by}`, not by `{module}`; imports are not inherited, so add the import to a file of `{module}`"
+        ),
+    }
 }

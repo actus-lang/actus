@@ -31,14 +31,23 @@ impl Analyzer {
             Expr::Cast { target, .. } => Some(target.clone()),
             Expr::Try { expression, .. } => self.enum_type_application(expression)
                 .and_then(|result| result.arguments.first().cloned()),
-            Expr::Call { callee, .. } => self.signatures.get(callee)
+            Expr::Call { callee, .. } => self.call_signature_name(callee)
+                .and_then(|name| self.signatures.get(&name))
                 .and_then(|signature| signature.return_type_name.clone()),
-            Expr::Case { branches, .. } => branches.iter().find_map(|branch| match &branch.body {
+            Expr::Case { subject, branches, .. } => branches.iter().find_map(|branch| match &branch.body {
+                crate::ast::CaseBody::Expression(expression)
+                    if let Expr::Identifier { name, .. } = expression.as_ref()
+                        && let Some(type_name) = self.pattern_binding_type(&branch.pattern, name, subject) =>
+                {
+                    Some(type_name)
+                }
                 crate::ast::CaseBody::Expression(expression) => self.resolved_type_name(expression),
-                crate::ast::CaseBody::Block(block) => block.statements.iter().rev().find_map(|statement| match statement {
-                    crate::ast::Stmt::Return { value: Some(expression), .. } => self.resolved_type_name(expression),
+                // A `return` leaves the verb; only a tail expression is the
+                // value of a block branch.
+                crate::ast::CaseBody::Block(block) => match block.statements.last() {
+                    Some(crate::ast::Stmt::Expression { expression, .. }) => self.resolved_type_name(expression),
                     _ => None,
-                }),
+                },
             }),
             Expr::FieldAccess { object, resolved_type: Some(type_name), .. }
                 if is_enum_qualifier(self, object) => Some(type_name.clone()),
@@ -52,7 +61,10 @@ impl Analyzer {
 
 fn is_enum_qualifier(analyzer: &Analyzer, object: &Expr) -> bool {
     match object {
-        Expr::Identifier { name, .. } => analyzer.enum_types.contains_key(name),
+        // `Option[T].None` spells the enum with its type application.
+        Expr::Identifier { name, .. } => analyzer
+            .enum_types
+            .contains_key(name.split_once('[').map_or(name.as_str(), |(base, _)| base)),
         Expr::Index { target, .. } => {
             matches!(target.as_ref(), Expr::Identifier { name, .. } if analyzer.enum_types.contains_key(name))
         }

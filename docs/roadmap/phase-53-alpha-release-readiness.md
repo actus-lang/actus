@@ -262,11 +262,10 @@ open verb start() -> Int {
    already rejects private type arguments of an imported unit at `check`
    (`E1109`, `tests/declaration_identity.rs`); the earlier "second
    reproduction" was a malformed fixture and is withdrawn.
-   Follow-up within C's scope, not yet implemented: an import of another
-   unit's child directory from outside that unit (for example
-   `import pkg::store::cache` in a different unit) still loads the
-   directory as its own unit; it should bind to the owning unit or be
-   rejected as the alpha guide states.
+   An import of another unit's opened child directory (for example
+   `import pkg::store::cache` in a different unit) binds to the owning unit
+   with the child's exports only, instead of loading the directory as a
+   second unit.
 8. **T — Grouped test binaries** (new ADR): `actus test` builds one binary per
    module (all tests of the module's `tests/` files), runs each test in its own
    process selected by name (isolation, timeouts and expected faults unchanged),

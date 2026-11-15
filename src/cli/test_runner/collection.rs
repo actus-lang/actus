@@ -7,7 +7,8 @@ use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnostic};
 use crate::lexer::TokenKind;
 use crate::modules::{
-    ModuleCompilationPlan, ModuleError, ModuleResolver, build_test_compilation_plan, parse_module,
+    ModuleCompilationPlan, ModuleError, ModuleResolver, build_test_compilation_plan,
+    load_module_unit,
 };
 use crate::semantic::filter_program_for_target_checked;
 use crate::session::{CompilationSession, FrontendError};
@@ -244,7 +245,9 @@ fn parse_source(
     let compilation_source = (!module_path.is_empty())
         .then_some(module_path.as_str())
         .map(|module_path| {
-            parse_module(resolver, module_path)
+            // The loaded unit binds imports of its own modules (ADR-0110).
+            load_module_unit(resolver, module_path)
+                .map(|unit| unit.implementation().clone())
                 .map_err(|error| format!("cannot load module `{module_path}`: {error}"))
         })
         .transpose()?

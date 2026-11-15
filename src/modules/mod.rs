@@ -6,7 +6,7 @@ pub(crate) use aggregation::DeclarationRegistry;
 pub use aggregation::{
     DuplicateDeclaration, ExportedSymbol, ModuleCompilationPlan, ModuleError, ModuleExports,
     ModuleIdentity, ModuleLocation, ModuleNamespace, ModuleObjectOwner, ModuleObjectPlan,
-    ModuleObjectUnit, ModuleSource, ModuleSourceKind, ModuleUnit, analyze_module,
+    ModuleObjectUnit, ModuleSource, ModuleSourceKind, ModuleUnit, ScopeViolation, analyze_module,
     analyze_module_unit, analyze_module_with_overlays, analyze_module_with_overlays_for_target,
     analyze_with_imports, analyze_with_imports_for_target,
     analyze_with_imports_with_overlays_for_target, build_compilation_plan,

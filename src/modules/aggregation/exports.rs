@@ -208,7 +208,7 @@ fn collect_open_sibling_exports(
     }
 }
 
-fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
+pub(super) fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
     match declaration {
         TopLevelDecl::Constant(value) => value.is_open,
         TopLevelDecl::Verb(value) => value.is_open,

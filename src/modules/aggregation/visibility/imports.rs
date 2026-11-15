@@ -51,6 +51,10 @@ fn private_names(unit: &ModuleUnit, kinds: &[&str]) -> HashSet<String> {
     unit.implementation()
         .declarations
         .iter()
+        // Internal import aliases (ADR-0110) name the unit's own verbs.
+        .filter(|declaration| {
+            !matches!(declaration, TopLevelDecl::ExternalVerb(verb) if verb.module_import)
+        })
         .filter_map(|declaration| super::super::validation::export_identity(declaration))
         .filter(|(declaration_kind, name)| {
             kinds.contains(declaration_kind) && !unit.exports().contains(declaration_kind, name)

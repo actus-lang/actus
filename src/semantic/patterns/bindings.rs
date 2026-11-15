@@ -94,6 +94,33 @@ impl Analyzer {
         Ok(())
     }
 
+    /// The type of the binding `name` introduced by `pattern` when it matches
+    /// `subject`, keeping the payload's declaration identity.
+    pub(in crate::semantic) fn pattern_binding_type(
+        &self,
+        pattern: &Pattern,
+        name: &str,
+        subject: &Expr,
+    ) -> Option<crate::ast::TypeName> {
+        let Pattern::Variant { enum_name, variant, payload, .. } = pattern else { return None };
+        let enum_name = self.imported_member_name(enum_name).unwrap_or(enum_name);
+        let candidate =
+            self.enum_types.get(enum_name)?.variants.iter().find(|item| item.name == *variant)?;
+        let declared = match (&candidate.payload, payload) {
+            (EnumPayload::Tuple(types), VariantPayload::Positional(bindings)) => bindings
+                .iter()
+                .zip(types)
+                .find_map(|(binding, ty)| (binding.name == name).then_some(ty)),
+            (EnumPayload::Struct(fields), VariantPayload::Named(patterns)) => {
+                patterns.iter().find(|item| item.binding.name == name).and_then(|item| {
+                    fields.iter().find(|field| field.name == item.name).map(|field| &field.ty)
+                })
+            }
+            _ => None,
+        }?;
+        self.specialize_pattern_type(enum_name, declared, subject).ok()
+    }
+
     fn specialize_pattern_type(
         &self,
         enum_name: &str,

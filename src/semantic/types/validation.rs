@@ -184,7 +184,12 @@ impl Analyzer {
             },
             Some(PrimitiveType::Void) | None => false,
         };
-        if literal_matches || type_names_match(&expected_name, &found) {
+        if literal_matches
+            || type_names_match(&expected_name, &found)
+            || self
+                .resolved_type_name(value)
+                .is_some_and(|found| same_declarations(expected, &found))
+        {
             return Ok(());
         }
         Err(SemanticError {
@@ -238,6 +243,19 @@ fn integer_literal(expression: &Expr) -> Option<(String, bool)> {
         }
         _ => None,
     }
+}
+
+/// Both types name the same declarations (ADR-0108), whatever spelling
+/// (`Metrics` or `shapes::Metrics`) each side was written with.
+fn same_declarations(expected: &TypeName, found: &TypeName) -> bool {
+    expected.resolved.is_some()
+        && expected.resolved == found.resolved
+        && expected.arguments.len() == found.arguments.len()
+        && expected
+            .arguments
+            .iter()
+            .zip(&found.arguments)
+            .all(|(expected, found)| same_declarations(expected, found))
 }
 
 fn type_names_match(expected: &str, found: &str) -> bool {

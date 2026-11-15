@@ -19,6 +19,7 @@ edition.
 | `E1083`–`E1099` | Bounded arrays, arenas, dynamic roles, and compile-time expressions |
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
 | `E1109` | Private module declaration or public-signature visibility violation |
+| `E1119` | Reference outside the hierarchical scope of its directory module |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |
 | `E1110` | Deterministic native symbol or ABI collision across module implementations |
 | `E1104` | Unknown sibling referenced by a module facade |
@@ -52,6 +53,16 @@ diagnostic includes the native symbol and both module namespaces. A generic
 type that renders with the same display text at two compiler boundaries is not
 reported as an ABI collision unless the resolved native contracts actually
 differ.
+
+`E1119` is emitted when a spelling in a directory module names a declaration
+of its unit that is not in that module's scope (ADR-0110): a declaration of a
+sibling or cousin directory that the module does not import, a private
+declaration of a child directory, or a name brought in only by an import of
+another module of the unit. It is also emitted for a name that is reached
+through an import of another unit's child module but is not exported by that
+child. Imports are not inherited by child modules. The
+diagnostic names the referencing module and, for an out-of-scope directory,
+the `import { open <module> }` that brings the declaration into scope.
 
 New diagnostics must use a new stable code, include a focused positive or
 negative test, and document the code's category here. Strict-conformance codes

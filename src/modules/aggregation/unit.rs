@@ -131,10 +131,25 @@ pub fn load_module_unit_with_overlays(
 ) -> Result<ModuleUnit, ModuleError> {
     let resolved =
         resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
-    let implementation =
+    let mut implementation =
         super::parsing::parse_module_with_overlays(resolver, module_path, overlays)?;
     let exports = super::exports::exports_module_with_overlays(resolver, module_path, overlays)?;
     let sources = load_sources(resolver, &resolved, overlays)?;
+    let tree = super::scope::ModuleTree::from_sources(module_path, &sources);
+    super::scope::bind_internal_imports(&tree, &mut implementation)?;
+    let friends = std::collections::HashSet::new();
+    let context = super::scope::ImportContext {
+        importer: module_path,
+        resolver,
+        overlays,
+        report_path: resolved.facade(),
+        friends: &friends,
+    };
+    super::scope::bind_child_imports(
+        &mut implementation,
+        |path| super::declarations::qualify_import_path(module_path, path),
+        &context,
+    )?;
     let source_key = sources
         .iter()
         .map(|source| format!("{}@{}", normalize(source.path()), source.fingerprint))

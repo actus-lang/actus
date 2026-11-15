@@ -110,7 +110,7 @@ fn lower_user_call(
         span,
     });
     loan::append_scalar_loan_writebacks(provider, writebacks, span, instructions);
-    result.ok_or_else(|| unsupported(span, "unit call cannot produce a value"))
+    result.ok_or_else(|| unsupported(span, format!("unit call `{callee}` cannot produce a value")))
 }
 
 fn expression_arguments(expression: &Expr) -> &[crate::ast::Argument] {

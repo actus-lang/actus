@@ -344,6 +344,17 @@ mod tests {
         let mut locked = original.clone();
         locked.set_mode(0o500);
         fs::set_permissions(&readonly, locked).expect("make workspace readonly");
+        // A process that bypasses directory permissions (root, or
+        // CAP_DAC_OVERRIDE) cannot observe a read-only workspace; the OS
+        // contract under test does not exist there.
+        let probe = readonly.join("permission-probe");
+        if fs::create_dir(&probe).is_ok() {
+            fs::remove_dir(&probe).expect("remove permission probe");
+            fs::set_permissions(&readonly, original).expect("restore workspace permissions");
+            fs::remove_dir_all(&root).expect("remove readonly test root");
+            eprintln!("skipped: directory permissions are not enforced for this process");
+            return;
+        }
         let result = create_temporary_directory_with_prefix(&readonly, b"rejected");
         fs::set_permissions(&readonly, original).expect("restore workspace permissions");
         assert!(result.is_err());
