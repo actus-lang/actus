@@ -258,13 +258,14 @@ fn accepts_multiple_aliases_for_the_compiler_owned_standard_library() {
     let root = std::env::temp_dir()
         .join(format!("actus-identity-standard-aliases-{}", std::process::id()));
     fs::create_dir_all(root.join("src")).expect("create alias fixture");
-    let standard_library = Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std");
+    // A TOML string, so a Windows path keeps its backslashes.
+    let standard_library = toml::Value::String(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std").display().to_string(),
+    );
     fs::write(
         root.join("Actus.toml"),
         format!(
-            "[package]\nname = \"application\"\nversion = \"1.0.0\"\n\n[dependencies.io]\npath = \"{}\"\n\n[dependencies.fs]\npath = \"{}\"\n",
-            standard_library.display(),
-            standard_library.display()
+            "[package]\nname = \"application\"\nversion = \"1.0.0\"\n\n[dependencies.io]\npath = {standard_library}\n\n[dependencies.fs]\npath = {standard_library}\n"
         ),
     )
     .expect("write alias manifest");
