@@ -5,8 +5,9 @@ Each kernel in `benchmarks/kernels` is built twice: the Actus source with
 the `release` profile on the LLVM backend, and the C source with
 `clang -O3`. Both run under Callgrind, which counts executed instructions
 deterministically, collecting from `main`. The gate fails when the two
-programs exit differently or when Actus executes more than `threshold`
-times the instructions of C.
+programs exit differently, when Actus executes more than `threshold` times
+the instructions of C, or when an Actus kernel executes more than
+`ratchet_tolerance` above its recorded baseline.
 """
 
 from __future__ import annotations
@@ -30,6 +31,11 @@ def arguments() -> argparse.Namespace:
         "--kernels",
         type=Path,
         default=Path(__file__).resolve().parent.parent / "benchmarks/kernels",
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="write the measured Actus counts as the new baseline",
     )
     return parser.parse_args()
 
@@ -65,6 +71,14 @@ def measure(program: Path) -> tuple[int, int]:
     return result.returncode, int(collected.group(1))
 
 
+def write_baseline(path: Path, counts: dict[str, int]) -> None:
+    """Rewrites the `[baseline]` table, which closes the file."""
+    text = path.read_text(encoding="utf-8")
+    head = text[: text.index("[baseline]")]
+    table = "".join(f"{name} = {count}\n" for name, count in sorted(counts.items()))
+    path.write_text(f"{head}[baseline]\n{table}", encoding="utf-8")
+
+
 def main() -> int:
     args = arguments()
     for tool in ("valgrind", args.cc):
@@ -72,6 +86,8 @@ def main() -> int:
             raise SystemExit(f"benchmark gate requires `{tool}` on PATH")
     config = tomllib.loads((args.kernels / "gate.toml").read_text(encoding="utf-8"))
     threshold = float(config["threshold"])
+    tolerance = float(config["ratchet_tolerance"])
+    baseline = config["baseline"]
     rows = []
     failures = []
     with tempfile.TemporaryDirectory(prefix="actus-benchmark-gate-") as temporary:
@@ -84,24 +100,29 @@ def main() -> int:
             actus_status, actus_count = measure(actus_program)
             c_status, c_count = measure(c_program)
             ratio = actus_count / c_count
-            rows.append((name, actus_count, c_count, ratio, actus_status))
+            change = actus_count / baseline[name] - 1
+            rows.append((name, actus_count, c_count, ratio, change, actus_status))
             if actus_status != c_status:
                 failures.append(f"{name}: Actus exited {actus_status}, C exited {c_status}")
             if ratio > threshold:
                 failures.append(f"{name}: {ratio:.3f}x the instructions of C exceeds {threshold}x")
+            if change > tolerance and not args.update_baseline:
+                failures.append(f"{name}: {change:+.1%} against its baseline exceeds {tolerance:+.0%}")
     report = [
         f"## Benchmark gate (threshold {threshold}x C `-O3`)",
         "",
-        "| kernel | Actus instructions | C instructions | ratio | exit |",
-        "|---|---:|---:|---:|---:|",
+        "| kernel | Actus instructions | C instructions | ratio | baseline | exit |",
+        "|---|---:|---:|---:|---:|---:|",
     ]
-    report += [f"| {n} | {a:,} | {c:,} | {r:.3f} | {s} |" for n, a, c, r, s in rows]
+    report += [f"| {n} | {a:,} | {c:,} | {r:.3f} | {b:+.1%} | {s} |" for n, a, c, r, b, s in rows]
     text = "\n".join(report) + "\n"
     print(text)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as handle:
             handle.write(text)
+    if args.update_baseline:
+        write_baseline(args.kernels / "gate.toml", {row[0]: row[1] for row in rows})
     for failure in failures:
         print(f"FAIL {failure}", file=sys.stderr)
     return 1 if failures else 0

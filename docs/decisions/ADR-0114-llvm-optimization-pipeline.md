@@ -116,6 +116,13 @@ time is not. A kernel fails when its exit status differs from C or when
 Actus executes more than 1.25 times the instructions of C; the threshold
 lives in `benchmarks/kernels/gate.toml`.
 
+The C threshold alone does not catch every regression: with the IR pipeline
+disabled, every kernel still stayed under 1.25 times C. The gate therefore
+also ratchets each Actus kernel against its instruction count recorded in
+`gate.toml` for the CI runner, and fails when a kernel executes more than 5%
+above it. A change that makes a kernel faster lowers its baseline in the
+same change (`--update-baseline`).
+
 ## Consequences
 
 - Release builds run the LLVM optimizer for the first time; compile time at
