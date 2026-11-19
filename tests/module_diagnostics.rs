@@ -167,7 +167,7 @@ fn check_and_build_reject_different_reexported_type_identities() {
         assert!(!output.status.success());
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains("E1027"), "stderr was: {stderr}");
-        assert!(stderr.contains("src/app/start.act: error"), "stderr was: {stderr}");
+        assert!(stderr.contains(&native_path("src/app/start.act: error")), "stderr was: {stderr}");
     }
     fs::remove_dir_all(root).expect("remove conflicting re-export fixture");
 }
@@ -223,10 +223,7 @@ fn assert_module_provenance(root: &Path, command: &str, expected_code: &str) {
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains(expected_code), "stderr was: {stderr}");
-    assert!(
-        stderr.contains("src/module.act: error[") || stderr.contains("src/module.act: "),
-        "stderr was: {stderr}"
-    );
+    assert!(stderr.contains(&native_path("src/module.act: ")), "stderr was: {stderr}");
     assert!(stderr.contains(" at 1:"), "stderr was: {stderr}");
 }
 
@@ -297,7 +294,7 @@ fn check_and_build_preserve_cross_file_duplicate_provenance() {
         assert!(!output.status.success());
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains("E1106"), "stderr was: {stderr}");
-        assert!(stderr.contains("src/demo/other.act"), "stderr was: {stderr}");
+        assert!(stderr.contains(&native_path("src/demo/other.act")), "stderr was: {stderr}");
     }
     fs::remove_dir_all(root).expect("remove duplicate fixture");
 }
@@ -334,4 +331,10 @@ fn missing_module_diagnostics_are_deterministic_and_stable() {
     assert!(String::from_utf8_lossy(&first.stderr).contains("error[E1101]"));
     assert!(String::from_utf8_lossy(&first.stderr).contains("missing its canonical facade"));
     fs::remove_dir_all(root).expect("remove module fixture");
+}
+
+/// Diagnostics print source paths with the host separator; the expected
+/// spelling is written with `/` and converted to it.
+fn native_path(path: &str) -> String {
+    path.replace('/', std::path::MAIN_SEPARATOR_STR)
 }
