@@ -244,6 +244,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         let value = self.materialize_aggregate_assignment(value, span, instructions)?;
+        let value = state::retype_assigned_literal(self, name, value, instructions);
         if let Some((destination, layout)) = self.aggregate_loan_parameter(name) {
             crate::codegen::shared_lowering::aggregate_assignment::assign_aggregate_loan(
                 self,

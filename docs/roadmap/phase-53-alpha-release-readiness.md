@@ -318,6 +318,42 @@ open verb start() -> Int {
 16. **G — Version and release note**: reconcile the compiler version, alpha tag,
    release notes, and final release evidence.
 
+## Benchmark findings
+
+Micro-benchmarks against C and Rust (collatz, recursive Fibonacci, a sieve
+over `Array[u8, 1000000]`, xorshift) exposed four shared-lowering defects,
+identical on both backends:
+
+1. A `loop` inside a branch inside another `loop` miscompiled. An `if` join
+   in the inner loop body rebinds every outer carried name to a block
+   parameter, and the inner loop, which never assigns that name, kept the
+   rebinding after its exit; the `if` edge then forwarded block parameters
+   by position, so an outer binding received the inner loop's value. Fixed:
+   a binding a loop does not assign keeps its entry value after the loop, and
+   an `if` edge carries each name's value where its block falls through.
+2. An unsuffixed literal assigned to an integer binding kept the `Int` type,
+   so a join of `x = 5` and `x = 2` with `x: u64` merged mismatched widths.
+   Fixed: the literal takes the binding's type.
+3. A literal operand kept the `Int` type beside a wider operand (`value / 2`
+   with `value: u64`), and every division emitted the signed overflow trap,
+   which also falsely trapped an unsigned divisor with all bits set. Fixed:
+   a literal operand takes the other operand's type, and only a signed
+   division checks `MIN / -1`.
+4. An unsuffixed literal above `i64::MAX` initializing a `u64` binding was
+   truncated, or trapped in a checked cast. Fixed: integer constants hold the
+   literal's magnitude, and an unsigned target accepts its full width.
+
+`tests/control_flow_lowering.rs` covers each defect.
+
+Pending: **LLVM optimization pipeline** (new ADR). The LLVM backend never runs
+the IR optimization pipeline (`LLVMRunPasses`); `--release` only selects the
+code-generation level, so LLVM output is two to four times slower than C and
+slower than Cranelift. With `default<O2>` run experimentally before emission,
+the loop kernels match clang and gcc, and recursion and array indexing are
+within about twice clang. The ADR maps profiles to pipelines (`dev` to `O0`,
+`release` to `O2` or `O3`), keeps output deterministic, and adds a benchmark
+gate that checks results against C.
+
 ## Evidence gates
 
 Each PR records formatter, clippy, source-limit, architecture, documentation,

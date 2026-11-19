@@ -37,6 +37,7 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
         mut instructions: Vec<BackendInstruction>,
     ) -> Result<BackendBlock, BackendContractError> {
         let carried = self.collect_carried_bindings(nested, nested.span)?;
+        let entry = self.provider.snapshot_bindings();
         let state = self.prepare_loop(&carried, nested.span);
         instructions.push(BackendInstruction::Jump {
             target: state.header_id,
@@ -59,12 +60,7 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
             body_values: &state.body_values,
             span: nested.span,
         })?;
-        for (binding, value) in carried.iter().zip(&state.exit_values) {
-            self.provider.set_binding_value(&binding.name, *value);
-            if let Some(type_name) = &binding.nominal_type {
-                self.provider.remember_nominal_type(*value, type_name.clone());
-            }
-        }
+        self.bind_loop_exit(&entry, &carried, &state.exit_values);
         let continuation =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
         let mut continuation_block =
@@ -83,6 +79,29 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(body);
         self.blocks.push(continuation_block);
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
+    }
+
+    /// Binds every name after a loop: a carried binding to its exit value, and
+    /// a binding the loop never assigns to its entry value. Lowering the body
+    /// may rebind the latter to a block parameter of a join inside the body,
+    /// which does not dominate the loop exit.
+    pub(in crate::codegen::body) fn bind_loop_exit(
+        &mut self,
+        entry: &std::collections::BTreeMap<String, BackendValueId>,
+        carried: &[super::CarriedBinding],
+        exit_values: &[BackendValueId],
+    ) {
+        for (name, value) in entry {
+            if !carried.iter().any(|binding| &binding.name == name) {
+                self.provider.set_binding_value(name, *value);
+            }
+        }
+        for (binding, value) in carried.iter().zip(exit_values) {
+            self.provider.set_binding_value(&binding.name, *value);
+            if let Some(type_name) = &binding.nominal_type {
+                self.provider.remember_nominal_type(*value, type_name.clone());
+            }
+        }
     }
 
     fn prepare_loop(

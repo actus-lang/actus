@@ -177,7 +177,7 @@ fn coerce_integer_literal(
     instructions: &mut [BackendInstruction],
 ) -> Option<BackendValueId> {
     let (
-        BackendValueType::Integer { signed: source_signed, .. },
+        BackendValueType::Integer { .. },
         BackendValueType::Integer { signed: target_signed, width: target_width },
     ) = (source_type, target_type)
     else {
@@ -198,8 +198,9 @@ fn coerce_integer_literal(
             (minimum..=maximum).contains(&literal)
         })
     } else {
-        (!source_signed || *literal <= i64::MAX as u64)
-            && integer_value_fits(*literal, false, target_width)
+        // Integer constants hold the literal's magnitude (negation is its own
+        // operation), so an unsigned target accepts every value of its width.
+        integer_value_fits(*literal, false, target_width)
     };
     if !fits {
         return None;
@@ -238,4 +239,63 @@ pub(super) fn coerce_value_to_type(
         span,
     });
     Ok(converted)
+}
+
+/// Gives an unsuffixed integer literal the integer type its context requires
+/// (the other operand, or the binding it is assigned to). A value that is not
+/// a literal, or a literal that does not fit, keeps its type.
+pub(super) fn retype_integer_literal(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: BackendValueId,
+    target_type: BackendValueType,
+    instructions: &mut [BackendInstruction],
+) -> BackendValueId {
+    let Some(source_type) = provider.value_type(value) else { return value };
+    if source_type == target_type {
+        return value;
+    }
+    coerce_integer_literal(provider, value, source_type, target_type, instructions).unwrap_or(value)
+}
+
+/// Retypes whichever operand of an integer operation is a literal to the type
+/// of the other operand, so both operands of one operation share one type.
+pub(super) fn unify_literal_operands(
+    provider: &mut SharedExpressionProvider<'_>,
+    left: BackendValueId,
+    right: BackendValueId,
+    instructions: &mut [BackendInstruction],
+) -> (BackendValueId, BackendValueId) {
+    let (Some(left_type), Some(right_type)) =
+        (provider.value_type(left), provider.value_type(right))
+    else {
+        return (left, right);
+    };
+    if left_type == right_type
+        || !matches!(left_type, BackendValueType::Integer { .. })
+        || !matches!(right_type, BackendValueType::Integer { .. })
+    {
+        return (left, right);
+    }
+    let right = retype_integer_literal(provider, right, left_type, instructions);
+    if provider.value_type(right) == Some(left_type) {
+        return (left, right);
+    }
+    (retype_integer_literal(provider, left, right_type, instructions), right)
+}
+
+/// An unsuffixed literal assigned to an integer binding takes the binding's
+/// type, so every value a join merges has one type.
+pub(super) fn retype_assigned_literal(
+    provider: &mut SharedExpressionProvider<'_>,
+    name: &str,
+    value: BackendValueId,
+    instructions: &mut [BackendInstruction],
+) -> BackendValueId {
+    let target = provider.binding_value(name).and_then(|previous| provider.value_type(previous));
+    match target {
+        Some(target @ BackendValueType::Integer { .. }) => {
+            retype_integer_literal(provider, value, target, instructions)
+        }
+        _ => value,
+    }
 }
