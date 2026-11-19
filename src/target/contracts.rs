@@ -113,6 +113,10 @@ impl LinkerFlavor {
         }
     }
 
+    /// The system libraries the runtime archive needs on Windows: the Rust
+    /// standard library inside it imports from each of them.
+    /// `synchronization.lib` provides `WaitOnAddress` and `WakeByAddress*`,
+    /// which the standard library's locks import directly.
     pub fn runtime_library_arguments(self) -> &'static [&'static str] {
         match self {
             Self::Msvc => &[
@@ -122,6 +126,7 @@ impl LinkerFlavor {
                 "libcmt.lib",
                 "ntdll.lib",
                 "oldnames.lib",
+                "synchronization.lib",
                 "userenv.lib",
                 "ws2_32.lib",
             ],
