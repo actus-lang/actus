@@ -54,4 +54,9 @@ check_layer src/ast 'crate::codegen' 'cranelift' 'NativeType'
 check_layer src/semantic 'crate::codegen' 'cranelift' 'render_diagnostic' 'println!' 'eprintln!'
 check_layer src/codegen 'SemanticErrorKind' 'SemanticError' 'Analyzer' 'render_diagnostic'
 
+# ADR-0108: a generic instance names its verb by canonical identity, never by
+# the last segment of a spelling.
+check_layer src/codegen/generic 'instance.name.rsplit' 'caller.rsplit' 'caller_name.rsplit'
+check_layer src/cli/build/emission 'instance.name.rsplit'
+
 exit "$failed"

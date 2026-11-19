@@ -4,7 +4,6 @@ use cranelift_codegen::ir::{InstBuilder, Value, types};
 use cranelift_frontend::FunctionBuilder;
 
 use crate::ast::{Argument, IntrinsicKind, lookup_call_intrinsic};
-use crate::lexer::SourceSpan;
 
 use super::super::layout::LayoutRegistry;
 use super::super::native::{BackendEmitError, FunctionRef};
@@ -17,15 +16,16 @@ pub(crate) fn lower_call(
     function: &mut FunctionBuilder<'_>,
     callee: &str,
     arguments: &[Argument],
+    generic_arguments: &[crate::ast::TypeName],
     context: &CallLoweringContext<'_, '_>,
 ) -> Result<Value, BackendEmitError> {
     let callee_name = callee.split_once('[').map_or(callee, |(name, _)| name);
     match lookup_call_intrinsic(callee) {
         Some(IntrinsicKind::SizeOf) => {
-            return lower_layout_value(function, callee, context.layouts, false);
+            return lower_layout_value(function, generic_arguments, context.layouts, false);
         }
         Some(IntrinsicKind::AlignOf) => {
-            return lower_layout_value(function, callee, context.layouts, true);
+            return lower_layout_value(function, generic_arguments, context.layouts, true);
         }
         _ => {}
     }
@@ -73,19 +73,14 @@ pub(crate) fn lower_call(
 
 fn lower_layout_value(
     function: &mut FunctionBuilder<'_>,
-    callee: &str,
+    generic_arguments: &[crate::ast::TypeName],
     layouts: &LayoutRegistry,
     alignment: bool,
 ) -> Result<Value, BackendEmitError> {
-    let prefix = if alignment { "align_of[" } else { "size_of[" };
-    let type_name = callee
-        .strip_prefix(prefix)
-        .and_then(|name| name.strip_suffix(']'))
-        .and_then(|name| crate::semantic::parse_type_name_key(name, SourceSpan::new(0, 0)))
-        .ok_or_else(|| {
-            BackendEmitError(format!("invalid layout intrinsic type application `{callee}`"))
-        })?;
-    let native_type = NativeType::from_type_name_with_layout(Some(&type_name), layouts)?;
+    let type_name = generic_arguments.first().ok_or_else(|| {
+        BackendEmitError("layout intrinsic has no resolved type argument".to_owned())
+    })?;
+    let native_type = NativeType::from_type_name_with_layout(Some(type_name), layouts)?;
     let value = if alignment {
         layouts.alignment(native_type)?
     } else {

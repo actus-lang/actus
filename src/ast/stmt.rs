@@ -36,7 +36,7 @@ pub enum CompoundAssignmentOp {
 pub enum Place {
     Binding { name: String, span: SourceSpan },
     Field { object: Box<Place>, field: String, span: SourceSpan },
-    Index { target: Box<Place>, index: Expr, span: SourceSpan },
+    Index { target: Box<Place>, index: Box<Expr>, span: SourceSpan },
 }
 
 impl Place {
@@ -54,11 +54,12 @@ impl Place {
             Self::Field { object, field, span } => Expr::FieldAccess {
                 object: Box::new(object.to_expr()),
                 field: field.clone(),
+                resolved_type: None,
                 span: *span,
             },
             Self::Index { target, index, span } => Expr::Index {
                 target: Box::new(target.to_expr()),
-                index: Box::new(index.clone()),
+                index: index.clone(),
                 span: *span,
             },
         }
@@ -71,6 +72,7 @@ pub enum Stmt {
         role: Role,
         name: String,
         ty: Option<String>,
+        resolved_type: Option<crate::ast::TypeName>,
         initializer: Expr,
         span: SourceSpan,
     },
@@ -103,7 +105,7 @@ pub enum Stmt {
     ForRange {
         binding: ForBinding,
         start: Expr,
-        end: Expr,
+        end: Box<Expr>,
         body: Block,
         span: SourceSpan,
     },

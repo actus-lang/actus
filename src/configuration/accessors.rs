@@ -10,6 +10,10 @@ impl CompilerConfiguration {
         &self.source_root
     }
 
+    pub fn package_identity(&self) -> &str {
+        &self.package_identity
+    }
+
     pub fn project_root(&self) -> &Path {
         &self.project_root
     }

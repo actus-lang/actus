@@ -1,6 +1,6 @@
 use super::identifiers::is_identifier_start;
 use super::{LexError, LexErrorKind, Scanner};
-use crate::lexer::{SourceSpan, Token, TokenKind};
+use crate::lexer::{Token, TokenKind};
 
 impl<'source> Scanner<'source> {
     pub(super) fn scan_token(&mut self) {
@@ -27,7 +27,7 @@ impl<'source> Scanner<'source> {
             character if character.is_ascii_digit() => self.scan_integer(start),
             character => self.errors.push(LexError::new(
                 LexErrorKind::UnexpectedCharacter(character),
-                SourceSpan::new(start, self.cursor),
+                self.span(start),
             )),
         }
     }
@@ -104,6 +104,6 @@ impl<'source> Scanner<'source> {
     }
 
     fn push_simple(&mut self, kind: TokenKind, start: usize) {
-        self.tokens.push(Token::new(kind, SourceSpan::new(start, self.cursor)));
+        self.tokens.push(Token::new(kind, self.span(start)));
     }
 }

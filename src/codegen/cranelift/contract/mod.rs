@@ -14,4 +14,4 @@ mod scalar;
 
 pub(super) use cleanup::LayoutCleanupProvider;
 pub(crate) use declarations::{parameter_types, scalar_type};
-pub use emission::emit_contract_module_object;
+pub use emission::{emit_contract_module_object, emit_contract_module_object_with_local_symbols};

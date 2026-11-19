@@ -106,6 +106,21 @@ fn executes_generated_serialization_encoder_natively() {
 
 #[cfg(unix)]
 #[test]
+fn checks_generated_serialization_verbs_before_emission() {
+    let root = std::env::temp_dir()
+        .join(format!("actus-generated-serialization-check-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let source = "pack FramePack { erg storage: Array[u8, 8]; layout little; fields { erg byte_0: u8 at 0; erg byte_1: u8 at 8; erg byte_2: u8 at 16; erg byte_3: u8 at 24; erg byte_4: u8 at 32; erg byte_5: u8 at 40; erg byte_6: u8 at 48; erg byte_7: u8 at 56; } } serialize Frame from FramePack { layout little; version u16 at 0; payload bytes at 2 length 1; checksum crc32 over 0 .. 3 at 3; } verb main() -> Int { erg source = FramePack { storage: Array[u8, 8](), }; erg encoded_output = Buffer[0]; erg migrated_output = Buffer[0]; erg version: u16 = 1u16; erg encoded = frame_encode(value: abs source, output: ins encoded_output); erg decoded = frame_decode(input: abs encoded_output, expected_version: abs version); erg valid = frame_validate(frame: abs encoded_output, expected_version: abs version); erg migrated = frame_migrate(input: abs encoded_output, from_version: abs version, to_version: abs version, output: ins migrated_output); return 0; }";
+    fs::write(&input, source).expect("write serialization check fixture");
+
+    let result = run_with_args(vec!["check".to_owned(), input.display().to_string()].into_iter());
+
+    assert_eq!(result, 0);
+    let _ = fs::remove_file(input);
+}
+
+#[cfg(unix)]
+#[test]
 fn executes_generated_serialization_decoder_natively() {
     let status = run_array_fixture(
         "generated-serialization-decoder",

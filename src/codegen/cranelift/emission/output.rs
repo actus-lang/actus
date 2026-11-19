@@ -1,6 +1,6 @@
 use crate::ast::{ExternalVerbDecl, Program, VerbDecl};
 use crate::configuration::NativeBackendConfiguration;
-use crate::semantic::{GenericInstance, SemanticModel, analyze, filter_program_for_target_checked};
+use crate::semantic::{GenericInstance, SemanticModel, filter_program_for_target_checked};
 use crate::target::TargetSpec;
 
 use cranelift_module::Module;
@@ -91,8 +91,9 @@ fn prepare_program(
 ) -> Result<(Program, SemanticModel), BackendEmitError> {
     let targeted_program = filter_program_for_target_checked(program, target)
         .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
-    let normalized_program = normalize_program(&targeted_program);
-    let semantic = analyze(&normalized_program)
+    let mut normalized_program = normalize_program(&targeted_program);
+    crate::modules::DeclarationRegistry::resolve_standalone(&mut normalized_program);
+    let semantic = crate::semantic::analyze_resolved(&normalized_program)
         .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
     let local_instances = semantic.generic_instances.clone();
     let mut generic_instances = local_instances.clone();

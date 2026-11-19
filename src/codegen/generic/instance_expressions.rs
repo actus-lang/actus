@@ -69,16 +69,16 @@ fn collect_expression_type_names(expression: &Expr, visit: &mut dyn FnMut(&TypeN
             collect_expression_type_names(right, visit);
         }
         Expr::Call { arguments, .. } => collect_arguments_type_names(arguments, visit),
-        Expr::MethodCall { receiver, arguments, span, .. } => {
-            collect_method_call_type_names(receiver, arguments, *span, visit)
+        Expr::MethodCall { receiver, arguments, resolved_type, .. } => {
+            if let Some(type_name) = resolved_type {
+                visit(type_name);
+            }
+            collect_method_call_type_names(receiver, arguments, visit)
         }
-        Expr::StructLit { name, type_arguments, fields, span } => {
-            visit(&TypeName {
-                name: name.clone(),
-                arguments: type_arguments.clone(),
-                reference_role: None,
-                span: *span,
-            });
+        Expr::StructLit { resolved_type, fields, .. } => {
+            visit(resolved_type.as_ref().expect(
+                "internal compiler error: struct literal reached generic instance collection without a resolved type",
+            ));
             for field in fields {
                 collect_expression_type_names(&field.value, visit);
             }
@@ -103,14 +103,8 @@ fn collect_expression_type_names(expression: &Expr, visit: &mut dyn FnMut(&TypeN
 fn collect_method_call_type_names(
     receiver: &Expr,
     arguments: &[crate::ast::Argument],
-    span: crate::lexer::SourceSpan,
     visit: &mut dyn FnMut(&TypeName),
 ) {
-    if let Expr::Identifier { name, .. } = receiver
-        && let Some(type_name) = crate::semantic::parse_type_name_key(name, span)
-    {
-        visit(&type_name);
-    }
     collect_expression_type_names(receiver, visit);
     collect_arguments_type_names(arguments, visit);
 }

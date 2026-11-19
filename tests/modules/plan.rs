@@ -168,6 +168,28 @@ fn deduplicates_identical_declarations_across_nested_module_scopes() {
 }
 
 #[test]
+fn deduplicates_identical_declarations_reached_through_two_facades() {
+    let fixture = Fixture::new();
+    fixture.write("left/left.act", "open api;");
+    fixture.write(
+        "left/api.act",
+        "open enum SharedError { Missing, } unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;",
+    );
+    fixture.write("right/right.act", "open api;");
+    fixture.write(
+        "right/api.act",
+        "open enum SharedError { Missing, } unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;",
+    );
+    let (tokens, errors) = scan("import left; import right; verb main() -> Int { return 0; }");
+    assert!(errors.is_empty());
+    let program = parse(tokens).unwrap();
+    let plan = build_compilation_plan(&program, &ModuleResolver::new(&fixture.0))
+        .expect("identical declarations through two facades should not collide");
+
+    plan.object_plan().expect("identical declarations should build an object plan");
+}
+
+#[test]
 fn rejects_incompatible_external_symbols_across_modules() {
     let fixture = Fixture::new();
     fixture.write("left/left.act", "open bridge;");

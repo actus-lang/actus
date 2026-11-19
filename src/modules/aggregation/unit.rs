@@ -3,8 +3,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ast::Program;
-use crate::lexer::scan;
-use crate::parser::parse;
 
 use super::super::resolver::{ModuleResolver, ResolvedModule};
 use super::identity::ModuleNamespace;
@@ -14,6 +12,7 @@ use super::visibility::validate_exported_signatures;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleIdentity {
     namespace: ModuleNamespace,
+    package: String,
     module_path: String,
     source_key: String,
 }
@@ -21,6 +20,10 @@ pub struct ModuleIdentity {
 impl ModuleIdentity {
     pub fn namespace(&self) -> &ModuleNamespace {
         &self.namespace
+    }
+
+    pub fn package(&self) -> &str {
+        &self.package
     }
 
     pub fn module_path(&self) -> &str {
@@ -91,6 +94,27 @@ impl ModuleUnit {
     pub fn exports(&self) -> &ModuleExports {
         &self.exports
     }
+
+    pub(crate) fn annotate_types(&mut self, registry: &super::registry::DeclarationRegistry) {
+        registry.annotate_program_headers(self.identity.module_path(), &mut self.implementation);
+        for source in &mut self.sources {
+            registry.annotate_program_headers(self.identity.module_path(), &mut source.program);
+        }
+    }
+
+    /// Replaces this unit's programs with the session's annotated revision.
+    pub(crate) fn replace_with_annotated(&mut self, annotated: &crate::session::AnnotatedUnit) {
+        assert_eq!(
+            self.sources.len(),
+            annotated.sources.len(),
+            "internal compiler error: annotated unit `{}` has a different source count",
+            self.identity.module_path()
+        );
+        self.implementation.clone_from(&annotated.implementation);
+        for (source, program) in self.sources.iter_mut().zip(&annotated.sources) {
+            source.program.clone_from(program);
+        }
+    }
 }
 
 pub fn load_module_unit(
@@ -107,10 +131,25 @@ pub fn load_module_unit_with_overlays(
 ) -> Result<ModuleUnit, ModuleError> {
     let resolved =
         resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
-    let implementation =
+    let mut implementation =
         super::parsing::parse_module_with_overlays(resolver, module_path, overlays)?;
     let exports = super::exports::exports_module_with_overlays(resolver, module_path, overlays)?;
     let sources = load_sources(resolver, &resolved, overlays)?;
+    let tree = super::scope::ModuleTree::from_sources(module_path, &sources);
+    super::scope::bind_internal_imports(&tree, &mut implementation)?;
+    let friends = std::collections::HashSet::new();
+    let context = super::scope::ImportContext {
+        importer: module_path,
+        resolver,
+        overlays,
+        report_path: resolved.facade(),
+        friends: &friends,
+    };
+    super::scope::bind_child_imports(
+        &mut implementation,
+        |path| super::declarations::qualify_import_path(module_path, path),
+        &context,
+    )?;
     let source_key = sources
         .iter()
         .map(|source| format!("{}@{}", normalize(source.path()), source.fingerprint))
@@ -119,7 +158,12 @@ pub fn load_module_unit_with_overlays(
     let namespace =
         ModuleNamespace::from_module_path(module_path).map_err(ModuleError::Resolution)?;
     let unit = ModuleUnit {
-        identity: ModuleIdentity { namespace, module_path: module_path.to_owned(), source_key },
+        identity: ModuleIdentity {
+            package: resolver.module_package_identity(module_path),
+            namespace,
+            module_path: module_path.to_owned(),
+            source_key,
+        },
         facade: resolved.facade().to_owned(),
         sources,
         implementation,
@@ -135,7 +179,7 @@ fn load_sources(
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<Vec<ModuleSource>, ModuleError> {
     let mut sources = Vec::new();
-    load_module_sources(resolved, overlays, &mut sources, false)?;
+    load_module_sources(resolver, resolved, overlays, &mut sources, false)?;
     for child in resolved.children() {
         let child = resolver
             .resolve_child(
@@ -149,6 +193,7 @@ fn load_sources(
 }
 
 fn load_module_sources(
+    resolver: &ModuleResolver,
     resolved: &ResolvedModule,
     overlays: &HashMap<PathBuf, String>,
     sources: &mut Vec<ModuleSource>,
@@ -159,7 +204,7 @@ fn load_module_sources(
     } else {
         ModuleSourceKind::Facade
     };
-    sources.push(load_source(resolved.facade(), facade_kind, overlays)?);
+    sources.push(load_source(resolver, resolved.facade(), facade_kind, overlays)?);
     for sibling in resolved.siblings() {
         let name = sibling.file_stem().and_then(|stem| stem.to_str()).unwrap_or_default();
         let kind = if child {
@@ -170,7 +215,7 @@ fn load_module_sources(
         } else {
             ModuleSourceKind::Sibling { name: name.to_owned() }
         };
-        sources.push(load_source(sibling, kind, overlays)?);
+        sources.push(load_source(resolver, sibling, kind, overlays)?);
     }
     Ok(())
 }
@@ -181,7 +226,7 @@ fn load_child_sources(
     overlays: &HashMap<PathBuf, String>,
     sources: &mut Vec<ModuleSource>,
 ) -> Result<(), ModuleError> {
-    load_module_sources(resolved, overlays, sources, true)?;
+    load_module_sources(resolver, resolved, overlays, sources, true)?;
     for child in resolved.children() {
         let child_path = child.module_path().rsplit("::").next().unwrap_or_default();
         let nested = resolver
@@ -193,6 +238,7 @@ fn load_child_sources(
 }
 
 fn load_source(
+    resolver: &ModuleResolver,
     path: &Path,
     kind: ModuleSourceKind,
     overlays: &HashMap<PathBuf, String>,
@@ -203,12 +249,9 @@ fn load_source(
             message: error.to_string(),
         })
     })?;
-    let (tokens, errors) = scan(&source);
-    if !errors.is_empty() {
-        return Err(ModuleError::Lex { path: path.to_owned(), errors });
-    }
-    let program = parse(tokens)
-        .map_err(|error| ModuleError::Parse { path: path.to_owned(), error: Box::new(error) })?;
+    let program = crate::session::parse_source(resolver.session(), path, &source)
+        .program()
+        .map_err(|error| ModuleError::frontend(path, error))?;
     Ok(ModuleSource {
         path: path.to_owned(),
         kind,

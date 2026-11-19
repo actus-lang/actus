@@ -1,4 +1,5 @@
 use super::*;
+use crate::ast::TypeName;
 
 pub(in crate::codegen::shared_lowering) fn lower_unit_call(
     provider: &mut SharedExpressionProvider<'_>,
@@ -30,7 +31,7 @@ impl SharedExpressionProvider<'_> {
         if arena::is_place_call(self, expression) {
             return arena::lower_place(self, expression, instructions);
         }
-        let Expr::MethodCall { receiver, method, arguments, span } = expression else {
+        let Expr::MethodCall { receiver, method, arguments, span, .. } = expression else {
             return Err(unsupported(expression_span(expression), "method call expected"));
         };
         let receiver_is_binding = self.is_binding_receiver(receiver);
@@ -49,7 +50,7 @@ impl SharedExpressionProvider<'_> {
         let receiver_type = self
             .nominal_type(receiver_value)
             .ok_or_else(|| unsupported(*span, "performance receiver has no nominal type"))?;
-        let key = (receiver_type.canonical_key(), method.clone());
+        let key = (self.performance_lookup_key(receiver_type), method.clone());
         let callee = self.method_callee(&key, method, *span)?;
         let mut lowered_arguments = Vec::with_capacity(arguments.len() + 1);
         lowered_arguments.push(receiver_value);
@@ -100,6 +101,10 @@ impl SharedExpressionProvider<'_> {
                     .flatten()
             })
             .ok_or_else(|| unsupported(span, "method has no static symbol"))
+    }
+
+    fn performance_lookup_key(&self, type_name: &TypeName) -> String {
+        type_name.canonical_lookup_key()
     }
 
     fn is_binding_receiver(&self, expression: &Expr) -> bool {

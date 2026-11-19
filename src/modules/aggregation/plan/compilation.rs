@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::ast::{Program, TopLevelDecl};
 
 use super::super::super::resolver::ModuleResolver;
 use super::super::declarations::{append_internal_declarations, append_public_declarations};
 use super::super::objects::{ModuleObjectPlan, build_object_plan};
+use super::super::registry::DeclarationRegistry;
 use super::super::types::ModuleError;
 use super::super::unit::ModuleUnit;
 use super::super::validation::{declaration_import_binding, validate_import_bindings};
@@ -15,10 +17,12 @@ pub(super) use super::super::declarations::qualify_import_path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleCompilationPlan {
-    local: Program,
-    caller: Program,
-    units: Vec<ModuleUnit>,
+    pub(super) local: Program,
+    pub(super) caller: Program,
+    pub(super) units: Vec<ModuleUnit>,
     friend_modules: HashSet<String>,
+    package_identity: String,
+    pub(super) registry: Arc<super::super::registry::DeclarationRegistry>,
 }
 
 impl ModuleCompilationPlan {
@@ -30,9 +34,15 @@ impl ModuleCompilationPlan {
         &self.caller
     }
 
+    pub fn package_identity(&self) -> &str {
+        &self.package_identity
+    }
+
     pub fn with_caller_program(&self, caller: Program) -> Self {
         let mut plan = self.clone();
         plan.caller = caller;
+        plan.registry
+            .annotate_program_headers(super::super::registry::ROOT_MODULE_PATH, &mut plan.caller);
         plan
     }
 
@@ -181,17 +191,20 @@ fn build_compilation_plan_with_overlays_and_scope_check(
     validate_root_import_bindings: bool,
     friend_modules: HashSet<String>,
 ) -> Result<ModuleCompilationPlan, ModuleError> {
+    let (program, friend_modules) = super::super::scope::bind_root_child_imports(
+        program,
+        importer_module_path,
+        resolver,
+        overlays,
+        friend_modules,
+    )?;
+    let program = &program;
     let mut caller_declarations = Vec::new();
     let mut local_declarations = Vec::new();
     let mut units = Vec::new();
     let mut imported_paths = HashSet::new();
     let mut appended_symbols = HashSet::new();
-    if validate_root_import_bindings
-        && !program
-            .declarations
-            .iter()
-            .any(|declaration| matches!(declaration, TopLevelDecl::OpenSibling(_)))
-    {
+    if validate_root_import_bindings && !opens_siblings(program) {
         validate_import_bindings(program)?;
     }
     collect_root_imports(
@@ -207,7 +220,8 @@ fn build_compilation_plan_with_overlays_and_scope_check(
         &friend_modules,
     )?;
     validate_symbol_collisions(&local_declarations, &units)?;
-    Ok(ModuleCompilationPlan {
+    super::super::scope::validate_plan_scopes(&units)?;
+    let mut plan = ModuleCompilationPlan {
         local: Program {
             file_metadata: program.file_metadata.clone(),
             declarations: local_declarations,
@@ -218,7 +232,19 @@ fn build_compilation_plan_with_overlays_and_scope_check(
         },
         units,
         friend_modules,
-    })
+        package_identity: resolver.package_identity().identity().to_owned(),
+        registry: Arc::new(DeclarationRegistry::default()),
+    };
+    super::annotation::annotate_plan(&mut plan, importer_module_path, resolver.session());
+    Ok(plan)
+}
+
+/// A facade program (one that opens siblings) is not validated as a root.
+fn opens_siblings(program: &Program) -> bool {
+    program
+        .declarations
+        .iter()
+        .any(|declaration| matches!(declaration, TopLevelDecl::OpenSibling(_)))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -447,6 +473,10 @@ fn collect_imported_units(
     for declaration in &unit.implementation().declarations {
         let TopLevelDecl::Import(import) = declaration else { continue };
         let import_path = qualify_import_path(module_path, &import.path);
+        if import_path == module_path {
+            // A binding of the unit's own modules (ADR-0110): already loaded.
+            continue;
+        }
         let imported_namespace = import_namespace(import);
         collect_unit(
             &import_path,

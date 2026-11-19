@@ -290,11 +290,19 @@ impl Parser {
         self.expect_keyword(TokenKind::Open, "`open`")?;
         if self.check_identifier() {
             let start = self.previous().span.start;
+            // `open unit x;` (ADR-0111): `unit` is a modifier only when a name
+            // follows it, so `open unit;` still opens a sibling named `unit`.
+            let unit = self.peek_next_is_identifier()
+                && matches!(&self.peek().expect("identifier").kind, TokenKind::Identifier(word) if word == "unit");
+            if unit {
+                self.take_identifier("`unit`")?;
+            }
             let name = identifier_text(&self.take_identifier("sibling module name")?.kind);
             let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
             return Ok(TopLevelDecl::OpenSibling(crate::ast::OpenSiblingDecl {
                 doc,
                 name,
+                unit,
                 span: SourceSpan::new(start, end),
             }));
         }
@@ -385,6 +393,7 @@ impl Parser {
             params: signature.params,
             return_type: signature.return_type,
             span,
+            identity: None,
         })
     }
 

@@ -6,22 +6,19 @@ use super::super::SharedExpressionProvider;
 
 pub(super) fn lower_array_constructor(
     provider: &mut SharedExpressionProvider<'_>,
-    callee: &str,
+    type_name: &TypeName,
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let type_name = crate::semantic::parse_type_name_key(callee, span).ok_or_else(|| {
-        super::super::super::errors::unsupported(span, "malformed fixed-array constructor")
-    })?;
-    validate_array_constructor(&type_name, span)?;
-    let capacity = parse_capacity(&type_name, span)?;
+    validate_array_constructor(type_name, span)?;
+    let capacity = parse_capacity(type_name, span)?;
     let element_layout = provider.layouts.layout_for(&type_name.arguments[0]).ok_or_else(|| {
         super::super::super::errors::unsupported(span, "array element has no neutral layout")
     })?;
     let size = element_layout.size.checked_mul(capacity).ok_or_else(|| {
         super::super::super::errors::unsupported(span, "array layout size overflow")
     })?;
-    let layout = provider.layouts.layout_for(&type_name).ok_or_else(|| {
+    let layout = provider.layouts.layout_for(type_name).ok_or_else(|| {
         super::super::super::errors::unsupported(span, "array has no neutral layout")
     })?;
     if size != layout.size {
@@ -32,7 +29,7 @@ pub(super) fn lower_array_constructor(
     }
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Aggregate { layout });
-    provider.remember_nominal_type(result, type_name);
+    provider.remember_nominal_type(result, type_name.clone());
     instructions.push(BackendInstruction::AggregateConstruct {
         result,
         layout,

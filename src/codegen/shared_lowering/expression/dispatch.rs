@@ -170,9 +170,10 @@ fn lower_string(
 ) -> Result<BackendValueId, BackendContractError> {
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Pointer);
-    if let Some(type_name) = crate::semantic::parse_type_name_key("String", span) {
-        provider.remember_nominal_type(result, type_name);
-    }
+    provider.remember_nominal_type(
+        result,
+        crate::ast::TypeName::builtin("String", Vec::new(), None, span),
+    );
     instructions.push(BackendInstruction::StringLiteral { result, value: value.to_owned(), span });
     Ok(result)
 }

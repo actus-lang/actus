@@ -336,7 +336,7 @@ fn lower_performance_signature(
     method: &VerbDecl,
     layouts: &impl BackendLayoutProvider,
 ) -> Result<BackendSignature, BackendContractError> {
-    let target = perform.target.canonical_key();
+    let target = perform.target.stable_symbol_name();
     let symbol_namespace = perform.module_import_namespace.as_deref().unwrap_or(namespace);
     let symbol = SymbolIdentity::specialized(
         symbol_namespace,

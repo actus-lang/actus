@@ -336,6 +336,7 @@ mod tests {
             arguments: Vec::new(),
             reference_role: None,
             span: crate::lexer::SourceSpan::new(0, 5),
+            resolved: None,
         };
         let first =
             provider.resolve_field(&root, "inner.first").expect("buffer field should resolve");

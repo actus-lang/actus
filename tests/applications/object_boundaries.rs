@@ -53,7 +53,7 @@ fn unresolved_external_bridge_fails_during_multi_object_link() {
 }
 
 #[test]
-fn freestanding_multi_object_build_keeps_configured_entry_and_module_symbols() {
+fn freestanding_object_keeps_only_the_configured_entry_global() {
     let source = "import { open math }; verb boot() -> Int { return add(); }\n";
     let (root, input, output) = project("freestanding-objects", source);
     fs::write(
@@ -77,24 +77,28 @@ fn freestanding_multi_object_build_keeps_configured_entry_and_module_symbols() {
         "build stderr: {}",
         String::from_utf8_lossy(&build_result.stderr)
     );
-    let root_bytes = fs::read(&object).expect("read root object");
-    let root_file = object::File::parse(root_bytes.as_slice()).expect("parse root object");
-    let root_symbols =
-        root_file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
-    assert!(root_symbols.iter().any(|symbol| symbol_matches(symbol, "boot")));
-    let module = root.join("application.module.actus_mod_4_math.obj");
-    let module_bytes = fs::read(&module).expect("read module object");
-    let module_file = object::File::parse(module_bytes.as_slice()).expect("parse module object");
-    let module_symbols =
-        module_file.symbols().filter_map(|symbol| symbol.name().ok()).collect::<Vec<_>>();
+    assert!(!root.join("application.module.actus_mod_4_math.obj").exists());
+    let bytes = fs::read(&object).expect("read program object");
+    let file = object::File::parse(bytes.as_slice()).expect("parse program object");
+    let global = file
+        .symbols()
+        .filter(|symbol| symbol.is_definition() && symbol.is_global())
+        .filter_map(|symbol| symbol.name().ok())
+        .collect::<Vec<_>>();
     assert!(
-        module_symbols.iter().any(|symbol| symbol_matches(symbol, "actus_mod_4_math__verb_add"))
+        global.len() == 1 && symbol_matches(global[0], "boot"),
+        "the entry is the only global definition (ADR-0113): {global:?}"
     );
+    assert!(file.symbols().any(|symbol| {
+        symbol.is_definition()
+            && !symbol.is_global()
+            && symbol.name().is_ok_and(|name| symbol_matches(name, "actus_mod_4_math__verb_add"))
+    }));
     fs::remove_dir_all(root).expect("remove freestanding object project");
 }
 
 #[test]
-fn object_build_emits_one_root_and_one_imported_module_object() {
+fn object_build_emits_one_object_for_the_program() {
     let source = "import { open math }; verb main() -> Int { return add(); }\n";
     let (root, input, output) = project("module-objects", source);
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
@@ -113,7 +117,9 @@ fn object_build_emits_one_root_and_one_imported_module_object() {
         .expect("build module objects");
     assert!(build.status.success(), "build stderr: {}", String::from_utf8_lossy(&build.stderr));
     assert!(object.exists());
-    assert!(root.join("application.module.actus_mod_4_math.obj").exists());
+    assert!(!root.join("application.module.actus_mod_4_math.obj").exists());
+    let manifest = fs::read_to_string(object.with_extension("symbols")).expect("read manifest");
+    assert_eq!(manifest.matches("[[objects]]").count(), 1, "manifest: {manifest}");
     fs::remove_dir_all(root).expect("remove module object project");
 }
 

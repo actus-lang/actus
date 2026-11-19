@@ -142,7 +142,6 @@ fn valid_identifier(name: &str) -> bool {
         .collect::<Vec<_>>();
     tokens.len() == 1
         && matches!(tokens[0].kind, TokenKind::Identifier(_))
-        && tokens[0].span.start == 0
         && tokens[0].span.end == name.len()
 }
 

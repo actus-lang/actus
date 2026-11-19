@@ -58,8 +58,8 @@ fn infer_complex_initializer_type(
             infer_call_type(callee, arguments, types, functions, layouts)
         }
         Expr::MethodCall { .. } => infer_method_type(expression, types, functions, layouts),
-        Expr::StructLit { name, type_arguments, .. } => {
-            infer_struct_type(name, type_arguments, layouts)
+        Expr::StructLit { name, type_arguments, resolved_type, span, .. } => {
+            infer_struct_type(name, type_arguments, resolved_type.as_ref(), *span, layouts)
         }
         Expr::FieldAccess { object, field, .. } => {
             infer_field_type(expression, object, field, types, layouts)
@@ -236,15 +236,14 @@ fn infer_method_type(
 
 fn infer_struct_type(
     name: &str,
-    type_arguments: &[crate::ast::TypeName],
+    _type_arguments: &[crate::ast::TypeName],
+    resolved_type: Option<&crate::ast::TypeName>,
+    _span: crate::lexer::SourceSpan,
     layouts: &LayoutRegistry,
 ) -> Result<NativeType, BackendEmitError> {
-    let type_name = crate::ast::TypeName {
-        name: name.to_owned(),
-        arguments: type_arguments.to_vec(),
-        reference_role: None,
-        span: crate::lexer::SourceSpan::new(0, 0),
-    };
+    let type_name = resolved_type.cloned().expect(
+        "internal compiler error: struct literal reached Cranelift initializer typing without a resolved type",
+    );
     layouts.type_for_type_name(&type_name).ok_or_else(|| {
         BackendEmitError(format!("native layout for struct `{name}` is unavailable"))
     })

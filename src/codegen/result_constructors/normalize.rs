@@ -6,7 +6,6 @@ use crate::ast::{
 use crate::lexer::SourceSpan;
 use std::collections::HashMap;
 
-use super::spans::initializer_span;
 /// Rewrites contextual `Ok` and `Err` calls into the existing enum-constructor
 /// representation before native lowering. The rewrite is compile-time only;
 /// the generated code uses the ordinary `Result` enum layout.
@@ -47,12 +46,12 @@ fn append_generated_serialization_validators(program: &mut Program) {
 }
 fn generated_validator(contract: &SerializeDecl) -> VerbDecl {
     let span = contract.span;
-    let buffer =
-        TypeName { name: "Buffer".to_owned(), arguments: Vec::new(), reference_role: None, span };
-    let version =
-        TypeName { name: "u16".to_owned(), arguments: Vec::new(), reference_role: None, span };
+    let buffer = TypeName::builtin("Buffer", Vec::new(), None, span);
+    let version = TypeName::builtin("u16", Vec::new(), None, span);
     let call = Expr::Call {
         callee: "validate_fixed_frame".to_owned(),
+        resolved_type: None,
+        generic_arguments: Vec::new(),
         arguments: validator_arguments(contract, span),
         span,
     };
@@ -81,16 +80,12 @@ fn generated_validator(contract: &SerializeDecl) -> VerbDecl {
         ],
         return_type: Some(ReturnType {
             access: ReturnAccess::Owned,
-            ty: TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
+            ty: TypeName::builtin("Int", Vec::new(), None, span),
             span,
         }),
         body: Block { statements: vec![Stmt::Return { value: Some(call), span }], span },
         span,
+        identity: None,
     }
 }
 fn validator_arguments(contract: &SerializeDecl, span: SourceSpan) -> Vec<Argument> {
@@ -132,7 +127,7 @@ fn named_argument(name: &str, role: Role, expression: Expr) -> Argument {
     Argument {
         name: Some(name.to_owned()),
         role: Some(role),
-        role_span: Some(expression_span(&expression)),
+        role_span: Some(super::spans::expression_span(&expression)),
         role_resolution: ArgumentRoleResolution::Explicit,
         expression,
     }
@@ -143,30 +138,6 @@ fn integer_argument(name: &str, value: u16, span: SourceSpan) -> Argument {
 fn identifier(name: &str, span: SourceSpan) -> Expr {
     Expr::Identifier { name: name.to_owned(), span }
 }
-fn expression_span(expression: &Expr) -> SourceSpan {
-    match expression {
-        Expr::Identifier { span, .. }
-        | Expr::Integer { span, .. }
-        | Expr::BoolLiteral { span, .. }
-        | Expr::BufferLiteral { span, .. }
-        | Expr::FloatLiteral { span, .. }
-        | Expr::StringLiteral { span, .. }
-        | Expr::Grouping { span, .. }
-        | Expr::Unary { span, .. }
-        | Expr::Cast { span, .. }
-        | Expr::Binary { span, .. }
-        | Expr::Borrow { span, .. }
-        | Expr::Try { span, .. }
-        | Expr::Call { span, .. }
-        | Expr::MethodCall { span, .. }
-        | Expr::StructLit { span, .. }
-        | Expr::FieldAccess { span, .. }
-        | Expr::Index { span, .. }
-        | Expr::Case { span, .. }
-        | Expr::If { span, .. } => *span,
-    }
-}
-
 fn normalize_verb(
     verb: &mut crate::ast::VerbDecl,
     signatures: &HashMap<String, Vec<(String, TypeName)>>,
@@ -222,9 +193,13 @@ fn normalize_statement(
     locals: &mut HashMap<String, TypeName>,
 ) {
     match statement {
-        Stmt::OwnerDecl { name, ty, initializer, .. } => {
-            normalize_owner_declaration(name, ty.as_deref(), initializer, signatures, locals)
-        }
+        Stmt::OwnerDecl { name, resolved_type, initializer, .. } => normalize_owner_declaration(
+            name,
+            resolved_type.as_ref(),
+            initializer,
+            signatures,
+            locals,
+        ),
         Stmt::Assignment { target, value, .. } => {
             let mut target_expression = target.to_expr();
             normalize_expression(&mut target_expression, None, signatures, locals);
@@ -269,13 +244,12 @@ fn normalize_statement(
 
 fn normalize_owner_declaration(
     name: &str,
-    declared_type: Option<&str>,
+    declared_type: Option<&TypeName>,
     initializer: &mut Expr,
     signatures: &HashMap<String, Vec<(String, TypeName)>>,
     locals: &mut HashMap<String, TypeName>,
 ) {
-    let expected =
-        declared_type.and_then(|name| parse_type_name(name, initializer_span(initializer)));
+    let expected = declared_type.cloned();
     normalize_expression(initializer, expected.as_ref(), signatures, locals);
     if let Some(expected) = expected {
         locals.insert(name.to_owned(), expected);
@@ -380,7 +354,7 @@ fn rewrite_result_call(
     signatures: &HashMap<String, Vec<(String, TypeName)>>,
     locals: &mut HashMap<String, TypeName>,
 ) {
-    let Expr::Call { callee, arguments, span } = expression else { return };
+    let Expr::Call { callee, arguments, span, .. } = expression else { return };
     let payload_index = usize::from(callee == "Err");
     normalize_expression(
         &mut arguments[0].expression,
@@ -395,6 +369,7 @@ fn rewrite_result_call(
         receiver: Box::new(receiver),
         method,
         arguments: rewritten_arguments,
+        resolved_type: Some(result_type.clone()),
         span: *span,
     };
 }
@@ -445,26 +420,6 @@ fn normalize_arguments(
             locals,
         );
     }
-}
-
-fn parse_type_name(input: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {
-    let Some(open) = input.find('[') else {
-        return Some(TypeName {
-            name: input.to_owned(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span,
-        });
-    };
-    if !input.ends_with(']') {
-        return None;
-    }
-    let inner = &input[open + 1..input.len() - 1];
-    let arguments = inner
-        .split(',')
-        .map(|argument| parse_type_name(argument.trim(), span))
-        .collect::<Option<Vec<_>>>()?;
-    Some(TypeName { name: input[..open].to_owned(), arguments, reference_role: None, span })
 }
 
 fn canonical_type_name(type_name: &TypeName) -> String {

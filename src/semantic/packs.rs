@@ -84,6 +84,12 @@ impl Analyzer {
     }
 
     pub(super) fn pack_field(&self, pack: &str, field: &str) -> Option<&PackField> {
+        let pack = pack
+            .strip_prefix("abs ")
+            .or_else(|| pack.strip_prefix("ins "))
+            .or_else(|| pack.strip_prefix("erg "))
+            .or_else(|| pack.strip_prefix("dat "))
+            .unwrap_or(pack);
         self.pack_types.get(pack)?.fields.iter().find(|candidate| candidate.name == field)
     }
 }
@@ -182,7 +188,7 @@ fn validate_pack(pack: &PackDecl) -> Result<PackLayoutContract, SemanticError> {
             Ok(PackFieldContract {
                 name: field.name.clone(),
                 role: role_name(&field.role).to_owned(),
-                ty: field.ty.canonical_key(),
+                ty: field.ty.spelling_key(),
                 offset: field.offset,
                 width,
                 indexed_count: indexed_field_count(field),
@@ -193,7 +199,7 @@ fn validate_pack(pack: &PackDecl) -> Result<PackLayoutContract, SemanticError> {
     Ok(PackLayoutContract {
         name: pack.name.clone(),
         identity: pack.layout_identity(),
-        storage: pack.storage.canonical_key(),
+        storage: pack.storage.type_name().spelling_key(),
         storage_bytes,
         storage_bits: u64::from(capacity),
         alignment_bytes: pack.storage.alignment_bytes().unwrap_or(1),

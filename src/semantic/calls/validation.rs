@@ -6,7 +6,7 @@ use super::errors::{SemanticError, SemanticErrorKind};
 use super::model::{ArgumentRoleFact, ArgumentRoleSource};
 use super::shapes::argument_span;
 use super::state::OwnershipState;
-use super::{VerbSignature, parse_type_name_key, shapes, signatures};
+use super::{VerbSignature, shapes};
 
 use super::paths::{format_field_path, paths_overlap, root_binding};
 
@@ -41,110 +41,33 @@ impl Analyzer {
         }
     }
 
-    pub(in crate::semantic) fn visit_call(
+    pub(super) fn visit_special_call(
         &mut self,
         callee: &str,
         arguments: &[Argument],
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        if self.visit_scalar_copy_call(callee, arguments, span)? {
-            return Ok(());
-        }
-        if matches!(callee, "print" | "eprint")
-            && print_uses_label(arguments)
-            && !signatures::has_matching_named_signature(self.signatures.get(callee), arguments)
-        {
-            return self.visit_intrinsic_call(callee, arguments, span).map(|_| ());
-        }
-        if let Some(result) = self.visit_special_call(callee, arguments, span)? {
-            return result;
-        }
-        let explicit_type_application = parse_generic_call_arguments(callee, span);
-        let parsed_lookup_name = explicit_type_application
-            .as_ref()
-            .map_or(callee, |type_name| type_name.name.as_str())
-            .to_owned();
-        let lookup_name = self.qualified_call_lookup_name(&parsed_lookup_name, span)?;
-        let Some(mut signature) = self.signatures.get(&lookup_name).cloned() else {
-            for argument in arguments {
-                self.visit_expression(&argument.expression)?;
-            }
-            return Err(SemanticError {
-                kind: SemanticErrorKind::UnknownVerb { name: lookup_name.clone() },
-                span,
-            });
-        };
-        if !signature.generic_parameters.is_empty() {
-            signature = self.instantiate_generic_signature(
-                &lookup_name,
-                &signature,
-                arguments,
-                explicit_type_application.as_ref().map(|type_name| type_name.arguments.as_slice()),
-                span,
-            )?;
-        } else if let Some(type_name) = explicit_type_application {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::GenericArityMismatch {
-                    name: lookup_name.to_owned(),
-                    expected: 0,
-                    found: type_name.arguments.len(),
-                },
-                span: type_name.span,
-            });
-        }
-        self.visit_call_with_signature(&lookup_name, arguments, span, &signature)
-    }
-
-    fn visit_scalar_copy_call(
-        &mut self,
-        callee: &str,
-        arguments: &[Argument],
-        span: SourceSpan,
-    ) -> Result<bool, SemanticError> {
-        let specialized = callee.starts_with("copy__")
-            && arguments.len() == 1
-            && arguments[0].name.as_deref() == Some("value");
-        let intrinsic = specialized || self.should_use_scalar_copy_intrinsic(callee, arguments);
-        if intrinsic {
-            self.visit_intrinsic_call("copy", arguments, span)?;
-        }
-        Ok(intrinsic)
-    }
-
-    fn should_use_scalar_copy_intrinsic(&self, callee: &str, arguments: &[Argument]) -> bool {
-        if callee != "copy" || arguments.len() != 1 {
-            return false;
-        }
-        if arguments[0].name.as_deref() != Some("value") {
-            return false;
-        }
-        if !self.local_signatures.contains(callee) {
-            return true;
-        }
-        self.signatures
-            .get(callee)
-            .is_none_or(|signature| signature.params.len() != 1 || signature.params[0].0 != "value")
-    }
-
-    fn visit_special_call(
-        &mut self,
-        callee: &str,
-        arguments: &[Argument],
+        resolved_type: Option<&crate::ast::TypeName>,
+        generic_arguments: &[crate::ast::TypeName],
         span: SourceSpan,
     ) -> Result<Option<Result<(), SemanticError>>, SemanticError> {
-        if let Some(type_name) = arena_constructor_type(callee, span) {
-            self.validate_type_reference(&type_name)?;
+        if is_arena_constructor(callee) {
+            let type_name = resolved_type.expect(
+                "internal compiler error: arena constructor reached semantic analysis unresolved",
+            );
+            self.validate_type_reference(type_name)?;
             if !arguments.is_empty() {
                 return Ok(Some(Err(SemanticError {
                     kind: SemanticErrorKind::WrongArgumentCount { callee: callee.to_owned() },
                     span,
                 })));
             }
-            self.inferred_expression_types.insert(self.expression_cache_key(span), type_name);
+            self.inferred_expression_types
+                .insert(self.expression_cache_key(span), type_name.clone());
             return Ok(Some(Ok(())));
         }
-        if let Some(type_name) = array_constructor_type(callee, span) {
-            let mut normalized_type_name = type_name;
+        if is_array_constructor(callee) {
+            let mut normalized_type_name = resolved_type.cloned().expect(
+                "internal compiler error: array constructor reached semantic analysis unresolved",
+            );
             self.normalize_array_capacities(&mut normalized_type_name)?;
             if !arguments.is_empty() {
                 return Ok(Some(Err(SemanticError {
@@ -160,7 +83,7 @@ impl Analyzer {
             return Ok(Some(self.visit_result_constructor(callee, arguments, span)));
         }
         if !self.signatures.contains_key(callee)
-            && self.visit_intrinsic_call(callee, arguments, span)?
+            && self.visit_intrinsic_call_with_types(callee, arguments, span, generic_arguments)?
         {
             return Ok(Some(Ok(())));
         }
@@ -242,7 +165,7 @@ impl Analyzer {
             self.resolve_argument_roles(callee, arguments, &parameter_indices, signature, span);
         for (argument, parameter_index) in resolved_arguments.iter().zip(&parameter_indices) {
             let expected =
-                parse_type_name_key(&signature.params[*parameter_index].2, argument_span(argument));
+                Some(self.normalize_imported_type_name(&signature.params[*parameter_index].2));
             self.visit_expression_with_expected(&argument.expression, expected.as_ref())?;
         }
         for (argument, parameter_index) in resolved_arguments.iter().zip(&parameter_indices) {
@@ -256,8 +179,8 @@ impl Analyzer {
         }
         self.execute_exclusive_loans(callee, &resolved_arguments, &parameter_indices, signature)?;
         if let Some(return_type) = &signature.return_type_name {
-            self.inferred_expression_types
-                .insert(self.expression_cache_key(span), return_type.clone());
+            let return_type = self.normalize_imported_type_name(return_type);
+            self.inferred_expression_types.insert(self.expression_cache_key(span), return_type);
         }
         self.discarded_expression = discarded;
         if discarded
@@ -393,7 +316,7 @@ impl Analyzer {
         self.validate_argument_type(
             callee,
             &signature.params[parameter_index].0,
-            ty,
+            &super::super::analyzer::canonical_type_name(ty),
             signature.dynamic_params[parameter_index],
             &argument.expression,
         )
@@ -443,21 +366,6 @@ impl Analyzer {
     }
 }
 
-fn print_uses_label(arguments: &[Argument]) -> bool {
-    arguments.iter().any(|argument| {
-        matches!(
-            argument.name.as_deref(),
-            Some("value")
-                | Some("format")
-                | Some("string")
-                | Some("int")
-                | Some("byte")
-                | Some("bool")
-                | Some("buffer")
-        )
-    })
-}
-
 fn call_role_matches(role: &Role, argument: &Argument) -> bool {
     !(*role == Role::Ins && argument.role != Some(Role::Ins))
         && !argument.role.as_ref().is_some_and(|actual| actual != role)
@@ -478,15 +386,10 @@ fn invalid_call_role(
     }
 }
 
-fn arena_constructor_type(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
-    callee.starts_with("Arena[").then(|| parse_type_name_key(callee, span)).flatten()
+fn is_arena_constructor(callee: &str) -> bool {
+    callee.starts_with("Arena[")
 }
 
-fn array_constructor_type(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
-    callee.starts_with("Array[").then(|| parse_type_name_key(callee, span)).flatten()
-}
-
-fn parse_generic_call_arguments(callee: &str, span: SourceSpan) -> Option<crate::ast::TypeName> {
-    let type_name = parse_type_name_key(callee, span)?;
-    (!type_name.arguments.is_empty()).then_some(type_name)
+fn is_array_constructor(callee: &str) -> bool {
+    callee.starts_with("Array[")
 }

@@ -22,7 +22,7 @@ fn lowers_result_layouts_for_scalar_and_region_payloads() {
             crate::ast::TopLevelDecl::Verb(verb) => verb,
             _ => unreachable!(),
         },
-        &ProgramLayouts::new(&program, "test"),
+        &ProgramLayouts::new(&program, "test", "test", "root"),
     )
     .expect("scalar Result signature should lower");
     let region = super::super::signature::lower_verb_signature(
@@ -31,7 +31,7 @@ fn lowers_result_layouts_for_scalar_and_region_payloads() {
             crate::ast::TopLevelDecl::Verb(verb) => verb,
             _ => unreachable!(),
         },
-        &ProgramLayouts::new(&program, "test"),
+        &ProgramLayouts::new(&program, "test", "test", "root"),
     )
     .expect("Region Result signature should lower");
 
@@ -72,7 +72,7 @@ fn derives_array_layout_from_pack_storage_in_the_neutral_contract() {
     let (tokens, errors) = crate::lexer::scan(source);
     assert!(errors.is_empty(), "pack layout fixture should lex: {errors:?}");
     let program = crate::parser::parse(tokens).expect("pack layout fixture should parse");
-    let layouts = ProgramLayouts::new(&program, "test");
+    let layouts = ProgramLayouts::new(&program, "test", "test", "root");
     let array = crate::semantic::parse_type_name_key(
         "Array[Register, 2]",
         crate::lexer::SourceSpan::new(0, 0),
@@ -87,7 +87,7 @@ fn exposes_pack_bit_field_metadata_to_the_neutral_contract() {
     let (tokens, errors) = crate::lexer::scan(source);
     assert!(errors.is_empty(), "pack field fixture should lex: {errors:?}");
     let program = crate::parser::parse(tokens).expect("pack field fixture should parse");
-    let layouts = ProgramLayouts::new(&program, "test");
+    let layouts = ProgramLayouts::new(&program, "test", "test", "root");
     let register =
         crate::semantic::parse_type_name_key("Register", crate::lexer::SourceSpan::new(0, 0))
             .expect("pack type should parse");

@@ -7,9 +7,6 @@ wall-clock, calendar, timezone, platform clock structures, raw pointers, or
 the private runtime bridge symbols. Hosted availability is selected by the
 standard-library runtime profile; unsupported profiles fail before emission.
 """
-"""Keep implementation constants private to the time module."""
-open config;
-
 """Re-export the typed time error variants used by fallible operations."""
 open errors;
 

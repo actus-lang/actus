@@ -18,6 +18,7 @@ pub(crate) fn specialize_program(
     let call_bindings = unique_generic_call_bindings(program, &instances);
     let call_site_bindings = generic_call_site_bindings(&instances);
     let mut declarations = Vec::with_capacity(program.declarations.len());
+    let mut external_instances = std::collections::HashSet::new();
     for declaration in &program.declarations {
         match declaration {
             TopLevelDecl::Verb(verb) if !verb.generic_parameters.is_empty() => {
@@ -27,6 +28,7 @@ pub(crate) fn specialize_program(
             }
             TopLevelDecl::ExternalVerb(verb) if !verb.generic_parameters.is_empty() => {
                 for specialized in specialize_external_verbs(verb, &instances, &call_bindings)? {
+                    external_instances.insert(specialized.name.clone());
                     declarations.push(TopLevelDecl::ExternalVerb(specialized));
                 }
             }
@@ -51,6 +53,7 @@ pub(crate) fn specialize_program(
             other => declarations.push(other.clone()),
         }
     }
+    let declarations = super::specializations::unique_instances(declarations, &external_instances);
     Ok(Program { file_metadata: program.file_metadata.clone(), declarations })
 }
 
@@ -70,7 +73,7 @@ fn generic_call_site_bindings(
         .map(|instance| {
             (
                 (instance.name.clone(), instance.call_span.start, instance.call_span.end),
-                specialized_name(instance),
+                specialized_generic_name(instance),
             )
         })
         .collect()
@@ -96,14 +99,17 @@ fn unique_generic_call_bindings(
     let mut candidates = HashMap::<String, Vec<String>>::new();
     for instance in instances {
         let is_concrete =
-            generic_parameters_for(program, &instance.name).is_some_and(|parameters| {
+            super::identity::generic_parameters_for(program, instance).is_some_and(|parameters| {
                 instance
                     .arguments
                     .iter()
                     .all(|argument| !contains_generic_parameter(argument, parameters))
             });
         if generic_names.contains(instance.name.as_str()) && is_concrete {
-            candidates.entry(instance.name.clone()).or_default().push(specialized_name(instance));
+            candidates
+                .entry(instance.name.clone())
+                .or_default()
+                .push(specialized_generic_name(instance));
         }
     }
     candidates
@@ -134,7 +140,9 @@ fn expand_transitive_once(
     let snapshot = expanded.clone();
     let mut changed = false;
     for caller_instance in snapshot.iter() {
-        let Some(caller_parameters) = generic_parameters_for(program, &caller_instance.name) else {
+        let Some(caller_parameters) =
+            super::identity::generic_parameters_for(program, caller_instance)
+        else {
             continue;
         };
         let substitution = TypeSubstitution::for_type(
@@ -146,12 +154,10 @@ fn expand_transitive_once(
         .map_err(|error| {
             BackendEmitError(format!("generic instance expansion failed: {error:?}"))
         })?;
-        for nested_template in snapshot.iter().filter(|instance| {
-            instance.caller.as_deref().is_some_and(|caller| {
-                caller == caller_instance.name
-                    || caller.rsplit("::").next() == caller_instance.name.rsplit("::").next()
-            })
-        }) {
+        for nested_template in snapshot
+            .iter()
+            .filter(|instance| super::identity::called_from(instance, caller_instance))
+        {
             changed |= append_specialized_nested_instance(
                 expanded,
                 caller_instance,
@@ -179,8 +185,8 @@ fn append_specialized_nested_instance(
     if arguments.iter().any(|argument| contains_generic_parameter(argument, caller_parameters)) {
         return false;
     }
-    let identity = TypeIdentity::from_application(&nested_template.name, &arguments);
-    let canonical_key = identity.key();
+    let identity = TypeIdentity::from_verb_application(&nested_template.name, &arguments);
+    let canonical_key = identity.verb_key();
     if expanded.iter().any(|instance| {
         instance.identity() == identity && instance.caller == Some(caller_instance.name.clone())
     }) {
@@ -189,33 +195,17 @@ fn append_specialized_nested_instance(
     expanded.push(GenericInstance {
         name: nested_template.name.clone(),
         arguments,
+        identity: identity.clone(),
         canonical_key,
         caller: Some(caller_instance.name.clone()),
         call_span: nested_template.call_span,
+        verb: nested_template.verb,
+        caller_verb: caller_instance.verb,
     });
     true
 }
 
-fn generic_parameters_for<'a>(
-    program: &'a Program,
-    name: &str,
-) -> Option<&'a [crate::ast::GenericParam]> {
-    program.declarations.iter().find_map(|declaration| match declaration {
-        TopLevelDecl::Verb(verb)
-            if verb.name == name || name.rsplit("::").next() == Some(verb.name.as_str()) =>
-        {
-            Some(verb.generic_parameters.as_slice())
-        }
-        TopLevelDecl::ExternalVerb(verb)
-            if verb.name == name || name.rsplit("::").next() == Some(verb.name.as_str()) =>
-        {
-            Some(verb.generic_parameters.as_slice())
-        }
-        _ => None,
-    })
-}
-
-fn contains_generic_parameter(
+pub(super) fn contains_generic_parameter(
     type_name: &TypeName,
     parameters: &[crate::ast::GenericParam],
 ) -> bool {
@@ -233,8 +223,10 @@ fn specialize_external_verbs(
 ) -> Result<Vec<ExternalVerbDecl>, BackendEmitError> {
     let mut specialized = Vec::new();
     let mut names = std::collections::HashSet::new();
-    for instance in instances.iter().filter(|instance| instance_matches_external(instance, verb)) {
-        if names.insert(specialized_name(instance)) {
+    for instance in
+        instances.iter().filter(|instance| super::identity::matches_external(instance, verb))
+    {
+        if names.insert(specialized_generic_name(instance)) {
             specialized.push(specialize_external_verb(verb, instance, instances, call_bindings)?);
         }
     }
@@ -262,7 +254,7 @@ fn specialize_external_verb(
         call_bindings,
     )?;
     let substitution = substitution.with_call_bindings(&call_bindings);
-    let specialized_name = specialized_name(instance);
+    let specialized_name = specialized_generic_name(instance);
     let native_symbol = if verb.module_import {
         Some(specialized_name.rsplit("::").next().unwrap_or(&specialized_name).to_owned())
     } else {
@@ -285,6 +277,7 @@ fn specialize_external_verb(
             .as_ref()
             .map(|return_type| specialize_return_type(return_type, &substitution)),
         span: verb.span,
+        identity: None,
     })
 }
 
@@ -295,7 +288,9 @@ fn specialize_verbs(
 ) -> Result<Vec<VerbDecl>, BackendEmitError> {
     let mut specialized = Vec::new();
     let mut names = std::collections::HashSet::new();
-    for instance in instances.iter().filter(|instance| instance_matches_verb(instance, verb)) {
+    for instance in
+        instances.iter().filter(|instance| super::identity::matches_verb(instance, verb))
+    {
         if names.insert(specialized_local_name(&verb.name, &instance.arguments)) {
             specialized.push(specialize_verb(verb, instance, instances, call_bindings)?);
         }
@@ -338,6 +333,7 @@ fn specialize_verb(
             .map(|return_type| specialize_return_type(return_type, &substitution)),
         body: specialize_block(&verb.body, &substitution),
         span: verb.span,
+        identity: None,
     })
 }
 
@@ -357,18 +353,17 @@ fn nested_call_bindings(
     .map_err(|error| BackendEmitError(format!("nested generic substitution failed: {error:?}")))?;
     let mut bindings = inherited.clone();
     for template in instances.iter().filter(|instance| {
-        instance.caller.as_deref().is_some_and(|caller| {
-            caller == caller_name || caller.rsplit("::").next() == caller_name.rsplit("::").next()
-        }) && instance.arguments.iter().any(|argument| substitution.apply(argument) != *argument)
+        super::identity::called_from(instance, caller_instance)
+            && instance.arguments.iter().any(|argument| substitution.apply(argument) != *argument)
     }) {
         let arguments = template
             .arguments
             .iter()
             .map(|argument| substitution.apply(argument))
             .collect::<Vec<_>>();
-        let identity = TypeIdentity::from_application(&template.name, &arguments);
+        let identity = TypeIdentity::from_verb_application(&template.name, &arguments);
         if let Some(concrete) = instances.iter().find(|instance| instance.identity() == identity) {
-            bindings.insert(template.name.clone(), specialized_name(concrete));
+            bindings.insert(template.name.clone(), specialized_generic_name(concrete));
         }
     }
     Ok(bindings)
@@ -376,10 +371,6 @@ fn nested_call_bindings(
 
 pub(crate) fn specialized_generic_name(instance: &GenericInstance) -> String {
     format!("{}__{}", instance.name, encode_specialization_arguments(&instance.arguments))
-}
-
-fn specialized_name(instance: &GenericInstance) -> String {
-    specialized_generic_name(instance)
 }
 
 fn specialized_local_name(name: &str, arguments: &[TypeName]) -> String {
@@ -401,28 +392,14 @@ fn encode_specialization_arguments(arguments: &[TypeName]) -> String {
         .collect()
 }
 
-fn instance_matches_verb(instance: &GenericInstance, verb: &VerbDecl) -> bool {
-    (instance.name == verb.name || instance.name.rsplit("::").next() == Some(verb.name.as_str()))
-        && instance.arguments.len() == verb.generic_parameters.len()
-        && instance
-            .arguments
-            .iter()
-            .all(|argument| !contains_generic_parameter(argument, &verb.generic_parameters))
-}
-
-fn instance_matches_external(instance: &GenericInstance, verb: &ExternalVerbDecl) -> bool {
-    (instance.name == verb.name || instance.name.rsplit("::").next() == Some(verb.name.as_str()))
-        && instance.arguments.len() == verb.generic_parameters.len()
-        && instance
-            .arguments
-            .iter()
-            .all(|argument| !contains_generic_parameter(argument, &verb.generic_parameters))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::codegen::generic::definitions::specialized_enums;
+
+    fn fixture_type(name: &str, role: Option<crate::ast::Role>, end: usize) -> TypeName {
+        TypeName::unresolved(name, Vec::new(), role, crate::lexer::SourceSpan::new(0, end))
+    }
 
     #[test]
     fn generic_specialization_preserves_structured_contracts() {
@@ -441,15 +418,16 @@ mod tests {
         let program = crate::parser::parse(tokens).expect("generic contract should parse");
         let instance = GenericInstance {
             name: "identity".to_owned(),
-            arguments: vec![TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span: crate::lexer::SourceSpan::new(0, 0),
-            }],
+            arguments: vec![fixture_type("Int", None, 0)],
+            identity: TypeIdentity::from_verb_application(
+                "identity",
+                &[fixture_type("Int", None, 0)],
+            ),
             canonical_key: "identity[Int]".to_owned(),
             caller: None,
             call_span: crate::lexer::SourceSpan::new(0, 0),
+            verb: None,
+            caller_verb: None,
         };
         let specialized = specialize_program(&program, &[instance]).expect("specialization");
         let TopLevelDecl::Verb(verb) = &specialized.declarations[0] else {
@@ -474,18 +452,19 @@ mod tests {
         let program = crate::parser::parse(tokens).expect("generic result should parse");
         let instance = GenericInstance {
             name: "Result".to_owned(),
-            arguments: vec![TypeName {
-                name: "Item".to_owned(),
-                arguments: Vec::new(),
-                reference_role: Some(crate::ast::Role::Abs),
-                span: crate::lexer::SourceSpan::new(0, 4),
-            }],
+            arguments: vec![fixture_type("Item", Some(crate::ast::Role::Abs), 4)],
+            identity: TypeIdentity::from_verb_application(
+                "Result",
+                &[fixture_type("Item", Some(crate::ast::Role::Abs), 4)],
+            ),
             canonical_key: "Result[abs Item]".to_owned(),
             caller: None,
             call_span: crate::lexer::SourceSpan::new(0, 4),
+            verb: None,
+            caller_verb: None,
         };
 
-        assert_eq!(instance.identity().key(), "Result[Item]");
+        assert_eq!(instance.identity().verb_key(), "Result[Item]");
         assert_eq!(instance.canonical_key, "Result[abs Item]");
 
         let specialized = specialized_enums(&program, &[instance]).expect("specialization");

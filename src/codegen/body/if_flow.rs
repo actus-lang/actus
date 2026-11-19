@@ -65,13 +65,14 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let result = self.lower_if_then_branch(id, branch, continuation_id, carried, span);
         self.pop_carried_scope(carries_outer_state);
         let (mut then_block, values, terminates) = result?;
+        let exit = self.block_exit_bindings.get(&then_block.id).cloned();
         replace_if_edge_arguments(
             &mut then_block,
             continuation_id,
             carried,
             &values,
+            exit.as_ref(),
             span,
-            !self.loop_targets.is_empty(),
         );
         self.replace_generated_if_edges(branch_start, continuation_id, carried, &values, span);
         Ok((then_block, values, terminates))
@@ -142,16 +143,9 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         values: &BTreeMap<String, BackendValueId>,
         span: SourceSpan,
     ) {
-        let forward_parameters = !self.loop_targets.is_empty();
         for block in self.blocks.iter_mut().skip(start) {
-            replace_if_edge_arguments(
-                block,
-                continuation_id,
-                carried,
-                values,
-                span,
-                forward_parameters,
-            );
+            let exit = self.block_exit_bindings.get(&block.id);
+            replace_if_edge_arguments(block, continuation_id, carried, values, exit, span);
         }
     }
 
@@ -237,13 +231,14 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         );
         let terminates = !reaches_continuation
             && terminates_without_continuation(lowered.instructions.last(), continuation_id);
+        let exit = self.block_exit_bindings.get(&lowered.id).cloned();
         replace_if_edge_arguments(
             &mut lowered,
             continuation_id,
             carried,
             &values,
+            exit.as_ref(),
             span,
-            !self.loop_targets.is_empty(),
         );
         Ok((lowered, values, terminates))
     }
@@ -266,13 +261,14 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
                     .map(|value| (binding.name.clone(), value))
             })
             .collect::<BTreeMap<_, _>>();
+        let exit = self.block_exit_bindings.get(&lowered.id).cloned();
         replace_if_edge_arguments(
             &mut lowered,
             continuation_id,
             carried,
             &values,
+            exit.as_ref(),
             span,
-            !self.loop_targets.is_empty(),
         );
         Ok(lowered)
     }
@@ -371,36 +367,24 @@ pub(super) struct IfLowering {
     pub(super) parameters: Vec<BackendBlockParameter>,
 }
 
+/// Gives every edge from `block` to the if continuation one argument per
+/// carried binding: the binding's value where `block` falls through, or, for a
+/// block without a recorded exit, the value at the end of the branch.
 fn replace_if_edge_arguments(
     block: &mut BackendBlock,
     continuation: BackendBlockId,
     carried: &[loops::CarriedBinding],
     values: &BTreeMap<String, BackendValueId>,
+    exit: Option<&BTreeMap<String, BackendValueId>>,
     span: SourceSpan,
-    forward_parameters: bool,
 ) {
-    let arguments = if forward_parameters && block.parameters.len() == carried.len() {
-        block
-            .parameters
-            .iter()
-            .zip(carried)
-            .map(|(parameter, binding)| BackendEdgeArgument {
-                value: parameter.value,
-                ty: binding.ty,
-                span,
-            })
-            .collect::<Vec<_>>()
-    } else {
-        carried
-            .iter()
-            .filter_map(|binding| {
-                values.get(&binding.name).map(|value| BackendEdgeArgument {
-                    value: *value,
-                    ty: binding.ty,
-                    span,
-                })
-            })
-            .collect::<Vec<_>>()
-    };
+    let arguments = carried
+        .iter()
+        .filter_map(|binding| {
+            exit.and_then(|exit| exit.get(&binding.name))
+                .or_else(|| values.get(&binding.name))
+                .map(|value| BackendEdgeArgument { value: *value, ty: binding.ty, span })
+        })
+        .collect::<Vec<_>>();
     loops::replace_jump_arguments_in_block(block, continuation, &arguments);
 }

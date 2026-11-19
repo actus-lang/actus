@@ -66,12 +66,7 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
             return niche_pointer_variant(variant);
         }
         self.enums.values().find_map(|definition| {
-            let type_name = TypeName {
-                name: definition.name.clone(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span: definition.span,
-            };
+            let type_name = self.declaration_type_name(&definition.name, definition.span);
             (self.enum_layout_for(&type_name) == Some(layout))
                 .then(|| self.enum_variant(&type_name, variant))
                 .flatten()
@@ -82,22 +77,12 @@ impl BackendLayoutProvider for ProgramLayouts<'_> {
         self.packs
             .values()
             .find_map(|definition| {
-                let type_name = TypeName {
-                    name: definition.name.clone(),
-                    arguments: Vec::new(),
-                    reference_role: None,
-                    span: definition.span,
-                };
+                let type_name = self.declaration_type_name(&definition.name, definition.span);
                 (self.layout_for(&type_name) == Some(layout)).then_some(type_name)
             })
             .or_else(|| {
                 self.structs.values().find_map(|definition| {
-                    let type_name = TypeName {
-                        name: definition.name.clone(),
-                        arguments: Vec::new(),
-                        reference_role: None,
-                        span: definition.span,
-                    };
+                    let type_name = self.declaration_type_name(&definition.name, definition.span);
                     (self.layout_for(&type_name) == Some(layout)).then_some(type_name)
                 })
             })

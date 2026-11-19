@@ -30,8 +30,7 @@ impl Analyzer {
         span: crate::lexer::SourceSpan,
     ) -> Result<(), SemanticError> {
         let Some(suffix) = suffix else { return Ok(()) };
-        let expected =
-            TypeName { name: suffix.to_owned(), arguments: Vec::new(), reference_role: None, span };
+        let expected = TypeName::builtin(suffix, Vec::new(), None, span);
         let expression =
             Expr::Integer { value: value.to_owned(), suffix: Some(suffix.to_owned()), span };
         if primitive_type(suffix).is_none() {
@@ -52,8 +51,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let Some(suffix) = integer_literal_suffix(expression) else { return Ok(()) };
         let span = crate::semantic::analyzer::expression_span(expression);
-        let expected =
-            TypeName { name: suffix.to_owned(), arguments: Vec::new(), reference_role: None, span };
+        let expected = TypeName::builtin(suffix, Vec::new(), None, span);
         self.validate_expected_literal(expression, &expected)
     }
 

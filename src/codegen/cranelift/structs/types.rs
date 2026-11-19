@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Expr, LayoutEndianness, TypeName};
+use crate::ast::{Expr, LayoutEndianness};
 
 use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
@@ -12,13 +12,10 @@ pub(crate) fn expression_native_type(
 ) -> Option<NativeType> {
     match expression {
         Expr::Identifier { name, .. } => local_types.get(name).copied(),
-        Expr::StructLit { name, type_arguments, .. } => {
-            let type_name = TypeName {
-                name: name.clone(),
-                arguments: type_arguments.clone(),
-                reference_role: None,
-                span: crate::lexer::SourceSpan::new(0, 0),
-            };
+        Expr::StructLit { resolved_type, .. } => {
+            let type_name = resolved_type.clone().expect(
+                "internal compiler error: struct literal reached Cranelift type inference without a resolved type",
+            );
             layouts.type_for_type_name(&type_name)
         }
         Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {

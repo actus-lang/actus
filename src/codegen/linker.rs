@@ -218,6 +218,7 @@ mod tests {
         assert!(libraries.contains(&"kernel32.lib"));
         assert!(libraries.contains(&"libcmt.lib"));
         assert!(libraries.contains(&"ws2_32.lib"));
+        assert!(libraries.contains(&"synchronization.lib"));
         assert!(LinkerFlavor::Gnu.runtime_library_arguments().is_empty());
     }
 

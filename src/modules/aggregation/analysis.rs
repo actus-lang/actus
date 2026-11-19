@@ -3,13 +3,12 @@ use std::path::PathBuf;
 
 use crate::ast::{ExternalVerbDecl, ForeignAbi, Program, TopLevelDecl};
 use crate::semantic::{
-    SemanticModel, analyze, filter_program_for_target_checked, validate_bounded_recursion,
-    validate_stack_limit_dynamic_dispatch, validate_stack_limit_native_claims,
-    validate_stack_limit_recursion,
+    SemanticModel, analyze, analyze_resolved, filter_program_for_target_checked,
+    validate_bounded_recursion, validate_stack_limit_dynamic_dispatch,
+    validate_stack_limit_native_claims, validate_stack_limit_recursion,
 };
 
 use super::super::resolver::ModuleResolver;
-use super::parsing::parse_module_with_overlays;
 use super::plan::{build_compilation_plan, build_module_compilation_plan_with_overlays};
 use super::types::ModuleError;
 use super::unit::{ModuleUnit, load_module_unit};
@@ -31,9 +30,15 @@ pub fn analyze_module_with_overlays(
     module_path: &str,
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<SemanticModel, ModuleError> {
-    let program = parse_module_with_overlays(resolver, module_path, overlays)?;
-    let program = resolve_module_imports_with_overlays(&program, resolver, overlays, module_path)?;
-    analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
+    // The loaded unit binds imports of its own modules (ADR-0110).
+    let unit = super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
+    let program = resolve_module_imports_with_overlays(
+        unit.implementation(),
+        resolver,
+        overlays,
+        module_path,
+    )?;
+    analyze_resolved(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
 pub fn analyze_module_with_overlays_for_target(
@@ -42,11 +47,17 @@ pub fn analyze_module_with_overlays_for_target(
     overlays: &HashMap<PathBuf, String>,
     target: &crate::target::TargetSpec,
 ) -> Result<SemanticModel, ModuleError> {
-    let program = parse_module_with_overlays(resolver, module_path, overlays)?;
-    let program = resolve_module_imports_with_overlays(&program, resolver, overlays, module_path)?;
+    // The loaded unit binds imports of its own modules (ADR-0110).
+    let unit = super::unit::load_module_unit_with_overlays(resolver, module_path, overlays)?;
+    let program = resolve_module_imports_with_overlays(
+        unit.implementation(),
+        resolver,
+        overlays,
+        module_path,
+    )?;
     let program = filter_program_for_target_checked(&program, target)
         .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
-    analyze(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
+    analyze_resolved(&program).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
 pub fn analyze_with_imports(
@@ -56,7 +67,7 @@ pub fn analyze_with_imports(
     let plan = build_compilation_plan(program, resolver)?;
     analyze_imported_units(&plan, resolver, &HashMap::new())?;
     let expanded = plan.caller().clone();
-    analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))
+    analyze_resolved(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
 pub fn analyze_with_imports_for_target(
@@ -69,7 +80,7 @@ pub fn analyze_with_imports_for_target(
     let expanded = plan.caller().clone();
     let filtered = filter_program_for_target_checked(&expanded, target)
         .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
-    analyze(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
+    analyze_resolved(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
 pub fn analyze_with_imports_with_overlays_for_target(
@@ -83,7 +94,7 @@ pub fn analyze_with_imports_with_overlays_for_target(
     let expanded = plan.caller().clone();
     let filtered = filter_program_for_target_checked(&expanded, target)
         .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
-    analyze(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
+    analyze_resolved(&filtered).map_err(|error| ModuleError::Semantic(Box::new(error)))
 }
 
 fn analyze_imported_units(
@@ -92,11 +103,12 @@ fn analyze_imported_units(
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<(), ModuleError> {
     for unit in plan.units() {
-        let program =
-            parse_module_with_overlays(resolver, unit.identity().module_path(), overlays)?;
+        // The unit's implementation with its own-module imports bound
+        // (ADR-0110); re-parsing would load the unit as its own dependency.
+        let program = unit.implementation();
         let module_plan = build_module_compilation_plan_with_overlays(
             unit.identity().module_path(),
-            &program,
+            program,
             resolver,
             overlays,
         )?;
@@ -104,7 +116,7 @@ fn analyze_imported_units(
             .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
         validate_stack_limit_contracts(module_plan.caller())?;
         let expanded = module_scope_program(module_plan.caller());
-        analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
+        analyze_resolved(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     }
     Ok(())
 }
@@ -116,11 +128,12 @@ fn analyze_imported_units_for_target(
     target: &crate::target::TargetSpec,
 ) -> Result<(), ModuleError> {
     for unit in plan.units() {
-        let program =
-            parse_module_with_overlays(resolver, unit.identity().module_path(), overlays)?;
+        // The unit's implementation with its own-module imports bound
+        // (ADR-0110); re-parsing would load the unit as its own dependency.
+        let program = unit.implementation();
         let module_plan = build_module_compilation_plan_with_overlays(
             unit.identity().module_path(),
-            &program,
+            program,
             resolver,
             overlays,
         )?;
@@ -130,7 +143,7 @@ fn analyze_imported_units_for_target(
             .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
         validate_stack_limit_contracts(&targeted)?;
         let expanded = module_scope_program(&targeted);
-        analyze(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
+        analyze_resolved(&expanded).map_err(|error| ModuleError::Semantic(Box::new(error)))?;
     }
     Ok(())
 }
@@ -164,6 +177,7 @@ fn module_scope_program(program: &Program) -> Program {
                 params: verb.params.clone(),
                 return_type: verb.return_type.clone(),
                 span: verb.span,
+                identity: verb.identity,
             }),
             _ => declaration.clone(),
         })

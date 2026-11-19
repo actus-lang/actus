@@ -78,10 +78,9 @@ impl Analyzer {
             Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
                 self.expression_enum_type(expression)
             }
-            Expr::Identifier { name, span } => self
-                .binding(name, *span)
-                .ok()
-                .and_then(|index| self.binding_enum_types.get(&index).cloned()),
+            Expr::Identifier { name, span } => self.binding(name, *span).ok().and_then(|index| {
+                self.binding_enum_types.get(&index).map(|type_name| type_name.name.clone())
+            }),
             Expr::Case { branches, .. } => branches.iter().find_map(|branch| match &branch.body {
                 crate::ast::CaseBody::Expression(expression) => {
                     self.expression_enum_type(expression)
@@ -110,7 +109,7 @@ impl Analyzer {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.binding_enum_types.insert(index, enum_name.to_owned());
+        self.binding_enum_types.insert(index, type_name.clone());
         if !type_name.arguments.is_empty() {
             self.binding_enum_type_applications.insert(index, type_name.clone());
         }
@@ -123,10 +122,10 @@ impl Analyzer {
         initializer: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let Some(type_name) = self.expression_enum_type(initializer) else { return Ok(()) };
+        let Some(type_name) = self.enum_type_application(initializer) else { return Ok(()) };
         let index = self.binding(name, span)?;
-        self.binding_enum_types.insert(index, type_name);
-        if let Some(type_name) = self.enum_type_application(initializer) {
+        self.binding_enum_types.insert(index, type_name.clone());
+        if !type_name.arguments.is_empty() {
             self.binding_enum_type_applications.insert(index, type_name);
         }
         Ok(())
@@ -136,6 +135,12 @@ impl Analyzer {
         &self,
         expression: &Expr,
     ) -> Option<crate::ast::TypeName> {
+        if let Expr::FieldAccess { resolved_type: Some(type_name), .. }
+        | Expr::MethodCall { resolved_type: Some(type_name), .. } = expression
+            && self.enum_types.contains_key(&self.normalize_imported_type_name(type_name).name)
+        {
+            return Some(self.normalize_imported_type_name(type_name));
+        }
         if let Some(type_name) = self.resolved_type_name(expression)
             && self.enum_types.contains_key(&self.normalize_imported_type_name(&type_name).name)
         {

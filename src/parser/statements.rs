@@ -130,7 +130,13 @@ impl Parser {
             let range_end = self.parse_expression()?;
             let body = self.parse_block()?;
             let span = SourceSpan::new(start, body.span.end);
-            return Ok(Stmt::ForRange { binding, start: range_start, end: range_end, body, span });
+            return Ok(Stmt::ForRange {
+                binding,
+                start: range_start,
+                end: Box::new(range_end),
+                body,
+                span,
+            });
         }
         let body = self.parse_block()?;
         let span = SourceSpan::new(start, body.span.end);
@@ -209,14 +215,12 @@ impl Parser {
     fn parse_place(&self, expression: Expr, span: SourceSpan) -> Result<Place, ParseError> {
         match expression {
             Expr::Identifier { name, span } => Ok(Place::Binding { name, span }),
-            Expr::FieldAccess { object, field, span } => {
+            Expr::FieldAccess { object, field, span, .. } => {
                 Ok(Place::Field { object: Box::new(self.parse_place(*object, span)?), field, span })
             }
-            Expr::Index { target, index, span } => Ok(Place::Index {
-                target: Box::new(self.parse_place(*target, span)?),
-                index: *index,
-                span,
-            }),
+            Expr::Index { target, index, span } => {
+                Ok(Place::Index { target: Box::new(self.parse_place(*target, span)?), index, span })
+            }
             _ => Err(ParseError {
                 code: ParseErrorCode::UnexpectedToken,
                 kind: ParseErrorKind::UnexpectedToken {
@@ -258,7 +262,14 @@ impl Parser {
         self.expect_simple(TokenKind::Equals, "`=`")?;
         let initializer = self.parse_owner_initializer(&role, start)?;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
-        Ok(Stmt::OwnerDecl { role, name, ty, initializer, span: SourceSpan::new(start, end) })
+        Ok(Stmt::OwnerDecl {
+            role,
+            name,
+            ty,
+            resolved_type: None,
+            initializer,
+            span: SourceSpan::new(start, end),
+        })
     }
 
     fn parse_owner_header(&mut self) -> Result<(Role, String, Option<String>, usize), ParseError> {

@@ -136,9 +136,9 @@ fn collect_type_arrays(type_name: &TypeName, definitions: &mut Vec<TypeName>) {
 fn collect_block_arrays(block: &crate::ast::Block, definitions: &mut Vec<TypeName>) {
     for statement in &block.statements {
         match statement {
-            Stmt::OwnerDecl { ty, initializer, .. } => {
-                if let Some(ty) = ty.as_deref().and_then(parse_array_type_name) {
-                    collect_type_arrays(&ty, definitions);
+            Stmt::OwnerDecl { resolved_type, initializer, .. } => {
+                if let Some(ty) = resolved_type.as_ref().filter(|ty| is_array_type(ty)) {
+                    collect_type_arrays(ty, definitions);
                 }
                 collect_expression_arrays(initializer, definitions);
             }
@@ -181,14 +181,8 @@ fn collect_block_arrays(block: &crate::ast::Block, definitions: &mut Vec<TypeNam
 
 fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>) {
     match expression {
-        Expr::Call { callee, arguments, .. } => {
-            if let Some(array) = parse_array_type_name(callee) {
-                collect_type_arrays(&array, definitions);
-            }
-            collect_layout_intrinsic_arrays(callee, definitions);
-            arguments
-                .iter()
-                .for_each(|argument| collect_expression_arrays(&argument.expression, definitions));
+        Expr::Call { resolved_type, generic_arguments, arguments, .. } => {
+            collect_call_arrays(resolved_type.as_ref(), generic_arguments, arguments, definitions);
         }
         Expr::Index { target, index, .. } => {
             collect_expression_arrays(target, definitions);
@@ -238,26 +232,25 @@ fn collect_expression_arrays(expression: &Expr, definitions: &mut Vec<TypeName>)
     }
 }
 
-fn collect_layout_intrinsic_arrays(callee: &str, definitions: &mut Vec<TypeName>) {
-    if !callee.starts_with("size_of[") && !callee.starts_with("align_of[") {
-        return;
+fn collect_call_arrays(
+    resolved_type: Option<&TypeName>,
+    generic_arguments: &[TypeName],
+    arguments: &[crate::ast::Argument],
+    definitions: &mut Vec<TypeName>,
+) {
+    if let Some(array) = resolved_type.filter(|ty| is_array_type(ty)) {
+        collect_type_arrays(array, definitions);
     }
-    let Some(type_name) = callee
-        .split_once('[')
-        .and_then(|(_, application)| application.strip_suffix(']'))
-        .and_then(|application| {
-            crate::semantic::parse_type_name_key(application, crate::lexer::SourceSpan::new(0, 0))
-        })
-    else {
-        return;
-    };
-    collect_type_arrays(&type_name, definitions);
+    if let Some(argument) = generic_arguments.first() {
+        collect_type_arrays(argument, definitions);
+    }
+    for argument in arguments {
+        collect_expression_arrays(&argument.expression, definitions);
+    }
 }
 
-fn parse_array_type_name(text: &str) -> Option<TypeName> {
-    let type_name =
-        crate::semantic::parse_type_name_key(text, crate::lexer::SourceSpan::new(0, 0))?;
-    (type_name.name == "Array" && type_name.arguments.len() == 2).then_some(type_name)
+fn is_array_type(type_name: &TypeName) -> bool {
+    type_name.name == "Array" && type_name.arguments.len() == 2
 }
 
 impl LayoutRegistry {

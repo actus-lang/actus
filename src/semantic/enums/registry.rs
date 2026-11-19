@@ -43,7 +43,10 @@ impl Analyzer {
                 span: definition.span,
             });
         }
-        self.with_generic_scope(&definition.generic_parameters, |analyzer| {
+        let previous_owner = self.current_generic_owner.take();
+        self.current_generic_owner =
+            (!definition.generic_parameters.is_empty()).then(|| definition.name.clone());
+        let result = self.with_generic_scope(&definition.generic_parameters, |analyzer| {
             for variant in &definition.variants {
                 let types = match &variant.payload {
                     EnumPayload::Unit => Vec::new(),
@@ -55,7 +58,9 @@ impl Analyzer {
                 }
             }
             Ok(())
-        })
+        });
+        self.current_generic_owner = previous_owner;
+        result
     }
 
     pub(in crate::semantic) fn validate_recursive_types(&self) -> Result<(), SemanticError> {

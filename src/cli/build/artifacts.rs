@@ -9,89 +9,57 @@ use super::options::EmitKind;
 pub(super) fn write_artifact(
     input: &str,
     output: &Path,
-    objects: Vec<super::emission::EmittedObject>,
+    object: super::emission::EmittedObject,
     emit: EmitKind,
     configuration: &CompilerConfiguration,
 ) -> Result<(), String> {
     let persistent_capsula_artifact = output.starts_with(configuration.capsula_target_directory());
-    let paths = object_paths(
-        output,
-        &objects,
-        emit,
-        persistent_capsula_artifact,
-        configuration.linker_flavor(),
-    );
-    write_objects(&paths, &objects)?;
+    let path =
+        object_path(output, emit, persistent_capsula_artifact, configuration.linker_flavor());
+    write_object(&path, &object)?;
     if matches!(emit, EmitKind::Executable) {
-        let references = paths.iter().map(PathBuf::as_path).collect::<Vec<_>>();
-        let result = crate::codegen::link_objects(&references, output, configuration)
+        let result = crate::codegen::link_objects(&[path.as_path()], output, configuration)
             .map_err(|error| format!("cannot link `{input}`: {error}"));
         if !persistent_capsula_artifact {
-            for path in &paths {
-                let _ = fs::remove_file(path);
-            }
+            let _ = fs::remove_file(&path);
         }
-        result.and_then(|()| write_success_metadata(output, &objects, configuration))
+        result.and_then(|()| write_success_metadata(output, &object, configuration))
     } else {
-        write_success_metadata(output, &objects, configuration)
+        write_success_metadata(output, &object, configuration)
     }
 }
 
 fn write_success_metadata(
     output: &Path,
-    objects: &[super::emission::EmittedObject],
+    object: &super::emission::EmittedObject,
     configuration: &CompilerConfiguration,
 ) -> Result<(), String> {
-    super::object_manifest::write(&super::object_manifest::path_for(output), objects)?;
+    super::object_manifest::write(&super::object_manifest::path_for(output), object)?;
     write_metadata(output, configuration).map_err(|error| error.to_string())
 }
 
-fn object_paths(
+/// The program object (ADR-0113): the output itself for `--emit obj`, and an
+/// intermediate object beside the executable for `--emit exe`.
+fn object_path(
     output: &Path,
-    objects: &[super::emission::EmittedObject],
     emit: EmitKind,
     persistent: bool,
     linker_flavor: LinkerFlavor,
-) -> Vec<PathBuf> {
+) -> PathBuf {
     if matches!(emit, EmitKind::Object) {
-        let mut paths = vec![output.to_owned()];
-        paths.extend(objects.iter().skip(1).map(|object| sidecar_path(output, &object.name)));
-        return paths;
+        return output.to_owned();
     }
     let extension = if persistent || linker_flavor == LinkerFlavor::Msvc { "obj" } else { "o" };
-    let root = output.with_extension(format!("root.{extension}"));
-    let mut paths = vec![root];
-    paths.extend(
-        objects
-            .iter()
-            .skip(1)
-            .map(|object| sidecar_path(&output.with_extension(extension), &object.name)),
-    );
-    paths
+    output.with_extension(format!("root.{extension}"))
 }
 
-fn sidecar_path(output: &Path, name: &str) -> PathBuf {
-    let stem = output.file_stem().and_then(|value| value.to_str()).unwrap_or("actus");
-    let safe_name = name.replace([':', '/', '\\'], "_");
-    output.with_file_name(format!(
-        "{stem}.module.{safe_name}.{}",
-        output.extension().and_then(|value| value.to_str()).unwrap_or("obj")
-    ))
-}
-
-fn write_objects(
-    paths: &[PathBuf],
-    objects: &[super::emission::EmittedObject],
-) -> Result<(), String> {
-    for (path, object) in paths.iter().zip(objects) {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("cannot create `{}`: {error}", parent.display()))?;
-        }
-        fs::write(path, &object.bytes)
-            .map_err(|error| format!("cannot write `{}`: {error}", path.display()))?;
+fn write_object(path: &Path, object: &super::emission::EmittedObject) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create `{}`: {error}", parent.display()))?;
     }
-    Ok(())
+    fs::write(path, &object.bytes)
+        .map_err(|error| format!("cannot write `{}`: {error}", path.display()))
 }
 
 pub(super) fn default_output(

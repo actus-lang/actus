@@ -136,6 +136,7 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
             fallthrough,
             instructions,
         } = input;
+        let entry = self.provider.snapshot_bindings();
         let RangeSetup { index_type, end_value, carried, ids, blocks, instructions } =
             self.prepare_range_loop(binding, start, end, body, span, instructions)?;
         let header = header_block(blocks, &ids, end_value, index_type, &carried, span);
@@ -153,12 +154,7 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
         let increment = increment_block(blocks, &ids, index_type, &carried, span);
         let continuation =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
-        for (binding, value) in carried.iter().zip(&ids.exit_carried) {
-            self.provider.set_binding_value(&binding.name, *value);
-            if let Some(type_name) = &binding.nominal_type {
-                self.provider.remember_nominal_type(*value, type_name.clone());
-            }
-        }
+        self.bind_loop_exit(&entry, &carried, &ids.exit_carried);
         let mut continuation_block =
             self.lower_block_in_scope(blocks.continuation, &continuation, fallthrough)?;
         continuation_block.parameters = ids

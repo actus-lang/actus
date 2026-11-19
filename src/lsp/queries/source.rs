@@ -78,17 +78,11 @@ pub(in crate::lsp) fn rename(
     cancellation: Option<&CancellationToken>,
     prepare: bool,
 ) -> io::Result<()> {
-    let stale = params
-        .get("textDocument")
+    let document = params.get("textDocument");
+    let stale = document
         .and_then(|document| document.get("uri"))
         .and_then(Value::as_str)
-        .and_then(|uri| {
-            params
-                .get("textDocument")
-                .and_then(|document| document.get("version"))
-                .and_then(Value::as_i64)
-                .map(|version| (uri, version))
-        })
+        .zip(document.and_then(|document| document.get("version")).and_then(Value::as_i64))
         .is_some_and(|(uri, version)| {
             store.get(uri).is_some_and(|current| current.version != version)
         });

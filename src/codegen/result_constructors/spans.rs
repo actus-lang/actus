@@ -1,7 +1,7 @@
 use crate::ast::Expr;
 use crate::lexer::SourceSpan;
 
-pub(super) fn initializer_span(expression: &Expr) -> SourceSpan {
+pub(super) fn expression_span(expression: &Expr) -> SourceSpan {
     match expression {
         Expr::Call { span, .. }
         | Expr::MethodCall { span, .. }

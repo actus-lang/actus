@@ -24,6 +24,8 @@ pub(crate) struct DependencyTable {
 
 #[derive(Clone, Debug)]
 pub(crate) struct DependencyPackage {
+    pub(crate) identity_name: String,
+    pub(crate) source_root: Option<PathBuf>,
     pub(crate) name: String,
     pub(crate) version: String,
     pub(crate) path: Option<String>,
@@ -39,7 +41,9 @@ pub(crate) struct DependencyGraph {
 pub(crate) fn resolve(manifest_path: &Path) -> Result<DependencyGraph, ConfigurationError> {
     let mut graph = DependencyGraph::default();
     let mut visiting = HashSet::new();
-    visit_manifest(manifest_path, &mut graph, &mut visiting)?;
+    let compiler_std_manifest = super::resolution::compiler_owned_std_canonical_root()
+        .and_then(|source_root| source_root.parent().map(|package| package.join("Actus.toml")));
+    visit_manifest(manifest_path, &mut graph, &mut visiting, compiler_std_manifest.as_deref())?;
     graph.packages.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(graph)
 }
@@ -48,6 +52,7 @@ fn visit_manifest(
     manifest_path: &Path,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
+    compiler_std_manifest: Option<&Path>,
 ) -> Result<(), ConfigurationError> {
     let canonical = canonical_manifest_path(manifest_path)?;
     if !visiting.insert(canonical.clone()) {
@@ -56,9 +61,9 @@ fn visit_manifest(
             canonical.display()
         )));
     }
-    let manifest = super::manifest::read(&canonical)?;
+    let manifest = super::manifest::read_with_compiler_std(&canonical, compiler_std_manifest)?;
     let dependencies = dependency_specs(&manifest)?;
-    visit_dependency_specs(&canonical, dependencies, graph, visiting)?;
+    visit_dependency_specs(&canonical, dependencies, graph, visiting, compiler_std_manifest)?;
     visiting.remove(&canonical);
     Ok(())
 }
@@ -77,6 +82,7 @@ fn visit_dependency_specs(
     dependencies: BTreeMap<String, DependencySpec>,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
+    compiler_std_manifest: Option<&Path>,
 ) -> Result<(), ConfigurationError> {
     for (name, specification) in dependencies {
         match specification {
@@ -88,12 +94,24 @@ fn visit_dependency_specs(
                 })?;
                 record_package(
                     graph,
-                    DependencyPackage { name, version, path: None, checksum: None },
+                    DependencyPackage {
+                        identity_name: name.clone(),
+                        source_root: None,
+                        name,
+                        version,
+                        path: None,
+                        checksum: None,
+                    },
                 )?;
             }
-            DependencySpec::Local(table) => {
-                visit_local_dependency(canonical, name, table, graph, visiting)?
-            }
+            DependencySpec::Local(table) => visit_local_dependency(
+                canonical,
+                name,
+                table,
+                graph,
+                visiting,
+                compiler_std_manifest,
+            )?,
         }
     }
     Ok(())
@@ -125,15 +143,16 @@ fn visit_local_dependency(
     table: DependencyTable,
     graph: &mut DependencyGraph,
     visiting: &mut HashSet<PathBuf>,
+    compiler_std_manifest: Option<&Path>,
 ) -> Result<(), ConfigurationError> {
     let relative_path = required_local_path(&name, table.path)?;
     let (package_root, dependency_manifest, child) =
-        load_local_dependency(parent_manifest, &name, &relative_path)?;
+        load_local_dependency(parent_manifest, &name, &relative_path, compiler_std_manifest)?;
     validate_dependency_version(&name, table.version.as_deref(), &child.package.version)?;
     let child_source_root = dependency_source_root(&name, &child, &package_root)?;
-    graph.roots.insert(name.clone(), child_source_root);
-    record_local_package(graph, name, relative_path, &child, &package_root)?;
-    visit_manifest(&dependency_manifest, graph, visiting)
+    graph.roots.insert(name.clone(), child_source_root.clone());
+    record_local_package(graph, name, relative_path, child_source_root, &child, &package_root)?;
+    visit_manifest(&dependency_manifest, graph, visiting, compiler_std_manifest)
 }
 
 fn required_local_path(name: &str, path: Option<String>) -> Result<String, ConfigurationError> {
@@ -161,12 +180,15 @@ fn record_local_package(
     graph: &mut DependencyGraph,
     name: String,
     relative_path: String,
+    source_root: PathBuf,
     child: &ActusManifest,
     package_root: &Path,
 ) -> Result<(), ConfigurationError> {
     record_package(
         graph,
         DependencyPackage {
+            identity_name: child.package.name.clone(),
+            source_root: fs::canonicalize(source_root).ok(),
             name,
             version: child.package.version.clone(),
             path: Some(relative_path),
@@ -179,6 +201,7 @@ fn load_local_dependency(
     parent_manifest: &Path,
     name: &str,
     relative_path: &str,
+    compiler_std_manifest: Option<&Path>,
 ) -> Result<(PathBuf, PathBuf, ActusManifest), ConfigurationError> {
     let package_root =
         parent_manifest.parent().unwrap_or_else(|| Path::new(".")).join(relative_path);
@@ -188,7 +211,8 @@ fn load_local_dependency(
             package_root.display()
         )));
     };
-    let child = super::manifest::read(&dependency_manifest)?;
+    let child =
+        super::manifest::read_with_compiler_std(&dependency_manifest, compiler_std_manifest)?;
     Ok((package_root, dependency_manifest, child))
 }
 

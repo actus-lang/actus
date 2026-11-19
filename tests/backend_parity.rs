@@ -657,8 +657,7 @@ fn freestanding_cli_backends_preserve_symbols_and_zero_float_evidence() {
     assert!(defined[0].contains("boot"), "freestanding entry symbol missing: {:?}", defined[0]);
     assert_eq!(defined[0], defined[1], "freestanding exported symbols diverged");
     assert!(
-        undefined[0].contains("actus_region_drop")
-            && undefined[0].iter().any(|symbol| symbol.contains("__verb_region_5fopen_5f_5fu8")),
+        undefined[0].contains("actus_region_drop") && undefined[0].contains("actus_region_open"),
         "required Region runtime bridges are missing: {:?}",
         undefined[0]
     );

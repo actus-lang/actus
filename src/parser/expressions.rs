@@ -204,6 +204,8 @@ impl Parser {
             };
             return Ok(Some(Expr::Call {
                 callee,
+                resolved_type: None,
+                generic_arguments: type_arguments.to_vec(),
                 arguments,
                 span: SourceSpan::new(span.start, end),
             }));
@@ -298,11 +300,12 @@ impl Parser {
                 receiver: Box::new(expression),
                 method: field,
                 arguments,
+                resolved_type: None,
                 span: SourceSpan::new(start, end),
             });
         }
         let span = SourceSpan::new(expression_span(&expression).start, field_token.span.end);
-        Ok(Expr::FieldAccess { object: Box::new(expression), field, span })
+        Ok(Expr::FieldAccess { object: Box::new(expression), field, resolved_type: None, span })
     }
 
     fn binary_operator(&self) -> Option<(BinaryOp, u8)> {

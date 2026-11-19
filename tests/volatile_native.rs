@@ -84,8 +84,10 @@ verb main() -> Int {
 
         let undefined = undefined_symbols(&output);
         assert!(
-            undefined.iter().any(|symbol| symbol.contains("volatile_5fread_5fu32")),
-            "typed volatile read specialization missing for {backend}: {undefined:?}"
+            undefined
+                .iter()
+                .any(|symbol| symbol.trim_start_matches('_') == "actus_volatile_read_u32"),
+            "checked volatile read call missing for {backend}: {undefined:?}"
         );
         assert!(
             undefined.iter().any(|symbol| is_provider_symbol(symbol)),
@@ -150,8 +152,10 @@ verb main() -> Int {
 
         let undefined = undefined_symbols(&output);
         assert!(
-            undefined.iter().any(|symbol| symbol.contains("volatile_5fwrite_5fu32")),
-            "typed volatile write specialization missing for {backend}: {undefined:?}"
+            undefined
+                .iter()
+                .any(|symbol| symbol.trim_start_matches('_') == "actus_volatile_write_u32"),
+            "checked volatile write call missing for {backend}: {undefined:?}"
         );
         assert!(
             undefined.iter().any(|symbol| is_provider_symbol(symbol)),

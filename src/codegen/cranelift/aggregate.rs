@@ -158,7 +158,8 @@ pub(super) fn lower_call(
     )?;
     let call = builder.ins().call(reference, &native_arguments);
     if declaration.runtime_pointer_return {
-        record_runtime_pointer_result(module, builder, call, *result, declaration, values)?;
+        let result = RuntimeResult { call, result: *result, declaration };
+        record_runtime_pointer_result(module, builder, result, declarations, values)?;
         return Ok(());
     }
     record_call_results(builder, call, result, return_slot, declaration, values, aggregate_values)?;
@@ -199,14 +200,22 @@ fn prepare_call_arguments(
     Ok((Some(address), arguments))
 }
 
-fn record_runtime_pointer_result(
-    module: &ObjectModule,
-    builder: &mut FunctionBuilder<'_>,
+struct RuntimeResult<'a> {
     call: cranelift_codegen::ir::Inst,
     result: Option<BackendValueId>,
-    declaration: &Declaration,
+    declaration: &'a Declaration,
+}
+
+/// Copies a runtime-allocated result into a stack slot and releases the
+/// runtime allocation, as the LLVM backend does.
+fn record_runtime_pointer_result(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    runtime: RuntimeResult<'_>,
+    declarations: &BTreeMap<String, Declaration>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
+    let RuntimeResult { call, result, declaration } = runtime;
     let result = result.ok_or_else(|| {
         BackendEmitError("Cranelift runtime-pointer call requires a result value".to_owned())
     })?;
@@ -236,6 +245,12 @@ fn record_runtime_pointer_result(
         false,
         cranelift_codegen::ir::MemFlagsData::new(),
     );
+    let enum_drop = declarations.get(crate::runtime::ENUM_DROP_SYMBOL).ok_or_else(|| {
+        BackendEmitError("Cranelift runtime result cleanup bridge is unavailable".to_owned())
+    })?;
+    let enum_drop = module.declare_func_in_func(enum_drop.id, builder.func);
+    let size = builder.ins().iconst(cranelift_codegen::ir::types::I64, i64::from(layout.size));
+    builder.ins().call(enum_drop, &[raw, size]);
     values.insert(result, address);
     Ok(())
 }

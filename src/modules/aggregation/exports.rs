@@ -3,8 +3,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ast::{Program, TopLevelDecl};
-use crate::lexer::scan;
-use crate::parser::parse;
 
 use super::super::resolver::ModuleResolver;
 use super::types::{ExportedSymbol, ModuleError, ModuleExports};
@@ -26,7 +24,7 @@ pub fn exports_module_with_overlays(
 ) -> Result<ModuleExports, ModuleError> {
     let resolved =
         resolver.resolve_for_aggregation(module_path).map_err(ModuleError::Resolution)?;
-    let parsed = parse_sources(resolved.source_files(), overlays)?;
+    let parsed = parse_sources(resolver, resolved.source_files(), overlays)?;
     validate_open_siblings(
         module_path,
         resolved.facade(),
@@ -41,7 +39,8 @@ pub fn exports_module_with_overlays(
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::OpenSibling(open) => Some(open.name.as_str()),
+            // Unit-scoped openings are not exports of the unit (ADR-0111).
+            TopLevelDecl::OpenSibling(open) if !open.unit => Some(open.name.as_str()),
             _ => None,
         })
         .collect::<std::collections::HashSet<_>>();
@@ -64,7 +63,7 @@ fn exports_child_module_with_overlays(
 ) -> Result<ModuleExports, ModuleError> {
     let child =
         resolver.resolve_child(parent_module_path, child_name).map_err(ModuleError::Resolution)?;
-    let parsed = parse_sources(child.source_files(), overlays)?;
+    let parsed = parse_sources(resolver, child.source_files(), overlays)?;
     validate_open_siblings(
         child.module_path(),
         child.facade(),
@@ -84,7 +83,8 @@ fn exports_child_module_with_overlays(
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::OpenSibling(open) => Some(open.name.as_str()),
+            // Unit-scoped openings are not exports of the unit (ADR-0111).
+            TopLevelDecl::OpenSibling(open) if !open.unit => Some(open.name.as_str()),
             _ => None,
         })
         .collect::<std::collections::HashSet<_>>();
@@ -109,6 +109,7 @@ fn exports_child_module_with_overlays(
 }
 
 fn parse_sources<'a, I>(
+    resolver: &ModuleResolver,
     source_paths: I,
     overlays: &HashMap<PathBuf, String>,
 ) -> Result<Vec<(PathBuf, Program)>, ModuleError>
@@ -124,14 +125,9 @@ where
                     message: error.to_string(),
                 })
             })?;
-            let (tokens, errors) = scan(&source);
-            if !errors.is_empty() {
-                return Err(ModuleError::Lex { path: source_path.to_owned(), errors });
-            }
-            let program = parse(tokens).map_err(|error| ModuleError::Parse {
-                path: source_path.to_owned(),
-                error: Box::new(error),
-            })?;
+            let program = crate::session::parse_source(resolver.session(), source_path, &source)
+                .program()
+                .map_err(|error| ModuleError::frontend(source_path, error))?;
             Ok((source_path.to_owned(), program))
         })
         .collect()
@@ -171,7 +167,7 @@ fn collect_exports(parsed: &[(PathBuf, Program)]) -> ModuleExports {
         .declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            TopLevelDecl::OpenSibling(sibling) => Some(sibling.name.as_str()),
+            TopLevelDecl::OpenSibling(sibling) if !sibling.unit => Some(sibling.name.as_str()),
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -208,13 +204,15 @@ fn collect_open_sibling_exports(
                 target: target_selector(declaration).map(str::to_owned),
             });
         }
-        if let TopLevelDecl::OpenSibling(open) = declaration {
+        if let TopLevelDecl::OpenSibling(open) = declaration
+            && !open.unit
+        {
             collect_open_sibling_exports(&open.name, parsed, visited, symbols);
         }
     }
 }
 
-fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
+pub(super) fn declaration_is_open(declaration: &TopLevelDecl) -> bool {
     match declaration {
         TopLevelDecl::Constant(value) => value.is_open,
         TopLevelDecl::Verb(value) => value.is_open,

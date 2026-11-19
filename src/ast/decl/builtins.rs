@@ -44,7 +44,7 @@ fn option_definition() -> EnumDef {
             EnumVariant {
                 doc: None,
                 name: "Some".to_owned(),
-                payload: EnumPayload::Tuple(vec![type_name("T")]),
+                payload: EnumPayload::Tuple(vec![type_name("Option", "T")]),
                 span: zero_span(),
             },
             EnumVariant {
@@ -69,13 +69,13 @@ fn result_definition() -> EnumDef {
             EnumVariant {
                 doc: None,
                 name: "Ok".to_owned(),
-                payload: EnumPayload::Tuple(vec![type_name("T")]),
+                payload: EnumPayload::Tuple(vec![type_name("Result", "T")]),
                 span: zero_span(),
             },
             EnumVariant {
                 doc: None,
                 name: "Err".to_owned(),
-                payload: EnumPayload::Tuple(vec![type_name("E")]),
+                payload: EnumPayload::Tuple(vec![type_name("Result", "E")]),
                 span: zero_span(),
             },
         ],
@@ -93,13 +93,17 @@ fn generic_parameter(name: &str) -> GenericParam {
     }
 }
 
-fn type_name(name: &str) -> TypeName {
-    TypeName {
-        name: name.to_owned(),
-        arguments: Vec::new(),
-        reference_role: None,
-        span: zero_span(),
-    }
+fn type_name(owner: &str, name: &str) -> TypeName {
+    TypeName::resolved(
+        super::types::DeclarationIdentity::GenericParameter {
+            owner: format!("builtin::{owner}"),
+            name: name.to_owned(),
+        },
+        name,
+        Vec::new(),
+        None,
+        zero_span(),
+    )
 }
 
 fn zero_span() -> SourceSpan {

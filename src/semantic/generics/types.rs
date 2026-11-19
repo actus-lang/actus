@@ -1,4 +1,4 @@
-use crate::ast::{GenericParam, GenericParamKind, TypeName, primitive_type};
+use crate::ast::{GenericParam, GenericParamKind, TypeIdentity, TypeName, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::Analyzer;
@@ -367,9 +367,12 @@ impl Analyzer {
         self.generic_instances.insert(super::model::GenericInstance {
             name: type_name.name.clone(),
             arguments: type_name.arguments.clone(),
+            identity: TypeIdentity::from_type_name(type_name),
             canonical_key,
             caller: None,
             call_span: type_name.span,
+            verb: None,
+            caller_verb: None,
         });
     }
 

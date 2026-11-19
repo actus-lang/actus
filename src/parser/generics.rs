@@ -83,12 +83,12 @@ impl Parser {
         };
         let end = self.previous().span.end;
         self.validate_bounded_array(name.as_str(), &arguments)?;
-        Ok(TypeName {
+        Ok(TypeName::unresolved(
             name,
             arguments,
             reference_role,
-            span: SourceSpan::new(token.span.start, end),
-        })
+            SourceSpan::new(token.span.start, end),
+        ))
     }
 
     fn validate_bounded_array(&self, name: &str, arguments: &[TypeName]) -> Result<(), ParseError> {
@@ -150,7 +150,9 @@ impl Parser {
 fn type_name_text(kind: &TokenKind) -> Option<String> {
     match kind {
         TokenKind::Identifier(name) => Some(name.clone()),
-        TokenKind::Integer { value, suffix: None } => Some(value.clone()),
+        TokenKind::Integer { value, suffix } => {
+            Some(format!("{value}{}", suffix.as_deref().unwrap_or_default()))
+        }
         TokenKind::IntType { signed, width } => {
             Some(format!("{}{}", if *signed { 'i' } else { 'u' }, width))
         }

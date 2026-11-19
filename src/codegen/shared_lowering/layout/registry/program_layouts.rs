@@ -11,6 +11,7 @@ pub(crate) struct ProgramLayouts<'program> {
     pub(super) enums: BTreeMap<&'program str, &'program EnumDef>,
     pub(super) packs: BTreeMap<&'program str, &'program PackDecl>,
     imported_namespaces: BTreeMap<String, String>,
+    declaration_identities: BTreeMap<String, crate::ast::DeclarationId>,
     pub(super) drop_symbols: BTreeMap<String, SymbolIdentity>,
     pointer_bytes: u32,
 }
@@ -19,6 +20,8 @@ impl<'program> ProgramLayouts<'program> {
     pub(in crate::codegen::shared_lowering) fn new(
         program: &'program Program,
         namespace: &str,
+        package: &str,
+        module_path: &str,
     ) -> Self {
         let structs = program
             .declarations
@@ -45,49 +48,52 @@ impl<'program> ProgramLayouts<'program> {
             })
             .collect();
         let imported_namespaces = collect_imported_namespaces(program);
-        let drop_symbols = program
-            .declarations
-            .iter()
-            .filter_map(|declaration| match declaration {
-                TopLevelDecl::Perform(perform) if perform.role_name == "Drop" => {
-                    let target = perform.target.canonical_key();
-                    let symbol_namespace =
-                        perform.module_import_namespace.as_deref().unwrap_or(namespace);
-                    let symbol = SymbolIdentity::specialized(
-                        symbol_namespace,
-                        SymbolKind::Performance,
-                        "drop",
-                        &["Drop", &target],
-                    )
-                    .ok()?;
-                    Some((target, symbol))
-                }
-                _ => None,
-            })
-            .collect();
+        let drop_symbols = collect_drop_symbols(program, namespace);
+        let declaration_identities =
+            crate::modules::DeclarationRegistry::declaration_ids(package, module_path, program);
         Self {
             structs,
             enums,
             packs,
             imported_namespaces,
+            declaration_identities,
             drop_symbols,
             pointer_bytes: usize::BITS / 8,
         }
     }
 
+    pub(super) fn declaration_type_name(
+        &self,
+        name: &str,
+        span: crate::lexer::SourceSpan,
+    ) -> TypeName {
+        TypeName::resolved_id(
+            self.declaration_identities
+                .get(name)
+                .copied()
+                .unwrap_or_else(|| panic!("missing declaration identity for `{name}`")),
+            name.to_owned(),
+            Vec::new(),
+            None,
+            span,
+        )
+    }
+
     pub(super) fn normalize_type_name(&self, type_name: &TypeName) -> TypeName {
+        let name = type_name
+            .name
+            .split_once("::")
+            .and_then(|(namespace, member)| {
+                (self.imported_namespaces.contains_key(namespace)
+                    || self.structs.contains_key(member)
+                    || self.enums.contains_key(member)
+                    || self.packs.contains_key(member))
+                .then(|| member.to_owned())
+            })
+            .unwrap_or_else(|| type_name.name.clone());
+        let resolved = type_name.resolved;
         TypeName {
-            name: type_name
-                .name
-                .split_once("::")
-                .and_then(|(namespace, member)| {
-                    (self.imported_namespaces.contains_key(namespace)
-                        || self.structs.contains_key(member)
-                        || self.enums.contains_key(member)
-                        || self.packs.contains_key(member))
-                    .then(|| member.to_owned())
-                })
-                .unwrap_or_else(|| type_name.name.clone()),
+            name,
             arguments: type_name
                 .arguments
                 .iter()
@@ -95,7 +101,12 @@ impl<'program> ProgramLayouts<'program> {
                 .collect(),
             reference_role: type_name.reference_role.clone(),
             span: type_name.span,
+            resolved,
         }
+    }
+
+    pub(super) fn lookup_key(&self, type_name: &TypeName) -> String {
+        self.normalize_type_name(type_name).canonical_lookup_key()
     }
 
     pub(super) fn type_layout(
@@ -408,22 +419,4 @@ impl<'program> ProgramLayouts<'program> {
             performance_symbol: None,
         }
     }
-}
-
-fn collect_imported_namespaces(program: &Program) -> BTreeMap<String, String> {
-    program
-        .declarations
-        .iter()
-        .filter_map(|declaration| {
-            let TopLevelDecl::Import(import) = declaration else { return None };
-            (!import.is_open).then(|| {
-                let binding = import
-                    .alias
-                    .clone()
-                    .or_else(|| import.path.rsplit("::").next().map(str::to_owned))
-                    .unwrap_or_else(|| import.path.clone());
-                (binding, import.path.clone())
-            })
-        })
-        .collect()
 }

@@ -60,6 +60,7 @@ pub(crate) use signature::{lower_parameter, lower_return};
 pub use symbols::{BackendSymbolBindings, SymbolError, SymbolIdentity, SymbolKind, SymbolRegistry};
 
 pub(crate) use generic::expand_generic_instances;
+pub(crate) use generic::instances_of_verb as generic_instances_of_verb;
 pub(crate) use generic::specialize_program;
 pub(crate) use generic::specialized_generic_name;
 pub(crate) use result_constructors::normalize_program;

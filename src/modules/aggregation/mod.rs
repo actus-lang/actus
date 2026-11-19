@@ -6,6 +6,8 @@ mod identity;
 mod objects;
 mod parsing;
 mod plan;
+pub(crate) mod registry;
+mod scope;
 mod types;
 mod unit;
 mod validation;
@@ -24,7 +26,12 @@ pub use plan::{
     ModuleCompilationPlan, build_compilation_plan, build_compilation_plan_with_overlays,
     build_test_compilation_plan,
 };
-pub use types::{DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation};
+pub(crate) use plan::{program_with_performance_context, validate_compilation_plan};
+pub(crate) use registry::DeclarationRegistry;
+pub use types::{
+    DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation,
+    OutOfScopeReference, ScopeViolation,
+};
 pub use unit::{
     ModuleIdentity, ModuleSource, ModuleSourceKind, ModuleUnit, load_module_unit,
     load_module_unit_with_overlays,

@@ -1,5 +1,5 @@
 use super::{LexError, LexErrorKind, Scanner};
-use crate::lexer::{SourceSpan, Token, TokenKind};
+use crate::lexer::{Token, TokenKind};
 
 impl<'source> Scanner<'source> {
     pub(super) fn scan_identifier(&mut self, start: usize) {
@@ -8,17 +8,16 @@ impl<'source> Scanner<'source> {
         }
         let text = &self.source[start..self.cursor];
         if let Some(kind) = integer_type_kind(text) {
-            self.tokens.push(Token::new(kind, SourceSpan::new(start, self.cursor)));
+            self.tokens.push(Token::new(kind, self.span(start)));
             return;
         }
         if is_invalid_integer_type(text) {
             self.errors.push(LexError::new(
                 LexErrorKind::InvalidIntegerType(text.to_owned()),
-                SourceSpan::new(start, self.cursor),
+                self.span(start),
             ));
         }
-        self.tokens
-            .push(Token::new(keyword_or_identifier(text), SourceSpan::new(start, self.cursor)));
+        self.tokens.push(Token::new(keyword_or_identifier(text), self.span(start)));
     }
 }
 

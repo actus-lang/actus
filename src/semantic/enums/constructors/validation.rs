@@ -13,6 +13,7 @@ impl Analyzer {
     pub(in crate::semantic) fn validate_enum_constructor(
         &mut self,
         receiver: &Expr,
+        resolved_type: Option<&TypeName>,
         variant: &str,
         arguments: &[Argument],
         span: SourceSpan,
@@ -20,10 +21,25 @@ impl Analyzer {
         let enum_name =
             self.enum_receiver_name(receiver).expect("enum receiver expected").to_owned();
         let definition = self.enum_types[&enum_name].clone();
-        if let Some(receiver_type) = type_parsing::receiver_type_name(receiver) {
-            self.validate_type_reference(&receiver_type)?;
+        let receiver_type = resolved_type.cloned();
+        if !definition.generic_parameters.is_empty()
+            && let Some(receiver_type) = &receiver_type
+            && !receiver_type.arguments.is_empty()
+        {
+            self.validate_type_reference(receiver_type)?;
         }
-        let substitution = type_parsing::enum_substitution(receiver, &definition)?;
+        let substitution = receiver_type
+            .as_ref()
+            .filter(|_| !definition.generic_parameters.is_empty())
+            .map(|type_name| {
+                TypeSubstitution::for_type(
+                    &definition.name,
+                    &definition.generic_parameters,
+                    &type_name.arguments,
+                    type_name.span,
+                )
+            })
+            .transpose()?;
         let Some(candidate) = variants::find_variant(&definition, variant).cloned() else {
             return Err(variants::unknown_variant(&enum_name, variant, span));
         };

@@ -3,11 +3,9 @@ use crate::ast::{
     ReturnAccess, Role, VerbDecl, lookup_builtin_type,
 };
 
-use super::super::analyzer::canonical_type_name;
-
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct VerbSignature {
-    pub(crate) params: Vec<(String, Role, String)>,
+    pub(crate) params: Vec<(String, Role, crate::ast::TypeName)>,
     pub(crate) dynamic_params: Vec<DispatchMode>,
     pub(crate) return_type: Option<BuiltinType>,
     pub(crate) return_type_name: Option<crate::ast::TypeName>,
@@ -20,6 +18,8 @@ pub(crate) struct VerbSignature {
     pub(crate) deterministic: bool,
     pub(crate) realtime: bool,
     pub(crate) bounded: Option<crate::ast::BoundedContract>,
+    /// The verb this signature belongs to (ADR-0108), when annotated.
+    pub(crate) identity: Option<crate::ast::DeclarationId>,
 }
 
 pub(super) fn has_matching_named_signature(
@@ -42,11 +42,7 @@ impl VerbDecl {
                 .params
                 .iter()
                 .map(|parameter| {
-                    (
-                        parameter.name.clone(),
-                        parameter.role.clone(),
-                        canonical_type_name(&parameter.ty),
-                    )
+                    (parameter.name.clone(), parameter.role.clone(), parameter.ty.clone())
                 })
                 .collect(),
             dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),
@@ -67,6 +63,7 @@ impl VerbDecl {
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
             bounded: metadata_bounded(&self.metadata),
+            identity: self.identity,
         }
     }
 }
@@ -78,11 +75,7 @@ impl ExternalVerbDecl {
                 .params
                 .iter()
                 .map(|parameter| {
-                    (
-                        parameter.name.clone(),
-                        parameter.role.clone(),
-                        canonical_type_name(&parameter.ty),
-                    )
+                    (parameter.name.clone(), parameter.role.clone(), parameter.ty.clone())
                 })
                 .collect(),
             dynamic_params: self.params.iter().map(|parameter| parameter.dispatch).collect(),
@@ -103,6 +96,7 @@ impl ExternalVerbDecl {
             deterministic: metadata_is_deterministic(&self.metadata),
             realtime: metadata_is_realtime(&self.metadata),
             bounded: metadata_bounded(&self.metadata),
+            identity: self.identity,
         }
     }
 }

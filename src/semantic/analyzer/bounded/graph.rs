@@ -345,10 +345,10 @@ fn expression_calls(
     performance_prefix: Option<&str>,
 ) -> Vec<(String, SourceSpan)> {
     match expression {
-        Expr::Call { callee, arguments, span } => {
+        Expr::Call { callee, arguments, span, .. } => {
             call_expression_calls(callee, arguments, *span, performance_prefix)
         }
-        Expr::MethodCall { receiver, method, arguments, span } => {
+        Expr::MethodCall { receiver, method, arguments, span, .. } => {
             method_expression_calls(receiver, method, arguments, *span, performance_prefix)
         }
         Expr::If { condition, then_branch, else_branch, .. } => {

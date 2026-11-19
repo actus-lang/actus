@@ -52,9 +52,11 @@ fn retain_reachable_functions(
     module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
 }
 
-pub(super) struct LoweredSharedModule {
-    pub(super) object_name: String,
+/// The whole program as one backend module (ADR-0113).
+pub(super) struct LinkedProgram {
     pub(super) module: BackendModule,
+    /// Functions emitted with local linkage: every function but the entry.
+    pub(super) local_symbols: std::collections::BTreeSet<String>,
 }
 
 pub(super) fn generic_inputs(
@@ -75,7 +77,7 @@ pub(super) fn generic_inputs(
         .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
         let expansion_program = crate::codegen::normalize_program(&targeted);
         combined_program.declarations.extend(expansion_program.declarations.clone());
-        let generic_instances = crate::semantic::analyze(&expansion_program)
+        let generic_instances = crate::semantic::analyze_resolved(&expansion_program)
             .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
             .generic_instances;
         let expanded_instances =
@@ -106,14 +108,14 @@ pub(super) fn generic_inputs(
     Ok((generic_types, unique_instances))
 }
 
-pub(super) fn lower_shared_modules(
+pub(super) fn lower_program(
     object_plan: &ModuleObjectPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
     bindings: &BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
     backend: &str,
-) -> Result<Vec<LoweredSharedModule>, BackendEmitError> {
+) -> Result<LinkedProgram, BackendEmitError> {
     let context =
         SharedLoweringContext { symbol, configuration, bindings, generic_instances, backend };
     let mut modules = object_plan
@@ -124,17 +126,17 @@ pub(super) fn lower_shared_modules(
         .collect::<Result<Vec<_>, _>>()?;
     let required_symbols = required_performance_symbols(&modules);
     if let Some(root) = modules.first_mut() {
-        retain_reachable_root_functions(&mut root.module, symbol, &required_symbols);
+        retain_reachable_root_functions(root, symbol, &required_symbols);
     }
-    let root_calls = modules.first().map(|root| called_symbols(&root.module)).unwrap_or_default();
+    let root_calls = modules.first().map(called_symbols).unwrap_or_default();
     let reachable_modules = reachable_module_symbols(&modules, &root_calls);
     for (module, reachable) in modules.iter_mut().skip(1).zip(reachable_modules) {
-        module.module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
+        module.functions.retain(|function| reachable.contains(function.symbol.as_str()));
     }
     for module in &mut modules {
-        retain_referenced_externals(&mut module.module);
+        retain_referenced_externals(module);
     }
-    Ok(modules)
+    super::linkage::link_program(modules, symbol)
 }
 
 struct SharedLoweringContext<'a> {
@@ -149,7 +151,7 @@ fn lower_unit_module(
     object_plan: &ModuleObjectPlan,
     index: usize,
     context: &SharedLoweringContext<'_>,
-) -> Result<LoweredSharedModule, BackendEmitError> {
+) -> Result<BackendModule, BackendEmitError> {
     let unit = &object_plan.units()[index];
     let targeted_program = crate::semantic::filter_program_for_target_checked(
         unit.program(),
@@ -167,9 +169,7 @@ fn lower_unit_module(
     let performance_context = (index != 0).then(|| {
         (object_plan.units()[0].namespace().symbol_prefix(), object_plan.units()[0].program())
     });
-    let module =
-        lower_unit_backend_module(object_plan, index, &program, performance_context, context)?;
-    Ok(LoweredSharedModule { object_name: unit_object_name(unit, index), module })
+    lower_unit_backend_module(object_plan, index, &program, performance_context, context)
 }
 
 fn lower_unit_backend_module(
@@ -188,6 +188,8 @@ fn lower_unit_backend_module(
         context.configuration.target(),
         context.configuration.entry_contract(),
         performance_context,
+        object_plan.package_identity(),
+        unit.namespace().module_path(),
     )
     .map_err(|error| {
         let error = error.with_backend_context(
@@ -203,17 +205,11 @@ fn lower_unit_backend_module(
     })
 }
 
-fn unit_object_name(unit: &crate::modules::ModuleObjectUnit, index: usize) -> String {
-    if index == 0 { "root".to_owned() } else { unit.namespace().symbol_prefix().to_owned() }
-}
-
-fn required_performance_symbols(
-    modules: &[LoweredSharedModule],
-) -> std::collections::BTreeSet<String> {
+fn required_performance_symbols(modules: &[BackendModule]) -> std::collections::BTreeSet<String> {
     modules
         .iter()
         .skip(1)
-        .flat_map(|lowered| lowered.module.functions.iter())
+        .flat_map(|module| module.functions.iter())
         .flat_map(|function| function.blocks.iter())
         .flat_map(|block| block.instructions.iter())
         .filter_map(|instruction| match instruction {
@@ -232,12 +228,12 @@ fn called_symbols(module: &crate::codegen::BackendModule) -> std::collections::B
 }
 
 fn reachable_module_symbols(
-    modules: &[LoweredSharedModule],
+    modules: &[BackendModule],
     roots: &std::collections::BTreeSet<String>,
 ) -> Vec<std::collections::BTreeSet<String>> {
     let calls = modules
         .iter()
-        .flat_map(|module| module.module.functions.iter())
+        .flat_map(|module| module.functions.iter())
         .map(|function| (function.symbol.as_str().to_owned(), called_symbols_in_function(function)))
         .collect::<std::collections::BTreeMap<_, _>>();
     let mut reachable = std::collections::BTreeSet::new();
@@ -255,7 +251,6 @@ fn reachable_module_symbols(
         .skip(1)
         .map(|module| {
             module
-                .module
                 .functions
                 .iter()
                 .map(|function| function.symbol.as_str().to_owned())
