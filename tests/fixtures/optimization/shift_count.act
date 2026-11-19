@@ -1,0 +1,6 @@
+"""A shift count equal to the operand width traps."""
+verb main() -> Int {
+    erg value: u8 = 1;
+    erg count: u8 = 8;
+    return (value << count) as Int;
+}

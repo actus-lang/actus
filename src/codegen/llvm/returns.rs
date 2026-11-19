@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::core::{
-    LLVMAppendBasicBlockInContext, LLVMBuildAlloca, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildLoad2,
+    LLVMAppendBasicBlockInContext, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildLoad2,
     LLVMBuildMemMove, LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildStore, LLVMConstInt, LLVMConstNull,
     LLVMGetTypeKind, LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMPositionBuilderAtEnd,
     LLVMSetAlignment, LLVMTypeOf,
@@ -153,12 +153,11 @@ fn return_slot_source(
             "LLVM return-slot source has an incompatible return mode".to_owned(),
         ));
     };
-    let temporary = unsafe {
-        LLVMBuildAlloca(builder, declaration.return_type, c"return.slot.source".as_ptr())
-    };
-    if temporary.is_null() {
-        return Err(BackendEmitError("LLVM failed to allocate return-slot source".to_owned()));
-    }
+    let temporary = crate::codegen::llvm::memory::entry_slot(
+        builder,
+        declaration.return_type,
+        c"return.slot.source",
+    )?;
     unsafe { LLVMSetAlignment(temporary, layout.alignment) };
     if unsafe { LLVMBuildStore(builder, value, temporary) }.is_null() {
         return Err(BackendEmitError("LLVM failed to store return-slot source".to_owned()));

@@ -1,0 +1,10 @@
+"""Integer division by a zero passed through a call traps."""
+verb divide(erg value: Int, erg divisor: Int) -> Int {
+    return value / divisor;
+}
+
+verb main() -> Int {
+    erg value = 42;
+    erg zero = 0;
+    return divide(value: erg value, divisor: erg zero);
+}

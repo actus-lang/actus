@@ -1,0 +1,6 @@
+"""An array index equal to the capacity traps."""
+verb main() -> Int {
+    erg values: Array[Int, 4] = Array[Int, 4]();
+    erg index = 4;
+    return values[index];
+}

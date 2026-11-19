@@ -2,8 +2,7 @@
 
 ## Status
 
-Proposed. This is a separate high-priority performance task and is not part
-of the stack-frame evidence implementation.
+Implemented by `ADR-0114` in phase 53.
 
 ## Problem
 

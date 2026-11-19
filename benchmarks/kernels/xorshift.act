@@ -1,0 +1,17 @@
+"""xorshift32 over 20 000 000 steps: shifts, xor and a bounded sum."""
+verb main() -> Int {
+    erg state: u32 = 2463534242;
+    erg sum: u64 = 0;
+    erg step: u64 = 0;
+    loop {
+        if step >= 20000000 {
+            break;
+        }
+        state = state ^ (state << 13);
+        state = state ^ (state >> 17);
+        state = state ^ (state << 5);
+        sum = sum + ((state & 255) as u64);
+        step = step + 1;
+    }
+    return (sum % 256) as Int;
+}

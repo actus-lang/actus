@@ -90,3 +90,13 @@ fn large_unsigned_literals_keep_their_value() {
     let source = "verb main() -> Int {\n    erg dividend: u64 = 9223372036854775808;\n    erg divisor: u64 = 3;\n    erg quotient = dividend / divisor;\n    return (quotient % 7) as Int;\n}\n";
     assert_eq!(run("large-literal", source), Some(2));
 }
+
+/// A struct built in every iteration of a long loop reuses one stack slot.
+/// Each temporary is a static slot of the verb's frame (ADR-0114); a slot
+/// allocated where the value is built would grow the stack on every
+/// iteration and overflow it long before the loop ends.
+#[test]
+fn temporaries_built_in_a_loop_reuse_one_stack_slot() {
+    let source = "struct Point {\n    x: Int,\n    y: Int,\n}\n\nverb sum(abs self: Point) -> Int {\n    return self.x + self.y;\n}\n\nverb main() -> Int {\n    erg total = 0;\n    erg i = 0;\n    loop {\n        if i == 50000000 {\n            break;\n        }\n        erg p = Point { x: i % 7, y: 1 };\n        abs view = ref p;\n        total = total + view.sum();\n        i = i + 1;\n    }\n    return total % 100;\n}\n";
+    assert_eq!(run("loop-temporaries", source), Some(97));
+}

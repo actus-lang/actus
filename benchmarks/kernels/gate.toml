@@ -1,0 +1,6 @@
+# Benchmark gate (ADR-0114): each Actus kernel built with the `release`
+# profile on the LLVM backend may execute at most `threshold` times the
+# instructions of its C twin compiled with `clang -O3`, counted by Callgrind
+# from `main`. Both programs must exit with the same status.
+threshold = 1.25
+kernels = ["collatz", "fib", "points", "sieve", "xorshift"]

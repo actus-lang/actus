@@ -3,10 +3,9 @@ use std::collections::BTreeMap;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMBuildAdd, LLVMBuildArrayAlloca, LLVMBuildCondBr,
-    LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore,
-    LLVMBuildUnreachable, LLVMConstInt, LLVMGetBasicBlockParent, LLVMGetInsertBlock,
-    LLVMInt8TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
-    LLVMPositionBuilderAtEnd, LLVMSetAlignment,
+    LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
+    LLVMGetBasicBlockParent, LLVMGetInsertBlock, LLVMInt8TypeInContext, LLVMInt32TypeInContext,
+    LLVMInt64TypeInContext, LLVMPositionBuilderAtEnd, LLVMSetAlignment,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
@@ -164,7 +163,7 @@ fn place_state(
         unsafe { LLVMAppendBasicBlockInContext(context, parent, c"arena.trap".as_ptr().cast()) };
     unsafe { LLVMBuildCondBr(builder, fits, ok, trap) };
     unsafe { LLVMPositionBuilderAtEnd(builder, trap) };
-    unsafe { LLVMBuildUnreachable(builder) };
+    super::guards::emit_llvm_trap(context, parent, builder)?;
     unsafe { LLVMPositionBuilderAtEnd(builder, ok) };
     Ok(PlacementState { offset_address, aligned, new_offset })
 }

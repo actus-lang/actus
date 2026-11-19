@@ -1,0 +1,6 @@
+"""A checked cast of a value outside the target range traps."""
+verb main() -> Int {
+    erg value = 256;
+    erg narrowed = value as u8;
+    return narrowed as Int;
+}

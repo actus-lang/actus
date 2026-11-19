@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 use std::ffi::CString;
 
-use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildCall2, LLVMBuildMemMove, LLVMConstInt, LLVMSetAlignment,
-};
+use llvm_sys::core::{LLVMBuildCall2, LLVMBuildMemMove, LLVMConstInt, LLVMSetAlignment};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendValueId};
@@ -84,7 +82,8 @@ fn prepare_return_slot(
     })?;
     let slot_name = CString::new(format!("slot{}", result.0))
         .map_err(|_| BackendEmitError("LLVM return slot name contains NUL".to_owned()))?;
-    let slot = unsafe { LLVMBuildAlloca(builder, declaration.return_type, slot_name.as_ptr()) };
+    let slot =
+        crate::codegen::llvm::memory::entry_slot(builder, declaration.return_type, &slot_name)?;
     arguments.insert(0, slot);
     Ok(Some(slot))
 }
@@ -175,13 +174,11 @@ fn allocate_runtime_result(
 ) -> Result<LLVMValueRef, BackendEmitError> {
     let slot_name = CString::new(format!("runtime.result{}", result.0))
         .map_err(|_| BackendEmitError("LLVM runtime result name contains NUL".to_owned()))?;
-    let value = unsafe {
-        LLVMBuildAlloca(result_context.builder, declaration.return_type, slot_name.as_ptr())
-    };
-    if value.is_null() {
-        return Err(BackendEmitError("LLVM failed to allocate runtime result copy".to_owned()));
-    }
-    Ok(value)
+    crate::codegen::llvm::memory::entry_slot(
+        result_context.builder,
+        declaration.return_type,
+        &slot_name,
+    )
 }
 
 fn copy_runtime_result(

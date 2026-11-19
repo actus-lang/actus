@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId};
-use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildLoad2, LLVMBuildStore};
+use llvm_sys::core::{LLVMBuildLoad2, LLVMBuildStore};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
 pub(in crate::codegen::llvm) fn emit_scalar_loan(
@@ -80,10 +80,7 @@ fn emit_scalar_loan_materialize(
     let value_type = super::super::values::llvm_type(context, ty)?;
     let name = std::ffi::CString::new(format!("scalar.loan.slot{}", result.0))
         .map_err(|_| BackendEmitError("LLVM scalar loan slot name contains NUL".to_owned()))?;
-    let address = unsafe { LLVMBuildAlloca(builder, value_type, name.as_ptr()) };
-    if address.is_null() {
-        return Err(BackendEmitError("LLVM failed to allocate scalar loan slot".to_owned()));
-    }
+    let address = crate::codegen::llvm::memory::entry_slot(builder, value_type, &name)?;
     if unsafe { LLVMBuildStore(builder, value, address) }.is_null() {
         return Err(BackendEmitError("LLVM failed to store scalar loan value".to_owned()));
     }

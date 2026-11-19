@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::configuration::CompilerConfiguration;
 
-const ACTMETA_FORMAT_VERSION: u32 = 5;
+const ACTMETA_FORMAT_VERSION: u32 = 6;
 
 #[derive(Debug)]
 pub struct BuildGraphError(String);
@@ -30,6 +30,9 @@ pub struct UnitMetadata {
     pub target_spec_hash: String,
     pub lockfile_checksum: Option<String>,
     pub profile: String,
+    /// The optimization level the profile resolved to (ADR-0114); a profile
+    /// table can override it, so the profile name alone does not decide it.
+    pub optimization: String,
     pub backend_identity: String,
     pub runtime: String,
     pub source_limits: String,
@@ -54,6 +57,7 @@ impl UnitMetadata {
             target_spec_hash: configuration.target_spec_hash().to_owned(),
             lockfile_checksum: configuration.lockfile_checksum().map(str::to_owned),
             profile: configuration.profile().directory_name().to_owned(),
+            optimization: configuration.native_backend().optimization_level().name().to_owned(),
             backend_identity: backend_identity(configuration.native_backend().backend().name()),
             runtime: configuration.runtime_profile().to_string(),
             source_limits: source_limit_name(configuration.source_limit_mode()).to_owned(),
@@ -71,6 +75,7 @@ impl UnitMetadata {
             && self.target_spec_hash == configuration.target_spec_hash()
             && self.lockfile_checksum.as_deref() == configuration.lockfile_checksum()
             && self.profile == configuration.profile().directory_name()
+            && self.optimization == configuration.native_backend().optimization_level().name()
             && self.backend_identity
                 == backend_identity(configuration.native_backend().backend().name())
             && self.runtime == configuration.runtime_profile().to_string()
@@ -185,6 +190,7 @@ mod tests {
         let configuration = CompilerConfiguration::from_environment();
         let metadata = UnitMetadata::for_configuration("sample", &configuration);
         assert_eq!(metadata.target_spec_hash, configuration.target_spec_hash());
+        assert_eq!(metadata.optimization, "none");
         assert_eq!(metadata.backend, configuration.native_backend().backend().name());
         assert_eq!(metadata.target_triple, configuration.target().triple().to_string());
         assert_eq!(metadata.runtime, configuration.runtime_profile().to_string());

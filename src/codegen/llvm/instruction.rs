@@ -9,7 +9,6 @@ use super::declarations::FunctionDeclaration;
 use super::failures::emit_failure;
 use super::memory::emit_memory_copy;
 use super::returns::emit_return;
-use llvm_sys::core::LLVMBuildUnreachable;
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
 pub(super) struct InstructionContext<'a> {
@@ -117,7 +116,11 @@ fn emit_terminal_instruction(
             Ok(false)
         }
         BackendInstruction::Trap { .. } => {
-            unsafe { LLVMBuildUnreachable(context.builder) };
+            super::guards::emit_llvm_trap(
+                context.context,
+                context.declaration.value,
+                context.builder,
+            )?;
             Ok(true)
         }
         BackendInstruction::Fail { failure, .. } => {

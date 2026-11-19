@@ -259,11 +259,14 @@ Build profiles are selected at the command line:
 
 ```sh
 actus build --release --emit exe
+actus build --profile size --emit exe
 actus run --profile debug
 ```
 
-The debug profile uses the configured non-optimizing Cranelift level. The
-release profile selects the speed-oriented level. Profile selection changes
+The `debug` profile does not optimize. The `release` profile optimizes for
+speed and the `size` profile for code size; a `[profile.<name>]` table may set
+`opt_level` to `none`, `speed` or `size`. Every profile keeps the same
+observable behavior, including every runtime trap. Profile selection changes
 backend settings; it does not weaken semantic validation or ownership checks.
 
 Before generating native code, use `check` for a fast frontend-only

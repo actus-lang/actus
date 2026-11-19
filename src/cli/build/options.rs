@@ -151,11 +151,7 @@ fn parse_profile(arguments: &mut impl Iterator<Item = String>) -> Result<BuildPr
     let Some(name) = arguments.next() else {
         return Err("missing value after `--profile`".to_owned());
     };
-    match name.as_str() {
-        "debug" => Ok(BuildProfile::Debug),
-        "release" => Ok(BuildProfile::Release),
-        _ => Err(format!("unsupported build profile `{name}`")),
-    }
+    BuildProfile::from_name(&name)
 }
 
 fn set_output(options: &mut BuildOptions, output: Option<String>) -> Result<(), String> {

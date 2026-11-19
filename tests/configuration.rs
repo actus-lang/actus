@@ -747,6 +747,32 @@ fn loads_profile_tables_and_maps_release_to_speed_optimization() {
     let _ = fs::remove_file(path);
 }
 
+/// The `size` profile optimizes for size by default and a `[profile.size]`
+/// table may override its level (ADR-0114).
+#[test]
+fn loads_the_size_profile_and_its_optimization_level() {
+    let _lock = configuration_test_lock();
+    let path = std::env::temp_dir().join(format!("actus-size-profile-{}.toml", std::process::id()));
+    fs::write(&path, "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n")
+        .expect("write manifest");
+    let configuration = CompilerConfiguration::from_manifest(&path).expect("manifest should load");
+    let size = configuration.with_profile(BuildProfile::Size);
+    assert_eq!(size.profile().directory_name(), "size");
+    assert_eq!(size.native_backend().optimization_level(), OptimizationLevel::Size);
+
+    fs::write(
+        &path,
+        "[package]\nname = \"sample\"\nversion = \"1.0.0\"\n\n[profile.size]\nopt_level = \"speed\"\n",
+    )
+    .expect("write overriding manifest");
+    let configuration = CompilerConfiguration::from_manifest(&path).expect("manifest should load");
+    let size = configuration.with_profile(BuildProfile::Size);
+    assert_eq!(size.native_backend().optimization_level(), OptimizationLevel::Speed);
+    assert_eq!(BuildProfile::from_name("size"), Ok(BuildProfile::Size));
+    assert!(BuildProfile::from_name("fast").is_err());
+    let _ = fs::remove_file(path);
+}
+
 #[test]
 fn derives_target_linker_unless_actus_overrides_it() {
     let _lock = configuration_test_lock();

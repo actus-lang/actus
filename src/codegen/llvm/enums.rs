@@ -3,9 +3,8 @@ use std::collections::BTreeMap;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::LLVMTypeKind::LLVMPointerTypeKind;
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove,
-    LLVMBuildStore, LLVMConstInt, LLVMConstNull, LLVMGetTypeKind, LLVMInt8TypeInContext,
-    LLVMSetAlignment, LLVMTypeOf,
+    LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
+    LLVMConstNull, LLVMGetTypeKind, LLVMInt8TypeInContext, LLVMSetAlignment, LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
@@ -214,10 +213,8 @@ fn initialize_enum_constructor(
         context,
         super::super::BackendValueType::Aggregate { layout: layout.layout },
     )?;
-    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, c"enum.construct".as_ptr()) };
-    if temporary.is_null() {
-        return Err(BackendEmitError("LLVM failed to allocate enum constructor value".to_owned()));
-    }
+    let temporary =
+        crate::codegen::llvm::memory::entry_slot(builder, enum_type, c"enum.construct")?;
     unsafe { LLVMSetAlignment(temporary, layout.layout.alignment) };
     if unsafe { LLVMBuildStore(builder, LLVMConstNull(enum_type), temporary) }.is_null() {
         return Err(BackendEmitError(
@@ -273,10 +270,8 @@ fn enum_temporary(
         context,
         super::super::BackendValueType::Aggregate { layout: layout.layout },
     )?;
-    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, c"enum.parameter".as_ptr()) };
-    if temporary.is_null() {
-        return Err(BackendEmitError("LLVM failed to allocate enum parameter storage".to_owned()));
-    }
+    let temporary =
+        crate::codegen::llvm::memory::entry_slot(builder, enum_type, c"enum.parameter")?;
     unsafe { LLVMSetAlignment(temporary, layout.layout.alignment) };
     if unsafe { LLVMBuildStore(builder, subject, temporary) }.is_null() {
         return Err(BackendEmitError("LLVM failed to materialize enum parameter".to_owned()));
