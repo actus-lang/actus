@@ -345,6 +345,17 @@ identical on both backends:
 
 `tests/control_flow_lowering.rs` covers each defect.
 
+One native object per program (`ADR-0113`) also made the backend parity
+gates see the standard library code in the same object, which exposed a
+fifth defect: Cranelift copied a runtime-allocated result (a `Result`,
+`Array`, `Pack`, `Struct` or `Region` returned by a runtime bridge) into a
+stack slot but never released the runtime allocation, so every such call
+leaked it. Fixed: Cranelift releases it through `actus_enum_drop`, as LLVM
+does. The parity gates compare the runtime relocations of both backends, and
+the freestanding Region expectations name the `actus_region_open` and
+`actus_region_drop` bridges, since the `region_open` specialization is now
+defined in the program object.
+
 Pending: **LLVM optimization pipeline** (new ADR). The LLVM backend never runs
 the IR optimization pipeline (`LLVMRunPasses`); `--release` only selects the
 code-generation level, so LLVM output is two to four times slower than C and
