@@ -312,11 +312,11 @@ fn accepts_compiler_owned_standard_library_copy_as_runtime() {
         "[package]\nname = \"runtime_copy\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\n",
     )
     .expect("write runtime project manifest");
+    let _environment = SysrootEnvironmentGuard;
     unsafe { std::env::set_var("ACTUS_SYSROOT", &sysroot) };
     let configuration = CompilerConfiguration::from_manifest_read_only(&project.join("Actus.toml"))
         .expect("runtime standard-library copy should load");
     assert_eq!(configuration.runtime_source_root(), Some(sysroot.join("std/src").as_path()));
-    unsafe { std::env::remove_var("ACTUS_SYSROOT") };
     fs::remove_dir_all(root).expect("remove runtime fixture");
 }
 
@@ -339,6 +339,16 @@ struct LinkerEnvironmentGuard;
 impl Drop for LinkerEnvironmentGuard {
     fn drop(&mut self) {
         unsafe { std::env::remove_var("ACTUS_LINKER") };
+    }
+}
+
+/// Removes `ACTUS_SYSROOT` even when the test fails, so a failure cannot
+/// redirect the compiler-owned standard library of later tests.
+struct SysrootEnvironmentGuard;
+
+impl Drop for SysrootEnvironmentGuard {
+    fn drop(&mut self) {
+        unsafe { std::env::remove_var("ACTUS_SYSROOT") };
     }
 }
 

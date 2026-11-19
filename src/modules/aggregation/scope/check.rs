@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use crate::ast::ImportDecl;
 
-use super::super::types::{ModuleError, ModuleExports, ScopeViolation};
+use super::super::types::{ModuleError, ModuleExports, OutOfScopeReference, ScopeViolation};
 use super::super::unit::{ModuleSource, ModuleUnit};
 use super::references::{Reference, program_references};
 use super::tree::{ModuleTree, child_toward, is_ancestor};
@@ -36,12 +36,14 @@ fn validate_unit_scope(
         let Some(module_path) = source_module(&tree, source) else { continue };
         let checker = Checker { tree: &tree, module_path, unit_exports };
         for reference in program_references(source.program()) {
-            checker.check(&reference).map_err(|reason| ModuleError::OutOfScopeReference {
-                module: module_path.to_owned(),
-                symbol: reference.path.clone(),
-                reason,
-                path: source.path().to_owned(),
-                span: reference.span,
+            checker.check(&reference).map_err(|reason| {
+                ModuleError::OutOfScopeReference(Box::new(OutOfScopeReference {
+                    module: module_path.to_owned(),
+                    symbol: reference.path.clone(),
+                    reason,
+                    path: source.path().to_owned(),
+                    span: reference.span,
+                }))
             })?;
         }
     }

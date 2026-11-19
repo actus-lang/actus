@@ -216,12 +216,14 @@ fn parent_package_scope_rejects_a_private_child_declaration() {
             .expect_err("a private child helper is outside the parent scope");
     assert!(matches!(
         error,
-        actus::modules::ModuleError::OutOfScopeReference {
-            ref module,
-            ref symbol,
-            reason: actus::modules::ScopeViolation::PrivateToChild { ref declared_in },
-            ..
-        } if module == "pkg" && symbol == "helper" && declared_in == "pkg::child"
+        actus::modules::ModuleError::OutOfScopeReference(ref violation)
+            if violation.module == "pkg"
+                && violation.symbol == "helper"
+                && matches!(
+                    violation.reason,
+                    actus::modules::ScopeViolation::PrivateToChild { ref declared_in }
+                        if declared_in == "pkg::child"
+                )
     ));
 }
 
@@ -916,11 +918,13 @@ fn child_module_import_rejects_a_private_child_declaration() {
         .expect_err("a private declaration is not reachable through the child binding");
     assert!(matches!(
         error,
-        ModuleError::OutOfScopeReference {
-            ref symbol,
-            reason: actus::modules::ScopeViolation::NotExported { ref module },
-            ..
-        } if symbol == "store::hidden" && module == "engine::store"
+        ModuleError::OutOfScopeReference(ref violation)
+            if violation.symbol == "store::hidden"
+                && matches!(
+                    violation.reason,
+                    actus::modules::ScopeViolation::NotExported { ref module }
+                        if module == "engine::store"
+                )
     ));
 }
 

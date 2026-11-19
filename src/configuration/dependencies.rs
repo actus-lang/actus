@@ -41,8 +41,8 @@ pub(crate) struct DependencyGraph {
 pub(crate) fn resolve(manifest_path: &Path) -> Result<DependencyGraph, ConfigurationError> {
     let mut graph = DependencyGraph::default();
     let mut visiting = HashSet::new();
-    let compiler_std_manifest = super::resolution::compiler_owned_std_source_root()
-        .map(|source_root| source_root.join("../Actus.toml"));
+    let compiler_std_manifest = super::resolution::compiler_owned_std_canonical_root()
+        .and_then(|source_root| source_root.parent().map(|package| package.join("Actus.toml")));
     visit_manifest(manifest_path, &mut graph, &mut visiting, compiler_std_manifest.as_deref())?;
     graph.packages.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(graph)

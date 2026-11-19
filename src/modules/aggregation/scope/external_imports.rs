@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use crate::ast::{ImportDecl, Program, TopLevelDecl};
 
-use super::super::types::{ModuleError, ScopeViolation};
+use super::super::types::{ModuleError, OutOfScopeReference, ScopeViolation};
 use super::check::binding;
 use super::references::program_references;
 use crate::modules::ModuleResolver;
@@ -177,11 +177,11 @@ fn not_exported(
     module: &str,
     span: crate::lexer::SourceSpan,
 ) -> ModuleError {
-    ModuleError::OutOfScopeReference {
+    ModuleError::OutOfScopeReference(Box::new(OutOfScopeReference {
         module: context.importer.to_owned(),
         symbol: symbol.to_owned(),
         reason: ScopeViolation::NotExported { module: module.to_owned() },
         path: context.report_path.to_owned(),
         span,
-    }
+    }))
 }

@@ -202,10 +202,19 @@ pub(super) fn runtime_source_root(
     })
 }
 
+/// The source root of the compiler-owned standard library, as configured:
+/// the first candidate directory that exists. The path keeps the spelling it
+/// was configured with, so diagnostics and tools show the path the user gave.
 pub(super) fn compiler_owned_std_source_root() -> Option<PathBuf> {
-    builtin_root_candidates()
-        .into_iter()
-        .find_map(|path| fs::canonicalize(path).ok().filter(|root| root.is_dir()))
+    builtin_root_candidates().into_iter().find(|path| path.is_dir())
+}
+
+/// The canonical form of that source root. Package identity compares paths
+/// only in this form, so a symlinked or differently spelled path to the same
+/// directory (`/var` and `/private/var` on macOS, `\\?\` prefixes on
+/// Windows) names the same package.
+pub(super) fn compiler_owned_std_canonical_root() -> Option<PathBuf> {
+    compiler_owned_std_source_root().and_then(|root| fs::canonicalize(root).ok())
 }
 
 pub(super) fn runtime_identity(

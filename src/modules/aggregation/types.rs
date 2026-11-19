@@ -70,14 +70,18 @@ pub enum ModuleError {
         facade: PathBuf,
         span: SourceSpan,
     },
-    OutOfScopeReference {
-        module: String,
-        symbol: String,
-        reason: ScopeViolation,
-        path: PathBuf,
-        span: SourceSpan,
-    },
+    OutOfScopeReference(Box<OutOfScopeReference>),
     Semantic(Box<crate::semantic::SemanticError>),
+}
+
+/// A reference to a declaration outside its module's scope (ADR-0110).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OutOfScopeReference {
+    pub module: String,
+    pub symbol: String,
+    pub reason: ScopeViolation,
+    pub path: PathBuf,
+    pub span: SourceSpan,
 }
 
 /// Why a spelling does not name a declaration in its module's scope
@@ -171,9 +175,7 @@ impl Display for ModuleError {
             Self::ConflictingOpening { module, name, .. } => {
                 write_conflict(formatter, module, name)
             }
-            Self::OutOfScopeReference { module, symbol, reason, .. } => {
-                write_scope_violation(formatter, module, symbol, reason)
-            }
+            Self::OutOfScopeReference(violation) => Display::fmt(violation, formatter),
             Self::Semantic(error) => write!(
                 formatter,
                 "module semantic error at {}..{}",
@@ -184,6 +186,12 @@ impl Display for ModuleError {
 }
 
 impl std::error::Error for ModuleError {}
+
+impl Display for OutOfScopeReference {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write_scope_violation(formatter, &self.module, &self.symbol, &self.reason)
+    }
+}
 
 impl ModuleError {
     pub(crate) fn frontend(path: &std::path::Path, error: crate::session::FrontendError) -> Self {

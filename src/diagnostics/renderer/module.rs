@@ -58,10 +58,13 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
             module_error("E1111", error.to_string(), SourceSpan::new(0, 0))
         }
         ModuleError::PrivateDeclarationAccess { span, facade: path, .. }
-        | ModuleError::ConflictingOpening { span, facade: path, .. }
-        | ModuleError::OutOfScopeReference { span, path, .. } => {
+        | ModuleError::ConflictingOpening { span, facade: path, .. } => {
             module_error(visibility_code(error), error.to_string(), *span)
                 .with_source_path(path.display().to_string())
+        }
+        ModuleError::OutOfScopeReference(violation) => {
+            module_error(visibility_code(error), error.to_string(), violation.span)
+                .with_source_path(violation.path.display().to_string())
         }
         ModuleError::Semantic(error) => semantic_diagnostic(error),
     }
@@ -70,7 +73,7 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
 fn visibility_code(error: &ModuleError) -> &'static str {
     match error {
         ModuleError::ConflictingOpening { .. } => "E1137",
-        ModuleError::OutOfScopeReference { .. } => "E1119",
+        ModuleError::OutOfScopeReference(_) => "E1119",
         _ => "E1109",
     }
 }

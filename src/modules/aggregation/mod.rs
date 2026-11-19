@@ -30,7 +30,7 @@ pub(crate) use plan::{program_with_performance_context, validate_compilation_pla
 pub(crate) use registry::DeclarationRegistry;
 pub use types::{
     DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation,
-    ScopeViolation,
+    OutOfScopeReference, ScopeViolation,
 };
 pub use unit::{
     ModuleIdentity, ModuleSource, ModuleSourceKind, ModuleUnit, load_module_unit,

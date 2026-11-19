@@ -63,7 +63,7 @@ impl CompilerConfiguration {
     ) -> Result<Self, ConfigurationError> {
         let manifest = manifest::read(path)?;
         let dependency_graph = super::dependencies::resolve(path)?;
-        let compiler_std_source_root = super::resolution::compiler_owned_std_source_root();
+        let compiler_std_source_root = super::resolution::compiler_owned_std_canonical_root();
         validate_package_identities(
             path,
             &manifest,
