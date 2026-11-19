@@ -24,7 +24,7 @@ pub(crate) fn lower_method_call(
         return lower_fat_pointer_method(function, receiver, context);
     }
     let callee = method_callee(receiver_type, method, context.functions);
-    lower_call(function, &callee, &combined, context)
+    lower_call(function, &callee, &combined, &[], context)
 }
 
 fn combine_method_arguments(receiver: &Expr, arguments: &[Argument]) -> Vec<Argument> {

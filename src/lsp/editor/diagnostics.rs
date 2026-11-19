@@ -92,7 +92,10 @@ fn analyze_test_fixture(
     target: &TargetSpec,
 ) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
-    let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
+    let configuration = match CompilerConfiguration::from_input_path_read_only(&path) {
+        Ok(configuration) => configuration,
+        Err(_) => return None,
+    };
     let syntax_fixture_roots = [
         configuration.project_root().join("tests/fixtures/formatter"),
         configuration.project_root().join("tests/fixtures/parser"),
@@ -120,14 +123,18 @@ fn analyze_package_module(
     target: &TargetSpec,
 ) -> Option<Result<(), ModuleError>> {
     let path = file_uri_to_path(uri)?;
-    let configuration = CompilerConfiguration::from_input_path_read_only(&path).ok()?;
+    let configuration = match CompilerConfiguration::from_input_path_read_only(&path) {
+        Ok(configuration) => configuration,
+        Err(_) => return None,
+    };
     let resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
     );
-    let result = match module_path_for_file(configuration.source_root(), &path) {
+    let module_root = module_root_for_file(&configuration, &path);
+    let result = match module_root.as_deref().and_then(|root| module_path_for_file(root, &path)) {
         Some(module_path) => crate::modules::analyze_module_with_overlays_for_target(
             &resolver,
             &module_path,
@@ -147,6 +154,18 @@ fn analyze_package_module(
         None => return None,
     };
     Some(result.map(|_| ()))
+}
+
+fn module_root_for_file(configuration: &CompilerConfiguration, path: &Path) -> Option<PathBuf> {
+    if path.starts_with(configuration.source_root()) {
+        return Some(configuration.source_root().to_owned());
+    }
+    if let Some(root) = configuration.runtime_source_root()
+        && path.starts_with(root)
+    {
+        return Some(root.to_owned());
+    }
+    configuration.dependency_roots().values().find(|root| path.starts_with(root)).cloned()
 }
 
 fn is_project_entry_with_imports(

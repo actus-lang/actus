@@ -25,6 +25,7 @@ impl SharedExpressionProvider<'_> {
             BinaryOp::NotEquals => BackendIntegerCompareOp::NotEquals,
             _ => return Err(unsupported(span, "comparison operator expected")),
         };
+        let (left, right) = super::state::unify_literal_operands(self, left, right, instructions);
         let left_type = self
             .value_type(left)
             .ok_or_else(|| unsupported(span, "left comparison operand type is unavailable"))?;

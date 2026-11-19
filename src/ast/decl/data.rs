@@ -115,7 +115,7 @@ impl PackDecl {
                     "{}:{}:{}@{}",
                     field_role_name(&field.role),
                     field.name,
-                    field.ty.canonical_key(),
+                    field.ty.spelling_key(),
                     field.offset
                 )
             })
@@ -124,7 +124,7 @@ impl PackDecl {
         format!(
             "{}|storage={}|layout={:?}|fields=[{}]",
             self.name,
-            self.storage.canonical_key(),
+            self.storage.type_name().spelling_key(),
             self.endianness,
             fields
         )

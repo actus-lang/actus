@@ -1,6 +1,8 @@
 use crate::lexer::SourceSpan;
 
-use super::super::analyzer::{Analyzer, type_contains_float, type_name_text_contains_float};
+use super::super::analyzer::{
+    Analyzer, canonical_type_name, type_contains_float, type_name_text_contains_float,
+};
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::VerbSignature;
 
@@ -113,6 +115,9 @@ fn bounded_error(dimension: &str, limit: u64, required: &str, span: SourceSpan) 
 }
 
 fn signature_contains_float(signature: &VerbSignature) -> bool {
-    signature.params.iter().any(|(_, _, type_name)| type_name_text_contains_float(type_name))
+    signature
+        .params
+        .iter()
+        .any(|(_, _, type_name)| type_name_text_contains_float(&canonical_type_name(type_name)))
         || signature.return_type_name.as_ref().is_some_and(type_contains_float)
 }

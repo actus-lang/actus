@@ -193,14 +193,33 @@ import {
 };
 ```
 
-These direct child paths are invalid because they bypass a parent facade or
-address an implementation file:
+A child directory that every facade on its path opens is part of the parent's
+public boundary, so `import control::runtime;` is valid. It binds to the unit
+that compiles the child (`control`), never to a second copy of it, and only the
+declarations `runtime.act` opens are reachable through `runtime::` (ADR-0110).
+These paths are invalid because they bypass a facade or address an
+implementation file:
 
 ```act
-import control::runtime;
-import control::runtime::safety;
-import control::runtime::runtime;
+import control::runtime::safety;   // a file, not a module
+import control::runtime::runtime;  // the facade file itself
 ```
+
+A child directory that its parent facade does not open is private to the
+parent and cannot be imported from outside it.
+
+A facade can also open a file or child directory for its unit only:
+
+```act
+// src/control/runtime/runtime.act
+open safety;          // public: reachable from other units
+open unit checks;     // reachable from every module of `control`, not outside it
+```
+
+Other modules of `control` import `control::runtime` as usual and reach the
+declarations `checks.act` opens; another unit sees only `safety`
+(ADR-0111). `unit` is a modifier only between `open` and a name, so
+`open unit;` still opens a file named `unit.act`.
 
 Use responsibility-specific child directories and keep one stable parent
 facade for external consumers. The resolver, semantic analyzer, native linker,

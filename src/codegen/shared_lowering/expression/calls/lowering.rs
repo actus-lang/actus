@@ -20,22 +20,33 @@ pub(in crate::codegen::shared_lowering::expression) fn lower_call(
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let Expr::Call { callee, arguments, span } = expression else {
+    let Expr::Call { callee, resolved_type, generic_arguments, arguments, span, .. } = expression
+    else {
         return Err(unsupported(expression_span(expression), "call expression expected"));
     };
-    if let Some(value) =
-        super::super::layout::lower_intrinsic(provider, callee, *span, instructions)?
-    {
+    if let Some(value) = super::super::layout::lower_intrinsic(
+        provider,
+        callee,
+        generic_arguments,
+        *span,
+        instructions,
+    )? {
         return Ok(value);
     }
     if is_scalar_copy_intrinsic(provider, callee) {
         return lower_copy_call(provider, arguments, *span, instructions);
     }
     if arguments.is_empty() && callee.starts_with("Array[") {
-        return constructors::lower_array_constructor(provider, callee, *span, instructions);
+        let type_name = resolved_type.as_ref().ok_or_else(|| {
+            unsupported(*span, "array constructor reached codegen without a resolved type")
+        })?;
+        return constructors::lower_array_constructor(provider, type_name, *span, instructions);
     }
     if arguments.is_empty() && callee.starts_with("Arena[") {
-        return super::super::arena::lower_constructor(provider, callee, *span, instructions);
+        let type_name = resolved_type.as_ref().ok_or_else(|| {
+            unsupported(*span, "arena constructor reached codegen without a resolved type")
+        })?;
+        return super::super::arena::lower_constructor(provider, type_name, *span, instructions);
     }
     let lowered = arguments::lower_arguments(provider, callee, arguments, *span, instructions)?;
     let arguments = lowered.values;
@@ -99,7 +110,7 @@ fn lower_user_call(
         span,
     });
     loan::append_scalar_loan_writebacks(provider, writebacks, span, instructions);
-    result.ok_or_else(|| unsupported(span, "unit call cannot produce a value"))
+    result.ok_or_else(|| unsupported(span, format!("unit call `{callee}` cannot produce a value")))
 }
 
 fn expression_arguments(expression: &Expr) -> &[crate::ast::Argument] {
@@ -154,7 +165,7 @@ pub(in crate::codegen::shared_lowering::expression) fn lower_unit_call(
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<(), BackendContractError> {
-    let Expr::Call { callee, arguments, span } = expression else {
+    let Expr::Call { callee, arguments, span, .. } = expression else {
         return Err(unsupported(expression_span(expression), "unit call expected"));
     };
     let lowered = arguments::lower_arguments(provider, callee, arguments, *span, instructions)?;

@@ -3,11 +3,11 @@ use crate::codegen::{BackendEmitError, BackendSymbolBindings, SymbolIdentity, Sy
 use crate::configuration::CompilerConfiguration;
 use crate::modules::{ModuleCompilationPlan, ModuleObjectPlan};
 
-pub(super) fn emit_objects_llvm(
+pub(super) fn emit_object_llvm(
     plan: &ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
-) -> Result<Vec<EmittedObject>, BackendEmitError> {
+) -> Result<EmittedObject, BackendEmitError> {
     let (generic_types, generic_instances) = super::shared::generic_inputs(plan, configuration)?;
     let object_plan = plan
         .object_plan_with_generic_types(&generic_types)
@@ -17,7 +17,7 @@ pub(super) fn emit_objects_llvm(
     } else {
         llvm_module_bindings(&object_plan, &generic_instances)?
     };
-    let modules = super::shared::lower_shared_modules(
+    let program = super::shared::lower_program(
         &object_plan,
         symbol,
         configuration,
@@ -25,36 +25,35 @@ pub(super) fn emit_objects_llvm(
         &generic_instances,
         "llvm",
     )?;
-    modules
-        .into_iter()
-        .map(|lowered| {
-            crate::codegen::reject_float_ir(
-                &lowered.module,
-                configuration.native_backend().verifies_no_float_ir(),
-            )?;
-            llvm_object(
-                &lowered.object_name,
-                &lowered.module,
-                configuration.target(),
-                configuration.native_backend().position_independent(),
-                configuration.native_backend().verifies_no_float_ir(),
-            )
-        })
-        .collect()
+    crate::codegen::reject_float_ir(
+        &program.module,
+        configuration.native_backend().verifies_no_float_ir(),
+    )?;
+    llvm_object(
+        "root",
+        &program.module,
+        &program.local_symbols,
+        configuration.target(),
+        configuration.native_backend().position_independent(),
+        configuration.native_backend().verifies_no_float_ir(),
+    )
 }
 
 fn llvm_object(
     name: &str,
     module: &crate::codegen::BackendModule,
+    local_symbols: &std::collections::BTreeSet<String>,
     target: &crate::target::TargetSpec,
     position_independent: bool,
     verify_no_float: bool,
 ) -> Result<EmittedObject, BackendEmitError> {
-    let bytes = crate::codegen::llvm::emit_object_bytes_with_configuration_and_float_policy(
+    let bytes = crate::codegen::llvm::emit_object_bytes_with_local_symbols(
         module,
+        local_symbols,
         target,
         position_independent,
         verify_no_float,
+        crate::codegen::llvm::ObjectEmissionOptions::default(),
     )?;
     let symbols =
         module.functions.iter().map(|function| function.symbol.as_str().to_owned()).collect();
@@ -91,9 +90,8 @@ fn llvm_module_bindings_with_policy(
                 name.clone(),
                 symbol.as_str().to_owned(),
             ));
-            for instance in generic_instances
-                .iter()
-                .filter(|instance| instance.name.rsplit("::").next() == Some(name.as_str()))
+            for instance in
+                crate::codegen::generic_instances_of_verb(unit.program(), name, generic_instances)
             {
                 let specialized_full = crate::codegen::specialized_generic_name(instance);
                 let specialized = specialized_full

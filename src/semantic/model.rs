@@ -91,9 +91,14 @@ pub struct ConditionalFact {
 pub struct GenericInstance {
     pub name: String,
     pub arguments: Vec<TypeName>,
+    pub identity: TypeIdentity,
     pub canonical_key: String,
     pub caller: Option<String>,
     pub call_span: SourceSpan,
+    /// The generic verb this instance specializes (ADR-0108), when known.
+    pub verb: Option<crate::ast::DeclarationId>,
+    /// The generic verb whose body calls this instance, when known.
+    pub caller_verb: Option<crate::ast::DeclarationId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -104,12 +109,7 @@ pub struct ExplicitDrop {
 
 impl GenericInstance {
     pub fn identity(&self) -> TypeIdentity {
-        TypeIdentity::from_type_name(&TypeName {
-            name: self.name.clone(),
-            arguments: self.arguments.clone(),
-            reference_role: None,
-            span: self.call_span,
-        })
+        self.identity.clone()
     }
 }
 

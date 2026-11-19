@@ -1,6 +1,7 @@
 pub(super) mod bounds;
 pub(super) mod cache;
 pub(super) mod handlers;
+pub(super) mod masking;
 pub(super) mod memory_graph;
 pub(super) mod model;
 pub(super) mod semantic;

@@ -78,10 +78,12 @@ fn extend_program_items(
 ) {
     let Some(source) = source else { return };
     let Some(ParseSnapshot::Valid(program)) = context.store.parse_snapshot(uri) else { return };
-    let Ok(program) = crate::semantic::filter_program_for_target_checked(&program, context.target)
+    let Ok(mut program) =
+        crate::semantic::filter_program_for_target_checked(&program, context.target)
     else {
         return;
     };
+    crate::modules::DeclarationRegistry::resolve_standalone(&mut program);
     labels.extend(super::module_scope::internal_symbols(&program));
     let namespace = position.and_then(|value| namespace_before_cursor(source, value));
     labels.extend(super::module_scope::imported_public_symbols(

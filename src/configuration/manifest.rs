@@ -182,6 +182,13 @@ pub enum LibraryKind {
 }
 
 pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
+    read_with_compiler_std(path, None)
+}
+
+pub(crate) fn read_with_compiler_std(
+    path: &Path,
+    compiler_std_manifest: Option<&Path>,
+) -> Result<ActusManifest, ConfigurationError> {
     let source = std::fs::read_to_string(path).map_err(|error| {
         ConfigurationError::new(format!("cannot read `{}`: {error}", path.display()))
     })?;
@@ -199,23 +206,36 @@ pub(crate) fn read(path: &Path) -> Result<ActusManifest, ConfigurationError> {
             ConfigurationError::new(format!("cannot parse `{}`: {message}", path.display()))
         }
     })?;
-    validate(&manifest)?;
+    let is_compiler_std = compiler_std_manifest.is_some_and(|allowed| same_path(path, allowed))
+        || is_compiler_owned_std_manifest(path, &manifest);
+    validate(&manifest, is_compiler_std)?;
     Ok(manifest)
 }
 
-pub(crate) fn validate(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
-    validate_package(manifest)?;
+fn same_path(left: &Path, right: &Path) -> bool {
+    std::fs::canonicalize(left).ok() == std::fs::canonicalize(right).ok()
+}
+
+pub(crate) fn validate(
+    manifest: &ActusManifest,
+    allow_compiler_owned_std: bool,
+) -> Result<(), ConfigurationError> {
+    validate_package(manifest, allow_compiler_owned_std)?;
     validate_build(manifest)?;
     validate_libraries(manifest)?;
     validate_runtime_manifest(manifest)
 }
 
-fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
+fn validate_package(
+    manifest: &ActusManifest,
+    allow_compiler_owned_std: bool,
+) -> Result<(), ConfigurationError> {
     if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
         return Err(ConfigurationError::new(
             "Actus.toml package name and version must not be empty".to_owned(),
         ));
     }
+    package_identity_name(&manifest.package.name, allow_compiler_owned_std)?;
     if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
         return Err(ConfigurationError::new(format!(
             "unsupported Actus edition; expected `{DEFAULT_EDITION}`"
@@ -230,6 +250,47 @@ fn validate_package(manifest: &ActusManifest) -> Result<(), ConfigurationError> 
         ));
     }
     Ok(())
+}
+
+pub(crate) fn package_identity_name(
+    name: &str,
+    allow_compiler_owned_std: bool,
+) -> Result<String, ConfigurationError> {
+    let identity = name.replace('-', "_");
+    let mut characters = identity.chars();
+    let valid_start = characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_ascii_alphabetic());
+    let valid_rest =
+        characters.all(|character| character == '_' || character.is_ascii_alphanumeric());
+    if !valid_start || !valid_rest {
+        return Err(ConfigurationError::coded(
+            crate::diagnostics::STRICT_PACKAGE_IDENTITY_INVALID,
+            format!("Actus.toml package name `{name}` is not a valid identity namespace"),
+        ));
+    }
+    if identity == "builtin" || (identity == "std" && !allow_compiler_owned_std) {
+        return Err(ConfigurationError::coded(
+            crate::diagnostics::STRICT_PACKAGE_IDENTITY_INVALID,
+            format!("Actus.toml package name `{name}` is reserved for compiler-owned declarations"),
+        ));
+    }
+    Ok(identity)
+}
+
+pub(crate) fn is_compiler_owned_std_manifest(path: &Path, manifest: &ActusManifest) -> bool {
+    manifest.package.name == "std"
+        && matches!(
+            manifest.runtime.as_ref().map(|runtime| runtime.kind),
+            Some(RuntimePackageKind::Builtin)
+        )
+        && path.file_name().is_some_and(|name| name == MANIFEST_FILE_NAME)
+        && path.parent().and_then(Path::file_name).is_some_and(|name| name == "std")
+        && path
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::file_name)
+            .is_some_and(|name| name == "library")
 }
 
 fn validate_build(manifest: &ActusManifest) -> Result<(), ConfigurationError> {

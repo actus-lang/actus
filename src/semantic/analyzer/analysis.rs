@@ -27,7 +27,16 @@ pub(crate) fn validate_stack_limit_dynamic_dispatch(
 
 use super::errors::SemanticError;
 use super::model::SemanticModel;
+/// Analyzes a parsed program that has no compilation plan. Its types are
+/// resolved against the program's own declarations first (ADR-0108).
 pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
-    let normalized = super::normalize_generated_locals(program);
+    let mut resolved = program.clone();
+    crate::modules::DeclarationRegistry::resolve_standalone(&mut resolved);
+    analyze_resolved(&resolved)
+}
+
+/// Analyzes a program whose types a compilation plan already annotated.
+pub(crate) fn analyze_resolved(program: &Program) -> Result<SemanticModel, SemanticError> {
+    let normalized = crate::semantic::normalize_generated_locals(program);
     Analyzer::new().analyze(&normalized)
 }

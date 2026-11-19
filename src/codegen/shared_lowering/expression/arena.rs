@@ -9,17 +9,15 @@ use crate::lexer::SourceSpan;
 
 pub(super) fn lower_constructor(
     provider: &mut SharedExpressionProvider<'_>,
-    callee: &str,
+    type_name: &TypeName,
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let type_name = crate::semantic::parse_type_name_key(callee, span)
-        .ok_or_else(|| unsupported(span, "malformed arena constructor"))?;
-    let capacity = arena_capacity(&type_name, span)?;
-    let pointer_width = pointer_width(provider, &type_name, span)?;
+    let capacity = arena_capacity(type_name, span)?;
+    let pointer_width = pointer_width(provider, type_name, span)?;
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Pointer);
-    provider.remember_nominal_type(result, type_name);
+    provider.remember_nominal_type(result, type_name.clone());
     instructions.push(BackendInstruction::ArenaConstruct { result, capacity, pointer_width, span });
     Ok(result)
 }

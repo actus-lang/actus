@@ -10,9 +10,12 @@ impl Analyzer {
         receiver: &Expr,
         method: &str,
         arguments: &[Argument],
+        resolved_type: Option<&crate::ast::TypeName>,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if let Some(result) = self.visit_special_method_call(receiver, method, arguments, span) {
+        if let Some(result) =
+            self.visit_special_method_call(receiver, method, arguments, resolved_type, span)
+        {
             return result;
         }
         self.visit_static_method_call(receiver, method, arguments, span)
@@ -23,6 +26,7 @@ impl Analyzer {
         receiver: &Expr,
         method: &str,
         arguments: &[Argument],
+        resolved_type: Option<&crate::ast::TypeName>,
         span: SourceSpan,
     ) -> Option<Result<(), SemanticError>> {
         if let Some(role_name) = self.dynamic_role_for_expression(receiver) {
@@ -39,7 +43,13 @@ impl Analyzer {
             return Some(result);
         }
         if self.enum_receiver_name(receiver).is_some() {
-            return Some(self.validate_enum_constructor(receiver, method, arguments, span));
+            return Some(self.validate_enum_constructor(
+                receiver,
+                resolved_type,
+                method,
+                arguments,
+                span,
+            ));
         }
         (method == "raw_slice").then(|| self.visit_raw_slice_call(receiver, arguments, span))
     }
@@ -66,12 +76,17 @@ impl Analyzer {
                 kind: SemanticErrorKind::InvalidReceiver { method: method.to_owned() },
                 span,
             })?;
-        self.validate_receiver_type(&actual_type, receiver_type, method, span)?;
+        self.validate_receiver_type(
+            &actual_type,
+            &super::super::analyzer::canonical_type_name(receiver_type),
+            method,
+            span,
+        )?;
         let combined = self.method_arguments(receiver, receiver_role, receiver_name, arguments);
         if performance.is_some() {
             self.dispatch_performance_method(&actual_type, method, &combined, span, &signature)
         } else {
-            self.visit_call(method, &combined, span)
+            self.visit_call(method, &combined, None, &[], span)
         }
     }
 

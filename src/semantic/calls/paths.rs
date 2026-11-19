@@ -35,6 +35,15 @@ pub(super) fn paths_overlap(left: &str, right: &str) -> bool {
 }
 
 impl Analyzer {
+    /// The signature a call spelling names, resolving an import namespace
+    /// such as `cli::print_help` the same way call analysis does.
+    pub(in crate::semantic) fn call_signature_name(&self, callee: &str) -> Option<String> {
+        if self.signatures.contains_key(callee) {
+            return Some(callee.to_owned());
+        }
+        self.qualified_call_lookup_name(callee, SourceSpan::new(0, 0)).ok()
+    }
+
     pub(super) fn qualified_call_lookup_name(
         &self,
         callee: &str,

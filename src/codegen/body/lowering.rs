@@ -26,6 +26,7 @@ pub fn lower_verb_body_with_expressions(
         next_block: 1,
         blocks: Vec::new(),
         block_bindings: BTreeMap::new(),
+        block_exit_bindings: BTreeMap::new(),
         loop_targets: Vec::new(),
         carried_scopes: Vec::new(),
         implicit_unit_return: verb
@@ -78,6 +79,9 @@ pub(in crate::codegen) struct BodyLowering<'a, P> {
     pub(in crate::codegen) blocks: Vec<BackendBlock>,
     pub(in crate::codegen) block_bindings:
         BTreeMap<BackendBlockId, BTreeMap<String, BackendValueId>>,
+    /// The binding values where a block falls through to its successor: the
+    /// arguments its edge must carry for each name (if joins).
+    pub(super) block_exit_bindings: BTreeMap<BackendBlockId, BTreeMap<String, BackendValueId>>,
     pub(super) loop_targets: Vec<LoopTargets>,
     pub(super) carried_scopes: Vec<Vec<String>>,
     implicit_unit_return: bool,
@@ -229,6 +233,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         if !terminates(instructions.last())
             && let Some(target) = fallthrough
         {
+            self.block_exit_bindings.insert(id, self.provider.snapshot_bindings());
             instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
         } else if !terminates(instructions.last()) && self.implicit_unit_return {
             self.provider.append_parameter_writebacks(&mut instructions);

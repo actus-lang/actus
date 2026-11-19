@@ -16,4 +16,8 @@ pub mod parser;
 pub mod registry;
 pub mod runtime;
 pub mod semantic;
+mod session;
+mod source_map;
 pub mod target;
+
+pub(crate) use source_map::SharedSourceMap;

@@ -51,11 +51,11 @@ impl Analyzer {
         expression: &Expr,
     ) -> Result<(), SemanticError> {
         let found = self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
-        let type_name = crate::ast::TypeName {
-            name: found.clone(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span: expression_span(expression),
+        let Some(type_name) = self.resolved_type_name(expression) else {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::DynamicRoleMismatch { role: expected.to_owned(), found },
+                span: expression_span(expression),
+            });
         };
         if self.has_performance(expected, &type_name) {
             return Ok(());

@@ -116,6 +116,12 @@ impl Parser {
             }
         }
         let end = self.expect_simple(TokenKind::RightBrace, "`}`")?.span.end;
-        Ok(Expr::StructLit { name, type_arguments, fields, span: SourceSpan::new(start, end) })
+        Ok(Expr::StructLit {
+            name,
+            type_arguments,
+            resolved_type: None,
+            fields,
+            span: SourceSpan::new(start, end),
+        })
     }
 }

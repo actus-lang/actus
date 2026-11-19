@@ -10,6 +10,7 @@ use crate::ast::{
 use crate::ast::{DispatchMode, ExternalVerbDecl, ForeignAbi, Param};
 use crate::codegen::link_objects;
 use crate::configuration::CompilerConfiguration;
+use crate::diagnostics::{render_diagnostic, semantic_diagnostic};
 use crate::lexer::SourceSpan;
 use crate::modules::{ModuleResolver, build_test_compilation_plan};
 
@@ -163,15 +164,20 @@ fn run_test(
     let verb = test_verb(test)?;
     validate_test_verb(verb)?;
     let plan = test_compilation_plan(test, configuration)?;
-    let objects = crate::cli::build::emit_objects(&plan, "main", configuration)
+    let caller =
+        crate::semantic::filter_program_for_target_checked(plan.caller(), configuration.target())
+            .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
+    crate::semantic::analyze_resolved(&caller)
+        .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
+    crate::modules::validate_compilation_plan(&plan, configuration.target())
+        .map_err(|error| test_diagnostic(test, crate::diagnostics::module_diagnostic(&error)))?;
+    let object = crate::cli::build::emit_object(&plan, "main", configuration)
         .map_err(|error| error.to_string())?;
-    let mut paths = TestArtifactPaths::new(index)?;
-    let result = paths
-        .write_objects(&objects)
+    let paths = TestArtifactPaths::new(index)?;
+    let result = fs::write(&paths.object, &object.bytes)
+        .map_err(|error| format!("cannot write test object: {error}"))
         .and_then(|()| {
-            let references =
-                paths.objects.iter().map(std::path::PathBuf::as_path).collect::<Vec<_>>();
-            link_objects(&references, &paths.executable, configuration)
+            link_objects(&[paths.object.as_path()], &paths.executable, configuration)
                 .map_err(|error| error.to_string())
         })
         .and_then(|()| run_test_process(&paths.executable, &paths.working_directory));
@@ -181,6 +187,18 @@ fn run_test(
         (Ok(_), Err(error)) => Err(error),
         (Err(run_error), Err(cleanup_error)) => Err(format!("{run_error}; {cleanup_error}")),
     }
+}
+
+fn test_diagnostic(test: &DiscoveredTest, diagnostic: crate::diagnostics::Diagnostic) -> String {
+    test.source_map
+        .lock()
+        .localize(&diagnostic)
+        .map(|(path, source, diagnostic)| {
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
+        })
+        .unwrap_or_else(|| {
+            format!("{}: {}", test.path.display(), render_diagnostic("", &diagnostic))
+        })
 }
 
 fn test_verb(test: &DiscoveredTest) -> Result<&crate::ast::VerbDecl, String> {
@@ -245,7 +263,8 @@ fn test_compilation_plan(
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
-    );
+    )
+    .with_package_identity(configuration.package_identity(), configuration.source_root());
     build_test_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
 }
 
@@ -263,7 +282,7 @@ fn test_program(source_program: &crate::ast::Program, test_name: &str) -> crate:
 }
 
 struct TestArtifactPaths {
-    objects: Vec<std::path::PathBuf>,
+    object: std::path::PathBuf,
     executable: std::path::PathBuf,
     working_directory: std::path::PathBuf,
 }
@@ -273,41 +292,15 @@ impl TestArtifactPaths {
         let root = std::env::temp_dir().join(format!("actus-test-{}-{index}", std::process::id()));
         fs::create_dir_all(&root)
             .map_err(|error| format!("cannot create test working directory: {error}"))?;
-        Ok(Self { objects: Vec::new(), executable: root.join("test.bin"), working_directory: root })
-    }
-
-    fn write_objects(
-        &mut self,
-        objects: &[crate::cli::build::EmittedObject],
-    ) -> Result<(), String> {
-        let root = self.executable.with_extension("root.o");
-        for (index, object) in objects.iter().enumerate() {
-            let path = if index == 0 {
-                root.clone()
-            } else {
-                self.executable.with_file_name(format!(
-                    "{}.module.{}.o",
-                    self.executable
-                        .file_stem()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("actus-test"),
-                    object.name.replace([':', '/', '\\'], "_")
-                ))
-            };
-            fs::write(&path, &object.bytes)
-                .map_err(|error| format!("cannot write test object: {error}"))?;
-            self.objects.push(path);
-        }
-        Ok(())
+        let executable = root.join("test.bin");
+        Ok(Self { object: executable.with_extension("o"), executable, working_directory: root })
     }
 
     fn cleanup(&self) -> Result<(), String> {
         if std::env::var("ACTUS_TEST_KEEP_ARTIFACTS").as_deref() == Ok("1") {
             return Ok(());
         }
-        for object in &self.objects {
-            remove_artifact(object)?;
-        }
+        remove_artifact(&self.object)?;
         remove_artifact(&self.executable)?;
         fs::remove_dir_all(&self.working_directory).map_err(|error| {
             format!(
@@ -344,25 +337,16 @@ fn test_fault_declaration() -> TopLevelDecl {
             role: Role::Abs,
             name: "code".to_owned(),
             dispatch: DispatchMode::Static,
-            ty: TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
+            ty: TypeName::builtin("Int", Vec::new(), None, span),
             span,
         }],
         return_type: Some(crate::ast::ReturnType {
             access: crate::ast::ReturnAccess::Owned,
-            ty: TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
+            ty: TypeName::builtin("Int", Vec::new(), None, span),
             span,
         }),
         span,
+        identity: None,
     })
 }
 
@@ -377,6 +361,8 @@ fn test_main(
         statements.push(Stmt::Expression {
             expression: Expr::Call {
                 callee: "actus_test_publication_fault".to_owned(),
+                resolved_type: None,
+                generic_arguments: Vec::new(),
                 arguments: vec![Argument {
                     name: None,
                     role: Some(Role::Abs),
@@ -394,7 +380,13 @@ fn test_main(
         });
     }
     statements.push(Stmt::Return {
-        value: Some(Expr::Call { callee: name.to_owned(), arguments: Vec::new(), span }),
+        value: Some(Expr::Call {
+            callee: name.to_owned(),
+            resolved_type: None,
+            generic_arguments: Vec::new(),
+            arguments: Vec::new(),
+            span,
+        }),
         span,
     });
     TopLevelDecl::Verb(VerbDecl {
@@ -407,15 +399,11 @@ fn test_main(
         params: Vec::new(),
         return_type: Some(crate::ast::ReturnType {
             access: crate::ast::ReturnAccess::Owned,
-            ty: TypeName {
-                name: "Int".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            },
+            ty: TypeName::builtin("Int", Vec::new(), None, span),
             span,
         }),
         body: Block { statements, span },
         span,
+        identity: None,
     })
 }

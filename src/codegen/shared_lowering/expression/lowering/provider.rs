@@ -10,6 +10,8 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     ) -> Result<(), crate::codegen::BackendContractError> {
         let expression = crate::ast::Expr::Call {
             callee: callee.to_owned(),
+            resolved_type: None,
+            generic_arguments: Vec::new(),
             arguments: arguments.to_vec(),
             span,
         };
@@ -222,8 +224,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         } else {
             value
         };
-        if let Some(declared_type) =
-            declared_type.and_then(|name| crate::semantic::parse_type_name_key(name, span))
+        if let Some(declared_type) = self.nominal_type(value).cloned()
             && self.layouts.layout_for(&declared_type).is_some()
         {
             self.remember_nominal_type(value, declared_type);
@@ -243,6 +244,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         let value = self.materialize_aggregate_assignment(value, span, instructions)?;
+        let value = state::retype_assigned_literal(self, name, value, instructions);
         if let Some((destination, layout)) = self.aggregate_loan_parameter(name) {
             crate::codegen::shared_lowering::aggregate_assignment::assign_aggregate_loan(
                 self,
@@ -336,12 +338,8 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         expression: &Expr,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        if let Expr::MethodCall { receiver, method, arguments, span } = expression
-            && let Some(result_type) =
-                super::super::super::constructors::parse_constructor_receiver_type(
-                    receiver.as_ref(),
-                    *span,
-                )
+        if let Expr::MethodCall { method, arguments, resolved_type, span, .. } = expression
+            && let Some(result_type) = resolved_type
             && result_type.name == "Result"
             && result_type.arguments.len() == 2
             && matches!(method.as_str(), "Ok" | "Err")
@@ -356,7 +354,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             }
             crate::codegen::shared_lowering::constructors::lower_result_constructor_payload(
                 self,
-                &result_type,
+                result_type,
                 method,
                 payload,
                 payload_type,

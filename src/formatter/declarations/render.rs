@@ -470,7 +470,7 @@ impl Formatter<'_> {
 
     pub(in crate::formatter) fn open_sibling(&mut self, sibling: &crate::ast::OpenSiblingDecl) {
         self.documentation(sibling.doc.as_deref());
-        self.output.push_str("open ");
+        self.output.push_str(if sibling.unit { "open unit " } else { "open " });
         self.output.push_str(&sibling.name);
         self.output.push(';');
     }

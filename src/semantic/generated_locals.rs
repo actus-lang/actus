@@ -224,7 +224,7 @@ fn normalize_place(place: &mut Place, generated: &mut Vec<Stmt>) {
         normalize_place(target, generated);
         let (prefix, expression) = normalize_nested_expression(index);
         generated.extend(prefix);
-        *index = expression;
+        **index = expression;
     } else if let Place::Field { object, .. } = place {
         normalize_place(object, generated);
     }
@@ -234,7 +234,7 @@ fn normalize_expression(
     expression: &mut Expr,
     context: &mut NormalizationContext<'_>,
 ) -> (Vec<Stmt>, Expr) {
-    let Expr::Call { callee, arguments, span } = expression else {
+    let Expr::Call { callee, arguments, span, .. } = expression else {
         return (Vec::new(), expression.clone());
     };
     let mut prefix = Vec::new();
@@ -277,6 +277,7 @@ fn materialize_arguments(
             role: Role::Erg,
             name: name.clone(),
             ty: Some(parameter.ty.clone()),
+            resolved_type: None,
             initializer,
             span,
         });

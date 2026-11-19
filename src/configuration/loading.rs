@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use super::ActusLock;
@@ -19,6 +20,8 @@ impl CompilerConfiguration {
         Self {
             project_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             source_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("src"),
+            package_identity: crate::modules::aggregation::registry::STANDALONE_PACKAGE_IDENTITY
+                .to_owned(),
             dependency_roots: std::collections::BTreeMap::new(),
             target_spec_hash: target.spec_hash(),
             lockfile_checksum: None,
@@ -60,6 +63,13 @@ impl CompilerConfiguration {
     ) -> Result<Self, ConfigurationError> {
         let manifest = manifest::read(path)?;
         let dependency_graph = super::dependencies::resolve(path)?;
+        let compiler_std_source_root = super::resolution::compiler_owned_std_canonical_root();
+        validate_package_identities(
+            path,
+            &manifest,
+            &dependency_graph,
+            compiler_std_source_root.as_deref(),
+        )?;
         validate_lockfile(path, sync_missing_lockfile)?;
         let environment = Self::from_environment();
         build_from_manifest(path, manifest, dependency_graph, environment)
@@ -96,6 +106,7 @@ fn build_from_manifest(
     environment: CompilerConfiguration,
 ) -> Result<CompilerConfiguration, ConfigurationError> {
     let explicit_backend = manifest.build.backend.is_some();
+    let compiler_owned_std = manifest::is_compiler_owned_std_manifest(path, &manifest);
     let (target, linker_flavor, entry_contract, linker, linker_explicit) =
         resolve_manifest_target(&manifest, &environment)?;
     let time_provider = resolve_time_provider(&manifest, entry_contract)?;
@@ -111,18 +122,16 @@ fn build_from_manifest(
     let lockfile_checksum =
         super::checksum::file_checksum(&manifest_directory.join(manifest::LOCK_FILE_NAME)).ok();
     let source_root = validated_source_root(&manifest, manifest_directory)?;
+    let package_name = manifest.package.name.clone();
     let (profile, native_backend, libraries, library_paths, linker_script) =
         build_settings(manifest.build, manifest.profile, &environment, manifest_directory);
     validate_explicit_backend(explicit_backend, &native_backend, &target)?;
     Ok(CompilerConfiguration {
         project_root: manifest_directory.to_path_buf(),
         source_root,
+        package_identity: manifest_package_identity(&package_name, compiler_owned_std)?,
         dependency_roots: dependency_graph.roots,
-        target_spec_hash: time_provider_hash(
-            explicit_time_provider,
-            &target,
-            time_provider.as_ref(),
-        ),
+        target_spec_hash: target_spec_hash(explicit_time_provider, &target, time_provider.as_ref()),
         lockfile_checksum,
         target,
         time_provider,
@@ -145,6 +154,21 @@ fn build_from_manifest(
         libraries,
         ..environment
     })
+}
+
+fn manifest_package_identity(
+    name: &str,
+    compiler_owned_std: bool,
+) -> Result<String, ConfigurationError> {
+    manifest::package_identity_name(name, compiler_owned_std)
+}
+
+fn target_spec_hash(
+    explicit_time_provider: bool,
+    target: &crate::target::TargetSpec,
+    time_provider: Option<&crate::target::TimeProviderContract>,
+) -> String {
+    time_provider_hash(explicit_time_provider, target, time_provider)
 }
 
 fn validate_explicit_backend(
@@ -249,7 +273,56 @@ pub(crate) fn manifest_path_in_directory(path: &Path) -> Option<PathBuf> {
 
 pub fn package_identity(path: &Path) -> Result<PackageIdentity, ConfigurationError> {
     let manifest = manifest::read(path)?;
-    Ok(PackageIdentity { name: manifest.package.name, version: manifest.package.version })
+    let name = manifest::package_identity_name(
+        &manifest.package.name,
+        manifest::is_compiler_owned_std_manifest(path, &manifest),
+    )?;
+    Ok(PackageIdentity { name, version: manifest.package.version })
+}
+
+fn validate_package_identities(
+    path: &Path,
+    manifest: &manifest::ActusManifest,
+    dependency_graph: &super::dependencies::DependencyGraph,
+    compiler_std_source_root: Option<&Path>,
+) -> Result<(), ConfigurationError> {
+    let mut identities = BTreeMap::new();
+    let root_source_root = std::fs::canonicalize(manifest::source_root(
+        manifest,
+        path.parent().unwrap_or_else(|| Path::new(".")),
+    ))
+    .ok();
+    let root_is_compiler_std = root_source_root
+        .as_deref()
+        .zip(compiler_std_source_root)
+        .is_some_and(|(root, compiler)| root == compiler)
+        || manifest::is_compiler_owned_std_manifest(path, manifest);
+    if root_is_compiler_std {
+        return Ok(());
+    }
+    let root_identity =
+        manifest::package_identity_name(&manifest.package.name, root_is_compiler_std)?;
+    identities.insert(root_identity, root_source_root);
+    for package in &dependency_graph.packages {
+        let is_compiler_std = package
+            .source_root
+            .as_deref()
+            .zip(compiler_std_source_root)
+            .is_some_and(|(package_root, compiler_root)| package_root == compiler_root);
+        let identity = manifest::package_identity_name(&package.identity_name, is_compiler_std)?;
+        let source_root = package.source_root.clone();
+        if let Some(previous_path) = identities.get(&identity) {
+            if previous_path != &source_root {
+                return Err(ConfigurationError::coded(
+                    crate::diagnostics::STRICT_PACKAGE_IDENTITY_INVALID,
+                    format!("package identity namespace `{identity}` is declared more than once"),
+                ));
+            }
+        } else {
+            identities.insert(identity, source_root);
+        }
+    }
+    Ok(())
 }
 
 fn validate_lockfile(path: &Path, sync_missing_lockfile: bool) -> Result<(), ConfigurationError> {

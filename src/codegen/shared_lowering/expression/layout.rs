@@ -10,6 +10,7 @@ use super::SharedExpressionProvider;
 pub(super) fn lower_intrinsic(
     provider: &mut SharedExpressionProvider<'_>,
     callee: &str,
+    generic_arguments: &[crate::ast::TypeName],
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<Option<BackendValueId>, BackendContractError> {
@@ -17,7 +18,7 @@ pub(super) fn lower_intrinsic(
     if !matches!(intrinsic, IntrinsicKind::SizeOf | IntrinsicKind::AlignOf) {
         return Ok(None);
     }
-    let value = layout_intrinsic_value(callee, intrinsic, provider.layouts)
+    let value = layout_intrinsic_value(generic_arguments, intrinsic, provider.layouts)
         .ok_or_else(|| unsupported(span, "layout intrinsic type has no backend layout"))?;
     let result = provider.allocate();
     let ty = BackendValueType::Integer { signed: false, width: 64 };
@@ -27,20 +28,12 @@ pub(super) fn lower_intrinsic(
 }
 
 fn layout_intrinsic_value(
-    callee: &str,
+    generic_arguments: &[crate::ast::TypeName],
     intrinsic: IntrinsicKind,
     layouts: &dyn super::super::BackendLayoutProvider,
 ) -> Option<u32> {
-    let prefix = match intrinsic {
-        IntrinsicKind::SizeOf => "size_of[",
-        IntrinsicKind::AlignOf => "align_of[",
-        _ => return None,
-    };
-    let type_name = callee
-        .strip_prefix(prefix)
-        .and_then(|name| name.strip_suffix(']'))
-        .and_then(|name| crate::semantic::parse_type_name_key(name, SourceSpan::new(0, 0)))?;
-    layout_for_type(&type_name, layouts).map(|layout| match intrinsic {
+    let type_name = generic_arguments.first()?;
+    layout_for_type(type_name, layouts).map(|layout| match intrinsic {
         IntrinsicKind::SizeOf => layout.size,
         IntrinsicKind::AlignOf => layout.alignment,
         _ => unreachable!(),

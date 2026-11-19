@@ -52,7 +52,7 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
         let bridge = match field_type.name.as_str() {
             "Buffer" => BackendCleanupBridge::BufferDrop,
             "Region" => BackendCleanupBridge::RegionDrop,
-            _ if self.drop_symbols.contains_key(&field_type.canonical_key()) => {
+            _ if self.drop_symbols.contains_key(&self.lookup_key(&field_type)) => {
                 return Ok(Some(BackendCleanupResolvedDescriptor {
                     descriptor: BackendCleanupBridgeDescriptor {
                         bridge: BackendCleanupBridge::PerformanceDrop,
@@ -61,7 +61,10 @@ impl BackendCleanupProvider for ProgramLayouts<'_> {
                     },
                     layout: root_layout,
                     field: Some(field),
-                    performance_symbol: self.drop_symbols.get(&field_type.canonical_key()).cloned(),
+                    performance_symbol: self
+                        .drop_symbols
+                        .get(&self.lookup_key(&field_type))
+                        .cloned(),
                 }));
             }
             _ => {
@@ -142,7 +145,7 @@ impl ProgramLayouts<'_> {
 
     fn field_requires_cleanup(&self, type_name: &TypeName) -> bool {
         matches!(type_name.name.as_str(), "Buffer" | "Region")
-            || self.drop_symbols.contains_key(&type_name.canonical_key())
+            || self.drop_symbols.contains_key(&self.lookup_key(type_name))
             || self
                 .type_layout(type_name, &mut Vec::new())
                 .is_some_and(|layout| layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD)
@@ -200,7 +203,11 @@ impl ProgramLayouts<'_> {
         type_name: Option<&TypeName>,
     ) -> Option<BackendCleanupResolvedDescriptor> {
         let type_name = type_name?;
-        let symbol = self.drop_symbols.get(&type_name.canonical_key())?;
+        if matches!(type_name.name.as_str(), "Buffer" | "Region") {
+            return None;
+        }
+        let key = self.lookup_key(type_name);
+        let symbol = self.drop_symbols.get(&key)?;
         let layout = self.type_layout(type_name, &mut Vec::new())?;
         Some(BackendCleanupResolvedDescriptor {
             descriptor: BackendCleanupBridgeDescriptor {

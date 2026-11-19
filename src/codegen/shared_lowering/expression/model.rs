@@ -241,6 +241,18 @@ impl<'a> SharedExpressionProvider<'a> {
         value: BackendValueId,
         type_name: crate::ast::TypeName,
     ) {
+        let type_name = if type_name.resolved.is_none()
+            && crate::ast::lookup_builtin_type(&type_name.name).is_some()
+        {
+            crate::ast::TypeName::builtin(
+                type_name.name.clone(),
+                type_name.arguments.clone(),
+                type_name.reference_role.clone(),
+                type_name.span,
+            )
+        } else {
+            type_name
+        };
         self.nominal_types.insert(value, type_name);
     }
     pub(in crate::codegen::shared_lowering) fn remember_array_endianness(

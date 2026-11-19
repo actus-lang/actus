@@ -341,6 +341,7 @@ impl Parser {
             return_type: signature.return_type,
             body,
             span,
+            identity: None,
         })
     }
 

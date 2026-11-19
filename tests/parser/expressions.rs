@@ -392,7 +392,7 @@ fn parses_bounded_array_types_and_indexed_assignments() {
             value: Expr::Integer { value: assigned, .. },
             ..
         } if matches!(target.as_ref(), Place::Binding { name, .. } if name == "table")
-            && matches!(index, Expr::Integer { value, .. } if value == "1")
+            && matches!(&**index, Expr::Integer { value, .. } if value == "1")
             && assigned == "2"
     ));
     let Stmt::Expression { expression: Expr::Call { arguments, .. }, .. } =

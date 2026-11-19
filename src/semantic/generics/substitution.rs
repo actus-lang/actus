@@ -87,18 +87,14 @@ impl TypeSubstitution {
             return Self::replace_root(argument, type_name);
         }
         if let Some(value) = self.apply_const(&type_name.name) {
-            return TypeName {
-                name: value.to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span: type_name.span,
-            };
+            return TypeName::constant(value, value, type_name.span);
         }
         TypeName {
             name: type_name.name.clone(),
             arguments: type_name.arguments.iter().map(|argument| self.apply(argument)).collect(),
             reference_role: type_name.reference_role.clone(),
             span: type_name.span,
+            resolved: type_name.resolved,
         }
     }
 
@@ -124,6 +120,7 @@ mod tests {
             arguments: Vec::new(),
             reference_role: None,
             span: SourceSpan::new(0, 1),
+            resolved: None,
         }
     }
 
@@ -148,10 +145,12 @@ mod tests {
                     arguments: vec![ty("T")],
                     reference_role: None,
                     span: ty("Array").span,
+                    resolved: None,
                 },
             ],
             reference_role: None,
             span: ty("Result").span,
+            resolved: None,
         };
         assert_eq!(substitution.apply(&applied).arguments[0].name, "Int");
         assert_eq!(substitution.apply(&applied).arguments[1].arguments[0].name, "Int");
@@ -174,6 +173,7 @@ mod tests {
             arguments: Vec::new(),
             reference_role: Some(crate::ast::Role::Abs),
             span: SourceSpan::new(4, 5),
+            resolved: None,
         };
         let substituted = substitution.apply(&source);
         assert_eq!(substituted.name, "Int");
@@ -194,5 +194,37 @@ mod tests {
             TypeSubstitution::for_type("Buffer", &parameters, &[ty("4")], ty("Buffer").span)
                 .expect("arity should match");
         assert_eq!(substitution.apply_const("N"), Some("4"));
+        let applied = substitution.apply(&ty("N"));
+        assert_eq!(
+            applied.resolved_identity(),
+            Some(&crate::ast::DeclarationIdentity::constant("4")),
+        );
+
+        let array_parameters = vec![GenericParam {
+            name: "N".to_owned(),
+            kind: crate::ast::GenericParamKind::Const { domain: ty("Usize") },
+            bound: None,
+            bounds: Vec::new(),
+            span: ty("N").span,
+        }];
+        let array_substitution =
+            TypeSubstitution::for_type("Array", &array_parameters, &[ty("64")], ty("Array").span)
+                .expect("array arity should match");
+        let template = TypeName::builtin(
+            "Array",
+            vec![TypeName::builtin("u8", Vec::new(), None, ty("u8").span), ty("N")],
+            None,
+            ty("Array").span,
+        );
+        let expected = TypeName::builtin(
+            "Array",
+            vec![
+                TypeName::builtin("u8", Vec::new(), None, ty("u8").span),
+                TypeName::constant("64", "64", ty("64").span),
+            ],
+            None,
+            ty("Array").span,
+        );
+        assert_eq!(array_substitution.apply(&template), expected);
     }
 }

@@ -29,6 +29,7 @@ mod types;
 mod volatile;
 
 pub use analyzer::analyze;
+pub(crate) use analyzer::analyze_resolved;
 pub(crate) use analyzer::validate_bounded_recursion;
 pub(crate) use analyzer::{
     validate_stack_limit_dynamic_dispatch, validate_stack_limit_native_claims,

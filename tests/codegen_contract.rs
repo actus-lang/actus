@@ -174,12 +174,7 @@ impl BackendLayoutProvider for TestLayouts {
 }
 
 fn type_name(name: &str, role: Option<Role>) -> TypeName {
-    TypeName {
-        name: name.to_owned(),
-        arguments: Vec::new(),
-        reference_role: role,
-        span: SourceSpan::new(0, name.len()),
-    }
+    TypeName::unresolved(name, Vec::new(), role, SourceSpan::new(0, name.len()))
 }
 
 fn verb_with_signature() -> VerbDecl {
@@ -227,6 +222,7 @@ fn verb_with_signature() -> VerbDecl {
         }),
         body: Block { statements: Vec::new(), span: SourceSpan::new(0, 32) },
         span: SourceSpan::new(0, 32),
+        identity: None,
     }
 }
 
@@ -953,15 +949,9 @@ fn derives_runtime_cleanup_bridges_from_authoritative_binding_types() {
             access: AccessState::Mutable,
         },
     ]);
-    model.binding_type_names.insert(
-        1,
-        TypeName {
-            name: "Region".to_owned(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span: SourceSpan::new(7, 13),
-        },
-    );
+    model
+        .binding_type_names
+        .insert(1, TypeName::unresolved("Region", Vec::new(), None, SourceSpan::new(7, 13)));
     model.cleanup_plans.push(ScopeCleanup {
         depth: 1,
         span: SourceSpan::new(0, 13),
@@ -1048,15 +1038,9 @@ fn lowers_semantic_moved_fields_through_the_cleanup_provider() {
         },
         access: AccessState::Mutable,
     });
-    model.binding_type_names.insert(
-        0,
-        TypeName {
-            name: "Outer".to_owned(),
-            arguments: Vec::new(),
-            reference_role: None,
-            span: SourceSpan::new(0, 5),
-        },
-    );
+    model
+        .binding_type_names
+        .insert(0, TypeName::unresolved("Outer", Vec::new(), None, SourceSpan::new(0, 5)));
     model.cleanup_plans.push(ScopeCleanup {
         depth: 1,
         span: SourceSpan::new(0, 5),
@@ -1158,6 +1142,8 @@ fn lowers_return_and_direct_calls_through_a_neutral_body_provider() {
             Stmt::Expression {
                 expression: Expr::Call {
                     callee: "emit".to_owned(),
+                    resolved_type: None,
+                    generic_arguments: Vec::new(),
                     arguments: Vec::new(),
                     span: SourceSpan::new(40, 44),
                 },
@@ -1240,6 +1226,8 @@ fn preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it() {
                 statements: vec![Stmt::Expression {
                     expression: Expr::Call {
                         callee: "emit".to_owned(),
+                        resolved_type: None,
+                        generic_arguments: Vec::new(),
                         arguments: Vec::new(),
                         span: SourceSpan::new(5, 9),
                     },
@@ -1251,6 +1239,8 @@ fn preserves_fallthrough_continuation_block_when_both_if_branches_jump_to_it() {
                 statements: vec![Stmt::Expression {
                     expression: Expr::Call {
                         callee: "emit".to_owned(),
+                        resolved_type: None,
+                        generic_arguments: Vec::new(),
                         arguments: Vec::new(),
                         span: SourceSpan::new(10, 14),
                     },
@@ -1347,6 +1337,8 @@ fn lowers_typed_failures_without_backend_specific_handles() {
         statements: vec![Stmt::Return {
             value: Some(Expr::Call {
                 callee: "Err".to_owned(),
+                resolved_type: None,
+                generic_arguments: Vec::new(),
                 arguments: Vec::new(),
                 span: SourceSpan::new(0, 6),
             }),
@@ -1391,7 +1383,11 @@ fn reports_range_loop_as_a_typed_neutral_contract_gap() {
                 span,
             },
             start: Expr::Integer { value: "0".to_owned(), suffix: Some("u32".to_owned()), span },
-            end: Expr::Integer { value: "4".to_owned(), suffix: Some("u32".to_owned()), span },
+            end: Box::new(Expr::Integer {
+                value: "4".to_owned(),
+                suffix: Some("u32".to_owned()),
+                span,
+            }),
             body: Block { statements: Vec::new(), span },
             span,
         }],

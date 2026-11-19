@@ -22,7 +22,29 @@ impl Analyzer {
                 span: binding.span,
             });
         }
-        let type_name = binding
+        let parsed_type = self.for_range_type(binding)?;
+        let type_name = crate::ast::TypeName::builtin(
+            parsed_type.name.clone(),
+            parsed_type.arguments.clone(),
+            parsed_type.reference_role.clone(),
+            parsed_type.span,
+        );
+        self.visit_expression_with_expected(start, Some(&type_name))?;
+        self.visit_expression_with_expected(end, Some(&type_name))?;
+        self.enter_scope(body.span);
+        self.loop_boundaries.push(self.scopes.len() - 1);
+        let binding_type = self.resolve_binding_type(Some(&type_name), start, span)?;
+        self.bind(Role::Erg, binding.name.clone(), binding_type, binding.span)?;
+        let index = self.binding(&binding.name, binding.span)?;
+        self.binding_type_names.insert(index, self.normalize_imported_type_name(&type_name));
+        let result = self.visit_block(body);
+        self.loop_boundaries.pop();
+        self.leave_scope();
+        result
+    }
+
+    fn for_range_type(&self, binding: &ForBinding) -> Result<crate::ast::TypeName, SemanticError> {
+        let parsed_type = binding
             .ty
             .as_deref()
             .and_then(|name| super::super::calls::parse_type_name_key(name, binding.span))
@@ -32,32 +54,22 @@ impl Analyzer {
                 },
                 span: binding.span,
             })?;
-        if !matches!(
-            crate::ast::primitive_type(&type_name.name),
+        if matches!(
+            crate::ast::primitive_type(&parsed_type.name),
             Some(crate::ast::PrimitiveType::Integer { .. })
         ) {
-            return Err(SemanticError {
+            Ok(parsed_type)
+        } else {
+            Err(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     callee: "for".to_owned(),
                     parameter: "range binding".to_owned(),
                     expected: "integer".to_owned(),
-                    found: type_name.name.clone(),
+                    found: parsed_type.name,
                 },
                 span: binding.span,
-            });
+            })
         }
-        self.visit_expression_with_expected(start, Some(&type_name))?;
-        self.visit_expression_with_expected(end, Some(&type_name))?;
-        self.enter_scope(body.span);
-        self.loop_boundaries.push(self.scopes.len() - 1);
-        let binding_type = self.resolve_binding_type(Some(&type_name), start, span)?;
-        self.bind(Role::Erg, binding.name.clone(), binding_type, binding.span)?;
-        let index = self.binding(&binding.name, binding.span)?;
-        self.binding_type_names.insert(index, type_name);
-        let result = self.visit_block(body);
-        self.loop_boundaries.pop();
-        self.leave_scope();
-        result
     }
 
     pub(super) fn visit_for_array(

@@ -187,10 +187,7 @@ fn freestanding_region_objects_have_compatible_backend_runtime_symbols() {
     cranelift_semantic.sort();
     llvm_semantic.sort();
     assert_eq!(cranelift_semantic, llvm_semantic);
-    assert_eq!(
-        llvm_semantic,
-        ["actus_mod_3_std_6_region__verb_region_5fopen_5f_5fu8", "actus_region_drop"]
-    );
+    assert_eq!(llvm_semantic, ["actus_region_drop", "actus_region_open"]);
     assert!(cranelift_symbols.iter().all(|symbol| symbol.starts_with("actus_")));
     assert!(llvm_symbols.iter().all(|symbol| symbol.starts_with("actus_") || symbol == "__chkstk"));
     let _ = fs::remove_dir_all(cranelift_root);

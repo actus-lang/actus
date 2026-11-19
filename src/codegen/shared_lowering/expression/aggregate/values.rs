@@ -22,7 +22,6 @@ pub(in crate::codegen::shared_lowering::expression) fn parameter_nominal_types(
 ) -> std::collections::BTreeMap<BackendValueId, TypeName> {
     metadata::parameter_nominal_types(verb, layouts)
 }
-
 pub(in crate::codegen::shared_lowering::expression) fn lower_array_element(
     provider: &mut SharedExpressionProvider<'_>,
     collection: &Expr,
@@ -32,7 +31,6 @@ pub(in crate::codegen::shared_lowering::expression) fn lower_array_element(
 ) -> Result<BackendValueId, BackendContractError> {
     arrays::lower_array_element(provider, collection, index, span, instructions)
 }
-
 pub(in crate::codegen::shared_lowering::expression) fn lower_array_element_assignment(
     provider: &mut SharedExpressionProvider<'_>,
     collection: &Expr,
@@ -105,13 +103,13 @@ pub(in crate::codegen::shared_lowering::expression) fn lower_aggregate_expressio
         Expr::StructLit { .. } => {
             structs::lower_struct_literal_expression(provider, expression, instructions)
         }
-        Expr::FieldAccess { object, field, span } => {
-            if let Some(type_name) = parse_receiver_type_name(object, *span)
-                && provider.enum_variant(&type_name, field).is_some()
+        Expr::FieldAccess { object, field, resolved_type, span } => {
+            if let Some(type_name) = resolved_type
+                && provider.enum_variant(type_name, field).is_some()
             {
                 return super::super::super::constructors::lower_named_unit_enum(
                     provider,
-                    &type_name,
+                    type_name,
                     field,
                     &[],
                     *span,
@@ -124,36 +122,5 @@ pub(in crate::codegen::shared_lowering::expression) fn lower_aggregate_expressio
             arrays::lower_array_element(provider, target, index, *span, instructions)
         }
         _ => Err(unsupported(expression_span(expression), "aggregate expression expected")),
-    }
-}
-
-fn parse_type_name(name: &str, span: crate::lexer::SourceSpan) -> TypeName {
-    crate::semantic::parse_type_name_key(name, span).unwrap_or(TypeName {
-        name: name.to_owned(),
-        arguments: Vec::new(),
-        reference_role: None,
-        span,
-    })
-}
-
-fn parse_receiver_type_name(
-    expression: &crate::ast::Expr,
-    span: crate::lexer::SourceSpan,
-) -> Option<TypeName> {
-    match expression {
-        crate::ast::Expr::Identifier { name, .. } => Some(parse_type_name(name, span)),
-        crate::ast::Expr::Index { target, index, .. } => {
-            let crate::ast::Expr::Identifier { name, .. } = target.as_ref() else { return None };
-            let crate::ast::Expr::Identifier { name: argument, .. } = index.as_ref() else {
-                return None;
-            };
-            Some(TypeName {
-                name: name.clone(),
-                arguments: vec![parse_type_name(argument, span)],
-                reference_role: None,
-                span,
-            })
-        }
-        _ => None,
     }
 }

@@ -9,8 +9,8 @@ use actus::configuration::{
     RuntimeProfile,
 };
 use actus::diagnostics::{
-    STRICT_MANUAL_FREESTANDING_LINKER, STRICT_RUNTIME_TARGET_INCOMPATIBLE,
-    STRICT_RUNTIME_UNSUPPORTED,
+    STRICT_MANUAL_FREESTANDING_LINKER, STRICT_PACKAGE_IDENTITY_INVALID,
+    STRICT_RUNTIME_TARGET_INCOMPATIBLE, STRICT_RUNTIME_UNSUPPORTED,
 };
 use actus::target::TargetSpec;
 
@@ -170,11 +170,186 @@ fn configuration_test_lock() -> std::sync::MutexGuard<'static, ()> {
     }
 }
 
+#[test]
+fn normalizes_hyphenated_package_identity_name() {
+    let _lock = configuration_test_lock();
+    let root = std::env::temp_dir().join(format!("actus-identity-hyphen-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create identity fixture");
+    let path = root.join("Actus.toml");
+    fs::write(&path, "[package]\nname = \"repro-r1\"\nversion = \"1.0.0\"\n")
+        .expect("write identity manifest");
+
+    let identity = actus::configuration::package_identity(&path).expect("identity should load");
+    assert_eq!(identity.name, "repro_r1");
+    fs::remove_dir_all(root).expect("remove identity fixture");
+}
+
+#[test]
+fn rejects_invalid_package_identity_name() {
+    let _lock = configuration_test_lock();
+    let root = std::env::temp_dir().join(format!("actus-identity-invalid-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create identity fixture");
+    let path = root.join("Actus.toml");
+    fs::write(&path, "[package]\nname = \"1app\"\nversion = \"1.0.0\"\n")
+        .expect("write identity manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&path)
+        .expect_err("invalid identity should be rejected");
+    assert_eq!(error.diagnostic().code(), STRICT_PACKAGE_IDENTITY_INVALID);
+    fs::remove_dir_all(root).expect("remove identity fixture");
+}
+
+#[test]
+fn rejects_reserved_package_identity_names() {
+    let _lock = configuration_test_lock();
+    for name in ["std", "builtin"] {
+        let root =
+            std::env::temp_dir().join(format!("actus-identity-{name}-{}", std::process::id()));
+        fs::create_dir_all(&root).expect("create identity fixture");
+        let path = root.join("Actus.toml");
+        fs::write(&path, format!("[package]\nname = \"{name}\"\nversion = \"1.0.0\"\n"))
+            .expect("write identity manifest");
+
+        let error = CompilerConfiguration::from_manifest_strict(&path)
+            .expect_err("reserved identity should be rejected");
+        assert_eq!(error.diagnostic().code(), STRICT_PACKAGE_IDENTITY_INVALID);
+        fs::remove_dir_all(root).expect("remove identity fixture");
+    }
+}
+
+#[test]
+fn rejects_colliding_normalized_dependency_identity_names() {
+    let _lock = configuration_test_lock();
+    let root =
+        std::env::temp_dir().join(format!("actus-identity-collision-{}", std::process::id()));
+    let first = root.join("one-a");
+    let second = root.join("one_a");
+    fs::create_dir_all(first.join("src")).expect("create first dependency");
+    fs::create_dir_all(second.join("src")).expect("create second dependency");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"root\"\nversion = \"1.0.0\"\n\n[dependencies]\none-a = { path = \"one-a\" }\none_a = { path = \"one_a\" }\n",
+    )
+    .expect("write root manifest");
+    for (path, name) in [(first.join("Actus.toml"), "one-a"), (second.join("Actus.toml"), "one_a")]
+    {
+        fs::write(path, format!("[package]\nname = \"{name}\"\nversion = \"1.0.0\"\n"))
+            .expect("write dependency manifest");
+    }
+
+    let error = CompilerConfiguration::from_manifest_strict(&root.join("Actus.toml"))
+        .expect_err("colliding identities should be rejected");
+    assert_eq!(error.diagnostic().code(), STRICT_PACKAGE_IDENTITY_INVALID);
+    fs::remove_dir_all(root).expect("remove identity fixture");
+}
+
+#[test]
+fn accepts_compiler_owned_standard_library_identity() {
+    let _lock = configuration_test_lock();
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std/Actus.toml");
+    let identity = actus::configuration::package_identity(&path)
+        .expect("compiler-owned standard library identity should load");
+    assert_eq!(identity.name, "std");
+}
+
+#[test]
+fn accepts_multiple_aliases_for_the_compiler_owned_standard_library() {
+    let _lock = configuration_test_lock();
+    let root = std::env::temp_dir()
+        .join(format!("actus-identity-standard-aliases-{}", std::process::id()));
+    fs::create_dir_all(root.join("src")).expect("create alias fixture");
+    // A TOML string, so a Windows path keeps its backslashes.
+    let standard_library = toml::Value::String(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std").display().to_string(),
+    );
+    fs::write(
+        root.join("Actus.toml"),
+        format!(
+            "[package]\nname = \"application\"\nversion = \"1.0.0\"\n\n[dependencies.io]\npath = {standard_library}\n\n[dependencies.fs]\npath = {standard_library}\n"
+        ),
+    )
+    .expect("write alias manifest");
+
+    CompilerConfiguration::from_manifest_strict(&root.join("Actus.toml"))
+        .expect("aliases for the compiler-owned standard library should load");
+    fs::remove_dir_all(root).expect("remove alias fixture");
+}
+
+#[test]
+fn rejects_dependency_named_std() {
+    let _lock = configuration_test_lock();
+    let root =
+        std::env::temp_dir().join(format!("actus-identity-dependency-{}", std::process::id()));
+    let dependency = root.join("dependency");
+    fs::create_dir_all(dependency.join("src")).expect("create dependency fixture");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"application\"\nversion = \"1.0.0\"\n\n[dependencies.std]\npath = \"dependency\"\n",
+    )
+    .expect("write root manifest");
+    fs::write(dependency.join("Actus.toml"), "[package]\nname = \"std\"\nversion = \"1.0.0\"\n")
+        .expect("write dependency manifest");
+
+    let error = CompilerConfiguration::from_manifest_strict(&root.join("Actus.toml"))
+        .expect_err("dependency std should be rejected");
+    assert_eq!(error.diagnostic().code(), STRICT_PACKAGE_IDENTITY_INVALID);
+    fs::remove_dir_all(root).expect("remove dependency fixture");
+}
+
+#[test]
+fn accepts_compiler_owned_standard_library_copy_as_runtime() {
+    let _lock = configuration_test_lock();
+    let root =
+        std::env::temp_dir().join(format!("actus-identity-runtime-copy-{}", std::process::id()));
+    let sysroot = root.join("sysroot");
+    copy_directory(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std"),
+        &sysroot.join("std"),
+    );
+    let project = root.join("project");
+    fs::create_dir_all(project.join("src")).expect("create runtime project");
+    fs::write(
+        project.join("Actus.toml"),
+        "[package]\nname = \"runtime_copy\"\nversion = \"1.0.0\"\n\n[build]\nruntime = \"std\"\n",
+    )
+    .expect("write runtime project manifest");
+    let _environment = SysrootEnvironmentGuard;
+    unsafe { std::env::set_var("ACTUS_SYSROOT", &sysroot) };
+    let configuration = CompilerConfiguration::from_manifest_read_only(&project.join("Actus.toml"))
+        .expect("runtime standard-library copy should load");
+    assert_eq!(configuration.runtime_source_root(), Some(sysroot.join("std/src").as_path()));
+    fs::remove_dir_all(root).expect("remove runtime fixture");
+}
+
+fn copy_directory(source: &Path, destination: &Path) {
+    fs::create_dir_all(destination).expect("create copied directory");
+    for entry in fs::read_dir(source).expect("read copied directory") {
+        let entry = entry.expect("read copied entry");
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_directory(&source_path, &destination_path);
+        } else {
+            fs::copy(source_path, destination_path).expect("copy standard-library file");
+        }
+    }
+}
+
 struct LinkerEnvironmentGuard;
 
 impl Drop for LinkerEnvironmentGuard {
     fn drop(&mut self) {
         unsafe { std::env::remove_var("ACTUS_LINKER") };
+    }
+}
+
+/// Removes `ACTUS_SYSROOT` even when the test fails, so a failure cannot
+/// redirect the compiler-owned standard library of later tests.
+struct SysrootEnvironmentGuard;
+
+impl Drop for SysrootEnvironmentGuard {
+    fn drop(&mut self) {
+        unsafe { std::env::remove_var("ACTUS_SYSROOT") };
     }
 }
 

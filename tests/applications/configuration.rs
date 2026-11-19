@@ -27,8 +27,8 @@ fn package_configuration_module_emits_without_an_anchor_verb() {
         "object build stderr: {}",
         String::from_utf8_lossy(&object_build.stderr)
     );
-    let module_bytes = fs::read(root.join("application.module.actus_mod_6_config.obj"))
-        .expect("read const-only configuration object");
+    assert!(!root.join("application.module.actus_mod_6_config.obj").exists());
+    let module_bytes = fs::read(&object).expect("read const-only configuration object");
     let module_file = object::File::parse(module_bytes.as_slice())
         .expect("parse const-only configuration object");
     assert!(
@@ -178,15 +178,7 @@ open verb inspect() -> u16 {
         "object build stderr: {}",
         String::from_utf8_lossy(&object_build.stderr)
     );
-    let feature_object = fs::read_dir(&root)
-        .expect("read project outputs")
-        .filter_map(Result::ok)
-        .find(|entry| {
-            entry.file_name().to_string_lossy().contains("feature")
-                && entry.path().extension().is_some_and(|extension| extension == "obj")
-        })
-        .expect("feature object");
-    let bytes = fs::read(feature_object.path()).expect("read feature object");
+    let bytes = fs::read(&object).expect("read program object");
     let object_file = object::File::parse(bytes.as_slice()).expect("parse feature object");
     assert!(
         !object_file

@@ -13,6 +13,7 @@ use crate::target::{EntryContract, TargetSpec};
 
 use super::cancellation::CancellationToken;
 use super::documents::DocumentStore;
+use super::masking::mask;
 use super::position::{LineIndex, LspRange};
 use super::query_cache::ParseSnapshot;
 
@@ -41,7 +42,9 @@ pub(super) fn query(
     let Ok(target_program) = filter_program_for_target_checked(&program, target) else {
         return json!({"state":"invalid","facts":[]});
     };
-    let Ok(model) = analyze(&target_program) else { return json!({"state":"invalid","facts":[]}) };
+    let Ok(model) = analyze(&target_program) else {
+        return json!({"state":"invalid","facts":[]});
+    };
     if cancellation.is_some_and(CancellationToken::checkpoint) {
         return json!({"state":"partial","reason":"canceled","facts":[]});
     }
@@ -492,9 +495,4 @@ fn access_name(state: &AccessState) -> Value {
         AccessState::Frozen { borrow_ids } => json!({"state":"Frozen","borrowIds":borrow_ids}),
         AccessState::Suspended { loan_id } => json!({"state":"Suspended","loanId":loan_id}),
     }
-}
-
-fn mask(width: u8) -> String {
-    let mask = if width == 128 { u128::MAX } else { (1u128 << width) - 1 };
-    format!("0x{mask:X}")
 }

@@ -3,6 +3,7 @@ mod assignment;
 mod literals;
 mod registry;
 mod roles;
+mod type_resolution;
 mod typing;
 
 pub(crate) use access::canonical_type_name;

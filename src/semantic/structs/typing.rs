@@ -22,48 +22,20 @@ impl Analyzer {
         })
     }
 
-    pub(crate) fn resolved_type_name(&self, expression: &Expr) -> Option<TypeName> {
-        if let Some(type_name) = self.inferred_call_type(expression) {
-            return Some(type_name);
-        }
-        match expression {
-            Expr::StructLit { name, type_arguments, span, .. } => Some(TypeName {
-                name: name.clone(),
-                arguments: type_arguments.clone(),
-                reference_role: None,
-                span: *span,
-            }),
-            Expr::Identifier { name, span } => self.identifier_type_name(name, *span),
-            Expr::Grouping { expression, .. } | Expr::Borrow { expression, .. } => {
-                self.resolved_type_name(expression)
-            }
-            Expr::Cast { target, .. } => Some(target.clone()),
-            Expr::Try { expression, .. } => self
-                .enum_type_application(expression)
-                .and_then(|result| result.arguments.first().cloned()),
-            Expr::FieldAccess { object, field, .. } => self
-                .resolved_type_name(object)
-                .and_then(|type_name| self.specialized_field_type(&type_name, field)),
-            Expr::Index { target, index, .. } => self.validate_index_access(target, index).ok(),
-            _ => None,
-        }
-    }
-
-    fn inferred_call_type(&self, expression: &Expr) -> Option<TypeName> {
+    pub(super) fn inferred_call_type(&self, expression: &Expr) -> Option<TypeName> {
         let (Expr::Call { span, .. } | Expr::MethodCall { span, .. }) = expression else {
             return None;
         };
         self.inferred_expression_types.get(&self.expression_cache_key(*span)).cloned()
     }
 
-    fn identifier_type_name(&self, name: &str, span: crate::lexer::SourceSpan) -> Option<TypeName> {
+    pub(super) fn identifier_type_name(
+        &self,
+        name: &str,
+        span: crate::lexer::SourceSpan,
+    ) -> Option<TypeName> {
         if self.is_const_generic_parameter(name) {
-            return Some(TypeName {
-                name: "Usize".to_owned(),
-                arguments: Vec::new(),
-                reference_role: None,
-                span,
-            });
+            return Some(TypeName::builtin("Usize", Vec::new(), None, span));
         }
         let index = self.binding(name, span).ok()?;
         self.binding_type_names
@@ -71,14 +43,8 @@ impl Analyzer {
             .cloned()
             .or_else(|| self.binding_enum_type_applications.get(&index).cloned())
             .or_else(|| self.binding_struct_type_applications.get(&index).cloned())
-            .or_else(|| {
-                self.binding_struct_types.get(&index).map(|name| TypeName {
-                    name: name.clone(),
-                    arguments: Vec::new(),
-                    reference_role: None,
-                    span,
-                })
-            })
+            .or_else(|| self.binding_struct_type_names.get(&index).cloned())
+            .or_else(|| self.binding_struct_types.get(&index).cloned())
     }
 
     pub(crate) fn specialized_field_type(
@@ -90,17 +56,17 @@ impl Analyzer {
         if field == "storage"
             && let Some(pack) = self.pack_types.get(&type_name.name)
         {
-            return Some(pack.storage.type_name().clone());
+            return Some(self.normalize_imported_type_name(pack.storage.type_name()));
         }
         if let Some(pack_field) = self.pack_field(&type_name.name, field) {
-            return Some(pack_field.ty.clone());
+            return Some(self.normalize_imported_type_name(&pack_field.ty));
         }
         let definition = self.struct_types.get(&type_name.name)?;
         let field = definition.fields.iter().find(|candidate| candidate.name == field)?;
         if type_name.arguments.is_empty() {
             let mut field_type = field.ty.clone();
             self.normalize_array_capacities(&mut field_type).ok()?;
-            return Some(field_type);
+            return Some(self.normalize_imported_type_name(&field_type));
         }
         TypeSubstitution::for_type(
             &definition.name,
@@ -112,7 +78,7 @@ impl Analyzer {
         .and_then(|substitution| {
             let mut field_type = substitution.apply(&field.ty);
             self.normalize_array_capacities(&mut field_type).ok()?;
-            Some(field_type)
+            Some(self.normalize_imported_type_name(&field_type))
         })
     }
 }

@@ -39,6 +39,8 @@ pub struct ConstantDecl {
 pub struct OpenSiblingDecl {
     pub doc: Option<String>,
     pub name: String,
+    /// `open unit x;` opens `x` for its unit only (ADR-0111).
+    pub unit: bool,
     pub span: SourceSpan,
 }
 

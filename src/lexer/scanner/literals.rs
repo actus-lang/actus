@@ -1,5 +1,5 @@
 use super::{LexError, LexErrorKind, Scanner};
-use crate::lexer::{SourceSpan, Token, TokenKind};
+use crate::lexer::{Token, TokenKind};
 
 impl<'source> Scanner<'source> {
     pub(super) fn scan_hex_integer(&mut self, start: usize) {
@@ -19,13 +19,11 @@ impl<'source> Scanner<'source> {
         if !has_digits || invalid_suffix {
             self.errors.push(LexError::new(
                 LexErrorKind::InvalidHexLiteral(text.clone()),
-                SourceSpan::new(start, self.cursor),
+                self.span(start),
             ));
         }
-        self.tokens.push(Token::new(
-            TokenKind::Integer { value: text, suffix: None },
-            SourceSpan::new(start, self.cursor),
-        ));
+        self.tokens
+            .push(Token::new(TokenKind::Integer { value: text, suffix: None }, self.span(start)));
     }
 
     pub(super) fn scan_integer(&mut self, start: usize) {
@@ -44,17 +42,14 @@ impl<'source> Scanner<'source> {
             let text = self.source[start..value_end].to_owned();
             self.tokens.push(Token::new(
                 TokenKind::FloatLiteral { value: text, suffix },
-                SourceSpan::new(start, self.cursor),
+                self.span(start),
             ));
             return;
         }
         let value_end = self.cursor;
         let suffix = self.scan_integer_suffix();
         let value = self.source[start..value_end].to_owned();
-        self.tokens.push(Token::new(
-            TokenKind::Integer { value, suffix },
-            SourceSpan::new(start, self.cursor),
-        ));
+        self.tokens.push(Token::new(TokenKind::Integer { value, suffix }, self.span(start)));
     }
 
     fn scan_integer_suffix(&mut self) -> Option<String> {
@@ -69,7 +64,7 @@ impl<'source> Scanner<'source> {
         if !is_integer_suffix(&suffix) {
             self.errors.push(LexError::new(
                 LexErrorKind::InvalidIntegerType(suffix.clone()),
-                SourceSpan::new(start, self.cursor),
+                self.span(start),
             ));
         }
         Some(suffix)
@@ -87,7 +82,7 @@ impl<'source> Scanner<'source> {
         if !matches!(suffix.as_str(), "f32" | "f64") {
             self.errors.push(LexError::new(
                 LexErrorKind::InvalidFloatType(suffix.clone()),
-                SourceSpan::new(start, self.cursor),
+                self.span(start),
             ));
         }
         Some(suffix)
@@ -100,10 +95,8 @@ impl<'source> Scanner<'source> {
                 '"' => {
                     let content = self.source[content_start..self.cursor].to_owned();
                     self.advance();
-                    self.tokens.push(Token::new(
-                        TokenKind::StringLiteral(content),
-                        SourceSpan::new(start, self.cursor),
-                    ));
+                    self.tokens
+                        .push(Token::new(TokenKind::StringLiteral(content), self.span(start)));
                     return;
                 }
                 '\\' => {
@@ -118,10 +111,7 @@ impl<'source> Scanner<'source> {
                 }
             }
         }
-        self.errors.push(LexError::new(
-            LexErrorKind::UnterminatedString,
-            SourceSpan::new(start, self.cursor),
-        ));
+        self.errors.push(LexError::new(LexErrorKind::UnterminatedString, self.span(start)));
     }
 
     pub(super) fn scan_doc_string(&mut self, start: usize) {
@@ -135,18 +125,12 @@ impl<'source> Scanner<'source> {
                 self.advance();
                 self.advance();
                 self.advance();
-                self.tokens.push(Token::new(
-                    TokenKind::DocString(content),
-                    SourceSpan::new(start, self.cursor),
-                ));
+                self.tokens.push(Token::new(TokenKind::DocString(content), self.span(start)));
                 return;
             }
             self.advance();
         }
-        self.errors.push(LexError::new(
-            LexErrorKind::UnterminatedDocString,
-            SourceSpan::new(start, self.cursor),
-        ));
+        self.errors.push(LexError::new(LexErrorKind::UnterminatedDocString, self.span(start)));
     }
 }
 

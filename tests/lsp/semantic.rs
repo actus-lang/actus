@@ -402,6 +402,28 @@ fn lsp_resolves_std_fs_imports_for_open_documents() {
 }
 
 #[test]
+fn lsp_resolves_std_io_error_hover_and_definition_without_diagnostics() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/fs/io_matrix.act");
+    let uri = file_uri(&path);
+    let source = concat!(
+        "import { open std::io };\n",
+        "verb local_read() -> Result[Int, IoError] { return Result[Int, IoError].Err(IoError.Failed); }\n",
+        "verb main() -> Int { local_read(); return 0; }\n",
+    );
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"textDocument/hover","params":{"textDocument":{"uri":uri},"position":position_after(source,"IoError")}}),
+        json!({"jsonrpc":"2.0","id":3,"method":"textDocument/definition","params":{"textDocument":{"uri":uri},"position":position_after(source,"IoError")}}),
+        json!({"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    let stdout = run_lsp(messages.to_vec());
+    assert!(stdout.contains("\"diagnostics\":[]"), "stdout: {stdout}");
+    assert!(stdout.contains("IoError"), "IoError hover/definition missing: {stdout}");
+}
+
+#[test]
 fn lsp_resolves_standard_library_test_fixture_imports() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let fs_path = root.join("tests/library/fs_contracts.act");

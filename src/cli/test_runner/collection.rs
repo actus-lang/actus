@@ -1,21 +1,24 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::SharedSourceMap;
 use crate::ast::{MetaAttribute, Program, TestFault, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnostic};
-use crate::lexer::{TokenKind, scan};
+use crate::lexer::TokenKind;
 use crate::modules::{
-    ModuleCompilationPlan, ModuleResolver, build_test_compilation_plan, parse_module,
+    ModuleCompilationPlan, ModuleError, ModuleResolver, build_test_compilation_plan,
+    load_module_unit,
 };
-use crate::parser::parse;
 use crate::semantic::filter_program_for_target_checked;
+use crate::session::{CompilationSession, FrontendError};
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::TestOptions;
 
 pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
+    pub(super) source_map: SharedSourceMap,
     pub(super) module: String,
     pub(super) display_module: String,
     pub(super) relative_path: PathBuf,
@@ -49,22 +52,29 @@ pub(super) fn collect_tests(
         std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(files.len());
     let chunk_size = files.len().div_ceil(worker_count);
     let chunks = files.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
+    // One session for the complete test run (ADR-0109): every worker shares
+    // source provenance and memoized parse results.
+    let session = CompilationSession::new();
     let results = std::thread::scope(|scope| {
         chunks
             .into_iter()
             .map(|chunk| {
                 let configuration = configuration.clone();
                 let options = options.clone();
+                let session = session.clone();
                 scope.spawn(move || {
                     let resolver = ModuleResolver::with_dependencies_and_runtime(
                         configuration.source_root(),
                         configuration.dependency_roots(),
                         configuration.runtime_source_root(),
                         configuration.runtime_module_roots(),
-                    );
+                    )
+                    .with_session(session.clone());
                     chunk
                         .into_iter()
-                        .map(|path| collect_file_tests(&path, &configuration, &options, &resolver))
+                        .map(|path| {
+                            collect_file_tests(&path, &configuration, &options, &resolver, &session)
+                        })
                         .collect::<Result<Vec<_>, _>>()
                 })
             })
@@ -90,9 +100,11 @@ fn collect_file_tests(
     configuration: &CompilerConfiguration,
     options: &TestOptions,
     resolver: &ModuleResolver,
+    session: &CompilationSession,
 ) -> Result<CollectedFile, String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
+    let source_map = session.source_map().clone();
     if options.mirror && path.starts_with(configuration.project_root().join("tests")) {
         validate_test_mirror(path, configuration)?;
     }
@@ -100,6 +112,7 @@ fn collect_file_tests(
     let Some((_source_program, program, compilation_plan, test_names)) = parse_source(
         path,
         &source,
+        session,
         resolver,
         configuration.source_root(),
         configuration.project_root(),
@@ -111,22 +124,53 @@ fn collect_file_tests(
     let declared = test_count(&program);
     let program =
         filter_program_for_target_checked(&program, configuration.target()).map_err(|error| {
-            format!("{}: {}", path.display(), render_diagnostic("", &semantic_diagnostic(&error)))
+            localized_test_diagnostic(path, "", &source_map, semantic_diagnostic(&error))
         })?;
     let filtered = declared.saturating_sub(test_count(&program));
-    validate_semantics(path, &source, &program, options.mode)?;
+    if let Err(error) = crate::semantic::analyze_resolved(&program) {
+        let diagnostic = semantic_diagnostic(&error);
+        return Err(localized_test_diagnostic(path, &source, &source_map, diagnostic));
+    }
     let module =
         module_path_for_test(path, configuration.source_root(), configuration.project_root());
     let relative_path =
         path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
-    let discovered =
-        discover_tests(path, &module, &relative_path, program, compilation_plan, &test_names);
+    let discovered = discover_tests(
+        path,
+        &module,
+        &relative_path,
+        program,
+        compilation_plan,
+        &test_names,
+        source_map,
+    );
     let selected = discovered.iter().filter(|test| test_matches(test, options)).count();
     let selection_filtered = discovered.len().saturating_sub(selected);
     Ok(CollectedFile {
         tests: discovered.into_iter().filter(|test| test_matches(test, options)).collect(),
         filtered: filtered + selection_filtered,
     })
+}
+
+fn localized_test_diagnostic(
+    fallback_path: &Path,
+    fallback_source: &str,
+    source_map: &SharedSourceMap,
+    diagnostic: crate::diagnostics::Diagnostic,
+) -> String {
+    source_map
+        .lock()
+        .localize(&diagnostic)
+        .map(|(path, source, diagnostic)| {
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
+        })
+        .unwrap_or_else(|| {
+            format!(
+                "{}: {}",
+                fallback_path.display(),
+                render_diagnostic(fallback_source, &diagnostic)
+            )
+        })
 }
 
 fn validate_test_mirror(path: &Path, configuration: &CompilerConfiguration) -> Result<(), String> {
@@ -173,20 +217,21 @@ fn validate_source(
 fn parse_source(
     path: &Path,
     source: &str,
+    session: &CompilationSession,
     resolver: &ModuleResolver,
     source_root: &Path,
     project_root: &Path,
     options: &TestOptions,
 ) -> Result<ParsedTestSource, String> {
-    let (tokens, errors) = scan(source);
-    if !tokens.iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
+    let source_map = session.source_map();
+    let parsed = session.parse(path, source);
+    if !parsed.tokens().iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
         return Ok(None);
     }
-    if !errors.is_empty() {
-        return Err(format!("cannot lex `{}`", path.display()));
-    }
-    let source_program =
-        parse(tokens).map_err(|error| format!("cannot parse `{}`: {error:?}", path.display()))?;
+    let source_program = parsed.program().map_err(|error| match error {
+        FrontendError::Lex(_) => format!("cannot lex `{}`", path.display()),
+        FrontendError::Parse(error) => parse_source_error(path, source_map, error),
+    })?;
     let test_names = test_names(&source_program);
     if test_names.is_empty() {
         return Ok(None);
@@ -200,7 +245,9 @@ fn parse_source(
     let compilation_source = (!module_path.is_empty())
         .then_some(module_path.as_str())
         .map(|module_path| {
-            parse_module(resolver, module_path)
+            // The loaded unit binds imports of its own modules (ADR-0110).
+            load_module_unit(resolver, module_path)
+                .map(|unit| unit.implementation().clone())
                 .map_err(|error| format!("cannot load module `{module_path}`: {error}"))
         })
         .transpose()?
@@ -214,10 +261,36 @@ fn parse_source(
         .unwrap_or_else(|| source_program.clone());
     let resolved = build_test_compilation_plan(&compilation_source, resolver)
         .map(|plan| (plan.caller().clone(), Some(plan)));
-    resolved.map(|(program, plan)| Some((compilation_source, program, plan, test_names))).map_err(
-        |error| {
-            let diagnostic = module_diagnostic(&error).with_source_path(path.display().to_string());
-            format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
+    resolved
+        .map(|(program, plan)| Some((compilation_source, program, plan, test_names)))
+        .map_err(|error| module_source_error(path, source, source_map, error))
+}
+
+fn parse_source_error(
+    path: &Path,
+    source_map: &SharedSourceMap,
+    error: crate::parser::ParseError,
+) -> String {
+    let diagnostic = crate::diagnostics::parse_diagnostic(&error);
+    source_map.lock().localize(&diagnostic).map_or_else(
+        || format!("cannot parse `{}`: {error:?}", path.display()),
+        |(localized_path, source, diagnostic)| {
+            format!("{}: {}", localized_path.display(), render_diagnostic(&source, &diagnostic))
+        },
+    )
+}
+
+fn module_source_error(
+    path: &Path,
+    source: &str,
+    source_map: &SharedSourceMap,
+    error: ModuleError,
+) -> String {
+    let diagnostic = module_diagnostic(&error);
+    source_map.lock().localize(&diagnostic).map_or_else(
+        || format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic)),
+        |(path, source, diagnostic)| {
+            format!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic))
         },
     )
 }
@@ -295,21 +368,6 @@ fn module_source(path: &Path, source_root: &Path) -> Option<String> {
     }
 }
 
-fn validate_semantics(
-    path: &Path,
-    source: &str,
-    program: &Program,
-    mode: ConformanceMode,
-) -> Result<(), String> {
-    if !mode.is_strict() {
-        return Ok(());
-    }
-    crate::semantic::analyze(program).map(|_| ()).map_err(|error| {
-        let diagnostic = semantic_diagnostic(&error).with_source_path(path.display().to_string());
-        format!("{}: {}", path.display(), render_diagnostic(source, &diagnostic))
-    })
-}
-
 fn discover_tests(
     path: &Path,
     module: &str,
@@ -317,6 +375,7 @@ fn discover_tests(
     program: Program,
     compilation_plan: Option<ModuleCompilationPlan>,
     names: &[String],
+    source_map: SharedSourceMap,
 ) -> Vec<DiscoveredTest> {
     program
         .declarations
@@ -327,6 +386,7 @@ fn discover_tests(
             {
                 Some(DiscoveredTest {
                     path: path.to_path_buf(),
+                    source_map: source_map.clone(),
                     module: if module.is_empty() { "<root>".to_owned() } else { module.to_owned() },
                     display_module: display_module(module, relative_path),
                     relative_path: relative_path.to_path_buf(),

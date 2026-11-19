@@ -13,26 +13,32 @@ pub(super) fn lower_struct_literal_expression(
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let Expr::StructLit { name, type_arguments, fields, span } = expression else {
+    let Expr::StructLit { name, type_arguments, resolved_type, fields, span } = expression else {
         return Err(unsupported(expression_span(expression), "struct literal expected"));
     };
-    lower_struct_literal(provider, name, type_arguments, fields, *span, instructions)
+    lower_struct_literal(
+        provider,
+        name,
+        type_arguments,
+        resolved_type.as_ref(),
+        fields,
+        *span,
+        instructions,
+    )
 }
 
 pub(super) fn lower_struct_literal(
     provider: &mut SharedExpressionProvider<'_>,
     name: &str,
-    type_arguments: &[TypeName],
+    _type_arguments: &[TypeName],
+    resolved_type: Option<&TypeName>,
     fields: &[StructFieldInit],
     span: SourceSpan,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
-    let type_name = TypeName {
-        name: name.to_owned(),
-        arguments: type_arguments.to_vec(),
-        reference_role: None,
-        span,
-    };
+    let type_name = resolved_type
+        .cloned()
+        .expect("internal compiler error: struct literal reached codegen without a resolved type");
     let layout = provider
         .layouts
         .layout_for(&type_name)

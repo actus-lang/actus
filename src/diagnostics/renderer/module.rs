@@ -8,7 +8,7 @@ use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, seman
 /// Converts a module, import, or facade failure into the shared diagnostic model.
 ///
 /// Resolution failures use the stable `E1100`–`E1108` module range. Visibility
-/// failures use `E1109`; configuration policy failures use `E1113`–`E1114`. Nested
+/// failures use `E1109`; hierarchical scope failures use `E1119`; conflicting facade openings use `E1137`; configuration policy failures use `E1113`–`E1114`. Nested
 /// lexical, parser, and semantic failures retain their subsystem code while
 /// gaining the module source path when one is available.
 pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
@@ -57,11 +57,24 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         ModuleError::DuplicateObjectOwner { .. } => {
             module_error("E1111", error.to_string(), SourceSpan::new(0, 0))
         }
-        ModuleError::PrivateDeclarationAccess { span, facade, .. } => {
-            module_error("E1109", error.to_string(), *span)
-                .with_source_path(facade.display().to_string())
+        ModuleError::PrivateDeclarationAccess { span, facade: path, .. }
+        | ModuleError::ConflictingOpening { span, facade: path, .. } => {
+            module_error(visibility_code(error), error.to_string(), *span)
+                .with_source_path(path.display().to_string())
+        }
+        ModuleError::OutOfScopeReference(violation) => {
+            module_error(visibility_code(error), error.to_string(), violation.span)
+                .with_source_path(violation.path.display().to_string())
         }
         ModuleError::Semantic(error) => semantic_diagnostic(error),
+    }
+}
+
+fn visibility_code(error: &ModuleError) -> &'static str {
+    match error {
+        ModuleError::ConflictingOpening { .. } => "E1137",
+        ModuleError::OutOfScopeReference(_) => "E1119",
+        _ => "E1109",
     }
 }
 

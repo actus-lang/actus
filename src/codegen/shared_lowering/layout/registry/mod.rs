@@ -16,8 +16,10 @@ use super::super::{
 mod cleanup;
 mod options;
 mod program_layouts;
+mod program_symbols;
 mod provider;
 
 use options::{is_niche_pointer_option, niche_option_variant, niche_pointer_variant};
+use program_symbols::{collect_drop_symbols, collect_imported_namespaces};
 
 pub(crate) use program_layouts::ProgramLayouts;

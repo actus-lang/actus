@@ -17,6 +17,12 @@ impl Analyzer {
             .map(str::to_owned)
             .or_else(|| type_name.name.rsplit_once("::").map(|(_, member)| member.to_owned()))
             .unwrap_or_else(|| type_name.name.clone());
+        let resolved = type_name.resolved.unwrap_or_else(|| {
+            panic!(
+                "internal compiler error: type `{}` reached semantic analysis unresolved",
+                type_name.name
+            )
+        });
         crate::ast::TypeName {
             name: normalized_name,
             arguments: type_name
@@ -26,6 +32,7 @@ impl Analyzer {
                 .collect(),
             reference_role: type_name.reference_role.clone(),
             span: type_name.span,
+            resolved: Some(resolved),
         }
     }
 

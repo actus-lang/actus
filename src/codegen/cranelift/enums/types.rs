@@ -3,27 +3,8 @@ use crate::ast::{Expr, TypeName};
 use super::super::types::NativeType;
 use crate::codegen::cranelift::layout::LayoutRegistry;
 
-pub(crate) fn enum_receiver_name(receiver: &Expr) -> Option<String> {
-    let span = match receiver {
-        Expr::Identifier { span, .. } => *span,
-        Expr::Index { span, .. } => *span,
-        _ => return None,
-    };
-    let type_name = match receiver {
-        Expr::Identifier { name, .. } => crate::semantic::parse_type_name_key(name, span)?,
-        Expr::Index { target, index, .. } => {
-            let Expr::Identifier { name, .. } = target.as_ref() else { return None };
-            let Expr::Identifier { name: argument, .. } = index.as_ref() else { return None };
-            TypeName {
-                name: name.clone(),
-                arguments: vec![crate::semantic::parse_type_name_key(argument, span)?],
-                reference_role: None,
-                span,
-            }
-        }
-        _ => return None,
-    };
-    Some(canonical_type_name(&type_name))
+pub(crate) fn enum_receiver_name(type_name: Option<&TypeName>) -> Option<String> {
+    type_name.map(canonical_type_name)
 }
 
 fn canonical_type_name(type_name: &TypeName) -> String {
@@ -41,12 +22,16 @@ pub(crate) fn enum_expression_type(
     expression: &Expr,
     layouts: &LayoutRegistry,
 ) -> Option<NativeType> {
-    let (receiver, variant) = match expression {
-        Expr::MethodCall { receiver, method, .. } => (receiver.as_ref(), method.as_str()),
-        Expr::FieldAccess { object, field, .. } => (object.as_ref(), field.as_str()),
+    let (_receiver, variant, resolved_type) = match expression {
+        Expr::MethodCall { receiver, method, resolved_type, .. } => {
+            (receiver.as_ref(), method.as_str(), resolved_type.as_ref())
+        }
+        Expr::FieldAccess { object, field, resolved_type, .. } => {
+            (object.as_ref(), field.as_str(), resolved_type.as_ref())
+        }
         _ => return None,
     };
-    let enum_name = enum_receiver_name(receiver)?;
+    let enum_name = enum_receiver_name(resolved_type)?;
     let (id, _) = layouts.enum_constructor(&enum_name, variant)?;
     Some(NativeType::Enum(id))
 }

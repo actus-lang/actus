@@ -39,7 +39,7 @@ fn parses_bounded_for_range_with_explicit_binding_span() {
     assert_eq!(binding.name, "index");
     assert_eq!(binding.ty.as_deref(), Some("u32"));
     assert!(matches!(start, Expr::Integer { suffix: Some(suffix), .. } if suffix == "u32"));
-    assert!(matches!(end, Expr::Integer { suffix: Some(suffix), .. } if suffix == "u32"));
+    assert!(matches!(&**end, Expr::Integer { suffix: Some(suffix), .. } if suffix == "u32"));
     assert!(binding.span.start < binding.span.end);
 }
 

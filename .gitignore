@@ -9,7 +9,7 @@ __pycache__/
 /runtime/**/Cargo.lock
 
 # Actus generated build artifacts
-/capsula/
+capsula/
 Actus.lock
 
 # Native compiler artifacts

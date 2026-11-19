@@ -145,8 +145,29 @@ pub fn emit_object_bytes_with_configuration_and_options_and_float_policy(
     verify_no_float: bool,
     options: ObjectEmissionOptions,
 ) -> Result<Vec<u8>, BackendEmitError> {
+    emit_object_bytes_with_local_symbols(
+        module,
+        &std::collections::BTreeSet::new(),
+        target,
+        position_independent,
+        verify_no_float,
+        options,
+    )
+}
+
+/// Emits an object buffer whose `local_symbols` have internal linkage
+/// (ADR-0112).
+pub fn emit_object_bytes_with_local_symbols(
+    module: &BackendModule,
+    local_symbols: &std::collections::BTreeSet<String>,
+    target: &TargetSpec,
+    position_independent: bool,
+    verify_no_float: bool,
+    options: ObjectEmissionOptions,
+) -> Result<Vec<u8>, BackendEmitError> {
     let (_context, owned_module) =
         lower_module(module, target.pointer_width.bits(), target.entry_contract())?;
+    super::linkage::localize(owned_module.raw, local_symbols)?;
     verify_module(owned_module.raw)?;
     if verify_no_float {
         verify_no_float_ir(owned_module.raw)?;

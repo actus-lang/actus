@@ -29,7 +29,10 @@ impl Analyzer {
     }
 
     fn validate_struct_definition(&mut self, definition: &StructDef) -> Result<(), SemanticError> {
-        self.with_generic_scope(&definition.generic_parameters, |analyzer| {
+        let previous_owner = self.current_generic_owner.take();
+        self.current_generic_owner =
+            (!definition.generic_parameters.is_empty()).then(|| definition.name.clone());
+        let result = self.with_generic_scope(&definition.generic_parameters, |analyzer| {
             let mut field_names = HashSet::new();
             for field in &definition.fields {
                 if !field_names.insert(field.name.clone()) {
@@ -45,7 +48,9 @@ impl Analyzer {
                 analyzer.validate_type_reference(&field.ty)?;
             }
             Ok(())
-        })
+        });
+        self.current_generic_owner = previous_owner;
+        result
     }
 
     pub(crate) fn record_struct_binding(
@@ -58,7 +63,8 @@ impl Analyzer {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.binding_struct_types.insert(index, type_name.name.clone());
+        self.binding_struct_types.insert(index, type_name.clone());
+        self.binding_struct_type_names.insert(index, type_name.clone());
         if !type_name.arguments.is_empty() {
             self.binding_struct_type_applications.insert(index, type_name.clone());
         }
@@ -76,7 +82,8 @@ impl Analyzer {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.binding_struct_types.insert(index, type_name.name.clone());
+        self.binding_struct_types.insert(index, type_name.clone());
+        self.binding_struct_type_names.insert(index, type_name.clone());
         if !type_name.arguments.is_empty() {
             self.binding_struct_type_applications.insert(index, type_name);
         }

@@ -3,6 +3,9 @@ use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::package_sources::{PackageRole, PackageSourceIdentity};
+use crate::session::CompilationSession;
+
 #[derive(Debug)]
 pub enum ModuleResolutionError {
     InvalidPath(String),
@@ -123,19 +126,32 @@ impl ResolvedChildModule {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleResolver {
-    source_root: PathBuf,
-    dependency_roots: BTreeMap<String, PathBuf>,
+    pub(crate) source_root: PathBuf,
+    pub(crate) package_identity: PackageSourceIdentity,
+    pub(crate) dependency_roots: BTreeMap<String, PathBuf>,
     runtime_source_root: Option<PathBuf>,
     runtime_module_roots: BTreeMap<String, PathBuf>,
+    pub(crate) session: Option<CompilationSession>,
 }
 
 impl ModuleResolver {
     pub fn new(source_root: impl Into<PathBuf>) -> Self {
+        let source_root = source_root.into();
         Self {
-            source_root: source_root.into(),
+            package_identity: PackageSourceIdentity::new(
+                source_root
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("root")
+                    .replace('-', "_"),
+                &source_root,
+                PackageRole::Root,
+            ),
+            source_root,
             dependency_roots: BTreeMap::new(),
             runtime_source_root: None,
             runtime_module_roots: BTreeMap::new(),
+            session: None,
         }
     }
 
@@ -143,11 +159,14 @@ impl ModuleResolver {
         source_root: impl Into<PathBuf>,
         dependency_roots: &BTreeMap<String, PathBuf>,
     ) -> Self {
+        let source_root = source_root.into();
         Self {
-            source_root: source_root.into(),
+            source_root: source_root.clone(),
+            package_identity: PackageSourceIdentity::new("root", source_root, PackageRole::Root),
             dependency_roots: dependency_roots.clone(),
             runtime_source_root: None,
             runtime_module_roots: BTreeMap::new(),
+            session: None,
         }
     }
 
@@ -157,11 +176,14 @@ impl ModuleResolver {
         runtime_source_root: Option<&Path>,
         runtime_module_roots: &BTreeMap<String, PathBuf>,
     ) -> Self {
+        let source_root = source_root.into();
         Self {
-            source_root: source_root.into(),
+            source_root: source_root.clone(),
+            package_identity: PackageSourceIdentity::new("root", source_root, PackageRole::Root),
             dependency_roots: dependency_roots.clone(),
             runtime_source_root: runtime_source_root.map(Path::to_owned),
             runtime_module_roots: runtime_module_roots.clone(),
+            session: None,
         }
     }
 
