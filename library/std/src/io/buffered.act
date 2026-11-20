@@ -30,7 +30,10 @@ Construct a buffered reader from an owned source and reusable buffer.
 Both `dat` arguments transfer ownership into the reader, which performs
 deterministic cleanup for the source and buffer and returns the new reader.
 """
-open verb buffered_reader[Source: Reader](dat source: Source, dat buffer: Buffer) -> BufferedReader[Source] {
+open verb buffered_reader[Source: Reader](
+    dat source: Source,
+    dat buffer: Buffer
+) -> BufferedReader[Source] {
     return BufferedReader[Source] {
         source: source,
         buffer: buffer,
@@ -43,7 +46,10 @@ Construct a buffered writer from an owned target and reusable buffer.
 Both `dat` arguments transfer ownership into the writer. No second
 allocation is performed by the constructor, which returns the new writer.
 """
-open verb buffered_writer[Target: Writer](dat target: Target, dat buffer: Buffer) -> BufferedWriter[Target] {
+open verb buffered_writer[Target: Writer](
+    dat target: Target,
+    dat buffer: Buffer
+) -> BufferedWriter[Target] {
     return BufferedWriter[Target] {
         target: target,
         buffer: buffer,
@@ -203,7 +209,9 @@ flush was needed; `Err(IoError)` reports buffer inspection or target-write
 failure. The helper performs no allocation.
 """
 meta effect("filesystem", "blocking")
-open verb flush_buffer_if_full[Target: Writer](ins writer: BufferedWriter[Target]) -> Result[Int, IoError] {
+open verb flush_buffer_if_full[Target: Writer](
+    ins writer: BufferedWriter[Target]
+) -> Result[Int, IoError] {
     erg full = buffered_storage_is_full(buffer: abs writer.buffer)?;
     return case full {
         1 => flush_buffer(writer: ins writer),

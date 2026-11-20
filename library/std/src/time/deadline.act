@@ -23,7 +23,10 @@ Both inputs are borrowed and remain owned by the caller. Returns
 `Err(TimeError.Overflow)` if the provider-domain tick addition cannot fit in
 `u64`; otherwise returns a deadline with no allocation or provider read.
 """
-open verb deadline_after(abs start: Instant, abs duration: Duration) -> Result[Deadline, TimeError] {
+open verb deadline_after(
+    abs start: Instant,
+    abs duration: Duration
+) -> Result[Deadline, TimeError] {
     if start.ticks > U64_MAX - duration.nanos {
         return Result[Deadline, TimeError].Err(TimeError.Overflow);
     }

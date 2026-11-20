@@ -101,7 +101,11 @@ verb wire_endpoint_validate_authority(
     return true;
 }
 
-verb wire_endpoint_parse_port(abs input: Buffer, erg start: u32, erg end: u32) -> Result[u32, WireEndpointError] {
+verb wire_endpoint_parse_port(
+    abs input: Buffer,
+    erg start: u32,
+    erg end: u32
+) -> Result[u32, WireEndpointError] {
     if start >= end || end - start > 5u32 {
         return Result[u32, WireEndpointError].Err(WireEndpointError.InvalidPort);
     }
@@ -231,7 +235,10 @@ verb wire_endpoint_initialize(
     return endpoint;
 }
 
-verb wire_endpoint_find_authority(abs input: Buffer, erg length: u32) -> Result[u32, WireEndpointError] {
+verb wire_endpoint_find_authority(
+    abs input: Buffer,
+    erg length: u32
+) -> Result[u32, WireEndpointError] {
     if length > WIRE_ENDPOINT_MAX_BYTES {
         return Result[u32, WireEndpointError].Err(WireEndpointError.TooLong);
     }
@@ -239,7 +246,10 @@ verb wire_endpoint_find_authority(abs input: Buffer, erg length: u32) -> Result[
         return Result[u32, WireEndpointError].Err(WireEndpointError.InvalidScheme);
     }
     erg authority_start: u32 = WIRE_ENDPOINT_SCHEME_BYTES;
-    erg authority_end: u32 = wire_endpoint_find_boundary(input: abs input, start: erg authority_start);
+    erg authority_end: u32 = wire_endpoint_find_boundary(
+        input: abs input,
+        start: erg authority_start
+    );
     if authority_end == authority_start {
         return Result[u32, WireEndpointError].Err(WireEndpointError.MissingAuthority);
     }

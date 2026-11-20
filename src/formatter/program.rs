@@ -27,6 +27,9 @@ pub fn format_program_with_comments(program: &Program, comments: &[SourceComment
     formatter.output
 }
 
+/// The canonical target line width (docs/language/style-and-conventions.md).
+pub(super) const LINE_WIDTH: usize = 100;
+
 pub(super) struct Formatter<'comments> {
     pub(in crate::formatter) output: String,
     pub(in crate::formatter) indent: usize,
@@ -121,6 +124,14 @@ impl Formatter<'_> {
         self.output.push_str(" = ");
         self.expression(&constant.initializer);
         self.output.push_str(";\n");
+    }
+
+    /// Width of the line that contains byte offset `start` of the output.
+    pub(super) fn width_of_line_at(&self, start: usize) -> usize {
+        let line_start = self.output[..start].rfind('\n').map_or(0, |newline| newline + 1);
+        let line_end =
+            self.output[start..].find('\n').map_or(self.output.len(), |newline| start + newline);
+        self.output[line_start..line_end].chars().count()
     }
 
     pub(super) fn line_indent(&mut self) {

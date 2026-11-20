@@ -82,7 +82,10 @@ encoding, too many arguments, an oversized argument, or insufficient buffer
 capacity. Failed reads leave the caller buffer and cursor unchanged. The
 implementation retains no pointer to either `ins` value.
 """
-open verb next_arg(ins arguments: Arguments, ins buffer: Buffer) -> Result[Option[Int], ProcessError] {
+open verb next_arg(
+    ins arguments: Arguments,
+    ins buffer: Buffer
+) -> Result[Option[Int], ProcessError] {
     if !arguments.valid {
         return Result[Option[Int], ProcessError].Err(ProcessError.InvalidIndex);
     }

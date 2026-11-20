@@ -163,7 +163,10 @@ open verb remove_file(abs path: path_module::Path) -> Result[Int, io::IoError] {
     return fs_status(status: erg status);
 }
 
-verb finish_canonicalize(dat output: path_module::Path, erg status: Int) -> Result[path_module::Path, io::IoError] {
+verb finish_canonicalize(
+    dat output: path_module::Path,
+    erg status: Int
+) -> Result[path_module::Path, io::IoError] {
     if status == 0 {
         return Ok(output);
     }
@@ -201,7 +204,10 @@ different existing identities. Host lookup failure returns `IoError.Failed`
 and missing stable identity returns `IoError.Unsupported`. No path is retained.
 """
 meta effect("filesystem", "blocking")
-open verb same_file(abs left: path_module::Path, abs right: path_module::Path) -> Result[Bool, io::IoError] {
+open verb same_file(
+    abs left: path_module::Path,
+    abs right: path_module::Path
+) -> Result[Bool, io::IoError] {
     erg status = actus_file_same_path(left: abs left, right: abs right);
     return case status {
         -2 => Err(io::IoError.Unsupported),
@@ -220,7 +226,10 @@ permission, and other provider failures remain typed errors. Neither view is
 consumed or retained.
 """
 meta effect("filesystem", "blocking")
-open verb rename(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
+open verb rename(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Result[Int, io::IoError] {
     erg status = actus_file_rename_path(from: abs from, to: abs to);
     return rename_status(status: erg status);
 }
@@ -252,7 +261,10 @@ Errors: provider failures return `Err(IoError.Failed)` after no partial count
 is reported. Side effects: the destination regular file is replaced.
 """
 meta effect("filesystem", "blocking")
-open verb copy_file(abs from: path_module::Path, abs to: path_module::Path) -> Result[Int, io::IoError] {
+open verb copy_file(
+    abs from: path_module::Path,
+    abs to: path_module::Path
+) -> Result[Int, io::IoError] {
     erg options = copy_options_new();
     erg overwrite = copy_options_overwrite(options: dat options);
     return copy_file_with_options(
@@ -428,7 +440,9 @@ open verb propagate_text_error(dat error: io::IoError) -> Result[Buffer, io::IoE
         io::IoError.InvalidInput => Result[Buffer, io::IoError].Err(io::IoError.InvalidInput),
         io::IoError.InvalidData => Result[Buffer, io::IoError].Err(io::IoError.InvalidData),
         io::IoError.Unsupported => Result[Buffer, io::IoError].Err(io::IoError.Unsupported),
-        io::IoError.PermissionDenied => Result[Buffer, io::IoError].Err(io::IoError.PermissionDenied),
+        io::IoError.PermissionDenied => Result[Buffer, io::IoError].Err(
+            io::IoError.PermissionDenied
+        ),
         io::IoError.Busy => Result[Buffer, io::IoError].Err(io::IoError.Busy),
         io::IoError.CrossDevice => Result[Buffer, io::IoError].Err(io::IoError.CrossDevice),
         io::IoError.AlreadyExists => Result[Buffer, io::IoError].Err(io::IoError.AlreadyExists),
@@ -455,7 +469,9 @@ open verb validate_text_bytes(dat output: Buffer) -> Result[Buffer, io::IoError]
 `IoError` variant; successful bytes are transferred to UTF-8 validation, which
 drops invalid data. No intermediate buffer is duplicated or retained.
 """
-open verb validate_loaded_text(dat loaded: Result[Buffer, io::IoError]) -> Result[Buffer, io::IoError] {
+open verb validate_loaded_text(
+    dat loaded: Result[Buffer, io::IoError]
+) -> Result[Buffer, io::IoError] {
     return case dat loaded {
         Result.Err(error) => propagate_text_error(error: dat error),
         Result.Ok(output) => validate_text_bytes(output: dat output),

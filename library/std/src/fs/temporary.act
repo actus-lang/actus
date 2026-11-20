@@ -111,7 +111,10 @@ and filesystem creation and must not be used in realtime engine paths.
 """
 meta capability("filesystem.create_exclusive")
 meta effect("filesystem", "blocking", "entropy")
-open verb temporary_file_open(abs root: path_module::Path, abs prefix: Buffer) -> Result[TemporaryFile, TemporaryError] {
+open verb temporary_file_open(
+    abs root: path_module::Path,
+    abs prefix: Buffer
+) -> Result[TemporaryFile, TemporaryError] {
     erg output_result = temporary_output_path();
     return case dat output_result {
         Result.Err(error) => Result[TemporaryFile, TemporaryError].Err(error),
@@ -124,15 +127,21 @@ open verb temporary_file_open(abs root: path_module::Path, abs prefix: Buffer) -
             return case status {
                 -1 => {
                     drop(output);
-                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(status: status));
+                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(
+                        status: status
+                    ));
                 },
                 -2 => {
                     drop(output);
-                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(status: status));
+                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(
+                        status: status
+                    ));
                 },
                 -3 => {
                     drop(output);
-                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(status: status));
+                    return Result[TemporaryFile, TemporaryError].Err(temporary_file_status(
+                        status: status
+                    ));
                 },
                 _ => Result[TemporaryFile, TemporaryError].Ok(TemporaryFile {
                     file: File {
