@@ -126,7 +126,10 @@ verb wire_parser_decode_header(ins parser: WireParser) -> Result[Int, WireError]
     };
 }
 
-verb wire_parser_finish(ins parser: WireParser, ins payload_output: Buffer) -> Result[Int, WireError] {
+verb wire_parser_finish(
+    ins parser: WireParser,
+    ins payload_output: Buffer
+) -> Result[Int, WireError] {
     if parser.filled != parser.expected_length {
         return Result[Int, WireError].Ok(0);
     }

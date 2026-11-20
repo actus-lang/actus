@@ -182,12 +182,18 @@ verb atomic_replace_replaces_existing_destination() -> Int {
                     erg replaced = fs::replace_file_atomic(from: abs staging, to: abs destination);
                     return case dat replaced {
                         Result.Err(_) => {
-                            cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                            cleanup_replace_fixture(
+                                destination: abs destination,
+                                staging: abs staging
+                            );
                             5;
                         },
                         Result.Ok(_) => {
                             erg result = read_replace_fixture(path: abs destination);
-                            cleanup_replace_fixture(destination: abs destination, staging: abs staging);
+                            cleanup_replace_fixture(
+                                destination: abs destination,
+                                staging: abs staging
+                            );
                             result;
                         },
                     };
@@ -285,7 +291,10 @@ verb atomic_publication_cleans_failed_rename() -> Int {
                                     4;
                                 },
                                 Result.Err(_) => {
-                                    erg result = verify_failed_publication(destination: abs destination, staging: abs staging_check);
+                                    erg result = verify_failed_publication(
+                                        destination: abs destination,
+                                        staging: abs staging_check
+                                    );
                                     drop(staging_check);
                                     result;
                                 },
@@ -381,7 +390,10 @@ verb injected_prepublication_failure(
                                     4;
                                 },
                                 Result.Err(_) => {
-                                    erg result = verify_failed_publication(destination: abs destination, staging: abs staging_check);
+                                    erg result = verify_failed_publication(
+                                        destination: abs destination,
+                                        staging: abs staging_check
+                                    );
                                     drop(staging_check);
                                     result;
                                 },
@@ -401,7 +413,10 @@ meta effect("filesystem", "blocking")
 verb injected_short_write_is_rejected() -> Int {
     erg destination_suffix: u8 = 65u8;
     erg staging_suffix: u8 = 66u8;
-    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
 }
 
 meta test
@@ -411,7 +426,10 @@ meta effect("filesystem", "blocking")
 verb injected_flush_failure_is_rejected() -> Int {
     erg destination_suffix: u8 = 67u8;
     erg staging_suffix: u8 = 68u8;
-    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
 }
 
 meta test
@@ -421,7 +439,10 @@ meta effect("filesystem", "blocking")
 verb injected_rename_failure_is_rejected() -> Int {
     erg destination_suffix: u8 = 69u8;
     erg staging_suffix: u8 = 70u8;
-    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
 }
 
 meta test

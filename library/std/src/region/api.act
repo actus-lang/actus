@@ -84,13 +84,21 @@ unsafe extern "C" verb actus_region_remap[T](
 ) -> Result[u64, RegionError];
 
 """Private bridge that reads one fixed-width Region metadata value."""
-unsafe extern "C" verb actus_region_logical_length[T](abs region: Region[T]) -> Result[u64, RegionError];
+unsafe extern "C" verb actus_region_logical_length[T](
+    abs region: Region[T]
+) -> Result[u64, RegionError];
 
-unsafe extern "C" verb actus_region_window_start[T](abs region: Region[T]) -> Result[u64, RegionError];
+unsafe extern "C" verb actus_region_window_start[T](
+    abs region: Region[T]
+) -> Result[u64, RegionError];
 
-unsafe extern "C" verb actus_region_window_count[T](abs region: Region[T]) -> Result[u64, RegionError];
+unsafe extern "C" verb actus_region_window_count[T](
+    abs region: Region[T]
+) -> Result[u64, RegionError];
 
-unsafe extern "C" verb actus_region_generation[T](abs region: Region[T]) -> Result[u64, RegionError];
+unsafe extern "C" verb actus_region_generation[T](
+    abs region: Region[T]
+) -> Result[u64, RegionError];
 
 unsafe extern "C" verb actus_region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError];
 

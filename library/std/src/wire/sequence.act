@@ -148,7 +148,10 @@ verb wire_sequence_accept_existing(
             distance: erg forward
         );
     }
-    erg backward = wire_sequence_backward_distance(current: erg sequence_num, previous: erg highest);
+    erg backward = wire_sequence_backward_distance(
+        current: erg sequence_num,
+        previous: erg highest
+    );
     return wire_sequence_accept_backward(window: ins window, distance: erg backward);
 }
 

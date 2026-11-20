@@ -1,5 +1,4 @@
 use super::super::{Formatter, meta_name, role_name};
-use super::widths::parameter_width;
 
 impl Formatter<'_> {
     fn metadata(&mut self, metadata: &[crate::ast::MetaAttribute]) {
@@ -115,8 +114,7 @@ impl Formatter<'_> {
             self.line_indent();
             self.output.push_str("verb ");
             self.output.push_str(&method.name);
-            self.parameters(&method.params);
-            self.return_type(&method.return_type);
+            self.signature(&method.params, &method.return_type, 1);
             self.output.push(';');
         }
         self.indent -= 1;
@@ -171,8 +169,7 @@ impl Formatter<'_> {
         self.output.push_str("verb ");
         self.output.push_str(&verb.name);
         self.generic_parameters(&verb.generic_parameters);
-        self.parameters(&verb.params);
-        self.return_type(&verb.return_type);
+        self.signature(&verb.params, &verb.return_type, 2);
         self.output.push(' ');
         self.block(&verb.body);
     }
@@ -191,8 +188,7 @@ impl Formatter<'_> {
         self.output.push_str("\" verb ");
         self.output.push_str(&verb.name);
         self.generic_parameters(&verb.generic_parameters);
-        self.parameters(&verb.params);
-        self.return_type(&verb.return_type);
+        self.signature(&verb.params, &verb.return_type, 1);
         self.output.push(';');
     }
 
@@ -230,65 +226,6 @@ impl Formatter<'_> {
             }
         }
         self.documentation(Some(&rendered));
-    }
-
-    fn parameters(&mut self, parameters: &[crate::ast::Param]) {
-        if self.should_wrap_parameters(parameters) {
-            self.multiline_parameters(parameters);
-            return;
-        }
-        self.output.push('(');
-        for (index, parameter) in parameters.iter().enumerate() {
-            if index > 0 {
-                self.output.push_str(", ");
-            }
-            self.output.push_str(role_name(&parameter.role));
-            self.output.push(' ');
-            self.output.push_str(&parameter.name);
-            self.output.push_str(": ");
-            self.type_name(&parameter.ty);
-        }
-        self.output.push(')');
-    }
-
-    fn multiline_parameters(&mut self, parameters: &[crate::ast::Param]) {
-        self.output.push_str("(\n");
-        self.indent += 1;
-        for (index, parameter) in parameters.iter().enumerate() {
-            self.line_indent();
-            self.output.push_str(role_name(&parameter.role));
-            self.output.push(' ');
-            self.output.push_str(&parameter.name);
-            self.output.push_str(": ");
-            self.type_name(&parameter.ty);
-            if index + 1 < parameters.len() {
-                self.output.push(',');
-            }
-            self.output.push('\n');
-        }
-        self.indent -= 1;
-        self.line_indent();
-        self.output.push(')');
-    }
-
-    fn should_wrap_parameters(&self, parameters: &[crate::ast::Param]) -> bool {
-        parameters.len() > 1
-            && self.current_line_width() + parameters.iter().map(parameter_width).sum::<usize>()
-                > 80
-    }
-
-    pub(in crate::formatter) fn current_line_width(&self) -> usize {
-        self.output.rsplit('\n').next().map_or(0, str::len)
-    }
-
-    fn return_type(&mut self, return_type: &Option<crate::ast::ReturnType>) {
-        if let Some(return_type) = return_type {
-            self.output.push_str(" -> ");
-            if matches!(return_type.access, crate::ast::ReturnAccess::Abs) {
-                self.output.push_str("abs ");
-            }
-            self.type_name(&return_type.ty);
-        }
     }
 
     pub(in crate::formatter) fn struct_definition(&mut self, definition: &crate::ast::StructDef) {

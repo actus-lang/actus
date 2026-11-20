@@ -302,7 +302,10 @@ incompatible flag combinations, existing-target violations, and unsupported
 security semantics.
 """
 meta effect("filesystem", "blocking")
-open verb options_open(dat options: OpenOptions, abs path: path_module::Path) -> Result[File, io::IoError] {
+open verb options_open(
+    dat options: OpenOptions,
+    abs path: path_module::Path
+) -> Result[File, io::IoError] {
     erg handle = actus_file_open_options_path(
         path: abs path,
         read: abs options.read,

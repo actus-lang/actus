@@ -85,7 +85,10 @@ verb injected_prepublication_failure(
                                     4;
                                 },
                                 Result.Err(_) => {
-                                    erg result = verify_failed_publication(destination: abs destination, staging: abs staging_check);
+                                    erg result = verify_failed_publication(
+                                        destination: abs destination,
+                                        staging: abs staging_check
+                                    );
                                     drop(staging_check);
                                     result;
                                 },
@@ -105,7 +108,10 @@ meta effect("filesystem", "blocking")
 verb injected_staging_open_failure_is_rejected() -> Int {
     erg destination_suffix: u8 = 75u8;
     erg staging_suffix: u8 = 76u8;
-    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
 }
 
 meta test
@@ -115,7 +121,10 @@ meta effect("filesystem", "blocking")
 verb injected_write_failure_is_rejected() -> Int {
     erg destination_suffix: u8 = 77u8;
     erg staging_suffix: u8 = 78u8;
-    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
 }
 
 meta test
@@ -125,7 +134,10 @@ meta effect("filesystem", "blocking")
 verb injected_close_failure_is_rejected() -> Int {
     erg destination_suffix: u8 = 79u8;
     erg staging_suffix: u8 = 80u8;
-    return injected_prepublication_failure(destination_suffix: erg destination_suffix, staging_suffix: erg staging_suffix);
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
 }
 
 meta effect("filesystem", "blocking")
@@ -182,7 +194,10 @@ verb injected_cleanup_failure_preserves_root_error() -> Int {
                                     4;
                                 },
                                 Result.Err(_) => {
-                                    erg result = verify_cleanup_failure(destination: abs destination, staging: abs staging_check);
+                                    erg result = verify_cleanup_failure(
+                                        destination: abs destination,
+                                        staging: abs staging_check
+                                    );
                                     drop(staging_check);
                                     result;
                                 },

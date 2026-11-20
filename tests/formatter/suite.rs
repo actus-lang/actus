@@ -637,3 +637,36 @@ fn keeps_spaces_in_generic_call_types() {
     assert!(formatted.contains("Result[Int, IoError].Ok(1)"), "formatted: {formatted}");
     assert_eq!(format_source(&formatted), formatted);
 }
+
+/// A signature whose line, with its ` {`, reaches 100 columns stays on one
+/// line; one column more places one parameter per line, even for a single
+/// parameter.
+#[test]
+fn wraps_signatures_past_the_target_line_width() {
+    let fitting = "verb fits(dat sample: Result[SensorMeasurement, SensorFault]) -> Result[CalibratedReading, Errors] {";
+    assert_eq!(fitting.len(), 100);
+    let source = format!("{fitting}\n    return sample;\n}}\n");
+    assert_eq!(format_source(&source), source);
+
+    let source = "verb fits(dat sample: Result[SensorMeasurement, SensorFault]) -> Result[CalibratedReading, Errorss] { return sample; }";
+    let expected = "verb fits(\n    dat sample: Result[SensorMeasurement, SensorFault]\n) -> Result[CalibratedReading, Errorss] {\n    return sample;\n}\n";
+    let formatted = format_source(source);
+    assert_eq!(formatted, expected);
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+/// A call whose line, with the `;` after it, reaches 100 columns stays on one
+/// line; one column more places one argument per line.
+#[test]
+fn wraps_calls_past_the_target_line_width() {
+    let fitting = "    erg filtered = apply_low_pass_filter(samples: ins capture.window, cutoff_hertz: erg cutoff_hzs);";
+    assert_eq!(fitting.len(), 100);
+    let source = format!("verb run() {{\n{fitting}\n}}\n");
+    assert_eq!(format_source(&source), source);
+
+    let source = "verb run() { erg filtered = apply_low_pass_filter(samples: ins capture.window, cutoff_hertz: erg cutoff_hzss); }";
+    let expected = "verb run() {\n    erg filtered = apply_low_pass_filter(\n        samples: ins capture.window,\n        cutoff_hertz: erg cutoff_hzss\n    );\n}\n";
+    let formatted = format_source(source);
+    assert_eq!(formatted, expected);
+    assert_eq!(format_source(&formatted), formatted);
+}

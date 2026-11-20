@@ -43,7 +43,10 @@ null or non-ASCII bytes with `PathError.InvalidEncoding`.
 unsafe extern "C" verb actus_path_ascii_to_native(ins storage: Buffer) -> Int;
 
 """Drop a rejected raw path buffer and return its typed validation error."""
-open verb reject_path_storage(dat storage: Buffer, dat error: PathError) -> Result[Path, PathError] {
+open verb reject_path_storage(
+    dat storage: Buffer,
+    dat error: PathError
+) -> Result[Path, PathError] {
     drop(storage);
     return Result[Path, PathError].Err(error);
 }

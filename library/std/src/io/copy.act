@@ -59,7 +59,11 @@ The `erg` counts are scalar working values. `Ok(total + actual)` is returned
 only when the writer consumed exactly `expected` bytes; a short or inconsistent
 write returns `Err(IoError.Failed)`. No stream or allocation is retained.
 """
-open verb copy_written_chunk(erg total: Int, erg expected: Int, erg actual: Int) -> Result[Int, IoError] {
+open verb copy_written_chunk(
+    erg total: Int,
+    erg expected: Int,
+    erg actual: Int
+) -> Result[Int, IoError] {
     erg difference = actual - expected;
     return case difference {
         0 => Result[Int, IoError].Ok(total + actual),

@@ -33,7 +33,11 @@ operation allocates no storage and returns a deterministic `Ok` checksum or a
 typed `WireError` failure. `Err(InvalidRange)` reports an inverted range and
 `Err(Truncated)` reports an end beyond the input buffer.
 """
-open verb wire_crc16_ccitt(abs input: Buffer, erg start: u32, erg end: u32) -> Result[u16, WireError] {
+open verb wire_crc16_ccitt(
+    abs input: Buffer,
+    erg start: u32,
+    erg end: u32
+) -> Result[u16, WireError] {
     erg input_length: Int = buffer_length(buffer: abs input);
     if start > end {
         return Result[u16, WireError].Err(WireError.InvalidRange);

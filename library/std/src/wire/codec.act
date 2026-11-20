@@ -225,7 +225,10 @@ verb wire_validate_and_copy_payload(
     erg frame_data_end: u32,
     erg payload_length: u32
 ) -> Result[Int, WireError] {
-    erg checksum_valid = wire_validate_checksum(input: abs input, frame_data_end: erg frame_data_end);
+    erg checksum_valid = wire_validate_checksum(
+        input: abs input,
+        frame_data_end: erg frame_data_end
+    );
     case dat checksum_valid {
         Result.Err(error) => {
             return Result[Int, WireError].Err(error);
@@ -301,7 +304,10 @@ header, length, and CRC validation succeeds. The result returns the validated
 header, while truncated, malformed, corrupt, or undersized operations return
 a typed `WireError` without partial payload delivery.
 """
-open verb wire_frame_decode(abs input: Buffer, ins payload_output: Buffer) -> Result[WireHeader, WireError] {
+open verb wire_frame_decode(
+    abs input: Buffer,
+    ins payload_output: Buffer
+) -> Result[WireHeader, WireError] {
     erg header_result = wire_header_decode(input: abs input);
     return case dat header_result {
         Result.Err(error) => Result[WireHeader, WireError].Err(error),

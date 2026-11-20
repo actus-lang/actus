@@ -59,7 +59,9 @@ Advance the borrowed iterator through the C ABI. `iter` is an `ins` loan whose
 cursor is restored to its caller; the returned `Option` is an `abs`
 source-origin view and no component allocation occurs.
 """
-unsafe extern "C" verb actus_path_next_component(ins iter: PathComponents) -> Option[abs PathComponent];
+unsafe extern "C" verb actus_path_next_component(
+    ins iter: PathComponents
+) -> Option[abs PathComponent];
 
 """Return the final parent component as a non-owning `abs` view, if present."""
 open verb parent(abs self: Path) -> Option[abs PathComponent] {

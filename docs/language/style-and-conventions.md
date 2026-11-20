@@ -299,15 +299,26 @@ verb loop_example() -> Int {
 }
 ```
 
-Short calls remain on one line. Long calls place one argument per line and
-use a trailing comma:
+Short calls remain on one line. A call with more than two arguments, or one
+whose line would pass 100 columns, places one argument per line:
 
 ```act
 erg result = configure_dma(
     channel: 2,
     buffer: rx_buf,
-    interrupt_priority: 1,
+    interrupt_priority: 1
 );
+```
+
+A signature whose line would pass 100 columns places one parameter per line,
+even when it has a single parameter:
+
+```act
+verb finish_sensor_calibration_window(
+    dat measured: Result[calibration::SensorMeasurement, calibration::SensorFault]
+) -> Result[calibration::SensorMeasurement, CalibrationError] {
+    return finish(measured: dat measured);
+}
 ```
 
 ## 8. Operators and bounded access

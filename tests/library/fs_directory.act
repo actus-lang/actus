@@ -45,7 +45,10 @@ verb directory_iteration_returns_entry_and_closes() -> Int {
                     erg entry = next_dir_entry(directory: ins directory);
                     return case dat entry {
                         Result.Err(_) => 3,
-                        Result.Ok(value) => close_directory_entry(directory: ins directory, value: dat value),
+                        Result.Ok(value) => close_directory_entry(
+                            directory: ins directory,
+                            value: dat value
+                        ),
                     };
                 },
             };

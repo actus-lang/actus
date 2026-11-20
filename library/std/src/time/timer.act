@@ -146,7 +146,11 @@ This is the deterministic fake-provider and embedded-provider boundary. The
 instant and resulting deadline must belong to the same monotonic provider
 domain; no wall-clock conversion is performed.
 """
-open verb timer_arm_at(ins timer: Timer, abs start: Instant, abs delay: Duration) -> Result[Int, TimeError] {
+open verb timer_arm_at(
+    ins timer: Timer,
+    abs start: Instant,
+    abs delay: Duration
+) -> Result[Int, TimeError] {
     erg state = timer.state;
     case state {
         3 => {

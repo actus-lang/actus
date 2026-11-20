@@ -233,7 +233,10 @@ or end-of-stream condition becomes a typed `IoError`; no partial success is
 reported and no hidden result buffer is allocated.
 """
 meta effect("filesystem", "blocking")
-open verb write_file(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
+open verb write_file(
+    abs path: path_module::Path,
+    abs contents: Buffer
+) -> Result[Int, io::IoError] {
     return write_and_flush(path: abs path, contents: abs contents);
 }
 
@@ -319,7 +322,10 @@ flushes before reporting success, and closes the handle on every branch.
 path, replacement buffer, or hidden allocation is introduced here.
 """
 meta effect("filesystem", "blocking")
-open verb write_and_flush(abs path: path_module::Path, abs contents: Buffer) -> Result[Int, io::IoError] {
+open verb write_and_flush(
+    abs path: path_module::Path,
+    abs contents: Buffer
+) -> Result[Int, io::IoError] {
     erg opened = file_create(path: abs path);
     return case dat opened {
         Result.Err(error) => Result[Int, io::IoError].Err(error),

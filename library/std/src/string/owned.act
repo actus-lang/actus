@@ -56,7 +56,10 @@ Drop rejected UTF-8 storage and preserve its typed construction error.
 Returns `Err(error)` after deterministic cleanup; no rejected buffer remains
 owned by the caller or callee.
 """
-open verb reject_utf8_storage(dat storage: Buffer, dat error: StringError) -> Result[Utf8Buffer, StringError] {
+open verb reject_utf8_storage(
+    dat storage: Buffer,
+    dat error: StringError
+) -> Result[Utf8Buffer, StringError] {
     drop(storage);
     return Err(error);
 }
@@ -69,7 +72,10 @@ used as an exclusive loan during the copy and is transferred into the result
 only when the provider reports success. Capacity, invalid source encoding,
 and invalid storage are returned as typed errors without a partial result.
 """
-open verb utf8_from_string(abs text: String, dat storage: Buffer) -> Result[Utf8Buffer, StringError] {
+open verb utf8_from_string(
+    abs text: String,
+    dat storage: Buffer
+) -> Result[Utf8Buffer, StringError] {
     erg status = actus_string_copy_to_buffer(text: abs text, storage: ins storage);
     return case status {
         -1 => {

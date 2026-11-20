@@ -104,7 +104,10 @@ open verb wire_fragment_encode(
     ins output: Buffer
 ) -> Result[u32, WireError] {
     erg payload_length: u32 = buffer_length(buffer: abs payload) as u32;
-    erg valid = wire_fragment_header_valid(metadata: abs header, payload_length: erg payload_length);
+    erg valid = wire_fragment_header_valid(
+        metadata: abs header,
+        payload_length: erg payload_length
+    );
     case dat valid {
         Result.Err(error) => {
             return Result[u32, WireError].Err(error);
@@ -147,7 +150,10 @@ open verb wire_fragment_decode(abs input: Buffer) -> Result[WireFragmentHeader, 
     }
     erg header: WireFragmentHeader = wire_fragment_read_header(input: abs input);
     erg payload_length: u32 = (buffer_length(buffer: abs input) as u32) - WIRE_FRAGMENT_HEADER_BYTES;
-    erg valid = wire_fragment_header_valid(metadata: abs header, payload_length: erg payload_length);
+    erg valid = wire_fragment_header_valid(
+        metadata: abs header,
+        payload_length: erg payload_length
+    );
     case dat valid {
         Result.Err(error) => {
             return Result[WireFragmentHeader, WireError].Err(error);

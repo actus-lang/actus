@@ -144,7 +144,10 @@ Zero is success; `-2` means not found, `-3` permission denied, `-4`
 unsupported, and `-1` an unspecified provider failure. The output slot is
 initialized only on success.
 """
-verb metadata_detailed_failed(dat output: Metadata, erg status: Int) -> Result[Metadata, MetadataError] {
+verb metadata_detailed_failed(
+    dat output: Metadata,
+    erg status: Int
+) -> Result[Metadata, MetadataError] {
     drop(output);
     return case status {
         -2 => Err(MetadataError.NotFound),
@@ -269,7 +272,9 @@ provider rejection. The operation performs no hidden link traversal or
 resource retention.
 """
 meta effect("filesystem", "blocking")
-open verb symlink_metadata_detailed(abs path: path_module::Path) -> Result[Metadata, MetadataError] {
+open verb symlink_metadata_detailed(
+    abs path: path_module::Path
+) -> Result[Metadata, MetadataError] {
     erg output = metadata_default();
     erg status = actus_file_symlink_metadata_path(path: abs path, output: ins output);
     return case status {

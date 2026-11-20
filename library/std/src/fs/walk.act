@@ -255,7 +255,10 @@ return `IoError.InvalidInput`. A root permission failure returns
 class. No walker is returned on failure and the input views remain unchanged.
 """
 meta effect("filesystem", "blocking")
-open verb walk(abs path: path_module::Path, abs options: WalkOptions) -> Result[Walker, io::IoError] {
+open verb walk(
+    abs path: path_module::Path,
+    abs options: WalkOptions
+) -> Result[Walker, io::IoError] {
     erg depth: Int = options.max_depth as Int;
     erg follow = options.follow_symlinks;
     erg hidden = options.include_hidden;

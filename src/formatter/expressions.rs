@@ -1,6 +1,6 @@
 use crate::ast::{Argument, Expr};
 
-use super::{Formatter, role_name};
+use super::{Formatter, LINE_WIDTH, role_name};
 
 impl Formatter<'_> {
     pub(super) fn expression(&mut self, expression: &Expr) {
@@ -127,6 +127,7 @@ impl Formatter<'_> {
             self.multiline_call(arguments);
             return;
         }
+        let start = self.output.len();
         self.output.push('(');
         for (index, argument) in arguments.iter().enumerate() {
             if index > 0 {
@@ -135,6 +136,11 @@ impl Formatter<'_> {
             self.argument(argument);
         }
         self.output.push(')');
+        // One column stays free for the `;`, `,` or `)` that follows a call.
+        if !arguments.is_empty() && self.width_of_line_at(start) + 1 > LINE_WIDTH {
+            self.output.truncate(start);
+            self.multiline_call(arguments);
+        }
     }
 
     fn multiline_call(&mut self, arguments: &[Argument]) {
