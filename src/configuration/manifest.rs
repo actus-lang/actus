@@ -136,6 +136,8 @@ pub(crate) struct ProfilesManifest {
     pub(crate) debug: ProfileManifest,
     #[serde(default)]
     pub(crate) release: ProfileManifest,
+    #[serde(default)]
+    pub(crate) size: ProfileManifest,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
@@ -149,6 +151,18 @@ pub(crate) struct ProfileManifest {
 pub enum OptimizationLevel {
     None,
     Speed,
+    Size,
+}
+
+impl OptimizationLevel {
+    /// The manifest spelling of the level.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Speed => "speed",
+            Self::Size => "size",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
@@ -156,6 +170,7 @@ pub enum OptimizationLevel {
 pub enum BuildProfile {
     Debug,
     Release,
+    Size,
 }
 
 impl BuildProfile {
@@ -163,6 +178,17 @@ impl BuildProfile {
         match self {
             Self::Debug => "debug",
             Self::Release => "release",
+            Self::Size => "size",
+        }
+    }
+
+    /// The profile a `--profile <name>` argument selects.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        match name {
+            "debug" => Ok(Self::Debug),
+            "release" => Ok(Self::Release),
+            "size" => Ok(Self::Size),
+            _ => Err(format!("unsupported build profile `{name}`")),
         }
     }
 }

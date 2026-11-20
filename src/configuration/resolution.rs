@@ -46,10 +46,12 @@ pub(super) fn optimization_level(
     let configured = match profile {
         BuildProfile::Debug => profiles.debug.opt_level,
         BuildProfile::Release => profiles.release.opt_level,
+        BuildProfile::Size => profiles.size.opt_level,
     };
     configured.unwrap_or(match profile {
         BuildProfile::Debug => OptimizationLevel::None,
         BuildProfile::Release => OptimizationLevel::Speed,
+        BuildProfile::Size => OptimizationLevel::Size,
     })
 }
 

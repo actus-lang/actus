@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use llvm_sys::LLVMTypeKind::{LLVMIntegerTypeKind, LLVMPointerTypeKind};
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildRetVoid, LLVMBuildStore, LLVMConstInt,
-    LLVMConstNull, LLVMGetIntTypeWidth, LLVMGetParam, LLVMGetTypeKind, LLVMInt8TypeInContext,
+    LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildRetVoid, LLVMBuildStore, LLVMConstInt, LLVMConstNull,
+    LLVMGetIntTypeWidth, LLVMGetParam, LLVMGetTypeKind, LLVMInt8TypeInContext,
     LLVMInt16TypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment,
     LLVMTypeOf,
 };
@@ -94,10 +94,7 @@ fn allocate_failure_storage(
     enum_type: llvm_sys::prelude::LLVMTypeRef,
     layout: BackendLayout,
 ) -> Result<LLVMValueRef, BackendEmitError> {
-    let temporary = unsafe { LLVMBuildAlloca(builder, enum_type, c"failure".as_ptr()) };
-    if temporary.is_null() {
-        return Err(BackendEmitError("LLVM failed to allocate typed failure value".to_owned()));
-    }
+    let temporary = crate::codegen::llvm::memory::entry_slot(builder, enum_type, c"failure")?;
     unsafe { LLVMSetAlignment(temporary, layout.alignment) };
     let zero = unsafe { LLVMConstNull(enum_type) };
     if unsafe { LLVMBuildStore(builder, zero, temporary) }.is_null() {

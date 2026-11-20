@@ -356,14 +356,29 @@ the freestanding Region expectations name the `actus_region_open` and
 `actus_region_drop` bridges, since the `region_open` specialization is now
 defined in the program object.
 
-Pending: **LLVM optimization pipeline** (new ADR). The LLVM backend never runs
-the IR optimization pipeline (`LLVMRunPasses`); `--release` only selects the
-code-generation level, so LLVM output is two to four times slower than C and
-slower than Cranelift. With `default<O2>` run experimentally before emission,
-the loop kernels match clang and gcc, and recursion and array indexing are
-within about twice clang. The ADR maps profiles to pipelines (`dev` to `O0`,
-`release` to `O2` or `O3`), keeps output deterministic, and adds a benchmark
-gate that checks results against C.
+**LLVM optimization pipeline** (`ADR-0114`). The LLVM backend never ran the
+IR optimization pipeline, so release output was two to four times slower than
+C. The `release` profile now runs `default<O3>` and the new `size` profile
+`default<O2>` over `minsize` functions; `debug` stays unoptimized. Preparing
+the IR exposed two LLVM defects, both on `main` before this phase:
+
+1. Temporaries were `alloca`s emitted where a value is built, so a loop that
+   built a struct grew the stack on every iteration and overflowed it.
+   Fixed: every stack slot is allocated in the entry block.
+2. The zero-divisor guard, the arena capacity guard and the fallback of an
+   exhaustive `case` ended in `unreachable`, which LLVM treats as undefined
+   behavior: `x % 0` segfaulted unoptimized and returned a value when
+   optimized. Fixed: every guard ends in `llvm.trap`.
+
+`tests/optimization_levels.rs` runs each fixture at every profile on both
+backends and requires each guard to trap; `scripts/benchmark_gate.py` holds
+release kernels within 1.25 times the Callgrind instruction count of
+`clang -O3`.
+
+Next: **overflow-trapping arithmetic** (`ADR-0115`, decided). `+`, `-` and
+`*` wrap today. They will trap on overflow in every profile, with explicit
+`wrapping_*`, `checked_*` and `saturating_*` operations for code that wants
+another result. The benchmark gate measures its cost.
 
 ## Evidence gates
 

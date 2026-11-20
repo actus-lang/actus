@@ -9,9 +9,9 @@ use llvm_sys::core::{
     LLVMSetTarget,
 };
 use llvm_sys::target_machine::{
-    LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMCreateTargetDataLayout,
-    LLVMCreateTargetMachine, LLVMDisposeTargetMachine, LLVMGetTargetFromTriple, LLVMRelocMode,
-    LLVMTargetHasTargetMachine, LLVMTargetMachineEmitToFile, LLVMTargetMachineEmitToMemoryBuffer,
+    LLVMCodeGenFileType, LLVMCodeModel, LLVMCreateTargetDataLayout, LLVMCreateTargetMachine,
+    LLVMDisposeTargetMachine, LLVMGetTargetFromTriple, LLVMRelocMode, LLVMTargetHasTargetMachine,
+    LLVMTargetMachineEmitToFile, LLVMTargetMachineEmitToMemoryBuffer,
 };
 use target_lexicon::BinaryFormat;
 
@@ -198,6 +198,10 @@ pub(super) fn emit_object(
     }
     unsafe { LLVMSetTarget(module, triple.as_ptr()) };
     unsafe { llvm_sys::target::LLVMSetModuleDataLayout(module, data_layout) };
+    if let Err(error) = run_pipeline(module, &machine, options.optimization_level) {
+        unsafe { llvm_sys::target::LLVMDisposeTargetData(data_layout) };
+        return Err(error);
+    }
     let mut error = ptr::null_mut();
     let failed = unsafe {
         LLVMTargetMachineEmitToFile(
@@ -236,6 +240,10 @@ pub(super) fn emit_object_bytes(
     }
     unsafe { LLVMSetTarget(module, triple.as_ptr()) };
     unsafe { llvm_sys::target::LLVMSetModuleDataLayout(module, data_layout) };
+    if let Err(error) = run_pipeline(module, &machine, options.optimization_level) {
+        unsafe { llvm_sys::target::LLVMDisposeTargetData(data_layout) };
+        return Err(error);
+    }
     let mut error = ptr::null_mut();
     let mut buffer = ptr::null_mut();
     let failed = unsafe {
@@ -284,6 +292,69 @@ fn initialize_targets() -> Result<(), BackendEmitError> {
     Ok(())
 }
 
+/// Marks every defined function `minsize` and `optsize`, so the pipeline and
+/// code generation choose the smaller form wherever they have a choice.
+fn mark_functions_for_size(module: llvm_sys::prelude::LLVMModuleRef) {
+    use llvm_sys::core::{
+        LLVMAddAttributeAtIndex, LLVMCreateEnumAttribute, LLVMGetEnumAttributeKindForName,
+        LLVMGetFirstFunction, LLVMGetModuleContext, LLVMGetNextFunction, LLVMIsDeclaration,
+    };
+    let context = unsafe { LLVMGetModuleContext(module) };
+    let attributes = [c"minsize", c"optsize"].map(|name| unsafe {
+        let kind = LLVMGetEnumAttributeKindForName(name.as_ptr(), name.count_bytes());
+        LLVMCreateEnumAttribute(context, kind, 0)
+    });
+    let mut function = unsafe { LLVMGetFirstFunction(module) };
+    while !function.is_null() {
+        if unsafe { LLVMIsDeclaration(function) } == 0 {
+            for attribute in attributes {
+                unsafe {
+                    LLVMAddAttributeAtIndex(
+                        function,
+                        llvm_sys::LLVMAttributeFunctionIndex,
+                        attribute,
+                    );
+                }
+            }
+        }
+        function = unsafe { LLVMGetNextFunction(function) };
+    }
+}
+
+/// Runs the IR pipeline of `level` on the verified module, with the target
+/// machine attached so cost models and the data layout match the target
+/// (ADR-0114). The pipeline string is fixed per level and LLVM runs it on one
+/// thread, so the optimized module is deterministic.
+fn run_pipeline(
+    module: llvm_sys::prelude::LLVMModuleRef,
+    machine: &TargetMachine,
+    level: ObjectOptimizationLevel,
+) -> Result<(), BackendEmitError> {
+    let Some(pipeline) = level.pipeline() else {
+        return Ok(());
+    };
+    if level == ObjectOptimizationLevel::Size {
+        mark_functions_for_size(module);
+    }
+    let options = unsafe { llvm_sys::transforms::pass_builder::LLVMCreatePassBuilderOptions() };
+    let error = unsafe {
+        llvm_sys::transforms::pass_builder::LLVMRunPasses(
+            module,
+            pipeline.as_ptr(),
+            machine.raw,
+            options,
+        )
+    };
+    unsafe { llvm_sys::transforms::pass_builder::LLVMDisposePassBuilderOptions(options) };
+    if error.is_null() {
+        return Ok(());
+    }
+    let message = unsafe { llvm_sys::error::LLVMGetErrorMessage(error) };
+    let text = unsafe { CStr::from_ptr(message) }.to_string_lossy().into_owned();
+    unsafe { llvm_sys::error::LLVMDisposeErrorMessage(message) };
+    Err(BackendEmitError(format!("LLVM optimization pipeline failed: {text}")))
+}
+
 struct TargetMachine {
     raw: llvm_sys::target_machine::LLVMTargetMachineRef,
 }
@@ -307,19 +378,13 @@ impl TargetMachine {
         }
         let cpu = CString::new("").expect("empty CPU string cannot contain NUL");
         let features = CString::new("").expect("empty feature string cannot contain NUL");
-        let options = if is_elf { options } else { ObjectEmissionOptions::default() };
         let raw = unsafe {
             LLVMCreateTargetMachine(
                 llvm_target,
                 triple.as_ptr(),
                 cpu.as_ptr(),
                 features.as_ptr(),
-                match options.optimization_level {
-                    ObjectOptimizationLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
-                    ObjectOptimizationLevel::Default => {
-                        LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault
-                    }
-                },
+                options.optimization_level.code_generation_level(),
                 if position_independent {
                     LLVMRelocMode::LLVMRelocPIC
                 } else {
@@ -333,9 +398,11 @@ impl TargetMachine {
         }
         super::shim::apply(
             raw,
+            // The stack-size section and function sections are ELF-only; the
+            // optimization level applies to every object format.
             super::shim::TargetMachineOptions {
-                emit_stack_size_section: options.emit_stack_size_section,
-                function_sections: options.function_sections,
+                emit_stack_size_section: is_elf && options.emit_stack_size_section,
+                function_sections: is_elf && options.function_sections,
             },
         );
         Ok(Self { raw })

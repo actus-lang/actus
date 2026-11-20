@@ -14,12 +14,54 @@ pub struct ObjectEmissionOptions {
     pub optimization_level: ObjectOptimizationLevel,
 }
 
-/// LLVM optimization level used by an object emission request.
+/// LLVM optimization level used by an object emission request (ADR-0114).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ObjectOptimizationLevel {
+    /// No IR pipeline; code generation at `None`. The `debug` profile.
     #[default]
     None,
+    /// No IR pipeline; code generation at `Default`. Used by stack-frame
+    /// evidence fixtures that measure code generation alone.
     Default,
+    /// `default<O3>` IR pipeline; code generation at `Aggressive`. The
+    /// `release` profile.
+    Speed,
+    /// `default<O2>` IR pipeline over functions marked `minsize` and
+    /// `optsize`, which is how LLVM optimizes for size; code generation at
+    /// `Default`. The `size` profile.
+    Size,
+}
+
+impl ObjectOptimizationLevel {
+    /// The level a configured build optimization level selects.
+    pub const fn from_configuration(level: crate::configuration::OptimizationLevel) -> Self {
+        match level {
+            crate::configuration::OptimizationLevel::None => Self::None,
+            crate::configuration::OptimizationLevel::Speed => Self::Speed,
+            crate::configuration::OptimizationLevel::Size => Self::Size,
+        }
+    }
+
+    /// The target machine code generation level of this level.
+    pub(super) const fn code_generation_level(
+        self,
+    ) -> llvm_sys::target_machine::LLVMCodeGenOptLevel {
+        use llvm_sys::target_machine::LLVMCodeGenOptLevel;
+        match self {
+            Self::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+            Self::Default | Self::Size => LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+            Self::Speed => LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
+        }
+    }
+
+    /// The new-pass-manager pipeline this level runs before code generation.
+    pub(super) const fn pipeline(self) -> Option<&'static std::ffi::CStr> {
+        match self {
+            Self::None | Self::Default => None,
+            Self::Speed => Some(c"default<O3>"),
+            Self::Size => Some(c"default<O2>"),
+        }
+    }
 }
 
 /// Emits the supported Actus backend-neutral contract slice as LLVM IR.

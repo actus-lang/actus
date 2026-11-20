@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use super::super::declarations::FunctionDeclaration;
 use llvm_sys::core::{
-    LLVMBuildAlloca, LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMemSet,
-    LLVMBuildStore, LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt, LLVMGetIntTypeWidth,
-    LLVMInt8TypeInContext, LLVMInt64TypeInContext, LLVMSetAlignment, LLVMTypeOf,
+    LLVMBuildGEP2, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildMemSet, LLVMBuildStore,
+    LLVMBuildTrunc, LLVMBuildZExt, LLVMConstInt, LLVMGetIntTypeWidth, LLVMInt8TypeInContext,
+    LLVMInt64TypeInContext, LLVMSetAlignment, LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRef};
 
@@ -72,12 +72,11 @@ fn allocate_aggregate_storage(
     declarations: &BTreeMap<String, FunctionDeclaration>,
 ) -> Result<LLVMValueRef, BackendEmitError> {
     if layout.size < crate::codegen::LARGE_AGGREGATE_THRESHOLD {
-        let address = unsafe {
-            LLVMBuildAlloca(builder, aggregate_type, c"aggregate.construct".as_ptr().cast())
-        };
-        if address.is_null() {
-            return Err(BackendEmitError("LLVM failed to allocate aggregate value".to_owned()));
-        }
+        let address = crate::codegen::llvm::memory::entry_slot(
+            builder,
+            aggregate_type,
+            c"aggregate.construct",
+        )?;
         unsafe { LLVMSetAlignment(address, layout.alignment) };
         return Ok(address);
     }

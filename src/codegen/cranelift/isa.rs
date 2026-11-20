@@ -34,6 +34,7 @@ fn optimization_level_name(level: OptimizationLevel) -> &'static str {
     match level {
         OptimizationLevel::None => "none",
         OptimizationLevel::Speed => "speed",
+        OptimizationLevel::Size => "speed_and_size",
     }
 }
 

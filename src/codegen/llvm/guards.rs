@@ -53,7 +53,7 @@ pub(super) fn emit_trap_if_zero(
     }
     unsafe {
         LLVMPositionBuilderAtEnd(builder, trap_block);
-        LLVMBuildUnreachable(builder);
+        emit_llvm_trap(context, function, builder)?;
         LLVMPositionBuilderAtEnd(builder, ok_block);
     }
     Ok(false)

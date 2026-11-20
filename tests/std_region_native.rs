@@ -872,7 +872,6 @@ verb boot(erg backing: Buffer, erg destination: Buffer, erg source: Buffer) -> I
     assert_eq!(
         undefined,
         [
-            "__chkstk",
             "actus_buffer_drop",
             "actus_enum_drop",
             "actus_region_cancel",

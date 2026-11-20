@@ -75,10 +75,8 @@ fn parse_run_options(arguments: &mut impl Iterator<Item = String>) -> Result<Run
         match argument.as_str() {
             "--release" => profile = Some(BuildProfile::Release),
             "--profile" => {
-                profile = match arguments.next().as_deref() {
-                    Some("debug") => Some(BuildProfile::Debug),
-                    Some("release") => Some(BuildProfile::Release),
-                    Some(name) => return Err(format!("unsupported build profile `{name}`")),
+                profile = match arguments.next() {
+                    Some(name) => Some(BuildProfile::from_name(&name)?),
                     None => return Err("missing value after `--profile`".to_owned()),
                 };
             }

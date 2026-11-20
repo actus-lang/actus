@@ -1,0 +1,6 @@
+"""The minimum signed value divided by -1 traps."""
+verb main() -> Int {
+    erg minimum: i64 = -9223372036854775807i64 - 1i64;
+    erg divisor: i64 = -1i64;
+    return (minimum / divisor) as Int;
+}

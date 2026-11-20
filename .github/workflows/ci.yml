@@ -458,6 +458,18 @@ jobs:
       - name: Run LLVM backend integration suite
         run: cargo test --no-default-features --features llvm --test llvm_backend -- --test-threads=1 --skip objects::executes_a_bundled_thumb_image_under_qemu
 
+      - name: Run benchmark gate against C
+        shell: bash
+        run: |
+          # ADR-0114: Callgrind instruction counts of the release kernels
+          # against `clang -O3`. The C twins are compiled by the system clang
+          # by absolute path; the poisoned PATH still proves Actus itself
+          # never invokes it.
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+          cargo build --no-default-features --features llvm --bin actus
+          python3 scripts/benchmark_gate.py --actus target/debug/actus --cc /usr/bin/clang
+
       - name: Record disk and target usage
         if: always()
         shell: bash

@@ -1,0 +1,6 @@
+"""Integer remainder by zero traps."""
+verb main() -> Int {
+    erg value = 42;
+    erg divisor = 0;
+    return value % divisor;
+}

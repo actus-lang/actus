@@ -134,7 +134,7 @@ fn parse_watch_options(
             "--release" => profile = replace_profile(profile, BuildProfile::Release)?,
             "--profile" => {
                 let name = arguments.next().ok_or("missing value after `--profile`".to_owned())?;
-                let selected = parse_profile(&name)?;
+                let selected = BuildProfile::from_name(&name)?;
                 profile = replace_profile(profile, selected)?;
             }
             "--interval" => {
@@ -153,14 +153,6 @@ fn parse_watch_options(
         }
     }
     Ok(WatchOptions { input, build, once, interval, profile })
-}
-
-fn parse_profile(name: &str) -> Result<BuildProfile, String> {
-    match name {
-        "debug" => Ok(BuildProfile::Debug),
-        "release" => Ok(BuildProfile::Release),
-        _ => Err(format!("unsupported build profile `{name}`")),
-    }
 }
 
 fn replace_profile(

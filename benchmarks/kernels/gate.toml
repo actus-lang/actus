@@ -1,0 +1,21 @@
+# Benchmark gate (ADR-0114): each Actus kernel built with the `release`
+# profile on the LLVM backend may execute at most `threshold` times the
+# instructions of its C twin compiled with `clang -O3`, counted by Callgrind
+# from `main`. Both programs must exit with the same status.
+threshold = 1.25
+kernels = ["collatz", "fib", "points", "sieve", "xorshift"]
+
+# Ratchet: the Callgrind instruction count of each Actus kernel on the
+# ubuntu-24.04 CI runner. A kernel fails when it executes more than
+# `ratchet_tolerance` above its baseline, which catches regressions the C
+# threshold allows, such as a disabled IR pipeline. When a change makes a
+# kernel faster, lower its baseline in the same change:
+# `scripts/benchmark_gate.py --actus <actus> --update-baseline`.
+ratchet_tolerance = 0.05
+
+[baseline]
+collatz = 288657374
+fib = 25579111
+points = 100000025
+sieve = 56944675
+xorshift = 240000006
