@@ -292,3 +292,42 @@ verb interrupted_before_rename_is_expected_signal() -> Int {
         },
     };
 }
+
+meta test
+meta target("unix")
+meta fault("short_write")
+meta effect("filesystem", "blocking")
+verb injected_short_write_is_rejected() -> Int {
+    erg destination_suffix: u8 = 65u8;
+    erg staging_suffix: u8 = 66u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta test
+meta target("unix")
+meta fault("flush_failure")
+meta effect("filesystem", "blocking")
+verb injected_flush_failure_is_rejected() -> Int {
+    erg destination_suffix: u8 = 67u8;
+    erg staging_suffix: u8 = 68u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
+
+meta test
+meta target("unix")
+meta fault("rename_failure")
+meta effect("filesystem", "blocking")
+verb injected_rename_failure_is_rejected() -> Int {
+    erg destination_suffix: u8 = 69u8;
+    erg staging_suffix: u8 = 70u8;
+    return injected_prepublication_failure(
+        destination_suffix: erg destination_suffix,
+        staging_suffix: erg staging_suffix
+    );
+}
