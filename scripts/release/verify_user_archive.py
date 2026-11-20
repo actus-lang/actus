@@ -140,14 +140,17 @@ def verify_installer(archive: Path, support: Path, version: str, commit: str, wo
     verify_identity(installed, commit)
     hello = work / "installer-hello"
     hello.mkdir()
-    verify_hosted(installed, hello)
-    print(f"installer: installed {version} and built hello through {installed}")
+    if verify_hosted(installed, hello):
+        print(f"installer: installed {version} and built hello through {installed}")
+    else:
+        print(f"installer: installed {version} at {installed}; hello NOT RUN")
 
 
-def verify_hosted(binary: Path, work: Path) -> None:
+def verify_hosted(binary: Path, work: Path) -> bool:
+    """Build and run a hosted hello; False when the host cannot link it."""
     if os.name == "nt" and (shutil.which("link.exe") is None or os.environ.get("VCToolsInstallDir") is None):
         print("NOT RUN: hosted Windows hello requires the MSVC linker and Windows SDK")
-        return
+        return False
     source = work / "hello.act"
     source.write_text("verb main() -> Int { return 0; }\n", encoding="utf-8")
     output = work / ("hello.exe" if os.name == "nt" else "hello")
@@ -157,6 +160,7 @@ def verify_hosted(binary: Path, work: Path) -> None:
     result = run([str(output)])
     if result.returncode != 0:
         raise SystemExit(f"hosted hello failed: {result.stderr}")
+    return True
 
 
 def verify_runtime(root: Path, target: str) -> None:
