@@ -192,7 +192,18 @@ fn emit_identity(identity: &LlvmBuildIdentity) {
     println!("cargo:rustc-env=ACTUS_GIT_COMMIT={}", git_commit());
 }
 
+/// The source commit, from `ACTUS_SOURCE_COMMIT` when a release build sets it
+/// (a build container may not be allowed to read the checkout's git metadata),
+/// otherwise from `git rev-parse`.
 fn git_commit() -> String {
+    println!("cargo:rerun-if-env-changed=ACTUS_SOURCE_COMMIT");
+    if let Ok(commit) = env::var("ACTUS_SOURCE_COMMIT") {
+        assert!(
+            commit.len() >= 12 && commit.bytes().all(|byte| byte.is_ascii_hexdigit()),
+            "ACTUS_SOURCE_COMMIT must be a hexadecimal commit id of at least 12 characters"
+        );
+        return commit[..12].to_ascii_lowercase();
+    }
     Command::new("git")
         .args(["rev-parse", "--short=12", "HEAD"])
         .output()

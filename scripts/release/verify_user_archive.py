@@ -20,6 +20,7 @@ def args() -> argparse.Namespace:
     parser.add_argument("--incoming", type=Path, required=True)
     parser.add_argument("--support", type=Path, required=True)
     parser.add_argument("--target", required=True)
+    parser.add_argument("--commit", required=True, help="source commit the archive was built from")
     return parser.parse_args()
 
 
@@ -103,7 +104,7 @@ def verify_licenses(root: Path) -> None:
         raise SystemExit("LLVM-LICENSE.TXT does not contain the LLVM exception notice")
 
 
-def verify_identity(binary: Path) -> None:
+def verify_identity(binary: Path, commit: str) -> None:
     result = run([str(binary), "--version", "--json"])
     if result.returncode != 0:
         raise SystemExit(result.stderr)
@@ -111,6 +112,36 @@ def verify_identity(binary: Path) -> None:
     llvm = identity["llvm"]
     if llvm["version"] != "23.1.2" or llvm["status"] != "verified":
         raise SystemExit(f"invalid bundled identity: {llvm}")
+    if identity["commit"] != commit[:12].lower():
+        raise SystemExit(f"archive commit {identity['commit']} is not the source commit {commit[:12]}")
+
+
+def verify_installer(archive: Path, support: Path, version: str, commit: str, work: Path) -> None:
+    """Install the archive with the release installer from a local release directory."""
+    release = work / "installer-release"
+    release.mkdir()
+    shutil.copy2(archive, release / archive.name)
+    digest = hashlib.sha256((release / archive.name).read_bytes()).hexdigest()
+    (release / "SHA256SUMS").write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
+    prefix = work / "installer-home"
+    environment = dict(os.environ)
+    if os.name == "nt":
+        environment["ACTUS_INSTALL_BASE_URL"] = str(release)
+        command = ["pwsh", "-NoProfile", "-File", str(support / "install.ps1"), "-Version", version,
+                   "-Prefix", str(prefix), "-NoModifyPath"]
+    else:
+        environment["ACTUS_INSTALL_BASE_URL"] = release.as_uri()
+        command = ["sh", str(support / "install.sh"), "--version", version, "--prefix", str(prefix),
+                   "--no-modify-path"]
+    result = subprocess.run(command, env=environment, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        raise SystemExit(f"installer failed: {result.stdout}{result.stderr}")
+    installed = prefix / "current" / "bin" / ("actus.exe" if os.name == "nt" else "actus")
+    verify_identity(installed, commit)
+    hello = work / "installer-hello"
+    hello.mkdir()
+    verify_hosted(installed, hello)
+    print(f"installer: installed {version} and built hello through {installed}")
 
 
 def verify_hosted(binary: Path, work: Path) -> None:
@@ -258,12 +289,14 @@ def main() -> int:
         verify_manifest(root)
         verify_licenses(root)
         binary = root / ("bin/actus.exe" if os.name == "nt" else "bin/actus")
-        verify_identity(binary)
+        verify_identity(binary, parsed.commit)
         verify_runtime(root, parsed.target)
         verify_platform(binary)
         verify_windows_runtime(root)
         verify_hosted(binary, Path(temporary))
         verify_arm(root, binary, startup, Path(temporary))
+        version = archive_name.removeprefix("actus-").removesuffix(f"-{parsed.target}")
+        verify_installer(archive, parsed.support, version, parsed.commit, Path(temporary))
     return 0
 
 

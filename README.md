@@ -70,6 +70,26 @@ while keeping ownership and borrowing checks active in safe code. See
 [ADR-0012](docs/decisions/ADR-0012-low-level-primitives-and-unsafe-boundaries.md)
 for the accepted low-level design.
 
+## Install
+
+Linux x86-64 and macOS arm64:
+
+```sh
+curl -fsSL https://actus-lang.org/install.sh | sh
+```
+
+Windows x86-64 (PowerShell):
+
+```powershell
+irm https://actus-lang.org/install.ps1 | iex
+```
+
+The installer downloads the latest release archive, checks it against the
+release's `SHA256SUMS`, installs it under `~/.actus` (`%LOCALAPPDATA%\Actus`
+on Windows) and adds it to `PATH`. See
+[Installing a release](docs/guide/workflow/project-setup.md#installing-a-release)
+for versions, locations and removal.
+
 ## Build and run
 
 Build the compiler and run the introductory example through the frontend:
