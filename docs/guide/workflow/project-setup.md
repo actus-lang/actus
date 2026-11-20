@@ -45,6 +45,41 @@ actus --version
 actus --version --json
 \`\`\`
 
+## Installing a release
+
+The installers download the host archive of a release, check it against the
+release's `SHA256SUMS` before extracting anything, and install it
+(ADR-0116).
+
+```sh
+curl -fsSL https://actus-lang.org/install.sh | sh
+curl -fsSL https://actus-lang.org/install.sh | sh -s -- --version 0.1.0
+```
+
+```powershell
+irm https://actus-lang.org/install.ps1 | iex
+& ([scriptblock]::Create((irm https://actus-lang.org/install.ps1))) -Version 0.1.0
+```
+
+Each version is extracted to `~/.actus/toolchains/<archive>`
+(`%LOCALAPPDATA%\Actus\toolchains\<archive>` on Windows), and
+`~/.actus/current` is switched to it only after the new compiler has run.
+`~/.actus/current/bin` goes on `PATH`: the Unix installer adds
+`. "$HOME/.actus/env"` to the shell profile (`~/.zshrc`, `~/.bashrc` or
+`~/.bash_profile`, a fish `conf.d` file, or `~/.profile`), and the Windows
+installer adds the directory to the user `Path`.
+
+| Option | PowerShell | Effect |
+| --- | --- | --- |
+| `--version <x.y.z>` | `-Version <x.y.z>` | install that release instead of the latest |
+| `--prefix <dir>` | `-Prefix <dir>` | install under `<dir>`; `ACTUS_HOME` sets the same default |
+| `--no-modify-path` | `-NoModifyPath` | leave the shell profile or user `Path` unchanged |
+
+Installing another version switches `current` to it and keeps the earlier
+toolchains, so switching back is another install of that version. To
+uninstall, delete `~/.actus` (or `%LOCALAPPDATA%\Actus`) and remove the
+profile line or user `Path` entry the installer added.
+
 ## Installing a user archive
 
 User archives are relocatable. Extract the host archive, keep `bin/actus` next
