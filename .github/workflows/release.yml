@@ -249,10 +249,12 @@ jobs:
           name: release-assets
           path: release-assets
       - name: Publish only archives and checksums
+        # This job has no checkout, so gh learns the repository from GH_REPO.
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then echo "release already exists: $GITHUB_REF_NAME" >&2; exit 1; fi
           args=(--title "Actus $GITHUB_REF_NAME" --generate-notes); case "$GITHUB_REF_NAME" in *-*) args+=(--prerelease --latest=false) ;; esac
-          gh release create "$GITHUB_REF_NAME" release-assets/* "${args[@]}"
+          gh release create "$GITHUB_REF_NAME" release-assets/* --verify-tag "${args[@]}"
