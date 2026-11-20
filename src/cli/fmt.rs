@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{render_lex_error, render_parse_error};
-use crate::formatter::{SourceComment, format_program_with_comments};
+use crate::formatter::{SourceComment, format_program_with_comments, source_comments};
 use crate::lexer::scan;
 use crate::parser::parse;
 
@@ -72,17 +72,6 @@ fn format_file(path: &Path, check_only: bool) -> i32 {
     let comments = source_comments(&source, &tokens);
     let Some(program) = parse_format_source(path, &source, tokens) else { return 1 };
     format_program_source(path, &source, &program, &comments, check_only)
-}
-
-fn source_comments(source: &str, tokens: &[crate::lexer::Token]) -> Vec<SourceComment> {
-    tokens
-        .iter()
-        .filter(|token| matches!(token.kind, crate::lexer::TokenKind::DocString(_)))
-        .map(|token| SourceComment {
-            span: token.span,
-            text: source[token.span.start..token.span.end].to_owned(),
-        })
-        .collect()
 }
 
 fn read_format_source(path: &Path) -> Option<String> {

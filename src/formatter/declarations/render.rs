@@ -102,7 +102,7 @@ impl Formatter<'_> {
         self.output.push_str(&role.name);
         self.output.push_str(" {");
         self.indent += 1;
-        for method in &role.methods {
+        for (index, method) in role.methods.iter().enumerate() {
             self.output.push('\n');
             if self.render_ast_docs && method.doc.is_some() {
                 self.skip_comments_before(method.span.start);
@@ -116,6 +116,12 @@ impl Formatter<'_> {
             self.output.push_str(&method.name);
             self.signature(&method.params, &method.return_type, 1);
             self.output.push(';');
+            self.emit_trailing_comments(next_start(
+                &role.methods,
+                index,
+                role.span.end,
+                |method| method.span.start,
+            ));
         }
         self.indent -= 1;
         if role.methods.is_empty() {
@@ -241,7 +247,7 @@ impl Formatter<'_> {
         if !definition.fields.is_empty() {
             self.output.push('\n');
             self.indent += 1;
-            for field in &definition.fields {
+            for (index, field) in definition.fields.iter().enumerate() {
                 if self.render_ast_docs && field.doc.is_some() {
                     self.skip_comments_before(field.span.start);
                 } else {
@@ -258,7 +264,14 @@ impl Formatter<'_> {
                 self.output.push_str(&field.name);
                 self.output.push_str(": ");
                 self.type_name(&field.ty);
-                self.output.push_str(",\n");
+                self.output.push(',');
+                self.emit_trailing_comments(next_start(
+                    &definition.fields,
+                    index,
+                    definition.span.end,
+                    |field| field.span.start,
+                ));
+                self.output.push('\n');
             }
             self.indent -= 1;
             self.line_indent();
@@ -279,7 +292,7 @@ impl Formatter<'_> {
         if !definition.variants.is_empty() {
             self.output.push('\n');
             self.indent += 1;
-            for variant in &definition.variants {
+            for (index, variant) in definition.variants.iter().enumerate() {
                 if self.render_ast_docs && variant.doc.is_some() {
                     self.skip_comments_before(variant.span.start);
                 } else {
@@ -288,7 +301,14 @@ impl Formatter<'_> {
                 self.documentation(variant.doc.as_deref());
                 self.line_indent();
                 self.enum_variant(variant);
-                self.output.push_str(",\n");
+                self.output.push(',');
+                self.emit_trailing_comments(next_start(
+                    &definition.variants,
+                    index,
+                    definition.span.end,
+                    |variant| variant.span.start,
+                ));
+                self.output.push('\n');
             }
             self.indent -= 1;
             self.line_indent();
@@ -378,7 +398,7 @@ impl Formatter<'_> {
     }
 
     fn pack_fields(&mut self, definition: &crate::ast::PackDecl) {
-        for field in &definition.fields {
+        for (index, field) in definition.fields.iter().enumerate() {
             if self.render_ast_docs && field.doc.is_some() {
                 self.skip_comments_before(field.span.start);
             } else {
@@ -401,6 +421,12 @@ impl Formatter<'_> {
                 self.expression(default_value);
             }
             self.output.push(';');
+            self.emit_trailing_comments(next_start(
+                &definition.fields,
+                index,
+                definition.span.end,
+                |field| field.span.start,
+            ));
             self.output.push('\n');
         }
     }
@@ -411,6 +437,16 @@ impl Formatter<'_> {
         self.output.push_str(&sibling.name);
         self.output.push(';');
     }
+}
+
+/// Where the item after `items[index]` starts, or `end` after the last one.
+fn next_start<Item>(
+    items: &[Item],
+    index: usize,
+    end: usize,
+    start: impl Fn(&Item) -> usize,
+) -> usize {
+    items.get(index + 1).map_or(end, start)
 }
 
 fn contract_section_name(kind: crate::ast::VerbContractSectionKind) -> &'static str {

@@ -12,10 +12,14 @@ impl Formatter<'_> {
 
         self.output.push('\n');
         self.indent += 1;
-        for statement in &block.statements {
+        for (index, statement) in block.statements.iter().enumerate() {
             self.emit_comments_before(statement_span(statement).start);
             self.line_indent();
             self.statement(statement);
+            let next = block.statements.get(index + 1);
+            self.emit_trailing_comments(
+                next.map_or(block.span.end, |next| statement_span(next).start),
+            );
             self.output.push('\n');
         }
         self.emit_comments_before(block.span.end);
