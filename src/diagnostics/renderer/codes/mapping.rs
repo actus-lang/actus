@@ -94,6 +94,7 @@ fn expression_value_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::InvalidPrimitiveCast { .. } => "E1090",
         SemanticErrorKind::PrimitiveCastOutOfRange { .. } => "E1091",
         SemanticErrorKind::ConstantRemainderByZero => "E1092",
+        SemanticErrorKind::ConstantArithmeticOverflow { .. } => "E1138",
         SemanticErrorKind::ConstantShiftCountOutOfRange { .. } => "E1093",
         SemanticErrorKind::ConstantRuntimeDependency { .. } => "E1097",
         SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",

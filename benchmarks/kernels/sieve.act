@@ -1,4 +1,4 @@
-"""Sieve of Eratosthenes below 1 000 000, three rounds: array indexing."""
+"""Sieve of Eratosthenes below 1 000 000, three rounds: array indexing. Wrapping arithmetic, as in its C twin."""
 verb count_primes() -> u64 {
     erg composite: Array[u8, 1000000] = Array[u8, 1000000]();
     erg count: u64 = 0;
@@ -8,17 +8,17 @@ verb count_primes() -> u64 {
             break;
         }
         if composite[candidate] == 0 {
-            count = count + 1;
-            erg multiple = candidate * candidate;
+            count = count +% 1;
+            erg multiple = candidate *% candidate;
             loop {
                 if multiple >= 1000000 {
                     break;
                 }
                 composite[multiple] = 1;
-                multiple = multiple + candidate;
+                multiple = multiple +% candidate;
             }
         }
-        candidate = candidate + 1;
+        candidate = candidate +% 1;
     }
     return count;
 }
@@ -30,8 +30,8 @@ verb main() -> Int {
         if round >= 3 {
             break;
         }
-        total = total + count_primes();
-        round = round + 1;
+        total = total +% count_primes();
+        round = round +% 1;
     }
     return (total % 256) as Int;
 }

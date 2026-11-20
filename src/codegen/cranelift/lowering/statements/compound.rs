@@ -28,7 +28,7 @@ pub(crate) fn lower_compound_assignment<'source>(
     string_data: &StringDataValues,
     layouts: &LayoutRegistry,
 ) -> Result<Flow, BackendEmitError> {
-    let operator = compound_binary_operator(operator);
+    let operator = operator.binary_operator();
     match target {
         Place::Binding { name, .. } => lower_identifier(
             function,
@@ -186,20 +186,5 @@ fn lower_index<'source>(
             string_data,
             layouts,
         )
-    }
-}
-
-fn compound_binary_operator(operator: CompoundAssignmentOp) -> BinaryOp {
-    match operator {
-        CompoundAssignmentOp::Add => BinaryOp::Add,
-        CompoundAssignmentOp::Subtract => BinaryOp::Subtract,
-        CompoundAssignmentOp::Multiply => BinaryOp::Multiply,
-        CompoundAssignmentOp::Divide => BinaryOp::Divide,
-        CompoundAssignmentOp::Remainder => BinaryOp::Remainder,
-        CompoundAssignmentOp::BitwiseAnd => BinaryOp::BitwiseAnd,
-        CompoundAssignmentOp::BitwiseOr => BinaryOp::BitwiseOr,
-        CompoundAssignmentOp::BitwiseXor => BinaryOp::BitwiseXor,
-        CompoundAssignmentOp::ShiftLeft => BinaryOp::ShiftLeft,
-        CompoundAssignmentOp::ShiftRight => BinaryOp::ShiftRight,
     }
 }

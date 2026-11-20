@@ -116,7 +116,7 @@ pub(super) fn lower_field_compound_assignment(
     let value = provider.lower_expression(value, instructions)?;
     let value = super::state::coerce_value_to_type(provider, value, Some(ty), span, instructions)?;
     let result = provider.lower_integer_binary(
-        compound_operation(operator),
+        BackendIntegerBinaryOp::from_compound(operator),
         current,
         value,
         span,
@@ -134,19 +134,4 @@ pub(super) fn lower_field_compound_assignment(
         span,
     });
     Ok(())
-}
-
-fn compound_operation(operator: CompoundAssignmentOp) -> BackendIntegerBinaryOp {
-    match operator {
-        CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
-        CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
-        CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
-        CompoundAssignmentOp::Divide => BackendIntegerBinaryOp::Divide,
-        CompoundAssignmentOp::Remainder => BackendIntegerBinaryOp::Remainder,
-        CompoundAssignmentOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
-        CompoundAssignmentOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
-        CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
-        CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
-        CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
-    }
 }

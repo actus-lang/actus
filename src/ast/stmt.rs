@@ -23,6 +23,12 @@ pub enum CompoundAssignmentOp {
     Add,
     Subtract,
     Multiply,
+    WrappingAdd,
+    WrappingSubtract,
+    WrappingMultiply,
+    SaturatingAdd,
+    SaturatingSubtract,
+    SaturatingMultiply,
     Divide,
     Remainder,
     BitwiseAnd,
@@ -30,6 +36,31 @@ pub enum CompoundAssignmentOp {
     BitwiseXor,
     ShiftLeft,
     ShiftRight,
+}
+
+impl CompoundAssignmentOp {
+    /// The binary operator `target op= value` applies.
+    pub const fn binary_operator(self) -> crate::ast::BinaryOp {
+        use crate::ast::BinaryOp;
+        match self {
+            Self::Add => BinaryOp::Add,
+            Self::Subtract => BinaryOp::Subtract,
+            Self::Multiply => BinaryOp::Multiply,
+            Self::WrappingAdd => BinaryOp::WrappingAdd,
+            Self::WrappingSubtract => BinaryOp::WrappingSubtract,
+            Self::WrappingMultiply => BinaryOp::WrappingMultiply,
+            Self::SaturatingAdd => BinaryOp::SaturatingAdd,
+            Self::SaturatingSubtract => BinaryOp::SaturatingSubtract,
+            Self::SaturatingMultiply => BinaryOp::SaturatingMultiply,
+            Self::Divide => BinaryOp::Divide,
+            Self::Remainder => BinaryOp::Remainder,
+            Self::BitwiseAnd => BinaryOp::BitwiseAnd,
+            Self::BitwiseOr => BinaryOp::BitwiseOr,
+            Self::BitwiseXor => BinaryOp::BitwiseXor,
+            Self::ShiftLeft => BinaryOp::ShiftLeft,
+            Self::ShiftRight => BinaryOp::ShiftRight,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

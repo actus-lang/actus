@@ -55,6 +55,9 @@ fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ConstantRemainderByZero => {
             "constant remainder divisor is zero".to_owned()
         }
+        SemanticErrorKind::ConstantArithmeticOverflow { operator, ty } => format!(
+            "constant `{operator}` overflows `{ty}`; use `{operator}%` to wrap or `{operator}|` to saturate"
+        ),
         SemanticErrorKind::ConstantShiftCountOutOfRange { count, width } => {
             format!("constant shift count `{count}` is outside the valid range `0..{width}`")
         }

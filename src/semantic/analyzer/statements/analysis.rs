@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, Block, Expr, Place, Role, Stmt, TypeName};
+use crate::ast::{Block, Expr, Place, Role, Stmt, TypeName};
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
@@ -71,18 +71,7 @@ impl Analyzer {
         value: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let binary_operator = match operator {
-            crate::ast::CompoundAssignmentOp::Add => BinaryOp::Add,
-            crate::ast::CompoundAssignmentOp::Subtract => BinaryOp::Subtract,
-            crate::ast::CompoundAssignmentOp::Multiply => BinaryOp::Multiply,
-            crate::ast::CompoundAssignmentOp::Divide => BinaryOp::Divide,
-            crate::ast::CompoundAssignmentOp::Remainder => BinaryOp::Remainder,
-            crate::ast::CompoundAssignmentOp::BitwiseAnd => BinaryOp::BitwiseAnd,
-            crate::ast::CompoundAssignmentOp::BitwiseOr => BinaryOp::BitwiseOr,
-            crate::ast::CompoundAssignmentOp::BitwiseXor => BinaryOp::BitwiseXor,
-            crate::ast::CompoundAssignmentOp::ShiftLeft => BinaryOp::ShiftLeft,
-            crate::ast::CompoundAssignmentOp::ShiftRight => BinaryOp::ShiftRight,
-        };
+        let binary_operator = operator.binary_operator();
         match target {
             Place::Binding { name, .. } => {
                 let binding = self.binding(name, span)?;

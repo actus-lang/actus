@@ -61,7 +61,7 @@ fn lower_buffer_element_compound_assignment(
         super::buffer::lower_buffer_element_from_base(provider, base, index, span, instructions)?;
     let value = provider.lower_expression(value, instructions)?;
     let result = provider.lower_integer_binary(
-        compound_operation(operator),
+        BackendIntegerBinaryOp::from_compound(operator),
         current,
         value,
         span,
@@ -116,7 +116,7 @@ fn lower_lowered_array_element_compound_assignment(
         return Err(unsupported(span, "array element compound assignment type mismatch"));
     }
     let result = provider.lower_integer_binary(
-        compound_operation(operator),
+        BackendIntegerBinaryOp::from_compound(operator),
         current,
         value,
         span,
@@ -134,19 +134,4 @@ fn lower_lowered_array_element_compound_assignment(
         span,
     });
     Ok(())
-}
-
-fn compound_operation(operator: CompoundAssignmentOp) -> BackendIntegerBinaryOp {
-    match operator {
-        CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
-        CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
-        CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
-        CompoundAssignmentOp::Divide => BackendIntegerBinaryOp::Divide,
-        CompoundAssignmentOp::Remainder => BackendIntegerBinaryOp::Remainder,
-        CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
-        CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
-        CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
-        CompoundAssignmentOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
-        CompoundAssignmentOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
-    }
 }

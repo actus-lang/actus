@@ -55,6 +55,12 @@ pub(in crate::semantic::analyzer) fn binary_operator_name(operator: BinaryOp) ->
         BinaryOp::BitwiseXor => "bitwise xor operator",
         BinaryOp::ShiftLeft => "left shift operator",
         BinaryOp::ShiftRight => "right shift operator",
+        BinaryOp::WrappingAdd => "wrapping addition operator",
+        BinaryOp::WrappingSubtract => "wrapping subtraction operator",
+        BinaryOp::WrappingMultiply => "wrapping multiplication operator",
+        BinaryOp::SaturatingAdd => "saturating addition operator",
+        BinaryOp::SaturatingSubtract => "saturating subtraction operator",
+        BinaryOp::SaturatingMultiply => "saturating multiplication operator",
         _ => "relational operator",
     }
 }
@@ -64,6 +70,7 @@ pub(in crate::semantic::analyzer) fn unary_operator_name(operator: UnaryOp) -> &
         UnaryOp::LogicalNot => "logical not operator",
         UnaryOp::BitwiseNot => "bitwise not operator",
         UnaryOp::Negate => "negation operator",
+        UnaryOp::WrappingNegate => "wrapping negation operator",
     }
 }
 
@@ -72,6 +79,7 @@ pub(in crate::semantic::analyzer) fn expected_unary_type(operator: UnaryOp) -> &
         UnaryOp::LogicalNot => "Bool",
         UnaryOp::BitwiseNot => "integer",
         UnaryOp::Negate => "numeric",
+        UnaryOp::WrappingNegate => "integer",
     }
 }
 

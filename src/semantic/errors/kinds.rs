@@ -304,6 +304,12 @@ pub enum SemanticErrorKind {
         literal: String,
     },
     ConstantRemainderByZero,
+    /// A trapping arithmetic operation on integer literals overflows its type
+    /// (ADR-0115).
+    ConstantArithmeticOverflow {
+        operator: String,
+        ty: String,
+    },
     ConstantShiftCountOutOfRange {
         count: String,
         width: u16,

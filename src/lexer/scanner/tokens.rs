@@ -70,19 +70,44 @@ impl<'source> Scanner<'source> {
             '^' if self.match_character('=') => TokenKind::CaretEquals,
             '^' => TokenKind::Caret,
             '~' => TokenKind::Tilde,
-            '+' if self.match_character('=') => TokenKind::PlusEquals,
-            '+' => TokenKind::Plus,
-            '-' if self.match_character('>') => TokenKind::Arrow,
-            '-' if self.match_character('=') => TokenKind::MinusEquals,
-            '-' => TokenKind::Minus,
-            '*' if self.match_character('=') => TokenKind::StarEquals,
-            '*' => TokenKind::Star,
+            '+' | '-' | '*' => self.arithmetic_operator(character),
             '/' if self.match_character('=') => TokenKind::SlashEquals,
             '/' => TokenKind::Slash,
             _ => return false,
         };
         self.push_simple(kind, start);
         true
+    }
+
+    /// `+`, `-` and `*` with their wrapping (`%`), saturating (`|`) and
+    /// compound-assignment (`=`) forms (ADR-0115), and `->`.
+    fn arithmetic_operator(&mut self, character: char) -> TokenKind {
+        if character == '-' && self.match_character('>') {
+            return TokenKind::Arrow;
+        }
+        let wrapping = self.match_character('%');
+        let saturating = !wrapping && self.match_character('|');
+        let compound = self.match_character('=');
+        match (character, wrapping, saturating, compound) {
+            ('+', true, _, false) => TokenKind::PlusPercent,
+            ('+', true, _, true) => TokenKind::PlusPercentEquals,
+            ('+', _, true, false) => TokenKind::PlusPipe,
+            ('+', _, true, true) => TokenKind::PlusPipeEquals,
+            ('+', _, _, true) => TokenKind::PlusEquals,
+            ('+', ..) => TokenKind::Plus,
+            ('-', true, _, false) => TokenKind::MinusPercent,
+            ('-', true, _, true) => TokenKind::MinusPercentEquals,
+            ('-', _, true, false) => TokenKind::MinusPipe,
+            ('-', _, true, true) => TokenKind::MinusPipeEquals,
+            ('-', _, _, true) => TokenKind::MinusEquals,
+            ('-', ..) => TokenKind::Minus,
+            (_, true, _, false) => TokenKind::StarPercent,
+            (_, true, _, true) => TokenKind::StarPercentEquals,
+            (_, _, true, false) => TokenKind::StarPipe,
+            (_, _, true, true) => TokenKind::StarPipeEquals,
+            (_, _, _, true) => TokenKind::StarEquals,
+            _ => TokenKind::Star,
+        }
     }
 
     fn scan_simple_token(&mut self, character: char, start: usize) -> bool {

@@ -1,0 +1,6 @@
+"""An unsigned addition past the maximum traps."""
+verb main() -> Int {
+    erg a: u8 = 250;
+    erg b: u8 = 10;
+    return (a + b) as Int;
+}

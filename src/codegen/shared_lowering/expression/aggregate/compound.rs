@@ -97,7 +97,7 @@ fn lower_plain_field_compound_assignment(
         return Err(unsupported(span, "aggregate field compound assignment type mismatch"));
     }
     let result = provider.lower_integer_binary(
-        compound_operation(operator),
+        BackendIntegerBinaryOp::from_compound(operator),
         current,
         value,
         span,
@@ -113,19 +113,4 @@ fn lower_plain_field_compound_assignment(
         span,
     });
     Ok(())
-}
-
-fn compound_operation(operator: CompoundAssignmentOp) -> BackendIntegerBinaryOp {
-    match operator {
-        CompoundAssignmentOp::Add => BackendIntegerBinaryOp::Add,
-        CompoundAssignmentOp::Subtract => BackendIntegerBinaryOp::Subtract,
-        CompoundAssignmentOp::Multiply => BackendIntegerBinaryOp::Multiply,
-        CompoundAssignmentOp::Divide => BackendIntegerBinaryOp::Divide,
-        CompoundAssignmentOp::Remainder => BackendIntegerBinaryOp::Remainder,
-        CompoundAssignmentOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
-        CompoundAssignmentOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
-        CompoundAssignmentOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
-        CompoundAssignmentOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
-        CompoundAssignmentOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
-    }
 }

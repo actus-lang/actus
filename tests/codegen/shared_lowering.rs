@@ -427,7 +427,7 @@ fn lowers_scalar_aggregate_field_compound_assignment_into_load_binary_store() {
     );
     assert!(instructions.iter().any(|instruction| matches!(
         instruction,
-        BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+        BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::TrappingAdd, .. }
     )));
     assert!(
         instructions.iter().any(|instruction| matches!(
@@ -551,7 +551,10 @@ fn lowers_scalar_integer_addition_into_neutral_ir() {
     assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
         |instruction| matches!(
             instruction,
-            BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+            BackendInstruction::IntegerBinary {
+                operation: BackendIntegerBinaryOp::TrappingAdd,
+                ..
+            }
         )
     ));
 }
@@ -714,7 +717,10 @@ fn lowers_scalar_integer_unary_into_neutral_ir() {
     assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
         |instruction| matches!(
             instruction,
-            BackendInstruction::IntegerUnary { operation: BackendIntegerUnaryOp::Negate, .. }
+            BackendInstruction::IntegerUnary {
+                operation: BackendIntegerUnaryOp::TrappingNegate,
+                ..
+            }
         )
     ));
 }
@@ -730,7 +736,10 @@ fn lowers_scalar_owner_declaration_into_a_scoped_value() {
     assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
         |instruction| matches!(
             instruction,
-            BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+            BackendInstruction::IntegerBinary {
+                operation: BackendIntegerBinaryOp::TrappingAdd,
+                ..
+            }
         )
     ));
 }
@@ -747,7 +756,7 @@ fn lowers_scalar_local_assignment_into_a_new_value() {
         module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter());
     assert!(instructions.clone().any(|instruction| matches!(
         instruction,
-        BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+        BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::TrappingAdd, .. }
     )));
     assert!(instructions.any(|instruction| matches!(
         instruction,
@@ -766,7 +775,10 @@ fn lowers_scalar_compound_assignment_into_integer_binary_ir() {
     assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
         |instruction| matches!(
             instruction,
-            BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+            BackendInstruction::IntegerBinary {
+                operation: BackendIntegerBinaryOp::TrappingAdd,
+                ..
+            }
         )
     ));
 }
@@ -798,7 +810,10 @@ fn lowers_scalar_parameter_assignment_in_the_function_scope() {
     assert!(module.functions[0].blocks.iter().flat_map(|block| block.instructions.iter()).any(
         |instruction| matches!(
             instruction,
-            BackendInstruction::IntegerBinary { operation: BackendIntegerBinaryOp::Add, .. }
+            BackendInstruction::IntegerBinary {
+                operation: BackendIntegerBinaryOp::TrappingAdd,
+                ..
+            }
         )
     ));
 }

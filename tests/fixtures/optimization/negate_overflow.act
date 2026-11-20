@@ -1,0 +1,6 @@
+"""Negating the minimum signed value traps."""
+verb main() -> Int {
+    erg minimum: i8 = -128;
+    erg negated = -minimum;
+    return negated as Int;
+}

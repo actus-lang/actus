@@ -9,6 +9,19 @@ fn format_source(source: &str) -> String {
     format_program(&program)
 }
 
+/// Wrapping and saturating operators keep their spelling, precedence and
+/// compound forms through formatting (ADR-0115).
+#[test]
+fn formats_wrapping_and_saturating_operators_idempotently() {
+    let source = "verb mix(erg a: u8, erg b: u8) -> u8 { erg c = a+%b*|b; c-|=a; c*%=b; return -%c +| a -% b; }";
+    let formatted = format_source(source);
+    assert!(formatted.contains("erg c = a +% b *| b;"), "{formatted}");
+    assert!(formatted.contains("c -|= a;"), "{formatted}");
+    assert!(formatted.contains("c *%= b;"), "{formatted}");
+    assert!(formatted.contains("return -%c +| a -% b;"), "{formatted}");
+    assert_eq!(format_source(&formatted), formatted);
+}
+
 #[test]
 fn formats_nested_blocks_and_calls() {
     let source =

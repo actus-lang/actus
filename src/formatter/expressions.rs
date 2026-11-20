@@ -78,6 +78,7 @@ impl Formatter<'_> {
     fn unary(&mut self, operator: &crate::ast::UnaryOp, expression: &Expr) {
         self.output.push_str(match operator {
             crate::ast::UnaryOp::Negate => "-",
+            crate::ast::UnaryOp::WrappingNegate => "-%",
             crate::ast::UnaryOp::LogicalNot => "!",
             crate::ast::UnaryOp::BitwiseNot => "~",
         });
@@ -90,6 +91,12 @@ impl Formatter<'_> {
             crate::ast::BinaryOp::Add => " + ",
             crate::ast::BinaryOp::Subtract => " - ",
             crate::ast::BinaryOp::Multiply => " * ",
+            crate::ast::BinaryOp::WrappingAdd => " +% ",
+            crate::ast::BinaryOp::WrappingSubtract => " -% ",
+            crate::ast::BinaryOp::WrappingMultiply => " *% ",
+            crate::ast::BinaryOp::SaturatingAdd => " +| ",
+            crate::ast::BinaryOp::SaturatingSubtract => " -| ",
+            crate::ast::BinaryOp::SaturatingMultiply => " *| ",
             crate::ast::BinaryOp::Divide => " / ",
             crate::ast::BinaryOp::Remainder => " % ",
             crate::ast::BinaryOp::BitwiseAnd => " & ",

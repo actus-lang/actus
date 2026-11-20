@@ -235,6 +235,37 @@ fn scans_comparison_and_logical_operators() {
     );
 }
 
+/// Wrapping and saturating arithmetic operators and their compound
+/// assignments are single tokens (ADR-0115); `->` stays an arrow.
+#[test]
+fn scans_wrapping_and_saturating_operators_as_single_tokens() {
+    let (tokens, errors) = scan("+% -% *% +| -| *| +%= -%= *%= +|= -|= *|= -> - + *");
+
+    assert!(errors.is_empty());
+    assert_eq!(
+        tokens.iter().map(|token| &token.kind).collect::<Vec<_>>(),
+        vec![
+            &TokenKind::PlusPercent,
+            &TokenKind::MinusPercent,
+            &TokenKind::StarPercent,
+            &TokenKind::PlusPipe,
+            &TokenKind::MinusPipe,
+            &TokenKind::StarPipe,
+            &TokenKind::PlusPercentEquals,
+            &TokenKind::MinusPercentEquals,
+            &TokenKind::StarPercentEquals,
+            &TokenKind::PlusPipeEquals,
+            &TokenKind::MinusPipeEquals,
+            &TokenKind::StarPipeEquals,
+            &TokenKind::Arrow,
+            &TokenKind::Minus,
+            &TokenKind::Plus,
+            &TokenKind::Star,
+            &TokenKind::Eof,
+        ]
+    );
+}
+
 #[test]
 fn scans_compound_assignment_operators_as_single_tokens() {
     let (tokens, errors) = scan("+= -= *= /= %= &= |= ^= <<= >>=");

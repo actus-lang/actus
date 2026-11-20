@@ -368,6 +368,55 @@ fn rejects_adr44_invalid_operator_operands() {
     }
 }
 
+/// Trapping arithmetic on integer literals that overflows its type is a
+/// compile-time error (`E1138`); results that fit, wrapping and saturating
+/// operators, and non-literal operands are accepted (ADR-0115).
+#[test]
+fn rejects_constant_arithmetic_overflow() {
+    for (source, operator, ty) in [
+        ("verb main() -> Int { erg x: u8 = 200u8 + 100u8; return x as Int; }", "+", "u8"),
+        ("verb main() -> Int { erg x: u8 = 0u8 - 1u8; return x as Int; }", "-", "u8"),
+        ("verb main() -> Int { erg x = 2147483647 + 1; return x; }", "+", "Int"),
+        ("verb main() -> Int { erg x: i8 = 64i8 * 2i8; return x as Int; }", "*", "i8"),
+    ] {
+        let error = analyze_source(source).expect_err("constant overflow must be rejected");
+        assert!(
+            matches!(
+                &error.kind,
+                SemanticErrorKind::ConstantArithmeticOverflow { operator: found, ty: found_type }
+                    if found == operator && found_type == ty
+            ),
+            "{source}: {:?}",
+            error.kind
+        );
+    }
+    for source in [
+        "verb main() -> Int { erg x: u8 = 200u8 + 55u8; return x as Int; }",
+        "verb main() -> Int { erg x: i8 = -127i8 - 1i8; return x as Int; }",
+        "verb main() -> Int { erg x: u8 = 200u8 +% 100u8; return x as Int; }",
+        "verb main() -> Int { erg x: u8 = 200u8 +| 100u8; return x as Int; }",
+        "verb main() -> Int { erg a: u8 = 200; erg x = a + 100; return x as Int; }",
+    ] {
+        analyze_source(source).unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    }
+}
+
+/// Wrapping and saturating operators take integers only.
+#[test]
+fn rejects_wrapping_and_saturating_operators_on_non_integers() {
+    for source in [
+        "verb main() -> Int { erg flag = true; erg other = flag +% flag; return 0; }",
+        "verb main() -> Int { erg flag = true; erg other = flag *| flag; return 0; }",
+        "verb main() -> Int { erg flag = true; erg other = -%flag; return 0; }",
+    ] {
+        let error = analyze_source(source).expect_err("non-integer operands must be rejected");
+        assert!(
+            matches!(error.kind, SemanticErrorKind::TypeMismatch { .. }),
+            "{source}: {error:?}"
+        );
+    }
+}
+
 #[test]
 fn rejects_statically_provable_invalid_integer_operations() {
     let remainder = analyze_source("verb main() -> Int { return 7 % 0; }")

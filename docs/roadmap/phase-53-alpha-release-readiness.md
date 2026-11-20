@@ -375,10 +375,12 @@ backends and requires each guard to trap; `scripts/benchmark_gate.py` holds
 release kernels within 1.25 times the Callgrind instruction count of
 `clang -O3`.
 
-Next: **overflow-trapping arithmetic** (`ADR-0115`, decided). `+`, `-` and
-`*` wrap today. They will trap on overflow in every profile, with explicit
-`wrapping_*`, `checked_*` and `saturating_*` operations for code that wants
-another result. The benchmark gate measures its cost.
+**Overflow-trapping arithmetic** (`ADR-0115`). `+`, `-`, `*` and negation
+trap on overflow in every profile; `+%`, `-%`, `*%` wrap and `+|`, `-|`, `*|`
+saturate; overflow of literal operands is `E1138`. The benchmark gate keeps a
+wrapping and a checked form of each kernel and reports the cost of the
+checks. Next: the `checked_add`, `checked_sub` and `checked_mul` builtins
+returning `Option`, the second step of `ADR-0115`.
 
 ## Evidence gates
 

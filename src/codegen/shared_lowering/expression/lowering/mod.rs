@@ -6,7 +6,7 @@ use super::super::super::{
 use super::super::errors::{expression_span, unsupported};
 use super::SharedExpressionProvider;
 use super::{aggregate, arena, array_ops, calls, case, cleanup, dispatch, drop, state};
-use crate::ast::{BinaryOp, CaseMode, Expr, UnaryOp, VariantPayload};
+use crate::ast::{CaseMode, Expr, UnaryOp, VariantPayload};
 use crate::lexer::SourceSpan;
 use crate::semantic::LoopExitKind;
 use std::collections::BTreeMap;

@@ -9,7 +9,7 @@ use super::super::guards::{
 use super::super::literals::emit_string_literal;
 use super::float::{emit_float_cast, emit_float_compare, emit_float_constant};
 use super::integer::{
-    emit_integer_binary, emit_integer_cast, emit_integer_compare, emit_integer_unary,
+    OverflowSite, emit_integer_binary, emit_integer_cast, emit_integer_compare, emit_integer_unary,
 };
 use super::loan::emit_scalar_loan;
 use llvm_sys::core::LLVMConstInt;
@@ -33,7 +33,7 @@ pub(in crate::codegen::llvm) fn emit_scalar_instruction(
             emit_string_literal(builder, *result, value, values)
         }
         BackendInstruction::IntegerBinary { .. } => {
-            emit_integer_binary(builder, instruction, values)
+            emit_integer_binary(&OverflowSite { context, function, builder }, instruction, values)
         }
         BackendInstruction::IntegerCast { .. } => {
             emit_integer_cast(context, builder, function, instruction, values)
@@ -52,7 +52,9 @@ pub(in crate::codegen::llvm) fn emit_scalar_instruction(
         }
         BackendInstruction::ScalarSelect { .. } => emit_scalar_select(builder, instruction, values),
         BackendInstruction::FloatCompare { .. } => emit_float_compare(builder, instruction, values),
-        BackendInstruction::IntegerUnary { .. } => emit_integer_unary(builder, instruction, values),
+        BackendInstruction::IntegerUnary { .. } => {
+            emit_integer_unary(&OverflowSite { context, function, builder }, instruction, values)
+        }
         BackendInstruction::EnumDiscriminant { .. } => {
             emit_enum_discriminant(context, builder, instruction, values)
         }

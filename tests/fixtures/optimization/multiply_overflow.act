@@ -1,0 +1,6 @@
+"""A signed multiplication past the maximum traps."""
+verb main() -> Int {
+    erg a: i32 = 100000;
+    erg b: i32 = 100000;
+    return a * b;
+}
