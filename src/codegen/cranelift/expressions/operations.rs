@@ -36,7 +36,27 @@ fn lower_unary(
 ) -> Result<cranelift_codegen::ir::Value, BackendEmitError> {
     let value = lower_expression_with_context(function, expression, context)?;
     match operator {
-        UnaryOp::Negate => Ok(function.ins().ineg(value)),
+        UnaryOp::WrappingNegate => Ok(function.ins().ineg(value)),
+        UnaryOp::Negate => {
+            let ty = function.func.dfg.value_type(value);
+            let zero = function.ins().iconst(ty, 0);
+            let signed = initializer_type(
+                expression,
+                context.local_types,
+                context.functions,
+                context.layouts,
+            )
+            .is_ok_and(is_signed);
+            let (negated, overflow) = super::super::numeric::overflowing(
+                function,
+                crate::codegen::BackendIntegerBinaryOp::TrappingSubtract,
+                signed,
+                zero,
+                value,
+            );
+            function.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            Ok(negated)
+        }
         UnaryOp::LogicalNot => {
             let value_type = function.func.dfg.value_type(value);
             let zero = function.ins().iconst(value_type, 0);
@@ -183,26 +203,7 @@ fn lower_integer_operation(
         right_type,
         context.layouts.pointer_type,
     )?;
-    if matches!(operator, BinaryOp::Divide | BinaryOp::Remainder) {
-        trap_if_zero(function, right);
-    }
-    if matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) {
-        trap_if_shift_count_exceeds_width(function, right, left);
-    }
-    Ok(match operator {
-        BinaryOp::Add => function.ins().iadd(left, right),
-        BinaryOp::Subtract => function.ins().isub(left, right),
-        BinaryOp::Multiply => function.ins().imul(left, right),
-        BinaryOp::Divide => integer_divide(function, left, right, left_type),
-        BinaryOp::Remainder => integer_remainder(function, left, right, left_type),
-        BinaryOp::BitwiseAnd => function.ins().band(left, right),
-        BinaryOp::BitwiseOr => function.ins().bor(left, right),
-        BinaryOp::BitwiseXor => function.ins().bxor(left, right),
-        BinaryOp::ShiftLeft => function.ins().ishl(left, right),
-        BinaryOp::ShiftRight if is_signed(left_type) => function.ins().sshr(left, right),
-        BinaryOp::ShiftRight => function.ins().ushr(left, right),
-        _ => return Err(BackendEmitError("unsupported integer operator".to_owned())),
-    })
+    lower_compound_integer_operation(function, left, *operator, right, left_type)
 }
 
 pub(crate) fn lower_compound_integer_operation(
@@ -218,10 +219,28 @@ pub(crate) fn lower_compound_integer_operation(
     if matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) {
         trap_if_shift_count_exceeds_width(function, right, left);
     }
+    let signed = is_signed(left_type);
     Ok(match operator {
-        BinaryOp::Add => function.ins().iadd(left, right),
-        BinaryOp::Subtract => function.ins().isub(left, right),
-        BinaryOp::Multiply => function.ins().imul(left, right),
+        BinaryOp::WrappingAdd => function.ins().iadd(left, right),
+        BinaryOp::WrappingSubtract => function.ins().isub(left, right),
+        BinaryOp::WrappingMultiply => function.ins().imul(left, right),
+        BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply => {
+            let Some(operation) = crate::codegen::BackendIntegerBinaryOp::from_source(operator)
+            else {
+                return Err(BackendEmitError("unsupported compound operator".to_owned()));
+            };
+            let (value, overflow) =
+                super::super::numeric::overflowing(function, operation, signed, left, right);
+            function.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            value
+        }
+        BinaryOp::SaturatingAdd | BinaryOp::SaturatingSubtract | BinaryOp::SaturatingMultiply => {
+            let Some(operation) = crate::codegen::BackendIntegerBinaryOp::from_source(operator)
+            else {
+                return Err(BackendEmitError("unsupported compound operator".to_owned()));
+            };
+            super::super::numeric::saturating(function, operation, signed, left, right)
+        }
         BinaryOp::Divide => integer_divide(function, left, right, left_type),
         BinaryOp::Remainder => integer_remainder(function, left, right, left_type),
         BinaryOp::BitwiseAnd => function.ins().band(left, right),

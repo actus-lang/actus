@@ -277,7 +277,7 @@ impl Analyzer {
             is_integer_type_name(&left_type) && is_integer_type_name(&right_type)
         };
         if valid {
-            self.validate_constant_operator(operator, right, &left_type)?;
+            self.validate_constant_operator(operator, left, right, &left_type)?;
             return Ok(());
         }
         Err(SemanticError {
@@ -310,6 +310,7 @@ impl Analyzer {
             self.expression_type_name(expression).unwrap_or_else(|| "unknown".to_owned());
         let valid = match operator {
             UnaryOp::Negate => true,
+            UnaryOp::WrappingNegate => is_integer_type_name(&operand_type),
             UnaryOp::LogicalNot => operand_type == "Bool",
             UnaryOp::BitwiseNot => is_integer_type_name(&operand_type),
         };

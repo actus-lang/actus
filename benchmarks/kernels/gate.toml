@@ -1,7 +1,9 @@
 # Benchmark gate (ADR-0114): each Actus kernel built with the `release`
 # profile on the LLVM backend may execute at most `threshold` times the
 # instructions of its C twin compiled with `clang -O3`, counted by Callgrind
-# from `main`. Both programs must exit with the same status.
+# from `main`. The kernel uses wrapping arithmetic like its C twin;
+# `<kernel>_checked.act` uses trapping arithmetic (ADR-0115) and is held by
+# its baseline only. All programs must exit with the same status.
 threshold = 1.25
 kernels = ["collatz", "fib", "points", "sieve", "xorshift"]
 
@@ -15,7 +17,12 @@ ratchet_tolerance = 0.05
 
 [baseline]
 collatz = 288657374
+collatz_checked = 288175244
 fib = 25579111
+fib_checked = 39041788
 points = 100000025
-sieve = 56944675
+points_checked = 240000016
+sieve = 56542761
+sieve_checked = 57180339
 xorshift = 240000006
+xorshift_checked = 300000006

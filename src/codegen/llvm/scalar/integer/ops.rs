@@ -16,7 +16,7 @@ use super::super::super::super::{
 use llvm_sys::core::{LLVMConstAllOnes, LLVMConstNull};
 
 pub(in crate::codegen::llvm) fn emit_integer_binary(
-    builder: LLVMBuilderRef,
+    site: &super::overflow::OverflowSite,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
@@ -32,8 +32,13 @@ pub(in crate::codegen::llvm) fn emit_integer_binary(
     })?;
     let signed =
         matches!(ty, super::super::super::super::BackendValueType::Integer { signed: true, .. });
+    let builder = site.builder;
     let (left, right) = normalize_integer_pair(builder, left, right, signed)?;
-    let value = build_integer_binary(builder, *operation, *ty, left, right);
+    let value =
+        match super::overflow::emit_checked_arithmetic(site, *operation, signed, left, right) {
+            Some(value) => value?,
+            None => build_integer_binary(builder, *operation, *ty, left, right),
+        };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to emit integer binary operation".to_owned()));
     }
@@ -102,6 +107,12 @@ fn build_integer_binary(
             | BackendIntegerBinaryOp::BitwiseXor
             | BackendIntegerBinaryOp::LogicalAnd
             | BackendIntegerBinaryOp::LogicalOr => build_bitwise(builder, operation, left, right),
+            BackendIntegerBinaryOp::TrappingAdd
+            | BackendIntegerBinaryOp::TrappingSubtract
+            | BackendIntegerBinaryOp::TrappingMultiply
+            | BackendIntegerBinaryOp::SaturatingAdd
+            | BackendIntegerBinaryOp::SaturatingSubtract
+            | BackendIntegerBinaryOp::SaturatingMultiply => std::ptr::null_mut(),
         }
     }
 }
@@ -236,11 +247,13 @@ fn normalize_integer_pair(
 }
 
 pub(in crate::codegen::llvm) fn emit_integer_unary(
-    builder: LLVMBuilderRef,
+    site: &super::overflow::OverflowSite,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
-    let BackendInstruction::IntegerUnary { result, operation, operand, .. } = instruction else {
+    let builder = site.builder;
+    let BackendInstruction::IntegerUnary { result, operation, operand, ty, .. } = instruction
+    else {
         return Err(BackendEmitError("LLVM integer unary operation expected".to_owned()));
     };
     let operand = values.get(operand).copied().ok_or_else(|| {
@@ -251,6 +264,13 @@ pub(in crate::codegen::llvm) fn emit_integer_unary(
             BackendIntegerUnaryOp::Negate => {
                 let zero = LLVMConstNull(LLVMTypeOf(operand));
                 LLVMBuildSub(builder, zero, operand, c"actus.negate".as_ptr())
+            }
+            BackendIntegerUnaryOp::TrappingNegate => {
+                let signed = matches!(
+                    ty,
+                    super::super::super::super::BackendValueType::Integer { signed: true, .. }
+                );
+                super::overflow::emit_trapping_negate(site, signed, operand)?
             }
             BackendIntegerUnaryOp::LogicalNot => {
                 let zero = LLVMConstNull(LLVMTypeOf(operand));

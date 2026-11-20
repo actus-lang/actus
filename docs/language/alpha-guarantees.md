@@ -76,7 +76,10 @@ Equality, remainder, logical, bitwise, shift, and relational operators are
 validated according to their operand families. `&&` and `||` are genuine
 short-circuit control flow: the right operand is not evaluated when its value
 cannot affect the result. Division and remainder by zero, invalid shift
-counts, and out-of-bounds indexing have deterministic native failure paths.
+counts, out-of-bounds indexing, and integer overflow of `+`, `-`, `*` and
+negation have deterministic native failure paths in every build profile.
+Wrap-around and saturation are explicit: `+%`, `-%`, `*%` and `+|`, `-|`,
+`*|`.
 
 `expr as Type` is the only supported primitive integer conversion syntax.
 Constant casts are range-checked during semantic analysis; dynamic casts use

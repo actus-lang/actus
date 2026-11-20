@@ -132,10 +132,22 @@ fn operator_token_type(kind: &TokenKind) -> Option<u32> {
             | TokenKind::Plus
             | TokenKind::Minus
             | TokenKind::Star
+            | TokenKind::PlusPercent
+            | TokenKind::MinusPercent
+            | TokenKind::StarPercent
+            | TokenKind::PlusPipe
+            | TokenKind::MinusPipe
+            | TokenKind::StarPipe
             | TokenKind::Slash
             | TokenKind::PlusEquals
             | TokenKind::MinusEquals
             | TokenKind::StarEquals
+            | TokenKind::PlusPercentEquals
+            | TokenKind::MinusPercentEquals
+            | TokenKind::StarPercentEquals
+            | TokenKind::PlusPipeEquals
+            | TokenKind::MinusPipeEquals
+            | TokenKind::StarPipeEquals
             | TokenKind::SlashEquals
             | TokenKind::PercentEquals
             | TokenKind::AmpersandEquals

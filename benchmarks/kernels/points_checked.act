@@ -1,0 +1,24 @@
+"""A struct built and borrowed by a method in each of 20 000 000 iterations. Trapping arithmetic: the cost of overflow checks."""
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+verb sum(abs self: Point) -> Int {
+    return self.x + self.y;
+}
+
+verb main() -> Int {
+    erg total = 0;
+    erg i = 0;
+    loop {
+        if i == 20000000 {
+            break;
+        }
+        erg p = Point { x: i % 7, y: 1 };
+        abs view = ref p;
+        total = total + view.sum();
+        i = i + 1;
+    }
+    return total % 100;
+}

@@ -146,6 +146,38 @@ fn checked_cast_overflow_traps_at_every_level() {
     assert_matrix("cast_overflow", Expected::Trap);
 }
 
+/// ADR-0115: `+`, `-`, `*`, unary `-` and `+=` trap on overflow at every
+/// level; results at a bound and the wrapping and saturating operators do not.
+#[test]
+fn addition_overflow_traps_at_every_level() {
+    assert_matrix("add_overflow", Expected::Trap);
+}
+
+#[test]
+fn subtraction_underflow_traps_at_every_level() {
+    assert_matrix("subtract_underflow", Expected::Trap);
+}
+
+#[test]
+fn multiplication_overflow_traps_at_every_level() {
+    assert_matrix("multiply_overflow", Expected::Trap);
+}
+
+#[test]
+fn negation_overflow_traps_at_every_level() {
+    assert_matrix("negate_overflow", Expected::Trap);
+}
+
+#[test]
+fn compound_assignment_overflow_traps_at_every_level() {
+    assert_matrix("compound_overflow", Expected::Trap);
+}
+
+#[test]
+fn bounds_wrapping_and_saturation_are_identical_at_every_level() {
+    assert_matrix("arithmetic_bounds", Expected::Exit(7));
+}
+
 /// The same source and profile give byte-identical objects, and the
 /// `release` and `size` pipelines change the object of an unoptimized build.
 #[cfg(feature = "llvm")]

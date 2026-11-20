@@ -1,0 +1,27 @@
+"""Arithmetic that reaches a bound exactly does not trap; wrapping and
+saturating operators give their defined results."""
+verb main() -> Int {
+    erg high: u8 = 250;
+    erg five: u8 = 5;
+    erg maximum = high + five;
+    erg low: i8 = -100;
+    erg step: i8 = 28;
+    erg minimum = low - step;
+    erg ten: u8 = 10;
+    erg wrapped = high +% ten;
+    erg saturated = high +| ten;
+    erg floor = five -| ten;
+    erg two: i8 = 2;
+    erg clamped = low *| two;
+    erg flipped = -%minimum;
+    erg counter: u8 = 255;
+    counter +%= 1;
+    erg level: u8 = 200;
+    level +|= 100;
+    erg checks = (maximum == 255) && (minimum == -128) && (wrapped == 4) && (saturated == 255)
+        && (floor == 0) && (clamped == -128) && (flipped == -128) && (counter == 0) && (level == 255);
+    if checks {
+        return 7;
+    }
+    return 1;
+}

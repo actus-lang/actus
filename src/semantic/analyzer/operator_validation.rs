@@ -1,5 +1,7 @@
 use crate::ast::{BinaryOp, Expr, PrimitiveType, UnaryOp, primitive_type};
 
+use crate::lexer::SourceSpan;
+
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::{Analyzer, expression_span};
 
@@ -7,9 +9,13 @@ impl Analyzer {
     pub(super) fn validate_constant_operator(
         &self,
         operator: BinaryOp,
+        left: &Expr,
         right: &Expr,
         left_type: &str,
     ) -> Result<(), SemanticError> {
+        if let Some(error) = constant_overflow_error(operator, left, right, left_type) {
+            return Err(error);
+        }
         if matches!(operator, BinaryOp::Remainder) && is_zero_integer(right) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::ConstantRemainderByZero,
@@ -20,6 +26,79 @@ impl Analyzer {
             return Err(error);
         }
         Ok(())
+    }
+}
+
+/// A trapping `+`, `-` or `*` whose operands are integer literals and whose
+/// result does not fit the operand type (ADR-0115).
+fn constant_overflow_error(
+    operator: BinaryOp,
+    left: &Expr,
+    right: &Expr,
+    left_type: &str,
+) -> Option<SemanticError> {
+    if !matches!(operator, BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply) {
+        return None;
+    }
+    let expression = Expr::Binary {
+        left: Box::new(left.clone()),
+        operator,
+        right: Box::new(right.clone()),
+        span: expression_span(right),
+    };
+    let value = literal_arithmetic_value(&expression)?;
+    let (minimum, maximum) = integer_range(left_type)?;
+    (value < minimum || value > maximum).then(|| SemanticError {
+        kind: SemanticErrorKind::ConstantArithmeticOverflow {
+            operator: binary_operator_symbol(operator).to_owned(),
+            ty: left_type.to_owned(),
+        },
+        span: SourceSpan::new(expression_span(left).start, expression_span(right).end),
+    })
+}
+
+/// The exact value of an expression built from integer literals with `+`,
+/// `-`, `*` and negation, or `None` when an operand is not a literal.
+fn literal_arithmetic_value(expression: &Expr) -> Option<i128> {
+    match expression {
+        Expr::Integer { value, .. } => i128::try_from(parse_integer_magnitude(value)?).ok(),
+        Expr::Grouping { expression, .. } => literal_arithmetic_value(expression),
+        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
+            literal_arithmetic_value(expression)?.checked_neg()
+        }
+        Expr::Binary { left, operator, right, .. } => {
+            let left = literal_arithmetic_value(left)?;
+            let right = literal_arithmetic_value(right)?;
+            match operator {
+                BinaryOp::Add => left.checked_add(right),
+                BinaryOp::Subtract => left.checked_sub(right),
+                BinaryOp::Multiply => left.checked_mul(right),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn integer_range(name: &str) -> Option<(i128, i128)> {
+    let signed = name == "Int"
+        || matches!(primitive_type(name), Some(PrimitiveType::Integer { signed: true, .. }));
+    let width = u32::from(integer_width(name)?);
+    if width >= 128 {
+        return signed.then_some((i128::MIN, i128::MAX)).or(Some((0, i128::MAX)));
+    }
+    Some(if signed {
+        (-(1i128 << (width - 1)), (1i128 << (width - 1)) - 1)
+    } else {
+        (0, (1i128 << width) - 1)
+    })
+}
+
+fn binary_operator_symbol(operator: BinaryOp) -> &'static str {
+    match operator {
+        BinaryOp::Add => "+",
+        BinaryOp::Subtract => "-",
+        _ => "*",
     }
 }
 

@@ -4,11 +4,21 @@ use serde::Deserialize;
 
 use crate::target::TargetSpec;
 
+/// Integer operations of the backend contract. `Add`, `Subtract` and
+/// `Multiply` wrap modulo 2^N; the `Trapping` forms trap when the result does
+/// not fit and the `Saturating` forms clamp it to the type's bounds
+/// (ADR-0115).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendIntegerBinaryOp {
     Add,
     Subtract,
     Multiply,
+    TrappingAdd,
+    TrappingSubtract,
+    TrappingMultiply,
+    SaturatingAdd,
+    SaturatingSubtract,
+    SaturatingMultiply,
     Divide,
     Remainder,
     ShiftLeft,
@@ -20,9 +30,69 @@ pub enum BackendIntegerBinaryOp {
     LogicalOr,
 }
 
+impl BackendIntegerBinaryOp {
+    /// The operation a source operator lowers to; `None` for comparisons,
+    /// which lower to compare instructions.
+    pub const fn from_source(operator: crate::ast::BinaryOp) -> Option<Self> {
+        use crate::ast::BinaryOp;
+        Some(match operator {
+            BinaryOp::Add => Self::TrappingAdd,
+            BinaryOp::Subtract => Self::TrappingSubtract,
+            BinaryOp::Multiply => Self::TrappingMultiply,
+            BinaryOp::WrappingAdd => Self::Add,
+            BinaryOp::WrappingSubtract => Self::Subtract,
+            BinaryOp::WrappingMultiply => Self::Multiply,
+            BinaryOp::SaturatingAdd => Self::SaturatingAdd,
+            BinaryOp::SaturatingSubtract => Self::SaturatingSubtract,
+            BinaryOp::SaturatingMultiply => Self::SaturatingMultiply,
+            BinaryOp::Divide => Self::Divide,
+            BinaryOp::Remainder => Self::Remainder,
+            BinaryOp::ShiftLeft => Self::ShiftLeft,
+            BinaryOp::ShiftRight => Self::ShiftRight,
+            BinaryOp::BitwiseAnd => Self::BitwiseAnd,
+            BinaryOp::BitwiseOr => Self::BitwiseOr,
+            BinaryOp::BitwiseXor => Self::BitwiseXor,
+            BinaryOp::LogicalAnd => Self::LogicalAnd,
+            BinaryOp::LogicalOr => Self::LogicalOr,
+            BinaryOp::LessThan
+            | BinaryOp::LessEquals
+            | BinaryOp::GreaterThan
+            | BinaryOp::GreaterEquals
+            | BinaryOp::Equals
+            | BinaryOp::NotEquals => return None,
+        })
+    }
+
+    /// The operation `target op= value` applies.
+    pub const fn from_compound(operator: crate::ast::CompoundAssignmentOp) -> Self {
+        use crate::ast::CompoundAssignmentOp;
+        match operator {
+            CompoundAssignmentOp::Add => Self::TrappingAdd,
+            CompoundAssignmentOp::Subtract => Self::TrappingSubtract,
+            CompoundAssignmentOp::Multiply => Self::TrappingMultiply,
+            CompoundAssignmentOp::WrappingAdd => Self::Add,
+            CompoundAssignmentOp::WrappingSubtract => Self::Subtract,
+            CompoundAssignmentOp::WrappingMultiply => Self::Multiply,
+            CompoundAssignmentOp::SaturatingAdd => Self::SaturatingAdd,
+            CompoundAssignmentOp::SaturatingSubtract => Self::SaturatingSubtract,
+            CompoundAssignmentOp::SaturatingMultiply => Self::SaturatingMultiply,
+            CompoundAssignmentOp::Divide => Self::Divide,
+            CompoundAssignmentOp::Remainder => Self::Remainder,
+            CompoundAssignmentOp::ShiftLeft => Self::ShiftLeft,
+            CompoundAssignmentOp::ShiftRight => Self::ShiftRight,
+            CompoundAssignmentOp::BitwiseAnd => Self::BitwiseAnd,
+            CompoundAssignmentOp::BitwiseOr => Self::BitwiseOr,
+            CompoundAssignmentOp::BitwiseXor => Self::BitwiseXor,
+        }
+    }
+}
+
+/// `Negate` wraps (`-%`); `TrappingNegate` traps on `-MIN` and on any
+/// nonzero unsigned operand (ADR-0115).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendIntegerUnaryOp {
     Negate,
+    TrappingNegate,
     LogicalNot,
     BitwiseNot,
 }

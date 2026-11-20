@@ -136,9 +136,18 @@ pub enum CaseBody {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BinaryOp {
+    /// `+`: traps when the result does not fit the integer type (ADR-0115).
     Add,
     Subtract,
     Multiply,
+    /// `+%`: the result modulo 2^N.
+    WrappingAdd,
+    WrappingSubtract,
+    WrappingMultiply,
+    /// `+|`: the result clamped to the type's bounds.
+    SaturatingAdd,
+    SaturatingSubtract,
+    SaturatingMultiply,
     Divide,
     Remainder,
     BitwiseAnd,
@@ -157,6 +166,19 @@ pub enum BinaryOp {
 }
 
 impl BinaryOp {
+    /// The wrapping and saturating operators, which take integers only.
+    pub const fn is_integer_only_arithmetic(self) -> bool {
+        matches!(
+            self,
+            Self::WrappingAdd
+                | Self::WrappingSubtract
+                | Self::WrappingMultiply
+                | Self::SaturatingAdd
+                | Self::SaturatingSubtract
+                | Self::SaturatingMultiply
+        )
+    }
+
     pub const fn is_relational(self) -> bool {
         matches!(self, Self::LessThan | Self::LessEquals | Self::GreaterThan | Self::GreaterEquals)
     }
@@ -164,7 +186,10 @@ impl BinaryOp {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnaryOp {
+    /// `-`: traps when the negation does not fit, such as `-MIN` (ADR-0115).
     Negate,
+    /// `-%`: the negation modulo 2^N.
+    WrappingNegate,
     LogicalNot,
     BitwiseNot,
 }

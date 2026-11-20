@@ -145,7 +145,7 @@ fn evaluate_constant_expression(
             match operator {
                 UnaryOp::Negate => value.checked_neg(),
                 UnaryOp::BitwiseNot => Some(!value),
-                UnaryOp::LogicalNot => None,
+                UnaryOp::WrappingNegate | UnaryOp::LogicalNot => None,
             }
         }
         Expr::Binary { left, operator, right, .. } => {

@@ -14,9 +14,9 @@ Operators bind from tighter to looser as follows:
 
 | Precedence | Operators | Result |
 | --- | --- | --- |
-| 1 | unary `!`, `~`, `-` | operand-dependent |
-| 2 | `*`, `/`, `%` | numeric/integer |
-| 3 | `+`, `-` | numeric |
+| 1 | unary `!`, `~`, `-`, `-%` | operand-dependent |
+| 2 | `*`, `*%`, `*\|`, `/`, `%` | numeric/integer |
+| 3 | `+`, `-`, `+%`, `-%`, `+\|`, `-\|` | numeric |
 | 4 | `<<`, `>>` | left integer type |
 | 5 | `&` | left integer type |
 | 6 | `^` | left integer type |
@@ -46,6 +46,23 @@ table.
 - Shifts require an integer left operand and an unsigned integer count. A
   count outside the destination width traps at runtime; a statically known
   invalid count reports `E1093`.
+
+## Integer overflow
+
+Integer arithmetic never wraps silently (ADR-0115):
+
+- `+`, `-`, `*`, unary `-` and `+=`, `-=`, `*=` trap when the result does not
+  fit the operand type, in every build profile. Unsigned types trap too:
+  `0u8 - 1u8` traps. The trap is the same deterministic trap as division by
+  zero.
+- `+%`, `-%`, `*%`, unary `-%` and `+%=`, `-%=`, `*%=` wrap modulo 2^N, for
+  hashes, checksums and sequence counters. `250u8 +% 10u8` is `4`.
+- `+|`, `-|`, `*|` and `+|=`, `-|=`, `*|=` clamp to the type's minimum or
+  maximum. `250u8 +| 10u8` is `255`; `5u8 -| 10u8` is `0`.
+
+Wrapping and saturating operators require integer operands. A trapping
+operation whose operands are integer literals and whose result does not fit
+its type is rejected with `E1138` before code generation.
 
 ## Checked casts and indexing
 

@@ -177,7 +177,8 @@ impl SharedExpressionProvider<'_> {
         };
         let operand = self.lower_expression(expression, instructions)?;
         let operation = match operator {
-            UnaryOp::Negate => BackendIntegerUnaryOp::Negate,
+            UnaryOp::Negate => BackendIntegerUnaryOp::TrappingNegate,
+            UnaryOp::WrappingNegate => BackendIntegerUnaryOp::Negate,
             UnaryOp::LogicalNot => BackendIntegerUnaryOp::LogicalNot,
             UnaryOp::BitwiseNot => BackendIntegerUnaryOp::BitwiseNot,
         };
@@ -209,27 +210,8 @@ impl SharedExpressionProvider<'_> {
         };
         let left = self.lower_expression(left, instructions)?;
         let right = self.lower_expression(right, instructions)?;
-        let operation = match operator {
-            BinaryOp::Add => BackendIntegerBinaryOp::Add,
-            BinaryOp::Subtract => BackendIntegerBinaryOp::Subtract,
-            BinaryOp::Multiply => BackendIntegerBinaryOp::Multiply,
-            BinaryOp::Divide => BackendIntegerBinaryOp::Divide,
-            BinaryOp::Remainder => BackendIntegerBinaryOp::Remainder,
-            BinaryOp::ShiftLeft => BackendIntegerBinaryOp::ShiftLeft,
-            BinaryOp::ShiftRight => BackendIntegerBinaryOp::ShiftRight,
-            BinaryOp::BitwiseAnd => BackendIntegerBinaryOp::BitwiseAnd,
-            BinaryOp::BitwiseOr => BackendIntegerBinaryOp::BitwiseOr,
-            BinaryOp::BitwiseXor => BackendIntegerBinaryOp::BitwiseXor,
-            BinaryOp::LogicalAnd => BackendIntegerBinaryOp::LogicalAnd,
-            BinaryOp::LogicalOr => BackendIntegerBinaryOp::LogicalOr,
-            BinaryOp::LessThan
-            | BinaryOp::LessEquals
-            | BinaryOp::GreaterThan
-            | BinaryOp::GreaterEquals
-            | BinaryOp::Equals
-            | BinaryOp::NotEquals => {
-                return self.lower_compare(left, right, *operator, *span, instructions);
-            }
+        let Some(operation) = BackendIntegerBinaryOp::from_source(*operator) else {
+            return self.lower_compare(left, right, *operator, *span, instructions);
         };
         self.lower_integer_binary(operation, left, right, *span, instructions)
     }

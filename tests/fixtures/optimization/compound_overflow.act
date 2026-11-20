@@ -1,0 +1,6 @@
+"""A compound addition past the maximum traps."""
+verb main() -> Int {
+    erg counter: u8 = 255;
+    counter += 1;
+    return counter as Int;
+}

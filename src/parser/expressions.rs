@@ -27,7 +27,7 @@ impl Parser {
     fn parse_primary_expression(&mut self) -> Result<Expr, ParseError> {
         let token = self.advance_required("expression")?;
         let expression = match token.kind {
-            TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde => {
+            TokenKind::Minus | TokenKind::MinusPercent | TokenKind::Bang | TokenKind::Tilde => {
                 self.parse_unary_prefix(token.span, unary_operator(&token.kind))
             }
             TokenKind::LeftParen => self.parse_grouped_prefix(token.span),
@@ -313,6 +313,12 @@ impl Parser {
             TokenKind::Plus => BinaryOp::Add,
             TokenKind::Minus => BinaryOp::Subtract,
             TokenKind::Star => BinaryOp::Multiply,
+            TokenKind::PlusPercent => BinaryOp::WrappingAdd,
+            TokenKind::MinusPercent => BinaryOp::WrappingSubtract,
+            TokenKind::StarPercent => BinaryOp::WrappingMultiply,
+            TokenKind::PlusPipe => BinaryOp::SaturatingAdd,
+            TokenKind::MinusPipe => BinaryOp::SaturatingSubtract,
+            TokenKind::StarPipe => BinaryOp::SaturatingMultiply,
             TokenKind::Slash => BinaryOp::Divide,
             TokenKind::Percent => BinaryOp::Remainder,
             TokenKind::ShiftLeft => BinaryOp::ShiftLeft,
@@ -342,8 +348,17 @@ impl Parser {
             BinaryOp::BitwiseXor => 5,
             BinaryOp::BitwiseAnd => 6,
             BinaryOp::ShiftLeft | BinaryOp::ShiftRight => 7,
-            BinaryOp::Add | BinaryOp::Subtract => 8,
-            BinaryOp::Multiply | BinaryOp::Divide | BinaryOp::Remainder => 9,
+            BinaryOp::Add
+            | BinaryOp::Subtract
+            | BinaryOp::WrappingAdd
+            | BinaryOp::WrappingSubtract
+            | BinaryOp::SaturatingAdd
+            | BinaryOp::SaturatingSubtract => 8,
+            BinaryOp::Multiply
+            | BinaryOp::WrappingMultiply
+            | BinaryOp::SaturatingMultiply
+            | BinaryOp::Divide
+            | BinaryOp::Remainder => 9,
         };
         Some((operator, precedence))
     }
@@ -397,6 +412,7 @@ fn unary_operator(kind: &TokenKind) -> UnaryOp {
         TokenKind::Bang => UnaryOp::LogicalNot,
         TokenKind::Tilde => UnaryOp::BitwiseNot,
         TokenKind::Minus => UnaryOp::Negate,
+        TokenKind::MinusPercent => UnaryOp::WrappingNegate,
         _ => unreachable!("unary_operator called for a non-unary token"),
     }
 }

@@ -21,6 +21,7 @@ edition.
 | `E1109` | Private module declaration or public-signature visibility violation |
 | `E1119` | Reference outside the hierarchical scope of its directory module |
 | `E1137` | Facade opens one name both publicly and for its unit |
+| `E1138` | Trapping arithmetic on integer literals overflows its type |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |
 | `E1110` | Deterministic native symbol or ABI collision across module implementations |
 | `E1104` | Unknown sibling referenced by a module facade |

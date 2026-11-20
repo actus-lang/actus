@@ -1,0 +1,6 @@
+"""An unsigned subtraction below zero traps."""
+verb main() -> Int {
+    erg a: u8 = 0;
+    erg b: u8 = 1;
+    return (a - b) as Int;
+}

@@ -1,11 +1,11 @@
-"""Recursive Fibonacci of 30: call overhead and return values."""
+"""Recursive Fibonacci of 30: call overhead and return values. Wrapping arithmetic, as in its C twin."""
 verb fib(erg n: u64) -> u64 {
     if n < 2 {
         return n;
     }
-    erg left = n - 1;
-    erg right = n - 2;
-    return fib(n: erg left) + fib(n: erg right);
+    erg left = n -% 1;
+    erg right = n -% 2;
+    return fib(n: erg left) +% fib(n: erg right);
 }
 
 verb main() -> Int {
