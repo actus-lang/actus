@@ -85,7 +85,7 @@ verb prepare_frame(ins encoded: Buffer) -> Int {
 
 verb feed_first(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer) -> u32 {
     erg first_chunk: Buffer = Buffer[5];
-    for erg index: u32 in 0u32 .. 5u32 {
+    for erg index: u32 in 0u32..5u32 {
         first_chunk[index] = encoded[index];
     }
     erg first_result = wire_parser_feed(
@@ -101,7 +101,7 @@ verb feed_first(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer)
 
 verb feed_second(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer) -> u32 {
     erg second_chunk: Buffer = Buffer[12];
-    for erg index: u32 in 0u32 .. 12u32 {
+    for erg index: u32 in 0u32..12u32 {
         second_chunk[index] = encoded[index + 5u32];
     }
     erg second_result = wire_parser_feed(

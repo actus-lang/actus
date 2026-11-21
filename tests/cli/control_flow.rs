@@ -87,3 +87,42 @@ fn llvm_backend_builds_and_runs_nested_shared_value_if_expression() {
         42
     );
 }
+
+/// Runs `source` with both backends and checks its exit code.
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+fn assert_exits_with(source: &str, expected: i32) {
+    for backend in ["cranelift", "llvm"] {
+        assert_eq!(run_shared_value_if_fixture(backend, source), expected, "{backend}");
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn a_for_range_without_a_type_counts_with_int() {
+    assert_exits_with(
+        "verb main() -> Int { erg total = 0; for erg index in 1..5 { total += index; } return total; }",
+        10,
+    );
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn a_for_range_without_a_type_takes_the_type_of_its_start() {
+    assert_exits_with(
+        "verb main() -> Int { erg last: u8 = 0u8; for erg index in 250u8..253u8 { last = index; } return last as Int; }",
+        252,
+    );
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn a_typed_for_range_gives_plain_literal_bounds_its_type() {
+    assert_exits_with(
+        "verb main() -> Int { erg total: u16 = 0u16; for erg index: u16 in 1..4 { total += index; } return total as Int; }",
+        6,
+    );
+    assert_exits_with(
+        "verb main() -> Int { erg total = 0; for erg index: Int in 1..4 { total += index; } return total; }",
+        6,
+    );
+}

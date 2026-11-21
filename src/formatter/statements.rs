@@ -63,7 +63,7 @@ impl Formatter<'_> {
             Stmt::ForRange { binding, start, end, body, .. } => {
                 self.for_header(binding);
                 self.expression(start);
-                self.output.push_str(" .. ");
+                self.output.push_str("..");
                 self.expression(end);
                 self.output.push(' ');
                 self.block(body);

@@ -8,7 +8,6 @@ use super::super::contract::unsupported;
 use super::super::{BodyLowering, LoopTargets};
 use super::carried::{
     collect_assignment_names, collect_ins_argument_names, index_type_signed, is_loop_carried_type,
-    range_binding_type,
 };
 use crate::ast::{Block, Expr, ForBinding, Stmt};
 use crate::lexer::SourceSpan;
@@ -146,6 +145,7 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
             increment_id: blocks.increment,
             continuation_id: blocks.continuation,
             binding,
+            index_type,
             body,
             ids: &ids,
             carried: &carried,
@@ -255,15 +255,11 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
             ids,
             carried,
             span,
+            ..
         } = input;
         self.push_range_targets(increment_id, continuation_id, binding, carried);
         self.provider.enter_loop();
-        for (binding, value) in carried.iter().zip(&ids.body_carried) {
-            self.provider.set_binding_value(&binding.name, *value);
-            if let Some(type_name) = &binding.nominal_type {
-                self.provider.remember_nominal_type(*value, type_name.clone());
-            }
-        }
+        self.bind_carried_values(carried, &ids.body_carried);
         self.provider.enter_scope(body.span);
         let mut prefix = Vec::new();
         self.provider.bind_owner(
@@ -298,8 +294,22 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
         for block in self.blocks.iter_mut().skip(nested_block_start) {
             replace_jump_arguments_in_block(block, increment_id, &continue_arguments);
         }
-        lowered.parameters = body_parameters(ids.body, binding, ids, carried, span)?;
+        lowered.parameters = body_parameters(ids.body, input.index_type, ids, carried, span);
         Ok(lowered)
+    }
+
+    /// Binds each carried binding to its loop value inside the body.
+    fn bind_carried_values(
+        &mut self,
+        carried: &[CarriedBinding],
+        values: &[super::super::super::BackendValueId],
+    ) {
+        for (binding, value) in carried.iter().zip(values) {
+            self.provider.set_binding_value(&binding.name, *value);
+            if let Some(type_name) = &binding.nominal_type {
+                self.provider.remember_nominal_type(*value, type_name.clone());
+            }
+        }
     }
 
     fn push_range_targets(
@@ -345,22 +355,18 @@ pub(in crate::codegen::body) fn initial_loop_arguments(
 
 fn body_parameters(
     index: super::super::super::BackendValueId,
-    binding: &ForBinding,
+    index_type: BackendValueType,
     ids: &LoopValues,
     carried: &[CarriedBinding],
     span: SourceSpan,
-) -> Result<Vec<BackendBlockParameter>, BackendContractError> {
-    Ok(std::iter::once(BackendBlockParameter {
-        value: index,
-        ty: range_binding_type(binding, span)?,
-        span,
-    })
-    .chain(ids.body_carried.iter().zip(carried).map(|(value, binding)| BackendBlockParameter {
-        value: *value,
-        ty: binding.ty,
-        span,
-    }))
-    .collect())
+) -> Vec<BackendBlockParameter> {
+    std::iter::once(BackendBlockParameter { value: index, ty: index_type, span })
+        .chain(ids.body_carried.iter().zip(carried).map(|(value, binding)| BackendBlockParameter {
+            value: *value,
+            ty: binding.ty,
+            span,
+        }))
+        .collect()
 }
 
 fn header_block(

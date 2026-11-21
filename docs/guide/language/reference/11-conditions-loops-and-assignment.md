@@ -48,7 +48,7 @@ an ownership-safe way.
 Actus also supports two bounded `for` forms:
 
 ```act
-for erg index: u32 in 0u32 .. 8u32 {
+for erg index: u32 in 0..8 {
     total += index;
 }
 
@@ -58,8 +58,10 @@ for erg index: u32 in values {
 ```
 
 The range is half-open: `start` is included and `end` is excluded. Both range
-bounds must have the declared primitive integer type of the `erg` index
-binding. Empty and reversed ranges execute zero times. Values that overflow
+bounds must have the integer type of the `erg` index binding. A plain integer
+literal bound takes that type. Without a declared type, the binding takes the
+type of `start`, and `Int` when `start` is a plain literal, so
+`for erg index in 0..8` counts with `Int`. Empty and reversed ranges execute zero times. Values that overflow
 the declared bound type are rejected during semantic analysis.
 
 The collection form is index iteration over a statically known `Array[T, N]`.

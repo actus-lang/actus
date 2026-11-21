@@ -142,7 +142,7 @@ fn formats_bounded_for_ranges_idempotently() {
     let formatted = format_source(
         "verb main(){for erg index:u32 in 0u32..4u32 { if index == 2u32 { break; } }}",
     );
-    assert!(formatted.contains("for erg index: u32 in 0u32 .. 4u32"));
+    assert!(formatted.contains("for erg index: u32 in 0u32..4u32"));
     assert_eq!(format_source(&formatted), formatted);
 }
 
@@ -150,7 +150,7 @@ fn formats_bounded_for_ranges_idempotently() {
 fn canonicalizes_repeat_to_bounded_for_idempotently() {
     let formatted =
         format_source("verb main(){repeat erg index:u32 in 0u32..4u32 { total += index; }}");
-    assert!(formatted.contains("for erg index: u32 in 0u32 .. 4u32"));
+    assert!(formatted.contains("for erg index: u32 in 0u32..4u32"));
     assert_eq!(format_source(&formatted), formatted);
 }
 
