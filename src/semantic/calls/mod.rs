@@ -9,4 +9,5 @@ mod validation;
 
 pub(crate) use crate::ast::parse_type_name_key;
 use crate::semantic::{analyzer, errors, model, state};
+pub(crate) use dispatch::print_uses_label;
 pub(super) use signatures::VerbSignature;

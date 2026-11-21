@@ -125,15 +125,6 @@ fn print_symbol(
                 crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL
             })
         }
-        Some(BackendValueType::Pointer)
-            if provider.nominal_type(value).is_some_and(|ty| ty.name == "String") =>
-        {
-            Ok(if stderr {
-                crate::runtime::PRINT_STRING_STDERR_SYMBOL
-            } else {
-                crate::runtime::WRITE_STRING_STDOUT_SYMBOL
-            })
-        }
         Some(BackendValueType::Pointer) => Ok(if stderr {
             crate::runtime::PRINT_STRING_STDERR_SYMBOL
         } else {

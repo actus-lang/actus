@@ -7,9 +7,33 @@ use super::contract::{
 use super::stream::write_buffer;
 use super::types::{ActusBuffer, BufferHandle};
 
+/// The process stdout, with a flush registered for process exit.
+///
+/// Rust flushes its stdout buffer only when a Rust `main` returns. An Actus
+/// program's `main` returns straight to the C runtime, so output that does not
+/// end in a newline would stay in the buffer and be lost. The first use
+/// registers a flush that the C runtime runs when the process exits.
+pub(super) fn stdout() -> std::io::Stdout {
+    static FLUSH_AT_EXIT: std::sync::Once = std::sync::Once::new();
+    FLUSH_AT_EXIT.call_once(|| {
+        unsafe extern "C" {
+            fn atexit(callback: extern "C" fn()) -> i32;
+        }
+        extern "C" fn flush_stdout() {
+            let _ = std::io::stdout().flush();
+        }
+        // SAFETY: `flush_stdout` is a plain function that lives for the whole
+        // process; a failed registration only loses the final flush.
+        unsafe {
+            atexit(flush_stdout);
+        }
+    });
+    std::io::stdout()
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_print_int(value: i32) -> i32 {
-    if writeln!(std::io::stdout(), "{value}").is_ok() { 0 } else { -1 }
+    if writeln!(stdout(), "{value}").is_ok() { 0 } else { -1 }
 }
 
 #[unsafe(no_mangle)]
@@ -20,7 +44,7 @@ pub extern "C" fn actus_print_int_stderr(value: i32) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_print_bool(value: i32) -> i32 {
     let text = if value == 0 { "false" } else { "true" };
-    if writeln!(std::io::stdout(), "{text}").is_ok() { 0 } else { -1 }
+    if writeln!(stdout(), "{text}").is_ok() { 0 } else { -1 }
 }
 
 #[unsafe(no_mangle)]
@@ -41,7 +65,7 @@ unsafe fn print_format_value(format: *const u8, value: &str, stderr: bool) -> i3
     let result = if stderr {
         writeln!(std::io::stderr(), "{rendered}")
     } else {
-        writeln!(std::io::stdout(), "{rendered}")
+        writeln!(stdout(), "{rendered}")
     };
     if result.is_ok() { 0 } else { -1 }
 }
@@ -99,7 +123,9 @@ pub unsafe extern "C" fn actus_print_string(value: *const u8) -> i32 {
         return 0;
     }
     let bytes = unsafe { std::ffi::CStr::from_ptr(value.cast()) }.to_bytes();
-    println!("{}", String::from_utf8_lossy(bytes));
+    if writeln!(stdout(), "{}", String::from_utf8_lossy(bytes)).is_err() {
+        return -1;
+    }
     i32::try_from(bytes.len()).unwrap_or(i32::MAX)
 }
 
@@ -114,7 +140,7 @@ pub unsafe extern "C" fn actus_write_string_stdout(value: *const u8) -> i32 {
         return 0;
     }
     let bytes = unsafe { std::ffi::CStr::from_ptr(value.cast()) }.to_bytes();
-    if std::io::stdout().write_all(bytes).is_ok() {
+    if stdout().write_all(bytes).is_ok() {
         i32::try_from(bytes.len()).unwrap_or(i32::MAX)
     } else {
         -1
@@ -273,7 +299,7 @@ pub unsafe extern "C" fn actus_print_line_buffer_stderr(handle: BufferHandle) ->
 /// Flushes stdout and returns zero on success or -1 on failure.
 #[unsafe(no_mangle)]
 pub extern "C" fn actus_flush_stdout() -> i32 {
-    if std::io::stdout().flush().is_ok() { 0 } else { -1 }
+    if stdout().flush().is_ok() { 0 } else { -1 }
 }
 
 /// Flushes stderr and returns zero on success or -1 on failure.

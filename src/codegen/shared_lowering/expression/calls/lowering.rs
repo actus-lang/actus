@@ -83,6 +83,11 @@ fn is_print_intrinsic_call(
     {
         return false;
     }
+    // With a `print` or `eprint` verb in scope, such as std::io's, a call
+    // without a built-in label goes to that verb, as the analyzer resolved it.
+    if provider.return_types.contains_key(callee) && !crate::semantic::print_uses_label(arguments) {
+        return false;
+    }
     !(callee == "eprint"
         && arguments.len() == 1
         && arguments[0].name.as_deref() == Some("buffer")

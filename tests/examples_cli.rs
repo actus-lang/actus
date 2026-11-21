@@ -315,7 +315,7 @@ fn runtime_profile_example_builds_and_executes_with_builtin_std() {
     let execution =
         std::process::Command::new(&output).output().expect("run runtime profile example");
     assert_eq!(execution.status.code(), Some(0));
-    assert_eq!(execution.stdout, b"text outputtext output\nbytesbytes\n");
+    assert_eq!(execution.stdout, b"text output\ntext output\nbytesbytes\n");
     let _ = fs::remove_file(output);
 }
 

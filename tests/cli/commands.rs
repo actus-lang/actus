@@ -67,6 +67,38 @@ fn build_command_returns_zero_for_a_void_hosted_entry() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(unix)]
+#[test]
+fn built_in_print_of_a_string_prints_a_line() {
+    let root = std::env::temp_dir().join(format!("actus-cli-print-string-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() { erg greeting: String = \"Hello\"; print(string: abs greeting); print(string: \"World\"); }\n",
+    )
+    .expect("write source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let execution = Command::new(&output).output().expect("run print executable");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"Hello\nWorld\n");
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
 #[test]
 fn build_command_rejects_a_hosted_entry_without_an_integer_exit_status() {
     let root = std::env::temp_dir().join(format!("actus-cli-entry-{}", std::process::id()));

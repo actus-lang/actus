@@ -35,7 +35,7 @@ pub(crate) use analyzer::{
     validate_stack_limit_dynamic_dispatch, validate_stack_limit_native_claims,
     validate_stack_limit_recursion,
 };
-pub(crate) use calls::parse_type_name_key;
+pub(crate) use calls::{parse_type_name_key, print_uses_label};
 pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
 pub use errors::{SemanticError, SemanticErrorKind};
 pub(crate) use generated_locals::normalize_program as normalize_generated_locals;
