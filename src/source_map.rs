@@ -107,6 +107,20 @@ impl SourceMap {
             })
         })
     }
+
+    /// The file, 1-based line and 1-based character column where `span`
+    /// starts, without copying the file's source.
+    pub(crate) fn line_column(&self, span: SourceSpan) -> Option<(PathBuf, usize, usize)> {
+        let file = self.files.iter().rev().find(|file| {
+            span.start.checked_sub(file.base).is_some_and(|offset| offset <= file.source.len())
+        })?;
+        let offset = span.start - file.base;
+        let before = file.source.get(..offset)?;
+        let line_start = before.rfind('\n').map_or(0, |newline| newline + 1);
+        let line = before.matches('\n').count() + 1;
+        let column = before[line_start..].chars().count() + 1;
+        Some((file.path.clone(), line, column))
+    }
 }
 
 pub(crate) fn canonical_path(path: &std::path::Path) -> PathBuf {
@@ -135,6 +149,18 @@ mod tests {
         assert_eq!(second, first + 3);
         assert_eq!(map.location(SourceSpan::new(first + 2, first + 2)).unwrap().source, "ab");
         assert_eq!(map.location(SourceSpan::new(second, second)).unwrap().source, "cd");
+    }
+
+    #[test]
+    fn reports_lines_and_character_columns() {
+        let mut map = SourceMap::default();
+        map.register("source-map-first-lines.act", "one");
+        let base = map.register("source-map-lines.act", "ab\nä x\n");
+
+        let (path, line, column) = map.line_column(SourceSpan::new(base + 6, base + 7)).unwrap();
+        assert!(path.ends_with("source-map-lines.act"));
+        assert_eq!((line, column), (2, 3));
+        assert_eq!(map.line_column(SourceSpan::new(base, base)).unwrap().1, 1);
     }
 
     #[test]

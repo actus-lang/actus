@@ -823,24 +823,24 @@ fn lowers_typed_float_literals_at_the_declared_width() {
 
 #[cfg(unix)]
 #[test]
-fn traps_on_integer_remainder_by_zero() {
-    let status = run_array_fixture(
+fn reports_integer_remainder_by_zero() {
+    assert_check_failure(
         "adr44-remainder-zero",
         "verb main() -> Int { erg value = 42; erg divisor = 0; return value % divisor; }",
+        "division by zero",
+        62,
     );
-    assert!(!status.success());
-    assert!(status.code().is_none(), "remainder by zero should trap: {status:?}");
 }
 
 #[cfg(unix)]
 #[test]
-fn traps_on_shift_count_out_of_range() {
-    let status = run_array_fixture(
+fn reports_shift_count_out_of_range() {
+    assert_check_failure(
         "adr44-shift-range",
         "verb main() -> Int { erg value: u8 = 1; erg count: u8 = 8; return value << count; }",
+        "shift count out of range",
+        67,
     );
-    assert!(!status.success());
-    assert!(status.code().is_none(), "shift count overflow should trap: {status:?}");
 }
 
 #[cfg(unix)]
@@ -945,35 +945,35 @@ fn executes_checked_integer_casts() {
 
 #[cfg(unix)]
 #[test]
-fn traps_on_runtime_integer_cast_overflow() {
-    let status = run_array_fixture(
+fn reports_runtime_integer_cast_overflow() {
+    assert_check_failure(
         "checked-cast-overflow",
         "verb main() -> Int { erg value = 256; erg narrowed = value as u8; return narrowed as Int; }",
+        "integer value out of range",
+        54,
     );
-    assert!(!status.success());
-    assert!(status.code().is_none(), "integer overflow should be a native trap: {status:?}");
 }
 
 #[cfg(unix)]
 #[test]
-fn traps_on_runtime_integer_cast_underflow() {
-    let status = run_array_fixture(
+fn reports_runtime_integer_cast_underflow() {
+    assert_check_failure(
         "checked-cast-underflow",
         "verb main() -> Int { erg value = -1; erg narrowed = value as u8; return narrowed as Int; }",
+        "integer value out of range",
+        53,
     );
-    assert!(!status.success());
-    assert!(status.code().is_none(), "integer underflow should be a native trap: {status:?}");
 }
 
 #[cfg(unix)]
 #[test]
-fn traps_deterministically_on_buffer_bounds_failure() {
-    let status = run_array_fixture(
+fn reports_a_buffer_index_past_the_end() {
+    assert_check_failure(
         "buffer-index-bounds",
         "verb main() -> Int { erg bytes: Buffer = Buffer[0]; append(bytes, 42); return bytes[1]; }",
+        "integer value out of range",
+        79,
     );
-    assert!(!status.success());
-    assert!(status.code().is_none(), "buffer bounds failure should be a native trap: {status:?}");
 }
 
 #[cfg(unix)]
@@ -998,24 +998,24 @@ fn checks_dynamic_values_before_writing_u8_pack_fields() {
 
 #[cfg(unix)]
 #[test]
-fn traps_when_a_dynamic_value_exceeds_u8_range() {
-    let status = run_array_fixture(
+fn reports_a_dynamic_value_that_exceeds_u8_range() {
+    assert_check_failure(
         "pack-u8-overflow",
         "pack Byte { erg storage: u8; layout little; fields { erg payload: u8 at 0; } } verb main() -> Int { erg byte = Byte { storage: 0, }; erg input = 256; byte.payload = input; return byte.payload; }",
+        "integer value out of range",
+        151,
     );
-    assert!(!status.success());
-    assert!(status.code().is_none(), "u8 overflow should be a native trap: {status:?}");
 }
 
 #[cfg(unix)]
 #[test]
-fn traps_deterministically_on_dynamic_array_bounds_failure() {
-    let status = run_array_fixture(
+fn reports_a_dynamic_array_index_out_of_bounds() {
+    assert_check_failure(
         "array-bounds",
         "verb main() -> Int { erg values: Array[Int, 4] = Array[Int, 4](); erg index = 4; return values[index]; }",
+        "index out of bounds",
+        89,
     );
-    assert!(!status.success());
-    assert!(status.code().is_none(), "bounds failure should be a native trap: {status:?}");
 }
 
 #[cfg(unix)]
@@ -1151,6 +1151,38 @@ fn emits_identical_objects_for_repeated_array_builds() {
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(first);
     let _ = fs::remove_file(second);
+}
+/// Builds and runs a one-line fixture whose runtime check fails, and checks
+/// that it reports `message` at `column` and exits with status 101
+/// (ADR-0117).
+#[cfg(unix)]
+fn assert_check_failure(name: &str, source: &str, message: &str, column: usize) {
+    let root = std::env::temp_dir().join(format!("actus-{name}-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(&input, source).expect("write array fixture");
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(result, 0);
+    let execution = std::process::Command::new(&output).output().expect("run array fixture");
+    let _ = fs::remove_file(&input);
+    let _ = fs::remove_file(&output);
+    let stderr = String::from_utf8_lossy(&execution.stderr);
+    assert_eq!(execution.status.code(), Some(101), "{name}: {:?}", execution.status);
+    assert!(
+        stderr.starts_with(&format!("error: {message} at "))
+            && stderr.ends_with(&format!("{name}-{}.act:1:{column}\n", std::process::id())),
+        "{name} reported {stderr:?}"
+    );
 }
 
 #[cfg(unix)]

@@ -1,3 +1,4 @@
+mod checks;
 mod cleanup;
 mod dominance;
 mod errors;
@@ -12,6 +13,7 @@ use super::abi::BackendEnumLayout;
 pub use super::backend::BackendIntegerBinaryOp;
 pub use super::backend::BackendIntegerCompareOp;
 pub use super::backend::BackendIntegerUnaryOp;
+pub use checks::{RuntimeCheckReporting, runtime_check};
 pub use cleanup::{
     BackendCleanupArgument, BackendCleanupBridge, BackendCleanupBridgeDescriptor,
     BackendCleanupField, BackendCleanupOperand, BackendCleanupProvider,

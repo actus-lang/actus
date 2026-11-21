@@ -80,7 +80,14 @@ fn build_file_with_report(
         .unwrap_or(fallback_symbol)
         .to_owned();
     let report_mode = report_output.then_some(mode);
-    emit_and_write(input, output, emit, configuration, &plan, &symbol, report_mode)
+    let program = LoadedProgram { plan: &plan, source_map: &source_map };
+    emit_and_write(input, output, emit, configuration, program, &symbol, report_mode)
+}
+
+/// A resolved build program and the source map its spans point into.
+struct LoadedProgram<'a> {
+    plan: &'a crate::modules::ModuleCompilationPlan,
+    source_map: &'a crate::SharedSourceMap,
 }
 
 fn validate_llvm_identity() -> bool {
@@ -99,10 +106,11 @@ fn emit_and_write(
     output: Option<&Path>,
     emit: EmitKind,
     configuration: &CompilerConfiguration,
-    plan: &crate::modules::ModuleCompilationPlan,
+    program: LoadedProgram<'_>,
     symbol: &str,
     report_mode: Option<ConformanceMode>,
 ) -> i32 {
+    let plan = program.plan;
     if let Err(error) = validate_entry(plan.caller(), symbol, emit, configuration.entry_contract())
     {
         eprintln!("error: {error}");
@@ -114,7 +122,12 @@ fn emit_and_write(
         eprintln!("error: {error}");
         return 1;
     }
-    let object = match emit_object(plan, symbol, configuration) {
+    // A hosted executable runs with the runtime, which reports a failed
+    // runtime check with its source location (ADR-0117).
+    let hosted_executable = matches!(emit, EmitKind::Executable)
+        && matches!(configuration.entry_contract(), EntryContract::Hosted);
+    let check_locations = hosted_executable.then_some(program.source_map);
+    let object = match emit_object(plan, symbol, configuration, check_locations) {
         Ok(object) => object,
         Err(error) => {
             eprintln!("error: cannot build `{input}`: {error}");
@@ -149,19 +162,20 @@ pub(crate) fn emit_object(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
+    check_locations: Option<&crate::SharedSourceMap>,
 ) -> Result<EmittedObject, BackendEmitError> {
     match configuration.native_backend().backend() {
         crate::codegen::BackendKind::Cranelift => {
-            emit_object_cranelift(plan, symbol, configuration)
+            emit_object_cranelift(plan, symbol, configuration, check_locations)
         }
         crate::codegen::BackendKind::Llvm => {
             #[cfg(feature = "llvm")]
             {
-                super::llvm::emit_object_llvm(plan, symbol, configuration)
+                super::llvm::emit_object_llvm(plan, symbol, configuration, check_locations)
             }
             #[cfg(not(feature = "llvm"))]
             {
-                let _ = (plan, symbol, configuration);
+                let _ = (plan, symbol, configuration, check_locations);
                 Err(BackendEmitError(
                     "backend `llvm` is not enabled; rebuild with feature `llvm`".to_owned(),
                 ))
@@ -175,6 +189,7 @@ fn emit_object_cranelift(
     plan: &crate::modules::ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
+    check_locations: Option<&crate::SharedSourceMap>,
 ) -> Result<EmittedObject, BackendEmitError> {
     let (generic_types, generic_instances) = super::shared::generic_inputs(plan, configuration)?;
     let object_plan = plan
@@ -188,6 +203,7 @@ fn emit_object_cranelift(
         configuration,
         &bindings,
         &generic_instances,
+        check_locations,
     )
 }
 
@@ -196,6 +212,7 @@ fn emit_object_cranelift(
     _plan: &crate::modules::ModuleCompilationPlan,
     _symbol: &str,
     _configuration: &CompilerConfiguration,
+    _check_locations: Option<&crate::SharedSourceMap>,
 ) -> Result<EmittedObject, BackendEmitError> {
     Err(BackendEmitError(
         "backend `cranelift` is not enabled; rebuild with feature `cranelift`".to_owned(),

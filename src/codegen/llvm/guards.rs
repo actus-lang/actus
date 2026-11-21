@@ -1,11 +1,14 @@
 use std::collections::BTreeMap;
 
+use llvm_sys::LLVMAttributeFunctionIndex;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
-    LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildICmp,
-    LLVMBuildUnreachable, LLVMConstInt, LLVMConstNull, LLVMFunctionType, LLVMGetGlobalParent,
-    LLVMGetIntrinsicDeclaration, LLVMLookupIntrinsicID, LLVMPositionBuilderAtEnd, LLVMTypeOf,
-    LLVMVoidTypeInContext,
+    LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildAnd,
+    LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildGlobalString, LLVMBuildICmp, LLVMBuildUnreachable,
+    LLVMConstInt, LLVMConstNull, LLVMCreateEnumAttribute, LLVMFunctionType,
+    LLVMGetEnumAttributeKindForName, LLVMGetGlobalParent, LLVMGetIntrinsicDeclaration,
+    LLVMGetNamedFunction, LLVMLookupIntrinsicID, LLVMPointerTypeInContext,
+    LLVMPositionBuilderAtEnd, LLVMTypeOf, LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -17,6 +20,7 @@ pub(super) fn emit_trap_if_zero(
     function: LLVMValueRef,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
+    failure: Option<&str>,
 ) -> Result<bool, BackendEmitError> {
     let BackendInstruction::TrapIfZero { value, span, .. } = instruction else {
         return Err(BackendEmitError("LLVM zero guard expected".to_owned()));
@@ -53,10 +57,56 @@ pub(super) fn emit_trap_if_zero(
     }
     unsafe {
         LLVMPositionBuilderAtEnd(builder, trap_block);
-        emit_llvm_trap(context, function, builder)?;
+        emit_check_failure(context, function, builder, failure)?;
         LLVMPositionBuilderAtEnd(builder, ok_block);
     }
     Ok(false)
+}
+
+/// Ends the current block at a failed runtime check: with a call to the
+/// runtime's check-failure report when `failure` holds its message
+/// (ADR-0117), otherwise with the target's trap instruction.
+pub(super) fn emit_check_failure(
+    context: llvm_sys::prelude::LLVMContextRef,
+    function: LLVMValueRef,
+    builder: LLVMBuilderRef,
+    failure: Option<&str>,
+) -> Result<(), BackendEmitError> {
+    let Some(message) = failure else {
+        return emit_llvm_trap(context, function, builder);
+    };
+    let message = std::ffi::CString::new(message)
+        .map_err(|_| BackendEmitError("LLVM check-failure message contains NUL".to_owned()))?;
+    let symbol = std::ffi::CString::new(crate::runtime::RUNTIME_CHECK_FAILED_SYMBOL)
+        .map_err(|_| BackendEmitError("LLVM runtime symbol contains NUL".to_owned()))?;
+    unsafe {
+        let module = LLVMGetGlobalParent(function);
+        let pointer = LLVMPointerTypeInContext(context, 0);
+        let mut parameters = [pointer];
+        let report_type =
+            LLVMFunctionType(LLVMVoidTypeInContext(context), parameters.as_mut_ptr(), 1, 0);
+        let mut report = LLVMGetNamedFunction(module, symbol.as_ptr());
+        if report.is_null() {
+            report = LLVMAddFunction(module, symbol.as_ptr(), report_type);
+            let no_return = LLVMGetEnumAttributeKindForName(c"noreturn".as_ptr(), 8);
+            let cold = LLVMGetEnumAttributeKindForName(c"cold".as_ptr(), 4);
+            for kind in [no_return, cold] {
+                let attribute = LLVMCreateEnumAttribute(context, kind, 0);
+                LLVMAddAttributeAtIndex(report, LLVMAttributeFunctionIndex, attribute);
+            }
+        }
+        let text =
+            LLVMBuildGlobalString(builder, message.as_ptr(), c"actus.check.message".as_ptr());
+        let mut arguments = [text];
+        if text.is_null()
+            || LLVMBuildCall2(builder, report_type, report, arguments.as_mut_ptr(), 1, c"".as_ptr())
+                .is_null()
+            || LLVMBuildUnreachable(builder).is_null()
+        {
+            return Err(BackendEmitError("LLVM failed to emit a runtime check report".to_owned()));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn emit_llvm_trap(
@@ -97,6 +147,7 @@ pub(super) fn emit_trap_if_shift_count_out_of_range(
     function: LLVMValueRef,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
+    failure: Option<&str>,
 ) -> Result<bool, BackendEmitError> {
     let BackendInstruction::TrapIfShiftCountOutOfRange { count, width, span, .. } = instruction
     else {
@@ -134,7 +185,7 @@ pub(super) fn emit_trap_if_shift_count_out_of_range(
     }
     unsafe {
         LLVMPositionBuilderAtEnd(builder, trap_block);
-        emit_llvm_trap(context, function, builder)?;
+        emit_check_failure(context, function, builder, failure)?;
         LLVMPositionBuilderAtEnd(builder, ok_block);
     }
     Ok(false)
@@ -146,6 +197,7 @@ pub(super) fn emit_trap_if_array_index_out_of_bounds(
     function: LLVMValueRef,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
+    failure: Option<&str>,
 ) -> Result<bool, BackendEmitError> {
     let BackendInstruction::TrapIfArrayIndexOutOfBounds { index, capacity, span, .. } = instruction
     else {
@@ -171,7 +223,7 @@ pub(super) fn emit_trap_if_array_index_out_of_bounds(
     }
     unsafe {
         LLVMPositionBuilderAtEnd(builder, trap_block);
-        emit_llvm_trap(context, function, builder)?;
+        emit_check_failure(context, function, builder, failure)?;
         LLVMPositionBuilderAtEnd(builder, ok_block);
     }
     Ok(false)
@@ -183,6 +235,7 @@ pub(super) fn emit_trap_if_signed_division_overflow(
     function: LLVMValueRef,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
+    failure: Option<&str>,
 ) -> Result<bool, BackendEmitError> {
     let BackendInstruction::TrapIfSignedDivisionOverflow { left, right, width, span, .. } =
         instruction
@@ -224,7 +277,7 @@ pub(super) fn emit_trap_if_signed_division_overflow(
     }
     unsafe {
         LLVMPositionBuilderAtEnd(builder, trap_block);
-        emit_llvm_trap(context, function, builder)?;
+        emit_check_failure(context, function, builder, failure)?;
         LLVMPositionBuilderAtEnd(builder, ok_block);
     }
     Ok(false)

@@ -5,6 +5,7 @@ pub(super) mod arrays;
 pub(super) mod buffer_index;
 pub(super) mod calls;
 pub(super) mod case;
+mod checks;
 pub(super) mod cleanup;
 pub(super) mod contract;
 pub(super) mod control_flow;

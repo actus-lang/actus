@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::super::super::{BackendEmitError, BackendInstruction, BackendValueId, BackendValueType};
+use super::super::super::{
+    BackendEmitError, BackendInstruction, BackendValueId, BackendValueType, RuntimeCheckReporting,
+};
 use super::super::enums::{emit_enum_construct, emit_enum_discriminant, emit_enum_payload};
 use super::super::guards::{
     emit_trap_if_array_index_out_of_bounds, emit_trap_if_shift_count_out_of_range,
@@ -21,7 +23,10 @@ pub(in crate::codegen::llvm) fn emit_scalar_instruction(
     function: LLVMValueRef,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+    checks: &RuntimeCheckReporting,
 ) -> Option<Result<bool, BackendEmitError>> {
+    let failure = checks.failure(instruction);
+    let site = OverflowSite { context, function, builder, failure: failure.as_deref() };
     let result = match instruction {
         BackendInstruction::Constant { result, ty, value, .. } => {
             emit_constant(context, *result, *ty, *value, values)
@@ -32,12 +37,8 @@ pub(in crate::codegen::llvm) fn emit_scalar_instruction(
         BackendInstruction::StringLiteral { result, value, .. } => {
             emit_string_literal(builder, *result, value, values)
         }
-        BackendInstruction::IntegerBinary { .. } => {
-            emit_integer_binary(&OverflowSite { context, function, builder }, instruction, values)
-        }
-        BackendInstruction::IntegerCast { .. } => {
-            emit_integer_cast(context, builder, function, instruction, values)
-        }
+        BackendInstruction::IntegerBinary { .. } => emit_integer_binary(&site, instruction, values),
+        BackendInstruction::IntegerCast { .. } => emit_integer_cast(&site, instruction, values),
         BackendInstruction::FloatCast { .. } => {
             emit_float_cast(context, builder, instruction, values)
         }
@@ -45,16 +46,14 @@ pub(in crate::codegen::llvm) fn emit_scalar_instruction(
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
-            emit_guard(context, builder, function, instruction, values)
+            emit_guard(&site, instruction, values)
         }
         BackendInstruction::IntegerCompare { .. } => {
             emit_integer_compare(builder, instruction, values)
         }
         BackendInstruction::ScalarSelect { .. } => emit_scalar_select(builder, instruction, values),
         BackendInstruction::FloatCompare { .. } => emit_float_compare(builder, instruction, values),
-        BackendInstruction::IntegerUnary { .. } => {
-            emit_integer_unary(&OverflowSite { context, function, builder }, instruction, values)
-        }
+        BackendInstruction::IntegerUnary { .. } => emit_integer_unary(&site, instruction, values),
         BackendInstruction::EnumDiscriminant { .. } => {
             emit_enum_discriminant(context, builder, instruction, values)
         }
@@ -110,24 +109,45 @@ fn emit_scalar_select(
 }
 
 fn emit_guard(
-    context: llvm_sys::prelude::LLVMContextRef,
-    builder: LLVMBuilderRef,
-    function: LLVMValueRef,
+    site: &OverflowSite<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
+    let (context, builder, function, failure) =
+        (site.context, site.builder, site.function, site.failure);
     match instruction {
         BackendInstruction::TrapIfZero { .. } => {
-            emit_trap_if_zero(context, builder, function, instruction, values)
+            emit_trap_if_zero(context, builder, function, instruction, values, failure)
         }
         BackendInstruction::TrapIfSignedDivisionOverflow { .. } => {
-            emit_trap_if_signed_division_overflow(context, builder, function, instruction, values)
+            emit_trap_if_signed_division_overflow(
+                context,
+                builder,
+                function,
+                instruction,
+                values,
+                failure,
+            )
         }
         BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
-            emit_trap_if_shift_count_out_of_range(context, builder, function, instruction, values)
+            emit_trap_if_shift_count_out_of_range(
+                context,
+                builder,
+                function,
+                instruction,
+                values,
+                failure,
+            )
         }
         BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
-            emit_trap_if_array_index_out_of_bounds(context, builder, function, instruction, values)
+            emit_trap_if_array_index_out_of_bounds(
+                context,
+                builder,
+                function,
+                instruction,
+                values,
+                failure,
+            )
         }
         _ => Err(BackendEmitError("LLVM guard instruction is not supported".to_owned())),
     }

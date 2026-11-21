@@ -201,15 +201,11 @@ fn initialize_aggregate_field(
 pub(in crate::codegen::llvm) fn emit_aggregate_instruction(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
-    pointer_width: u8,
     instruction: &BackendInstruction,
     declarations: &BTreeMap<String, FunctionDeclaration>,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     match instruction {
-        BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } => {
-            super::super::arena::emit(context, builder, pointer_width, instruction, values)
-        }
         BackendInstruction::AggregateConstruct { .. } => {
             emit_aggregate_construct(context, builder, instruction, declarations, values)
         }

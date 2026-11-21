@@ -10,6 +10,7 @@ pub(super) fn emit_program_object(
     configuration: &CompilerConfiguration,
     bindings: &BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
+    check_locations: Option<&crate::SharedSourceMap>,
 ) -> Result<EmittedObject, BackendEmitError> {
     let program = super::shared::lower_program(
         object_plan,
@@ -18,6 +19,7 @@ pub(super) fn emit_program_object(
         bindings,
         generic_instances,
         "Cranelift shared",
+        check_locations,
     )?;
     let bytes = crate::codegen::cranelift::emit_contract_module_object_with_local_symbols(
         &program.module,

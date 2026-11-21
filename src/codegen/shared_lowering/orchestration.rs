@@ -277,6 +277,7 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
             &external_symbols,
         )?,
         functions,
+        runtime_checks: crate::codegen::RuntimeCheckReporting::Trap,
     };
     append_performance_externals(&mut module.externals, &declarations.performance_externals)?;
     let mut runtime_symbols = referenced_runtime_symbols(&module.functions);

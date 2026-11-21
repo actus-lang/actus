@@ -171,7 +171,7 @@ fn run_test(
         .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
     crate::modules::validate_compilation_plan(&plan, configuration.target())
         .map_err(|error| test_diagnostic(test, crate::diagnostics::module_diagnostic(&error)))?;
-    let object = crate::cli::build::emit_object(&plan, "main", configuration)
+    let object = crate::cli::build::emit_object(&plan, "main", configuration, None)
         .map_err(|error| error.to_string())?;
     let paths = TestArtifactPaths::new(index)?;
     let result = fs::write(&paths.object, &object.bytes)

@@ -8,6 +8,7 @@ use cranelift_object::ObjectModule;
 
 use super::super::aggregate::{Declaration, lower_call};
 use super::super::native::BackendEmitError;
+use super::super::numeric;
 use super::{aggregate, arena, cleanup, enums, returns};
 use crate::codegen::{BackendFunction, BackendInstruction, BackendValueId};
 
@@ -22,6 +23,7 @@ pub(super) struct LoweringState<'a> {
     pub(super) values: &'a mut ValueMap,
     pub(super) aggregate_values: &'a mut AggregateValueMap,
     pub(super) function: &'a BackendFunction,
+    pub(super) runtime_checks: &'a crate::codegen::RuntimeCheckReporting,
 }
 
 pub(super) fn lower_instruction(
@@ -49,7 +51,9 @@ pub(super) fn lower_instruction(
         | BackendInstruction::ScalarLoanLoad { .. }
         | BackendInstruction::ScalarLoanStore { .. }
         | BackendInstruction::ScalarLoanMaterialize { .. } => {
-            lower_scalar(module, builder, instruction, state.function, state.values)
+            let failure = state.runtime_checks.failure(instruction);
+            let scalar = ScalarState { function: state.function, failure: failure.as_deref() };
+            lower_scalar(module, builder, instruction, &scalar, state.values)
         }
         _ => lower_non_scalar(module, builder, instruction, state),
     }
@@ -63,7 +67,8 @@ fn lower_non_scalar(
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } => {
-            arena::lower(module, builder, instruction, state.values)
+            let failure = state.runtime_checks.failure(instruction);
+            arena::lower(module, builder, instruction, state.values, failure.as_deref())
         }
         BackendInstruction::EnumDiscriminant { .. }
         | BackendInstruction::EnumPayload { .. }
@@ -136,13 +141,21 @@ fn cf(
     }
 }
 
+/// The function a scalar instruction belongs to and the message its failed
+/// runtime check reports, or `None` when it traps (ADR-0117).
+struct ScalarState<'a> {
+    function: &'a BackendFunction,
+    failure: Option<&'a str>,
+}
+
 fn lower_scalar(
     module: &mut ObjectModule,
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
-    function: &BackendFunction,
+    scalar: &ScalarState<'_>,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
 ) -> Result<(), BackendEmitError> {
+    let failure = scalar.failure;
     match instruction {
         BackendInstruction::Constant { .. } => {
             super::scalar::lower_constant(module, builder, instruction, values)
@@ -151,13 +164,13 @@ fn lower_scalar(
             super::scalar::lower_float_constant(builder, instruction, values)
         }
         BackendInstruction::StringLiteral { result, value, .. } => {
-            lower_string_literal(module, builder, function, *result, value, values)
+            lower_string_literal(module, builder, scalar.function, *result, value, values)
         }
         BackendInstruction::IntegerBinary { .. } => {
-            super::super::numeric::lower_integer_binary(builder, instruction, values)
+            numeric::lower_integer_binary(builder, instruction, values, module, failure)
         }
         BackendInstruction::IntegerCast { .. } => {
-            super::super::numeric::lower_integer_cast(builder, instruction, values)
+            numeric::lower_integer_cast(builder, instruction, values, module, failure)
         }
         BackendInstruction::FloatCast { .. } => {
             super::scalar::lower_float_cast(builder, instruction, values)
@@ -166,19 +179,19 @@ fn lower_scalar(
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
-            super::scalar::lower_guard(builder, instruction, values)
+            super::scalar::lower_guard(builder, instruction, values, module, failure)
         }
         BackendInstruction::IntegerCompare { .. } => {
-            super::super::numeric::lower_integer_compare(builder, instruction, values)
+            numeric::lower_integer_compare(builder, instruction, values)
         }
         BackendInstruction::ScalarSelect { .. } => {
-            super::super::numeric::lower_scalar_select(builder, instruction, values)
+            numeric::lower_scalar_select(builder, instruction, values)
         }
         BackendInstruction::FloatCompare { .. } => {
-            super::super::numeric::lower_float_compare(builder, instruction, values)
+            numeric::lower_float_compare(builder, instruction, values)
         }
         BackendInstruction::IntegerUnary { .. } => {
-            super::super::numeric::lower_integer_unary(builder, instruction, values)
+            numeric::lower_integer_unary(builder, instruction, values, module, failure)
         }
         BackendInstruction::MemoryCopy { .. } => {
             super::scalar::lower_memory_copy(module, builder, instruction, values)
@@ -241,10 +254,12 @@ fn lower_termination(
             state.return_slot,
             state.values,
         ),
-        BackendInstruction::Trap { .. } => {
-            builder.ins().trap(TrapCode::unwrap_user(1));
-            Ok(())
-        }
+        BackendInstruction::Trap { .. } => super::super::checks::emit_check_failure(
+            module,
+            builder,
+            TrapCode::unwrap_user(1),
+            state.runtime_checks.failure(instruction).as_deref(),
+        ),
         BackendInstruction::Cleanup { action, operand, .. } => cleanup::lower_cleanup(
             module,
             builder,

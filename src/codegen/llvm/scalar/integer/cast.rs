@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::super::super::guards::emit_llvm_trap;
+use super::super::super::guards::emit_check_failure;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
     LLVMAppendBasicBlockInContext, LLVMBuildAnd, LLVMBuildCondBr, LLVMBuildICmp, LLVMBuildSExt,
@@ -13,12 +13,11 @@ use super::super::super::super::{
 };
 
 pub(in crate::codegen::llvm) fn emit_integer_cast(
-    context: llvm_sys::prelude::LLVMContextRef,
-    builder: LLVMBuilderRef,
-    function: LLVMValueRef,
+    site: &super::overflow::OverflowSite<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
+    let (context, builder, function) = (site.context, site.builder, site.function);
     let BackendInstruction::IntegerCast { result, source, source_type, target_type, span } =
         instruction
     else {
@@ -35,7 +34,7 @@ pub(in crate::codegen::llvm) fn emit_integer_cast(
         return Err(BackendEmitError("LLVM failed to emit integer cast branch".to_owned()));
     }
     unsafe { LLVMPositionBuilderAtEnd(builder, trap_block) };
-    emit_llvm_trap(context, function, builder)?;
+    emit_check_failure(context, function, builder, site.failure)?;
     unsafe { LLVMPositionBuilderAtEnd(builder, ok_block) };
     let converted = convert_value(context, builder, wide, *target_type)?;
     values.insert(*result, converted);

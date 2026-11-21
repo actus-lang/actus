@@ -58,8 +58,12 @@ fn emit_runtime_status_bridge(
         }],
         cleanup: Vec::new(),
     };
-    emit_module(&BackendModule { externals: vec![external], functions: vec![function] })
-        .expect("runtime bridge ABI should lower through LLVM")
+    emit_module(&BackendModule {
+        externals: vec![external],
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("runtime bridge ABI should lower through LLVM")
 }
 
 fn emit_source_runtime_bridge(source: &str) -> String {

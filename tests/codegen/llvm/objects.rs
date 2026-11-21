@@ -45,6 +45,7 @@ fn emits_a_host_object_with_a_stable_public_symbol() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let output = std::env::temp_dir().join(format!("actus-llvm-object-{}.o", std::process::id()));
     let second_output =
@@ -171,6 +172,7 @@ fn emits_an_arm32_thumb_object_for_the_cortex_m_profile() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let output =
         std::env::temp_dir().join(format!("actus-llvm-arm-object-{}.o", std::process::id()));
@@ -324,6 +326,7 @@ fn emits_arm32_thumb_scalar_and_aggregate_call_fixtures() {
     let module = BackendModule {
         externals: Vec::new(),
         functions: vec![scalar_callee, scalar_caller, aggregate_callee, aggregate_caller],
+        ..Default::default()
     };
     let output =
         std::env::temp_dir().join(format!("actus-llvm-arm-call-fixtures-{}.o", std::process::id()));
@@ -475,6 +478,7 @@ module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .isr_vector,\22
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let target = actus::target::TargetSpec::parse("thumbv7em-none-eabihf")
         .expect("Cortex-M target should parse");
@@ -633,6 +637,7 @@ module asm ".syntax unified\0A.cpu cortex-m7\0A.thumb\0A.section .text.Reset_Han
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let target = actus::target::TargetSpec::parse("thumbv7em-none-eabihf")
         .expect("Cortex-M target should parse");
@@ -888,6 +893,7 @@ fn links_and_runs_a_host_object_through_the_shared_linker() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let llvm_object = root.join("module.o");
     let target = actus::target::TargetSpec::host().expect("host target should parse");
@@ -1001,7 +1007,8 @@ fn compares_llvm_and_cranelift_on_niche_option_none_fixture() {
         }],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![function] };
+    let module =
+        BackendModule { externals: Vec::new(), functions: vec![function], ..Default::default() };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
         .expect("niche parity fixture configuration should load");
@@ -1099,7 +1106,8 @@ fn compares_llvm_and_cranelift_on_niche_option_some_fixture() {
         }],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![function] };
+    let module =
+        BackendModule { externals: Vec::new(), functions: vec![function], ..Default::default() };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
         .expect("niche Some parity fixture configuration should load");
@@ -1274,7 +1282,11 @@ fn compares_llvm_and_cranelift_on_the_same_scalar_contract_fixture() {
         ],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![identity, entry, control] };
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![identity, entry, control],
+        ..Default::default()
+    };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
         .expect("parity fixture configuration should load");
@@ -1426,6 +1438,7 @@ fn compares_llvm_and_cranelift_on_runtime_cleanup_order_fixture() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
@@ -1550,8 +1563,11 @@ fn compares_llvm_and_cranelift_on_direct_register_aggregate_fixture() {
         }],
         cleanup: Vec::new(),
     };
-    let module =
-        BackendModule { externals: Vec::new(), functions: vec![aggregate_function, caller] };
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![aggregate_function, caller],
+        ..Default::default()
+    };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
         .expect("direct aggregate fixture configuration should load");
@@ -1701,7 +1717,11 @@ fn compares_llvm_and_cranelift_on_result_return_slot_call_fixture() {
         }],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![callee, caller] };
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![callee, caller],
+        ..Default::default()
+    };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
         .expect("Result call fixture configuration should load");
@@ -1839,6 +1859,7 @@ fn compares_llvm_and_cranelift_on_the_same_indirect_aggregate_copy_fixture() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)
@@ -1945,6 +1966,7 @@ fn compares_llvm_and_cranelift_on_the_same_return_slot_failure_fixture() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let configuration = CompilerConfiguration::from_manifest(&manifest)

@@ -240,6 +240,7 @@ pub struct BackendExternal {
 pub struct BackendModule {
     pub externals: Vec<BackendExternal>,
     pub functions: Vec<BackendFunction>,
+    pub runtime_checks: super::RuntimeCheckReporting,
 }
 
 impl BackendModule {

@@ -17,11 +17,13 @@ use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMTypeRef, LLVMValueRe
 
 use super::super::super::super::{BackendEmitError, BackendIntegerBinaryOp};
 
-/// The function and builder an overflow check emits into.
-pub(in crate::codegen::llvm) struct OverflowSite {
+/// The function and builder a runtime check emits into, and the message its
+/// failure reports, or `None` when it traps (ADR-0117).
+pub(in crate::codegen::llvm) struct OverflowSite<'a> {
     pub(in crate::codegen::llvm) context: LLVMContextRef,
     pub(in crate::codegen::llvm) function: LLVMValueRef,
     pub(in crate::codegen::llvm) builder: LLVMBuilderRef,
+    pub(in crate::codegen::llvm) failure: Option<&'a str>,
 }
 
 /// `left op right` for a trapping or saturating operation, or `None` for any
@@ -94,7 +96,12 @@ fn emit_trapping(
         return Err(BackendEmitError("LLVM failed to emit overflow-guard branch".to_owned()));
     }
     unsafe { LLVMPositionBuilderAtEnd(site.builder, trap_block) };
-    super::super::super::guards::emit_llvm_trap(site.context, site.function, site.builder)?;
+    super::super::super::guards::emit_check_failure(
+        site.context,
+        site.function,
+        site.builder,
+        site.failure,
+    )?;
     unsafe { LLVMPositionBuilderAtEnd(site.builder, ok_block) };
     Ok(value)
 }

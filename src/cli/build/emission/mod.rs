@@ -1,3 +1,4 @@
+mod checks;
 #[cfg(feature = "cranelift")]
 mod cranelift;
 mod linkage;

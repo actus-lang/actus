@@ -115,6 +115,7 @@ pub(super) fn lower_program(
     bindings: &BackendSymbolBindings,
     generic_instances: &[crate::semantic::GenericInstance],
     backend: &str,
+    check_locations: Option<&crate::SharedSourceMap>,
 ) -> Result<LinkedProgram, BackendEmitError> {
     let context =
         SharedLoweringContext { symbol, configuration, bindings, generic_instances, backend };
@@ -136,7 +137,12 @@ pub(super) fn lower_program(
     for module in &mut modules {
         retain_referenced_externals(module);
     }
-    super::linkage::link_program(modules, symbol)
+    let mut program = super::linkage::link_program(modules, symbol)?;
+    if let Some(source_map) = check_locations {
+        program.module.runtime_checks =
+            super::checks::runtime_check_reporting(&program.module, source_map);
+    }
+    Ok(program)
 }
 
 struct SharedLoweringContext<'a> {

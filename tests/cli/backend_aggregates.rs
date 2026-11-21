@@ -574,7 +574,7 @@ fn llvm_backend_builds_and_runs_a_shared_dynamic_fixed_array_index() {
 
 #[cfg(all(unix, feature = "cranelift"))]
 #[test]
-fn cranelift_backend_traps_on_a_shared_dynamic_fixed_array_index_out_of_bounds() {
+fn cranelift_backend_reports_a_shared_dynamic_fixed_array_index_out_of_bounds() {
     let root =
         std::env::temp_dir().join(format!("actus-cli-cranelift-array-oob-{}", std::process::id()));
     let input = root.with_extension("act");
@@ -599,16 +599,17 @@ fn cranelift_backend_traps_on_a_shared_dynamic_fixed_array_index_out_of_bounds()
         .status()
         .expect("build Cranelift array bounds fixture");
     assert!(status.success());
-    let status = Command::new(&output).status().expect("run Cranelift array bounds fixture");
-    assert!(!status.success());
-    assert!(status.code().is_none(), "array bounds failure should be a native trap");
+    let execution = Command::new(&output).output().expect("run Cranelift array bounds fixture");
+    assert_eq!(execution.status.code(), Some(101), "array bounds failure must be reported");
+    let stderr = String::from_utf8_lossy(&execution.stderr);
+    assert!(stderr.starts_with("error: index out of bounds at "), "reported {stderr:?}");
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
 }
 
 #[cfg(all(unix, feature = "llvm"))]
 #[test]
-fn llvm_backend_traps_on_a_shared_dynamic_fixed_array_index_out_of_bounds() {
+fn llvm_backend_reports_a_shared_dynamic_fixed_array_index_out_of_bounds() {
     let root =
         std::env::temp_dir().join(format!("actus-cli-llvm-array-oob-{}", std::process::id()));
     let input = root.with_extension("act");
@@ -633,9 +634,10 @@ fn llvm_backend_traps_on_a_shared_dynamic_fixed_array_index_out_of_bounds() {
         .status()
         .expect("build LLVM array bounds fixture");
     assert!(status.success());
-    let status = Command::new(&output).status().expect("run LLVM array bounds fixture");
-    assert!(!status.success());
-    assert!(status.code().is_none(), "array bounds failure should be a native trap");
+    let execution = Command::new(&output).output().expect("run LLVM array bounds fixture");
+    assert_eq!(execution.status.code(), Some(101), "array bounds failure must be reported");
+    let stderr = String::from_utf8_lossy(&execution.stderr);
+    assert!(stderr.starts_with("error: index out of bounds at "), "reported {stderr:?}");
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
 }

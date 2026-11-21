@@ -52,6 +52,7 @@ fn llvm_rejects_invalid_integer_width_with_stable_error() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let error = emit_module(&module).expect_err("invalid integer width must be rejected");
     assert_eq!(
@@ -93,6 +94,7 @@ fn llvm_zero_float_policy_rejects_generated_float_ir() {
             runtime_pointer_return: false,
         }],
         functions: Vec::new(),
+        ..Default::default()
     };
     let target = actus::target::TargetSpec::host().expect("host target should parse");
     let error = emit_object_bytes_with_configuration_and_float_policy(&module, &target, true, true)

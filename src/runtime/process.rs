@@ -73,3 +73,22 @@ pub unsafe extern "C" fn actus_process_arg(handle: BufferHandle, index: i32) -> 
         }
     }
 }
+
+/// Reports a failed runtime check, such as an integer overflow, and ends the
+/// process with exit status 101 (ADR-0117). Compiled code of a hosted program
+/// calls it with a message that names the check and its source location.
+///
+/// # Safety
+///
+/// `message` must be null or point to a valid null-terminated byte string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn actus_runtime_check_failed(message: *const u8) -> ! {
+    let message = if message.is_null() {
+        std::borrow::Cow::Borrowed("runtime check failed")
+    } else {
+        unsafe { std::ffi::CStr::from_ptr(message.cast()) }.to_string_lossy()
+    };
+    let _ = std::io::Write::flush(&mut super::console::stdout());
+    eprintln!("error: {message}");
+    std::process::exit(101)
+}
