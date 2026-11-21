@@ -353,7 +353,7 @@ belongs to 51.4; stack-limit reports remain under ADR-0103 S3.
 - [x] Publish checksums and a release manifest beside every archive. (Evidence:
       the assemble job in CI run [42709649621](https://github.com/actus-lang/actus/actions/runs/42709649621),
       which produced six assets and passed `sha256sum -c`. The first Actus
-      publication is the `v0.1.0-alpha.1` tag run; `llvm-23.1.2-actus-2` is a
+      publication is the `v0.1.0` tag run; `llvm-23.1.2-actus-2` is a
       contributor LLVM release, not an Actus release.)
 - [x] Document installation, rollback, explicit system override, and removal. (Evidence: `docs/guide/workflow/project-setup.md:36-70`, this PR.)
 

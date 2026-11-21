@@ -1,10 +1,9 @@
-# Versioned Changelogs
+# Release Notes
 
-Each tagged Actus release receives a generated changelog in this directory.
+Release notes for each tagged Actus release are published with the release on
+[GitHub Releases](https://github.com/actus-lang/actus/releases). The release
+workflow creates them from the pull requests merged since the previous tag, so
+they follow the Conventional Commit titles of those pull requests.
 
-The release workflow creates files such as `v0.1.0.md`, updates the root
-[`CHANGELOG.md`](../../CHANGELOG.md) index, and publishes the same content as
-the GitHub Release notes.
-
-Do not edit generated release files manually. Update the source history with a
-Conventional Commit and create a version tag when the release is ready.
+To change what a future release says, write a precise Conventional Commit
+title for the pull request; do not edit published notes by hand.

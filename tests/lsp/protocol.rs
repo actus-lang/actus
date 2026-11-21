@@ -36,7 +36,8 @@ fn lsp_hover_and_formatting_return_compiler_information() {
     assert!(stdout.contains("The value is inspected without ownership transfer."));
     assert!(stdout.contains("newText"));
     assert!(stdout.contains("verb add(abs value: Int) -> Int"));
-    assert!(stdout.contains("\"compilerVersion\":\"0.1.0\""), "stdout: {stdout}");
+    let compiler_version = format!("\"compilerVersion\":\"{}\"", env!("CARGO_PKG_VERSION"));
+    assert!(stdout.contains(&compiler_version), "stdout: {stdout}");
     assert!(stdout.contains("\"target\":"), "stdout: {stdout}");
     assert!(
         stdout.contains("\"document\":{\"uri\":\"file:///tmp/actus-lsp-hover.act\",\"version\":1}"),
