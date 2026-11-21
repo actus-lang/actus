@@ -1,72 +1,10 @@
 use std::collections::{BTreeMap, HashSet};
-use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::package_sources::{PackageRole, PackageSourceIdentity};
+pub use super::resolution_error::ModuleResolutionError;
 use crate::session::CompilationSession;
-
-#[derive(Debug)]
-pub enum ModuleResolutionError {
-    InvalidPath(String),
-    MissingFacade {
-        module: String,
-        expected: PathBuf,
-    },
-    /// A builtin module exists but is unavailable for the configured target.
-    IncompatibleRuntime {
-        module: String,
-        expected: PathBuf,
-    },
-    AmbiguousModule {
-        module: String,
-        directory: PathBuf,
-        file: PathBuf,
-    },
-    BypassesFacade {
-        module: String,
-        parent: String,
-        facade: PathBuf,
-    },
-    Io {
-        path: PathBuf,
-        message: String,
-    },
-}
-
-impl Display for ModuleResolutionError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidPath(path) => write!(formatter, "invalid module path `{path}`"),
-            Self::MissingFacade { module, expected } => write!(
-                formatter,
-                "module `{module}` is missing its canonical facade `{}`",
-                expected.display()
-            ),
-            Self::IncompatibleRuntime { module, expected } => write!(
-                formatter,
-                "builtin module `{module}` is incompatible with the configured target; facade `{}` is unavailable",
-                expected.display()
-            ),
-            Self::AmbiguousModule { module, directory, file } => write!(
-                formatter,
-                "module `{module}` has both directory `{}` and file `{}` roots",
-                directory.display(),
-                file.display()
-            ),
-            Self::BypassesFacade { module, parent, facade } => write!(
-                formatter,
-                "module `{module}` bypasses parent facade `{}` for `{parent}`",
-                facade.display()
-            ),
-            Self::Io { path, message } => {
-                write!(formatter, "cannot inspect module path `{}`: {message}", path.display())
-            }
-        }
-    }
-}
-
-impl std::error::Error for ModuleResolutionError {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolvedModule {
@@ -278,10 +216,9 @@ impl ModuleResolver {
         module_name: &str,
     ) -> Result<ResolvedModule, ModuleResolutionError> {
         let Some(root) = self.runtime_module_roots.get(module_name) else {
-            let root = self
-                .runtime_source_root
-                .as_ref()
-                .ok_or_else(|| ModuleResolutionError::InvalidPath(module_path.to_owned()))?;
+            let root = self.runtime_source_root.as_ref().ok_or_else(|| {
+                ModuleResolutionError::StandardLibraryUnavailable(module_path.to_owned())
+            })?;
             let expected = root.join(module_name).join(format!("{module_name}.act"));
             return if expected.is_file() {
                 Err(ModuleResolutionError::IncompatibleRuntime {

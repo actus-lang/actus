@@ -5,7 +5,7 @@ use std::process::Command;
 use crate::configuration::RuntimeProfile;
 
 const MANIFEST: &str = "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\ntarget = \"host\"\nprofile = \"debug\"{runtime}\n";
-const MAIN_SOURCE: &str = "verb main() -> Int { return 0; }\n";
+const MAIN_SOURCE: &str = "verb main() {\n    print(string: \"Hello, world!\");\n}\n";
 const GITIGNORE: &str = "/capsula/\nActus.lock\n*.o\n*.bin\n*.actus\n";
 
 struct ProjectOptions {
@@ -79,7 +79,8 @@ fn parse_options(
     create_path: bool,
 ) -> Result<ProjectOptions, String> {
     let mut vcs = true;
-    let mut runtime = RuntimeProfile::Core;
+    // New projects use the hosted standard library; `--runtime core` opts out.
+    let mut runtime = RuntimeProfile::Std;
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--no-git" => vcs = false,

@@ -80,7 +80,8 @@ fn visibility_code(error: &ModuleError) -> &'static str {
 
 fn resolution_diagnostic(error: &ModuleResolutionError) -> Diagnostic {
     let (code, path) = match error {
-        ModuleResolutionError::InvalidPath(_) => ("E1100", None),
+        ModuleResolutionError::InvalidPath(_)
+        | ModuleResolutionError::StandardLibraryUnavailable(_) => ("E1100", None),
         ModuleResolutionError::MissingFacade { expected, .. } => {
             ("E1101", Some(expected.display().to_string()))
         }
