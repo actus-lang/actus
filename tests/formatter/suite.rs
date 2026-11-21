@@ -23,6 +23,15 @@ fn formats_wrapping_and_saturating_operators_idempotently() {
 }
 
 #[test]
+fn keeps_a_block_value_without_a_semicolon() {
+    let source = "verb pick(erg t: Int) -> Int { erg warm: Bool = if t > 15 { true } else { false }; if warm { report(t); } return 0; }";
+    let expected = "verb pick(erg t: Int) -> Int {\n    erg warm: Bool = if t > 15 {\n        true\n    } else {\n        false\n    };\n    if warm {\n        report(t);\n    }\n    return 0;\n}\n";
+
+    assert_eq!(format_source(source), expected);
+    assert_eq!(format_source(expected), expected);
+}
+
+#[test]
 fn formats_nested_blocks_and_calls() {
     let source =
         "verb process(){erg buffer=Buffer[10];{abs view=ref buffer;inspect(view,source:view);}}";

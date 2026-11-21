@@ -46,9 +46,9 @@ verb validate_frame(abs encoded: Buffer) -> Int {
     return case dat decoded_result {
         Result.Err(_) => 1,
         Result.Ok(value) => if value.sequence_num == 42u32 && decoded_payload[0] == 65u8 {
-            0;
+            0
         } else {
-            2;
+            2
         },
     };
 }

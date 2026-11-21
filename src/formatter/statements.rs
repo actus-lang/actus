@@ -15,7 +15,11 @@ impl Formatter<'_> {
         for (index, statement) in block.statements.iter().enumerate() {
             self.emit_comments_before(statement_span(statement).start);
             self.line_indent();
-            self.statement(statement);
+            match block_value(statement) {
+                // The block's value, written without a `;` as in the source.
+                Some(value) if index + 1 == block.statements.len() => self.expression(value),
+                _ => self.statement(statement),
+            }
             let next = block.statements.get(index + 1);
             self.emit_trailing_comments(
                 next.map_or(block.span.end, |next| statement_span(next).start),
@@ -199,5 +203,18 @@ fn compound_operator_text(operator: CompoundAssignmentOp) -> &'static str {
         CompoundAssignmentOp::BitwiseXor => " ^= ",
         CompoundAssignmentOp::ShiftLeft => " <<= ",
         CompoundAssignmentOp::ShiftRight => " >>= ",
+    }
+}
+
+/// The expression of `statement` when it has no closing `;`; as a block's
+/// last statement it is the block's value.
+fn block_value(statement: &Stmt) -> Option<&crate::ast::Expr> {
+    match statement {
+        Stmt::Expression { expression, span }
+            if span.end == crate::parser::expression_span(expression).end =>
+        {
+            Some(expression)
+        }
+        _ => None,
     }
 }

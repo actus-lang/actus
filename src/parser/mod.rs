@@ -17,5 +17,6 @@ mod statements;
 mod structs;
 
 pub use grammar::parse;
+pub(crate) use spans::expression_span;
 use state::identifier_text;
 pub use state::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
