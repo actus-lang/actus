@@ -1,6 +1,6 @@
 use crate::ast::TopLevelDecl;
-use crate::formatter::{SourceComment, format_program_with_comments};
-use crate::lexer::{Token, TokenKind, scan};
+use crate::formatter::{format_program_with_comments, source_comments};
+use crate::lexer::scan;
 use crate::parser::parse;
 
 use super::position::{LineIndex, LspRange};
@@ -17,17 +17,6 @@ pub fn format_document(source: &str) -> Option<(LspRange, String)> {
         end: LineIndex::new(source).position(source, source.len()),
     };
     Some((range, format_program_with_comments(&program, &comments)))
-}
-
-fn source_comments(source: &str, tokens: &[Token]) -> Vec<SourceComment> {
-    tokens
-        .iter()
-        .filter(|token| matches!(token.kind, TokenKind::DocString(_)))
-        .map(|token| SourceComment {
-            span: token.span,
-            text: source[token.span.start..token.span.end].to_owned(),
-        })
-        .collect()
 }
 
 pub fn format_range(source: &str, requested: &LspRange) -> Option<(LspRange, String)> {

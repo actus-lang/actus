@@ -1,4 +1,4 @@
-use actus::formatter::{SourceComment, format_program, format_program_with_comments};
+use actus::formatter::{format_program, format_program_with_comments, source_comments};
 use actus::lexer::scan;
 use actus::parser::parse;
 
@@ -512,14 +512,7 @@ fn preserves_docstrings_and_module_declarations() {
     let source = "\"\"\"Keep this module documentation.\"\"\"\nimport io;\nopen stdout;\n\"\"\"Keep this verb documentation.\"\"\"\nverb main() -> Int { return 0; }\n";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let comments = tokens
-        .iter()
-        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
-        .map(|token| SourceComment {
-            span: token.span,
-            text: source[token.span.start..token.span.end].to_owned(),
-        })
-        .collect::<Vec<_>>();
+    let comments = source_comments(source, &tokens);
     let program = parse(tokens).expect("source should parse");
     let formatted = format_program_with_comments(&program, &comments);
 
@@ -534,14 +527,7 @@ fn preserves_docstrings_before_declarations() {
     let source = "\"\"\"Keeps this public documentation.\"\"\"\nopen struct Reader { erg buffer: Buffer, }\n";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let comments = tokens
-        .iter()
-        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
-        .map(|token| SourceComment {
-            span: token.span,
-            text: source[token.span.start..token.span.end].to_owned(),
-        })
-        .collect::<Vec<_>>();
+    let comments = source_comments(source, &tokens);
     let program = parse(tokens).expect("source should parse");
     let formatted = format_program_with_comments(&program, &comments);
 
@@ -554,14 +540,7 @@ fn does_not_duplicate_open_sibling_docstrings() {
     let source = "\"\"\"Re-export the time implementation.\"\"\"\nopen timer;\n";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let comments = tokens
-        .iter()
-        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
-        .map(|token| SourceComment {
-            span: token.span,
-            text: source[token.span.start..token.span.end].to_owned(),
-        })
-        .collect::<Vec<_>>();
+    let comments = source_comments(source, &tokens);
     let program = parse(tokens).expect("source should parse");
     let formatted = format_program_with_comments(&program, &comments);
 
@@ -578,14 +557,7 @@ fn collapses_adjacent_identical_docstrings() {
     );
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
-    let comments = tokens
-        .iter()
-        .filter(|token| matches!(token.kind, actus::lexer::TokenKind::DocString(_)))
-        .map(|token| SourceComment {
-            span: token.span,
-            text: source[token.span.start..token.span.end].to_owned(),
-        })
-        .collect::<Vec<_>>();
+    let comments = source_comments(source, &tokens);
     let program = parse(tokens).expect("source should parse");
     let formatted = format_program_with_comments(&program, &comments);
 
@@ -669,4 +641,103 @@ fn wraps_calls_past_the_target_line_width() {
     let formatted = format_source(source);
     assert_eq!(formatted, expected);
     assert_eq!(format_source(&formatted), formatted);
+}
+
+fn format_with_comments(source: &str) -> String {
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let comments = source_comments(source, &tokens);
+    let program = parse(tokens).expect("source should parse");
+    format_program_with_comments(&program, &comments)
+}
+
+/// `#` comments on their own line and after code survive formatting in
+/// place, inside nested blocks and at the end of a block, and a repeated
+/// comment line is not collapsed.
+#[test]
+fn keeps_line_comments_in_verb_bodies() {
+    let source = concat!(
+        "# File comment.\n",
+        "verb main() -> Int {\n",
+        "    # Leading comment.\n",
+        "    erg peak: u8 = 200u8 +| 100u8; # saturates at 255\n",
+        "    #\n",
+        "    #\n",
+        "    if peak == 255u8 {\n",
+        "        # Nested comment.\n",
+        "        return 1; # nested trailing\n",
+        "    }\n",
+        "    # End of block.\n",
+        "    return 0;\n",
+        "}\n",
+        "# Last comment.\n",
+    );
+
+    let formatted = format_with_comments(source);
+
+    assert_eq!(formatted, source);
+}
+
+/// A trailing comment stays on the line of its field, variant or role
+/// method, including the last one before the closing brace.
+#[test]
+fn keeps_trailing_comments_on_fields_variants_and_methods() {
+    let source = concat!(
+        "struct Point {\n",
+        "    erg x: Int, # horizontal\n",
+        "    erg y: Int, # vertical\n",
+        "}\n",
+        "\n",
+        "enum Mode {\n",
+        "    Off, # off\n",
+        "    On, # on\n",
+        "}\n",
+        "\n",
+        "role Reader {\n",
+        "    verb read(abs reader: Self) -> Int; # bytes read\n",
+        "}\n",
+    );
+
+    let formatted = format_with_comments(source);
+
+    assert_eq!(formatted, source);
+}
+
+/// Unformatted code keeps every comment, and formatting the result again
+/// changes nothing.
+#[test]
+fn keeps_comments_when_reformatting() {
+    let source = concat!(
+        "verb main() -> Int {\n",
+        "  # misindented\n",
+        "    erg total: Int = 1 +  2;   # spaced trailing\n",
+        "    return total;\n",
+        "}\n",
+    );
+    let expected = concat!(
+        "verb main() -> Int {\n",
+        "    # misindented\n",
+        "    erg total: Int = 1 + 2; # spaced trailing\n",
+        "    return total;\n",
+        "}\n",
+    );
+
+    let formatted = format_with_comments(source);
+
+    assert_eq!(formatted, expected);
+    assert_eq!(format_with_comments(&formatted), formatted);
+}
+
+/// A `#` inside a string literal is text, not a comment.
+#[test]
+fn does_not_read_comments_inside_string_literals() {
+    let source = "verb main() -> Int {\n    print(\"a # b\"); # real\n    return 0;\n}\n";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+
+    let comments = source_comments(source, &tokens);
+
+    assert_eq!(comments.len(), 1);
+    assert_eq!(comments[0].text, "# real");
+    assert!(comments[0].trailing);
 }

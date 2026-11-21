@@ -11,6 +11,10 @@ normalize indentation and spacing, but it must preserve:
 - imports and module facade declarations;
 - declaration order and semantic boundaries;
 - comments/docstrings attached to the declaration they describe;
+- every `#` comment: a comment on its own line stays on its own line before
+  the statement, field or declaration that follows it; a comment after code
+  stays at the end of that line, or of the statement, field, variant or
+  method the line belongs to;
 - all tokens required for a reparsable program.
 
 Formatting must be idempotent: formatting an already formatted file produces

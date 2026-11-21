@@ -1,14 +1,10 @@
 use crate::ast::{Program, Role, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
+use super::SourceComment;
+
 pub fn format_program(program: &Program) -> String {
     format_program_with_comments(program, &[])
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SourceComment {
-    pub span: SourceSpan,
-    pub text: String,
 }
 
 pub fn format_program_with_comments(program: &Program, comments: &[SourceComment]) -> String {
@@ -92,6 +88,10 @@ impl Formatter<'_> {
                 self.top_level(declaration);
                 index += 1;
             }
+            let next = program.declarations.get(index);
+            self.emit_trailing_comments(
+                next.map_or(usize::MAX, |next| declaration_span(next).start),
+            );
         }
     }
 
@@ -209,7 +209,9 @@ impl Formatter<'_> {
         {
             let text = self.comments[self.next_comment].text.clone();
             self.next_comment += 1;
-            if previous_text.as_deref() == Some(text.as_str()) {
+            // Adjacent identical documentation strings collapse into one;
+            // `#` comments are kept as written.
+            if text.starts_with("\"\"\"") && previous_text.as_deref() == Some(text.as_str()) {
                 continue;
             }
             previous_text = Some(text.clone());
@@ -219,6 +221,19 @@ impl Formatter<'_> {
             self.line_indent();
             self.output.push_str(text.trim_end_matches('\r'));
             self.output.push('\n');
+        }
+    }
+
+    /// Keeps `#` comments that followed code on its line at the end of the
+    /// line just written, up to the next item at `limit`.
+    pub(super) fn emit_trailing_comments(&mut self, limit: usize) {
+        while let Some(comment) = self.comments.get(self.next_comment) {
+            if !comment.trailing || comment.span.start >= limit {
+                return;
+            }
+            self.output.push(' ');
+            self.output.push_str(&comment.text);
+            self.next_comment += 1;
         }
     }
 
@@ -235,7 +250,9 @@ impl Formatter<'_> {
         while self.next_comment < self.comments.len() {
             let text = self.comments[self.next_comment].text.clone();
             self.next_comment += 1;
-            if previous_text.as_deref() == Some(text.as_str()) {
+            // Adjacent identical documentation strings collapse into one;
+            // `#` comments are kept as written.
+            if text.starts_with("\"\"\"") && previous_text.as_deref() == Some(text.as_str()) {
                 continue;
             }
             previous_text = Some(text.clone());

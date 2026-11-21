@@ -1,3 +1,4 @@
+mod comments;
 mod declarations;
 mod expressions;
 mod imports;
@@ -6,4 +7,5 @@ mod statements;
 
 use program::{Formatter, LINE_WIDTH, meta_name, role_name};
 
-pub use program::{SourceComment, format_program, format_program_with_comments};
+pub use comments::{SourceComment, source_comments};
+pub use program::{format_program, format_program_with_comments};
