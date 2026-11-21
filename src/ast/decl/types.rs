@@ -109,6 +109,21 @@ impl fmt::Debug for TypeName {
     }
 }
 
+/// The type as written in source: `Result[Int, IoError]`.
+impl fmt::Display for TypeName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.name)?;
+        if let Some((first, rest)) = self.arguments.split_first() {
+            write!(formatter, "[{first}")?;
+            for argument in rest {
+                write!(formatter, ", {argument}")?;
+            }
+            formatter.write_str("]")?;
+        }
+        Ok(())
+    }
+}
+
 impl TypeName {
     pub fn unresolved(
         name: impl Into<String>,

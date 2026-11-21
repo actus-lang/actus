@@ -279,7 +279,32 @@ fn validate_entry(
     if matches!(emit, EmitKind::Executable) && !verb.params.is_empty() {
         return Err(format!("executable entry verb `{symbol}` cannot have parameters"));
     }
+    // The hosted entry returns the process exit status; an aggregate return
+    // would be lowered through a return slot the host never passes.
+    if matches!(emit, EmitKind::Executable)
+        && matches!(contract, EntryContract::Hosted)
+        && let Some(return_type) = &verb.return_type
+        && !is_exit_status_type(&return_type.ty)
+    {
+        return Err(format!(
+            "hosted entry verb `{symbol}` must return nothing or an integer exit status, \
+             found `{}`; return an `Int` and handle errors inside `{symbol}`",
+            return_type.ty
+        ));
+    }
     Ok(())
+}
+
+/// `Void`, `Int` or a fixed-width integer of at most 64 bits: the types the
+/// host receives directly as the process exit status.
+fn is_exit_status_type(type_name: &crate::ast::TypeName) -> bool {
+    type_name.arguments.is_empty()
+        && (type_name.name == "Int"
+            || matches!(
+                crate::ast::primitive_type(&type_name.name),
+                Some(crate::ast::PrimitiveType::Void)
+                    | Some(crate::ast::PrimitiveType::Integer { width: 1..=64, .. })
+            ))
 }
 
 fn hosted_entry_symbol<'a>(

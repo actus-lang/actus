@@ -67,6 +67,34 @@ fn build_command_returns_zero_for_a_void_hosted_entry() {
     let _ = fs::remove_file(output);
 }
 
+#[test]
+fn build_command_rejects_a_hosted_entry_without_an_integer_exit_status() {
+    let root = std::env::temp_dir().join(format!("actus-cli-entry-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create test directory");
+    for (return_type, body) in [("Result[Int, Int]", "return Ok(0);"), ("Bool", "return true;")] {
+        let input = root.join("main.act");
+        fs::write(&input, format!("verb main() -> {return_type} {{ {body} }}\n"))
+            .expect("write source");
+
+        let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args(["build", input.to_str().expect("utf-8 path"), "--emit", "exe", "-o"])
+            .arg(root.join("main.bin"))
+            .output()
+            .expect("run actus build");
+
+        assert_eq!(output.status.code(), Some(1), "`-> {return_type}` must not build");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(&format!(
+                "hosted entry verb `main` must return nothing or an integer exit status, found `{return_type}`"
+            )),
+            "unexpected diagnostic for `-> {return_type}`: {stderr}"
+        );
+        assert!(!root.join("main.bin").exists(), "`-> {return_type}` left an executable");
+    }
+    let _ = fs::remove_dir_all(root);
+}
+
 #[cfg(unix)]
 #[test]
 fn build_command_links_an_executable() {
