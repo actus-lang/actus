@@ -126,3 +126,25 @@ fn a_typed_for_range_gives_plain_literal_bounds_its_type() {
         6,
     );
 }
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn an_else_if_value_chain_selects_the_first_matching_arm() {
+    for (value, expected) in [(12, 4), (8, 3), (4, 2), (1, 1)] {
+        assert_exits_with(
+            &format!(
+                "verb main() -> Int {{ erg v = {value}; erg size = if v > 10 {{ 4 }} else if v > 7 {{ 3 }} else if v > 3 {{ 2 }} else {{ 1 }}; return size; }}"
+            ),
+            expected,
+        );
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn an_else_if_value_chain_runs_only_the_selected_arm() {
+    assert_exits_with(
+        "verb main() -> Int { erg y = 1; erg r = if y == 0 { 0 } else if y == 1 { 7 } else { 10 / (y - 1) }; return r; }",
+        7,
+    );
+}

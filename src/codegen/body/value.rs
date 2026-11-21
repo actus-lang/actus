@@ -16,26 +16,10 @@ struct IfOwnerInput<'a> {
     fallthrough: Option<BackendBlockId>,
     merge_id: BackendBlockId,
     instructions: Vec<BackendInstruction>,
-    then_block: BackendBlock,
-    then_value: BackendValueId,
-    else_block: BackendBlock,
-    else_value: BackendValueId,
-}
-
-struct IfOwnerReturnInput<'a> {
-    id: BackendBlockId,
-    block: &'a Block,
-    index: usize,
-    name: &'a str,
-    declared_type: Option<&'a str>,
-    span: SourceSpan,
-    fallthrough: Option<BackendBlockId>,
-    merge_id: BackendBlockId,
-    instructions: Vec<BackendInstruction>,
-    then_block: BackendBlock,
-    then_value: BackendValueId,
-    else_id: BackendBlockId,
-    else_branch: &'a Block,
+    /// Each branch block with the value it produces, in source order.
+    arms: Vec<(BackendBlock, BackendValueId)>,
+    /// The condition blocks of `else if` arms, which produce no value.
+    tests: Vec<BackendBlock>,
 }
 
 impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
@@ -60,28 +44,11 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let else_id = self.allocate_block();
         append_if_owner_branch(&mut instructions, condition, then_id, else_id, *span);
         let (then_block, then_value) = self.lower_if_value_branch(then_id, then_branch, *span)?;
-        let Some(IfBranch::Block(else_branch)) = else_branch else {
-            return Err(unsupported(*span, "value-producing if requires a block else branch"));
-        };
-        if matches!(else_branch.statements.last(), Some(Stmt::Return { .. })) {
-            return self.finish_if_owner_return(IfOwnerReturnInput {
-                id,
-                block,
-                index,
-                name,
-                declared_type: ty.as_deref(),
-                span: *span,
-                fallthrough,
-                merge_id,
-                instructions,
-                then_block,
-                then_value,
-                else_id,
-                else_branch,
-            });
-        }
-        let (else_block, else_value) = self.lower_if_value_branch(else_id, else_branch, *span)?;
-        self.finish_if_owner(IfOwnerInput {
+        let mut arms = vec![(then_block, then_value)];
+        let mut tests = Vec::new();
+        let returning_else =
+            self.lower_owner_else(else_id, else_branch.as_ref(), *span, &mut arms, &mut tests)?;
+        let input = IfOwnerInput {
             id,
             block,
             index,
@@ -91,18 +58,52 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             fallthrough,
             merge_id,
             instructions,
-            then_block,
-            then_value,
-            else_block,
-            else_value,
-        })
+            arms,
+            tests,
+        };
+        match returning_else {
+            Some(branch) => self.finish_if_owner_return(input, else_id, branch),
+            None => self.finish_if_owner(input),
+        }
     }
 
+    /// Lowers the `else` of an owner `if` into `arms` and `tests`, or returns
+    /// the `else` block when it ends with `return` and so produces no value.
+    fn lower_owner_else<'a>(
+        &mut self,
+        else_id: BackendBlockId,
+        else_branch: Option<&'a IfBranch>,
+        span: SourceSpan,
+        arms: &mut Vec<(BackendBlock, BackendValueId)>,
+        tests: &mut Vec<BackendBlock>,
+    ) -> Result<Option<&'a Block>, BackendContractError> {
+        match else_branch {
+            Some(IfBranch::Block(branch))
+                if matches!(branch.statements.last(), Some(Stmt::Return { .. })) =>
+            {
+                Ok(Some(branch))
+            }
+            Some(IfBranch::Block(branch)) => {
+                arms.push(self.lower_if_value_branch(else_id, branch, span)?);
+                Ok(None)
+            }
+            Some(IfBranch::ElseIf(nested)) => {
+                self.lower_else_if_arms(else_id, nested, arms, tests)?;
+                Ok(None)
+            }
+            None => Err(unsupported(span, "value-producing if requires an else branch")),
+        }
+    }
+
+    /// Finishes an owner `if` whose only value arm is `then`; its `else`
+    /// branch, `else_branch` at block `else_id`, returns from the verb.
     fn finish_if_owner_return(
         &mut self,
-        input: IfOwnerReturnInput<'_>,
+        input: IfOwnerInput<'_>,
+        else_id: BackendBlockId,
+        else_branch: &Block,
     ) -> Result<BackendBlock, BackendContractError> {
-        let IfOwnerReturnInput {
+        let IfOwnerInput {
             id,
             block,
             index,
@@ -112,11 +113,12 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             fallthrough,
             merge_id,
             instructions,
-            mut then_block,
-            then_value,
-            else_id,
-            else_branch,
+            arms,
+            ..
         } = input;
+        let Some((mut then_block, then_value)) = arms.into_iter().next() else {
+            return Err(unsupported(span, "if owner has no value arm"));
+        };
         let else_block = self.return_branch(else_id, else_branch, span)?;
         let result_type = self
             .provider
@@ -154,20 +156,19 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             fallthrough,
             merge_id,
             instructions,
-            mut then_block,
-            then_value,
-            mut else_block,
-            else_value,
+            arms,
+            tests,
         } = input;
+        let first_value = arms[0].1;
         let result_type = self
             .provider
-            .value_type(then_value)
+            .value_type(first_value)
             .ok_or_else(|| unsupported(span, "if branch result type is unavailable"))?;
-        if self.provider.value_type(else_value) != Some(result_type) {
+        if arms.iter().any(|(_, value)| self.provider.value_type(*value) != Some(result_type)) {
             return Err(unsupported(span, "if branches have different value types"));
         }
         let result = self.provider.allocate_value(result_type);
-        self.provider.copy_value_metadata(then_value, result);
+        self.provider.copy_value_metadata(first_value, result);
         let mut merge_instructions = Vec::new();
         self.provider.bind_owner(name, result, declared_type, span, &mut merge_instructions)?;
         let continuation =
@@ -177,12 +178,43 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         continuation_block.parameters =
             vec![BackendBlockParameter { value: result, ty: result_type, span }];
         continuation_block.instructions.splice(0..0, merge_instructions);
-        append_if_owner_jump(&mut then_block, merge_id, then_value, result_type, span);
-        append_if_owner_jump(&mut else_block, merge_id, else_value, result_type, span);
         self.blocks.push(continuation_block);
-        self.blocks.push(then_block);
-        self.blocks.push(else_block);
+        self.blocks.extend(tests);
+        for (mut arm, value) in arms {
+            append_if_owner_jump(&mut arm, merge_id, value, result_type, span);
+            self.blocks.push(arm);
+        }
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
+    }
+
+    /// Lowers the `else if` chain `nested` starting at block `test_id`: each
+    /// condition gets a test block that branches to its arm or to the next
+    /// test, so only the selected arm runs.
+    fn lower_else_if_arms(
+        &mut self,
+        test_id: BackendBlockId,
+        nested: &Expr,
+        arms: &mut Vec<(BackendBlock, BackendValueId)>,
+        tests: &mut Vec<BackendBlock>,
+    ) -> Result<(), BackendContractError> {
+        let Expr::If { condition, then_branch, else_branch, span } = nested else {
+            return Err(unsupported(crate::parser::expression_span(nested), "`else if` expected"));
+        };
+        let mut instructions = Vec::new();
+        let condition = self.provider.lower_expression(condition, &mut instructions)?;
+        let then_id = self.allocate_block();
+        let next_id = self.allocate_block();
+        append_if_owner_branch(&mut instructions, condition, then_id, next_id, *span);
+        tests.push(BackendBlock { parameters: Vec::new(), id: test_id, instructions });
+        arms.push(self.lower_if_value_branch(then_id, then_branch, *span)?);
+        match else_branch {
+            Some(IfBranch::Block(block)) => {
+                arms.push(self.lower_if_value_branch(next_id, block, *span)?);
+                Ok(())
+            }
+            Some(IfBranch::ElseIf(next)) => self.lower_else_if_arms(next_id, next, arms, tests),
+            None => Err(unsupported(*span, "value-producing if requires an else branch")),
+        }
     }
 
     fn lower_if_value_branch(
