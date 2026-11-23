@@ -99,6 +99,7 @@ fn built_in_print_of_a_string_prints_a_line() {
     let _ = fs::remove_file(output);
 }
 
+#[cfg(unix)]
 #[test]
 fn build_command_rejects_a_hosted_entry_without_an_integer_exit_status() {
     let root = std::env::temp_dir().join(format!("actus-cli-entry-{}", std::process::id()));
@@ -127,6 +128,7 @@ fn build_command_rejects_a_hosted_entry_without_an_integer_exit_status() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(unix)]
 #[test]
 fn check_command_names_the_fix_for_a_verb_value_without_return() {
     let root = std::env::temp_dir().join(format!("actus-cli-no-return-{}", std::process::id()));
