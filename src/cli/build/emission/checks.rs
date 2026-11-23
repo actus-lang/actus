@@ -31,6 +31,8 @@ pub(super) fn runtime_check_reporting(
             .as_deref()
             .and_then(|directory| path.strip_prefix(directory).ok())
             .unwrap_or(&path);
+        // Discovered test files are named `./tests/x.act`; drop the `./`.
+        let path = path.strip_prefix(".").unwrap_or(path);
         locations.insert(key, format!("{}:{line}:{column}", path.display()));
     }
     RuntimeCheckReporting::Report { locations }

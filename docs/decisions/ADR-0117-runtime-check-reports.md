@@ -54,8 +54,10 @@ by a trap that is never reached.
 The backend contract carries the choice in `BackendModule::runtime_checks`:
 `Trap` keeps the trap instruction and is the default; `Report` holds the
 location of each checking instruction, keyed by its span. The compiler
-driver fills it from the source map for hosted executables only. Objects
-(`--emit obj`), freestanding builds and test executables keep the trap.
+driver fills it from the source map for hosted executables and for the test
+executables that `actus test` builds in a hosted project. Objects
+(`--emit obj`) and freestanding builds, including freestanding tests, keep
+the trap.
 
 ## Consequences
 
@@ -64,4 +66,5 @@ driver fills it from the source map for hosted executables only. Objects
 - Each check site in a hosted executable adds one constant string and one
   cold call; code that passes its checks runs the same comparisons as before.
 - Freestanding code and objects are unchanged.
-- `actus test` executables still trap; reporting there is a later step.
+- A failing runtime check in a test of a hosted project fails that test with
+  exit code 101 and the message on its stderr, instead of a signal.
