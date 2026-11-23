@@ -4,12 +4,16 @@
 //! needs. With one it calls the runtime's check-failure report, which prints
 //! the message and ends the process.
 
+use std::collections::BTreeMap;
+
+use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::{AbiParam, InstBuilder, TrapCode, Value};
 use cranelift_frontend::FunctionBuilder;
 use cranelift_module::{DataDescription, Linkage, Module};
 use cranelift_object::ObjectModule;
 
 use super::native::BackendEmitError;
+use crate::codegen::{BackendInstruction, BackendValueId};
 
 /// Ends the current block at a failed check: reports `failure` when it
 /// holds a message, otherwise traps with `code`.
@@ -63,6 +67,35 @@ pub(super) fn check_failed_if(
     builder.switch_to_block(failure_block);
     emit_check_failure(module, builder, code, failure)?;
     builder.seal_block(failure_block);
+    builder.switch_to_block(ok_block);
+    builder.seal_block(ok_block);
+    Ok(())
+}
+
+/// Fails the check of a `TrapIfBufferIndexOutOfBounds` instruction when its
+/// runtime status value is negative.
+pub(super) fn lower_trap_if_buffer_index_out_of_bounds(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::TrapIfBufferIndexOutOfBounds { status, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift Buffer-index guard expected".to_owned()));
+    };
+    let status = values.get(status).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift Buffer-index status {} is unavailable", status.0))
+    })?;
+    let status_type = builder.func.dfg.value_type(status);
+    let zero = builder.ins().iconst(status_type, 0);
+    let valid = builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, status, zero);
+    let ok_block = builder.create_block();
+    let trap_block = builder.create_block();
+    builder.ins().brif(valid, ok_block, &[], trap_block, &[]);
+    builder.switch_to_block(trap_block);
+    emit_check_failure(module, builder, TrapCode::INTEGER_OVERFLOW, failure)?;
+    builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.seal_block(ok_block);
     Ok(())

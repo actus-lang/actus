@@ -229,6 +229,43 @@ pub(super) fn emit_trap_if_array_index_out_of_bounds(
     Ok(false)
 }
 
+pub(super) fn emit_trap_if_buffer_index_out_of_bounds(
+    context: llvm_sys::prelude::LLVMContextRef,
+    builder: LLVMBuilderRef,
+    function: LLVMValueRef,
+    instruction: &BackendInstruction,
+    values: &BTreeMap<BackendValueId, LLVMValueRef>,
+    failure: Option<&str>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::TrapIfBufferIndexOutOfBounds { status, span, .. } = instruction else {
+        return Err(BackendEmitError("LLVM Buffer-index guard expected".to_owned()));
+    };
+    let status = guard_value(values, *status, "Buffer-index status")?;
+    let zero = unsafe { LLVMConstInt(LLVMTypeOf(status), 0, 0) };
+    let condition = unsafe {
+        LLVMBuildICmp(
+            builder,
+            LLVMIntPredicate::LLVMIntSGE,
+            status,
+            zero,
+            c"actus.buffer.index.valid".as_ptr(),
+        )
+    };
+    if condition.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit Buffer-index guard".to_owned()));
+    }
+    let (ok_block, trap_block) = append_guard_blocks(context, function, "buffer.index", *span)?;
+    if unsafe { LLVMBuildCondBr(builder, condition, ok_block, trap_block) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit Buffer-index guard branch".to_owned()));
+    }
+    unsafe {
+        LLVMPositionBuilderAtEnd(builder, trap_block);
+        emit_check_failure(context, function, builder, failure)?;
+        LLVMPositionBuilderAtEnd(builder, ok_block);
+    }
+    Ok(false)
+}
+
 pub(super) fn emit_trap_if_signed_division_overflow(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,

@@ -40,7 +40,7 @@ The checks report these messages:
 | `/` or `%` by zero | `division by zero` |
 | shift count not below the bit width | `shift count out of range` |
 | conversion, explicit (`as`) or implicit, to a type that cannot hold the value | `integer value out of range` |
-| fixed-array index outside the capacity | `index out of bounds` |
+| fixed-array or Buffer index outside its bounds | `index out of bounds` |
 | arena placement past the capacity | `arena capacity exceeded` |
 
 The program first writes out any stdout output it still holds, then prints

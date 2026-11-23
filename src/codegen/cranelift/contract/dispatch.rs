@@ -43,6 +43,7 @@ pub(super) fn lower_instruction(
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. }
+        | BackendInstruction::TrapIfBufferIndexOutOfBounds { .. }
         | BackendInstruction::IntegerCompare { .. }
         | BackendInstruction::ScalarSelect { .. }
         | BackendInstruction::FloatCompare { .. }
@@ -178,7 +179,8 @@ fn lower_scalar(
         BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
-        | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
+        | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. }
+        | BackendInstruction::TrapIfBufferIndexOutOfBounds { .. } => {
             super::scalar::lower_guard(builder, instruction, values, module, failure)
         }
         BackendInstruction::IntegerCompare { .. } => {

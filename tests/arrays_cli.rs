@@ -971,7 +971,7 @@ fn reports_a_buffer_index_past_the_end() {
     assert_check_failure(
         "buffer-index-bounds",
         "verb main() -> Int { erg bytes: Buffer = Buffer[0]; append(bytes, 42); return bytes[1]; }",
-        "integer value out of range",
+        "index out of bounds",
         79,
     );
 }

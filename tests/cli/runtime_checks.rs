@@ -81,6 +81,53 @@ fn failed_index_check_reports_its_location() {
 }
 
 #[test]
+fn failed_buffer_read_check_reports_its_location() {
+    assert_check_fails(
+        "buffer-read",
+        "verb main() -> Int {\n    erg bytes = Buffer[0];\n    append(bytes, 7);\n    erg index: Usize = 1;\n    return bytes[index] as Int;\n}\n",
+        "",
+        "index out of bounds at main.act:5:12",
+    );
+}
+
+#[test]
+fn failed_buffer_write_check_reports_its_location() {
+    assert_check_fails(
+        "buffer-write",
+        "verb main() -> Int {\n    erg bytes = Buffer[0];\n    append(bytes, 7);\n    erg index: Usize = 3;\n    bytes[index] = 9u8;\n    return 5;\n}\n",
+        "",
+        "index out of bounds at main.act:5:5",
+    );
+}
+
+#[test]
+fn failed_buffer_compound_assignment_check_reports_its_location() {
+    assert_check_fails(
+        "buffer-compound",
+        "verb main() -> Int {\n    erg bytes = Buffer[0];\n    append(bytes, 7);\n    erg index: Usize = 3;\n    bytes[index] += 1u8;\n    return 5;\n}\n",
+        "",
+        "index out of bounds at main.act:5:5",
+    );
+}
+
+#[test]
+fn in_bounds_buffer_accesses_pass_their_checks() {
+    for backend in backends() {
+        let root = build(
+            "buffer-in-bounds",
+            "verb main() -> Int {\n    erg bytes = Buffer[0];\n    append(bytes, 7);\n    erg index: Usize = 0;\n    bytes[index] = 9u8;\n    bytes[index] += 1u8;\n    return bytes[index] as Int;\n}\n",
+            backend,
+            "exe",
+        );
+        let execution =
+            Command::new(root.join("main.out")).output().expect("run the built program");
+        assert_eq!(execution.status.code(), Some(10), "in-bounds Buffer access with {backend}");
+        assert!(execution.stderr.is_empty(), "no report with {backend}");
+        let _ = fs::remove_dir_all(root);
+    }
+}
+
+#[test]
 fn failed_arena_check_reports_its_location() {
     assert_check_fails(
         "arena",

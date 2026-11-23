@@ -65,6 +65,9 @@ pub fn runtime_check(instruction: &BackendInstruction) -> Option<(&str, SourceSp
         BackendInstruction::TrapIfArrayIndexOutOfBounds { span, .. } => {
             Some(("index out of bounds", *span))
         }
+        BackendInstruction::TrapIfBufferIndexOutOfBounds { span, .. } => {
+            Some(("index out of bounds", *span))
+        }
         BackendInstruction::ArenaPlace { span, .. } => Some(("arena capacity exceeded", *span)),
         BackendInstruction::Trap { reason, span } => Some((reason, *span)),
         _ => None,

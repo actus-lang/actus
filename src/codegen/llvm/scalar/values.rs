@@ -5,8 +5,9 @@ use super::super::super::{
 };
 use super::super::enums::{emit_enum_construct, emit_enum_discriminant, emit_enum_payload};
 use super::super::guards::{
-    emit_trap_if_array_index_out_of_bounds, emit_trap_if_shift_count_out_of_range,
-    emit_trap_if_signed_division_overflow, emit_trap_if_zero,
+    emit_trap_if_array_index_out_of_bounds, emit_trap_if_buffer_index_out_of_bounds,
+    emit_trap_if_shift_count_out_of_range, emit_trap_if_signed_division_overflow,
+    emit_trap_if_zero,
 };
 use super::super::literals::emit_string_literal;
 use super::float::{emit_float_cast, emit_float_compare, emit_float_constant};
@@ -45,7 +46,8 @@ pub(in crate::codegen::llvm) fn emit_scalar_instruction(
         BackendInstruction::TrapIfZero { .. }
         | BackendInstruction::TrapIfSignedDivisionOverflow { .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { .. }
-        | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
+        | BackendInstruction::TrapIfArrayIndexOutOfBounds { .. }
+        | BackendInstruction::TrapIfBufferIndexOutOfBounds { .. } => {
             emit_guard(&site, instruction, values)
         }
         BackendInstruction::IntegerCompare { .. } => {
@@ -141,6 +143,16 @@ fn emit_guard(
         }
         BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
             emit_trap_if_array_index_out_of_bounds(
+                context,
+                builder,
+                function,
+                instruction,
+                values,
+                failure,
+            )
+        }
+        BackendInstruction::TrapIfBufferIndexOutOfBounds { .. } => {
+            emit_trap_if_buffer_index_out_of_bounds(
                 context,
                 builder,
                 function,

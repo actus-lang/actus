@@ -80,6 +80,13 @@ pub enum BackendInstruction {
         reason: String,
         span: SourceSpan,
     },
+    /// Fails when a runtime status value, such as the result of a Buffer byte
+    /// access, is negative.
+    TrapIfBufferIndexOutOfBounds {
+        status: super::BackendValueId,
+        reason: String,
+        span: SourceSpan,
+    },
     IntegerCompare {
         result: super::BackendValueId,
         operation: BackendIntegerCompareOp,

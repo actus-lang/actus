@@ -44,6 +44,11 @@ pub(super) fn lower_buffer_element_from_base(
         result: Some(raw),
         span,
     });
+    instructions.push(BackendInstruction::TrapIfBufferIndexOutOfBounds {
+        status: raw,
+        reason: "Buffer index is outside the Buffer length".to_owned(),
+        span,
+    });
     let result = provider.allocate();
     let result_type = BackendValueType::Integer { signed: false, width: 8 };
     provider.remember_value(result, result_type);
@@ -108,6 +113,11 @@ pub(super) fn lower_buffer_element_store(
         .map_err(|error| unsupported(span, error.to_string()))?,
         arguments: vec![base, index, value],
         result: Some(result),
+        span,
+    });
+    instructions.push(BackendInstruction::TrapIfBufferIndexOutOfBounds {
+        status: result,
+        reason: "Buffer index is outside the Buffer length".to_owned(),
         span,
     });
     Ok(())

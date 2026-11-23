@@ -180,6 +180,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         | BackendInstruction::TrapIfZero { value: source, .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { count: source, .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { index: source, .. }
+        | BackendInstruction::TrapIfBufferIndexOutOfBounds { status: source, .. }
         | BackendInstruction::EnumDiscriminant { subject: source, .. }
         | BackendInstruction::EnumPayload { subject: source, .. }
         | BackendInstruction::EnumPayloadBinding { subject: source, .. } => vec![*source],
