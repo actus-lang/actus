@@ -127,6 +127,34 @@ fn build_command_rejects_a_hosted_entry_without_an_integer_exit_status() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[test]
+fn check_command_names_the_fix_for_a_verb_value_without_return() {
+    let root = std::env::temp_dir().join(format!("actus-cli-no-return-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create test directory");
+    let input = root.join("main.act");
+    fs::write(
+        &input,
+        "verb pick(erg v: Int) -> Int {\n    v + 1\n}\nverb main() -> Int { erg v = 1; return pick(v: v); }\n",
+    )
+    .expect("write source");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", input.to_str().expect("utf-8 path")])
+        .output()
+        .expect("run actus check");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("error[E0003]"), "unexpected diagnostic: {stderr}");
+    assert!(
+        stderr.contains(
+            "expected `;` after this expression; a verb returns a value with `return`, as in `return <expression>;`"
+        ),
+        "unexpected diagnostic: {stderr}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
 #[cfg(unix)]
 #[test]
 fn build_command_links_an_executable() {

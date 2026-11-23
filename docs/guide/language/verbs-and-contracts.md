@@ -41,6 +41,12 @@ buffers, external calls, generic boundaries, dynamic calls, and ownership
 transfers should keep the role explicit. Do not rely on inference to hide a
 lifetime or mutation boundary.
 
+A verb returns a value only with `return`. A final expression without `;` gives
+a value only inside an expression block, such as the branches of
+`erg x = if c { 3 } else { 1 };`. A verb body that ends in a bare expression is
+rejected, and the message shows the fix. To return a conditional value, write
+`return if v > 10 { 3 } else { 1 };`. See ADR-0118.
+
 ## Declaring a role
 
 A role lists the methods a conforming type must provide. Each method has an

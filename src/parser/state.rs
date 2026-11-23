@@ -26,6 +26,7 @@ pub enum ParseErrorKind {
     InvalidStackLimit { reason: String },
     MalformedVerbContract { reason: String },
     OpenImportRequiresBlock,
+    ValueWithoutReturn,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -85,6 +86,9 @@ pub struct Parser {
     pub(super) cursor: usize,
     pub(super) enum_names: HashSet<String>,
     pub(super) case_subject: bool,
+    /// Whether the verb body being parsed declares a return value, so a final
+    /// expression without `;` there is a value missing its `return` (ADR-0118).
+    pub(super) verb_returns_value: bool,
 }
 
 struct VerbSignature {
@@ -96,7 +100,13 @@ struct VerbSignature {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, cursor: 0, enum_names: HashSet::new(), case_subject: false }
+        Self {
+            tokens,
+            cursor: 0,
+            enum_names: HashSet::new(),
+            case_subject: false,
+            verb_returns_value: false,
+        }
     }
 
     pub(super) fn parse_contract(
@@ -326,7 +336,12 @@ impl Parser {
     ) -> Result<VerbDecl, ParseError> {
         let start = self.expect_keyword(TokenKind::Verb, "`verb`")?.span.start;
         let signature = self.parse_verb_signature()?;
-        let body = self.parse_block()?;
+        let returns_value =
+            signature.return_type.as_ref().is_some_and(|return_type| return_type.ty.name != "Void");
+        let outer_returns_value = std::mem::replace(&mut self.verb_returns_value, returns_value);
+        let body = self.parse_block();
+        self.verb_returns_value = outer_returns_value;
+        let body = body?;
         let span = SourceSpan::new(start, body.span.end);
         let contract = self.parse_contract(doc.as_deref(), span)?;
 

@@ -169,6 +169,16 @@ impl Parser {
                 });
             }
         }
+        if let Some(token) = self
+            .peek()
+            .filter(|token| self.verb_returns_value && token.kind == TokenKind::RightBrace)
+        {
+            return Err(ParseError {
+                code: ParseErrorCode::UnexpectedToken,
+                kind: ParseErrorKind::ValueWithoutReturn,
+                span: token.span,
+            });
+        }
         let start = expression_span(&expression).start;
         let end = self.expect_simple(TokenKind::Semicolon, "`;`")?.span.end;
         Ok(Stmt::Expression { expression, span: SourceSpan::new(start, end) })
