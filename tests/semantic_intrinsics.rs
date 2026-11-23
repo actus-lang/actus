@@ -225,6 +225,31 @@ fn rejects_labelled_print_intrinsic_with_a_mismatched_type() {
 }
 
 #[test]
+fn accepts_a_u8_binding_for_the_byte_label() {
+    analyze_source("verb main() { erg b: u8 = 200u8; print(byte: b); eprint(byte: b); }")
+        .expect("a u8 binding should be valid for the byte label");
+}
+
+#[test]
+fn rejects_the_byte_label_for_values_that_are_not_u8() {
+    for source in [
+        "verb main() { erg s: String = \"x\"; print(byte: s); }",
+        "verb main() { erg n = 5; print(byte: n); }",
+        "verb main() { erg n: u16 = 5u16; print(byte: n); }",
+        "verb main() { erg s: String = \"x\"; eprint(byte: s); }",
+    ] {
+        let error = analyze_source(source).expect_err("byte label must reject non-u8 values");
+        assert!(
+            matches!(
+                error.kind,
+                SemanticErrorKind::InvalidIntrinsicArgument { ref parameter, .. } if parameter == "byte"
+            ),
+            "{source}: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn validates_typed_constants_and_resolves_constant_references() {
     analyze_source("const FRAME_HEADER: u16 = 12u16; verb main() -> u16 { return FRAME_HEADER; }")
         .expect("typed constant reference should be valid");

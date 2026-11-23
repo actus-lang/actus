@@ -60,3 +60,91 @@ fn write_console_project(root: &Path) {
     )
     .expect("write console application");
 }
+
+/// Backends compiled into this test build.
+#[cfg(unix)]
+fn enabled_backends() -> Vec<&'static str> {
+    let backends: Vec<&'static str> = [
+        #[cfg(feature = "llvm")]
+        "llvm",
+        #[cfg(feature = "cranelift")]
+        "cranelift",
+    ]
+    .to_vec();
+    assert!(!backends.is_empty(), "no native backend is enabled");
+    backends
+}
+
+/// Builds a single-file program with every enabled backend, runs it, and
+/// returns each backend's name with its output.
+#[cfg(unix)]
+fn build_and_run_on_each_backend(
+    name: &str,
+    source: &str,
+) -> Vec<(&'static str, std::process::Output)> {
+    enabled_backends()
+        .into_iter()
+        .map(|backend| {
+            let root = std::env::temp_dir()
+                .join(format!("actus-console-{name}-{backend}-{}", std::process::id()));
+            let input = root.with_extension("act");
+            let output = root.with_extension("bin");
+            fs::write(&input, source).expect("write console source");
+            let build = Command::new(env!("CARGO_BIN_EXE_actus"))
+                .args(["build", "--emit", "exe", "--backend", backend, "-o"])
+                .arg(&output)
+                .arg(&input)
+                .output()
+                .expect("build console source");
+            assert!(
+                build.status.success(),
+                "{backend} build failed: {}",
+                String::from_utf8_lossy(&build.stderr)
+            );
+            let run = Command::new(&output).output().expect("run console executable");
+            let _ = fs::remove_file(input);
+            let _ = fs::remove_file(output);
+            (backend, run)
+        })
+        .collect()
+}
+
+#[cfg(unix)]
+#[test]
+fn built_in_eprint_writes_labelled_values_to_stderr() {
+    let source = "verb main() { eprint(string: \"e\"); eprint(int: 5); eprint(bool: true); }\n";
+    for (backend, run) in build_and_run_on_each_backend("eprint", source) {
+        assert_eq!(run.stderr, b"e\n5\ntrue\n", "{backend} stderr");
+        assert!(run.stdout.is_empty(), "{backend} stdout");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn built_in_eprint_writes_a_borrowed_string_to_stderr() {
+    let source = "verb main() { erg text: String = \"e\"; eprint(string: abs text); }\n";
+    for (backend, run) in build_and_run_on_each_backend("eprint-abs", source) {
+        assert_eq!(run.stderr, b"e\n", "{backend} stderr");
+        assert!(run.stdout.is_empty(), "{backend} stdout");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn built_in_print_of_a_byte_writes_its_decimal_value() {
+    let source = "verb main() { erg b: u8 = 200u8; print(byte: 7u8); print(byte: b); }\n";
+    for (backend, run) in build_and_run_on_each_backend("print-byte", source) {
+        assert_eq!(run.stdout, b"7\n200\n", "{backend} stdout");
+        assert!(run.stderr.is_empty(), "{backend} stderr");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn built_in_eprint_of_a_byte_writes_its_decimal_value_to_stderr() {
+    let source = "verb main() { erg b: u8 = 200u8; eprint(byte: b); }\n";
+    for (backend, run) in build_and_run_on_each_backend("eprint-byte", source) {
+        assert_eq!(run.stderr, b"200\n", "{backend} stderr");
+        assert!(run.stdout.is_empty(), "{backend} stdout");
+    }
+}

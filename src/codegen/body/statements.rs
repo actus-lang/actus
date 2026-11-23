@@ -19,6 +19,7 @@ pub(super) fn lower_expression_statement(
                     | IntrinsicKind::Crc32Matches
                     | IntrinsicKind::ValidateFixedFrame
                     | IntrinsicKind::Print
+                    | IntrinsicKind::Eprint
             )
         }) {
             provider.lower_expression(expression, instructions).map(|_| ())?;

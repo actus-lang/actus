@@ -36,13 +36,13 @@ storage with sufficient capacity and retain ownership after the call.
 | --- | --- |
 | `print(string: abs value)` | Writes a borrowed `String` and a newline. |
 | `print(int: erg value) -> Int` | Writes one integer value and a newline through the unified console intrinsic. |
-| `print(byte: erg value)` | Writes one `u8` value. |
+| `print(byte: erg value)` | Writes one `u8` value as a decimal number and a newline. |
 | `print(bool: erg value)` | Writes `true` or `false` and a newline. |
 | `print(buffer: abs bytes)` | Writes borrowed bytes as they are, without a newline. |
 | `eprint(string: abs value)` | Writes a borrowed `String` and a newline to stderr. |
-| `eprint(int: erg value)` | Writes one integer to stderr. |
-| `eprint(byte: erg value)` | Writes one byte to stderr. |
-| `eprint(bool: erg value)` | Writes `true` or `false` to stderr. |
+| `eprint(int: erg value)` | Writes one integer and a newline to stderr. |
+| `eprint(byte: erg value)` | Writes one `u8` value as a decimal number and a newline to stderr. |
+| `eprint(bool: erg value)` | Writes `true` or `false` and a newline to stderr. |
 | `eprint(buffer: abs bytes)` | Writes borrowed bytes to stderr. |
 | `print(format: abs template, int: erg value)` | Replaces `{}` with one integer and writes the result and a newline. |
 | `print(format: abs template, bool: erg value)` | Replaces `{}` with `true` or `false` and writes the result and a newline. |

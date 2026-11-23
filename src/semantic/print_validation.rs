@@ -34,6 +34,18 @@ impl Analyzer {
             });
         }
         self.visit_expression(&argument.expression)?;
+        if label == Some("byte") {
+            // `byte:` takes a `u8` value; only a bare integer literal is
+            // accepted without that type.
+            let is_u8 = self.expression_type_name(&argument.expression).as_deref() == Some("u8");
+            let is_bare_literal = matches!(argument.expression, Expr::Integer { suffix: None, .. });
+            if is_u8 {
+                return Ok(true);
+            }
+            if !is_bare_literal {
+                return Err(invalid_print_argument(callee, "byte", &argument.expression));
+            }
+        }
         let value_type = self.expression_type(&argument.expression).ok_or_else(|| {
             invalid_print_argument(callee, label.unwrap_or("value"), &argument.expression)
         })?;
