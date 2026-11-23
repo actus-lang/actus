@@ -40,6 +40,9 @@ pub const PROCESS_STATUS_ARGUMENT_TOO_LARGE: i32 = -7;
 /// Stable runtime symbol names used by native lowering.
 pub const BUFFER_ALLOCATE_SYMBOL: &str = "actus_buffer_allocate";
 pub const PROCESS_ARG_COUNT_SYMBOL: &str = "actus_process_arg_count";
+/// Reports a failed runtime check of a hosted program and ends the process
+/// (ADR-0117). Takes one null-terminated message; never returns.
+pub const RUNTIME_CHECK_FAILED_SYMBOL: &str = "actus_runtime_check_failed";
 pub const PROCESS_ARG_SYMBOL: &str = "actus_process_arg";
 pub const BUFFER_DROP_SYMBOL: &str = "actus_buffer_drop";
 /// Stable runtime symbol for ownership-preserving replacement of one Buffer handle.

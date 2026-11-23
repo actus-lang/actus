@@ -34,7 +34,11 @@ entry = "main"
 [build]
 target = "host"
 profile = "debug"
+runtime = "std"
 ```
+
+`runtime = "std"` makes the hosted standard library available. Pass
+`--runtime core` to `new` or `init` for a package without it.
 
 Standard-library modules are dependencies with manifest-relative paths:
 

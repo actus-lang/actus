@@ -11,19 +11,22 @@ use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
 use super::super::{BackendEmitError, BackendInstruction, BackendValueId};
 
+/// Emits an arena instruction. `failure` is the message a full arena
+/// reports, or `None` when it traps (ADR-0117).
 pub(super) fn emit(
     context: LLVMContextRef,
     builder: LLVMBuilderRef,
     pointer_width: u8,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+    failure: Option<&str>,
 ) -> Result<bool, BackendEmitError> {
     match instruction {
         BackendInstruction::ArenaConstruct { .. } => {
             emit_construct(context, builder, pointer_width, instruction, values)
         }
         BackendInstruction::ArenaPlace { .. } => {
-            emit_place(context, builder, pointer_width, instruction, values)
+            emit_place(context, builder, pointer_width, instruction, values, failure)
         }
         _ => Err(BackendEmitError("LLVM arena instruction expected".to_owned())),
     }
@@ -69,6 +72,7 @@ fn emit_place(
     pointer_width: u8,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+    failure: Option<&str>,
 ) -> Result<bool, BackendEmitError> {
     let BackendInstruction::ArenaPlace {
         result,
@@ -94,6 +98,7 @@ fn emit_place(
         .ok_or_else(|| BackendEmitError("LLVM arena placement value is unavailable".to_owned()))?;
     let state =
         place_state(context, builder, arena, *capacity, value_layout.size, *alignment, *width)?;
+    check_capacity(context, builder, state.fits, failure)?;
     publish_place(builder, &state)?;
     let destination = byte_address_value(context, builder, arena, state.aligned)?;
     let size =
@@ -107,10 +112,30 @@ fn emit_place(
     Ok(false)
 }
 
+/// Continues when the value `fits`; otherwise fails the capacity check.
+fn check_capacity(
+    context: LLVMContextRef,
+    builder: LLVMBuilderRef,
+    fits: LLVMValueRef,
+    failure: Option<&str>,
+) -> Result<(), BackendEmitError> {
+    let parent = unsafe { LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)) };
+    let ok = unsafe { LLVMAppendBasicBlockInContext(context, parent, c"arena.ok".as_ptr().cast()) };
+    let trap =
+        unsafe { LLVMAppendBasicBlockInContext(context, parent, c"arena.trap".as_ptr().cast()) };
+    unsafe { LLVMBuildCondBr(builder, fits, ok, trap) };
+    unsafe { LLVMPositionBuilderAtEnd(builder, trap) };
+    super::guards::emit_check_failure(context, parent, builder, failure)?;
+    unsafe { LLVMPositionBuilderAtEnd(builder, ok) };
+    Ok(())
+}
+
 struct PlacementState {
     offset_address: LLVMValueRef,
     aligned: LLVMValueRef,
     new_offset: LLVMValueRef,
+    /// Whether the value fits in the arena's remaining capacity.
+    fits: LLVMValueRef,
 }
 
 fn place_state(
@@ -157,15 +182,7 @@ fn place_state(
     if fits.is_null() {
         return Err(BackendEmitError("LLVM failed to check arena capacity".to_owned()));
     }
-    let parent = unsafe { LLVMGetBasicBlockParent(LLVMGetInsertBlock(builder)) };
-    let ok = unsafe { LLVMAppendBasicBlockInContext(context, parent, c"arena.ok".as_ptr().cast()) };
-    let trap =
-        unsafe { LLVMAppendBasicBlockInContext(context, parent, c"arena.trap".as_ptr().cast()) };
-    unsafe { LLVMBuildCondBr(builder, fits, ok, trap) };
-    unsafe { LLVMPositionBuilderAtEnd(builder, trap) };
-    super::guards::emit_llvm_trap(context, parent, builder)?;
-    unsafe { LLVMPositionBuilderAtEnd(builder, ok) };
-    Ok(PlacementState { offset_address, aligned, new_offset })
+    Ok(PlacementState { offset_address, aligned, new_offset, fits })
 }
 
 fn publish_place(builder: LLVMBuilderRef, state: &PlacementState) -> Result<(), BackendEmitError> {

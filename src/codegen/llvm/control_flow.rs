@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use super::super::{
     BackendBlockId, BackendEmitError, BackendFunction, BackendInstruction, BackendValueId,
-    BackendValueType,
+    BackendValueType, RuntimeCheckReporting,
 };
 use super::branches::block_value;
 use super::declarations::FunctionDeclaration;
@@ -14,13 +14,19 @@ use llvm_sys::prelude::{LLVMBasicBlockRef, LLVMBuilderRef, LLVMValueRef};
 
 pub(super) type BlockParameters = BTreeMap<BackendBlockId, Vec<(BackendValueId, LLVMValueRef)>>;
 
+/// What every function of a module is emitted with.
+pub(super) struct ModuleEmission<'a> {
+    pub(super) pointer_width: u8,
+    pub(super) declarations: &'a BTreeMap<String, FunctionDeclaration>,
+    pub(super) runtime_checks: &'a RuntimeCheckReporting,
+}
+
 pub(super) fn emit_blocks(
     context: llvm_sys::prelude::LLVMContextRef,
     builder: LLVMBuilderRef,
-    pointer_width: u8,
+    emission: &ModuleEmission<'_>,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
-    declarations: &BTreeMap<String, FunctionDeclaration>,
     blocks: &BTreeMap<BackendBlockId, LLVMBasicBlockRef>,
 ) -> Result<(), BackendEmitError> {
     let mut values = parameter_values(declaration);
@@ -40,10 +46,11 @@ pub(super) fn emit_blocks(
                 &mut InstructionContext {
                     context,
                     builder,
-                    pointer_width,
+                    pointer_width: emission.pointer_width,
                     function,
                     declaration,
-                    declarations,
+                    declarations: emission.declarations,
+                    runtime_checks: emission.runtime_checks,
                     blocks,
                     block_parameters: &block_parameters,
                     values: &mut values,
@@ -173,6 +180,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         | BackendInstruction::TrapIfZero { value: source, .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { count: source, .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { index: source, .. }
+        | BackendInstruction::TrapIfBufferIndexOutOfBounds { status: source, .. }
         | BackendInstruction::EnumDiscriminant { subject: source, .. }
         | BackendInstruction::EnumPayload { subject: source, .. }
         | BackendInstruction::EnumPayloadBinding { subject: source, .. } => vec![*source],

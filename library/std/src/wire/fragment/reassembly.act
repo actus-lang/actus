@@ -73,7 +73,7 @@ verb wire_reassembly_overlaps(
     erg payload_length: u32
 ) -> Bool {
     erg candidate_end: u32 = candidate_offset + payload_length;
-    for erg index: u32 in 0u32 .. (WIRE_FRAGMENT_MAX_COUNT as u32) {
+    for erg index: u32 in 0u32..(WIRE_FRAGMENT_MAX_COUNT as u32) {
         if index >= (reassembly.received_count as u32) {
             break;
         }
@@ -215,7 +215,10 @@ The result returns the copied byte count; incomplete or undersized output
 returns a typed error. No allocation, I/O, ownership transfer, or cleanup
 side effect occurs.
 """
-open verb wire_reassembly_copy(abs reassembly: WireReassembly, ins output: Buffer) -> Result[u32, WireError] {
+open verb wire_reassembly_copy(
+    abs reassembly: WireReassembly,
+    ins output: Buffer
+) -> Result[u32, WireError] {
     if reassembly.state != 2u8 {
         return Result[u32, WireError].Err(WireError.ReassemblyIncomplete);
     }

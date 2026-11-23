@@ -9,7 +9,7 @@ use crate::ast::{
 #[cfg(feature = "test-fault-injection")]
 use crate::ast::{DispatchMode, ExternalVerbDecl, ForeignAbi, Param};
 use crate::codegen::link_objects;
-use crate::configuration::CompilerConfiguration;
+use crate::configuration::{CompilerConfiguration, EntryContract};
 use crate::diagnostics::{render_diagnostic, semantic_diagnostic};
 use crate::lexer::SourceSpan;
 use crate::modules::{ModuleResolver, build_test_compilation_plan};
@@ -171,7 +171,11 @@ fn run_test(
         .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
     crate::modules::validate_compilation_plan(&plan, configuration.target())
         .map_err(|error| test_diagnostic(test, crate::diagnostics::module_diagnostic(&error)))?;
-    let object = crate::cli::build::emit_object(&plan, "main", configuration)
+    // A hosted test executable reports a failed runtime check with its source
+    // location, as `actus build` does (ADR-0117); freestanding tests trap.
+    let check_locations =
+        matches!(configuration.entry_contract(), EntryContract::Hosted).then_some(&test.source_map);
+    let object = crate::cli::build::emit_object(&plan, "main", configuration, check_locations)
         .map_err(|error| error.to_string())?;
     let paths = TestArtifactPaths::new(index)?;
     let result = fs::write(&paths.object, &object.bytes)

@@ -22,6 +22,7 @@ fn emits_a_valid_unit_function_as_llvm_ir() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
 
     let ir = emit_module(&module).expect("unit function should lower to LLVM IR");
@@ -63,6 +64,7 @@ fn emits_a_neutral_integer_constant_and_returns_it() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
 
     let ir = emit_module(&module).expect("constant should lower to LLVM IR");
@@ -123,8 +125,12 @@ fn emits_neutral_enum_discriminant_and_payload_extraction() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("LLVM should emit neutral enum extraction");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("LLVM should emit neutral enum extraction");
     assert!(ir.contains("load i32"));
     assert!(ir.contains("getelementptr i8"));
 }
@@ -179,8 +185,12 @@ fn emits_neutral_enum_payload_binding_with_ownership_mode() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("LLVM should emit enum payload binding");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("LLVM should emit enum payload binding");
     assert!(ir.contains("load i32"));
     assert!(ir.contains("getelementptr i8"));
 }
@@ -246,8 +256,12 @@ fn emits_neutral_result_constructor_with_payload() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("LLVM should emit neutral Result construction");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("LLVM should emit neutral Result construction");
     assert!(ir.contains("store i32 7"));
     assert!(ir.contains("ret void"));
 }
@@ -335,6 +349,7 @@ fn emits_signed_division_overflow_guard_for_runtime_operands() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
 
     let ir = emit_module(&module).expect("runtime division guard should lower to LLVM IR");
@@ -404,8 +419,12 @@ fn emits_scalar_parameter_return_and_direct_call() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![callee, caller] })
-        .expect("scalar call should lower to LLVM IR");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![callee, caller],
+        ..Default::default()
+    })
+    .expect("scalar call should lower to LLVM IR");
     assert!(ir.contains("define i32 @test__verb_add_5fone"));
     assert!(ir.contains("define i32 @test__verb_main"));
     assert!(ir.contains("call i32 @test__verb_add_5fone"));
@@ -464,8 +483,12 @@ fn declares_and_calls_a_neutral_external_runtime_symbol() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: vec![external], functions: vec![function] })
-        .expect("neutral external should be declared and called");
+    let ir = emit_module(&BackendModule {
+        externals: vec![external],
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("neutral external should be declared and called");
     assert!(ir.contains("declare void @runtime__extern_write_5fbyte(i32)"));
     assert!(ir.contains("call void @runtime__extern_write_5fbyte(i32 %0)"));
 }
@@ -551,7 +574,8 @@ fn emits_block_parameter_phi_from_typed_edge_arguments() {
         ],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![function] };
+    let module =
+        BackendModule { externals: Vec::new(), functions: vec![function], ..Default::default() };
     let ir = emit_module(&module).expect("LLVM should lower typed edge arguments to PHI");
     assert!(ir.contains("phi i32"));
     assert!(ir.contains("[ 41, %bb1 ]"));
@@ -626,8 +650,12 @@ fn emits_scalar_branch_jump_and_trap_terminators() {
         ],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("scalar control flow should lower to LLVM IR");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("scalar control flow should lower to LLVM IR");
     assert!(ir.contains("br i1 %0, label %bb1, label %bb2"));
     assert!(ir.contains("br label %bb3"));
     assert!(ir.contains("unreachable"));
@@ -663,8 +691,12 @@ fn lowers_end_borrow_cleanup_as_a_compile_time_boundary() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("end-borrow cleanup should lower without a runtime call");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("end-borrow cleanup should lower without a runtime call");
     assert!(ir.contains("define void @test__verb_cleanup()"));
     assert!(ir.contains("ret void"));
 }
@@ -717,8 +749,12 @@ fn emits_region_runtime_cleanup_bridge_call() {
         cleanup: Vec::new(),
     };
 
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("region cleanup bridge should lower to an LLVM call");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("region cleanup bridge should lower to an LLVM call");
     assert!(ir.contains("declare i32 @actus_region_drop(ptr)"));
     assert!(ir.contains("call i32 @actus_region_drop(ptr %0)"));
 }
@@ -771,8 +807,12 @@ fn emits_target_width_enum_runtime_cleanup_bridge_call() {
         cleanup: Vec::new(),
     };
 
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("enum cleanup bridge should lower to an LLVM call");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("enum cleanup bridge should lower to an LLVM call");
     assert!(ir.contains("declare void @actus_enum_drop(ptr, i64)"));
     assert!(ir.contains("call void @actus_enum_drop(ptr %0, i64 24)"));
 }
@@ -818,8 +858,12 @@ fn lowers_pointer_memory_copy_with_declared_extent_and_alignment() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("pointer memory copy should lower to LLVM memmove");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("pointer memory copy should lower to LLVM memmove");
     assert!(ir.contains("llvm.memmove"));
     assert!(ir.contains("i64 16"));
 }
@@ -867,8 +911,12 @@ fn lowers_regular_enum_failure_with_discriminant_and_integer_payload() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("regular enum failure should lower to an aggregate return");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("regular enum failure should lower to an aggregate return");
     assert!(ir.contains("store i32 1"));
     assert!(ir.contains("store i32 %0"));
     assert!(ir.contains("ret [2 x i64]"));
@@ -912,8 +960,12 @@ fn lowers_niche_option_failure_to_a_null_pointer() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("niche None should lower to a null pointer");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("niche None should lower to a null pointer");
     assert!(ir.contains("ret ptr null"));
 }
 
@@ -939,6 +991,7 @@ fn rejects_floating_point_types_before_llvm_lowering() {
             }],
             cleanup: Vec::new(),
         }],
+        ..Default::default()
     };
     let error = emit_module(&module).expect_err("LLVM integer-only lowering must reject floats");
     assert!(error.to_string().contains("integer-only emission"));
@@ -1005,8 +1058,12 @@ fn emits_fixed_layout_aggregate_parameter_and_return() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("fixed-layout aggregate should lower to LLVM IR");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("fixed-layout aggregate should lower to LLVM IR");
     assert!(ir.contains("define [2 x i64] @test__verb_aggregate([2 x i64] %0)"));
     assert!(ir.contains("ret [2 x i64] %0"));
 }
@@ -1037,8 +1094,12 @@ fn emits_non_direct_aggregate_parameter_as_aligned_pointer() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![function] })
-        .expect("non-direct aggregate parameter should lower to a pointer");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![function],
+        ..Default::default()
+    })
+    .expect("non-direct aggregate parameter should lower to a pointer");
     assert!(ir.contains("define void @test__verb_loan(ptr align 8 %0)"));
 }
 
@@ -1104,8 +1165,12 @@ fn lowers_aggregate_return_slot_between_caller_and_callee() {
         }],
         cleanup: Vec::new(),
     };
-    let ir = emit_module(&BackendModule { externals: Vec::new(), functions: vec![callee, caller] })
-        .expect("aggregate return slot should lower to LLVM IR");
+    let ir = emit_module(&BackendModule {
+        externals: Vec::new(),
+        functions: vec![callee, caller],
+        ..Default::default()
+    })
+    .expect("aggregate return slot should lower to LLVM IR");
     assert!(ir.contains("define void @test__verb_make(ptr align 8"));
     assert!(ir.contains("call void @test__verb_make(ptr"));
     assert!(ir.contains("store "));

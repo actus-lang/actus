@@ -273,7 +273,10 @@ name or directory exceeds the bounded snapshot contract. The operation does
 not expose native pointers or allow an unbounded array.
 """
 meta effect("filesystem", "blocking")
-open verb read_dir_ordered(abs path: path_module::Path, erg order: DirectoryOrder) -> Result[Directory, io::IoError] {
+open verb read_dir_ordered(
+    abs path: path_module::Path,
+    erg order: DirectoryOrder
+) -> Result[Directory, io::IoError] {
     erg filter = directory_filter_default();
     return read_dir_ordered_with_filter(
         path: abs path,
@@ -356,7 +359,10 @@ verb directory_entry_matches(
     }
     return case filter.extension {
         Option.None => true,
-        Option.Some(extension) => actus_path_extension_equals(path: abs entry.name, extension: abs extension),
+        Option.Some(extension) => actus_path_extension_equals(
+            path: abs entry.name,
+            extension: abs extension
+        ),
     };
 }
 
@@ -454,7 +460,9 @@ verb directory_entry_kind(abs metadata: Metadata) -> DirectoryEntryKind {
     };
 }
 
-verb directory_path_result(dat result: Result[path_module::Path, path_module::PathError]) -> Result[path_module::Path, io::IoError] {
+verb directory_path_result(
+    dat result: Result[path_module::Path, path_module::PathError]
+) -> Result[path_module::Path, io::IoError] {
     return case dat result {
         Result.Err(_) => Err(io::IoError.InvalidData),
         Result.Ok(value) => Ok(value),

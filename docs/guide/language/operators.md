@@ -36,6 +36,19 @@ Division and remainder require a valid non-zero divisor. Runtime-invalid
 operations follow the compiler's checked failure or trap contract for the
 selected type and target.
 
+## Failed runtime checks
+
+Integer overflow, division by zero, out-of-range shift counts and casts, and
+indexes outside an array stop the program. A program built as an executable
+reports what failed and where, then exits with status 101:
+
+```text
+error: integer overflow at src/main.act:3:17
+```
+
+Objects and freestanding builds execute the target's trap instruction
+instead, because they may run without the Actus runtime (ADR-0117).
+
 Read [types and literals](types-and-literals.md) for casts and numeric bounds,
 and [the repository operator reference](../../language/operators.md) for the
 complete precedence and operand table.

@@ -231,7 +231,7 @@ open verb wire_parser_feed(
 ) -> Result[u32, WireError] {
     parser.last_consumed = 0u32;
     erg chunk_length: u32 = buffer_length(buffer: abs chunk) as u32;
-    for erg index: u32 in 0u32 .. WIRE_MAX_FRAME_BYTES {
+    for erg index: u32 in 0u32..WIRE_MAX_FRAME_BYTES {
         if index >= chunk_length {
             break;
         }

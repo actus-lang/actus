@@ -7,6 +7,7 @@ pub(super) fn emit_object_llvm(
     plan: &ModuleCompilationPlan,
     symbol: &str,
     configuration: &CompilerConfiguration,
+    check_locations: Option<&crate::SharedSourceMap>,
 ) -> Result<EmittedObject, BackendEmitError> {
     let (generic_types, generic_instances) = super::shared::generic_inputs(plan, configuration)?;
     let object_plan = plan
@@ -24,6 +25,7 @@ pub(super) fn emit_object_llvm(
         &bindings,
         &generic_instances,
         "llvm",
+        check_locations,
     )?;
     crate::codegen::reject_float_ir(
         &program.module,

@@ -140,7 +140,11 @@ fn large_return_slot_aggregate_has_a_real_caller_frame() {
         }],
         cleanup: Vec::new(),
     };
-    let module = BackendModule { externals: Vec::new(), functions: vec![callee, caller] };
+    let module = BackendModule {
+        externals: Vec::new(),
+        functions: vec![callee, caller],
+        ..Default::default()
+    };
     let (path, object) = emit_stack_fixture(&module, "large-return-slot");
     assert!(object.section_by_name(".stack_sizes").is_some());
     let records = read_stack_sizes(&path);
@@ -234,7 +238,7 @@ fn eight_argument_module(callee_name: &str, caller_name: &str) -> BackendModule 
         }],
         cleanup: Vec::new(),
     };
-    BackendModule { externals: Vec::new(), functions: vec![callee, caller] }
+    BackendModule { externals: Vec::new(), functions: vec![callee, caller], ..Default::default() }
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

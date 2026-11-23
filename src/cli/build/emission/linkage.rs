@@ -43,6 +43,7 @@ pub(super) fn link_program(
             .filter(|external| !defined.contains(external.symbol.as_str()))
             .collect(),
         functions,
+        runtime_checks: crate::codegen::RuntimeCheckReporting::Trap,
     };
     let local_symbols = defined.into_iter().filter(|symbol| symbol != entry).collect();
     Ok(LinkedProgram { module, local_symbols })

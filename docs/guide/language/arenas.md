@@ -134,9 +134,11 @@ use separate owners or an API whose contract provides that lifetime model.
 ## Capacity and failure
 
 Placement consumes aligned space. When the next value cannot fit, the bounded
-capacity contract is violated. Current native execution terminates through a
-deterministic native trap rather than silently growing the arena or returning an
-untracked allocation.
+capacity contract is violated. Current native execution terminates rather than
+silently growing the arena or returning an untracked allocation: an executable
+reports `arena capacity exceeded` with the placement's source location and
+exits with status 101, and freestanding code executes a deterministic native
+trap (ADR-0117).
 
 Choose `N` from the largest supported placement set, including alignment and
 nested aggregate size. A successful semantic check proves that the type is

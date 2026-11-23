@@ -175,6 +175,17 @@ impl SharedExpressionProvider<'_> {
         let Expr::Unary { operator, expression, span } = expression else {
             return Err(unsupported(expression_span(expression), "unary expression expected"));
         };
+        if let (UnaryOp::Negate, Expr::Integer { value, suffix, span: literal_span }) =
+            (operator, expression.as_ref())
+        {
+            // `-N` is one constant, so the type minimum needs no runtime negation.
+            let negated = Expr::Integer {
+                value: format!("-{value}"),
+                suffix: suffix.clone(),
+                span: *literal_span,
+            };
+            return self.lower_expression(&negated, instructions);
+        }
         let operand = self.lower_expression(expression, instructions)?;
         let operation = match operator {
             UnaryOp::Negate => BackendIntegerUnaryOp::TrappingNegate,

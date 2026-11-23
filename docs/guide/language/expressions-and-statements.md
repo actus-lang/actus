@@ -36,10 +36,18 @@ Use a bounded `for` when the iteration range is known and a `loop` when early
 termination or carried state is the clearer representation:
 
 ```actus
-for index in 0u32..count {
+for erg index in 0..5 {
+    print(int: index);
+}
+
+for erg index: u32 in 0..count {
     inspect(value: abs values[index]);
 }
 ```
+
+Without a type the index takes the type of the range's start, which is `Int`
+for a plain number such as `0`. With a type, plain numbers in the range take
+that type.
 
 `break` leaves the nearest loop and `continue` begins its next iteration.
 Ownership cleanup is performed at the relevant scope boundary.

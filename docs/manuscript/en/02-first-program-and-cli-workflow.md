@@ -108,13 +108,16 @@ entry = "main"
 [build]
 target = "host"
 profile = "debug"
+runtime = "std"
 ```
 
 The `[package]` table identifies the package. `name` is the package
 namespace, `version` is its package version, and `edition` selects the
 language edition. `entry = "main"` tells the hosted build which Actus
 `verb` is the executable entry point. The `[build]` table selects the host
-target and the default debug profile.
+target, the default debug profile and the `std` runtime profile, which makes
+the hosted standard library, such as `std::io`, available. `actus new
+--runtime core` creates a package without it.
 
 The manifest is not source code. It does not define ownership or type rules.
 It gives the build system the information needed to select a source root,
@@ -125,8 +128,10 @@ The generated `.gitignore` contains:
 
 ```text
 /capsula/
+Actus.lock
 *.o
 *.bin
+*.actus
 ```
 
 `capsula/` is reserved for generated build metadata and artifacts. Object
@@ -135,8 +140,8 @@ files and binary outputs are local products of compilation, not source files.
 The `src/main.act` file is the initial source module:
 
 ```actus
-verb main() -> Int {
-    return 0;
+verb main() {
+    print(string: "Hello, world!");
 }
 ```
 

@@ -155,6 +155,19 @@ fn validates_case_branch_result_types_and_divergence() {
 }
 
 #[test]
+fn else_if_statement_branches_ending_in_calls_have_no_value() {
+    analyze_source(
+        "verb report(abs code: Int) -> Int { return 0; } verb classify(erg value: Int) { if value > 10 { report(code: abs value); } else if value > 5 { report(code: abs value); } else { report(code: abs value); } }",
+    )
+    .expect("an else-if statement chain whose branches end in calls is a statement");
+
+    analyze_source(
+        "verb classify(erg value: Int) -> Int { erg size = if value > 10 { 3 } else if value > 5 { 2 } else { 1 }; return size; }",
+    )
+    .expect("an else-if chain used as a value keeps its branch values");
+}
+
+#[test]
 fn preserves_path_payload_state_across_dat_result_case_branches() {
     analyze_source(
         "enum Failure { Missing, } struct Config { erg brain_path: Buffer, } verb consume_path(dat path: Buffer) { drop(path); } verb inspect_case(erg result: Result[Config, Failure]) -> Int { return case dat result { Result.Ok(command) => { consume_path(path: dat command.brain_path); return 0; }, Result.Err(_) => 1, }; }",

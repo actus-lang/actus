@@ -9,6 +9,10 @@ emission.
 runtime = "std"
 ```
 
+`actus new` and `actus init` write `runtime = "std"`; pass `--runtime core`
+for a dependency-free package. Importing a `std::` module in a build without
+the standard library is an error that names this setting.
+
 ## Core and hosted services
 
 The dependency-free `core` profile does not silently provide console I/O,

@@ -69,6 +69,96 @@ fn build_command_returns_zero_for_a_void_hosted_entry() {
 
 #[cfg(unix)]
 #[test]
+fn built_in_print_of_a_string_prints_a_line() {
+    let root = std::env::temp_dir().join(format!("actus-cli-print-string-{}", std::process::id()));
+    let input = root.with_extension("act");
+    let output = root.with_extension("bin");
+    fs::write(
+        &input,
+        "verb main() { erg greeting: String = \"Hello\"; print(string: abs greeting); print(string: \"World\"); }\n",
+    )
+    .expect("write source");
+
+    let result = run_with_args(
+        vec![
+            "build".to_owned(),
+            input.display().to_string(),
+            "--emit".to_owned(),
+            "exe".to_owned(),
+            "-o".to_owned(),
+            output.display().to_string(),
+        ]
+        .into_iter(),
+    );
+
+    assert_eq!(result, 0);
+    let execution = Command::new(&output).output().expect("run print executable");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"Hello\nWorld\n");
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+}
+
+#[cfg(unix)]
+#[test]
+fn build_command_rejects_a_hosted_entry_without_an_integer_exit_status() {
+    let root = std::env::temp_dir().join(format!("actus-cli-entry-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create test directory");
+    for (return_type, body) in [("Result[Int, Int]", "return Ok(0);"), ("Bool", "return true;")] {
+        let input = root.join("main.act");
+        fs::write(&input, format!("verb main() -> {return_type} {{ {body} }}\n"))
+            .expect("write source");
+
+        let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args(["build", input.to_str().expect("utf-8 path"), "--emit", "exe", "-o"])
+            .arg(root.join("main.bin"))
+            .output()
+            .expect("run actus build");
+
+        assert_eq!(output.status.code(), Some(1), "`-> {return_type}` must not build");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(&format!(
+                "hosted entry verb `main` must return nothing or an integer exit status, found `{return_type}`"
+            )),
+            "unexpected diagnostic for `-> {return_type}`: {stderr}"
+        );
+        assert!(!root.join("main.bin").exists(), "`-> {return_type}` left an executable");
+    }
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn check_command_names_the_fix_for_a_verb_value_without_return() {
+    let root = std::env::temp_dir().join(format!("actus-cli-no-return-{}", std::process::id()));
+    fs::create_dir_all(&root).expect("create test directory");
+    let input = root.join("main.act");
+    fs::write(
+        &input,
+        "verb pick(erg v: Int) -> Int {\n    v + 1\n}\nverb main() -> Int { erg v = 1; return pick(v: v); }\n",
+    )
+    .expect("write source");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["check", input.to_str().expect("utf-8 path")])
+        .output()
+        .expect("run actus check");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("error[E0003]"), "unexpected diagnostic: {stderr}");
+    assert!(
+        stderr.contains(
+            "expected `;` after this expression; a verb returns a value with `return`, as in `return <expression>;`"
+        ),
+        "unexpected diagnostic: {stderr}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
 fn build_command_links_an_executable() {
     let root = std::env::temp_dir().join(format!("actus-cli-exe-{}", std::process::id()));
     let input = root.with_extension("act");

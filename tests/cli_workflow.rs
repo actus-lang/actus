@@ -26,6 +26,69 @@ fn new_creates_an_actus_project_without_git_when_requested() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[cfg(unix)]
+#[test]
+fn new_creates_a_formatted_hello_world_with_the_standard_library() {
+    let root = std::env::temp_dir().join(format!("actus-new-hello-{}", std::process::id()));
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["new", root.to_str().unwrap(), "--no-git"])
+        .output()
+        .expect("run new command");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+
+    let manifest = fs::read_to_string(root.join("Actus.toml")).expect("read manifest");
+    assert!(
+        manifest.contains("\n[build]\ntarget = \"host\"\nprofile = \"debug\"\nruntime = \"std\"\n")
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("src/main.act")).unwrap(),
+        "verb main() {\n    print(string: \"Hello, world!\");\n}\n"
+    );
+    let actus = |arguments: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_actus"))
+            .args(arguments)
+            .current_dir(&root)
+            .output()
+            .expect("run actus in the new project")
+    };
+    assert!(actus(&["fmt", "--check", "src/main.act"]).status.success());
+    let build = actus(&["build", "--emit", "exe", "-o", "hello.bin"]);
+    assert!(build.status.success(), "stderr: {}", String::from_utf8_lossy(&build.stderr));
+    let run = Command::new(root.join("hello.bin")).output().expect("run hello world");
+    assert_eq!(run.stdout, b"Hello, world!\n");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn a_core_project_importing_the_standard_library_names_the_runtime_setting() {
+    let root = std::env::temp_dir().join(format!("actus-new-core-{}", std::process::id()));
+    let output = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["new", root.to_str().unwrap(), "--runtime", "core", "--no-git"])
+        .output()
+        .expect("run new command");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    let manifest = fs::read_to_string(root.join("Actus.toml")).expect("read manifest");
+    assert!(!manifest.contains("runtime"), "{manifest}");
+
+    fs::write(root.join("src/main.act"), "import std::io;\n\nverb main() {}\n")
+        .expect("write std import");
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .expect("check core project");
+    assert!(!check.status.success());
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(
+        stderr.contains(
+            "error[E1100] at 1:1: module `std::io` is part of the standard library, which this \
+             build does not use; set `runtime = \"std\"` under `[build]` in Actus.toml"
+        ),
+        "{stderr}"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
 #[test]
 fn new_initializes_main_and_prints_next_steps() {
     let root = std::env::temp_dir().join(format!("actus-new-main-{}", std::process::id()));

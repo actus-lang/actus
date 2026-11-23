@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use super::super::checks::emit_check_failure;
 use cranelift_codegen::ir::{InstBuilder, MemFlagsData, TrapCode, condcodes::IntCC};
 use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
@@ -13,12 +14,15 @@ pub(super) fn lower(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
         BackendInstruction::ArenaConstruct { .. } => {
             lower_construct(module, builder, instruction, values)
         }
-        BackendInstruction::ArenaPlace { .. } => lower_place(module, builder, instruction, values),
+        BackendInstruction::ArenaPlace { .. } => {
+            lower_place(module, builder, instruction, values, failure)
+        }
         _ => Err(BackendEmitError("Cranelift arena instruction expected".to_owned())),
     }
 }
@@ -55,6 +59,7 @@ fn lower_place(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::ArenaPlace {
         result,
@@ -86,7 +91,7 @@ fn lower_place(
     let trap_block = builder.create_block();
     builder.ins().brif(fits, ok_block, &[], trap_block, &[]);
     builder.switch_to_block(trap_block);
-    builder.ins().trap(TrapCode::HEAP_OUT_OF_BOUNDS);
+    emit_check_failure(module, builder, TrapCode::HEAP_OUT_OF_BOUNDS, failure)?;
     builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.ins().store(MemFlagsData::new(), new_offset, offset_address, 0);

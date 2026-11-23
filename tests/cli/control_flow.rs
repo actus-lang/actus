@@ -87,3 +87,64 @@ fn llvm_backend_builds_and_runs_nested_shared_value_if_expression() {
         42
     );
 }
+
+/// Runs `source` with both backends and checks its exit code.
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+fn assert_exits_with(source: &str, expected: i32) {
+    for backend in ["cranelift", "llvm"] {
+        assert_eq!(run_shared_value_if_fixture(backend, source), expected, "{backend}");
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn a_for_range_without_a_type_counts_with_int() {
+    assert_exits_with(
+        "verb main() -> Int { erg total = 0; for erg index in 1..5 { total += index; } return total; }",
+        10,
+    );
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn a_for_range_without_a_type_takes_the_type_of_its_start() {
+    assert_exits_with(
+        "verb main() -> Int { erg last: u8 = 0u8; for erg index in 250u8..253u8 { last = index; } return last as Int; }",
+        252,
+    );
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn a_typed_for_range_gives_plain_literal_bounds_its_type() {
+    assert_exits_with(
+        "verb main() -> Int { erg total: u16 = 0u16; for erg index: u16 in 1..4 { total += index; } return total as Int; }",
+        6,
+    );
+    assert_exits_with(
+        "verb main() -> Int { erg total = 0; for erg index: Int in 1..4 { total += index; } return total; }",
+        6,
+    );
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn an_else_if_value_chain_selects_the_first_matching_arm() {
+    for (value, expected) in [(12, 4), (8, 3), (4, 2), (1, 1)] {
+        assert_exits_with(
+            &format!(
+                "verb main() -> Int {{ erg v = {value}; erg size = if v > 10 {{ 4 }} else if v > 7 {{ 3 }} else if v > 3 {{ 2 }} else {{ 1 }}; return size; }}"
+            ),
+            expected,
+        );
+    }
+}
+
+#[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
+#[test]
+fn an_else_if_value_chain_runs_only_the_selected_arm() {
+    assert_exits_with(
+        "verb main() -> Int { erg y = 1; erg r = if y == 0 { 0 } else if y == 1 { 7 } else { 10 / (y - 1) }; return r; }",
+        7,
+    );
+}

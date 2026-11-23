@@ -634,3 +634,23 @@ fn run_command(root: &std::path::Path, arguments: &[&str]) -> std::process::Outp
         .output()
         .expect("run project command")
 }
+
+#[cfg(unix)]
+#[test]
+fn test_reports_a_failed_runtime_check_with_its_location() {
+    let root = create_test_project(
+        "runner-check",
+        "overflow.act",
+        "meta test\nverb overflows() -> Int {\n    erg x: u8 = 250u8;\n    erg y: u8 = x + 10u8;\n    return y as Int;\n}\n",
+    );
+    let output = run_test_command(&root);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(1), "stdout: {stdout}");
+    assert!(stdout.contains("exit code 101"), "stdout: {stdout}");
+    assert!(
+        stdout.contains("error: integer overflow at tests/overflow.act:4:17"),
+        "stdout: {stdout}"
+    );
+    assert!(stdout.contains("0 passed; 1 failed"), "stdout: {stdout}");
+    let _ = fs::remove_dir_all(root);
+}

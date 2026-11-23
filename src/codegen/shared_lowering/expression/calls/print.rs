@@ -49,7 +49,37 @@ pub(super) fn lower_print_call(
     };
     let label = source_arguments.first().and_then(|argument| argument.name.as_deref());
     let symbol = print_symbol(provider, callee, *value, label, span)?;
+    widen_small_integer_argument(provider, &mut arguments, span, instructions);
     emit_print_call(provider, symbol, arguments, span, instructions)
+}
+
+/// Extends an integer narrower than 32 bits, such as a `u8`, to the 32-bit
+/// parameter of the integer print runtime functions.
+fn widen_small_integer_argument(
+    provider: &mut SharedExpressionProvider<'_>,
+    arguments: &mut [BackendValueId],
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    let [source] = *arguments else { return };
+    let Some(source_type @ BackendValueType::Integer { width, .. }) = provider.value_type(source)
+    else {
+        return;
+    };
+    if width >= 32 {
+        return;
+    }
+    let target_type = BackendValueType::Integer { signed: true, width: 32 };
+    let widened = provider.allocate();
+    provider.remember_value(widened, target_type);
+    instructions.push(BackendInstruction::IntegerCast {
+        result: widened,
+        source,
+        source_type,
+        target_type,
+        span,
+    });
+    arguments[0] = widened;
 }
 
 fn normalize_bool_argument(
@@ -123,15 +153,6 @@ fn print_symbol(
                 crate::runtime::PRINT_BUFFER_STDERR_SYMBOL
             } else {
                 crate::runtime::PRINT_BUFFER_STDOUT_SYMBOL
-            })
-        }
-        Some(BackendValueType::Pointer)
-            if provider.nominal_type(value).is_some_and(|ty| ty.name == "String") =>
-        {
-            Ok(if stderr {
-                crate::runtime::PRINT_STRING_STDERR_SYMBOL
-            } else {
-                crate::runtime::WRITE_STRING_STDOUT_SYMBOL
             })
         }
         Some(BackendValueType::Pointer) => Ok(if stderr {

@@ -117,7 +117,10 @@ impl Analyzer {
     }
 }
 
-fn print_uses_label(arguments: &[Argument]) -> bool {
+/// Whether a `print` or `eprint` call uses a label of the built-in form, such
+/// as `string:` or `format:`; such a call is built in unless a verb in scope
+/// names all of its labels.
+pub(crate) fn print_uses_label(arguments: &[Argument]) -> bool {
     arguments.iter().any(|argument| {
         matches!(
             argument.name.as_deref(),

@@ -150,7 +150,7 @@ verb read_to_bytes_closes_each_owned_file() -> Int {
     if !write_ok {
         return 1;
     }
-    for erg attempt: u32 in 0u32 .. 2048u32 {
+    for erg attempt: u32 in 0u32..2048u32 {
         erg loaded = read_to_bytes(path: abs path);
         case dat loaded {
             Result.Ok(bytes) => {

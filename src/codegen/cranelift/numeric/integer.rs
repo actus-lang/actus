@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::{InstBuilder, TrapCode, types};
 use cranelift_frontend::FunctionBuilder;
+use cranelift_object::ObjectModule;
+
+use super::super::checks::{check_failed_if, emit_check_failure};
 
 use crate::codegen::{
     BackendEmitError, BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp,
@@ -13,6 +16,8 @@ pub(in crate::codegen::cranelift) fn lower_integer_binary(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::IntegerBinary { result, operation, left, right, ty, .. } = instruction
     else {
@@ -25,7 +30,7 @@ pub(in crate::codegen::cranelift) fn lower_integer_binary(
         BackendEmitError(format!("Cranelift binary right operand {} is unavailable", right.0))
     })?;
     let right = coerce_integer_width(builder, right, builder.func.dfg.value_type(left));
-    let value = match arithmetic(builder, *operation, *ty, left, right) {
+    let value = match arithmetic(builder, *operation, *ty, (left, right), (module, failure))? {
         Some(value) => value,
         None => match operation {
             BackendIntegerBinaryOp::ShiftLeft => builder.ins().ishl(left, right),
@@ -57,11 +62,11 @@ fn arithmetic(
     builder: &mut FunctionBuilder<'_>,
     operation: BackendIntegerBinaryOp,
     ty: BackendValueType,
-    left: cranelift_codegen::ir::Value,
-    right: cranelift_codegen::ir::Value,
-) -> Option<cranelift_codegen::ir::Value> {
+    (left, right): (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value),
+    (module, failure): (&mut ObjectModule, Option<&str>),
+) -> Result<Option<cranelift_codegen::ir::Value>, BackendEmitError> {
     let signed = is_signed(ty);
-    Some(match operation {
+    Ok(Some(match operation {
         BackendIntegerBinaryOp::Add => builder.ins().iadd(left, right),
         BackendIntegerBinaryOp::Subtract => builder.ins().isub(left, right),
         BackendIntegerBinaryOp::Multiply => builder.ins().imul(left, right),
@@ -69,7 +74,7 @@ fn arithmetic(
         | BackendIntegerBinaryOp::TrappingSubtract
         | BackendIntegerBinaryOp::TrappingMultiply => {
             let (value, overflow) = overflowing(builder, operation, signed, left, right);
-            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            check_failed_if(module, builder, overflow, TrapCode::INTEGER_OVERFLOW, failure)?;
             value
         }
         BackendIntegerBinaryOp::SaturatingAdd
@@ -81,8 +86,8 @@ fn arithmetic(
         BackendIntegerBinaryOp::Divide => builder.ins().udiv(left, right),
         BackendIntegerBinaryOp::Remainder if signed => builder.ins().srem(left, right),
         BackendIntegerBinaryOp::Remainder => builder.ins().urem(left, right),
-        _ => return None,
-    })
+        _ => return Ok(None),
+    }))
 }
 
 /// The wrapped result of an add, subtract or multiply and whether the exact
@@ -151,6 +156,8 @@ pub(in crate::codegen::cranelift) fn lower_integer_cast(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::IntegerCast { result, source, source_type, target_type, .. } =
         instruction
@@ -166,7 +173,7 @@ pub(in crate::codegen::cranelift) fn lower_integer_cast(
     let trap_block = builder.create_block();
     builder.ins().brif(valid, ok_block, &[], trap_block, &[]);
     builder.switch_to_block(trap_block);
-    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
+    emit_check_failure(module, builder, TrapCode::INTEGER_OVERFLOW, failure)?;
     builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.seal_block(ok_block);
@@ -251,6 +258,8 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_zero(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::TrapIfZero { value, .. } = instruction else {
         return Err(BackendEmitError("Cranelift zero guard expected".to_owned()));
@@ -265,7 +274,7 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_zero(
     let trap_block = builder.create_block();
     builder.ins().brif(nonzero, ok_block, &[], trap_block, &[]);
     builder.switch_to_block(trap_block);
-    builder.ins().trap(TrapCode::INTEGER_DIVISION_BY_ZERO);
+    emit_check_failure(module, builder, TrapCode::INTEGER_DIVISION_BY_ZERO, failure)?;
     builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.seal_block(ok_block);
@@ -276,6 +285,8 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_shift_count_out_of_range(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::TrapIfShiftCountOutOfRange { count, width, .. } = instruction else {
         return Err(BackendEmitError("Cranelift shift-count guard expected".to_owned()));
@@ -290,7 +301,7 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_shift_count_out_of_range(
     let trap_block = builder.create_block();
     builder.ins().brif(valid, ok_block, &[], trap_block, &[]);
     builder.switch_to_block(trap_block);
-    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
+    emit_check_failure(module, builder, TrapCode::INTEGER_OVERFLOW, failure)?;
     builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.seal_block(ok_block);
@@ -301,6 +312,8 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_array_index_out_of_bounds(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::TrapIfArrayIndexOutOfBounds { index, capacity, .. } = instruction
     else {
@@ -316,7 +329,7 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_array_index_out_of_bounds(
     let trap_block = builder.create_block();
     builder.ins().brif(valid, ok_block, &[], trap_block, &[]);
     builder.switch_to_block(trap_block);
-    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
+    emit_check_failure(module, builder, TrapCode::INTEGER_OVERFLOW, failure)?;
     builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.seal_block(ok_block);
@@ -327,6 +340,8 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_signed_division_overflow(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::TrapIfSignedDivisionOverflow { left, right, width, .. } = instruction
     else {
@@ -348,7 +363,7 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_signed_division_overflow(
     let trap_block = builder.create_block();
     builder.ins().brif(overflow, trap_block, &[], ok_block, &[]);
     builder.switch_to_block(trap_block);
-    builder.ins().trap(TrapCode::INTEGER_OVERFLOW);
+    emit_check_failure(module, builder, TrapCode::INTEGER_OVERFLOW, failure)?;
     builder.seal_block(trap_block);
     builder.switch_to_block(ok_block);
     builder.seal_block(ok_block);
@@ -435,6 +450,8 @@ pub(in crate::codegen::cranelift) fn lower_integer_unary(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     let BackendInstruction::IntegerUnary { result, operation, operand, .. } = instruction else {
         return Err(BackendEmitError("Cranelift integer unary operation expected".to_owned()));
@@ -461,7 +478,7 @@ pub(in crate::codegen::cranelift) fn lower_integer_unary(
                 zero,
                 operand,
             );
-            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            check_failed_if(module, builder, overflow, TrapCode::INTEGER_OVERFLOW, failure)?;
             value
         }
         BackendIntegerUnaryOp::LogicalNot => {

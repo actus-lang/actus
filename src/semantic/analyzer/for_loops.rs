@@ -22,7 +22,7 @@ impl Analyzer {
                 span: binding.span,
             });
         }
-        let parsed_type = self.for_range_type(binding)?;
+        let parsed_type = self.for_range_type(binding, start)?;
         let type_name = crate::ast::TypeName::builtin(
             parsed_type.name.clone(),
             parsed_type.arguments.clone(),
@@ -43,21 +43,35 @@ impl Analyzer {
         result
     }
 
-    fn for_range_type(&self, binding: &ForBinding) -> Result<crate::ast::TypeName, SemanticError> {
-        let parsed_type = binding
-            .ty
+    /// The integer type of a range binding: its annotation, or without one
+    /// the type of the range's start, which is `Int` for a plain literal.
+    fn for_range_type(
+        &mut self,
+        binding: &ForBinding,
+        start: &Expr,
+    ) -> Result<crate::ast::TypeName, SemanticError> {
+        let declared = match binding.ty.as_deref() {
+            Some(name) => Some(name.to_owned()),
+            None => {
+                self.visit_expression(start)?;
+                Some(self.expression_type_name(start).unwrap_or_else(|| "Int".to_owned()))
+            }
+        };
+        let parsed_type = declared
             .as_deref()
             .and_then(|name| super::super::calls::parse_type_name_key(name, binding.span))
             .ok_or_else(|| SemanticError {
                 kind: SemanticErrorKind::MalformedTypeName {
-                    name: "for range binding requires an explicit integer type".to_owned(),
+                    name: "for range binding requires an integer type".to_owned(),
                 },
                 span: binding.span,
             })?;
-        if matches!(
-            crate::ast::primitive_type(&parsed_type.name),
-            Some(crate::ast::PrimitiveType::Integer { .. })
-        ) {
+        if parsed_type.name == "Int"
+            || matches!(
+                crate::ast::primitive_type(&parsed_type.name),
+                Some(crate::ast::PrimitiveType::Integer { .. })
+            )
+        {
             Ok(parsed_type)
         } else {
             Err(SemanticError {

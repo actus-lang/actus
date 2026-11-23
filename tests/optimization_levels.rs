@@ -1,18 +1,20 @@
 //! Every optimization level keeps the observable behavior of a program
 //! (ADR-0114): each fixture in `tests/fixtures/optimization` is built with
 //! the `debug`, `release` and `size` profiles on every compiled backend and
-//! must exit with the same status, and every guard must still trap.
+//! must exit with the same status, and every failed guard must still be
+//! reported (ADR-0117).
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 
 const PROFILES: [&str; 3] = ["debug", "release", "size"];
 
 #[derive(Clone, Copy, Debug)]
 enum Expected {
     Exit(i32),
-    Trap,
+    /// The program stops with status 101 and reports this failed check.
+    CheckFailure(&'static str),
 }
 
 fn backends() -> Vec<&'static str> {
@@ -54,20 +56,6 @@ fn build(source: &Path, profile: &str, backend: &str, emit: &str, output: &Path)
     );
 }
 
-/// A guard ends the program through the trap instruction: `SIGILL` from
-/// `ud2` on x86, `SIGTRAP` from `brk` on AArch64. Any other signal, such as
-/// a segmentation fault, means the guard did not run.
-#[cfg(unix)]
-fn trapped(status: ExitStatus) -> bool {
-    use std::os::unix::process::ExitStatusExt;
-    matches!(status.signal(), Some(4 | 5))
-}
-
-#[cfg(not(unix))]
-fn trapped(status: ExitStatus) -> bool {
-    !status.success() && status.code().is_some_and(|code| code < 0)
-}
-
 fn assert_matrix(name: &str, expected: Expected) {
     let source = fixture(name);
     let root = work_directory(name);
@@ -75,15 +63,22 @@ fn assert_matrix(name: &str, expected: Expected) {
         for profile in PROFILES {
             let program = root.join(format!("{backend}-{profile}{}", std::env::consts::EXE_SUFFIX));
             build(&source, profile, backend, "exe", &program);
-            let status = Command::new(&program).status().expect("run optimization fixture");
+            let execution = Command::new(&program).output().expect("run optimization fixture");
+            let status = execution.status;
             match expected {
                 Expected::Exit(code) => assert_eq!(
                     status.code(),
                     Some(code),
                     "{name}: {backend} {profile} exited with {status:?}"
                 ),
-                Expected::Trap => {
-                    assert!(trapped(status), "{name}: {backend} {profile} did not trap: {status:?}")
+                Expected::CheckFailure(message) => {
+                    let stderr = String::from_utf8_lossy(&execution.stderr);
+                    assert_eq!(status.code(), Some(101), "{name}: {backend} {profile}: {status:?}");
+                    assert!(
+                        stderr.starts_with(&format!("error: {message} at "))
+                            && stderr.contains(&format!("{name}.act:")),
+                        "{name}: {backend} {profile} reported {stderr:?}"
+                    );
                 }
             }
         }
@@ -117,60 +112,60 @@ fn struct_temporaries_in_a_loop_are_identical_at_every_level() {
 }
 
 #[test]
-fn division_by_zero_traps_at_every_level() {
-    assert_matrix("division_by_zero", Expected::Trap);
+fn division_by_zero_is_reported_at_every_level() {
+    assert_matrix("division_by_zero", Expected::CheckFailure("division by zero"));
 }
 
 #[test]
-fn remainder_by_zero_traps_at_every_level() {
-    assert_matrix("remainder_by_zero", Expected::Trap);
+fn remainder_by_zero_is_reported_at_every_level() {
+    assert_matrix("remainder_by_zero", Expected::CheckFailure("division by zero"));
 }
 
 #[test]
-fn signed_division_overflow_traps_at_every_level() {
-    assert_matrix("signed_division_overflow", Expected::Trap);
+fn signed_division_overflow_is_reported_at_every_level() {
+    assert_matrix("signed_division_overflow", Expected::CheckFailure("integer overflow"));
 }
 
 #[test]
-fn shift_count_out_of_range_traps_at_every_level() {
-    assert_matrix("shift_count", Expected::Trap);
+fn shift_count_out_of_range_is_reported_at_every_level() {
+    assert_matrix("shift_count", Expected::CheckFailure("shift count out of range"));
 }
 
 #[test]
-fn array_index_out_of_bounds_traps_at_every_level() {
-    assert_matrix("array_index", Expected::Trap);
+fn array_index_out_of_bounds_is_reported_at_every_level() {
+    assert_matrix("array_index", Expected::CheckFailure("index out of bounds"));
 }
 
 #[test]
-fn checked_cast_overflow_traps_at_every_level() {
-    assert_matrix("cast_overflow", Expected::Trap);
+fn checked_cast_overflow_is_reported_at_every_level() {
+    assert_matrix("cast_overflow", Expected::CheckFailure("integer value out of range"));
 }
 
 /// ADR-0115: `+`, `-`, `*`, unary `-` and `+=` trap on overflow at every
 /// level; results at a bound and the wrapping and saturating operators do not.
 #[test]
-fn addition_overflow_traps_at_every_level() {
-    assert_matrix("add_overflow", Expected::Trap);
+fn addition_overflow_is_reported_at_every_level() {
+    assert_matrix("add_overflow", Expected::CheckFailure("integer overflow"));
 }
 
 #[test]
-fn subtraction_underflow_traps_at_every_level() {
-    assert_matrix("subtract_underflow", Expected::Trap);
+fn subtraction_underflow_is_reported_at_every_level() {
+    assert_matrix("subtract_underflow", Expected::CheckFailure("integer overflow"));
 }
 
 #[test]
-fn multiplication_overflow_traps_at_every_level() {
-    assert_matrix("multiply_overflow", Expected::Trap);
+fn multiplication_overflow_is_reported_at_every_level() {
+    assert_matrix("multiply_overflow", Expected::CheckFailure("integer overflow"));
 }
 
 #[test]
-fn negation_overflow_traps_at_every_level() {
-    assert_matrix("negate_overflow", Expected::Trap);
+fn negation_overflow_is_reported_at_every_level() {
+    assert_matrix("negate_overflow", Expected::CheckFailure("integer overflow"));
 }
 
 #[test]
-fn compound_assignment_overflow_traps_at_every_level() {
-    assert_matrix("compound_overflow", Expected::Trap);
+fn compound_assignment_overflow_is_reported_at_every_level() {
+    assert_matrix("compound_overflow", Expected::CheckFailure("integer overflow"));
 }
 
 #[test]

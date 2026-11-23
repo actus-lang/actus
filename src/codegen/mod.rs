@@ -36,8 +36,8 @@ pub use contract::{
     BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp, BackendIntegerUnaryOp,
     BackendLayout, BackendModule, BackendParameter, BackendPassingMode, BackendReturn,
     BackendReturnMode, BackendTargetContext, BackendUnsupportedOperation, BackendValueId,
-    BackendValueType, lower_semantic_cleanup, lower_semantic_cleanup_with_provider,
-    validate_edge_arguments,
+    BackendValueType, RuntimeCheckReporting, lower_semantic_cleanup,
+    lower_semantic_cleanup_with_provider, runtime_check, validate_edge_arguments,
 };
 
 pub use linker::{LinkerPlan, NativeLinkError, link_object, link_objects};

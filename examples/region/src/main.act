@@ -82,9 +82,9 @@ verb cancel_region(ins region: region::Region[Array[u16, 2]]) -> Int {
             erg canceled = region::region_cancel[Array[u16, 2]](region: ins region);
             return case dat canceled {
                 Result.Ok(value) => if value == 0 {
-                    0;
+                    0
                 } else {
-                    6;
+                    6
                 },
                 Result.Err(_) => 6,
             };

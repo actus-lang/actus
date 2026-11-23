@@ -16,7 +16,7 @@ pub(super) unsafe fn write_buffer(handle: BufferHandle, stderr: bool, newline: b
         let mut stream = std::io::stderr().lock();
         write_bytes(&mut stream, bytes, newline)
     } else {
-        let mut stream = std::io::stdout().lock();
+        let mut stream = super::console::stdout().lock();
         write_bytes(&mut stream, bytes, newline)
     };
     if result.is_err() {
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn actus_cursor_flush(handle: BufferHandle) -> i32 {
 
 unsafe fn flush_raw_buffer(buffer: &mut ActusBuffer) -> std::io::Result<()> {
     let written = unsafe { actus_write_buffer_stdout(buffer as *mut ActusBuffer) };
-    if written < 0 || std::io::stdout().flush().is_err() {
+    if written < 0 || super::console::stdout().flush().is_err() {
         Err(std::io::Error::other("buffered stdout write failed"))
     } else {
         buffer.length = 0;

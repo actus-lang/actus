@@ -3,7 +3,7 @@
 use super::super::super::BackendValueType;
 use super::super::BackendContractError;
 use super::super::contract::unsupported;
-use crate::ast::{Argument, Block, CaseBody, Expr, ForBinding, IfBranch, Place, Role, Stmt};
+use crate::ast::{Argument, Block, CaseBody, Expr, IfBranch, Place, Role, Stmt};
 use crate::lexer::SourceSpan;
 
 pub(in crate::codegen::body) fn is_loop_carried_type(ty: BackendValueType) -> bool {
@@ -15,11 +15,13 @@ pub(in crate::codegen::body) fn is_loop_carried_type(ty: BackendValueType) -> bo
     )
 }
 
+/// The backend type of a range binding declared as `name`; `u32` without
+/// an annotation.
 pub(in crate::codegen::body) fn range_binding_type(
-    binding: &ForBinding,
+    name: Option<&str>,
     span: SourceSpan,
 ) -> Result<BackendValueType, BackendContractError> {
-    let name = binding.ty.as_deref().unwrap_or("u32");
+    let name = name.unwrap_or("u32");
     let (signed, width) = match name {
         "Int" | "i8" | "i16" | "i32" | "i64" => (true, integer_width(name)),
         "u8" | "u16" | "u32" | "u64" => (false, integer_width(name)),

@@ -18,9 +18,9 @@ verb public_text_boundary_test() -> Int {
             drop(text);
             return case dat first {
                 Result.Ok(byte) => if byte == 65 {
-                    0;
+                    0
                 } else {
-                    1;
+                    1
                 },
                 Result.Err(_) => 2,
             };

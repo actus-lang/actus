@@ -30,7 +30,12 @@ pub fn emit_contract_module_object_with_local_symbols(
     let mut module = create_module(configuration, target)?;
     let declarations = declarations::declare_functions(&mut module, backend_module, local_symbols)?;
     for function in &backend_module.functions {
-        functions::define_function(&mut module, function, &declarations)?;
+        functions::define_function(
+            &mut module,
+            function,
+            &declarations,
+            &backend_module.runtime_checks,
+        )?;
     }
     module.finish().emit().map_err(|error| BackendEmitError(error.to_string()))
 }

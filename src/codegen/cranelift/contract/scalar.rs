@@ -5,6 +5,7 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
+use super::super::checks::lower_trap_if_buffer_index_out_of_bounds;
 use super::super::native::BackendEmitError;
 use super::super::numeric::{
     lower_trap_if_array_index_out_of_bounds, lower_trap_if_shift_count_out_of_range,
@@ -16,17 +17,24 @@ pub(super) fn lower_guard(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+    module: &mut ObjectModule,
+    failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
     match instruction {
-        BackendInstruction::TrapIfZero { .. } => lower_trap_if_zero(builder, instruction, values),
+        BackendInstruction::TrapIfZero { .. } => {
+            lower_trap_if_zero(builder, instruction, values, module, failure)
+        }
         BackendInstruction::TrapIfSignedDivisionOverflow { .. } => {
-            lower_trap_if_signed_division_overflow(builder, instruction, values)
+            lower_trap_if_signed_division_overflow(builder, instruction, values, module, failure)
         }
         BackendInstruction::TrapIfShiftCountOutOfRange { .. } => {
-            lower_trap_if_shift_count_out_of_range(builder, instruction, values)
+            lower_trap_if_shift_count_out_of_range(builder, instruction, values, module, failure)
         }
         BackendInstruction::TrapIfArrayIndexOutOfBounds { .. } => {
-            lower_trap_if_array_index_out_of_bounds(builder, instruction, values)
+            lower_trap_if_array_index_out_of_bounds(builder, instruction, values, module, failure)
+        }
+        BackendInstruction::TrapIfBufferIndexOutOfBounds { .. } => {
+            lower_trap_if_buffer_index_out_of_bounds(builder, instruction, values, module, failure)
         }
         _ => Err(BackendEmitError("Cranelift guard instruction is not supported".to_owned())),
     }

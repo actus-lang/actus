@@ -14,7 +14,7 @@ use super::super::{
     BackendValueId, BackendValueType,
 };
 use super::context::{LlvmContext, LlvmModule};
-use super::control_flow::{BlockParameters, emit_blocks};
+use super::control_flow::{BlockParameters, ModuleEmission, emit_blocks};
 use super::declarations::{
     FunctionDeclaration, apply_freestanding_attribute, declare_cleanup_bridge, declare_function,
 };
@@ -38,12 +38,17 @@ pub(super) fn lower_module(
             apply_freestanding_attribute(context.raw, declaration.value)?;
         }
     }
+    let emission = ModuleEmission {
+        pointer_width,
+        declarations: &declarations,
+        runtime_checks: &module.runtime_checks,
+    };
     for function in &module.functions {
         let declaration = declarations
             .get(function.symbol.as_str())
             .copied()
             .ok_or_else(|| BackendEmitError("LLVM function declaration is missing".to_owned()))?;
-        emit_function(context.raw, pointer_width, function, declaration, &declarations)?;
+        emit_function(context.raw, &emission, function, declaration)?;
     }
     Ok((context, owned_module))
 }
@@ -236,18 +241,16 @@ fn cleanup_bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
 
 fn emit_function(
     context: LLVMContextRef,
-    pointer_width: u8,
+    emission: &ModuleEmission<'_>,
     function: &BackendFunction,
     declaration: FunctionDeclaration,
-    declarations: &BTreeMap<String, FunctionDeclaration>,
 ) -> Result<(), BackendEmitError> {
     let blocks = append_blocks(context, declaration.value, function)?;
     let builder = unsafe { LLVMCreateBuilderInContext(context) };
     if builder.is_null() {
         return Err(BackendEmitError("LLVM failed to create a builder".to_owned()));
     }
-    let result =
-        emit_blocks(context, builder, pointer_width, function, declaration, declarations, &blocks);
+    let result = emit_blocks(context, builder, emission, function, declaration, &blocks);
     unsafe { LLVMDisposeBuilder(builder) };
     result
 }

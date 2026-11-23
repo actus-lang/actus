@@ -121,6 +121,21 @@ fn std_io_native_bridge_prints_string_text() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[test]
+fn std_io_native_print_without_newline_reaches_stdout_at_exit() {
+    let (root, input, output) = project(
+        "unflushed",
+        "open stdout;\nopen error;\n",
+        &["stdout.act", "error.act"],
+        "import { open io }; verb main() { erg text = \"no newline\"; print(abs text); }\n",
+    );
+    build(&input, &output);
+    let execution = Command::new(&output).output().expect("unflushed fixture should run");
+    assert_eq!(execution.status.code(), Some(0));
+    assert_eq!(execution.stdout, b"no newline");
+    let _ = fs::remove_dir_all(root);
+}
+
 fn assert_labelled_print_output(backend: &str) {
     let (root, input, output) = project(
         &format!("labelled-{backend}"),
@@ -131,7 +146,7 @@ fn assert_labelled_print_output(backend: &str) {
     build_with_backend(&input, &output, backend);
     let execution = Command::new(&output).output().expect("labelled print fixture should run");
     assert_eq!(execution.status.code(), Some(0));
-    assert_eq!(execution.stdout, b"Hi42\ntrue\nscore=42\nok=true\n");
+    assert_eq!(execution.stdout, b"Hi\n42\ntrue\nscore=42\nok=true\n");
     assert_eq!(execution.stderr, b"");
     let _ = fs::remove_dir_all(root);
 }

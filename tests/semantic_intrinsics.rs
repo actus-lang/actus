@@ -225,6 +225,31 @@ fn rejects_labelled_print_intrinsic_with_a_mismatched_type() {
 }
 
 #[test]
+fn accepts_a_u8_binding_for_the_byte_label() {
+    analyze_source("verb main() { erg b: u8 = 200u8; print(byte: b); eprint(byte: b); }")
+        .expect("a u8 binding should be valid for the byte label");
+}
+
+#[test]
+fn rejects_the_byte_label_for_values_that_are_not_u8() {
+    for source in [
+        "verb main() { erg s: String = \"x\"; print(byte: s); }",
+        "verb main() { erg n = 5; print(byte: n); }",
+        "verb main() { erg n: u16 = 5u16; print(byte: n); }",
+        "verb main() { erg s: String = \"x\"; eprint(byte: s); }",
+    ] {
+        let error = analyze_source(source).expect_err("byte label must reject non-u8 values");
+        assert!(
+            matches!(
+                error.kind,
+                SemanticErrorKind::InvalidIntrinsicArgument { ref parameter, .. } if parameter == "byte"
+            ),
+            "{source}: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn validates_typed_constants_and_resolves_constant_references() {
     analyze_source("const FRAME_HEADER: u16 = 12u16; verb main() -> u16 { return FRAME_HEADER; }")
         .expect("typed constant reference should be valid");
@@ -496,6 +521,54 @@ fn rejects_primitive_integer_overflow_and_unsigned_underflow() {
         let error = analyze_source(source).expect_err("out-of-range literal must be rejected");
         assert!(matches!(error.kind, SemanticErrorKind::NumericLiteralOutOfRange { .. }));
     }
+}
+
+#[test]
+fn accepts_a_negated_literal_as_one_value_at_the_type_minimum() {
+    for source in [
+        "verb main() { erg value: i8 = -128i8; }",
+        "verb main() { erg value: i32 = -2147483648i32; }",
+        "verb main() { erg value: i64 = -9223372036854775808i64; }",
+        "verb main() { erg value = -2147483648; }",
+    ] {
+        analyze_source(source).unwrap_or_else(|error| panic!("{source} must pass: {error:?}"));
+    }
+}
+
+#[test]
+fn rejects_a_negated_literal_below_the_type_minimum() {
+    let error = analyze_source("verb main() { erg value: i8 = -129i8; }")
+        .expect_err("-129i8 must be rejected");
+    assert!(matches!(
+        &error.kind,
+        SemanticErrorKind::NumericLiteralOutOfRange { ty, literal }
+            if ty == "i8" && literal == "-129"
+    ));
+}
+
+#[test]
+fn rejects_an_unsuffixed_literal_outside_int_when_no_type_is_expected() {
+    let error = analyze_source("verb main() { erg value = 2147483648; }")
+        .expect_err("an unsuffixed literal without context is an Int");
+    assert!(matches!(
+        &error.kind,
+        SemanticErrorKind::NumericLiteralOutOfRange { ty, .. } if ty == "Int"
+    ));
+    analyze_source("verb main() { erg value: u64 = 3000000000; }")
+        .expect("an expected type directs the literal");
+}
+
+#[test]
+fn checks_a_bare_literal_for_the_byte_label_against_u8() {
+    for source in ["verb main() { print(byte: 300); }", "verb main() { eprint(byte: 256); }"] {
+        let error = analyze_source(source).expect_err("byte literal above 255 must fail");
+        assert!(matches!(
+            &error.kind,
+            SemanticErrorKind::NumericLiteralOutOfRange { ty, .. } if ty == "u8"
+        ));
+    }
+    analyze_source("verb main() { print(byte: 255); eprint(byte: 0); }")
+        .expect("literals within 0..=255 should pass");
 }
 
 #[test]

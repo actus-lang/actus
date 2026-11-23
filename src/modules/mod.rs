@@ -1,5 +1,6 @@
 pub(crate) mod aggregation;
 mod package_sources;
+mod resolution_error;
 mod resolver;
 
 pub(crate) use aggregation::DeclarationRegistry;

@@ -115,6 +115,9 @@ fn lex_message(error: &LexError) -> String {
     }
 }
 
+/// Message for a verb body that ends in a value without `return`; it shows the fix.
+const VALUE_WITHOUT_RETURN_MESSAGE: &str = "expected `;` after this expression; a verb returns a value with `return`, as in `return <expression>;`";
+
 fn parse_message(error: &ParseError) -> String {
     match &error.kind {
         ParseErrorKind::UnexpectedToken { expected, found } => {
@@ -123,9 +126,7 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::UnexpectedEndOfInput { expected } => {
             format!("expected {expected}, found end of input")
         }
-        ParseErrorKind::DuplicateName { kind, name } => {
-            format!("duplicate {kind} `{name}`")
-        }
+        ParseErrorKind::DuplicateName { kind, name } => format!("duplicate {kind} `{name}`"),
         ParseErrorKind::UnknownKeyword { name } => format!("unknown keyword `{name}`"),
         ParseErrorKind::UnknownMetadata { name } => format!("unknown metadata attribute `{name}`"),
         ParseErrorKind::UnsupportedTargetPlatform { name } => {
@@ -172,6 +173,7 @@ fn parse_message(error: &ParseError) -> String {
         ParseErrorKind::OpenImportRequiresBlock => {
             "`open` imports are only allowed inside an `import { ... };` block".to_owned()
         }
+        ParseErrorKind::ValueWithoutReturn => VALUE_WITHOUT_RETURN_MESSAGE.to_owned(),
     }
 }
 

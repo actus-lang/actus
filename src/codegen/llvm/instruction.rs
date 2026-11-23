@@ -18,6 +18,7 @@ pub(super) struct InstructionContext<'a> {
     pub(super) function: &'a BackendFunction,
     pub(super) declaration: FunctionDeclaration,
     pub(super) declarations: &'a BTreeMap<String, FunctionDeclaration>,
+    pub(super) runtime_checks: &'a super::super::RuntimeCheckReporting,
     pub(super) blocks:
         &'a BTreeMap<super::super::BackendBlockId, llvm_sys::prelude::LLVMBasicBlockRef>,
     pub(super) block_parameters: &'a BlockParameters,
@@ -34,6 +35,7 @@ pub(super) fn emit_instruction(
         context.declaration.value,
         instruction,
         context.values,
+        context.runtime_checks,
     ) {
         return result;
     }
@@ -63,11 +65,23 @@ fn emit_non_control_instruction(
     context: &mut InstructionContext<'_>,
     instruction: &BackendInstruction,
 ) -> Result<bool, BackendEmitError> {
+    if let BackendInstruction::ArenaConstruct { .. } | BackendInstruction::ArenaPlace { .. } =
+        instruction
+    {
+        let failure = context.runtime_checks.failure(instruction);
+        return super::arena::emit(
+            context.context,
+            context.builder,
+            context.pointer_width,
+            instruction,
+            context.values,
+            failure.as_deref(),
+        );
+    }
     if is_aggregate_instruction(instruction) {
         return super::aggregate::emit_aggregate_instruction(
             context.context,
             context.builder,
-            context.pointer_width,
             instruction,
             context.declarations,
             context.values,
@@ -116,10 +130,11 @@ fn emit_terminal_instruction(
             Ok(false)
         }
         BackendInstruction::Trap { .. } => {
-            super::guards::emit_llvm_trap(
+            super::guards::emit_check_failure(
                 context.context,
                 context.declaration.value,
                 context.builder,
+                context.runtime_checks.failure(instruction).as_deref(),
             )?;
             Ok(true)
         }

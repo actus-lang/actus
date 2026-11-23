@@ -19,9 +19,9 @@ verb process_arguments_are_bounded_and_ordered() -> Int {
                     erg length: Option[Int] = value;
                     return case dat length {
                         Option.Some(byte_count) => if byte_count >= 0 {
-                            0;
+                            0
                         } else {
-                            4;
+                            4
                         },
                         Option.None => 5,
                     };

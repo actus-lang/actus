@@ -14,6 +14,7 @@ pub(super) fn define_function(
     module: &mut ObjectModule,
     function: &BackendFunction,
     declarations: &BTreeMap<String, Declaration>,
+    runtime_checks: &crate::codegen::RuntimeCheckReporting,
 ) -> Result<(), BackendEmitError> {
     if function.blocks.is_empty() {
         return Err(BackendEmitError(
@@ -33,7 +34,13 @@ pub(super) fn define_function(
         false,
     )?;
     let mut function_context = FunctionBuilderContext::new();
-    lower_function_body(module, function, declarations, &mut context, &mut function_context)?;
+    lower_function_body(
+        module,
+        function,
+        (declarations, runtime_checks),
+        &mut context,
+        &mut function_context,
+    )?;
     module.define_function(declaration.id, &mut context).map_err(|error| {
         let calls = function
             .blocks
@@ -66,7 +73,10 @@ pub(super) fn define_function(
 fn lower_function_body(
     module: &mut ObjectModule,
     function: &BackendFunction,
-    declarations: &BTreeMap<String, Declaration>,
+    (declarations, runtime_checks): (
+        &BTreeMap<String, Declaration>,
+        &crate::codegen::RuntimeCheckReporting,
+    ),
     context: &mut cranelift_codegen::Context,
     function_context: &mut FunctionBuilderContext,
 ) -> Result<(), BackendEmitError> {
@@ -102,6 +112,7 @@ fn lower_function_body(
         values: &mut values,
         aggregate_values: &mut aggregate_values,
         function,
+        runtime_checks,
     };
     lower_blocks(module, &mut builder, &mut state)?;
     builder.seal_all_blocks();
@@ -198,6 +209,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         | BackendInstruction::TrapIfZero { value: source, .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { count: source, .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { index: source, .. }
+        | BackendInstruction::TrapIfBufferIndexOutOfBounds { status: source, .. }
         | BackendInstruction::EnumDiscriminant { subject: source, .. }
         | BackendInstruction::EnumPayload { subject: source, .. }
         | BackendInstruction::EnumPayloadBinding { subject: source, .. } => vec![*source],

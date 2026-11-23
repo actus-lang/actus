@@ -48,9 +48,9 @@ verb walker_emits_root_enter_event() -> Int {
                     Option.None => 3,
                     Option.Some(event) => {
                         erg result = if event.kind == fs::WalkEventKind.EnterDirectory && event.depth == 0u32 {
-                            0;
+                            0
                         } else {
-                            4;
+                            4
                         };
                         drop(event);
                         result;
@@ -87,9 +87,9 @@ verb walker_emits_root_leave_event() -> Int {
                     Option.None => 3,
                     Option.Some(event) => {
                         erg result = if event.kind == fs::WalkEventKind.LeaveDirectory {
-                            0;
+                            0
                         } else {
-                            4;
+                            4
                         };
                         drop(event);
                         result;

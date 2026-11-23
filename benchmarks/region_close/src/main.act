@@ -56,7 +56,7 @@ verb drop_once() -> Int {
 
 verb main() -> Int {
     erg close_started: u64 = monotonic_nanos();
-    for erg iteration: u32 in 0u32 .. 10000u32 {
+    for erg iteration: u32 in 0u32..10000u32 {
         erg status: Int = close_once();
         if status != 0 {
             return status;
@@ -64,7 +64,7 @@ verb main() -> Int {
     }
     erg close_finished: u64 = monotonic_nanos();
     erg drop_started: u64 = monotonic_nanos();
-    for erg iteration: u32 in 0u32 .. 10000u32 {
+    for erg iteration: u32 in 0u32..10000u32 {
         erg status: Int = drop_once();
         if status != 0 {
             return status;

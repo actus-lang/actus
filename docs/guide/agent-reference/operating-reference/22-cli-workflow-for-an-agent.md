@@ -8,11 +8,12 @@ This page preserves the complete technical detail for this source section. The s
 
 ```sh
 actus new my_program
-actus new my_program --runtime std
+actus new my_program --runtime core
 actus init --no-git
 ```
 
 `new` creates a project directory. `init` initializes an existing directory.
+Both select the hosted `std` runtime profile unless `--runtime core` is given.
 Neither command should be assumed to compile or publish code.
 
 ### Validate and build

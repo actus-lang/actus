@@ -51,9 +51,18 @@ impl Parser {
             return Ok(None);
         }
         if self.match_simple(TokenKind::If) {
-            return Ok(Some(IfBranch::ElseIf(Box::new(
-                self.parse_if_expression(self.previous().span)?,
-            ))));
+            // An `else if` continues its chain: in a statement chain every
+            // block is a statement block, so a block ending in `call();`
+            // has no value, just as in the first branch.
+            let start = self.previous().span;
+            let (condition, then_branch, else_branch, end) =
+                self.parse_if_parts(allow_statement_conditionals)?;
+            return Ok(Some(IfBranch::ElseIf(Box::new(Expr::If {
+                condition: Box::new(condition),
+                then_branch,
+                else_branch,
+                span: SourceSpan::new(start.start, end),
+            }))));
         }
         let block = if allow_statement_conditionals {
             self.parse_block_with_statement_conditionals(true)?

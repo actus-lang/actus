@@ -27,6 +27,8 @@ impl Analyzer {
             if let Some(expected) = expected {
                 self.validate_expected_literal(expression, expected)?;
                 self.validate_void_expression(expression, expected)?;
+            } else {
+                self.validate_default_integer_literal(expression)?;
             }
             Ok(())
         });
@@ -94,7 +96,7 @@ impl Analyzer {
         expression: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.visit_consumed_expression(expression)?;
+        self.visit_unary_operand(operator, expression)?;
         self.validate_unary_operator(operator, expression)?;
         let unary = Expr::Unary { operator, expression: Box::new(expression.clone()), span };
         self.validate_typed_integer_expression(&unary)
@@ -106,7 +108,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn record_literal_fact(
+    pub(crate) fn record_literal_fact(
         &mut self,
         kind: &'static str,
         value: &str,

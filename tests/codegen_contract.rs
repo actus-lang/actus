@@ -10,10 +10,10 @@ use actus::codegen::{
     BackendFailure, BackendFunction, BackendInstruction, BackendLayout, BackendLayoutProvider,
     BackendModule, BackendParameter, BackendPassingMode, BackendReturn, BackendReturnMode,
     BackendTargetContext, BackendUnsupportedOperation, BackendValueId, BackendValueType,
-    LoweredCleanupInstruction, SymbolIdentity, SymbolKind, lower_scalar_program,
-    lower_semantic_cleanup, lower_semantic_cleanup_with_provider, lower_verb, lower_verb_body,
-    lower_verb_body_with_expressions, lower_verb_signature, lower_verb_with_cleanup,
-    validate_edge_arguments,
+    LoweredCleanupInstruction, RuntimeCheckReporting, SymbolIdentity, SymbolKind,
+    lower_scalar_program, lower_semantic_cleanup, lower_semantic_cleanup_with_provider, lower_verb,
+    lower_verb_body, lower_verb_body_with_expressions, lower_verb_signature,
+    lower_verb_with_cleanup, runtime_check, validate_edge_arguments,
 };
 use actus::lexer::{SourceSpan, scan};
 use actus::parser::parse;
@@ -1107,6 +1107,7 @@ fn validates_functions_and_external_symbols_as_one_neutral_module() {
                 instructions: Vec::new(),
             }],
         )],
+        ..Default::default()
     };
     assert!(module.validate().is_ok());
 
@@ -1130,6 +1131,7 @@ fn validates_functions_and_external_symbols_as_one_neutral_module() {
                 }],
             ),
         ],
+        ..Default::default()
     };
     assert_eq!(duplicate.validate(), Err(BackendContractError::DuplicateModuleSymbol));
 }
@@ -1480,4 +1482,31 @@ fn validates_loop_edge_argument_shape_before_backend_lowering() {
         validate_edge_arguments(&parameters, &[]),
         Err(BackendContractError::InvalidBlockArguments(_))
     ));
+}
+
+#[test]
+fn runtime_check_reporting_names_the_check_and_its_location() {
+    let span = SourceSpan::new(4, 9);
+    let check = BackendInstruction::TrapIfZero {
+        value: BackendValueId(0),
+        reason: "integer division or remainder by zero".to_owned(),
+        span,
+    };
+    assert_eq!(runtime_check(&check), Some(("division by zero", span)));
+    assert_eq!(RuntimeCheckReporting::Trap.failure(&check), None);
+
+    let located = RuntimeCheckReporting::Report {
+        locations: [((4, 9), "src/main.act:3:5".to_owned())].into_iter().collect(),
+    };
+    assert_eq!(located.failure(&check).as_deref(), Some("division by zero at src/main.act:3:5"));
+    let unlocated = RuntimeCheckReporting::Report { locations: Default::default() };
+    assert_eq!(unlocated.failure(&check).as_deref(), Some("division by zero"));
+
+    let wrapping = BackendInstruction::Constant {
+        result: BackendValueId(1),
+        ty: BackendValueType::Bool,
+        value: 0,
+        span,
+    };
+    assert_eq!(runtime_check(&wrapping), None);
 }

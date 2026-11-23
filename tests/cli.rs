@@ -14,3 +14,6 @@ mod backend_selection;
 mod commands;
 #[path = "cli/control_flow.rs"]
 mod control_flow;
+#[cfg(unix)]
+#[path = "cli/runtime_checks.rs"]
+mod runtime_checks;
