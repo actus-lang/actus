@@ -55,6 +55,49 @@ impl Analyzer {
         self.validate_expected_literal(expression, &expected)
     }
 
+    /// Visits the operand of a unary operator. `-N` is one value: the literal alone may be out
+    /// of range (`128i8`) while `-N` fits, so a typed integer literal under `-` is not checked
+    /// by itself; the whole negated literal is checked afterwards.
+    pub(crate) fn visit_unary_operand(
+        &mut self,
+        operator: crate::ast::UnaryOp,
+        operand: &Expr,
+    ) -> Result<(), SemanticError> {
+        if let (crate::ast::UnaryOp::Negate, Expr::Integer { value, suffix, span }) =
+            (operator, operand)
+            && suffix.as_deref().is_some_and(|name| {
+                matches!(primitive_type(name), Some(PrimitiveType::Integer { .. }))
+            })
+        {
+            self.record_origin(operand);
+            self.record_literal_fact("integer", value, suffix, *span);
+            return Ok(());
+        }
+        self.visit_consumed_expression(operand)
+    }
+
+    /// An unsuffixed integer literal with no expected type is an `Int`; reject values outside it.
+    pub(crate) fn validate_default_integer_literal(
+        &self,
+        expression: &Expr,
+    ) -> Result<(), SemanticError> {
+        if integer_literal_suffix(expression).is_some() {
+            return Ok(());
+        }
+        let span = crate::semantic::analyzer::expression_span(expression);
+        // `Int` is a 32-bit signed integer; report the error under its own name.
+        self.validate_expected_literal(
+            expression,
+            &TypeName::builtin("i32", Vec::new(), None, span),
+        )
+        .map_err(|mut error| {
+            if let SemanticErrorKind::NumericLiteralOutOfRange { ty, .. } = &mut error.kind {
+                *ty = "Int".to_owned();
+            }
+            error
+        })
+    }
+
     pub(crate) fn validate_expected_literal(
         &self,
         expression: &Expr,

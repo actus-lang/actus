@@ -161,6 +161,11 @@ fn emit_constant(
     values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
 ) -> Result<bool, BackendEmitError> {
     let llvm_type = super::super::values::llvm_type(context, ty)?;
+    // A negated literal arrives sign-extended to 64 bits; LLVM needs only the type's own bits.
+    let value = match ty {
+        BackendValueType::Integer { width, .. } if width < 64 => value & ((1_u64 << width) - 1),
+        _ => value,
+    };
     let constant = unsafe { LLVMConstInt(llvm_type, value, 0) };
     if constant.is_null() {
         return Err(BackendEmitError("LLVM failed to create integer constant".to_owned()));

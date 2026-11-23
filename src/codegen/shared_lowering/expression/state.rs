@@ -191,15 +191,14 @@ fn coerce_integer_literal(
         return None;
     };
     let fits = if target_signed {
-        i64::try_from(*literal).is_ok_and(|literal| {
-            let minimum = if target_width == 64 { i64::MIN } else { -(1i64 << (target_width - 1)) };
-            let maximum =
-                if target_width == 64 { i64::MAX } else { (1i64 << (target_width - 1)) - 1 };
-            (minimum..=maximum).contains(&literal)
-        })
+        // A negated literal (`-N`) is stored as its 64-bit two's complement.
+        let literal = *literal as i64;
+        let minimum = if target_width == 64 { i64::MIN } else { -(1i64 << (target_width - 1)) };
+        let maximum = if target_width == 64 { i64::MAX } else { (1i64 << (target_width - 1)) - 1 };
+        (minimum..=maximum).contains(&literal)
     } else {
-        // Integer constants hold the literal's magnitude (negation is its own
-        // operation), so an unsigned target accepts every value of its width.
+        // Semantic analysis already rejected negative literals for unsigned
+        // targets, so an unsigned target accepts every value of its width.
         integer_value_fits(*literal, false, target_width)
     };
     if !fits {

@@ -524,6 +524,54 @@ fn rejects_primitive_integer_overflow_and_unsigned_underflow() {
 }
 
 #[test]
+fn accepts_a_negated_literal_as_one_value_at_the_type_minimum() {
+    for source in [
+        "verb main() { erg value: i8 = -128i8; }",
+        "verb main() { erg value: i32 = -2147483648i32; }",
+        "verb main() { erg value: i64 = -9223372036854775808i64; }",
+        "verb main() { erg value = -2147483648; }",
+    ] {
+        analyze_source(source).unwrap_or_else(|error| panic!("{source} must pass: {error:?}"));
+    }
+}
+
+#[test]
+fn rejects_a_negated_literal_below_the_type_minimum() {
+    let error = analyze_source("verb main() { erg value: i8 = -129i8; }")
+        .expect_err("-129i8 must be rejected");
+    assert!(matches!(
+        &error.kind,
+        SemanticErrorKind::NumericLiteralOutOfRange { ty, literal }
+            if ty == "i8" && literal == "-129"
+    ));
+}
+
+#[test]
+fn rejects_an_unsuffixed_literal_outside_int_when_no_type_is_expected() {
+    let error = analyze_source("verb main() { erg value = 2147483648; }")
+        .expect_err("an unsuffixed literal without context is an Int");
+    assert!(matches!(
+        &error.kind,
+        SemanticErrorKind::NumericLiteralOutOfRange { ty, .. } if ty == "Int"
+    ));
+    analyze_source("verb main() { erg value: u64 = 3000000000; }")
+        .expect("an expected type directs the literal");
+}
+
+#[test]
+fn checks_a_bare_literal_for_the_byte_label_against_u8() {
+    for source in ["verb main() { print(byte: 300); }", "verb main() { eprint(byte: 256); }"] {
+        let error = analyze_source(source).expect_err("byte literal above 255 must fail");
+        assert!(matches!(
+            &error.kind,
+            SemanticErrorKind::NumericLiteralOutOfRange { ty, .. } if ty == "u8"
+        ));
+    }
+    analyze_source("verb main() { print(byte: 255); eprint(byte: 0); }")
+        .expect("literals within 0..=255 should pass");
+}
+
+#[test]
 fn rejects_mismatched_primitive_calls_and_assignments() {
     let call_error = analyze_source(
         "verb consume(erg sample: f32) { } verb main() { erg sample: f64 = 1.5; consume(sample: sample); }",

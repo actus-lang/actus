@@ -708,7 +708,7 @@ fn lowers_unit_enum_equality_through_discriminants() {
 
 #[test]
 fn lowers_scalar_integer_unary_into_neutral_ir() {
-    let source = "verb main() -> Int { return -7; }";
+    let source = "verb main() -> Int { erg x: Int = 7; return -x; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "lexer errors: {errors:?}");
     let program = parse(tokens).expect("scalar fixture should parse");

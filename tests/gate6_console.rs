@@ -148,3 +148,13 @@ fn built_in_eprint_of_a_byte_writes_its_decimal_value_to_stderr() {
         assert!(run.stdout.is_empty(), "{backend} stdout");
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn negated_literals_at_the_type_minimum_run_as_single_constants() {
+    let source = "verb main() { erg a: i8 = -128i8; print(int: a as Int); erg m: i32 = -2147483648i32; print(int: m as Int); erg n = -2147483648; print(int: n); erg w: i64 = -9223372036854775808i64; print(int: (w + 1i64) as Int); erg big: i64 = -3000000000; print(int: (big / 1000000i64) as Int); }\n";
+    for (backend, run) in build_and_run_on_each_backend("negated-minimums", source) {
+        assert_eq!(run.stdout, b"-128\n-2147483648\n-2147483648\n1\n-3000\n", "{backend} stdout");
+        assert!(run.stderr.is_empty(), "{backend} stderr");
+    }
+}
