@@ -43,6 +43,9 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::MoveFrozen { name, .. } => {
             format!("cannot move frozen binding `{name}`")
         }
+        SemanticErrorKind::MutateFrozen { name, .. } => format!(
+            "cannot assign to frozen binding `{name}`: it is borrowed by a live `abs` view and cannot change until the view ends"
+        ),
         _ => return None,
     })
 }

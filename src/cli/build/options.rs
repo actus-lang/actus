@@ -128,7 +128,7 @@ fn parse_build_argument(
         _ if options.input.is_none() && !argument.starts_with('-') => {
             options.input = Some(argument)
         }
-        _ => return Err(format!("unexpected build argument `{argument}`")),
+        _ => return Err(super::super::input::argument_error("build", &argument)),
     }
     Ok(())
 }

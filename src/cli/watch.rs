@@ -149,7 +149,7 @@ fn parse_watch_options(
                 interval = Duration::from_millis(milliseconds);
             }
             _ if input.is_none() && !argument.starts_with('-') => input = Some(argument),
-            _ => return Err(format!("unexpected watch argument `{argument}`")),
+            _ => return Err(super::input::argument_error("watch", &argument)),
         }
     }
     Ok(WatchOptions { input, build, once, interval, profile })

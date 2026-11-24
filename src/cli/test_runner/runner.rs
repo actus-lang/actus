@@ -78,7 +78,7 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
             match parse_strict_option(&argument, &mut mode) {
                 Ok(true) => {}
                 Ok(false) => {
-                    return Err(format!("`actus test` does not accept argument `{argument}`"));
+                    return Err(crate::cli::input::argument_error("test", &argument));
                 }
                 Err(error) => return Err(error),
             }

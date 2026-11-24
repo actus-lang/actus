@@ -47,6 +47,10 @@ actus watch --once
 `build`, and `test` workflows. It validates fail-closed source, ownership,
 architecture, documentation, target, lockfile, and execution contracts.
 It is not an argument for `run`, `fmt`, or `watch`.
+Every subcommand rejects an option it does not define with
+``error: unknown option `--strict` for `actus run` `` and exit status 2; it never
+treats an option-like argument as a file name. `run` forwards arguments after a
+`--` separator to the program unchanged.
 
 ### Repository development commands
 

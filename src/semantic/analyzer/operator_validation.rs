@@ -1,11 +1,108 @@
-use crate::ast::{BinaryOp, Expr, PrimitiveType, UnaryOp, primitive_type};
+use crate::ast::{BinaryOp, Expr, PrimitiveType, TypeName, UnaryOp, primitive_type};
 
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
+use super::expressions::rules::{binary_operator_name, is_integer_type_name};
 use super::{Analyzer, expression_span};
 
+/// The `E1025` error for operands an operator cannot take. When the left operand is of a type the
+/// operator never accepts (`f64 + f64`, `Bool < Bool`, `i32 && i32`) or the shift count is not
+/// unsigned, it names what the operator accepts at the offending operand, so the message never
+/// reads "expected `f64`, found `f64`". Otherwise it names the two differing operand types.
+pub(super) fn operand_type_error(
+    operator: BinaryOp,
+    left: &Expr,
+    right: &Expr,
+    left_type: &str,
+    right_type: &str,
+) -> SemanticError {
+    let is_shift = matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight);
+    let is_float = matches!(primitive_type(left_type), Some(PrimitiveType::Float { .. }));
+    let left_integer = is_integer_type_name(left_type);
+    let (expected, found, operand) = if is_shift && left_integer {
+        ("unsigned integer", right_type, right)
+    } else if (is_shift || operator.requires_same_operand_type()) && !left_integer {
+        ("integer", left_type, left)
+    } else if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) && left_type != "Bool"
+    {
+        ("Bool", left_type, left)
+    } else if operator.is_relational() && !(left_integer || is_float) {
+        ("integer or float", left_type, left)
+    } else if matches!(operator, BinaryOp::Equals | BinaryOp::NotEquals) && left_type == right_type
+    {
+        ("integer, float, Bool or payload-free enum", left_type, left)
+    } else {
+        (left_type, right_type, right)
+    };
+    SemanticError {
+        kind: SemanticErrorKind::TypeMismatch {
+            callee: binary_operator_name(operator).to_owned(),
+            parameter: "operands".to_owned(),
+            expected: expected.to_owned(),
+            found: found.to_owned(),
+        },
+        span: expression_span(operand),
+    }
+}
+
 impl Analyzer {
+    /// Both operands of an arithmetic or bitwise operator have one integer
+    /// type. An unsuffixed literal on either side takes the other side's type
+    /// and must fit it; any other difference is `E1140` (ADR-0119).
+    pub(super) fn validate_same_type_operands(
+        &self,
+        operator: BinaryOp,
+        left: &Expr,
+        right: &Expr,
+    ) -> Result<(), SemanticError> {
+        let left_type = &self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
+        let right_type = &self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
+        if !(is_integer_type_name(left_type) && is_integer_type_name(right_type)) {
+            return Err(operand_type_error(operator, left, right, left_type, right_type));
+        }
+        let mut operand_type = left_type;
+        if right.is_plain_integer_literal() {
+            self.validate_literal_fits(right, left_type)?;
+        } else if left_type != right_type && left.is_plain_integer_literal() {
+            self.validate_literal_fits(left, right_type)?;
+            operand_type = right_type;
+        } else if left_type != right_type {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::MixedIntegerOperands {
+                    operator: operator.symbol().to_owned(),
+                    left: left_type.to_owned(),
+                    right: right_type.to_owned(),
+                },
+                span: expression_span(right),
+            });
+        }
+        self.validate_constant_operator(operator, left, right, operand_type)
+    }
+
+    /// An unsuffixed literal shift count must fit the shifted type; returns
+    /// whether the count was such a literal, which makes the operands valid.
+    pub(super) fn validate_literal_shift_count(
+        &self,
+        operator: BinaryOp,
+        count: &Expr,
+        shifted_type: &str,
+    ) -> Result<bool, SemanticError> {
+        let is_literal = matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight)
+            && is_unsuffixed_integer_literal(count)
+            && is_integer_type_name(shifted_type);
+        if is_literal {
+            self.validate_literal_fits(count, shifted_type)?;
+        }
+        Ok(is_literal)
+    }
+
+    fn validate_literal_fits(&self, literal: &Expr, type_name: &str) -> Result<(), SemanticError> {
+        let expected =
+            TypeName::builtin(type_name.to_owned(), Vec::new(), None, expression_span(literal));
+        self.validate_expected_literal(literal, &expected)
+    }
+
     pub(super) fn validate_constant_operator(
         &self,
         operator: BinaryOp,
@@ -29,15 +126,32 @@ impl Analyzer {
     }
 }
 
-/// A trapping `+`, `-` or `*` whose operands are integer literals and whose
-/// result does not fit the operand type (ADR-0115).
+fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
+    match expression {
+        Expr::Integer { suffix: None, .. } => true,
+        Expr::Grouping { expression, .. } | Expr::Cast { expression, .. } => {
+            is_unsuffixed_integer_literal(expression)
+        }
+        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
+            is_unsuffixed_integer_literal(expression)
+        }
+        _ => false,
+    }
+}
+
+/// A trapping `+`, `-`, `*` or `/` whose operands are integer literals and
+/// whose result does not fit the operand type (ADR-0115). Only `MIN / -1`
+/// overflows a division; a remainder never does (`MIN % -1` is 0).
 fn constant_overflow_error(
     operator: BinaryOp,
     left: &Expr,
     right: &Expr,
     left_type: &str,
 ) -> Option<SemanticError> {
-    if !matches!(operator, BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply) {
+    if !matches!(
+        operator,
+        BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply | BinaryOp::Divide
+    ) {
         return None;
     }
     let expression = Expr::Binary {
@@ -50,7 +164,7 @@ fn constant_overflow_error(
     let (minimum, maximum) = integer_range(left_type)?;
     (value < minimum || value > maximum).then(|| SemanticError {
         kind: SemanticErrorKind::ConstantArithmeticOverflow {
-            operator: binary_operator_symbol(operator).to_owned(),
+            operator: operator.symbol().to_owned(),
             ty: left_type.to_owned(),
         },
         span: SourceSpan::new(expression_span(left).start, expression_span(right).end),
@@ -58,7 +172,7 @@ fn constant_overflow_error(
 }
 
 /// The exact value of an expression built from integer literals with `+`,
-/// `-`, `*` and negation, or `None` when an operand is not a literal.
+/// `-`, `*`, `/` and negation, or `None` when an operand is not a literal.
 fn literal_arithmetic_value(expression: &Expr) -> Option<i128> {
     match expression {
         Expr::Integer { value, .. } => i128::try_from(parse_integer_magnitude(value)?).ok(),
@@ -73,6 +187,7 @@ fn literal_arithmetic_value(expression: &Expr) -> Option<i128> {
                 BinaryOp::Add => left.checked_add(right),
                 BinaryOp::Subtract => left.checked_sub(right),
                 BinaryOp::Multiply => left.checked_mul(right),
+                BinaryOp::Divide => left.checked_div(right),
                 _ => None,
             }
         }
@@ -92,14 +207,6 @@ fn integer_range(name: &str) -> Option<(i128, i128)> {
     } else {
         (0, (1i128 << width) - 1)
     })
-}
-
-fn binary_operator_symbol(operator: BinaryOp) -> &'static str {
-    match operator {
-        BinaryOp::Add => "+",
-        BinaryOp::Subtract => "-",
-        _ => "*",
-    }
 }
 
 fn constant_shift_error(

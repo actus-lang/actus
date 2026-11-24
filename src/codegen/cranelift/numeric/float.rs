@@ -8,7 +8,18 @@ use crate::codegen::{
     BackendEmitError, BackendInstruction, BackendIntegerCompareOp, BackendValueId, BackendValueType,
 };
 
-pub(in crate::codegen::cranelift) fn lower_float_compare(
+pub(in crate::codegen::cranelift) fn lower_float_operation(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    match instruction {
+        BackendInstruction::FloatNegate { .. } => lower_float_negate(builder, instruction, values),
+        _ => lower_float_compare(builder, instruction, values),
+    }
+}
+
+fn lower_float_compare(
     builder: &mut FunctionBuilder<'_>,
     instruction: &BackendInstruction,
     values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
@@ -41,5 +52,23 @@ pub(in crate::codegen::cranelift) fn lower_float_compare(
         BackendIntegerCompareOp::GreaterEquals => FloatCC::GreaterThanOrEqual,
     };
     values.insert(*result, builder.ins().fcmp(condition, left, right));
+    Ok(())
+}
+
+fn lower_float_negate(
+    builder: &mut FunctionBuilder<'_>,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let BackendInstruction::FloatNegate { result, operand, ty, .. } = instruction else {
+        return Err(BackendEmitError("Cranelift float negation expected".to_owned()));
+    };
+    if !matches!(ty, BackendValueType::Float { width: 32 | 64 }) {
+        return Err(BackendEmitError("Cranelift float negation requires f32 or f64".to_owned()));
+    }
+    let operand = values.get(operand).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift float negation operand {} is unavailable", operand.0))
+    })?;
+    values.insert(*result, builder.ins().fneg(operand));
     Ok(())
 }

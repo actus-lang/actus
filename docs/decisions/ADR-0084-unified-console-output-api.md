@@ -28,8 +28,9 @@ migration so existing programs do not break unexpectedly.
 The legacy `print_int` wrapper remains available as a compatibility alias
 until all repository call sites and documentation use the labelled form.
 Formatted output is deliberately bounded to one `{}` placeholder and one
-`int` or `bool` value. It does not introduce variadic arguments or dynamic
-allocation into engine code. `eprint` uses the same labels and writes to
+`int` or `bool` value. The `int` value takes the same integer types as plain
+`print(int:)` (up to 64 bits, `E1139` beyond). It does not introduce variadic
+arguments or dynamic allocation into engine code. `eprint` uses the same labels and writes to
 stderr. This change does not alter the integer-only guarantee.
 
 ## Constraints

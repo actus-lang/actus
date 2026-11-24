@@ -10,6 +10,9 @@ struct VisibilityContext<'a> {
     private_types: &'a HashSet<String>,
     private_constants: &'a HashSet<String>,
     module_path: &'a str,
+    /// The local namespace the importer binds for this module, so a
+    /// qualified call `namespace::verb` is checked like an unqualified one.
+    namespace: Option<&'a str>,
     unit: &'a ModuleUnit,
 }
 
@@ -19,10 +22,17 @@ pub(super) fn check_block(
     private_types: &HashSet<String>,
     private_constants: &HashSet<String>,
     module_path: &str,
+    namespace: Option<&str>,
     unit: &ModuleUnit,
 ) -> Result<(), ModuleError> {
-    let context =
-        VisibilityContext { private_verbs, private_types, private_constants, module_path, unit };
+    let context = VisibilityContext {
+        private_verbs,
+        private_types,
+        private_constants,
+        module_path,
+        namespace,
+        unit,
+    };
     check_block_with_context(block, &context)
 }
 
@@ -100,7 +110,7 @@ fn check_expr_with_context(
         Expr::Case { .. } => check_case(expression, context)?,
         Expr::If { .. } => check_if_expression(expression, context)?,
         Expr::Identifier { name, span } => super::reject_private(
-            name,
+            unqualified(name, context),
             &context.private_types.union(context.private_constants).cloned().collect(),
             context.module_path,
             context.unit,
@@ -138,6 +148,7 @@ fn check_call(expression: &Expr, context: &VisibilityContext<'_>) -> Result<(), 
         unreachable!()
     };
     let verb = callee.split_once('[').map_or(callee.as_str(), |(verb, _)| verb);
+    let verb = unqualified(verb, context);
     super::reject_private(verb, context.private_verbs, context.module_path, context.unit, *span)?;
     for type_name in generic_arguments.iter().chain(resolved_type) {
         check_type(type_name, context, *span)?;
@@ -146,6 +157,15 @@ fn check_call(expression: &Expr, context: &VisibilityContext<'_>) -> Result<(), 
         check_expr_with_context(&argument.expression, context)?;
     }
     Ok(())
+}
+
+/// Strips the importer's own namespace from `namespace::member`; any other
+/// qualifier is left for name resolution to report.
+fn unqualified<'a>(name: &'a str, context: &VisibilityContext<'_>) -> &'a str {
+    match name.rsplit_once("::") {
+        Some((namespace, member)) if context.namespace == Some(namespace) => member,
+        _ => name,
+    }
 }
 
 fn check_struct_literal(

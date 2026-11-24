@@ -24,17 +24,28 @@ Binary operators are left-associative. Parentheses override precedence.
 
 ### Numeric operators
 
-`+`, `-`, `*`, `/`, and `%` operate on compatible numeric types. Integer
-families preserve declared width and signedness. Do not expect automatic
-promotion between `u8`, `u32`, `Int`, or signed/unsigned families.
+`+`, `-`, `*`, `/`, and `%` (and the wrapping `+%`, `-%`, `*%`, the
+saturating `+|`, `-|`, `*|`, and `&`, `|`, `^`) take two operands of the same
+integer type and produce that type. Integer families preserve declared width
+and signedness. There is no automatic promotion between `u8`, `u32`, `Int`,
+or signed/unsigned families: operands of different types are rejected with
+`E1140`, and one side is converted with `as`. Compound assignments such as
+`+=` follow the same rule (ADR-0119).
+
+An unsuffixed integer literal operand, on either side, takes the type of the
+other operand and must fit it. A suffixed literal, a cast, and a constant
+expression such as `2 * 3` keep their own type.
 
 ### Comparisons
 
-`<`, `<=`, `>`, and `>=` return `Bool`. Operands must belong to the same
-numeric family: matching signed integers, matching unsigned integers, or the
-same floating width. Signed and unsigned values are not implicitly mixed.
+`<`, `<=`, `>`, and `>=` return `Bool`. Integer operands must have the same
+integer type, so `u8` and `u32`, `i32` and `Int`, or `i8` and `u8` are rejected
+with `E1140`; convert one side with `as`. Floating-point operands must have
+the same width. An unsuffixed integer literal on either side takes the type of
+the other operand and must fit it (ADR-0120).
 
-`==` and `!=` compare compatible numeric families or booleans.
+`==` and `!=` follow the same rule for integers and also compare `Bool`
+values and enums whose variants carry no payload.
 
 ### Logical operators
 

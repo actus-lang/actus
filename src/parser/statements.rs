@@ -1,5 +1,5 @@
 use crate::ast::{Block, CompoundAssignmentOp, Expr, ForBinding, Place, Role, Stmt};
-use crate::lexer::{SourceSpan, TokenKind};
+use crate::lexer::{SourceSpan, Token, TokenKind};
 
 use super::{ParseError, ParseErrorCode, ParseErrorKind, Parser};
 use crate::parser::spans::expression_span;
@@ -89,8 +89,33 @@ impl Parser {
         if self.match_simple(TokenKind::Drop) {
             return self.parse_drop_statement();
         }
-        let expression = self.parse_expression()?;
-        self.parse_expression_statement(expression, allow_implicit_final_expression)
+        // `while` is an ordinary identifier to the lexer; a statement that starts with it and then
+        // fails to parse is another language's loop, not a malformed expression.
+        let foreign_loop = self.foreign_loop_keyword();
+        let statement = self.parse_expression().and_then(|expression| {
+            self.parse_expression_statement(expression, allow_implicit_final_expression)
+        });
+        match (statement, foreign_loop) {
+            (Err(_), Some(error)) => Err(error),
+            (statement, _) => statement,
+        }
+    }
+
+    fn foreign_loop_keyword(&self) -> Option<ParseError> {
+        let Some(Token { kind: TokenKind::Identifier(name), span }) = self.peek() else {
+            return None;
+        };
+        let continues_identifier = self.tokens.get(self.cursor + 1).is_none_or(|next| {
+            matches!(
+                next.kind,
+                TokenKind::Equals | TokenKind::Dot | TokenKind::LeftBracket | TokenKind::Semicolon
+            )
+        });
+        (name == "while" && !continues_identifier).then(|| ParseError {
+            code: ParseErrorCode::UnknownKeyword,
+            kind: ParseErrorKind::ForeignLoopKeyword { name: name.clone() },
+            span: *span,
+        })
     }
 
     fn parse_for_range_statement(&mut self) -> Result<Stmt, ParseError> {

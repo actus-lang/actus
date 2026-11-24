@@ -42,6 +42,26 @@ pub extern "C" fn actus_print_int_stderr(value: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn actus_print_i64(value: i64) -> i32 {
+    if writeln!(stdout(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_i64_stderr(value: i64) -> i32 {
+    if writeln!(std::io::stderr(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_u64(value: u64) -> i32 {
+    if writeln!(stdout(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_u64_stderr(value: u64) -> i32 {
+    if writeln!(std::io::stderr(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn actus_print_bool(value: i32) -> i32 {
     let text = if value == 0 { "false" } else { "true" };
     if writeln!(stdout(), "{text}").is_ok() { 0 } else { -1 }
@@ -110,6 +130,46 @@ pub unsafe extern "C" fn actus_print_format_int_stderr(format: *const u8, value:
 pub unsafe extern "C" fn actus_print_format_bool_stderr(format: *const u8, value: i32) -> i32 {
     let text = if value == 0 { "false" } else { "true" };
     unsafe { print_format_value(format, text, true) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one `i64` into a bounded one-placeholder format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_i64(format: *const u8, value: i64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), false) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one `i64` into a bounded one-placeholder format string on stderr.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_i64_stderr(format: *const u8, value: i64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), true) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one `u64` into a bounded one-placeholder format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_u64(format: *const u8, value: u64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), false) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one `u64` into a bounded one-placeholder format string on stderr.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_u64_stderr(format: *const u8, value: u64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), true) }
 }
 
 /// Prints a null-terminated UTF-8 string followed by a newline.

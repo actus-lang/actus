@@ -197,6 +197,7 @@ fn normalize_const_value(value: &str) -> String {
     let (digits, suffix) = split.map_or((compact.as_str(), ""), |index| compact.split_at(index));
     let normalized_digits = digits
         .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
         .and_then(|hex| u128::from_str_radix(hex, 16).ok())
         .map(|number| number.to_string())
         .or_else(|| digits.parse::<u128>().ok().map(|number| number.to_string()))

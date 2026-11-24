@@ -18,10 +18,16 @@ edition.
 | `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |
 | `E1083`–`E1099` | Bounded arrays, arenas, dynamic roles, and compile-time expressions |
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
-| `E1109` | Private module declaration or public-signature visibility violation |
+| `E1109` | Private module declaration or public-signature visibility violation; reached unqualified or qualified (`module::name`) and hinted to be marked `open` |
 | `E1119` | Reference outside the hierarchical scope of its directory module |
 | `E1137` | Facade opens one name both publicly and for its unit |
-| `E1138` | Trapping arithmetic on integer literals overflows its type |
+| `E1139` | `print(int:)`, `eprint(int:)`, or a `format:` print with `int:`, given an integer wider than 64 bits |
+| `E1138` | Trapping `+`, `-`, `*` or `/` on integer literals overflows its type (`/` only for the minimum value divided by `-1`) |
+| `E1140` | Arithmetic, bitwise or comparison operator given operands of different integer types |
+| `E1141` | Call to a verb that returns nothing used where a value is needed (binding, assignment, argument, operand, condition, `return`, conditional value or field initializer); such a call is only valid as a statement of its own |
+| `E1142` | Assignment to a constant (`const`); constants are fixed at compile time, use an `erg` binding for a value that changes |
+| `E1090` | Cast between types that are not both integer types |
+| `E1091` | Integer literal in a cast is outside the range of the target type |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |
 | `E1110` | Deterministic native symbol or ABI collision across module implementations |
 | `E1104` | Unknown sibling referenced by a module facade |
@@ -69,6 +75,23 @@ the `import { open <module> }` that brings the declaration into scope.
 `E1137` is emitted when one facade opens the same sibling file or child
 directory both with `open x;` and with `open unit x;` (ADR-0111). Keep one of
 the two openings.
+
+`E1142` is emitted when an assignment, compound assignment, field assignment
+or indexed assignment names a `const`. A constant is fixed at compile time and
+is not a binding; declare an `erg` binding for a value that changes.
+
+Several existing codes name their problem precisely rather than generically:
+
+- `E1063` reports `` `if` condition must be `Bool`, found `T` `` for an `if` or
+  `else if` condition, and `case guard must return `Bool`` for a case guard.
+- `E1011` reports `cannot move frozen binding` when a binding with a live `abs`
+  view is moved, and `cannot assign to frozen binding` when it is assigned to.
+- `E1025` names `integer` as the expected operand type when an arithmetic,
+  bitwise or shift operator is given a floating-point or `Bool` left operand
+  (Actus arithmetic is integer-only), and never reports the same type as both
+  expected and found.
+- `E0009` is also reported for `while`, which is not an Actus keyword; the
+  message names `loop`, `for` and `repeat`.
 
 New diagnostics must use a new stable code, include a focused positive or
 negative test, and document the code's category here. Strict-conformance codes

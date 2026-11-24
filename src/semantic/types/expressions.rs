@@ -249,7 +249,17 @@ impl Analyzer {
     }
 
     fn binary_type_name(&self, expression: &Expr) -> Option<String> {
-        let Expr::Binary { operator, left, .. } = expression else { return None };
+        let Expr::Binary { operator, left, right, .. } = expression else { return None };
+        let left_type = self.expression_type_name(left);
+        // An unsuffixed literal on the left takes the integer type on the right
+        // (ADR-0119); shifts keep the type of the shifted value.
+        if operator.requires_same_operand_type()
+            && left.is_plain_integer_literal()
+            && let Some(right_type) = self.expression_type_name(right)
+            && super::super::analyzer::is_integer_type_name(&right_type)
+        {
+            return Some(right_type);
+        }
         (!matches!(
             operator,
             crate::ast::BinaryOp::Equals
@@ -261,7 +271,7 @@ impl Analyzer {
                 | crate::ast::BinaryOp::GreaterThan
                 | crate::ast::BinaryOp::GreaterEquals
         ))
-        .then(|| self.expression_type_name(left))
+        .then_some(left_type)
         .flatten()
     }
 

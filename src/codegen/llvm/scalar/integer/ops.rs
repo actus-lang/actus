@@ -4,8 +4,9 @@ use std::ffi::CStr;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
     LLVMBuildAShr, LLVMBuildAdd, LLVMBuildAnd, LLVMBuildICmp, LLVMBuildLShr, LLVMBuildMul,
-    LLVMBuildOr, LLVMBuildSDiv, LLVMBuildSExt, LLVMBuildSRem, LLVMBuildShl, LLVMBuildSub,
-    LLVMBuildUDiv, LLVMBuildURem, LLVMBuildXor, LLVMBuildZExt, LLVMGetIntTypeWidth, LLVMTypeOf,
+    LLVMBuildOr, LLVMBuildSDiv, LLVMBuildSExt, LLVMBuildSRem, LLVMBuildSelect, LLVMBuildShl,
+    LLVMBuildSub, LLVMBuildUDiv, LLVMBuildURem, LLVMBuildXor, LLVMBuildZExt, LLVMGetIntTypeWidth,
+    LLVMTypeOf,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -13,7 +14,7 @@ use super::super::super::super::{
     BackendEmitError, BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp,
     BackendIntegerUnaryOp, BackendValueId,
 };
-use llvm_sys::core::{LLVMConstAllOnes, LLVMConstNull};
+use llvm_sys::core::{LLVMConstAllOnes, LLVMConstInt, LLVMConstNull};
 
 pub(in crate::codegen::llvm) fn emit_integer_binary(
     site: &super::overflow::OverflowSite,
@@ -150,8 +151,27 @@ fn build_signed_division_or_remainder(
             BackendIntegerBinaryOp::Divide => {
                 LLVMBuildSDiv(builder, left, right, c"actus.sdiv".as_ptr())
             }
+            // `srem MIN, -1` is undefined behaviour in LLVM (a hardware trap
+            // on x86), while the result is mathematically 0. A divisor of -1
+            // is replaced with 1, which has the same remainder, so
+            // `MIN % -1` is 0 on every backend and never traps.
             BackendIntegerBinaryOp::Remainder => {
-                LLVMBuildSRem(builder, left, right, c"actus.srem".as_ptr())
+                let ty = LLVMTypeOf(right);
+                let is_minus_one = LLVMBuildICmp(
+                    builder,
+                    LLVMIntPredicate::LLVMIntEQ,
+                    right,
+                    LLVMConstAllOnes(ty),
+                    c"actus.srem.negone".as_ptr(),
+                );
+                let divisor = LLVMBuildSelect(
+                    builder,
+                    is_minus_one,
+                    LLVMConstInt(ty, 1, 0),
+                    right,
+                    c"actus.srem.divisor".as_ptr(),
+                );
+                LLVMBuildSRem(builder, left, divisor, c"actus.srem".as_ptr())
             }
             _ => unreachable!(),
         }

@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use llvm_sys::LLVMRealPredicate;
-use llvm_sys::core::{LLVMBuildFCmp, LLVMBuildFPExt, LLVMBuildFPTrunc, LLVMConstReal};
+use llvm_sys::core::{
+    LLVMBuildFCmp, LLVMBuildFNeg, LLVMBuildFPExt, LLVMBuildFPTrunc, LLVMConstReal,
+};
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMContextRef, LLVMValueRef};
 
 use super::super::super::{
@@ -103,6 +105,28 @@ pub(in crate::codegen::llvm) fn emit_float_cast(
     };
     if value.is_null() {
         return Err(BackendEmitError("LLVM failed to emit float cast".to_owned()));
+    }
+    values.insert(*result, value);
+    Ok(false)
+}
+
+pub(in crate::codegen::llvm) fn emit_float_negate(
+    builder: LLVMBuilderRef,
+    instruction: &BackendInstruction,
+    values: &mut BTreeMap<BackendValueId, LLVMValueRef>,
+) -> Result<bool, BackendEmitError> {
+    let BackendInstruction::FloatNegate { result, operand, ty, .. } = instruction else {
+        return Err(BackendEmitError("LLVM float negation expected".to_owned()));
+    };
+    if !matches!(ty, BackendValueType::Float { width: 32 | 64 }) {
+        return Err(BackendEmitError("LLVM float negation requires f32 or f64".to_owned()));
+    }
+    let operand = values.get(operand).copied().ok_or_else(|| {
+        BackendEmitError(format!("LLVM float negation operand {} is unavailable", operand.0))
+    })?;
+    let value = unsafe { LLVMBuildFNeg(builder, operand, c"actus.float.negate".as_ptr()) };
+    if value.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit float negation".to_owned()));
     }
     values.insert(*result, value);
     Ok(false)

@@ -10,7 +10,7 @@ use super::super::guards::{
     emit_trap_if_zero,
 };
 use super::super::literals::emit_string_literal;
-use super::float::{emit_float_cast, emit_float_compare, emit_float_constant};
+use super::float::{emit_float_cast, emit_float_compare, emit_float_constant, emit_float_negate};
 use super::integer::{
     OverflowSite, emit_integer_binary, emit_integer_cast, emit_integer_compare, emit_integer_unary,
 };
@@ -55,6 +55,7 @@ pub(in crate::codegen::llvm) fn emit_scalar_instruction(
         }
         BackendInstruction::ScalarSelect { .. } => emit_scalar_select(builder, instruction, values),
         BackendInstruction::FloatCompare { .. } => emit_float_compare(builder, instruction, values),
+        BackendInstruction::FloatNegate { .. } => emit_float_negate(builder, instruction, values),
         BackendInstruction::IntegerUnary { .. } => emit_integer_unary(&site, instruction, values),
         BackendInstruction::EnumDiscriminant { .. } => {
             emit_enum_discriminant(context, builder, instruction, values)

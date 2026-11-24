@@ -157,6 +157,7 @@ impl Analyzer {
         span: SourceSpan,
         signature: &VerbSignature,
     ) -> Result<(), SemanticError> {
+        self.reject_void_call_value(callee, signature, span)?;
         self.validate_effects(callee, signature, span)?;
         let discarded = self.discarded_expression;
         self.discarded_expression = false;

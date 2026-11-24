@@ -540,7 +540,7 @@ fn conditional_guards_require_bool_values() {
         expect_semantic_error("verb main() -> Int { if 1 { return 1; } else { return 0; } }");
     assert!(matches!(
         invalid.kind,
-        SemanticErrorKind::GuardTypeMismatch { ref found } if found == "Int"
+        SemanticErrorKind::ConditionTypeMismatch { ref found } if found == "Int"
     ));
     assert_eq!(semantic_diagnostic(&invalid).code(), "E1063");
 }

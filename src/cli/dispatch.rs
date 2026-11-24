@@ -69,8 +69,12 @@ fn parse_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         print_usage();
         return 2;
     };
-    if arguments.next().is_some() {
-        eprintln!("error: unexpected extra argument");
+    if super::input::is_option_like(&path) {
+        eprintln!("error: {}", super::input::argument_error("parse", &path));
+        return 2;
+    }
+    if let Some(extra) = arguments.next() {
+        eprintln!("error: {}", super::input::argument_error("parse", &extra));
         return 2;
     }
     parse_file(&path, true)

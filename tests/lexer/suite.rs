@@ -338,3 +338,32 @@ fn rejects_unterminated_docstrings() {
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0].kind, LexErrorKind::UnterminatedDocString);
 }
+
+#[test]
+fn scans_suffixed_hex_literals_keeping_spelling_and_suffix() {
+    let (tokens, errors) = scan("0xFFu8 0x7fi8 0XaBi40 0xFFFFFFFFu32 0x1f32");
+
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let expected = [
+        ("0xFF", Some("u8")),
+        ("0x7f", Some("i8")),
+        ("0XaB", Some("i40")),
+        ("0xFFFFFFFF", Some("u32")),
+        ("0x1f32", None),
+    ];
+    assert_eq!(tokens.len(), expected.len() + 1, "literals plus end of input");
+    for (token, (value, suffix)) in tokens.iter().zip(expected) {
+        assert_eq!(
+            token.kind,
+            TokenKind::Integer { value: value.to_owned(), suffix: suffix.map(str::to_owned) }
+        );
+    }
+}
+
+#[test]
+fn rejects_hex_literals_without_digits_or_with_unknown_suffixes() {
+    let (_, errors) = scan("0xu8 0xFFu 0xFFu0 0xFFu129 0xFF_u8 0xFFusize");
+
+    assert_eq!(errors.len(), 6, "{errors:?}");
+    assert!(errors.iter().all(|error| matches!(error.kind, LexErrorKind::InvalidHexLiteral(_))));
+}

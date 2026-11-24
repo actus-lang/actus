@@ -11,6 +11,16 @@ pub(crate) fn append_print_externals(
 ) -> Result<(), BackendContractError> {
     for (symbol, ty) in [
         (crate::runtime::PRINT_INT_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
+        (crate::runtime::PRINT_I64_SYMBOL, BackendValueType::Integer { signed: true, width: 64 }),
+        (crate::runtime::PRINT_U64_SYMBOL, BackendValueType::Integer { signed: false, width: 64 }),
+        (
+            crate::runtime::PRINT_I64_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: true, width: 64 },
+        ),
+        (
+            crate::runtime::PRINT_U64_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: false, width: 64 },
+        ),
         (crate::runtime::PRINT_BOOL_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
         (
             crate::runtime::PRINT_INT_STDERR_SYMBOL,
@@ -53,16 +63,38 @@ pub(crate) fn append_print_externals(
     Ok(())
 }
 
+/// Each formatted-print runtime symbol with the type of its value parameter.
+fn format_symbol_value_types() -> [(&'static str, BackendValueType); 8] {
+    let int32 = BackendValueType::Integer { signed: true, width: 32 };
+    [
+        (crate::runtime::PRINT_FORMAT_INT_SYMBOL, int32),
+        (crate::runtime::PRINT_FORMAT_BOOL_SYMBOL, int32),
+        (crate::runtime::PRINT_FORMAT_INT_STDERR_SYMBOL, int32),
+        (crate::runtime::PRINT_FORMAT_BOOL_STDERR_SYMBOL, int32),
+        (
+            crate::runtime::PRINT_FORMAT_I64_SYMBOL,
+            BackendValueType::Integer { signed: true, width: 64 },
+        ),
+        (
+            crate::runtime::PRINT_FORMAT_I64_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: true, width: 64 },
+        ),
+        (
+            crate::runtime::PRINT_FORMAT_U64_SYMBOL,
+            BackendValueType::Integer { signed: false, width: 64 },
+        ),
+        (
+            crate::runtime::PRINT_FORMAT_U64_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: false, width: 64 },
+        ),
+    ]
+}
+
 pub(crate) fn append_format_externals(
     externals: &mut Vec<BackendExternal>,
     required_symbols: &std::collections::BTreeSet<String>,
 ) -> Result<(), BackendContractError> {
-    for symbol in [
-        crate::runtime::PRINT_FORMAT_INT_SYMBOL,
-        crate::runtime::PRINT_FORMAT_BOOL_SYMBOL,
-        crate::runtime::PRINT_FORMAT_INT_STDERR_SYMBOL,
-        crate::runtime::PRINT_FORMAT_BOOL_STDERR_SYMBOL,
-    ] {
+    for (symbol, value_type) in format_symbol_value_types() {
         if !required_symbols.contains(symbol)
             || externals.iter().any(|external| external.symbol.as_str() == symbol)
         {
@@ -82,7 +114,7 @@ pub(crate) fn append_format_externals(
                 BackendParameter {
                     name: "value".to_owned(),
                     role: crate::ast::Role::Erg,
-                    ty: BackendValueType::Integer { signed: true, width: 32 },
+                    ty: value_type,
                     passing: BackendPassingMode::Direct,
                 },
             ],

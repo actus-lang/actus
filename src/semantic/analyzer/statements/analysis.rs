@@ -73,7 +73,8 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let binary_operator = operator.binary_operator();
         match target {
-            Place::Binding { name, .. } => {
+            Place::Binding { name, span: target_span } => {
+                self.reject_constant_assignment(name, *target_span)?;
                 let binding = self.binding(name, span)?;
                 self.ensure_mutable(binding, name, span)?;
                 let left = Expr::Identifier { name: name.clone(), span };
@@ -88,6 +89,7 @@ impl Analyzer {
                     resolved_type: None,
                     span,
                 };
+                self.precheck_compound_operands(binary_operator, &left, value)?;
                 self.validate_field_assignment(&object_expression, field, value, span)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
@@ -98,10 +100,28 @@ impl Analyzer {
                     index: index.clone(),
                     span,
                 };
+                self.precheck_compound_operands(binary_operator, &left, value)?;
                 self.visit_index_assignment(&target_expression, index, value)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
         }
+    }
+
+    /// Reports a mixed-type compound assignment to a field or element as the
+    /// operator error (`E1140`) before the place's own type check reports the
+    /// same difference as a plain assignment mismatch. Silent when either
+    /// type is unknown, so the place's own diagnostics stay in charge.
+    fn precheck_compound_operands(
+        &self,
+        operator: crate::ast::BinaryOp,
+        place: &Expr,
+        value: &Expr,
+    ) -> Result<(), SemanticError> {
+        if self.expression_type_name(place).is_some() && self.expression_type_name(value).is_some()
+        {
+            return self.validate_binary_operator(operator, place, value);
+        }
+        Ok(())
     }
 
     fn visit_place_assignment(
@@ -111,7 +131,10 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         match target {
-            Place::Binding { name, .. } => self.visit_assignment(name, value, span),
+            Place::Binding { name, span: target_span } => {
+                self.reject_constant_assignment(name, *target_span)?;
+                self.visit_assignment(name, value, span)
+            }
             Place::Field { object, field, .. } => {
                 let object = object.to_expr();
                 self.validate_field_assignment(&object, field, value, span)
@@ -131,6 +154,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, span)?;
         self.ensure_mutable(index, name, span)?;
+        self.reject_void_value(value)?;
         self.validate_binding_assignment(index, name, value, span)?;
         if let Some(expected) = self.binding_type_names.get(&index) {
             self.validate_expected_literal(value, expected)?;
@@ -190,6 +214,7 @@ impl Analyzer {
         self.validate_index_assignment_owner(target)?;
         self.visit_expression(target)?;
         self.visit_expression(index)?;
+        self.reject_void_value(value)?;
         self.validate_index_value(target, index, value)?;
         self.visit_expression(value)?;
         self.plan_try_unwind(value);
@@ -199,6 +224,7 @@ impl Analyzer {
     fn validate_index_assignment_owner(&self, target: &Expr) -> Result<(), SemanticError> {
         match target {
             Expr::Identifier { name, span } => {
+                self.reject_constant_assignment(name, *span)?;
                 let binding = self.binding(name, *span)?;
                 self.ensure_mutable(binding, name, *span)
             }
@@ -449,6 +475,7 @@ impl Analyzer {
         let previous_consumed = self.expression_value_consumed;
         self.discarded_expression = true;
         self.expression_value_consumed = false;
+        self.drops_next_value = true;
         let result = self.visit_expression(expression);
         self.discarded_expression = previous;
         self.expression_value_consumed = previous_consumed;

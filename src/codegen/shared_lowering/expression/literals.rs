@@ -12,16 +12,15 @@ pub(super) fn integer_literal_type(suffix: Option<&str>) -> BackendValueType {
     let Some(suffix) = suffix else {
         return BackendValueType::Integer { signed: true, width: 32 };
     };
+    // Any `i1`..`i128` / `u1`..`u128` suffix keeps its own width; the literal is a
+    // two's-complement bit pattern of that width.
     let (signed, width) = match suffix {
-        "u8" => (false, 8),
-        "u16" => (false, 16),
-        "u32" => (false, 32),
-        "u64" | "usize" => (false, 64),
-        "i8" => (true, 8),
-        "i16" => (true, 16),
-        "i32" => (true, 32),
-        "i64" | "isize" => (true, 64),
-        _ => (true, 32),
+        "usize" => (false, 64),
+        "isize" => (true, 64),
+        _ => match crate::ast::primitive_type(suffix) {
+            Some(crate::ast::PrimitiveType::Integer { signed, width }) => (signed, width),
+            _ => (true, 32),
+        },
     };
     BackendValueType::Integer { signed, width }
 }

@@ -4,35 +4,23 @@ pub(in crate::semantic::analyzer) fn is_integer_primitive(primitive: PrimitiveTy
     matches!(primitive, PrimitiveType::Integer { .. })
 }
 
+/// Floating-point operands of a comparison have the same width. Integer
+/// operands are checked by `validate_same_type_operands` (ADR-0120).
 pub(in crate::semantic::analyzer) fn relational_types_match(left: &str, right: &str) -> bool {
-    let left_primitive = primitive_for_comparison(left);
-    let right_primitive = primitive_for_comparison(right);
-    match (left_primitive, right_primitive) {
-        (
-            Some(PrimitiveType::Integer { signed: left_signed, .. }),
-            Some(PrimitiveType::Integer { signed: right_signed, .. }),
-        ) => left_signed == right_signed,
+    matches!(
+        (primitive_type(left), primitive_type(right)),
         (
             Some(PrimitiveType::Float { width: left_width }),
             Some(PrimitiveType::Float { width: right_width }),
-        ) => left_width == right_width,
-        _ => false,
-    }
-}
-
-fn primitive_for_comparison(name: &str) -> Option<PrimitiveType> {
-    if name == "Int" {
-        Some(PrimitiveType::Integer { signed: true, width: 32 })
-    } else {
-        primitive_type(name)
-    }
+        ) if left_width == right_width
+    )
 }
 
 pub(in crate::semantic::analyzer) fn equality_types_match(left: &str, right: &str) -> bool {
     (left == "Bool" && right == "Bool") || relational_types_match(left, right)
 }
 
-pub(in crate::semantic::analyzer) fn is_integer_type_name(name: &str) -> bool {
+pub(crate) fn is_integer_type_name(name: &str) -> bool {
     name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
 }
 
@@ -45,6 +33,10 @@ pub(in crate::semantic::analyzer) fn is_unsigned_integer_type_name(name: &str) -
 
 pub(in crate::semantic::analyzer) fn binary_operator_name(operator: BinaryOp) -> &'static str {
     match operator {
+        BinaryOp::Add => "addition operator",
+        BinaryOp::Subtract => "subtraction operator",
+        BinaryOp::Multiply => "multiplication operator",
+        BinaryOp::Divide => "division operator",
         BinaryOp::Equals => "equality operator",
         BinaryOp::NotEquals => "inequality operator",
         BinaryOp::Remainder => "remainder operator",
@@ -61,7 +53,10 @@ pub(in crate::semantic::analyzer) fn binary_operator_name(operator: BinaryOp) ->
         BinaryOp::SaturatingAdd => "saturating addition operator",
         BinaryOp::SaturatingSubtract => "saturating subtraction operator",
         BinaryOp::SaturatingMultiply => "saturating multiplication operator",
-        _ => "relational operator",
+        BinaryOp::LessThan
+        | BinaryOp::LessEquals
+        | BinaryOp::GreaterThan
+        | BinaryOp::GreaterEquals => "relational operator",
     }
 }
 
@@ -116,6 +111,25 @@ pub(in crate::semantic::analyzer) fn integer_literal(expression: &Expr) -> Optio
             Some((value, true))
         }
         Expr::Cast { expression, .. } => integer_literal(expression),
+        _ => None,
+    }
+}
+
+/// The literal a cast operand is written as (`300`, `(300)`, `-(300)`). Unlike `integer_literal`
+/// it does not look through a nested cast: `300 as Int as u8` casts a runtime-checked `Int`, so
+/// the range check belongs to the run-time trap, not to the literal.
+pub(in crate::semantic::analyzer) fn cast_operand_literal(
+    expression: &Expr,
+) -> Option<(String, bool)> {
+    match expression {
+        Expr::Integer { value, .. } => Some((value.clone(), false)),
+        Expr::Grouping { expression, .. } => cast_operand_literal(expression),
+        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
+            match cast_operand_literal(expression)? {
+                (value, false) => Some((value, true)),
+                _ => None,
+            }
+        }
         _ => None,
     }
 }

@@ -88,8 +88,10 @@ fn parse_run_options(arguments: &mut impl Iterator<Item = String>) -> Result<Run
                 }
                 backend = Some(super::input::parse_backend(&name)?);
             }
-            _ if input.is_none() => input = Some(argument),
-            _ => return Err(format!("unexpected argument `{argument}`")),
+            _ if input.is_none() && !super::input::is_option_like(&argument) => {
+                input = Some(argument)
+            }
+            _ => return Err(super::input::argument_error("run", &argument)),
         }
     }
     Ok(RunOptions { input, profile, backend, program_arguments })

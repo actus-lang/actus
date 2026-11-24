@@ -288,7 +288,7 @@ fn rejects_mutation_while_an_owner_is_frozen() {
         "verb broken(erg buffer: Buffer) { abs view = ref buffer; buffer = make(); }",
     )
     .expect_err("frozen owners must not be mutated");
-    assert!(matches!(error.kind, SemanticErrorKind::MoveFrozen { name, .. } if name == "buffer"));
+    assert!(matches!(error.kind, SemanticErrorKind::MutateFrozen { name, .. } if name == "buffer"));
 }
 
 #[test]

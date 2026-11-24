@@ -6,6 +6,7 @@ use cranelift_module::Module;
 use cranelift_object::ObjectModule;
 
 use super::super::native::BackendEmitError;
+use super::super::numeric::integer_carrier_type;
 use crate::codegen::{BackendInstruction, BackendValueId, BackendValueType};
 
 pub(super) fn lower(
@@ -267,10 +268,11 @@ fn enum_storage_pointer(
 
 fn scalar_type(ty: BackendValueType) -> Result<Type, BackendEmitError> {
     match ty {
-        BackendValueType::Bool | BackendValueType::Integer { width: 8, .. } => Ok(types::I8),
-        BackendValueType::Integer { width: 16, .. } => Ok(types::I16),
-        BackendValueType::Integer { width: 32, .. } => Ok(types::I32),
-        BackendValueType::Integer { width: 64, .. } => Ok(types::I64),
+        BackendValueType::Bool => Ok(types::I8),
+        BackendValueType::Integer { width, .. } if integer_carrier_type(width).is_some() => {
+            integer_carrier_type(width)
+                .ok_or_else(|| BackendEmitError("Cranelift enum payload is not scalar".to_owned()))
+        }
         _ => Err(BackendEmitError("Cranelift enum payload is not scalar".to_owned())),
     }
 }

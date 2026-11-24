@@ -22,21 +22,14 @@ pub(in crate::codegen::body) fn range_binding_type(
     span: SourceSpan,
 ) -> Result<BackendValueType, BackendContractError> {
     let name = name.unwrap_or("u32");
-    let (signed, width) = match name {
-        "Int" | "i8" | "i16" | "i32" | "i64" => (true, integer_width(name)),
-        "u8" | "u16" | "u32" | "u64" => (false, integer_width(name)),
+    let (signed, width) = match crate::ast::primitive_type(name) {
+        Some(crate::ast::PrimitiveType::Integer { signed, width }) if width <= 64 => {
+            (signed, width)
+        }
+        _ if name == "Int" => (true, 32),
         _ => return Err(unsupported(span, "range binding must have an integer type")),
     };
     Ok(BackendValueType::Integer { signed, width })
-}
-
-fn integer_width(name: &str) -> u8 {
-    match name {
-        "i8" | "u8" => 8,
-        "i16" | "u16" => 16,
-        "i64" | "u64" => 64,
-        _ => 32,
-    }
 }
 
 pub(in crate::codegen::body) fn index_type_signed(ty: BackendValueType) -> bool {

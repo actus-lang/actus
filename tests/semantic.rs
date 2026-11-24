@@ -12,10 +12,18 @@ mod drop;
 mod dynamic;
 #[path = "semantic/enums.rs"]
 mod enums;
+#[path = "semantic/float_negation.rs"]
+mod float_negation;
 #[path = "semantic/generics.rs"]
 mod generics;
+#[path = "semantic/integer_comparisons.rs"]
+mod integer_comparisons;
+#[path = "semantic/integer_operands.rs"]
+mod integer_operands;
 #[path = "semantic/loans.rs"]
 mod loans;
+#[path = "semantic/misleading_messages.rs"]
+mod misleading_messages;
 #[path = "semantic/origins.rs"]
 mod origins;
 #[path = "semantic/packs.rs"]
@@ -34,3 +42,5 @@ mod state;
 mod structs;
 #[path = "semantic/suite.rs"]
 mod suite;
+#[path = "semantic/void_values.rs"]
+mod void_values;

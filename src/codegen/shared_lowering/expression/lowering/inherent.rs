@@ -1,5 +1,5 @@
 use super::*;
-use crate::ast::TypeName;
+use crate::ast::{BinaryOp, TypeName};
 
 pub(in crate::codegen::shared_lowering) fn lower_unit_call(
     provider: &mut SharedExpressionProvider<'_>,
@@ -187,6 +187,9 @@ impl SharedExpressionProvider<'_> {
             return self.lower_expression(&negated, instructions);
         }
         let operand = self.lower_expression(expression, instructions)?;
+        if let Some(float_type @ BackendValueType::Float { .. }) = self.value_type(operand) {
+            return self.lower_float_negation(*operator, operand, float_type, *span, instructions);
+        }
         let operation = match operator {
             UnaryOp::Negate => BackendIntegerUnaryOp::TrappingNegate,
             UnaryOp::WrappingNegate => BackendIntegerUnaryOp::Negate,
@@ -211,6 +214,24 @@ impl SharedExpressionProvider<'_> {
         Ok(result)
     }
 
+    /// Unary `-` on a float is IEEE negation; no other unary operator takes a float.
+    fn lower_float_negation(
+        &mut self,
+        operator: UnaryOp,
+        operand: BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        if !matches!(operator, UnaryOp::Negate) {
+            return Err(unsupported(span, "only `-` applies to a float operand"));
+        }
+        let result = self.allocate();
+        self.remember_value(result, ty);
+        instructions.push(BackendInstruction::FloatNegate { result, operand, ty, span });
+        Ok(result)
+    }
+
     pub(in crate::codegen::shared_lowering::expression) fn lower_binary(
         &mut self,
         expression: &Expr,
@@ -219,8 +240,23 @@ impl SharedExpressionProvider<'_> {
         let Expr::Binary { left, operator, right, span } = expression else {
             return Err(unsupported(expression_span(expression), "binary expression expected"));
         };
+        let (left_literal, right_literal) =
+            (left.is_plain_integer_literal(), right.is_plain_integer_literal());
         let left = self.lower_expression(left, instructions)?;
         let right = self.lower_expression(right, instructions)?;
+        // A literal on the left takes the type of the other operand. Without
+        // this, a binding that holds a constant would look like the literal and
+        // be retyped to `Int` instead (ADR-0119).
+        let left = match self.value_type(right) {
+            Some(right_type)
+                if left_literal
+                    && !right_literal
+                    && !matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) =>
+            {
+                super::super::state::retype_integer_literal(self, left, right_type, instructions)
+            }
+            _ => left,
+        };
         let Some(operation) = BackendIntegerBinaryOp::from_source(*operator) else {
             return self.lower_compare(left, right, *operator, *span, instructions);
         };

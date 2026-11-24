@@ -38,6 +38,9 @@ fn constant_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ConstantCycle { name } => {
             format!("constant `{name}` participates in a cyclic initializer")
         }
+        SemanticErrorKind::AssignToConstant { name } => format!(
+            "cannot assign to constant `{name}`: constants are fixed at compile time; declare an `erg` binding for a value that changes"
+        ),
         _ => return None,
     };
     Some(message)
@@ -52,11 +55,29 @@ fn serialization_message(kind: &SemanticErrorKind) -> Option<String> {
 
 fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
+        SemanticErrorKind::PrintIntegerTooWide { callee, type_name } => format!(
+            "`{callee}(int:)` prints integers up to 64 bits; `{type_name}` is wider, cast it to a 64-bit type first"
+        ),
+        SemanticErrorKind::InvalidPrimitiveCast { source, target } => {
+            format!("cannot cast `{source}` to `{target}`; casts convert between integer types")
+        }
+        SemanticErrorKind::PrimitiveCastOutOfRange { target, literal } => {
+            format!("literal `{literal}` is outside the range of `{target}` in a cast")
+        }
         SemanticErrorKind::ConstantRemainderByZero => {
             "constant remainder divisor is zero".to_owned()
         }
+        SemanticErrorKind::ConstantArithmeticOverflow { operator, ty } if operator == "/" => {
+            format!("constant `/` overflows `{ty}`; the minimum value divided by `-1` does not fit")
+        }
         SemanticErrorKind::ConstantArithmeticOverflow { operator, ty } => format!(
             "constant `{operator}` overflows `{ty}`; use `{operator}%` to wrap or `{operator}|` to saturate"
+        ),
+        SemanticErrorKind::MixedIntegerOperands { operator, left, right } => format!(
+            "operands of `{operator}` must have the same integer type, found `{left}` and `{right}`; convert one side explicitly with `as`"
+        ),
+        SemanticErrorKind::VoidValue { callee } => format!(
+            "`{callee}` returns nothing, so its call has no value to bind or use; call it as a statement on its own"
         ),
         SemanticErrorKind::ConstantShiftCountOutOfRange { count, width } => {
             format!("constant shift count `{count}` is outside the valid range `0..{width}`")
@@ -198,6 +219,9 @@ fn guard_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::GuardTypeMismatch { found } => {
             format!("case guard must return `Bool`, found `{found}`")
+        }
+        SemanticErrorKind::ConditionTypeMismatch { found } => {
+            format!("`if` condition must be `Bool`, found `{found}`")
         }
         SemanticErrorKind::BranchStateMismatch { name, expected, found } => {
             format!(

@@ -81,6 +81,7 @@ fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId
         | BackendInstruction::IntegerCompare { result, .. }
         | BackendInstruction::ScalarSelect { result, .. }
         | BackendInstruction::FloatCompare { result, .. }
+        | BackendInstruction::FloatNegate { result, .. }
         | BackendInstruction::EnumDiscriminant { result, .. }
         | BackendInstruction::EnumPayload { result, .. }
         | BackendInstruction::EnumPayloadBinding { result, .. }

@@ -9,21 +9,20 @@ impl<'source> Scanner<'source> {
             self.advance();
         }
         let has_digits = self.cursor > digits_start;
-        let invalid_suffix = self.peek().is_some_and(is_identifier_continue);
-        if invalid_suffix {
-            while self.peek().is_some_and(is_identifier_continue) {
-                self.advance();
-            }
+        let value_end = self.cursor;
+        let suffix_start = self.cursor;
+        while self.peek().is_some_and(is_identifier_continue) {
+            self.advance();
         }
-        let text = self.source[start..self.cursor].to_owned();
-        if !has_digits || invalid_suffix {
-            self.errors.push(LexError::new(
-                LexErrorKind::InvalidHexLiteral(text.clone()),
-                self.span(start),
-            ));
+        let tail = &self.source[suffix_start..self.cursor];
+        let suffix = (!tail.is_empty() && is_integer_suffix(tail)).then(|| tail.to_owned());
+        if !has_digits || (!tail.is_empty() && suffix.is_none()) {
+            let text = self.source[start..self.cursor].to_owned();
+            self.errors
+                .push(LexError::new(LexErrorKind::InvalidHexLiteral(text), self.span(start)));
         }
-        self.tokens
-            .push(Token::new(TokenKind::Integer { value: text, suffix: None }, self.span(start)));
+        let value = self.source[start..value_end].to_owned();
+        self.tokens.push(Token::new(TokenKind::Integer { value, suffix }, self.span(start)));
     }
 
     pub(super) fn scan_integer(&mut self, start: usize) {

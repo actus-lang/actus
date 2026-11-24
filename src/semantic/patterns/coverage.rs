@@ -180,6 +180,7 @@ impl Analyzer {
         match body {
             CaseBody::Expression(expression) => {
                 let expected = self.expected_expression_type.clone();
+                self.drops_next_value = self.conditional_value_dropped;
                 self.visit_expression_with_expected(expression, expected.as_ref())
             }
             CaseBody::Block(block) => self.visit_block(block),

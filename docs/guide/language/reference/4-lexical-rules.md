@@ -106,8 +106,10 @@ literal's declared integer family and width; it does not perform a general
 conversion of another value.
 
 Unsuffixed integer literals can be directed by a known integer context when
-the value fits. Do not rely on implicit signed/unsigned conversion between
-variables. Explicit casts use `as`.
+the value fits, including the other operand of an arithmetic or bitwise
+operator. Do not rely on implicit signed/unsigned conversion between
+variables, and do not mix integer types in one operator. Explicit casts use
+`as`.
 
 String literals are native data, not temporary text buffers. During native
 emission the compiler collects every reachable `String` literal through the

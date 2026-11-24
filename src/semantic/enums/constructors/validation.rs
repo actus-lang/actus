@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{Argument, EnumPayload, Expr, TypeName};
+use crate::ast::{Argument, EnumPayload, Expr, PrimitiveType, TypeName, primitive_type};
 use crate::lexer::SourceSpan;
 
 use crate::semantic::TypeSubstitution;
@@ -159,6 +159,9 @@ impl Analyzer {
         expected: &TypeName,
         argument: &Argument,
     ) -> Result<(), SemanticError> {
+        // `Result[Void, E].Ok(done())` builds the unit payload from a call that
+        // returns nothing, so that call is not a missing value.
+        self.drops_next_value = primitive_type(&expected.name) == Some(PrimitiveType::Void);
         self.visit_expression(&argument.expression)?;
         let found = self
             .expression_type_name(&argument.expression)

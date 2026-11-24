@@ -295,6 +295,12 @@ pub enum SemanticErrorKind {
         ty: String,
         literal: String,
     },
+    /// `print(int:)` or `eprint(int:)` got an integer wider than the 64 bits the
+    /// runtime can print.
+    PrintIntegerTooWide {
+        callee: String,
+        type_name: String,
+    },
     InvalidPrimitiveCast {
         source: String,
         target: String,
@@ -313,6 +319,18 @@ pub enum SemanticErrorKind {
     ConstantShiftCountOutOfRange {
         count: String,
         width: u16,
+    },
+    /// The two operands of an arithmetic or bitwise operator have different
+    /// integer types and neither is an unsuffixed literal (ADR-0119).
+    MixedIntegerOperands {
+        operator: String,
+        left: String,
+        right: String,
+    },
+    /// A call to a verb that returns nothing is used where a value is needed
+    /// (E1141).
+    VoidValue {
+        callee: String,
     },
     InvalidArenaCapacity {
         capacity: String,
@@ -426,6 +444,16 @@ pub enum SemanticErrorKind {
     },
     InvalidMutation {
         name: String,
+    },
+    AssignToConstant {
+        name: String,
+    },
+    ConditionTypeMismatch {
+        found: String,
+    },
+    MutateFrozen {
+        name: String,
+        borrow_ids: Vec<usize>,
     },
     MissingReturnValue,
     InvalidPackStorage {

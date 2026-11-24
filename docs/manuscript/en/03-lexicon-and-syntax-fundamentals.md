@@ -155,10 +155,11 @@ verb coordinate() -> F32 {
 `1.5` is first a lexical fact. The semantic layer checks whether the context
 accepts `F32` or `F64`.
 
-Hexadecimal forms such as `0x2A`, binary forms such as `0b101010`, and
-standalone byte-literal syntax are not current scanner forms. They must not be
-presented as valid Alpha source until lexer, parser, semantic, and regression
-tests support them.
+Hexadecimal literals such as `0x2A` are scanner forms and accept a width suffix
+directly after the digits (`0xFFu8`, `0x7Fi8`). Binary forms such as
+`0b101010`, digit separators, and standalone byte-literal syntax are not
+current scanner forms. They must not be presented as valid Alpha source until
+lexer, parser, semantic, and regression tests support them.
 
 ### Boolean and string literals
 
@@ -436,8 +437,8 @@ The current lexical contract is explicit:
 - non-owning returned views use an access-qualified return such as `-> abs Buffer`;
 - pattern branching uses `case`;
 - statements end with semicolons;
-- hexadecimal and binary integer literals, and byte literals, are outside the
-  current literal grammar.
+- binary integer literals and byte literals are outside the current literal
+  grammar; hexadecimal literals accept width suffixes.
 
 Chapter 04 moves from names and grammar to values. It explains primitive types,
 `Buffer`, `struct`, `enum`, compiler-provided `Option[T]` and `Result[T, E]`,

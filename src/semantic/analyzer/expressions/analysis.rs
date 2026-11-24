@@ -5,9 +5,10 @@ use crate::ast::{
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
+use super::super::operator_validation::operand_type_error;
 use super::Analyzer;
 use super::rules::{
-    binary_operator_name, cast_literal_fits, equality_types_match, expected_unary_type,
+    cast_literal_fits, cast_operand_literal, equality_types_match, expected_unary_type,
     integer_literal, is_cast_integer_type, is_integer_primitive, is_integer_type_name,
     is_unsigned_integer_type_name, parse_integer_magnitude, relational_types_match,
     type_names_match, unary_operator_name,
@@ -37,6 +38,19 @@ impl Analyzer {
     }
 
     pub(crate) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
+        let dropped = std::mem::take(&mut self.drops_next_value);
+        let previous = (self.call_value_dropped, self.conditional_value_dropped);
+        (self.call_value_dropped, self.conditional_value_dropped) = (dropped, dropped);
+        let result = self.visit_expression_node(expression, dropped);
+        (self.call_value_dropped, self.conditional_value_dropped) = previous;
+        result
+    }
+
+    fn visit_expression_node(
+        &mut self,
+        expression: &Expr,
+        dropped: bool,
+    ) -> Result<(), SemanticError> {
         self.record_origin(expression);
         match expression {
             Expr::BoolLiteral { value, span } => self.visit_bool_literal(*value, *span),
@@ -45,7 +59,7 @@ impl Analyzer {
             Expr::Binary { left, operator, right, .. } => {
                 self.visit_binary_expression(left, operator, right)
             }
-            Expr::Grouping { expression, .. } => self.visit_expression(expression),
+            Expr::Grouping { expression, .. } => self.visit_grouped_expression(expression, dropped),
             Expr::Unary { operator, expression, span } => {
                 self.visit_unary_expression(*operator, expression, *span)
             }
@@ -249,22 +263,14 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let left_type = self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
         let right_type = self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
-        let unsuffixed_integer_matches =
-            if is_unsuffixed_integer_literal(right) && is_integer_type_name(&left_type) {
-                self.validate_expected_literal(
-                    right,
-                    &crate::ast::TypeName::builtin(
-                        left_type.clone(),
-                        Vec::new(),
-                        None,
-                        expression_span(right),
-                    ),
-                )?;
-                true
-            } else {
-                false
-            };
-        let valid = if unsuffixed_integer_matches {
+        let integer_operands =
+            is_integer_type_name(&left_type) && is_integer_type_name(&right_type);
+        // Comparisons of two integers follow the arithmetic rule (ADR-0120).
+        if operator.requires_same_operand_type() || (operator.is_comparison() && integer_operands) {
+            return self.validate_same_type_operands(operator, left, right);
+        }
+        let literal_shift_count = self.validate_literal_shift_count(operator, right, &left_type)?;
+        let valid = if literal_shift_count {
             true
         } else if operator.is_relational() {
             relational_types_match(&left_type, &right_type)
@@ -273,24 +279,15 @@ impl Analyzer {
                 || self.enum_equality_types_match(&left_type, &right_type)
         } else if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
             left_type == "Bool" && right_type == "Bool"
-        } else if matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) {
-            is_integer_type_name(&left_type) && is_unsigned_integer_type_name(&right_type)
         } else {
-            is_integer_type_name(&left_type) && is_integer_type_name(&right_type)
+            // Only shifts remain: any integer value, an unsigned count.
+            is_integer_type_name(&left_type) && is_unsigned_integer_type_name(&right_type)
         };
         if valid {
             self.validate_constant_operator(operator, left, right, &left_type)?;
             return Ok(());
         }
-        Err(SemanticError {
-            kind: SemanticErrorKind::TypeMismatch {
-                callee: binary_operator_name(operator).to_owned(),
-                parameter: "operands".to_owned(),
-                expected: left_type,
-                found: right_type,
-            },
-            span: expression_span(right),
-        })
+        Err(operand_type_error(operator, left, right, &left_type, &right_type))
     }
 
     fn enum_equality_types_match(&self, left: &str, right: &str) -> bool {
@@ -432,7 +429,7 @@ impl Analyzer {
                 span,
             });
         }
-        if let Some((literal, negative)) = integer_literal(expression)
+        if let Some((literal, negative)) = cast_operand_literal(expression)
             && !cast_literal_fits(&literal, negative, &target.name)
         {
             return Err(SemanticError {
@@ -440,23 +437,10 @@ impl Analyzer {
                     target: target.name.clone(),
                     literal: if negative { format!("-{literal}") } else { literal },
                 },
-                span,
+                span: expression_span(expression),
             });
         }
         Ok(())
-    }
-}
-
-fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
-    match expression {
-        Expr::Integer { suffix: None, .. } => true,
-        Expr::Grouping { expression, .. } | Expr::Cast { expression, .. } => {
-            is_unsuffixed_integer_literal(expression)
-        }
-        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
-            is_unsuffixed_integer_literal(expression)
-        }
-        _ => false,
     }
 }
 

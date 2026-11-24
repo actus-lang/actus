@@ -9,6 +9,7 @@ pub enum ParseErrorKind {
     UnexpectedEndOfInput { expected: String },
     DuplicateName { kind: String, name: String },
     UnknownKeyword { name: String },
+    ForeignLoopKeyword { name: String },
     UnknownMetadata { name: String },
     UnsupportedTargetPlatform { name: String },
     ConflictingTargetPlatforms { first: String, second: String },

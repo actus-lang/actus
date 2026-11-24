@@ -31,11 +31,24 @@ table.
 
 ## Operand contracts
 
-- Relational operators require matching signed integer, unsigned integer, or
-  equal-width floating-point families. Signed and unsigned integers are not
-  mixed implicitly.
-- `==` and `!=` compare compatible numeric families or `Bool` values and
-  return `Bool`.
+- Relational operators require two integer operands of the same integer type
+  or two floating-point operands of equal width (ADR-0120). Integer operands
+  of different types, such as `u8` and `u32`, `i8` and `u8`, or `Int` and
+  `i32`, are rejected with `E1140`; convert one side with `as`. An unsuffixed
+  integer literal, on either side, takes the type of the other operand and
+  must fit it, so `100 < x` and `x < 100` are valid for `x: u8`, and
+  `-1 < x` is rejected with `E1068`.
+- `==` and `!=` follow the same rule for integers and also compare `Bool`
+  values and payload-free enums; they return `Bool`.
+- `+`, `-`, `*`, `/`, `%`, the wrapping and saturating forms, `&`, `|`, `^`
+  and their compound assignments require both operands to have the same
+  integer type, and the result has that type (ADR-0119). Operands of
+  different integer types, such as `u8` and `u32`, `u32` and `i32`, `i8` and
+  `u8`, or `u8` and `Int`, are rejected with `E1140`; convert one side with
+  `as`. An unsuffixed integer literal, on either side, takes the type of the
+  other operand and must fit it, so `x + 1` and `1 + x` are valid for
+  `x: u8` and `x + 300` is rejected with `E1068`. A suffixed literal, a cast
+  and a constant expression such as `2 * 3` keep their own type.
 - `%` requires integer operands. A zero divisor is a deterministic runtime
   trap unless the semantic analyzer can prove the divisor is zero, in which
   case it reports `E1092` before code generation.
@@ -60,9 +73,16 @@ Integer arithmetic never wraps silently (ADR-0115):
 - `+|`, `-|`, `*|` and `+|=`, `-|=`, `*|=` clamp to the type's minimum or
   maximum. `250u8 +| 10u8` is `255`; `5u8 -| 10u8` is `0`.
 
+Unary `-` also applies to `f32` and `f64`. A negative float literal such as
+`-1.5f64` or `-0.0f64` is one constant, and `-x` on a float binding is IEEE 754
+negation: it flips the sign and never traps. `-%` requires an integer operand.
+
 Wrapping and saturating operators require integer operands. A trapping
 operation whose operands are integer literals and whose result does not fit
-its type is rejected with `E1138` before code generation.
+its type is rejected with `E1138` before code generation; for `/` that is the
+minimum signed value divided by `-1`. At run time the same division traps
+with `integer overflow`, while `MIN % -1` is `0` and never traps, on every
+backend and profile.
 
 ## Checked casts and indexing
 
@@ -92,6 +112,10 @@ verb classify(erg sample: u8, erg limit: u8) -> Bool {
     return sample < limit && sample != (0 as u8);
 }
 
+verb widen(erg small: u8, erg wide: u32) -> u32 {
+    return (small as u32) + wide + 1;
+}
+
 verb mask(erg input: u8) -> u8 {
     erg count: u8 = 1;
     erg mask: u8 = 0x0F;
@@ -105,6 +129,11 @@ verb mask(erg input: u8) -> u8 {
 // Signed and unsigned values are not implicitly converted.
 verb invalid(erg left: i8, erg right: u8) -> Bool {
     return left < right;
+}
+
+// Operands of an arithmetic or bitwise operator have one integer type.
+verb invalid_sum(erg small: u8, erg wide: u32) -> u32 {
+    return small + wide;
 }
 
 // The semantic analyzer rejects a statically known zero divisor.

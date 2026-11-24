@@ -5,23 +5,18 @@ pub(super) fn parse_integer(value: &str) -> Option<u64> {
         value.strip_prefix('-').map_or((false, value), |digits| (true, digits));
     let magnitude = digits
         .strip_prefix("0x")
+        .or_else(|| digits.strip_prefix("0X"))
         .map(|hex| u64::from_str_radix(hex, 16).ok())
         .unwrap_or_else(|| digits.parse().ok())?;
     Some(if negative { 0u64.wrapping_sub(magnitude) } else { magnitude })
 }
 
 pub(super) fn scalar_integer_type(type_name: &TypeName) -> Option<(bool, u8)> {
-    match type_name.name.as_str() {
-        "Int" => Some((true, 32)),
-        "i8" => Some((true, 8)),
-        "i16" => Some((true, 16)),
-        "i32" => Some((true, 32)),
-        "i64" => Some((true, 64)),
-        "u8" => Some((false, 8)),
-        "u16" => Some((false, 16)),
-        "u32" => Some((false, 32)),
-        "u64" => Some((false, 64)),
-        "Usize" => Some((false, 64)),
+    match crate::ast::primitive_type(&type_name.name) {
+        Some(crate::ast::PrimitiveType::Integer { signed, width }) if width <= 64 => {
+            Some((signed, width))
+        }
+        _ if type_name.name == "Int" => Some((true, 32)),
         _ => None,
     }
 }
