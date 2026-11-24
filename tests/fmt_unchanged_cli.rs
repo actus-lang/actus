@@ -65,7 +65,8 @@ fn project_wide_run_prints_a_summary_of_changed_and_unchanged_files() {
     assert_eq!(output.status.code(), Some(0));
     let text = stdout(&output);
     assert!(text.contains("is already formatted"), "{text}");
-    assert!(text.contains("formatted `./src/other.act`"), "{text}");
+    let other = Path::new(".").join("src").join("other.act");
+    assert!(text.contains(&format!("formatted `{}`", other.display())), "{text}");
     assert!(text.ends_with("formatted 2 files, 1 already formatted\n"), "{text}");
     fs::write(root.join("src/third.act"), UNFORMATTED).expect("rewrite third");
     let text = stdout(&actus(&root, &["fmt"]));
