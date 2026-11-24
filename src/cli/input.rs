@@ -37,6 +37,25 @@ pub(super) fn source_path(path: &Path) -> String {
     path.display().to_string()
 }
 
+/// True for an argument that looks like an option (`-x`, `--name`); a lone `-` is not.
+pub(super) fn is_option_like(argument: &str) -> bool {
+    argument.len() > 1 && argument.starts_with('-')
+}
+
+/// Error text for an argument a subcommand does not accept. Option-like arguments name the
+/// option and the subcommand; `--strict` also points at the commands that support it.
+pub(in crate::cli) fn argument_error(command: &str, argument: &str) -> String {
+    if !is_option_like(argument) {
+        return format!("unexpected argument `{argument}` for `actus {command}`");
+    }
+    let hint = if argument == "--strict" {
+        "; `--strict` is an option of `actus check`, `actus build`, `actus test` and `actus conformance`"
+    } else {
+        ""
+    };
+    format!("unknown option `{argument}` for `actus {command}`{hint}")
+}
+
 pub(super) fn parse_backend(name: &str) -> Result<BackendKind, String> {
     match name {
         "cranelift" => Ok(BackendKind::Cranelift),

@@ -48,7 +48,7 @@ fn parse_check_options(arguments: impl Iterator<Item = String>) -> Result<CheckO
             input = Some(argument);
             continue;
         }
-        return Err(format!("unexpected check argument `{argument}`"));
+        return Err(super::input::argument_error("check", &argument));
     }
     Ok(CheckOptions { input, mode })
 }

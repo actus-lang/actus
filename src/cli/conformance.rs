@@ -136,7 +136,7 @@ fn parse_conformance_mode(
         match parse_strict_option(&argument, &mut mode) {
             Ok(true) => continue,
             Ok(false) => {
-                return Err(format!("`actus conformance` does not accept argument `{argument}`"));
+                return Err(super::input::argument_error("conformance", &argument));
             }
             Err(error) => return Err(error),
         }

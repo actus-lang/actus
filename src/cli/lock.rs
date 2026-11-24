@@ -31,7 +31,7 @@ fn parse_options(arguments: &mut impl Iterator<Item = String>) -> Result<bool, S
     let mut check_only = false;
     for argument in arguments {
         if argument != "--check" {
-            return Err(format!("unexpected lock argument `{argument}`"));
+            return Err(super::input::argument_error("lock", &argument));
         }
         if check_only {
             return Err("duplicate `--check` option".to_owned());

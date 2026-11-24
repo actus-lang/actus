@@ -19,6 +19,10 @@ pub(super) fn new_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         eprintln!("error: missing project name");
         return 2;
     };
+    if super::input::is_option_like(&name) {
+        eprintln!("error: {}", super::input::argument_error("new", &name));
+        return 2;
+    }
     let options = match parse_options(&name, arguments, true) {
         Ok(options) => options,
         Err(error) => {
@@ -93,7 +97,10 @@ fn parse_options(
             "--runtime" => {
                 runtime = parse_runtime(arguments.next().as_deref())?;
             }
-            _ => return Err(format!("unexpected argument `{argument}`")),
+            _ => {
+                let command = if create_path { "new" } else { "init" };
+                return Err(super::input::argument_error(command, &argument));
+            }
         }
     }
     let path = if create_path {

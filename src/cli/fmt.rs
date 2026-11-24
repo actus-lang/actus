@@ -13,9 +13,11 @@ pub(super) fn fmt_command(arguments: impl Iterator<Item = String>) -> i32 {
     for argument in arguments {
         match argument.as_str() {
             "--check" if !check_only => check_only = true,
-            _ if input.is_none() => input = Some(PathBuf::from(argument)),
+            _ if input.is_none() && !super::input::is_option_like(&argument) => {
+                input = Some(PathBuf::from(argument));
+            }
             _ => {
-                eprintln!("error: unexpected argument `{argument}`");
+                eprintln!("error: {}", super::input::argument_error("fmt", &argument));
                 return 2;
             }
         }

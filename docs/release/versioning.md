@@ -22,7 +22,8 @@ The supported application workflow is:
 
 Release evidence uses the strict forms where the command supports them. The
 absence of `--strict` from `run`, `fmt`, `watch`, and `lock` is intentional and
-must not be hidden by documentation or shell wrappers.
+must not be hidden by documentation or shell wrappers. Those commands reject
+`--strict` as an unknown option (exit status 2) instead of treating it as a path.
 
 ## Change classification
 

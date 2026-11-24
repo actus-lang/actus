@@ -23,7 +23,7 @@ fn parse_json_flag(arguments: impl Iterator<Item = String>) -> Result<bool, ()> 
             eprintln!("error: duplicate --json option");
             return Err(());
         } else {
-            eprintln!("error: unexpected argument {argument}");
+            eprintln!("error: {}", super::input::argument_error("version", &argument));
             return Err(());
         }
     }

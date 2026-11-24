@@ -96,8 +96,10 @@ fn parse_options(mut arguments: impl Iterator<Item = String>) -> Result<PublishO
         match argument.as_str() {
             "--registry" => registry = Some(next_path(&mut arguments, "--registry")?),
             "--cache" => cache = Some(next_path(&mut arguments, "--cache")?),
-            _ if input == Path::new("Actus.toml") => input = PathBuf::from(argument),
-            _ => return Err(format!("unexpected argument `{argument}`")),
+            _ if input == Path::new("Actus.toml") && !super::input::is_option_like(&argument) => {
+                input = PathBuf::from(argument);
+            }
+            _ => return Err(super::input::argument_error("publish", &argument)),
         }
     }
     Ok(PublishOptions { input, registry, cache })
