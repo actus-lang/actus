@@ -38,3 +38,5 @@ mod state;
 mod structs;
 #[path = "semantic/suite.rs"]
 mod suite;
+#[path = "semantic/void_values.rs"]
+mod void_values;

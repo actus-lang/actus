@@ -41,6 +41,12 @@ impl Analyzer {
             else_branch.as_ref(),
             expression,
         )?;
+        // A statement `if` has no unterminated tail (the parser requires `;`),
+        // so this only rejects the value of an `if` expression.
+        self.reject_void_block_value(then_branch)?;
+        if let Some(IfBranch::Block(block)) = else_branch {
+            self.reject_void_block_value(block)?;
+        }
         self.validate_if_result(then_branch, else_branch.as_ref(), expression)?;
         self.model.conditional_facts.push(super::super::model::ConditionalFact {
             span: expression_span(expression),

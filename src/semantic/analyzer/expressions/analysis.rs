@@ -37,6 +37,19 @@ impl Analyzer {
     }
 
     pub(crate) fn visit_expression(&mut self, expression: &Expr) -> Result<(), SemanticError> {
+        let dropped = std::mem::take(&mut self.drops_next_value);
+        let previous = (self.call_value_dropped, self.conditional_value_dropped);
+        (self.call_value_dropped, self.conditional_value_dropped) = (dropped, dropped);
+        let result = self.visit_expression_node(expression, dropped);
+        (self.call_value_dropped, self.conditional_value_dropped) = previous;
+        result
+    }
+
+    fn visit_expression_node(
+        &mut self,
+        expression: &Expr,
+        dropped: bool,
+    ) -> Result<(), SemanticError> {
         self.record_origin(expression);
         match expression {
             Expr::BoolLiteral { value, span } => self.visit_bool_literal(*value, *span),
@@ -45,7 +58,7 @@ impl Analyzer {
             Expr::Binary { left, operator, right, .. } => {
                 self.visit_binary_expression(left, operator, right)
             }
-            Expr::Grouping { expression, .. } => self.visit_expression(expression),
+            Expr::Grouping { expression, .. } => self.visit_grouped_expression(expression, dropped),
             Expr::Unary { operator, expression, span } => {
                 self.visit_unary_expression(*operator, expression, *span)
             }

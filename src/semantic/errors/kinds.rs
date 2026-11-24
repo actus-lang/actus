@@ -327,6 +327,11 @@ pub enum SemanticErrorKind {
         left: String,
         right: String,
     },
+    /// A call to a verb that returns nothing is used where a value is needed
+    /// (E1141).
+    VoidValue {
+        callee: String,
+    },
     InvalidArenaCapacity {
         capacity: String,
     },

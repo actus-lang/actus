@@ -70,6 +70,9 @@ fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::MixedIntegerOperands { operator, left, right } => format!(
             "operands of `{operator}` must have the same integer type, found `{left}` and `{right}`; convert one side explicitly with `as`"
         ),
+        SemanticErrorKind::VoidValue { callee } => format!(
+            "`{callee}` returns nothing, so its call has no value to bind or use; call it as a statement on its own"
+        ),
         SemanticErrorKind::ConstantShiftCountOutOfRange { count, width } => {
             format!("constant shift count `{count}` is outside the valid range `0..{width}`")
         }

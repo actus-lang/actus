@@ -150,6 +150,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, span)?;
         self.ensure_mutable(index, name, span)?;
+        self.reject_void_value(value)?;
         self.validate_binding_assignment(index, name, value, span)?;
         if let Some(expected) = self.binding_type_names.get(&index) {
             self.validate_expected_literal(value, expected)?;
@@ -209,6 +210,7 @@ impl Analyzer {
         self.validate_index_assignment_owner(target)?;
         self.visit_expression(target)?;
         self.visit_expression(index)?;
+        self.reject_void_value(value)?;
         self.validate_index_value(target, index, value)?;
         self.visit_expression(value)?;
         self.plan_try_unwind(value);
@@ -468,6 +470,7 @@ impl Analyzer {
         let previous_consumed = self.expression_value_consumed;
         self.discarded_expression = true;
         self.expression_value_consumed = false;
+        self.drops_next_value = true;
         let result = self.visit_expression(expression);
         self.discarded_expression = previous;
         self.expression_value_consumed = previous_consumed;

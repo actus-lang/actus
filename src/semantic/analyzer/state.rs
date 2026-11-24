@@ -73,6 +73,15 @@ pub(crate) struct Analyzer {
     pub(crate) type_registry: super::super::types::TypeRegistry,
     pub(crate) discarded_expression: bool,
     pub(crate) expression_value_consumed: bool,
+    /// Set by a parent just before it visits the one child whose value is
+    /// dropped: a statement expression, the inside of a grouping, or an arm
+    /// of a statement `case`. The child's visit takes it, so every other
+    /// child sees `false`.
+    pub(crate) drops_next_value: bool,
+    /// Whether the call being visited has its value dropped.
+    pub(crate) call_value_dropped: bool,
+    /// Whether the `if` or `case` being visited has its value dropped.
+    pub(crate) conditional_value_dropped: bool,
     pub(crate) current_effects: Vec<Effect>,
     pub(crate) current_capabilities: Vec<Capability>,
     pub(crate) current_deterministic: bool,
