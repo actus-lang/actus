@@ -147,6 +147,7 @@ fn instruction_result(instruction: &BackendInstruction) -> Option<BackendValueId
         | BackendInstruction::IntegerCompare { result, .. }
         | BackendInstruction::ScalarSelect { result, .. }
         | BackendInstruction::FloatCompare { result, .. }
+        | BackendInstruction::FloatNegate { result, .. }
         | BackendInstruction::EnumDiscriminant { result, .. }
         | BackendInstruction::EnumPayload { result, .. }
         | BackendInstruction::EnumPayloadBinding { result, .. }
@@ -177,6 +178,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         BackendInstruction::IntegerCast { source, .. }
         | BackendInstruction::FloatCast { source, .. }
         | BackendInstruction::IntegerUnary { operand: source, .. }
+        | BackendInstruction::FloatNegate { operand: source, .. }
         | BackendInstruction::TrapIfZero { value: source, .. }
         | BackendInstruction::TrapIfShiftCountOutOfRange { count: source, .. }
         | BackendInstruction::TrapIfArrayIndexOutOfBounds { index: source, .. }
@@ -214,9 +216,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
         BackendInstruction::ArrayElementStore { base, index, value, .. } => {
             vec![*base, *index, *value]
         }
-        BackendInstruction::Cleanup { operand, .. } => {
-            operand.iter().map(|item| item.value).collect()
-        }
+        BackendInstruction::Cleanup { operand, .. } => operand.iter().map(|c| c.value).collect(),
         BackendInstruction::Constant { .. }
         | BackendInstruction::FloatConstant { .. }
         | BackendInstruction::StringLiteral { .. }

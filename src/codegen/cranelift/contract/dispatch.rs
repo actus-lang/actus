@@ -47,6 +47,7 @@ pub(super) fn lower_instruction(
         | BackendInstruction::IntegerCompare { .. }
         | BackendInstruction::ScalarSelect { .. }
         | BackendInstruction::FloatCompare { .. }
+        | BackendInstruction::FloatNegate { .. }
         | BackendInstruction::IntegerUnary { .. }
         | BackendInstruction::MemoryCopy { .. }
         | BackendInstruction::ScalarLoanLoad { .. }
@@ -189,8 +190,8 @@ fn lower_scalar(
         BackendInstruction::ScalarSelect { .. } => {
             numeric::lower_scalar_select(builder, instruction, values)
         }
-        BackendInstruction::FloatCompare { .. } => {
-            numeric::lower_float_compare(builder, instruction, values)
+        BackendInstruction::FloatCompare { .. } | BackendInstruction::FloatNegate { .. } => {
+            numeric::lower_float_operation(builder, instruction, values)
         }
         BackendInstruction::IntegerUnary { .. } => {
             numeric::lower_integer_unary(builder, instruction, values, module, failure)

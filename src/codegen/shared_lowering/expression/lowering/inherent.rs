@@ -187,6 +187,9 @@ impl SharedExpressionProvider<'_> {
             return self.lower_expression(&negated, instructions);
         }
         let operand = self.lower_expression(expression, instructions)?;
+        if let Some(float_type @ BackendValueType::Float { .. }) = self.value_type(operand) {
+            return self.lower_float_negation(*operator, operand, float_type, *span, instructions);
+        }
         let operation = match operator {
             UnaryOp::Negate => BackendIntegerUnaryOp::TrappingNegate,
             UnaryOp::WrappingNegate => BackendIntegerUnaryOp::Negate,
@@ -208,6 +211,24 @@ impl SharedExpressionProvider<'_> {
             ty: result_type,
             span: *span,
         });
+        Ok(result)
+    }
+
+    /// Unary `-` on a float is IEEE negation; no other unary operator takes a float.
+    fn lower_float_negation(
+        &mut self,
+        operator: UnaryOp,
+        operand: BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+        instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<BackendValueId, BackendContractError> {
+        if !matches!(operator, UnaryOp::Negate) {
+            return Err(unsupported(span, "only `-` applies to a float operand"));
+        }
+        let result = self.allocate();
+        self.remember_value(result, ty);
+        instructions.push(BackendInstruction::FloatNegate { result, operand, ty, span });
         Ok(result)
     }
 

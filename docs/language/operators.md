@@ -73,6 +73,10 @@ Integer arithmetic never wraps silently (ADR-0115):
 - `+|`, `-|`, `*|` and `+|=`, `-|=`, `*|=` clamp to the type's minimum or
   maximum. `250u8 +| 10u8` is `255`; `5u8 -| 10u8` is `0`.
 
+Unary `-` also applies to `f32` and `f64`. A negative float literal such as
+`-1.5f64` or `-0.0f64` is one constant, and `-x` on a float binding is IEEE 754
+negation: it flips the sign and never traps. `-%` requires an integer operand.
+
 Wrapping and saturating operators require integer operands. A trapping
 operation whose operands are integer literals and whose result does not fit
 its type is rejected with `E1138` before code generation.

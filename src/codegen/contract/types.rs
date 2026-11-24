@@ -37,6 +37,7 @@ pub(crate) fn reject_float_ir(
                     instruction,
                     BackendInstruction::FloatConstant { .. }
                         | BackendInstruction::FloatCompare { .. }
+                        | BackendInstruction::FloatNegate { .. }
                         | BackendInstruction::FloatCast { .. }
                 )
             })

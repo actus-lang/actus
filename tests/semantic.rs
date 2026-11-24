@@ -12,6 +12,8 @@ mod drop;
 mod dynamic;
 #[path = "semantic/enums.rs"]
 mod enums;
+#[path = "semantic/float_negation.rs"]
+mod float_negation;
 #[path = "semantic/generics.rs"]
 mod generics;
 #[path = "semantic/integer_comparisons.rs"]

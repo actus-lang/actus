@@ -103,6 +103,13 @@ pub enum BackendInstruction {
         ty: BackendValueType,
         span: SourceSpan,
     },
+    /// IEEE 754 negation of a float value. It flips the sign bit and never traps.
+    FloatNegate {
+        result: super::BackendValueId,
+        operand: super::BackendValueId,
+        ty: BackendValueType,
+        span: SourceSpan,
+    },
     FloatCompare {
         result: super::BackendValueId,
         operation: BackendIntegerCompareOp,

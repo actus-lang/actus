@@ -18,8 +18,8 @@ not usable for real programs until this phase lands.
 
 ## Goals
 
-1. **Arithmetic.** `+`, `-`, `*`, `/` and unary `-` on `f32` and `f64`, on the
-   LLVM and Cranelift back ends. Both operands have the same float type, as
+1. **Arithmetic.** `+`, `-`, `*` and `/` on `f32` and `f64`, on the LLVM and
+   Cranelift back ends; unary `-` already works. Both operands have the same float type, as
    ADR-0119 requires for integers; an unsuffixed float literal takes the type
    of the other operand. The wrapping, saturating and bitwise operators and
    `%` stay integer-only unless an ADR decides otherwise.
@@ -37,13 +37,6 @@ not usable for real programs until this phase lands.
 5. **Standard library.** `abs`, `min`, `max`, `sqrt`, `floor`, `ceil`, `round`
    and the basic trigonometric functions for `f32` and `f64`, with their
    behaviour on `NaN` and infinities documented.
-
-## Known defects to fix first
-
-- A negative float literal such as `-1.5f64` passes `actus check` and then fails
-  LLVM module verification, because negation is lowered with an integer
-  overflow intrinsic (`llvm.usub.with.overflow.f64`). This is tracked as an
-  0.1.3 bug and is fixed before this phase starts.
 
 ## Exit criteria
 
