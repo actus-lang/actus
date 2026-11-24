@@ -967,6 +967,17 @@ fn reports_runtime_integer_cast_underflow() {
 
 #[cfg(unix)]
 #[test]
+fn traps_a_cast_of_a_constant_that_was_widened_first() {
+    assert_check_failure(
+        "checked-cast-widened-constant",
+        "verb main() -> Int { erg narrowed: u8 = 300 as Int as u8; return narrowed as Int; }",
+        "integer value out of range",
+        41,
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn reports_a_buffer_index_past_the_end() {
     assert_check_failure(
         "buffer-index-bounds",

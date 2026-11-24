@@ -52,6 +52,12 @@ fn serialization_message(kind: &SemanticErrorKind) -> Option<String> {
 
 fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
+        SemanticErrorKind::InvalidPrimitiveCast { source, target } => {
+            format!("cannot cast `{source}` to `{target}`; casts convert between integer types")
+        }
+        SemanticErrorKind::PrimitiveCastOutOfRange { target, literal } => {
+            format!("literal `{literal}` is outside the range of `{target}` in a cast")
+        }
         SemanticErrorKind::ConstantRemainderByZero => {
             "constant remainder divisor is zero".to_owned()
         }

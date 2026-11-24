@@ -7,10 +7,10 @@ use crate::lexer::SourceSpan;
 use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
 use super::rules::{
-    binary_operator_name, cast_literal_fits, equality_types_match, expected_unary_type,
-    integer_literal, is_cast_integer_type, is_integer_primitive, is_integer_type_name,
-    is_unsigned_integer_type_name, parse_integer_magnitude, relational_types_match,
-    type_names_match, unary_operator_name,
+    binary_operator_name, cast_literal_fits, cast_operand_literal, equality_types_match,
+    expected_unary_type, integer_literal, is_cast_integer_type, is_integer_primitive,
+    is_integer_type_name, is_unsigned_integer_type_name, parse_integer_magnitude,
+    relational_types_match, type_names_match, unary_operator_name,
 };
 use super::{canonical_type_name, expression_span, try_type_mismatch};
 
@@ -432,7 +432,7 @@ impl Analyzer {
                 span,
             });
         }
-        if let Some((literal, negative)) = integer_literal(expression)
+        if let Some((literal, negative)) = cast_operand_literal(expression)
             && !cast_literal_fits(&literal, negative, &target.name)
         {
             return Err(SemanticError {
@@ -440,7 +440,7 @@ impl Analyzer {
                     target: target.name.clone(),
                     literal: if negative { format!("-{literal}") } else { literal },
                 },
-                span,
+                span: expression_span(expression),
             });
         }
         Ok(())

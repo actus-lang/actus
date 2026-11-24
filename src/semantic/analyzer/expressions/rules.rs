@@ -120,6 +120,25 @@ pub(in crate::semantic::analyzer) fn integer_literal(expression: &Expr) -> Optio
     }
 }
 
+/// The literal a cast operand is written as (`300`, `(300)`, `-(300)`). Unlike `integer_literal`
+/// it does not look through a nested cast: `300 as Int as u8` casts a runtime-checked `Int`, so
+/// the range check belongs to the run-time trap, not to the literal.
+pub(in crate::semantic::analyzer) fn cast_operand_literal(
+    expression: &Expr,
+) -> Option<(String, bool)> {
+    match expression {
+        Expr::Integer { value, .. } => Some((value.clone(), false)),
+        Expr::Grouping { expression, .. } => cast_operand_literal(expression),
+        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
+            match cast_operand_literal(expression)? {
+                (value, false) => Some((value, true)),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
 pub(in crate::semantic::analyzer) fn parse_integer_magnitude(literal: &str) -> Option<u128> {
     literal
         .strip_prefix("0x")
