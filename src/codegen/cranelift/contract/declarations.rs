@@ -8,6 +8,7 @@ use super::super::aggregate::{
     Declaration, declaration, direct_aggregate_types, runtime_declaration,
 };
 use super::super::native::BackendEmitError;
+use super::super::numeric::integer_carrier_type;
 use crate::codegen::{BackendModule, BackendPassingMode, BackendValueType};
 
 pub(super) fn declare_functions(
@@ -163,10 +164,9 @@ pub(crate) fn scalar_type(
     let result = match ty {
         BackendValueType::Unit => None,
         BackendValueType::Bool => Some(types::I8),
-        BackendValueType::Integer { width: 8, .. } => Some(types::I8),
-        BackendValueType::Integer { width: 16, .. } => Some(types::I16),
-        BackendValueType::Integer { width: 32, .. } => Some(types::I32),
-        BackendValueType::Integer { width: 64, .. } => Some(types::I64),
+        BackendValueType::Integer { width, .. } if integer_carrier_type(width).is_some() => {
+            integer_carrier_type(width)
+        }
         BackendValueType::Pointer => Some(module.isa().pointer_type()),
         BackendValueType::Region { .. } => Some(module.isa().pointer_type()),
         BackendValueType::Enum { .. } => Some(module.isa().pointer_type()),

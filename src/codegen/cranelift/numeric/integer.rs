@@ -6,6 +6,8 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift_object::ObjectModule;
 
 use super::super::checks::{check_failed_if, emit_check_failure};
+use super::narrow::{canonicalize_for, integer_carrier_type};
+use super::overflow::{overflowing_in, saturating_in};
 
 use crate::codegen::{
     BackendEmitError, BackendInstruction, BackendIntegerBinaryOp, BackendIntegerCompareOp,
@@ -33,7 +35,10 @@ pub(in crate::codegen::cranelift) fn lower_integer_binary(
     let value = match arithmetic(builder, *operation, *ty, (left, right), (module, failure))? {
         Some(value) => value,
         None => match operation {
-            BackendIntegerBinaryOp::ShiftLeft => builder.ins().ishl(left, right),
+            BackendIntegerBinaryOp::ShiftLeft => {
+                let shifted = builder.ins().ishl(left, right);
+                canonicalize_for(builder, shifted, *ty)
+            }
             BackendIntegerBinaryOp::ShiftRight if is_signed(*ty) => builder.ins().sshr(left, right),
             BackendIntegerBinaryOp::ShiftRight => builder.ins().ushr(left, right),
             BackendIntegerBinaryOp::BitwiseAnd | BackendIntegerBinaryOp::LogicalAnd => {
@@ -67,20 +72,29 @@ fn arithmetic(
 ) -> Result<Option<cranelift_codegen::ir::Value>, BackendEmitError> {
     let signed = is_signed(ty);
     Ok(Some(match operation {
-        BackendIntegerBinaryOp::Add => builder.ins().iadd(left, right),
-        BackendIntegerBinaryOp::Subtract => builder.ins().isub(left, right),
-        BackendIntegerBinaryOp::Multiply => builder.ins().imul(left, right),
+        BackendIntegerBinaryOp::Add => {
+            let sum = builder.ins().iadd(left, right);
+            canonicalize_for(builder, sum, ty)
+        }
+        BackendIntegerBinaryOp::Subtract => {
+            let difference = builder.ins().isub(left, right);
+            canonicalize_for(builder, difference, ty)
+        }
+        BackendIntegerBinaryOp::Multiply => {
+            let product = builder.ins().imul(left, right);
+            canonicalize_for(builder, product, ty)
+        }
         BackendIntegerBinaryOp::TrappingAdd
         | BackendIntegerBinaryOp::TrappingSubtract
         | BackendIntegerBinaryOp::TrappingMultiply => {
-            let (value, overflow) = overflowing(builder, operation, signed, left, right);
+            let (value, overflow) = overflowing_in(builder, operation, ty, left, right);
             check_failed_if(module, builder, overflow, TrapCode::INTEGER_OVERFLOW, failure)?;
             value
         }
         BackendIntegerBinaryOp::SaturatingAdd
         | BackendIntegerBinaryOp::SaturatingSubtract
         | BackendIntegerBinaryOp::SaturatingMultiply => {
-            saturating(builder, operation, signed, left, right)
+            saturating_in(builder, operation, ty, left, right)
         }
         BackendIntegerBinaryOp::Divide if signed => builder.ins().sdiv(left, right),
         BackendIntegerBinaryOp::Divide => builder.ins().udiv(left, right),
@@ -88,68 +102,6 @@ fn arithmetic(
         BackendIntegerBinaryOp::Remainder => builder.ins().urem(left, right),
         _ => return Ok(None),
     }))
-}
-
-/// The wrapped result of an add, subtract or multiply and whether the exact
-/// result overflowed the operand type (ADR-0115).
-pub(in crate::codegen::cranelift) fn overflowing(
-    builder: &mut FunctionBuilder<'_>,
-    operation: BackendIntegerBinaryOp,
-    signed: bool,
-    left: cranelift_codegen::ir::Value,
-    right: cranelift_codegen::ir::Value,
-) -> (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value) {
-    use BackendIntegerBinaryOp::{
-        SaturatingAdd, SaturatingSubtract, TrappingAdd, TrappingSubtract,
-    };
-    let instructions = builder.ins();
-    match (operation, signed) {
-        (TrappingAdd | SaturatingAdd, true) => instructions.sadd_overflow(left, right),
-        (TrappingAdd | SaturatingAdd, false) => instructions.uadd_overflow(left, right),
-        (TrappingSubtract | SaturatingSubtract, true) => instructions.ssub_overflow(left, right),
-        (TrappingSubtract | SaturatingSubtract, false) => instructions.usub_overflow(left, right),
-        (_, true) => instructions.smul_overflow(left, right),
-        (_, false) => instructions.umul_overflow(left, right),
-    }
-}
-
-/// The result clamped to the bound the exact result crossed: the maximum,
-/// or for a signed operation whose exact result is negative, the minimum;
-/// an unsigned subtraction clamps at zero.
-pub(in crate::codegen::cranelift) fn saturating(
-    builder: &mut FunctionBuilder<'_>,
-    operation: BackendIntegerBinaryOp,
-    signed: bool,
-    left: cranelift_codegen::ir::Value,
-    right: cranelift_codegen::ir::Value,
-) -> cranelift_codegen::ir::Value {
-    let (value, overflow) = overflowing(builder, operation, signed, left, right);
-    let ty = builder.func.dfg.value_type(value);
-    let bits = ty.bits();
-    let maximum = if signed { (1i128 << (bits - 1)) - 1 } else { (1i128 << bits) - 1 };
-    let maximum = builder.ins().iconst(ty, maximum as i64);
-    let bound = if !signed {
-        if operation == BackendIntegerBinaryOp::SaturatingSubtract {
-            builder.ins().iconst(ty, 0)
-        } else {
-            maximum
-        }
-    } else {
-        let minimum = builder.ins().iconst(ty, (-(1i128 << (bits - 1))) as i64);
-        let sign_source = match operation {
-            BackendIntegerBinaryOp::SaturatingMultiply => builder.ins().bxor(left, right),
-            _ => right,
-        };
-        let zero = builder.ins().iconst(ty, 0);
-        let negative = builder.ins().icmp(IntCC::SignedLessThan, sign_source, zero);
-        match operation {
-            BackendIntegerBinaryOp::SaturatingSubtract => {
-                builder.ins().select(negative, maximum, minimum)
-            }
-            _ => builder.ins().select(negative, minimum, maximum),
-        }
-    };
-    builder.ins().select(overflow, bound, value)
 }
 
 pub(in crate::codegen::cranelift) fn lower_integer_cast(
@@ -246,12 +198,10 @@ fn cast_validity(
 
 fn integer_ir_type(ty: BackendValueType) -> Result<types::Type, BackendEmitError> {
     match ty {
-        BackendValueType::Integer { width: 8, .. } => Ok(types::I8),
-        BackendValueType::Integer { width: 16, .. } => Ok(types::I16),
-        BackendValueType::Integer { width: 32, .. } => Ok(types::I32),
-        BackendValueType::Integer { width: 64, .. } => Ok(types::I64),
-        _ => Err(BackendEmitError("integer cast target must be an integer".to_owned())),
+        BackendValueType::Integer { width, .. } => integer_carrier_type(width),
+        _ => None,
     }
+    .ok_or_else(|| BackendEmitError("integer cast target must be an integer".to_owned()))
 }
 
 pub(in crate::codegen::cranelift) fn lower_trap_if_zero(
@@ -354,7 +304,7 @@ pub(in crate::codegen::cranelift) fn lower_trap_if_signed_division_overflow(
         BackendEmitError(format!("Cranelift division right operand {} is unavailable", right.0))
     })?;
     let value_type = builder.func.dfg.value_type(left);
-    let minimum = builder.ins().iconst(value_type, 1i64 << (u32::from(*width) - 1));
+    let minimum = builder.ins().iconst(value_type, i64::MIN >> (64 - u32::from(*width)));
     let minus_one = builder.ins().iconst(value_type, -1);
     let minimum_match = builder.ins().icmp(IntCC::Equal, left, minimum);
     let minus_one_match = builder.ins().icmp(IntCC::Equal, right, minus_one);
@@ -453,28 +403,25 @@ pub(in crate::codegen::cranelift) fn lower_integer_unary(
     module: &mut ObjectModule,
     failure: Option<&str>,
 ) -> Result<(), BackendEmitError> {
-    let BackendInstruction::IntegerUnary { result, operation, operand, .. } = instruction else {
+    let BackendInstruction::IntegerUnary { result, operation, operand, ty, .. } = instruction
+    else {
         return Err(BackendEmitError("Cranelift integer unary operation expected".to_owned()));
     };
     let operand = values.get(operand).copied().ok_or_else(|| {
         BackendEmitError(format!("Cranelift unary operand {} is unavailable", operand.0))
     })?;
     let value = match operation {
-        BackendIntegerUnaryOp::Negate => builder.ins().ineg(operand),
+        BackendIntegerUnaryOp::Negate => {
+            let negated = builder.ins().ineg(operand);
+            canonicalize_for(builder, negated, *ty)
+        }
         BackendIntegerUnaryOp::TrappingNegate => {
-            let ty = builder.func.dfg.value_type(operand);
-            let zero = builder.ins().iconst(ty, 0);
-            let signed = matches!(
-                instruction,
-                BackendInstruction::IntegerUnary {
-                    ty: BackendValueType::Integer { signed: true, .. },
-                    ..
-                }
-            );
-            let (value, overflow) = overflowing(
+            let carrier = builder.func.dfg.value_type(operand);
+            let zero = builder.ins().iconst(carrier, 0);
+            let (value, overflow) = overflowing_in(
                 builder,
                 BackendIntegerBinaryOp::TrappingSubtract,
-                signed,
+                *ty,
                 zero,
                 operand,
             );
@@ -486,7 +433,10 @@ pub(in crate::codegen::cranelift) fn lower_integer_unary(
             let zero = builder.ins().iconst(value_type, 0);
             builder.ins().icmp(IntCC::Equal, operand, zero)
         }
-        BackendIntegerUnaryOp::BitwiseNot => builder.ins().bnot(operand),
+        BackendIntegerUnaryOp::BitwiseNot => {
+            let complement = builder.ins().bnot(operand);
+            canonicalize_for(builder, complement, *ty)
+        }
     };
     values.insert(*result, value);
     Ok(())

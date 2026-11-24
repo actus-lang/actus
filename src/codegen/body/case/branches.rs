@@ -449,25 +449,15 @@ fn literal_case_expression(
             };
             Ok(Expr::Integer {
                 value: value.clone(),
-                suffix: Some(integer_suffix(signed, width).to_owned()),
+                suffix: Some(integer_suffix(signed, width)),
                 span,
             })
         }
     }
 }
 
-fn integer_suffix(signed: bool, width: u8) -> &'static str {
-    match (signed, width) {
-        (true, 8) => "i8",
-        (true, 16) => "i16",
-        (true, 32) => "i32",
-        (true, 64) => "i64",
-        (false, 8) => "u8",
-        (false, 16) => "u16",
-        (false, 32) => "u32",
-        (false, 64) => "u64",
-        _ => "i32",
-    }
+fn integer_suffix(signed: bool, width: u8) -> String {
+    format!("{}{width}", if signed { 'i' } else { 'u' })
 }
 
 fn branch_variant(branch: &crate::ast::CaseBranch) -> &str {

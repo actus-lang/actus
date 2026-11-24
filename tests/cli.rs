@@ -15,5 +15,8 @@ mod commands;
 #[path = "cli/control_flow.rs"]
 mod control_flow;
 #[cfg(unix)]
+#[path = "cli/odd_width_literals.rs"]
+mod odd_width_literals;
+#[cfg(unix)]
 #[path = "cli/runtime_checks.rs"]
 mod runtime_checks;

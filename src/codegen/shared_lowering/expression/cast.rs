@@ -51,7 +51,7 @@ impl SharedExpressionProvider<'_> {
             .ok_or_else(|| unsupported(span, "cast source type is unavailable"))?;
         let target_type = scalar_backend_type(target)
             .ok_or_else(|| unsupported(span, "cast target is not a supported scalar integer"))?;
-        if !matches!(source_type, BackendValueType::Integer { .. }) {
+        if !matches!(source_type, BackendValueType::Integer { width: ..=64, .. }) {
             return Err(unsupported(span, "cast source is not a supported scalar integer"));
         }
         let result = self.allocate();
