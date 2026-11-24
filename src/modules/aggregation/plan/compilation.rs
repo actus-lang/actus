@@ -319,7 +319,7 @@ fn collect_unit(
         .iter()
         .any(|friend| module_path == friend || module_path.starts_with(&format!("{friend}::")));
     if !friend {
-        validate_import_visibility(importer, module_path, &unit)?;
+        validate_import_visibility(importer, module_path, namespace, &unit)?;
     }
     let first_load = imported_paths.insert(module_path.to_owned());
     if first_load {

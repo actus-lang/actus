@@ -57,8 +57,8 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         ModuleError::DuplicateObjectOwner { .. } => {
             module_error("E1111", error.to_string(), SourceSpan::new(0, 0))
         }
-        ModuleError::PrivateDeclarationAccess { span, facade: path, .. }
-        | ModuleError::ConflictingOpening { span, facade: path, .. } => {
+        ModuleError::PrivateDeclarationAccess { .. } => private_access_diagnostic(error),
+        ModuleError::ConflictingOpening { span, facade: path, .. } => {
             module_error(visibility_code(error), error.to_string(), *span)
                 .with_source_path(path.display().to_string())
         }
@@ -68,6 +68,15 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         }
         ModuleError::Semantic(error) => semantic_diagnostic(error),
     }
+}
+
+fn private_access_diagnostic(error: &ModuleError) -> Diagnostic {
+    let ModuleError::PrivateDeclarationAccess { symbol, span, facade, .. } = error else {
+        unreachable!("private access diagnostic received another module error")
+    };
+    module_error("E1109", error.to_string(), *span)
+        .with_source_path(facade.display().to_string())
+        .with_suggestion(format!("mark `{symbol}` as `open` in its module to export it"))
 }
 
 fn visibility_code(error: &ModuleError) -> &'static str {

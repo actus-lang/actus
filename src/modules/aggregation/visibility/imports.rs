@@ -10,6 +10,7 @@ use super::expression_checks;
 pub(in crate::modules::aggregation) fn validate_import_visibility(
     program: &Program,
     module_path: &str,
+    namespace: Option<&str>,
     unit: &ModuleUnit,
 ) -> Result<(), ModuleError> {
     if program
@@ -35,6 +36,7 @@ pub(in crate::modules::aggregation) fn validate_import_visibility(
                 &private_types,
                 &private_constants,
                 module_path,
+                namespace,
                 unit,
             )?;
         }
