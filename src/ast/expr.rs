@@ -200,6 +200,12 @@ impl BinaryOp {
         matches!(self, Self::LessThan | Self::LessEquals | Self::GreaterThan | Self::GreaterEquals)
     }
 
+    /// The relational operators and `==` / `!=`. Two integer operands of one
+    /// of these have one integer type (ADR-0120).
+    pub const fn is_comparison(self) -> bool {
+        self.is_relational() || matches!(self, Self::Equals | Self::NotEquals)
+    }
+
     /// The arithmetic, wrapping, saturating and bitwise operators, whose two
     /// operands must have one integer type (ADR-0119). Shifts, comparisons
     /// and logical operators are not in this family.

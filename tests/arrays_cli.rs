@@ -358,7 +358,7 @@ fn respects_big_endian_array_backed_pack_fields() {
 fn lowers_unaligned_multi_byte_pack_fields_natively() {
     let status = run_array_fixture(
         "array-backed-pack-unaligned-field",
-        "pack Slice { erg storage: Array[u8, 2]; layout little; fields { abs _prefix: u2 at 0 = 0; erg payload: u12 at 2; abs _suffix: u2 at 14 = 0; } } verb main() -> Int { erg slice = Slice { storage: Array[u8, 2](), }; slice.payload = 2748u16; return if slice.payload == 2748u16 { 42 } else { 0 }; }",
+        "pack Slice { erg storage: Array[u8, 2]; layout little; fields { abs _prefix: u2 at 0 = 0; erg payload: u12 at 2; abs _suffix: u2 at 14 = 0; } } verb main() -> Int { erg slice = Slice { storage: Array[u8, 2](), }; slice.payload = 2748u16; return if slice.payload as u16 == 2748u16 { 42 } else { 0 }; }",
     );
     assert_eq!(status.code(), Some(42));
 }

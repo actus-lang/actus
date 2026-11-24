@@ -38,11 +38,14 @@ expression such as `2 * 3` keep their own type.
 
 ### Comparisons
 
-`<`, `<=`, `>`, and `>=` return `Bool`. Operands must belong to the same
-numeric family: matching signed integers, matching unsigned integers, or the
-same floating width. Signed and unsigned values are not implicitly mixed.
+`<`, `<=`, `>`, and `>=` return `Bool`. Integer operands must have the same
+integer type, so `u8` and `u32`, `i32` and `Int`, or `i8` and `u8` are rejected
+with `E1140`; convert one side with `as`. Floating-point operands must have
+the same width. An unsuffixed integer literal on either side takes the type of
+the other operand and must fit it (ADR-0120).
 
-`==` and `!=` compare compatible numeric families or booleans.
+`==` and `!=` follow the same rule for integers and also compare `Bool`
+values and enums whose variants carry no payload.
 
 ### Logical operators
 

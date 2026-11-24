@@ -23,11 +23,18 @@ keep their own type. Shift counts are not part of this rule.
 
 ## Comparisons
 
-Comparisons produce `Bool` and require compatible operands:
+Comparisons produce `Bool`. Two integer operands of `<`, `<=`, `>`, `>=`, `==`
+and `!=` have the same integer type, like the arithmetic operators; mixing
+`u8` and `u32`, or `Int` and `i32`, is the compile error `E1140`. An
+unsuffixed literal on either side takes the other operand's type and must fit
+it (ADR-0120):
 
 ```actus
 if count >= limit {
     return 1;
+}
+if 100 < small {
+    return 2;
 }
 ```
 

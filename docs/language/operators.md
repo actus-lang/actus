@@ -31,11 +31,15 @@ table.
 
 ## Operand contracts
 
-- Relational operators require matching signed integer, unsigned integer, or
-  equal-width floating-point families. Signed and unsigned integers are not
-  mixed implicitly.
-- `==` and `!=` compare compatible numeric families or `Bool` values and
-  return `Bool`.
+- Relational operators require two integer operands of the same integer type
+  or two floating-point operands of equal width (ADR-0120). Integer operands
+  of different types, such as `u8` and `u32`, `i8` and `u8`, or `Int` and
+  `i32`, are rejected with `E1140`; convert one side with `as`. An unsuffixed
+  integer literal, on either side, takes the type of the other operand and
+  must fit it, so `100 < x` and `x < 100` are valid for `x: u8`, and
+  `-1 < x` is rejected with `E1068`.
+- `==` and `!=` follow the same rule for integers and also compare `Bool`
+  values and payload-free enums; they return `Bool`.
 - `+`, `-`, `*`, `/`, `%`, the wrapping and saturating forms, `&`, `|`, `^`
   and their compound assignments require both operands to have the same
   integer type, and the result has that type (ADR-0119). Operands of

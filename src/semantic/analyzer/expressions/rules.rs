@@ -4,28 +4,16 @@ pub(in crate::semantic::analyzer) fn is_integer_primitive(primitive: PrimitiveTy
     matches!(primitive, PrimitiveType::Integer { .. })
 }
 
+/// Floating-point operands of a comparison have the same width. Integer
+/// operands are checked by `validate_same_type_operands` (ADR-0120).
 pub(in crate::semantic::analyzer) fn relational_types_match(left: &str, right: &str) -> bool {
-    let left_primitive = primitive_for_comparison(left);
-    let right_primitive = primitive_for_comparison(right);
-    match (left_primitive, right_primitive) {
-        (
-            Some(PrimitiveType::Integer { signed: left_signed, .. }),
-            Some(PrimitiveType::Integer { signed: right_signed, .. }),
-        ) => left_signed == right_signed,
+    matches!(
+        (primitive_type(left), primitive_type(right)),
         (
             Some(PrimitiveType::Float { width: left_width }),
             Some(PrimitiveType::Float { width: right_width }),
-        ) => left_width == right_width,
-        _ => false,
-    }
-}
-
-fn primitive_for_comparison(name: &str) -> Option<PrimitiveType> {
-    if name == "Int" {
-        Some(PrimitiveType::Integer { signed: true, width: 32 })
-    } else {
-        primitive_type(name)
-    }
+        ) if left_width == right_width
+    )
 }
 
 pub(in crate::semantic::analyzer) fn equality_types_match(left: &str, right: &str) -> bool {

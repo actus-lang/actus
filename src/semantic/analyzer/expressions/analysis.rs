@@ -247,27 +247,16 @@ impl Analyzer {
         left: &Expr,
         right: &Expr,
     ) -> Result<(), SemanticError> {
-        if operator.requires_same_operand_type() {
-            return self.validate_same_type_operands(operator, left, right);
-        }
         let left_type = self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
         let right_type = self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
-        let unsuffixed_integer_matches =
-            if is_unsuffixed_integer_literal(right) && is_integer_type_name(&left_type) {
-                self.validate_expected_literal(
-                    right,
-                    &crate::ast::TypeName::builtin(
-                        left_type.clone(),
-                        Vec::new(),
-                        None,
-                        expression_span(right),
-                    ),
-                )?;
-                true
-            } else {
-                false
-            };
-        let valid = if unsuffixed_integer_matches {
+        let integer_operands =
+            is_integer_type_name(&left_type) && is_integer_type_name(&right_type);
+        // Comparisons of two integers follow the arithmetic rule (ADR-0120).
+        if operator.requires_same_operand_type() || (operator.is_comparison() && integer_operands) {
+            return self.validate_same_type_operands(operator, left, right);
+        }
+        let literal_shift_count = self.validate_literal_shift_count(operator, right, &left_type)?;
+        let valid = if literal_shift_count {
             true
         } else if operator.is_relational() {
             relational_types_match(&left_type, &right_type)
@@ -446,19 +435,6 @@ impl Analyzer {
             });
         }
         Ok(())
-    }
-}
-
-fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
-    match expression {
-        Expr::Integer { suffix: None, .. } => true,
-        Expr::Grouping { expression, .. } | Expr::Cast { expression, .. } => {
-            is_unsuffixed_integer_literal(expression)
-        }
-        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
-            is_unsuffixed_integer_literal(expression)
-        }
-        _ => false,
     }
 }
 

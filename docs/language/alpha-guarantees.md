@@ -64,7 +64,8 @@ The relational operators `<`, `<=`, `>`, and `>=` return `Bool`. Signed integer
 operands use signed comparison semantics; unsigned integer operands, including
 `Usize`, use unsigned comparison semantics; and `f32` and `f64` use their
 corresponding floating-point comparison semantics. The semantic analyzer rejects
-mixed numeric families instead of inserting an implicit conversion.
+integer operands of different types (`E1140`, ADR-0120) and mixed numeric
+families instead of inserting an implicit conversion.
 
 When `print` receives an `abs Buffer`, the runtime writes exactly the Buffer's
 current length. The operation is binary-safe and does not read beyond the live

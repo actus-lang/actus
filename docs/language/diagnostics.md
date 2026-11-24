@@ -23,7 +23,7 @@ edition.
 | `E1137` | Facade opens one name both publicly and for its unit |
 | `E1139` | `print(int:)` or `eprint(int:)` given an integer wider than 64 bits |
 | `E1138` | Trapping arithmetic on integer literals overflows its type |
-| `E1140` | Arithmetic or bitwise operator given operands of different integer types |
+| `E1140` | Arithmetic, bitwise or comparison operator given operands of different integer types |
 | `E1090` | Cast between types that are not both integer types |
 | `E1091` | Integer literal in a cast is outside the range of the target type |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |

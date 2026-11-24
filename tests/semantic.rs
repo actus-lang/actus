@@ -14,6 +14,8 @@ mod dynamic;
 mod enums;
 #[path = "semantic/generics.rs"]
 mod generics;
+#[path = "semantic/integer_comparisons.rs"]
+mod integer_comparisons;
 #[path = "semantic/integer_operands.rs"]
 mod integer_operands;
 #[path = "semantic/loans.rs"]

@@ -48,6 +48,23 @@ impl Analyzer {
         self.validate_constant_operator(operator, left, right, operand_type)
     }
 
+    /// An unsuffixed literal shift count must fit the shifted type; returns
+    /// whether the count was such a literal, which makes the operands valid.
+    pub(super) fn validate_literal_shift_count(
+        &self,
+        operator: BinaryOp,
+        count: &Expr,
+        shifted_type: &str,
+    ) -> Result<bool, SemanticError> {
+        let is_literal = matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight)
+            && is_unsuffixed_integer_literal(count)
+            && is_integer_type_name(shifted_type);
+        if is_literal {
+            self.validate_literal_fits(count, shifted_type)?;
+        }
+        Ok(is_literal)
+    }
+
     fn validate_literal_fits(&self, literal: &Expr, type_name: &str) -> Result<(), SemanticError> {
         let expected =
             TypeName::builtin(type_name.to_owned(), Vec::new(), None, expression_span(literal));
@@ -74,6 +91,19 @@ impl Analyzer {
             return Err(error);
         }
         Ok(())
+    }
+}
+
+fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
+    match expression {
+        Expr::Integer { suffix: None, .. } => true,
+        Expr::Grouping { expression, .. } | Expr::Cast { expression, .. } => {
+            is_unsuffixed_integer_literal(expression)
+        }
+        Expr::Unary { operator: UnaryOp::Negate, expression, .. } => {
+            is_unsuffixed_integer_literal(expression)
+        }
+        _ => false,
     }
 }
 

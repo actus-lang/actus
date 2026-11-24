@@ -296,7 +296,7 @@ fn checksum_guard(contract: &SerializeDecl, span: SourceSpan) -> Stmt {
         condition: Expr::Binary {
             left: Box::new(call),
             operator: BinaryOp::Equals,
-            right: Box::new(integer(0, Some("i64"), span)),
+            right: Box::new(integer(0, None, span)),
             span,
         },
         then_branch: Block {

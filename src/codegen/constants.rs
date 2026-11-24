@@ -4,6 +4,7 @@ use crate::ast::{
     BinaryOp, Block, CaseBody, EnumPayload, Expr, IfBranch, PackStorage, Place, Program, Stmt,
     TopLevelDecl, TypeName, UnaryOp,
 };
+use crate::lexer::SourceSpan;
 
 /// Inlines validated constant values before native lowering.
 ///
@@ -259,14 +260,41 @@ fn inline_place(place: &mut Place, constants: &HashMap<String, Expr>) {
 }
 
 fn inline_expression(expression: &mut Expr, constants: &HashMap<String, Expr>) {
-    if let Expr::Identifier { name, .. } = expression
+    if let Expr::Identifier { name, span } = expression
         && let Some(replacement) = constants.get(name)
     {
+        let use_site = *span;
         *expression = replacement.clone();
         inline_expression(expression, constants);
+        relocate_to_use_site(expression, use_site);
         return;
     }
     inline_expression_node(expression, constants);
+}
+
+/// Gives an inlined constant value the span of the name it replaces, so a
+/// diagnostic on the value points at the use and not at the declaration. A
+/// constant value is built from literals, names, groupings, negations, casts
+/// and binary operators only.
+fn relocate_to_use_site(expression: &mut Expr, use_site: SourceSpan) {
+    match expression {
+        Expr::Integer { span, .. }
+        | Expr::BoolLiteral { span, .. }
+        | Expr::FloatLiteral { span, .. }
+        | Expr::Identifier { span, .. } => *span = use_site,
+        Expr::Grouping { expression, span }
+        | Expr::Unary { expression, span, .. }
+        | Expr::Cast { expression, span, .. } => {
+            *span = use_site;
+            relocate_to_use_site(expression, use_site);
+        }
+        Expr::Binary { left, right, span, .. } => {
+            *span = use_site;
+            relocate_to_use_site(left, use_site);
+            relocate_to_use_site(right, use_site);
+        }
+        _ => {}
+    }
 }
 
 fn inline_expression_node(expression: &mut Expr, constants: &HashMap<String, Expr>) {

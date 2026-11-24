@@ -1,4 +1,4 @@
-//! ADR-0119 end to end: mixed integer operands are rejected by the driver, a
+//! ADR-0119 and ADR-0120 end to end: mixed integer operands are rejected by the driver, a
 //! literal operand takes the other operand's type in generated code, and the
 //! standard library and the examples still pass the checker.
 #![cfg(unix)]
@@ -61,6 +61,10 @@ fn the_driver_rejects_mixed_integer_operands() {
         "verb main() -> Int { erg a: u8 = 1u8; erg b = a + (4 as Int); return 0; }",
         "verb main() -> Int { erg a: u32 = 1u32; erg b: i32 = 2i32; erg c = a & b; return 0; }",
         "verb main() -> Int { erg a: u8 = 1u8; erg b: Int = 2; a +%= b; return 0; }",
+        "verb main() -> Int { erg a: u8 = 1u8; erg b: u32 = 2u32; if a < b { return 1; } return 0; }",
+        "verb main() -> Int { erg a: i8 = 1i8; erg b: i64 = 2i64; if a == b { return 1; } return 0; }",
+        "verb main() -> Int { erg a: u8 = 1u8; erg b: Int = 2; if b != a { return 1; } return 0; }",
+        "verb main() -> Int { erg a: u8 = 1u8; if -1 < a { return 1; } return 0; }",
     ];
     for (index, source) in cases.iter().enumerate() {
         let path = dir.join(format!("mixed{index}.act"));
@@ -82,6 +86,16 @@ fn literal_operands_take_the_other_operands_type_in_generated_code() {
     for backend in backends() {
         assert_eq!(build_and_run("actus-literal-exact", exact, backend), Some(122), "{backend}");
         assert_eq!(build_and_run("actus-literal-trap", trapping, backend), Some(101), "{backend}");
+    }
+}
+
+#[test]
+fn a_literal_on_the_left_of_a_comparison_takes_the_other_operands_type() {
+    // 200u8 is 200, not -56: `100 < a` is an unsigned `u8` comparison, and
+    // `255 == k` holds only when the literal is retyped to `u8`.
+    let source = "verb main() -> Int {\n    erg a: u8 = 200u8;\n    erg k: u8 = 255u8;\n    erg result: Int = 0;\n    if 100 < a { result += 1; }\n    if 255 == k { result += 2; }\n    if 250 <= a { result += 4; }\n    if 255 != k { result += 8; }\n    return result;\n}\n";
+    for backend in backends() {
+        assert_eq!(build_and_run("actus-literal-compare", source, backend), Some(3), "{backend}");
     }
 }
 
