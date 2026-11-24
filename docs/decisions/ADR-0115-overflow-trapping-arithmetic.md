@@ -57,7 +57,7 @@ cannot declare a verb that shadows them. This step follows the operators.
 
 ### Constant overflow
 
-A trapping `+`, `-` or `*` whose operands are integer literals, possibly
+A trapping `+`, `-`, `*` or `/` whose operands are integer literals, possibly
 nested and negated, and whose result does not fit its type is rejected
 before code generation with the new diagnostic `E1138`:
 `erg x: u8 = 200u8 + 100u8;` does not build. Wrapping and saturating

@@ -22,7 +22,7 @@ edition.
 | `E1119` | Reference outside the hierarchical scope of its directory module |
 | `E1137` | Facade opens one name both publicly and for its unit |
 | `E1139` | `print(int:)`, `eprint(int:)`, or a `format:` print with `int:`, given an integer wider than 64 bits |
-| `E1138` | Trapping arithmetic on integer literals overflows its type |
+| `E1138` | Trapping `+`, `-`, `*` or `/` on integer literals overflows its type (`/` only for the minimum value divided by `-1`) |
 | `E1140` | Arithmetic, bitwise or comparison operator given operands of different integer types |
 | `E1141` | Call to a verb that returns nothing used where a value is needed (binding, assignment, argument, operand, condition, `return`, conditional value or field initializer); such a call is only valid as a statement of its own |
 | `E1142` | Assignment to a constant (`const`); constants are fixed at compile time, use an `erg` binding for a value that changes |

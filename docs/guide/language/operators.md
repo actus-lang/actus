@@ -55,6 +55,10 @@ Division and remainder require a valid non-zero divisor. Runtime-invalid
 operations follow the compiler's checked failure or trap contract for the
 selected type and target.
 
+Signed division of the minimum value by `-1` has no representable result and
+stops the program with `integer overflow`, including when both operands are
+constants. The matching remainder `MIN % -1` is `0` and never fails.
+
 ## Failed runtime checks
 
 Integer overflow, division by zero, out-of-range shift counts and casts, and

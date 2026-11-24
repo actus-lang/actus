@@ -67,6 +67,9 @@ fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ConstantRemainderByZero => {
             "constant remainder divisor is zero".to_owned()
         }
+        SemanticErrorKind::ConstantArithmeticOverflow { operator, ty } if operator == "/" => {
+            format!("constant `/` overflows `{ty}`; the minimum value divided by `-1` does not fit")
+        }
         SemanticErrorKind::ConstantArithmeticOverflow { operator, ty } => format!(
             "constant `{operator}` overflows `{ty}`; use `{operator}%` to wrap or `{operator}|` to saturate"
         ),

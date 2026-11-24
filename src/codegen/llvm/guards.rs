@@ -4,11 +4,11 @@ use llvm_sys::LLVMAttributeFunctionIndex;
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
     LLVMAddAttributeAtIndex, LLVMAddFunction, LLVMAppendBasicBlockInContext, LLVMBuildAnd,
-    LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildGlobalString, LLVMBuildICmp, LLVMBuildUnreachable,
-    LLVMConstInt, LLVMConstNull, LLVMCreateEnumAttribute, LLVMFunctionType,
-    LLVMGetEnumAttributeKindForName, LLVMGetGlobalParent, LLVMGetIntrinsicDeclaration,
-    LLVMGetNamedFunction, LLVMLookupIntrinsicID, LLVMPointerTypeInContext,
-    LLVMPositionBuilderAtEnd, LLVMTypeOf, LLVMVoidTypeInContext,
+    LLVMBuildCall2, LLVMBuildCondBr, LLVMBuildGlobalString, LLVMBuildICmp, LLVMBuildShl,
+    LLVMBuildUnreachable, LLVMConstAllOnes, LLVMConstInt, LLVMConstNull, LLVMCreateEnumAttribute,
+    LLVMFunctionType, LLVMGetEnumAttributeKindForName, LLVMGetGlobalParent,
+    LLVMGetIntrinsicDeclaration, LLVMGetNamedFunction, LLVMLookupIntrinsicID,
+    LLVMPointerTypeInContext, LLVMPositionBuilderAtEnd, LLVMTypeOf, LLVMVoidTypeInContext,
 };
 use llvm_sys::prelude::{LLVMBuilderRef, LLVMValueRef};
 
@@ -281,9 +281,40 @@ pub(super) fn emit_trap_if_signed_division_overflow(
     };
     let left = guard_value(values, *left, "division left operand")?;
     let right = guard_value(values, *right, "division right operand")?;
+    let overflow = build_division_overflow_condition(builder, left, right, *width)?;
+    let (ok_block, trap_block) = append_guard_blocks(context, function, "division", *span)?;
+    if unsafe { LLVMBuildCondBr(builder, overflow, trap_block, ok_block) }.is_null() {
+        return Err(BackendEmitError("LLVM failed to emit division guard branch".to_owned()));
+    }
+    unsafe {
+        LLVMPositionBuilderAtEnd(builder, trap_block);
+        emit_check_failure(context, function, builder, failure)?;
+        LLVMPositionBuilderAtEnd(builder, ok_block);
+    }
+    Ok(false)
+}
+
+/// `left == MIN && right == -1` at `width` bits.
+fn build_division_overflow_condition(
+    builder: LLVMBuilderRef,
+    left: LLVMValueRef,
+    right: LLVMValueRef,
+    width: u8,
+) -> Result<LLVMValueRef, BackendEmitError> {
     let ty = unsafe { LLVMTypeOf(left) };
-    let minimum = unsafe { LLVMConstInt(ty, 1u64 << (u32::from(*width) - 1), 0) };
-    let minus_one = unsafe { LLVMConstInt(ty, u64::MAX, 0) };
+    // `LLVMConstInt` keeps bits above the type's width when the value does
+    // not fit (`u64::MAX` in an `i32`), and LLVM then folds the comparison
+    // against such a constant to `false`, deleting the guard. Build both
+    // constants from values that fit the width.
+    let minimum = unsafe {
+        LLVMBuildShl(
+            builder,
+            LLVMConstInt(ty, 1, 0),
+            LLVMConstInt(ty, u64::from(width) - 1, 0),
+            c"actus.div.minimum".as_ptr(),
+        )
+    };
+    let minus_one = unsafe { LLVMConstAllOnes(ty) };
     let minimum_match = unsafe {
         LLVMBuildICmp(
             builder,
@@ -308,16 +339,7 @@ pub(super) fn emit_trap_if_signed_division_overflow(
     if minimum_match.is_null() || minus_one_match.is_null() || overflow.is_null() {
         return Err(BackendEmitError("LLVM failed to emit signed-division guard".to_owned()));
     }
-    let (ok_block, trap_block) = append_guard_blocks(context, function, "division", *span)?;
-    if unsafe { LLVMBuildCondBr(builder, overflow, trap_block, ok_block) }.is_null() {
-        return Err(BackendEmitError("LLVM failed to emit division guard branch".to_owned()));
-    }
-    unsafe {
-        LLVMPositionBuilderAtEnd(builder, trap_block);
-        emit_check_failure(context, function, builder, failure)?;
-        LLVMPositionBuilderAtEnd(builder, ok_block);
-    }
-    Ok(false)
+    Ok(overflow)
 }
 
 fn append_guard_blocks(

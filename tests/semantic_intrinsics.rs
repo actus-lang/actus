@@ -523,6 +523,37 @@ fn rejects_constant_arithmetic_overflow() {
     }
 }
 
+/// The minimum signed value divided by `-1` on integer literals overflows
+/// its type at compile time (`E1138`); other divisions and every remainder
+/// are accepted (ADR-0115).
+#[test]
+fn rejects_constant_minimum_division_by_minus_one() {
+    for (source, ty) in [
+        ("verb main() -> Int { erg x = -2147483648i32 / -1i32; return x as Int; }", "i32"),
+        ("verb main() -> Int { erg x = -128i8 / -1i8; return x as Int; }", "i8"),
+        ("verb main() -> Int { erg x = -549755813888i40 / -1i40; return x as Int; }", "i40"),
+    ] {
+        let error = analyze_source(source).expect_err("constant MIN / -1 must be rejected");
+        assert!(
+            matches!(
+                &error.kind,
+                SemanticErrorKind::ConstantArithmeticOverflow { operator, ty: found }
+                    if operator == "/" && found == ty
+            ),
+            "{source}: {:?}",
+            error.kind
+        );
+    }
+    for source in [
+        "verb main() -> Int { erg x = -2147483647i32 / -1i32; return x as Int; }",
+        "verb main() -> Int { erg x = -2147483648i32 / 1i32; return x as Int; }",
+        "verb main() -> Int { erg x = -2147483648i32 % -1i32; return x as Int; }",
+        "verb main() -> Int { erg x: u8 = 200u8 / 255u8; return x as Int; }",
+    ] {
+        analyze_source(source).unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    }
+}
+
 /// Wrapping and saturating operators take integers only.
 #[test]
 fn rejects_wrapping_and_saturating_operators_on_non_integers() {

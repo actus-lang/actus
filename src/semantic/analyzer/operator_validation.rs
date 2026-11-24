@@ -139,15 +139,19 @@ fn is_unsuffixed_integer_literal(expression: &Expr) -> bool {
     }
 }
 
-/// A trapping `+`, `-` or `*` whose operands are integer literals and whose
-/// result does not fit the operand type (ADR-0115).
+/// A trapping `+`, `-`, `*` or `/` whose operands are integer literals and
+/// whose result does not fit the operand type (ADR-0115). Only `MIN / -1`
+/// overflows a division; a remainder never does (`MIN % -1` is 0).
 fn constant_overflow_error(
     operator: BinaryOp,
     left: &Expr,
     right: &Expr,
     left_type: &str,
 ) -> Option<SemanticError> {
-    if !matches!(operator, BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply) {
+    if !matches!(
+        operator,
+        BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply | BinaryOp::Divide
+    ) {
         return None;
     }
     let expression = Expr::Binary {
@@ -168,7 +172,7 @@ fn constant_overflow_error(
 }
 
 /// The exact value of an expression built from integer literals with `+`,
-/// `-`, `*` and negation, or `None` when an operand is not a literal.
+/// `-`, `*`, `/` and negation, or `None` when an operand is not a literal.
 fn literal_arithmetic_value(expression: &Expr) -> Option<i128> {
     match expression {
         Expr::Integer { value, .. } => i128::try_from(parse_integer_magnitude(value)?).ok(),
@@ -183,6 +187,7 @@ fn literal_arithmetic_value(expression: &Expr) -> Option<i128> {
                 BinaryOp::Add => left.checked_add(right),
                 BinaryOp::Subtract => left.checked_sub(right),
                 BinaryOp::Multiply => left.checked_mul(right),
+                BinaryOp::Divide => left.checked_div(right),
                 _ => None,
             }
         }

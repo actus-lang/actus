@@ -20,3 +20,6 @@ mod odd_width_literals;
 #[cfg(unix)]
 #[path = "cli/runtime_checks.rs"]
 mod runtime_checks;
+#[cfg(unix)]
+#[path = "cli/signed_division_overflow.rs"]
+mod signed_division_overflow;

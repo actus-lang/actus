@@ -79,7 +79,10 @@ negation: it flips the sign and never traps. `-%` requires an integer operand.
 
 Wrapping and saturating operators require integer operands. A trapping
 operation whose operands are integer literals and whose result does not fit
-its type is rejected with `E1138` before code generation.
+its type is rejected with `E1138` before code generation; for `/` that is the
+minimum signed value divided by `-1`. At run time the same division traps
+with `integer overflow`, while `MIN % -1` is `0` and never traps, on every
+backend and profile.
 
 ## Checked casts and indexing
 
