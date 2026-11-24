@@ -27,7 +27,20 @@ pub(super) fn fmt_command(arguments: impl Iterator<Item = String>) -> i32 {
         eprintln!("error: no Actus source files found");
         return 1;
     }
-    paths.into_iter().map(|path| format_file(&path, check_only)).max().unwrap_or(1)
+    let project_wide = paths.len() > 1;
+    let (mut code, mut written, mut unchanged) = (0, 0, 0);
+    for path in paths {
+        let (file_code, wrote) = format_file(&path, check_only);
+        code = code.max(file_code);
+        if file_code == 0 && !check_only {
+            if wrote { written += 1 } else { unchanged += 1 }
+        }
+    }
+    if project_wide && !check_only && code == 0 {
+        let files = if written == 1 { "file" } else { "files" };
+        println!("formatted {written} {files}, {unchanged} already formatted");
+    }
+    code
 }
 
 fn project_sources() -> Vec<PathBuf> {
@@ -63,16 +76,17 @@ fn collect_act_files(directory: &Path, paths: &mut Vec<PathBuf>) {
     }
 }
 
-fn format_file(path: &Path, check_only: bool) -> i32 {
+/// Returns the exit code and whether the file was rewritten.
+fn format_file(path: &Path, check_only: bool) -> (i32, bool) {
     let display = path.display();
-    let Some(source) = read_format_source(path) else { return 1 };
+    let Some(source) = read_format_source(path) else { return (1, false) };
     let (tokens, lex_errors) = scan(&source);
     if let Some(error) = lex_errors.first() {
         eprintln!("{display}: {}", render_lex_error(&source, error));
-        return 1;
+        return (1, false);
     }
     let comments = source_comments(&source, &tokens);
-    let Some(program) = parse_format_source(path, &source, tokens) else { return 1 };
+    let Some(program) = parse_format_source(path, &source, tokens) else { return (1, false) };
     format_program_source(path, &source, &program, &comments, check_only)
 }
 
@@ -106,26 +120,29 @@ fn format_program_source(
     program: &crate::ast::Program,
     comments: &[SourceComment],
     check_only: bool,
-) -> i32 {
+) -> (i32, bool) {
     let display = path.display();
     let formatted = format_program_with_comments(program, comments);
     if check_only {
         if formatted == source {
             println!("{display} is formatted");
-            0
+            (0, false)
         } else {
             eprintln!("{display} is not formatted");
-            1
+            (1, false)
         }
+    } else if formatted == source {
+        println!("`{display}` is already formatted");
+        (0, false)
     } else {
         match fs::write(path, formatted) {
             Ok(()) => {
                 println!("formatted `{display}`");
-                0
+                (0, true)
             }
             Err(error) => {
                 eprintln!("error: cannot write `{display}`: {error}");
-                1
+                (1, false)
             }
         }
     }
