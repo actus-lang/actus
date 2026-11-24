@@ -6,6 +6,23 @@ use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::Analyzer;
 
 impl Analyzer {
+    /// A constant is not a binding, so an assignment that names one is an
+    /// assignment to a constant (E1142), not an undeclared identifier. `span`
+    /// is the assignment target.
+    pub(crate) fn reject_constant_assignment(
+        &self,
+        name: &str,
+        span: crate::lexer::SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if self.binding(name, span).is_err() && self.is_constant_name(name) {
+            return Err(SemanticError {
+                kind: SemanticErrorKind::AssignToConstant { name: name.to_owned() },
+                span,
+            });
+        }
+        Ok(())
+    }
+
     pub(crate) fn is_constant_name(&self, name: &str) -> bool {
         if self.constants.contains_key(name) {
             return true;

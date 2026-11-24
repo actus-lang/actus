@@ -445,6 +445,16 @@ pub enum SemanticErrorKind {
     InvalidMutation {
         name: String,
     },
+    AssignToConstant {
+        name: String,
+    },
+    ConditionTypeMismatch {
+        found: String,
+    },
+    MutateFrozen {
+        name: String,
+        borrow_ids: Vec<usize>,
+    },
     MissingReturnValue,
     InvalidPackStorage {
         pack: String,

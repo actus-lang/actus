@@ -118,6 +118,13 @@ fn lex_message(error: &LexError) -> String {
 /// Message for a verb body that ends in a value without `return`; it shows the fix.
 const VALUE_WITHOUT_RETURN_MESSAGE: &str = "expected `;` after this expression; a verb returns a value with `return`, as in `return <expression>;`";
 
+/// The loop forms Actus has, named for a keyword it does not (`while`).
+fn foreign_loop_message(name: &str) -> String {
+    format!(
+        "`{name}` is not an Actus keyword or loop form; write `loop {{ ... }}` and leave it with `break`, or use `for erg index in start..end {{ ... }}` or `repeat erg index in start .. end {{ ... }}`"
+    )
+}
+
 fn parse_message(error: &ParseError) -> String {
     match &error.kind {
         ParseErrorKind::UnexpectedToken { expected, found } => {
@@ -128,6 +135,7 @@ fn parse_message(error: &ParseError) -> String {
         }
         ParseErrorKind::DuplicateName { kind, name } => format!("duplicate {kind} `{name}`"),
         ParseErrorKind::UnknownKeyword { name } => format!("unknown keyword `{name}`"),
+        ParseErrorKind::ForeignLoopKeyword { name } => foreign_loop_message(name),
         ParseErrorKind::UnknownMetadata { name } => format!("unknown metadata attribute `{name}`"),
         ParseErrorKind::UnsupportedTargetPlatform { name } => {
             format!("unsupported target platform `{name}`")

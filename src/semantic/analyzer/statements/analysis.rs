@@ -73,7 +73,8 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let binary_operator = operator.binary_operator();
         match target {
-            Place::Binding { name, .. } => {
+            Place::Binding { name, span: target_span } => {
+                self.reject_constant_assignment(name, *target_span)?;
                 let binding = self.binding(name, span)?;
                 self.ensure_mutable(binding, name, span)?;
                 let left = Expr::Identifier { name: name.clone(), span };
@@ -130,7 +131,10 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         match target {
-            Place::Binding { name, .. } => self.visit_assignment(name, value, span),
+            Place::Binding { name, span: target_span } => {
+                self.reject_constant_assignment(name, *target_span)?;
+                self.visit_assignment(name, value, span)
+            }
             Place::Field { object, field, .. } => {
                 let object = object.to_expr();
                 self.validate_field_assignment(&object, field, value, span)
@@ -220,6 +224,7 @@ impl Analyzer {
     fn validate_index_assignment_owner(&self, target: &Expr) -> Result<(), SemanticError> {
         match target {
             Expr::Identifier { name, span } => {
+                self.reject_constant_assignment(name, *span)?;
                 let binding = self.binding(name, *span)?;
                 self.ensure_mutable(binding, name, *span)
             }

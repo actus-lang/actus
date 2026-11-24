@@ -38,6 +38,9 @@ fn constant_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ConstantCycle { name } => {
             format!("constant `{name}` participates in a cyclic initializer")
         }
+        SemanticErrorKind::AssignToConstant { name } => format!(
+            "cannot assign to constant `{name}`: constants are fixed at compile time; declare an `erg` binding for a value that changes"
+        ),
         _ => return None,
     };
     Some(message)
@@ -213,6 +216,9 @@ fn guard_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::GuardTypeMismatch { found } => {
             format!("case guard must return `Bool`, found `{found}`")
+        }
+        SemanticErrorKind::ConditionTypeMismatch { found } => {
+            format!("`if` condition must be `Bool`, found `{found}`")
         }
         SemanticErrorKind::BranchStateMismatch { name, expected, found } => {
             format!(

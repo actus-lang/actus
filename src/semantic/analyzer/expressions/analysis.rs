@@ -5,12 +5,13 @@ use crate::ast::{
 use crate::lexer::SourceSpan;
 
 use super::super::errors::{SemanticError, SemanticErrorKind};
+use super::super::operator_validation::operand_type_error;
 use super::Analyzer;
 use super::rules::{
-    binary_operator_name, cast_literal_fits, cast_operand_literal, equality_types_match,
-    expected_unary_type, integer_literal, is_cast_integer_type, is_integer_primitive,
-    is_integer_type_name, is_unsigned_integer_type_name, parse_integer_magnitude,
-    relational_types_match, type_names_match, unary_operator_name,
+    cast_literal_fits, cast_operand_literal, equality_types_match, expected_unary_type,
+    integer_literal, is_cast_integer_type, is_integer_primitive, is_integer_type_name,
+    is_unsigned_integer_type_name, parse_integer_magnitude, relational_types_match,
+    type_names_match, unary_operator_name,
 };
 use super::{canonical_type_name, expression_span, try_type_mismatch};
 
@@ -286,15 +287,7 @@ impl Analyzer {
             self.validate_constant_operator(operator, left, right, &left_type)?;
             return Ok(());
         }
-        Err(SemanticError {
-            kind: SemanticErrorKind::TypeMismatch {
-                callee: binary_operator_name(operator).to_owned(),
-                parameter: "operands".to_owned(),
-                expected: left_type,
-                found: right_type,
-            },
-            span: expression_span(right),
-        })
+        Err(operand_type_error(operator, left, right, &left_type, &right_type))
     }
 
     fn enum_equality_types_match(&self, left: &str, right: &str) -> bool {

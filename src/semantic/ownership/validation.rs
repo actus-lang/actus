@@ -175,7 +175,7 @@ impl Analyzer {
         }
         if self.model.bindings[index].access.is_frozen() {
             return Err(SemanticError {
-                kind: SemanticErrorKind::MoveFrozen {
+                kind: SemanticErrorKind::MutateFrozen {
                     name: name.to_owned(),
                     borrow_ids: self.blocking_borrow_ids(index),
                 },

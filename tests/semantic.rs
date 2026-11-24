@@ -20,6 +20,8 @@ mod integer_comparisons;
 mod integer_operands;
 #[path = "semantic/loans.rs"]
 mod loans;
+#[path = "semantic/misleading_messages.rs"]
+mod misleading_messages;
 #[path = "semantic/origins.rs"]
 mod origins;
 #[path = "semantic/packs.rs"]

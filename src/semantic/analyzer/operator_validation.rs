@@ -6,6 +6,46 @@ use super::super::errors::{SemanticError, SemanticErrorKind};
 use super::expressions::rules::{binary_operator_name, is_integer_type_name};
 use super::{Analyzer, expression_span};
 
+/// The `E1025` error for operands an operator cannot take. When the left operand is of a type the
+/// operator never accepts (`f64 + f64`, `Bool < Bool`, `i32 && i32`) or the shift count is not
+/// unsigned, it names what the operator accepts at the offending operand, so the message never
+/// reads "expected `f64`, found `f64`". Otherwise it names the two differing operand types.
+pub(super) fn operand_type_error(
+    operator: BinaryOp,
+    left: &Expr,
+    right: &Expr,
+    left_type: &str,
+    right_type: &str,
+) -> SemanticError {
+    let is_shift = matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight);
+    let is_float = matches!(primitive_type(left_type), Some(PrimitiveType::Float { .. }));
+    let left_integer = is_integer_type_name(left_type);
+    let (expected, found, operand) = if is_shift && left_integer {
+        ("unsigned integer", right_type, right)
+    } else if (is_shift || operator.requires_same_operand_type()) && !left_integer {
+        ("integer", left_type, left)
+    } else if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) && left_type != "Bool"
+    {
+        ("Bool", left_type, left)
+    } else if operator.is_relational() && !(left_integer || is_float) {
+        ("integer or float", left_type, left)
+    } else if matches!(operator, BinaryOp::Equals | BinaryOp::NotEquals) && left_type == right_type
+    {
+        ("integer, float, Bool or payload-free enum", left_type, left)
+    } else {
+        (left_type, right_type, right)
+    };
+    SemanticError {
+        kind: SemanticErrorKind::TypeMismatch {
+            callee: binary_operator_name(operator).to_owned(),
+            parameter: "operands".to_owned(),
+            expected: expected.to_owned(),
+            found: found.to_owned(),
+        },
+        span: expression_span(operand),
+    }
+}
+
 impl Analyzer {
     /// Both operands of an arithmetic or bitwise operator have one integer
     /// type. An unsuffixed literal on either side takes the other side's type
@@ -19,15 +59,7 @@ impl Analyzer {
         let left_type = &self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
         let right_type = &self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
         if !(is_integer_type_name(left_type) && is_integer_type_name(right_type)) {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::TypeMismatch {
-                    callee: binary_operator_name(operator).to_owned(),
-                    parameter: "operands".to_owned(),
-                    expected: left_type.to_owned(),
-                    found: right_type.to_owned(),
-                },
-                span: expression_span(right),
-            });
+            return Err(operand_type_error(operator, left, right, left_type, right_type));
         }
         let mut operand_type = left_type;
         if right.is_plain_integer_literal() {

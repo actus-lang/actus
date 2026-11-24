@@ -33,6 +33,7 @@ impl Analyzer {
                 span,
             });
         };
+        self.reject_constant_assignment(name, object_span)?;
         let binding_index = self.binding(name, object_span)?;
         self.validate_assignment_owner(binding_index, name, field, span)?;
         self.ensure_mutable(binding_index, name, object_span)?;

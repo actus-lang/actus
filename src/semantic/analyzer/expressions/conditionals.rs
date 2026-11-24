@@ -17,7 +17,7 @@ impl Analyzer {
             self.expression_type_name(condition).unwrap_or_else(|| "unknown".to_owned());
         if condition_type != "Bool" {
             return Err(SemanticError {
-                kind: SemanticErrorKind::GuardTypeMismatch { found: condition_type },
+                kind: SemanticErrorKind::ConditionTypeMismatch { found: condition_type },
                 span: expression_span(condition),
             });
         }

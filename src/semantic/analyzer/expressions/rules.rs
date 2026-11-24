@@ -33,6 +33,10 @@ pub(in crate::semantic::analyzer) fn is_unsigned_integer_type_name(name: &str) -
 
 pub(in crate::semantic::analyzer) fn binary_operator_name(operator: BinaryOp) -> &'static str {
     match operator {
+        BinaryOp::Add => "addition operator",
+        BinaryOp::Subtract => "subtraction operator",
+        BinaryOp::Multiply => "multiplication operator",
+        BinaryOp::Divide => "division operator",
         BinaryOp::Equals => "equality operator",
         BinaryOp::NotEquals => "inequality operator",
         BinaryOp::Remainder => "remainder operator",
@@ -49,7 +53,10 @@ pub(in crate::semantic::analyzer) fn binary_operator_name(operator: BinaryOp) ->
         BinaryOp::SaturatingAdd => "saturating addition operator",
         BinaryOp::SaturatingSubtract => "saturating subtraction operator",
         BinaryOp::SaturatingMultiply => "saturating multiplication operator",
-        _ => "relational operator",
+        BinaryOp::LessThan
+        | BinaryOp::LessEquals
+        | BinaryOp::GreaterThan
+        | BinaryOp::GreaterEquals => "relational operator",
     }
 }
 
