@@ -52,6 +52,9 @@ fn serialization_message(kind: &SemanticErrorKind) -> Option<String> {
 
 fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
+        SemanticErrorKind::PrintIntegerTooWide { callee, type_name } => format!(
+            "`{callee}(int:)` prints integers up to 64 bits; `{type_name}` is wider, cast it to a 64-bit type first"
+        ),
         SemanticErrorKind::InvalidPrimitiveCast { source, target } => {
             format!("cannot cast `{source}` to `{target}`; casts convert between integer types")
         }

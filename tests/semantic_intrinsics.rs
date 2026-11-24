@@ -225,6 +225,65 @@ fn rejects_labelled_print_intrinsic_with_a_mismatched_type() {
 }
 
 #[test]
+fn accepts_every_integer_type_for_the_int_label() {
+    for type_name in [
+        "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "Usize", "Int", "u1", "i7", "u24",
+        "i40", "u63",
+    ] {
+        for verb in ["print", "eprint"] {
+            let source =
+                format!("verb main() {{ erg n: {type_name} = 1 as {type_name}; {verb}(int: n); }}");
+            analyze_source(&source).unwrap_or_else(|error| {
+                panic!("{source}: {verb}(int:) rejected {type_name}: {error:?}")
+            });
+        }
+    }
+    analyze_source(
+        "verb main() { print(int: 5i64); print(int: 5u64); eprint(int: 5u8); print(int: 5i16); print(int: 3 as u64 + 4u64); }",
+    )
+    .expect("integer literals and expressions of any integer type should be valid");
+}
+
+#[test]
+fn rejects_non_integers_for_the_int_label() {
+    for source in [
+        "verb main() { erg b: Bool = true; print(int: b); }",
+        "verb main() { erg s: String = \"x\"; print(int: s); }",
+        "verb main() { print(int: true); }",
+        "verb main() { eprint(int: \"x\"); }",
+        "verb main() { erg b: Bool = false; eprint(int: b); }",
+    ] {
+        let error = analyze_source(source).expect_err("int label must reject non-integers");
+        assert!(
+            matches!(
+                error.kind,
+                SemanticErrorKind::InvalidIntrinsicArgument { ref parameter, .. } if parameter == "int"
+            ),
+            "{source}: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn rejects_integers_wider_than_64_bits_for_the_int_label() {
+    for (source, expected) in [
+        ("verb main() { erg a: u128 = 5u128; print(int: a); }", "u128"),
+        ("verb main() { erg a: i128 = 5i128; eprint(int: a); }", "i128"),
+        ("verb main() { erg a: u65 = 5u65; print(int: a); }", "u65"),
+        ("verb main() { print(int: 5i128); }", "i128"),
+    ] {
+        let error = analyze_source(source).expect_err("int label must reject wide integers");
+        assert!(
+            matches!(
+                error.kind,
+                SemanticErrorKind::PrintIntegerTooWide { ref type_name, .. } if type_name == expected
+            ),
+            "{source}: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn accepts_a_u8_binding_for_the_byte_label() {
     analyze_source("verb main() { erg b: u8 = 200u8; print(byte: b); eprint(byte: b); }")
         .expect("a u8 binding should be valid for the byte label");

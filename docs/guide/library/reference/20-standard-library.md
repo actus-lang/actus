@@ -58,7 +58,9 @@ The public I/O facade includes:
 
 Use labelled `print(string: ...)`, `print(int: ...)`, `print(byte: ...)`,
 `print(bool: ...)`, or `print(buffer: ...)` for
-the unified console intrinsic. `printb` remains a compatibility wrapper for
+the unified console intrinsic. `print(int: ...)` and `eprint(int: ...)` take
+an integer of any type up to 64 bits and write its exact decimal value, so no
+`as Int` cast is needed; wider integers are rejected with `E1139`. `printb` remains a compatibility wrapper for
 binary `Buffer` output, and typed result handling remains available through
 the explicit std wrappers. Do not pass a `String` to `printb` or a `Buffer` to
 `print(string: ...)`.

@@ -92,6 +92,7 @@ fn expression_value_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
         SemanticErrorKind::NumericLiteralOutOfRange { .. } => "E1068",
         SemanticErrorKind::InvalidPrimitiveCast { .. } => "E1090",
+        SemanticErrorKind::PrintIntegerTooWide { .. } => "E1139",
         SemanticErrorKind::PrimitiveCastOutOfRange { .. } => "E1091",
         SemanticErrorKind::ConstantRemainderByZero => "E1092",
         SemanticErrorKind::ConstantArithmeticOverflow { .. } => "E1138",

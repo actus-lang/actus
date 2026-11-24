@@ -98,6 +98,10 @@ pub const BUFFER_CRC32_SYMBOL: &str = "actus_buffer_crc32";
 pub const BUFFER_CRC32_MATCHES_SYMBOL: &str = "actus_buffer_crc32_matches";
 pub const BUFFER_VALIDATE_FIXED_FRAME_SYMBOL: &str = "actus_buffer_validate_fixed_frame";
 pub const PRINT_INT_SYMBOL: &str = "actus_print_int";
+/// Stable runtime symbol printing a signed 64-bit integer as a decimal line.
+pub const PRINT_I64_SYMBOL: &str = "actus_print_i64";
+/// Stable runtime symbol printing an unsigned 64-bit integer as a decimal line.
+pub const PRINT_U64_SYMBOL: &str = "actus_print_u64";
 pub const PRINT_BOOL_SYMBOL: &str = "actus_print_bool";
 pub const PRINT_STRING_SYMBOL: &str = "actus_print_string";
 pub const WRITE_STRING_STDOUT_SYMBOL: &str = "actus_write_string_stdout";
@@ -116,6 +120,10 @@ pub const STRING_COPY_STATUS_CAPACITY: i32 = -2;
 /// Source string bytes were not valid UTF-8.
 pub const STRING_COPY_STATUS_INVALID_UTF8: i32 = -3;
 pub const PRINT_INT_STDERR_SYMBOL: &str = "actus_print_int_stderr";
+/// Standard-error form of [`PRINT_I64_SYMBOL`].
+pub const PRINT_I64_STDERR_SYMBOL: &str = "actus_print_i64_stderr";
+/// Standard-error form of [`PRINT_U64_SYMBOL`].
+pub const PRINT_U64_STDERR_SYMBOL: &str = "actus_print_u64_stderr";
 pub const PRINT_BOOL_STDERR_SYMBOL: &str = "actus_print_bool_stderr";
 pub const PRINT_FORMAT_INT_SYMBOL: &str = "actus_print_format_int";
 pub const PRINT_FORMAT_BOOL_SYMBOL: &str = "actus_print_format_bool";

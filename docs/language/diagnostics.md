@@ -21,6 +21,7 @@ edition.
 | `E1109` | Private module declaration or public-signature visibility violation |
 | `E1119` | Reference outside the hierarchical scope of its directory module |
 | `E1137` | Facade opens one name both publicly and for its unit |
+| `E1139` | `print(int:)` or `eprint(int:)` given an integer wider than 64 bits |
 | `E1138` | Trapping arithmetic on integer literals overflows its type |
 | `E1090` | Cast between types that are not both integer types |
 | `E1091` | Integer literal in a cast is outside the range of the target type |

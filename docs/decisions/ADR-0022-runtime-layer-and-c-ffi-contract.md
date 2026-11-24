@@ -69,12 +69,18 @@ actus_buffer_allocate(usize) -> void*
 actus_buffer_append(void*, u8) -> bool
 actus_buffer_drop(void*) -> void
 actus_print_int(int32_t) -> int32_t
+actus_print_i64(int64_t) -> int32_t
+actus_print_u64(uint64_t) -> int32_t
 actus_print_string(const uint8_t*) -> int32_t
 ```
 
 Allocation failure returns a null handle. Buffer append returns `false` and
 preserves the handle on invalid input or allocation failure. Null-safe release
-is permitted, but releasing a live handle twice is invalid. Print operations
+is permitted, but releasing a live handle twice is invalid. The `_stderr` forms
+of the integer prints write to standard error. The compiler extends an integer print argument by the signedness of its own type
+and calls `actus_print_int` for values that fit `int32_t`, `actus_print_i64`
+for other signed values, and `actus_print_u64` for other unsigned values.
+Print operations
 return a deterministic scalar result; they do not transfer ownership.
 
 The runtime contract has an explicit ABI version and stable symbol constants.

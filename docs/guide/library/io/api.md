@@ -35,16 +35,16 @@ storage with sufficient capacity and retain ownership after the call.
 | Verb | Contract |
 | --- | --- |
 | `print(string: abs value)` | Writes a borrowed `String` and a newline. |
-| `print(int: erg value) -> Int` | Writes one integer value and a newline through the unified console intrinsic. |
+| `print(int: erg value) -> Int` | Writes one integer of any type up to 64 bits (`i8` to `i64`, `u8` to `u64`, `Usize`, `Int`) as its exact decimal value and a newline. No `as Int` cast is needed. |
 | `print(byte: erg value)` | Writes one `u8` value as a decimal number and a newline. |
 | `print(bool: erg value)` | Writes `true` or `false` and a newline. |
 | `print(buffer: abs bytes)` | Writes borrowed bytes as they are, without a newline. |
 | `eprint(string: abs value)` | Writes a borrowed `String` and a newline to stderr. |
-| `eprint(int: erg value)` | Writes one integer and a newline to stderr. |
+| `eprint(int: erg value)` | Writes one integer of any type up to 64 bits as its exact decimal value and a newline to stderr. |
 | `eprint(byte: erg value)` | Writes one `u8` value as a decimal number and a newline to stderr. |
 | `eprint(bool: erg value)` | Writes `true` or `false` and a newline to stderr. |
 | `eprint(buffer: abs bytes)` | Writes borrowed bytes to stderr. |
-| `print(format: abs template, int: erg value)` | Replaces `{}` with one integer and writes the result and a newline. |
+| `print(format: abs template, int: erg value)` | Replaces `{}` with one `Int` and writes the result and a newline. |
 | `print(format: abs template, bool: erg value)` | Replaces `{}` with `true` or `false` and writes the result and a newline. |
 | `print(abs text: String) -> Result[Int, IoError]` | Writes a borrowed `String` without a newline. |
 | `println(abs text: String) -> Result[Int, IoError]` | Writes a borrowed `String` and a newline. |
@@ -53,6 +53,9 @@ storage with sufficient capacity and retain ownership after the call.
 | `printlnb(abs text: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes, newline, and flushes. |
 | `flush() -> Result[Int, IoError]` | Flushes stdout and returns `Ok(0)` on success. |
 | `write(abs buffer: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes and returns the exact byte count. |
+
+`print(int:)` and `eprint(int:)` reject integers wider than 64 bits (`u128`,
+`i128`, `u65` to `i127`) with `E1139`; cast them to a 64-bit type first.
 
 Use `print` for the language's `String` value and `printb` for raw bytes. A
 `Buffer` is not silently interpreted as text.

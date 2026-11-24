@@ -1,4 +1,4 @@
-use crate::ast::{Argument, BuiltinType, Expr};
+use crate::ast::{Argument, BuiltinType, Expr, PrimitiveType, primitive_type};
 use crate::lexer::SourceSpan;
 
 use super::analyzer::{Analyzer, expression_span};
@@ -51,10 +51,42 @@ impl Analyzer {
         } else {
             self.validate_default_integer_literal(&argument.expression)?;
         }
+        if label == Some("int") {
+            return self.validate_print_integer(callee, &argument.expression);
+        }
         let value_type = self.expression_type(&argument.expression).ok_or_else(|| {
             invalid_print_argument(callee, label.unwrap_or("value"), &argument.expression)
         })?;
         validate_print_type(callee, label, value_type, &argument.expression)
+    }
+
+    /// `int:` takes a value of any integer type up to 64 bits wide.
+    fn validate_print_integer(
+        &self,
+        callee: &str,
+        expression: &Expr,
+    ) -> Result<bool, SemanticError> {
+        let type_name = self.expression_type_name(expression);
+        let width = match type_name.as_deref() {
+            Some("Int") => Some(32),
+            Some(name) => match primitive_type(name) {
+                Some(PrimitiveType::Integer { width, .. }) => Some(width),
+                _ => None,
+            },
+            None => None,
+        };
+        match width {
+            Some(width) if width > 64 => Err(SemanticError {
+                kind: SemanticErrorKind::PrintIntegerTooWide {
+                    callee: callee.to_owned(),
+                    type_name: type_name.unwrap_or_default(),
+                },
+                span: expression_span(expression),
+            }),
+            Some(_) => Ok(true),
+            None if self.expression_type(expression) == Some(BuiltinType::Int) => Ok(true),
+            None => Err(invalid_print_argument(callee, "int", expression)),
+        }
     }
 
     fn validate_print_format(

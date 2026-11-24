@@ -42,6 +42,26 @@ pub extern "C" fn actus_print_int_stderr(value: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn actus_print_i64(value: i64) -> i32 {
+    if writeln!(stdout(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_i64_stderr(value: i64) -> i32 {
+    if writeln!(std::io::stderr(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_u64(value: u64) -> i32 {
+    if writeln!(stdout(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn actus_print_u64_stderr(value: u64) -> i32 {
+    if writeln!(std::io::stderr(), "{value}").is_ok() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn actus_print_bool(value: i32) -> i32 {
     let text = if value == 0 { "false" } else { "true" };
     if writeln!(stdout(), "{text}").is_ok() { 0 } else { -1 }

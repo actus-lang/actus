@@ -295,6 +295,12 @@ pub enum SemanticErrorKind {
         ty: String,
         literal: String,
     },
+    /// `print(int:)` or `eprint(int:)` got an integer wider than the 64 bits the
+    /// runtime can print.
+    PrintIntegerTooWide {
+        callee: String,
+        type_name: String,
+    },
     InvalidPrimitiveCast {
         source: String,
         target: String,

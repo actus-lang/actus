@@ -11,6 +11,16 @@ pub(crate) fn append_print_externals(
 ) -> Result<(), BackendContractError> {
     for (symbol, ty) in [
         (crate::runtime::PRINT_INT_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
+        (crate::runtime::PRINT_I64_SYMBOL, BackendValueType::Integer { signed: true, width: 64 }),
+        (crate::runtime::PRINT_U64_SYMBOL, BackendValueType::Integer { signed: false, width: 64 }),
+        (
+            crate::runtime::PRINT_I64_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: true, width: 64 },
+        ),
+        (
+            crate::runtime::PRINT_U64_STDERR_SYMBOL,
+            BackendValueType::Integer { signed: false, width: 64 },
+        ),
         (crate::runtime::PRINT_BOOL_SYMBOL, BackendValueType::Integer { signed: true, width: 32 }),
         (
             crate::runtime::PRINT_INT_STDERR_SYMBOL,
