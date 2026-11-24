@@ -80,6 +80,10 @@ is permitted, but releasing a live handle twice is invalid. The `_stderr` forms
 of the integer prints write to standard error. The compiler extends an integer print argument by the signedness of its own type
 and calls `actus_print_int` for values that fit `int32_t`, `actus_print_i64`
 for other signed values, and `actus_print_u64` for other unsigned values.
+Formatted integer prints follow the same classification with
+`actus_print_format_int(const uint8_t*, int32_t)`,
+`actus_print_format_i64(const uint8_t*, int64_t)` and
+`actus_print_format_u64(const uint8_t*, uint64_t)`, each with a `_stderr` form.
 Print operations
 return a deterministic scalar result; they do not transfer ownership.
 

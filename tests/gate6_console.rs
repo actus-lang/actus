@@ -263,3 +263,67 @@ fn built_in_print_of_an_integer_wider_than_64_bits_is_a_compile_error() {
         assert!(stderr.contains("128"), "{verb_name} must name the type: {stderr}");
     }
 }
+
+/// A program printing integers of many types through `verb_name(format:, int:)`.
+#[cfg(unix)]
+fn formatted_integer_print_program(verb_name: &str) -> (String, String) {
+    let cases = [
+        ("i8", "-128i8", "-128"),
+        ("u8", "255u8", "255"),
+        ("i40", "-5i40", "-5"),
+        ("u33", "8589934591u33", "8589934591"),
+        ("i64", "-9223372036854775808i64", "-9223372036854775808"),
+        ("u64", "18446744073709551615u64", "18446744073709551615"),
+        ("Usize", "18446744073709551615 as Usize", "18446744073709551615"),
+        ("Int", "-2147483648", "-2147483648"),
+    ];
+    let mut body = String::new();
+    let mut expected = String::new();
+    for (index, (type_name, literal, text)) in cases.iter().enumerate() {
+        body.push_str(&format!(
+            "erg v{index}: {type_name} = {literal}; {verb_name}(format: \"[{{}}]\", int: v{index}); "
+        ));
+        expected.push_str(&format!("[{text}]\n"));
+    }
+    body.push_str(&format!("{verb_name}(format: \"{{}}!\", int: 7u16); "));
+    expected.push_str("7!\n");
+    (format!("verb main() {{ {body}}}\n"), expected)
+}
+
+#[cfg(unix)]
+#[test]
+fn built_in_print_format_of_an_integer_writes_the_exact_value_of_every_type() {
+    let (source, expected) = formatted_integer_print_program("print");
+    for (backend, run) in build_and_run_on_each_backend("print-format-integers", &source) {
+        assert_eq!(String::from_utf8_lossy(&run.stdout), expected, "{backend} stdout");
+        assert!(run.stderr.is_empty(), "{backend} stderr");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn built_in_eprint_format_of_an_integer_writes_the_exact_value_of_every_type() {
+    let (source, expected) = formatted_integer_print_program("eprint");
+    for (backend, run) in build_and_run_on_each_backend("eprint-format-integers", &source) {
+        assert_eq!(String::from_utf8_lossy(&run.stderr), expected, "{backend} stderr");
+        assert!(run.stdout.is_empty(), "{backend} stdout");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn built_in_print_format_of_an_integer_wider_than_64_bits_is_a_compile_error() {
+    let input =
+        std::env::temp_dir().join(format!("actus-console-wide-format-{}.act", std::process::id()));
+    fs::write(&input, "verb main() { erg a: i72 = 5i72; print(format: \"{}\", int: a); }\n")
+        .expect("write wide format source");
+    let check = Command::new(env!("CARGO_BIN_EXE_actus"))
+        .arg("check")
+        .arg(&input)
+        .output()
+        .expect("run check");
+    let _ = fs::remove_file(&input);
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(!check.status.success(), "format accepted a wide integer");
+    assert!(stderr.contains("E1139") && stderr.contains("72"), "{stderr}");
+}

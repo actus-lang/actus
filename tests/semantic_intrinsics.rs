@@ -284,6 +284,44 @@ fn rejects_integers_wider_than_64_bits_for_the_int_label() {
 }
 
 #[test]
+fn accepts_any_integer_up_to_64_bits_in_the_format_form() {
+    analyze_source(
+        "verb main() { erg a: u33 = 5u33; print(format: \"{}\", int: a); eprint(format: \"{}\", int: 5u64); print(format: \"{}\", int: 3 as i40); }",
+    )
+    .expect("format int must accept every integer up to 64 bits");
+}
+
+#[test]
+fn rejects_integers_wider_than_64_bits_in_the_format_form() {
+    for (source, expected) in [
+        ("verb main() { erg a: i72 = 5i72; print(format: \"{}\", int: a); }", "i72"),
+        ("verb main() { erg a: u128 = 5u128; eprint(format: \"{}\", int: a); }", "u128"),
+    ] {
+        let error = analyze_source(source).expect_err("format int must reject wide integers");
+        assert!(
+            matches!(
+                error.kind,
+                SemanticErrorKind::PrintIntegerTooWide { ref type_name, .. } if type_name == expected
+            ),
+            "{source}: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn rejects_non_integers_in_the_format_form_int_label() {
+    let error = analyze_source("verb main() { print(format: \"{}\", int: \"x\"); }")
+        .expect_err("format int must reject strings");
+    assert!(
+        matches!(
+            error.kind,
+            SemanticErrorKind::InvalidIntrinsicArgument { ref parameter, .. } if parameter == "int"
+        ),
+        "{error:?}"
+    );
+}
+
+#[test]
 fn accepts_a_u8_binding_for_the_byte_label() {
     analyze_source("verb main() { erg b: u8 = 200u8; print(byte: b); eprint(byte: b); }")
         .expect("a u8 binding should be valid for the byte label");

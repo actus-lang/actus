@@ -129,6 +129,14 @@ pub const PRINT_FORMAT_INT_SYMBOL: &str = "actus_print_format_int";
 pub const PRINT_FORMAT_BOOL_SYMBOL: &str = "actus_print_format_bool";
 pub const PRINT_FORMAT_INT_STDERR_SYMBOL: &str = "actus_print_format_int_stderr";
 pub const PRINT_FORMAT_BOOL_STDERR_SYMBOL: &str = "actus_print_format_bool_stderr";
+/// Formatted print of a signed 64-bit integer.
+pub const PRINT_FORMAT_I64_SYMBOL: &str = "actus_print_format_i64";
+/// Formatted print of an unsigned 64-bit integer.
+pub const PRINT_FORMAT_U64_SYMBOL: &str = "actus_print_format_u64";
+/// Standard-error form of [`PRINT_FORMAT_I64_SYMBOL`].
+pub const PRINT_FORMAT_I64_STDERR_SYMBOL: &str = "actus_print_format_i64_stderr";
+/// Standard-error form of [`PRINT_FORMAT_U64_SYMBOL`].
+pub const PRINT_FORMAT_U64_STDERR_SYMBOL: &str = "actus_print_format_u64_stderr";
 pub const PRINT_FORMAT_MAX_BYTES: usize = 4096;
 pub const PRINT_STRING_STDERR_SYMBOL: &str = "actus_print_string_stderr";
 pub const PRINT_BUFFER_STDOUT_SYMBOL: &str = "actus_print_buffer_stdout";

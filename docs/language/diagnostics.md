@@ -21,7 +21,7 @@ edition.
 | `E1109` | Private module declaration or public-signature visibility violation; reached unqualified or qualified (`module::name`) and hinted to be marked `open` |
 | `E1119` | Reference outside the hierarchical scope of its directory module |
 | `E1137` | Facade opens one name both publicly and for its unit |
-| `E1139` | `print(int:)` or `eprint(int:)` given an integer wider than 64 bits |
+| `E1139` | `print(int:)`, `eprint(int:)`, or a `format:` print with `int:`, given an integer wider than 64 bits |
 | `E1138` | Trapping arithmetic on integer literals overflows its type |
 | `E1140` | Arithmetic, bitwise or comparison operator given operands of different integer types |
 | `E1141` | Call to a verb that returns nothing used where a value is needed (binding, assignment, argument, operand, condition, `return`, conditional value or field initializer); such a call is only valid as a statement of its own |

@@ -44,7 +44,7 @@ storage with sufficient capacity and retain ownership after the call.
 | `eprint(byte: erg value)` | Writes one `u8` value as a decimal number and a newline to stderr. |
 | `eprint(bool: erg value)` | Writes `true` or `false` and a newline to stderr. |
 | `eprint(buffer: abs bytes)` | Writes borrowed bytes to stderr. |
-| `print(format: abs template, int: erg value)` | Replaces `{}` with one `Int` and writes the result and a newline. |
+| `print(format: abs template, int: erg value)` | Replaces `{}` with one integer of any type up to 64 bits (same types as `print(int:)`, exact decimal value) and writes the result and a newline. `eprint(format:, int:)` does the same on stderr. |
 | `print(format: abs template, bool: erg value)` | Replaces `{}` with `true` or `false` and writes the result and a newline. |
 | `print(abs text: String) -> Result[Int, IoError]` | Writes a borrowed `String` without a newline. |
 | `println(abs text: String) -> Result[Int, IoError]` | Writes a borrowed `String` and a newline. |
@@ -54,7 +54,7 @@ storage with sufficient capacity and retain ownership after the call.
 | `flush() -> Result[Int, IoError]` | Flushes stdout and returns `Ok(0)` on success. |
 | `write(abs buffer: Buffer) -> Result[Int, IoError]` | Writes borrowed bytes and returns the exact byte count. |
 
-`print(int:)` and `eprint(int:)` reject integers wider than 64 bits (`u128`,
+`print(int:)`, `eprint(int:)` and the `format:` forms with `int:` reject integers wider than 64 bits (`u128`,
 `i128`, `u65` to `i127`) with `E1139`; cast them to a 64-bit type first.
 
 Use `print` for the language's `String` value and `printb` for raw bytes. A

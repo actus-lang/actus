@@ -114,6 +114,9 @@ impl Analyzer {
         if self.expression_type(&format.expression) != Some(BuiltinType::String) {
             return Err(invalid_print_argument(callee, "format", &format.expression));
         }
+        if value.name.as_deref() == Some("int") {
+            return self.validate_print_integer(callee, &value.expression);
+        }
         let value_type = self.expression_type(&value.expression).ok_or_else(|| {
             invalid_print_argument(
                 callee,

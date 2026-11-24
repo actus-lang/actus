@@ -132,6 +132,46 @@ pub unsafe extern "C" fn actus_print_format_bool_stderr(format: *const u8, value
     unsafe { print_format_value(format, text, true) }
 }
 
+#[unsafe(no_mangle)]
+/// Prints one `i64` into a bounded one-placeholder format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_i64(format: *const u8, value: i64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), false) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one `i64` into a bounded one-placeholder format string on stderr.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_i64_stderr(format: *const u8, value: i64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), true) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one `u64` into a bounded one-placeholder format string.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_u64(format: *const u8, value: u64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), false) }
+}
+
+#[unsafe(no_mangle)]
+/// Prints one `u64` into a bounded one-placeholder format string on stderr.
+///
+/// # Safety
+///
+/// `format` must be null or point to a valid null-terminated byte string.
+pub unsafe extern "C" fn actus_print_format_u64_stderr(format: *const u8, value: u64) -> i32 {
+    unsafe { print_format_value(format, &value.to_string(), true) }
+}
+
 /// Prints a null-terminated UTF-8 string followed by a newline.
 ///
 /// # Safety
