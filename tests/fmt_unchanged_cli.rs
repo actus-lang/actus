@@ -89,3 +89,16 @@ fn check_keeps_its_messages_and_exit_codes_and_never_writes() {
     assert_eq!(fs::read_to_string(&bad).expect("read"), UNFORMATTED);
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn suffixed_hex_literals_survive_formatting_unchanged() {
+    let root = scratch("hex-suffix");
+    let file = root.join("src/main.act");
+    let source = "verb main() {\n    erg a: u8 = 0xFFu8;\n    erg b: i8 = 0x7fi8;\n    erg c: i40 = 0XaBi40;\n}\n";
+    fs::write(&file, source).expect("write source");
+    let output = actus(&root, &["fmt", "src/main.act"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).expect("read source"), source);
+    assert_eq!(stdout(&output), "`src/main.act` is already formatted\n");
+    let _ = fs::remove_dir_all(root);
+}

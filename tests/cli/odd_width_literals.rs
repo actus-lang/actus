@@ -303,3 +303,36 @@ fn odd_width_literals_just_outside_their_range_are_rejected() {
         assert_rejected(name, body, message);
     }
 }
+
+#[test]
+fn suffixed_hex_literals_print_their_values_on_every_backend() {
+    assert_prints(
+        "hex-suffix",
+        "",
+        "erg a: u8 = 0xFFu8;\nprint(int: a as i64);\n\
+         erg b: i8 = 0x7Fi8;\nprint(int: b as i64);\n\
+         erg c: u32 = 0xFFFFFFFFu32;\nprint(int: c as i64);\n\
+         erg d: i40 = 0xFFi40;\nprint(int: d as i64);\n\
+         erg e: u8 = 0XFFu8;\nprint(int: e as i64);",
+        &["255", "127", "4294967295", "255", "255"],
+    );
+}
+
+#[test]
+fn suffixed_hex_literals_are_range_checked_against_their_suffix() {
+    assert_rejected(
+        "hex-u8-range",
+        "erg a = 0x100u8;",
+        "literal `0x100` is outside the range of `u8`",
+    );
+    assert_rejected(
+        "hex-i8-range",
+        "erg a = 0xFFi8;",
+        "literal `0xFF` is outside the range of `i8`",
+    );
+}
+
+#[test]
+fn hex_literal_without_digits_is_rejected_even_with_a_suffix() {
+    assert_rejected("hex-no-digits", "erg a = 0xu8;", "invalid hexadecimal literal `0xu8`");
+}

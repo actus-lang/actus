@@ -132,6 +132,21 @@ Primitive integer names use lowercase widths such as `u8`, `i32`, and `u128`;
 `Usize` is the unsigned target-sized index type. Floating primitives are
 `f32` and `f64`.
 
+## Integer Literals
+
+Decimal literals are digits only. Hexadecimal literals start with `0x` or `0X`
+followed by at least one hex digit; the spelling (including digit case) is kept
+by the formatter. Digit separators (`_`), binary (`0b`) and octal (`0o`) forms
+do not exist.
+
+An integer literal may carry a width suffix `i1`..`i128` or `u1`..`u128`,
+written directly after the digits with no separator: `255u8`, `0xFFu8`,
+`0x7Fi8`. The suffix fixes the literal's type and the value must fit that type
+(`0x100u8` and `0xFFi8` are E1068, as are `256u8` and `255i8`). Because `f` is a
+hex digit, hex literals take no float suffix and there are no hex floats:
+`0x1f32` is the integer `0x1f32`. A hex literal with no digits (`0xu8`) or an
+unknown suffix (`0x12G`, `0xFFu`) is E0005.
+
 `Option[T]` and `Result[T, E]` depend on the generic type phase and exhaustive
 pattern semantics. They must not be documented as fully built-in until their
 registry, construction, and lowering are implemented.
