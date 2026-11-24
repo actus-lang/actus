@@ -16,6 +16,9 @@ during semantic analysis. Dynamic values use a native range check and fail
 deterministically on overflow or underflow.
 
 There is no general implicit numeric conversion. If a `u32` operation needs a
-`u32` operand, write `1u32` or use an explicit cast. Do not solve type errors by
+`u32` operand, write `1u32` or use an explicit cast. This includes arithmetic
+and bitwise operators: `a + b` with `a: u8` and `b: u32` is rejected (`E1140`)
+and is written `(a as u32) + b`. Only an unsuffixed literal adapts to the other
+operand. Do not solve type errors by
 changing a protocol field to `Int` unless the ABI and width contract really
 requires it.

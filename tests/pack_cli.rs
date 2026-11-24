@@ -39,7 +39,7 @@ verb main() -> Int {
     control.channel = 21;
     erg big = BigControl { storage: 0, };
     big.high = 10;
-    return control.enabled + control.channel + control.mode + big.high;
+    return (control.enabled as Int) + (control.channel as Int) + (control.mode as Int) + (big.high as Int);
 }
 "#
 }
@@ -74,7 +74,7 @@ verb main() -> Int {
     erg header = NetworkHeader { storage: 0, };
     header.version = 4;
     header.total_length = 150;
-    return header.version + header.total_length;
+    return (header.version as Int) + (header.total_length as Int);
 }
 "#
 }

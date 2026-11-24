@@ -1,5 +1,5 @@
 use super::*;
-use crate::ast::TypeName;
+use crate::ast::{BinaryOp, TypeName};
 
 pub(in crate::codegen::shared_lowering) fn lower_unit_call(
     provider: &mut SharedExpressionProvider<'_>,
@@ -219,8 +219,23 @@ impl SharedExpressionProvider<'_> {
         let Expr::Binary { left, operator, right, span } = expression else {
             return Err(unsupported(expression_span(expression), "binary expression expected"));
         };
+        let (left_literal, right_literal) =
+            (left.is_plain_integer_literal(), right.is_plain_integer_literal());
         let left = self.lower_expression(left, instructions)?;
         let right = self.lower_expression(right, instructions)?;
+        // A literal on the left takes the type of the other operand. Without
+        // this, a binding that holds a constant would look like the literal and
+        // be retyped to `Int` instead (ADR-0119).
+        let left = match self.value_type(right) {
+            Some(right_type)
+                if left_literal
+                    && !right_literal
+                    && !matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) =>
+            {
+                super::super::state::retype_integer_literal(self, left, right_type, instructions)
+            }
+            _ => left,
+        };
         let Some(operation) = BackendIntegerBinaryOp::from_source(*operator) else {
             return self.lower_compare(left, right, *operator, *span, instructions);
         };

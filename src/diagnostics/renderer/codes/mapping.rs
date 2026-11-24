@@ -97,6 +97,7 @@ fn expression_value_code(kind: &SemanticErrorKind) -> Option<&'static str> {
         SemanticErrorKind::ConstantRemainderByZero => "E1092",
         SemanticErrorKind::ConstantArithmeticOverflow { .. } => "E1138",
         SemanticErrorKind::ConstantShiftCountOutOfRange { .. } => "E1093",
+        SemanticErrorKind::MixedIntegerOperands { .. } => "E1140",
         SemanticErrorKind::ConstantRuntimeDependency { .. } => "E1097",
         SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",
         SemanticErrorKind::ArenaReferenceEscape { .. } => "E1077",

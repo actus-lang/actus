@@ -247,6 +247,9 @@ impl Analyzer {
         left: &Expr,
         right: &Expr,
     ) -> Result<(), SemanticError> {
+        if operator.requires_same_operand_type() {
+            return self.validate_same_type_operands(operator, left, right);
+        }
         let left_type = self.expression_type_name(left).unwrap_or_else(|| "unknown".to_owned());
         let right_type = self.expression_type_name(right).unwrap_or_else(|| "unknown".to_owned());
         let unsuffixed_integer_matches =
@@ -273,10 +276,9 @@ impl Analyzer {
                 || self.enum_equality_types_match(&left_type, &right_type)
         } else if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
             left_type == "Bool" && right_type == "Bool"
-        } else if matches!(operator, BinaryOp::ShiftLeft | BinaryOp::ShiftRight) {
-            is_integer_type_name(&left_type) && is_unsigned_integer_type_name(&right_type)
         } else {
-            is_integer_type_name(&left_type) && is_integer_type_name(&right_type)
+            // Only shifts remain: any integer value, an unsigned count.
+            is_integer_type_name(&left_type) && is_unsigned_integer_type_name(&right_type)
         };
         if valid {
             self.validate_constant_operator(operator, left, right, &left_type)?;

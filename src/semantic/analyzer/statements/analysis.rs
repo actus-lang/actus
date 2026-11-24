@@ -88,6 +88,7 @@ impl Analyzer {
                     resolved_type: None,
                     span,
                 };
+                self.precheck_compound_operands(binary_operator, &left, value)?;
                 self.validate_field_assignment(&object_expression, field, value, span)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
@@ -98,10 +99,28 @@ impl Analyzer {
                     index: index.clone(),
                     span,
                 };
+                self.precheck_compound_operands(binary_operator, &left, value)?;
                 self.visit_index_assignment(&target_expression, index, value)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
         }
+    }
+
+    /// Reports a mixed-type compound assignment to a field or element as the
+    /// operator error (`E1140`) before the place's own type check reports the
+    /// same difference as a plain assignment mismatch. Silent when either
+    /// type is unknown, so the place's own diagnostics stay in charge.
+    fn precheck_compound_operands(
+        &self,
+        operator: crate::ast::BinaryOp,
+        place: &Expr,
+        value: &Expr,
+    ) -> Result<(), SemanticError> {
+        if self.expression_type_name(place).is_some() && self.expression_type_name(value).is_some()
+        {
+            return self.validate_binary_operator(operator, place, value);
+        }
+        Ok(())
     }
 
     fn visit_place_assignment(

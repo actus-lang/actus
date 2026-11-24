@@ -32,7 +32,7 @@ pub(in crate::semantic::analyzer) fn equality_types_match(left: &str, right: &st
     (left == "Bool" && right == "Bool") || relational_types_match(left, right)
 }
 
-pub(in crate::semantic::analyzer) fn is_integer_type_name(name: &str) -> bool {
+pub(crate) fn is_integer_type_name(name: &str) -> bool {
     name == "Int" || name == "Usize" || primitive_type(name).is_some_and(is_integer_primitive)
 }
 

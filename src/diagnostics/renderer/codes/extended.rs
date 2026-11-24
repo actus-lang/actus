@@ -67,6 +67,9 @@ fn operator_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ConstantArithmeticOverflow { operator, ty } => format!(
             "constant `{operator}` overflows `{ty}`; use `{operator}%` to wrap or `{operator}|` to saturate"
         ),
+        SemanticErrorKind::MixedIntegerOperands { operator, left, right } => format!(
+            "operands of `{operator}` must have the same integer type, found `{left}` and `{right}`; convert one side explicitly with `as`"
+        ),
         SemanticErrorKind::ConstantShiftCountOutOfRange { count, width } => {
             format!("constant shift count `{count}` is outside the valid range `0..{width}`")
         }

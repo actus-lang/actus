@@ -165,6 +165,23 @@ pub enum BinaryOp {
     LogicalOr,
 }
 
+impl Expr {
+    /// An unsuffixed integer literal, possibly negated or parenthesized. Such
+    /// an operand takes the integer type of the other operand of an
+    /// arithmetic or bitwise operator (ADR-0119). A cast is not one: it has
+    /// the type it names.
+    pub fn is_plain_integer_literal(&self) -> bool {
+        match self {
+            Self::Integer { suffix: None, .. } => true,
+            Self::Grouping { expression, .. }
+            | Self::Unary { operator: UnaryOp::Negate, expression, .. } => {
+                expression.is_plain_integer_literal()
+            }
+            _ => false,
+        }
+    }
+}
+
 impl BinaryOp {
     /// The wrapping and saturating operators, which take integers only.
     pub const fn is_integer_only_arithmetic(self) -> bool {
@@ -181,6 +198,55 @@ impl BinaryOp {
 
     pub const fn is_relational(self) -> bool {
         matches!(self, Self::LessThan | Self::LessEquals | Self::GreaterThan | Self::GreaterEquals)
+    }
+
+    /// The arithmetic, wrapping, saturating and bitwise operators, whose two
+    /// operands must have one integer type (ADR-0119). Shifts, comparisons
+    /// and logical operators are not in this family.
+    pub const fn requires_same_operand_type(self) -> bool {
+        !matches!(
+            self,
+            Self::ShiftLeft
+                | Self::ShiftRight
+                | Self::LessThan
+                | Self::LessEquals
+                | Self::GreaterThan
+                | Self::GreaterEquals
+                | Self::Equals
+                | Self::NotEquals
+                | Self::LogicalAnd
+                | Self::LogicalOr
+        )
+    }
+
+    /// The operator as written in source.
+    pub const fn symbol(self) -> &'static str {
+        match self {
+            Self::Add => "+",
+            Self::Subtract => "-",
+            Self::Multiply => "*",
+            Self::WrappingAdd => "+%",
+            Self::WrappingSubtract => "-%",
+            Self::WrappingMultiply => "*%",
+            Self::SaturatingAdd => "+|",
+            Self::SaturatingSubtract => "-|",
+            Self::SaturatingMultiply => "*|",
+            Self::Divide => "/",
+            Self::Remainder => "%",
+            Self::BitwiseAnd => "&",
+            Self::BitwiseOr => "|",
+            Self::BitwiseXor => "^",
+            Self::ShiftLeft => "<<",
+            Self::ShiftRight => ">>",
+            Self::LessThan => "<",
+            Self::LessEquals => "<=",
+            Self::GreaterThan => ">",
+            Self::GreaterEquals => ">=",
+            Self::Equals => "==",
+            Self::NotEquals => "!=",
+            Self::LogicalAnd => "&&",
+            Self::LogicalOr => "||",
+        }
     }
 }
 

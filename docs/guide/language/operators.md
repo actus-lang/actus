@@ -5,9 +5,21 @@ contract; Actus does not silently convert unrelated numeric types.
 
 ## Arithmetic
 
-`+`, `-`, `*`, and the checked arithmetic forms operate on compatible integer
-or supported numeric types. The result keeps the declared type. Use explicit
-casts when values have different widths or signedness.
+`+`, `-`, `*`, `/`, `%`, the wrapping forms `+%`, `-%`, `*%`, the saturating
+forms `+|`, `-|`, `*|`, the bitwise operators `&`, `|`, `^`, and the compound
+assignments built from them take two operands of the same integer type. The
+result has that type. `Int`, `i32`, `Usize`, and `u64` are different types.
+Mixing two types is the compile error `E1140`; convert one side with `as`:
+
+```actus
+erg total: u32 = (small as u32) + wide;
+```
+
+An unsuffixed integer literal takes the type of the other operand, on either
+side, so `small + 1`, `1 + small`, and `small += 1` are valid when `small` is
+a `u8`. The literal must fit that type: `small + 300` is rejected. A suffixed
+literal such as `4u32`, a cast, and a constant expression such as `2 * 3`
+keep their own type. Shift counts are not part of this rule.
 
 ## Comparisons
 

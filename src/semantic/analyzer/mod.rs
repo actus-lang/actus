@@ -18,7 +18,10 @@ pub(crate) use analysis::{
     validate_bounded_recursion, validate_stack_limit_dynamic_dispatch,
     validate_stack_limit_native_claims, validate_stack_limit_recursion,
 };
-pub(crate) use expressions::{analysis::case_branch_type, rules::cast_literal_fits};
+pub(crate) use expressions::{
+    analysis::case_branch_type,
+    rules::{cast_literal_fits, is_integer_type_name},
+};
 pub(crate) use state::{Analyzer, ScopeFrame};
 pub(crate) use validation::{
     canonical_type_name, expression_span, is_origin_return_expression, try_type_mismatch,

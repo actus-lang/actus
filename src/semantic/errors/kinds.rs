@@ -320,6 +320,13 @@ pub enum SemanticErrorKind {
         count: String,
         width: u16,
     },
+    /// The two operands of an arithmetic or bitwise operator have different
+    /// integer types and neither is an unsuffixed literal (ADR-0119).
+    MixedIntegerOperands {
+        operator: String,
+        left: String,
+        right: String,
+    },
     InvalidArenaCapacity {
         capacity: String,
     },

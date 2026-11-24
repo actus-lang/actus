@@ -38,7 +38,7 @@ verb operator_score() -> Int {
         true => 1,
         _ => 0,
     };
-    return (remainder as Int) + (bits as Int) + (inverted as Int) + shifted_left + shifted_right + ordered + reversed + logical;
+    return (remainder as Int) + (bits as Int) + (inverted as Int) + (shifted_left as Int) + (shifted_right as Int) + ordered + reversed + logical;
 }
 
 """Exercise checked casts, Buffer and Array indexing, and pack mutation."""

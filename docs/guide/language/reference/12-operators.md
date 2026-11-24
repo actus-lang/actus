@@ -24,9 +24,17 @@ Binary operators are left-associative. Parentheses override precedence.
 
 ### Numeric operators
 
-`+`, `-`, `*`, `/`, and `%` operate on compatible numeric types. Integer
-families preserve declared width and signedness. Do not expect automatic
-promotion between `u8`, `u32`, `Int`, or signed/unsigned families.
+`+`, `-`, `*`, `/`, and `%` (and the wrapping `+%`, `-%`, `*%`, the
+saturating `+|`, `-|`, `*|`, and `&`, `|`, `^`) take two operands of the same
+integer type and produce that type. Integer families preserve declared width
+and signedness. There is no automatic promotion between `u8`, `u32`, `Int`,
+or signed/unsigned families: operands of different types are rejected with
+`E1140`, and one side is converted with `as`. Compound assignments such as
+`+=` follow the same rule (ADR-0119).
+
+An unsuffixed integer literal operand, on either side, takes the type of the
+other operand and must fit it. A suffixed literal, a cast, and a constant
+expression such as `2 * 3` keep their own type.
 
 ### Comparisons
 
