@@ -26,8 +26,12 @@ const TYPES: [(&str, &str); 4] = [
 /// Builds `source` with `backend` and `profile`, runs it, and returns the
 /// exit status, standard output and standard error.
 fn run(source: &str, backend: &str, profile: &str) -> (Option<i32>, String, String) {
+    // Tests of this file run in parallel in one process: every call needs a
+    // directory of its own.
+    static NEXT_DIRECTORY: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let unique = NEXT_DIRECTORY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let root = std::env::temp_dir()
-        .join(format!("actus-signed-division-{backend}-{profile}-{}", std::process::id()));
+        .join(format!("actus-signed-division-{backend}-{profile}-{}-{unique}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).expect("create test directory");
     fs::write(root.join("main.act"), source).expect("write source");
