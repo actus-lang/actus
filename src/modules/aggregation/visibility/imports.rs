@@ -152,12 +152,7 @@ pub(super) fn reject_private(
     span: SourceSpan,
 ) -> Result<(), ModuleError> {
     if private_names.contains(name) {
-        return Err(ModuleError::PrivateDeclarationAccess {
-            module: module_path.to_owned(),
-            symbol: name.to_owned(),
-            facade: unit.facade().to_owned(),
-            span,
-        });
+        return Err(super::cause::private_access(unit, module_path, name, span));
     }
     Ok(())
 }

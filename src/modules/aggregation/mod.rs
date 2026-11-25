@@ -31,7 +31,7 @@ pub(crate) use registry::DeclarationRegistry;
 pub(crate) use scope::validate_plan_scopes;
 pub use types::{
     DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation,
-    OutOfScopeReference, ScopeViolation,
+    OutOfScopeReference, PrivateCause, ScopeViolation,
 };
 pub use unit::{
     ModuleIdentity, ModuleSource, ModuleSourceKind, ModuleUnit, load_module_unit,

@@ -18,7 +18,7 @@ edition.
 | `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |
 | `E1083`–`E1099` | Bounded arrays, arenas, dynamic roles, and compile-time expressions |
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
-| `E1109` | Private module declaration or public-signature visibility violation; reached unqualified or qualified (`module::name`) and hinted to be marked `open` |
+| `E1109` | Private module declaration or public-signature visibility violation; reached unqualified or qualified (`module::name`); the help names the cause: mark the declaration `open`, or, when it is already `open`, change `open unit x;` to `open x;` or add `open x;` in the named facade |
 | `E1119` | Reference outside the hierarchical scope of its directory module |
 | `E1137` | Facade opens one name both publicly and for its unit |
 | `E1139` | `print(int:)`, `eprint(int:)`, or a `format:` print with `int:`, given an integer wider than 64 bits |

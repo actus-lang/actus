@@ -71,6 +71,7 @@ pub enum ModuleError {
         symbol: String,
         facade: PathBuf,
         span: SourceSpan,
+        cause: Box<PrivateCause>,
     },
     /// One facade opens a name both publicly and for its unit (ADR-0111).
     ConflictingOpening {
@@ -81,6 +82,19 @@ pub enum ModuleError {
     },
     OutOfScopeReference(Box<OutOfScopeReference>),
     Semantic(Box<crate::semantic::SemanticError>),
+}
+
+/// Why a declaration is not exported by the facade chain of its module
+/// (ADR-0018, ADR-0111).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PrivateCause {
+    /// The declaration is not marked `open`.
+    NotOpen,
+    /// The declaration is `open`, but `facade` opens `entry` with
+    /// `open unit entry;`, so it reaches the unit only.
+    UnitOnly { entry: String, facade: PathBuf },
+    /// The declaration is `open`, but `facade` does not open `entry` at all.
+    NotOpened { entry: String, facade: PathBuf },
 }
 
 /// A reference to a declaration outside its module's scope (ADR-0110).

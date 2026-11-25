@@ -227,10 +227,5 @@ fn private_error(
     span: crate::lexer::SourceSpan,
     unit: &ModuleUnit,
 ) -> Result<(), ModuleError> {
-    Err(ModuleError::PrivateDeclarationAccess {
-        module: unit.identity().module_path().to_owned(),
-        symbol: symbol.to_owned(),
-        facade: unit.facade().to_owned(),
-        span,
-    })
+    Err(super::cause::private_access(unit, unit.identity().module_path(), symbol, span))
 }

@@ -1,5 +1,5 @@
 use crate::lexer::SourceSpan;
-use crate::modules::{ModuleError, ModuleResolutionError};
+use crate::modules::{ModuleError, ModuleResolutionError, PrivateCause};
 
 use crate::diagnostics::DiagnosticRelatedLocation;
 
@@ -81,12 +81,24 @@ fn duplicate_diagnostic(
 }
 
 fn private_access_diagnostic(error: &ModuleError) -> Diagnostic {
-    let ModuleError::PrivateDeclarationAccess { symbol, span, facade, .. } = error else {
+    let ModuleError::PrivateDeclarationAccess { symbol, span, facade, cause, .. } = error else {
         unreachable!("private access diagnostic received another module error")
     };
     module_error("E1109", error.to_string(), *span)
         .with_source_path(facade.display().to_string())
-        .with_suggestion(format!("mark `{symbol}` as `open` in its module to export it"))
+        .with_suggestion(match &**cause {
+            PrivateCause::NotOpen => {
+                format!("mark `{symbol}` as `open` in its module to export it")
+            }
+            PrivateCause::UnitOnly { entry, facade } => format!(
+                "`{symbol}` is already `open`, but the facade exports `{entry}` only to its unit; to export it, change `open unit {entry};` to `open {entry};` in `{}`",
+                facade.display()
+            ),
+            PrivateCause::NotOpened { entry, facade } => format!(
+                "`{symbol}` is already `open`, but the facade does not export `{entry}`; to export it, add `open {entry};` to `{}`",
+                facade.display()
+            ),
+        })
 }
 
 fn visibility_code(error: &ModuleError) -> &'static str {
