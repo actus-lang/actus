@@ -31,9 +31,37 @@ verb close_directory_entry(
     };
 }
 
+"""Create a one-byte regular file named by one ASCII byte in the working directory."""
+meta effect("filesystem", "blocking")
+verb create_marker_file(erg name: u8) -> Int {
+    erg raw: Buffer = Buffer[0];
+    append(raw, name);
+    append(raw, 0u8);
+    erg made = path_from_ascii(storage: dat raw);
+    return case dat made {
+        Result.Err(_) => 1,
+        Result.Ok(target) => {
+            erg payload: Buffer = Buffer[0];
+            append(payload, 120u8);
+            erg written = write_file(path: abs target, contents: abs payload);
+            drop(target);
+            drop(payload);
+            return case dat written {
+                Result.Ok(_) => 0,
+                Result.Err(_) => 7,
+            };
+        },
+    };
+}
+
 meta test
 meta effect("filesystem", "blocking")
 verb directory_iteration_returns_entry_and_closes() -> Int {
+    erg letter: u8 = 97u8;
+    erg created = create_marker_file(name: erg letter);
+    if created != 0 {
+        return created + 20;
+    }
     erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,
@@ -56,31 +84,41 @@ verb directory_iteration_returns_entry_and_closes() -> Int {
     };
 }
 
+"""
+Return the first byte of the next entry name, `-1` at the end of the
+directory and `-2` when iteration fails.
+"""
 meta effect("filesystem", "blocking")
-verb verify_filtered_directory(ins directory: Directory) -> Int {
+verb next_first_name_byte(ins directory: Directory) -> Int {
     erg entry = next_dir_entry(directory: ins directory);
     return case dat entry {
-        Result.Err(_) => {
-            close_dir(directory: ins directory);
-            3;
-        },
+        Result.Err(_) => -2,
         Result.Ok(value) => case dat value {
-            Option.None => {
-                close_dir(directory: ins directory);
-                4;
+            Option.None => -1,
+            Option.Some(found) => {
+                erg first: u8 = found.name.storage[0];
+                drop(found);
+                first as Int;
             },
-            Option.Some(entry_value) => {
-                erg is_file = directory_entry_is_file(entry: abs entry_value);
-                drop(entry_value);
-                erg closed = close_dir(directory: ins directory);
-                case dat closed {
-                    Result.Err(_) => 5,
-                    Result.Ok(_) => case is_file {
-                        true => 0,
-                        _ => 6,
-                    },
-                };
-            },
+        },
+    };
+}
+
+meta effect("filesystem", "blocking")
+verb verify_filtered_directory(ins directory: Directory) -> Int {
+    erg first = next_first_name_byte(directory: ins directory);
+    erg second = next_first_name_byte(directory: ins directory);
+    erg third = next_first_name_byte(directory: ins directory);
+    erg end = next_first_name_byte(directory: ins directory);
+    erg closed = close_dir(directory: ins directory);
+    return case dat closed {
+        Result.Err(_) => 5,
+        Result.Ok(_) => {
+            if first != 97 { return 10; }
+            if second != 98 { return 11; }
+            if third != 99 { return 12; }
+            if end != -1 { return 13; }
+            0;
         },
     };
 }
@@ -88,6 +126,20 @@ verb verify_filtered_directory(ins directory: Directory) -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb lexicographic_directory_iteration_is_bounded() -> Int {
+    erg names = Buffer[0];
+    append(names, 99u8);
+    append(names, 97u8);
+    append(names, 98u8);
+    erg index: Int = 0;
+    loop {
+        if index >= 3 { break; }
+        erg letter: u8 = names[index];
+        erg created = create_marker_file(name: erg letter);
+        if created != 0 {
+            return created + 20;
+        }
+        index += 1;
+    }
     erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,

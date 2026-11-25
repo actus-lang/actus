@@ -16,25 +16,45 @@ use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::TestOptions;
 use super::layout::{TestDirectory, TestScope};
 
+/// One selected test. What it is compiled with is shared by its group.
 pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
-    pub(super) source_map: SharedSourceMap,
     pub(super) module: String,
     pub(super) display_module: String,
     pub(super) relative_path: PathBuf,
     pub(super) name: String,
-    pub(super) program: Program,
-    pub(super) compilation_plan: ModuleCompilationPlan,
     pub(super) fault: Option<TestFault>,
 }
 
-pub(super) struct TestCollection {
+/// The selected tests of one test directory and the one program they are all
+/// compiled from (ADR-0121): the directory's namespace after target
+/// filtering, still holding every test verb of the directory.
+pub(super) struct TestGroup {
+    pub(super) label: String,
+    pub(super) source_map: SharedSourceMap,
+    pub(super) program: Program,
+    pub(super) compilation_plan: ModuleCompilationPlan,
+    /// The selected tests in program order. The position of a test in this
+    /// list is the index its executable is told to run.
     pub(super) tests: Vec<DiscoveredTest>,
+}
+
+pub(super) struct TestCollection {
+    pub(super) groups: Vec<TestGroup>,
+    /// Every selected test as `(group, position in group)`, in canonical
+    /// order: by file path, then by name.
+    pub(super) order: Vec<(usize, usize)>,
     pub(super) filtered: usize,
 }
 
+impl TestCollection {
+    pub(super) fn test(&self, (group, position): (usize, usize)) -> &DiscoveredTest {
+        &self.groups[group].tests[position]
+    }
+}
+
 struct CollectedDirectory {
-    tests: Vec<DiscoveredTest>,
+    group: Option<TestGroup>,
     filtered: usize,
 }
 
@@ -45,7 +65,7 @@ pub(super) fn collect_tests(
     session: &CompilationSession,
 ) -> Result<TestCollection, String> {
     if directories.is_empty() {
-        return Ok(TestCollection { tests: Vec::new(), filtered: 0 });
+        return Ok(TestCollection { groups: Vec::new(), order: Vec::new(), filtered: 0 });
     }
     let worker_count =
         std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(directories.len());
@@ -64,16 +84,20 @@ pub(super) fn collect_tests(
             .map(|handle| handle.join().expect("test collection worker panicked"))
             .collect::<Result<Vec<_>, _>>()
     })?;
-    let mut tests = Vec::new();
+    let mut groups = Vec::new();
     let mut filtered = 0;
-    for collected_directories in results {
-        for collected in collected_directories {
-            tests.extend(collected.tests);
-            filtered += collected.filtered;
-        }
+    for collected in results.into_iter().flatten() {
+        groups.extend(collected.group);
+        filtered += collected.filtered;
     }
-    tests.sort_by(|left, right| left.path.cmp(&right.path).then(left.name.cmp(&right.name)));
-    Ok(TestCollection { tests, filtered })
+    let mut order = (0..groups.len())
+        .flat_map(|group| (0..groups[group].tests.len()).map(move |position| (group, position)))
+        .collect::<Vec<_>>();
+    order.sort_by(|left, right| {
+        let (left, right) = (&groups[left.0].tests[left.1], &groups[right.0].tests[right.1]);
+        left.path.cmp(&right.path).then(left.name.cmp(&right.name))
+    });
+    Ok(TestCollection { groups, order, filtered })
 }
 
 /// One collection worker: the directories of one chunk, in order.
@@ -105,6 +129,29 @@ struct TestFile {
     program: Program,
 }
 
+/// Reads, validates and parses the files of one test directory.
+fn parse_directory_files(
+    directory: &TestDirectory,
+    configuration: &CompilerConfiguration,
+    options: &TestOptions,
+    session: &CompilationSession,
+) -> Result<Vec<TestFile>, String> {
+    let mut files = Vec::new();
+    for path in &directory.files {
+        let source = fs::read_to_string(path)
+            .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
+        validate_source(path, &source, options.mode, configuration)?;
+        let program = session.parse(path, &source).program().map_err(|error| match error {
+            FrontendError::Lex(_) => format!("cannot lex `{}`", path.display()),
+            FrontendError::Parse(error) => parse_source_error(path, session.source_map(), error),
+        })?;
+        let relative_path =
+            path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
+        files.push(TestFile { path: path.clone(), relative_path, program });
+    }
+    Ok(files)
+}
+
 /// Compiles every file of one test directory together as one namespace and
 /// returns the selected tests of its files.
 fn collect_directory_tests(
@@ -115,19 +162,7 @@ fn collect_directory_tests(
     session: &CompilationSession,
 ) -> Result<CollectedDirectory, String> {
     let source_map = session.source_map().clone();
-    let mut files = Vec::new();
-    for path in &directory.files {
-        let source = fs::read_to_string(path)
-            .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
-        validate_source(path, &source, options.mode, configuration)?;
-        let program = session.parse(path, &source).program().map_err(|error| match error {
-            FrontendError::Lex(_) => format!("cannot lex `{}`", path.display()),
-            FrontendError::Parse(error) => parse_source_error(path, &source_map, error),
-        })?;
-        let relative_path =
-            path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
-        files.push(TestFile { path: path.clone(), relative_path, program });
-    }
+    let files = parse_directory_files(directory, configuration, options, session)?;
     let label = match &directory.scope {
         TestScope::Module(module) => module.as_str(),
         TestScope::Project => "tests",
@@ -138,7 +173,7 @@ fn collect_directory_tests(
             .any(|name| raw_test_matches(name, label, &file.relative_path, options))
     });
     if !selected {
-        return Ok(CollectedDirectory { tests: Vec::new(), filtered: 0 });
+        return Ok(CollectedDirectory { group: None, filtered: 0 });
     }
     let (program, plan) = compile_directory(directory, &files, resolver, &source_map)?;
     let declared = test_count(&program);
@@ -151,13 +186,19 @@ fn collect_directory_tests(
         let diagnostic = semantic_diagnostic(&error);
         return Err(localized_test_diagnostic(&files[0].path, "", &source_map, diagnostic));
     }
-    let discovered = discover_tests(label, &files, &program, &plan, &source_map);
-    let selected = discovered.iter().filter(|test| test_matches(test, options)).count();
-    let selection_filtered = discovered.len().saturating_sub(selected);
-    Ok(CollectedDirectory {
-        tests: discovered.into_iter().filter(|test| test_matches(test, options)).collect(),
-        filtered: filtered + selection_filtered,
-    })
+    let discovered = discover_tests(label, &files, &program);
+    let discovered_count = discovered.len();
+    let tests =
+        discovered.into_iter().filter(|test| test_matches(test, options)).collect::<Vec<_>>();
+    let filtered = filtered + discovered_count - tests.len();
+    let group = (!tests.is_empty()).then(|| TestGroup {
+        label: label.to_owned(),
+        source_map,
+        program,
+        compilation_plan: plan,
+        tests,
+    });
+    Ok(CollectedDirectory { group, filtered })
 }
 
 /// Merges the files of a test directory into the program they are compiled
@@ -307,13 +348,7 @@ fn is_internal_module_path(import_path: &str, module_path: &str) -> bool {
 
 /// The tests of a directory: its files' `meta test` verbs, named
 /// `<module path>::<verb>` or `tests::<verb>`.
-fn discover_tests(
-    label: &str,
-    files: &[TestFile],
-    program: &Program,
-    plan: &ModuleCompilationPlan,
-    source_map: &SharedSourceMap,
-) -> Vec<DiscoveredTest> {
+fn discover_tests(label: &str, files: &[TestFile], program: &Program) -> Vec<DiscoveredTest> {
     let declared = files
         .iter()
         .flat_map(|file| test_names(&file.program).into_iter().map(move |name| (name, file)))
@@ -329,13 +364,10 @@ fn discover_tests(
             let (_, file) = declared.iter().find(|(name, _)| *name == verb.name)?;
             Some(DiscoveredTest {
                 path: file.path.clone(),
-                source_map: source_map.clone(),
                 module: label.to_owned(),
                 display_module: label.to_owned(),
                 relative_path: file.relative_path.clone(),
                 name: verb.name.clone(),
-                program: program.clone(),
-                compilation_plan: plan.clone(),
                 fault: verb.metadata.iter().find_map(|attribute| match attribute {
                     MetaAttribute::Fault(fault) => Some(*fault),
                     _ => None,

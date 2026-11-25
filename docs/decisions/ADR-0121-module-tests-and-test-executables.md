@@ -99,6 +99,40 @@ directory once.
 Executables are built in parallel, bounded by `--test-threads`; tests run in
 parallel under the same bound. Output order stays the canonical test order.
 
+**Selecting the test.** The runner names the test in the environment variable
+`ACTUS_TEST_INDEX`, a decimal index that is the position of the test among the
+selected tests of its directory. The generated entry reads it with the C
+library alone (`getenv`, `strlen`, `strspn`, `atoll`, `write`, `exit`), which
+every hosted target links, and dispatches on the integer with `if` statements;
+no strings are matched in Actus. The Actus runtime is not linked for the entry,
+so a test executable that does not otherwise use it stays small. The
+environment is used instead of arguments so a test sees the same argument
+vector as before. A missing or non-decimal value, or one that names no test of
+the executable, ends the process with status 125 and one stderr line that starts
+with `actus test entry error:`. A test can return 125 too, so the runner treats
+a process as an entry failure only when it has both the status and the line,
+and reports it as an internal error of the runner, never as a result or a pass.
+
+**Per-test contract.** The `meta fault` call is emitted in the branch of the
+test that declares it, so no other test of the executable is affected. The
+entry declares the union of the `meta effect` and `meta capability` attributes
+of its tests, which is what lets it call all of them; each test verb is still
+checked against its own declarations where it is defined. A test verb with
+parameters, or a fault test on a compiler without `test-fault-injection`, fails
+alone and is left out of the executable. Runtime-check reports keep their
+source locations (ADR-0117). A freestanding target has no process environment
+to select a test with, so its tests keep one executable each and an entry that
+calls the test directly.
+
+**Failures and cleanup.** If an executable fails to build, its diagnostic is
+reported once, with the first of its tests in canonical order, and every other
+selected test of the directory fails with a line that points to it; other
+directories are not affected. The executable is shared read-only. Each test runs
+in its own temporary working directory, which is empty when the test starts
+and is removed after the test. The executable is removed when the last test of its directory has
+finished. `ACTUS_TEST_KEEP_ARTIFACTS=1` keeps all of it and
+`ACTUS_TEST_TIMEOUT_SECONDS` still sets the timeout of each process.
+
 ### Names and filters
 
 A test is named by its directory and verb: `ie::persistence::accepts_header`

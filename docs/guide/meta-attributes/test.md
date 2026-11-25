@@ -50,9 +50,11 @@ A test is named `<module path>::<verb>` for a module test
 build. It does not export private symbols, weaken ownership, or add a runtime
 test framework to the program.
 
-The test runner may compile a temporary test entry and execute it as a child
-process. A non-zero result, timeout, signal, or failed compilation is a test
-failure.
+The test runner compiles one temporary executable for each test directory,
+with a generated entry that runs the test chosen when the process starts, and
+executes it once per test as a child process. A non-zero result, timeout,
+signal, or failed compilation is a test failure; a failed compilation fails
+every selected test of its directory and reports its diagnostic once.
 
 ## Filters
 

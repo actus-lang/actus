@@ -363,7 +363,12 @@ pub(crate) fn scalar_external_symbols(
         .iter()
         .map(|external| {
             let source = external.native_symbol.as_deref().unwrap_or(&external.name);
+            // A declaration that is not an import and names its native symbol
+            // names exactly that C symbol; the import bindings, which map the
+            // names of module verbs, must not rename it.
+            let named_directly = !external.module_import && external.native_symbol.is_some();
             let symbol = bindings
+                .filter(|_| !named_directly)
                 .map(|bindings| bindings.external_symbol(namespace, source))
                 .unwrap_or(source);
             Ok((
