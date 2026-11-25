@@ -14,20 +14,30 @@ Operators bind from tighter to looser as follows:
 
 | Precedence | Operators | Result |
 | --- | --- | --- |
-| 1 | unary `!`, `~`, `-`, `-%` | operand-dependent |
-| 2 | `*`, `*%`, `*\|`, `/`, `%` | numeric/integer |
-| 3 | `+`, `-`, `+%`, `-%`, `+\|`, `-\|` | numeric |
-| 4 | `<<`, `>>` | left integer type |
-| 5 | `&` | left integer type |
-| 6 | `^` | left integer type |
-| 7 | `\|` | left integer type |
-| 8 | `<`, `<=`, `>`, `>=` | `Bool` |
-| 9 | `==`, `!=` | `Bool` |
-| 10 | `&&` | `Bool` |
-| 11 | `\|\|` | `Bool` |
+| 1 | postfix `.field`, `.method()`, `[index]`, `?` | operand-dependent |
+| 2 | unary `!`, `~`, `-`, `-%` | operand-dependent |
+| 3 | `as` (checked cast) | target type |
+| 4 | `*`, `*%`, `*\|`, `/`, `%` | numeric/integer |
+| 5 | `+`, `-`, `+%`, `-%`, `+\|`, `-\|` | numeric |
+| 6 | `<<`, `>>` | left integer type |
+| 7 | `&` | left integer type |
+| 8 | `^` | left integer type |
+| 9 | `\|` | left integer type |
+| 10 | `<`, `<=`, `>`, `>=` | `Bool` |
+| 11 | `==`, `!=` | `Bool` |
+| 12 | `&&` | `Bool` |
+| 13 | `\|\|` | `Bool` |
 
-Binary operators are left-associative. Parentheses explicitly override this
-table.
+Binary operators and `as` are left-associative. Parentheses explicitly
+override this table.
+
+A prefix operator applies to its operand before a following `as`, as in Rust
+and C: `-1 as u8` is `(-1) as u8` and `-x as i64` negates `x` in its own type
+and then casts the result. To cast first and negate afterwards, write the
+parentheses: `-(x as i64)`. A postfix form binds tighter than a prefix
+operator, so `-v.len() as u8` is `(-(v.len())) as u8`. `as` binds tighter than
+every binary operator: `a - 1 as u8` is `a - (1 as u8)`, and `x as u8 + 1` is
+`(x as u8) + 1`.
 
 ## Operand contracts
 
@@ -87,7 +97,9 @@ backend and profile.
 ## Checked casts and indexing
 
 `expr as Type` is an explicit checked primitive integer cast. Constant values
-outside the target range are rejected during semantic analysis. Dynamic casts
+outside the target range are rejected during semantic analysis. A negated
+literal is one signed constant, so `-128 as i8` is valid and `-1 as u8` is
+rejected with `E1091`. Dynamic casts
 perform a native range check and trap on overflow or underflow. A cast never
 changes ownership or allocates.
 

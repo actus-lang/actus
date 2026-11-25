@@ -750,3 +750,22 @@ fn does_not_read_comments_inside_string_literals() {
     assert_eq!(comments[0].text, "# real");
     assert!(comments[0].trailing);
 }
+
+/// Prefix operators bind tighter than `as`, so formatting must keep an explicit grouping that
+/// changes the meaning (`-(1 as u8)`) and stays stable on the unparenthesized forms.
+#[test]
+fn formatting_keeps_the_meaning_of_prefix_operators_and_casts() {
+    let source = "verb main(erg x: i32, erg a: u8) { erg p = -(1 as u8); erg q = (-1) as i8; erg r = -128 as i8; erg s = -x as i64; erg t = a - 1 as u8; erg u = -(x as i64); }";
+    let formatted = format_source(source);
+    for expected in [
+        "erg p = -(1 as u8);",
+        "erg q = (-1) as i8;",
+        "erg r = -128 as i8;",
+        "erg s = -x as i64;",
+        "erg t = a - 1 as u8;",
+        "erg u = -(x as i64);",
+    ] {
+        assert!(formatted.contains(expected), "{expected}\n{formatted}");
+    }
+    assert_eq!(format_source(&formatted), formatted);
+}

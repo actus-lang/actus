@@ -8,19 +8,26 @@ Precedence, from tightest to loosest:
 
 | Level | Operators |
 |---:|---|
-| 1 | unary `!`, `~`, `-` |
-| 2 | `*`, `/`, `%` |
-| 3 | `+`, `-` |
-| 4 | `<<`, `>>` |
-| 5 | `&` |
-| 6 | `^` |
-| 7 | `|` |
-| 8 | `<`, `<=`, `>`, `>=` |
-| 9 | `==`, `!=` |
-| 10 | `&&` |
-| 11 | `||` |
+| 1 | postfix `.field`, `.method()`, `[index]`, `?` |
+| 2 | unary `!`, `~`, `-`, `-%` |
+| 3 | `as` |
+| 4 | `*`, `/`, `%` |
+| 5 | `+`, `-` |
+| 6 | `<<`, `>>` |
+| 7 | `&` |
+| 8 | `^` |
+| 9 | `|` |
+| 10 | `<`, `<=`, `>`, `>=` |
+| 11 | `==`, `!=` |
+| 12 | `&&` |
+| 13 | `||` |
 
-Binary operators are left-associative. Parentheses override precedence.
+Binary operators and `as` are left-associative. Parentheses override
+precedence. A prefix operator binds tighter than `as`: `-1 as u8` is
+`(-1) as u8` (rejected at compile time with `E1091`), `-128 as i8` is the valid
+`(-128) as i8`, and `-x as i64` negates `x` before the cast. Write
+`-(x as i64)` to cast first. `as` binds tighter than every binary operator, so
+`a - 1 as u8` is `a - (1 as u8)`.
 
 ### Numeric operators
 

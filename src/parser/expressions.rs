@@ -11,7 +11,7 @@ impl Parser {
     }
 
     fn parse_binary_expression(&mut self, minimum_precedence: u8) -> Result<Expr, ParseError> {
-        let mut left = self.parse_primary_expression()?;
+        let mut left = self.parse_cast_expression()?;
         while let Some((operator, precedence)) = self.binary_operator() {
             if precedence < minimum_precedence {
                 break;
@@ -22,6 +22,19 @@ impl Parser {
             left = Expr::Binary { left: Box::new(left), operator, right: Box::new(right), span };
         }
         Ok(left)
+    }
+
+    /// `as` binds looser than prefix operators and postfix forms but tighter than every binary
+    /// operator, so `-1 as u8` is `(-1) as u8` and `a - 1 as u8` is `a - (1 as u8)`.
+    fn parse_cast_expression(&mut self) -> Result<Expr, ParseError> {
+        let mut expression = self.parse_primary_expression()?;
+        while self.match_simple(TokenKind::As) {
+            let target = self.parse_type_name()?;
+            let span = SourceSpan::new(expression_span(&expression).start, target.span.end);
+            expression = Expr::Cast { expression: Box::new(expression), target, span };
+            expression = self.parse_field_access(expression)?;
+        }
+        Ok(expression)
     }
 
     fn parse_primary_expression(&mut self) -> Result<Expr, ParseError> {
@@ -269,12 +282,6 @@ impl Parser {
                 let span =
                     SourceSpan::new(expression_span(&expression).start, self.previous().span.end);
                 expression = Expr::Try { expression: Box::new(expression), span };
-                continue;
-            }
-            if self.match_simple(TokenKind::As) {
-                let target = self.parse_type_name()?;
-                let span = SourceSpan::new(expression_span(&expression).start, target.span.end);
-                expression = Expr::Cast { expression: Box::new(expression), target, span };
                 continue;
             }
             if !self.match_simple(TokenKind::Dot) {
