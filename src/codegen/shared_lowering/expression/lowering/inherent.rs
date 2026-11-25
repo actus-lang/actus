@@ -49,9 +49,10 @@ impl SharedExpressionProvider<'_> {
         };
         let receiver_type = self
             .nominal_type(receiver_value)
-            .ok_or_else(|| unsupported(*span, "performance receiver has no nominal type"))?;
-        let key = (self.performance_lookup_key(receiver_type), method.clone());
-        let callee = self.method_callee(&key, method, *span)?;
+            .ok_or_else(|| unsupported(*span, "performance receiver has no nominal type"))?
+            .clone();
+        let key = (self.performance_lookup_key(&receiver_type), method.clone());
+        let callee = self.method_callee(&key, &receiver_type, method, *span)?;
         let mut lowered_arguments = Vec::with_capacity(arguments.len() + 1);
         lowered_arguments.push(receiver_value);
         lowered_arguments.extend(
@@ -62,7 +63,7 @@ impl SharedExpressionProvider<'_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?,
         );
-        let result_type = self.method_result_type(&key, method);
+        let result_type = self.method_result_type(&key, &receiver_type, method);
         let result = result_type.map(|_| self.allocate());
         if let (Some(result), Some(result_type)) = (result, result_type) {
             self.remember_call_result(result, result_type, &key, method);
@@ -76,30 +77,45 @@ impl SharedExpressionProvider<'_> {
         result.ok_or_else(|| unsupported(*span, "unit performance method cannot produce a value"))
     }
 
+    /// A concrete receiver type that has no performance of this name calls an
+    /// ordinary verb of that name when one exists (`Cursor.seek` next to
+    /// `File`'s performance of `Seeker.seek`). Only a receiver with no layout of
+    /// its own, such as a role behind `dynamic`, falls back to the one
+    /// performance that carries the name.
+    fn prefers_ordinary_verb(&self, receiver_type: &TypeName, method: &str) -> bool {
+        self.parameter_modes.contains_key(method)
+            && self.layouts.layout_for(receiver_type).is_some()
+    }
+
     fn method_callee(
         &self,
         key: &(String, String),
+        receiver_type: &TypeName,
         method: &str,
         span: SourceSpan,
     ) -> Result<SymbolIdentity, BackendContractError> {
+        let ordinary = || {
+            self.return_types
+                .contains_key(method)
+                .then(|| calls::callee_for(self, method, span).ok())
+                .flatten()
+        };
+        let by_name = || {
+            let candidates = self
+                .performance_symbols
+                .iter()
+                .filter(|((_, candidate), _)| candidate == method)
+                .map(|(_, symbol)| symbol)
+                .collect::<Vec<_>>();
+            (candidates.len() == 1).then(|| candidates[0].clone())
+        };
+        let prefer_ordinary = self.prefers_ordinary_verb(receiver_type, method);
         self.performance_symbols
             .get(key)
             .cloned()
-            .or_else(|| {
-                let candidates = self
-                    .performance_symbols
-                    .iter()
-                    .filter(|((_, candidate), _)| candidate == method)
-                    .map(|(_, symbol)| symbol)
-                    .collect::<Vec<_>>();
-                (candidates.len() == 1).then(|| candidates[0].clone())
-            })
-            .or_else(|| {
-                self.return_types
-                    .contains_key(method)
-                    .then(|| calls::callee_for(self, method, span).ok())
-                    .flatten()
-            })
+            .or_else(|| if prefer_ordinary { ordinary() } else { None })
+            .or_else(by_name)
+            .or_else(ordinary)
             .ok_or_else(|| unsupported(span, "method has no static symbol"))
     }
 
@@ -125,21 +141,30 @@ impl SharedExpressionProvider<'_> {
             .map(|(_, address, _, _)| *address)
     }
 
-    fn method_result_type(&self, key: &(String, String), method: &str) -> Option<BackendValueType> {
+    fn method_result_type(
+        &self,
+        key: &(String, String),
+        receiver_type: &TypeName,
+        method: &str,
+    ) -> Option<BackendValueType> {
+        let ordinary = || self.return_types.get(method).copied().flatten();
+        let by_name = || {
+            let candidates = self
+                .performance_return_types
+                .iter()
+                .filter(|((_, candidate), _)| candidate == method)
+                .filter_map(|(_, ty)| *ty)
+                .collect::<Vec<_>>();
+            (candidates.len() == 1).then(|| candidates[0])
+        };
+        let prefer_ordinary = self.prefers_ordinary_verb(receiver_type, method);
         self.performance_return_types
             .get(key)
             .copied()
             .flatten()
-            .or_else(|| {
-                let candidates = self
-                    .performance_return_types
-                    .iter()
-                    .filter(|((_, candidate), _)| candidate == method)
-                    .filter_map(|(_, ty)| *ty)
-                    .collect::<Vec<_>>();
-                (candidates.len() == 1).then(|| candidates[0])
-            })
-            .or_else(|| self.return_types.get(method).copied().flatten())
+            .or_else(|| if prefer_ordinary { ordinary() } else { None })
+            .or_else(by_name)
+            .or_else(ordinary)
     }
 
     fn remember_call_result(
