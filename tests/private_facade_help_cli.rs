@@ -47,7 +47,8 @@ fn assert_help(name: &str, files: &[(&str, &str)], help: &str) {
         vec!["build", "--strict", "--emit", "exe", "-o", "main.bin", "src/main.act"],
     ] {
         let output = actus(&root, &command);
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+        // Paths print with the host separator; compare them in `/` form.
+        let stderr = String::from_utf8_lossy(&output.stderr).replace('\\', "/");
         assert!(!output.status.success(), "{name}: {} accepted: {stderr}", command[0]);
         assert!(stderr.contains("error[E1109] at 3:12:"), "{name}: {stderr}");
         assert!(
