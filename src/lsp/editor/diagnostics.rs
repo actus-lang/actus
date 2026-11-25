@@ -127,13 +127,28 @@ fn analyze_package_module(
         Ok(configuration) => configuration,
         Err(_) => return None,
     };
-    let resolver = ModuleResolver::with_dependencies_and_runtime(
+    let mut resolver = ModuleResolver::with_dependencies_and_runtime(
         configuration.source_root(),
         configuration.dependency_roots(),
         configuration.runtime_source_root(),
         configuration.runtime_module_roots(),
     );
     let module_root = module_root_for_file(&configuration, &path);
+    // A file of a module's `tests` directory is analyzed as part of its module
+    // together with the other files of that directory (ADR-0121).
+    if let (Some(root), Some(directory)) = (module_root.as_deref(), path.parent())
+        && directory.file_name().is_some_and(|name| name == "tests")
+        && let Some(module) = directory.parent().and_then(|parent| parent.strip_prefix(root).ok())
+        && !module.as_os_str().is_empty()
+    {
+        let files = fs::read_dir(directory)
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| Some(entry.ok()?.path()))
+            .filter(|file| file.extension().is_some_and(|extension| extension == "act"))
+            .collect();
+        resolver = resolver.with_module_tests(&path_components(module).join("::"), files);
+    }
     let result = match module_root.as_deref().and_then(|root| module_path_for_file(root, &path)) {
         Some(module_path) => crate::modules::analyze_module_with_overlays_for_target(
             &resolver,

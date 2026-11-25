@@ -70,6 +70,7 @@ pub struct ModuleResolver {
     runtime_source_root: Option<PathBuf>,
     runtime_module_roots: BTreeMap<String, PathBuf>,
     pub(crate) session: Option<CompilationSession>,
+    module_tests: BTreeMap<String, Vec<PathBuf>>,
 }
 
 impl ModuleResolver {
@@ -90,6 +91,7 @@ impl ModuleResolver {
             runtime_source_root: None,
             runtime_module_roots: BTreeMap::new(),
             session: None,
+            module_tests: BTreeMap::new(),
         }
     }
 
@@ -105,6 +107,7 @@ impl ModuleResolver {
             runtime_source_root: None,
             runtime_module_roots: BTreeMap::new(),
             session: None,
+            module_tests: BTreeMap::new(),
         }
     }
 
@@ -122,7 +125,30 @@ impl ModuleResolver {
             runtime_source_root: runtime_source_root.map(Path::to_owned),
             runtime_module_roots: runtime_module_roots.clone(),
             session: None,
+            module_tests: BTreeMap::new(),
         }
+    }
+
+    /// Compiles `files` as part of the module `module_path`, as if they were
+    /// additional sibling files of its directory. The test runner uses it for
+    /// the files of a module's `tests` directory (ADR-0121).
+    pub fn with_module_tests(mut self, module_path: &str, files: Vec<PathBuf>) -> Self {
+        self.module_tests.insert(module_path.to_owned(), files);
+        self
+    }
+
+    fn resolve_directory(
+        &self,
+        module_path: &str,
+        directory: &Path,
+        module_name: &str,
+    ) -> Result<ResolvedModule, ModuleResolutionError> {
+        let mut resolved = resolve_directory(module_path, directory, module_name)?;
+        if let Some(files) = self.module_tests.get(module_path) {
+            resolved.siblings.extend(files.iter().cloned());
+            resolved.siblings.sort_by_key(|path| normalized_path(path));
+        }
+        Ok(resolved)
     }
 
     pub fn resolve(&self, module_path: &str) -> Result<ResolvedModule, ModuleResolutionError> {
@@ -148,7 +174,7 @@ impl ModuleResolver {
             });
         }
         if directory.is_dir() {
-            return resolve_directory(module_path, &directory, segments.last().expect("path"));
+            return self.resolve_directory(module_path, &directory, segments.last().expect("path"));
         }
         if file.is_file() {
             return Ok(ResolvedModule {
@@ -235,7 +261,7 @@ impl ModuleResolver {
         if segments.len() != 2 {
             return Err(ModuleResolutionError::InvalidPath(module_path.to_owned()));
         }
-        resolve_directory(module_path, root, module_name)
+        self.resolve_directory(module_path, root, module_name)
     }
 
     /// Resolves a child through an already-resolved parent facade.
@@ -277,7 +303,7 @@ impl ModuleResolver {
                     .join(format!("{child_name}.act")),
             });
         };
-        resolve_directory(child.module_path(), child.directory(), child_name)
+        self.resolve_directory(child.module_path(), child.directory(), child_name)
     }
 
     fn root_and_segments<'a>(&'a self, segments: &'a [&str]) -> (PathBuf, &'a [&'a str]) {
@@ -347,6 +373,9 @@ fn resolve_directory(
     directory: &Path,
     module_name: &str,
 ) -> Result<ResolvedModule, ModuleResolutionError> {
+    if module_name == TESTS_DIRECTORY {
+        return Err(tests_directory_is_not_a_module(directory));
+    }
     let facade = directory.join(format!("{module_name}.act"));
     if !facade.is_file() {
         return Err(ModuleResolutionError::MissingFacade {
@@ -400,6 +429,14 @@ fn discover_children(
             continue;
         }
         let child_facade = child_directory.join(format!("{child_name}.act"));
+        if child_name == TESTS_DIRECTORY {
+            // A tests directory belongs to its module and is never a child
+            // module (ADR-0121); only a facade inside it is an error.
+            if child_facade.is_file() {
+                return Err(tests_directory_is_not_a_module(&child_directory));
+            }
+            continue;
+        }
         if sibling_names.contains(child_name.as_str()) {
             return Err(ModuleResolutionError::AmbiguousModule {
                 module: format!("{module_path}::{child_name}"),
@@ -421,6 +458,18 @@ fn discover_children(
     }
     children.sort_by(|left, right| left.module_path.cmp(&right.module_path));
     Ok(children)
+}
+
+/// The directory name that holds module tests; it never names a module.
+pub(crate) const TESTS_DIRECTORY: &str = "tests";
+
+fn tests_directory_is_not_a_module(directory: &Path) -> ModuleResolutionError {
+    ModuleResolutionError::TestLayout {
+        path: directory.to_owned(),
+        message: "a `tests` directory holds the tests of its module and is never a module; \
+                  remove its facade `tests.act`, or rename the directory if it holds a module"
+            .to_owned(),
+    }
 }
 
 fn is_act_file(path: &Path) -> bool {

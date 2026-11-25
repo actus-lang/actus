@@ -7,7 +7,8 @@ use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, seman
 
 /// Converts a module, import, or facade failure into the shared diagnostic model.
 ///
-/// Resolution failures use the stable `E1100`–`E1108` module range. Visibility
+/// Resolution failures use the stable `E1100`–`E1108` module range. Test layout
+/// failures use `E1143` and `E1144`. Visibility
 /// failures use `E1109`; hierarchical scope failures use `E1119`; conflicting facade openings use `E1137`; configuration policy failures use `E1113`–`E1114`. Nested
 /// lexical, parser, and semantic failures retain their subsystem code while
 /// gaining the module source path when one is available.
@@ -37,14 +38,10 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         ModuleError::Parse { path, error: parse_error } => {
             parse_diagnostic(parse_error).with_source_path(path.display().to_string())
         }
-        ModuleError::DuplicateDeclaration(diagnostic) => {
-            module_error("E1106", error.to_string(), diagnostic.second.span)
-                .with_source_path(diagnostic.second.path.display().to_string())
-                .with_related_location(DiagnosticRelatedLocation::new(
-                    Some(diagnostic.first.path.display().to_string()),
-                    diagnostic.first.span,
-                    "first declaration is here",
-                ))
+        ModuleError::DuplicateDeclaration(duplicate) => duplicate_diagnostic(error, duplicate),
+        ModuleError::TestVerbInProduction { path, span, .. } => {
+            module_error("E1144", error.to_string(), *span)
+                .with_source_path(path.display().to_string())
         }
         ModuleError::SymbolCollision { .. } => {
             module_error("E1110", error.to_string(), SourceSpan::new(0, 0))
@@ -68,6 +65,19 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         }
         ModuleError::Semantic(error) => semantic_diagnostic(error),
     }
+}
+
+fn duplicate_diagnostic(
+    error: &ModuleError,
+    duplicate: &crate::modules::DuplicateDeclaration,
+) -> Diagnostic {
+    module_error("E1106", error.to_string(), duplicate.second.span)
+        .with_source_path(duplicate.second.path.display().to_string())
+        .with_related_location(DiagnosticRelatedLocation::new(
+            Some(duplicate.first.path.display().to_string()),
+            duplicate.first.span,
+            "first declaration is here",
+        ))
 }
 
 fn private_access_diagnostic(error: &ModuleError) -> Diagnostic {
@@ -104,6 +114,9 @@ fn resolution_diagnostic(error: &ModuleResolutionError) -> Diagnostic {
             ("E1108", Some(facade.display().to_string()))
         }
         ModuleResolutionError::Io { path, .. } => ("E1103", Some(path.display().to_string())),
+        ModuleResolutionError::TestLayout { path, .. } => {
+            ("E1143", Some(path.display().to_string()))
+        }
     };
     let diagnostic = module_error(code, error.to_string(), SourceSpan::new(0, 0));
     match path {

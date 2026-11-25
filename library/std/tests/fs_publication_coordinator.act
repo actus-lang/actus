@@ -1,7 +1,7 @@
-"""Mirrored strict coverage for coordinator-serialized publication."""
+"""Strict coverage for coordinator-serialized publication."""
 import {
-    open std::fs,
-    open std::io,
+    open fs,
+    open io,
     path,
 };
 

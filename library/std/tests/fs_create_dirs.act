@@ -1,7 +1,7 @@
-"""Mirrored strict coverage for explicit parent-directory creation."""
+"""Strict coverage for explicit parent-directory creation."""
 import {
-    open std::fs,
-    std::path,
+    open fs,
+    path,
 };
 
 verb relative_fixture_path(erg depth: u8) -> Result[path::Path, path::PathError] {

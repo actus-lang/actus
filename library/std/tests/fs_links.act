@@ -1,7 +1,7 @@
-"""Mirrored symbolic-link inspection coverage for the hosted filesystem facade."""
+"""Symbolic-link inspection coverage for the hosted filesystem facade."""
 import {
-    std::fs,
-    std::path,
+    fs,
+    path,
 };
 
 verb current_path() -> Result[path::Path, path::PathError] {

@@ -4,7 +4,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb fs_handles_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_ascii(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -178,7 +178,7 @@ verb handle_file_path() -> Path {
     append(raw, 105);
     append(raw, 110);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return fs_handles_make_posix(raw: dat raw);
 }
 
 verb handle_directory_path() -> Path {
@@ -199,7 +199,7 @@ verb handle_directory_path() -> Path {
     append(raw, 105);
     append(raw, 114);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return fs_handles_make_posix(raw: dat raw);
 }
 
 meta test

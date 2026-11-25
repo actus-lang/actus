@@ -1,7 +1,7 @@
-"""Mirrored durability-boundary coverage for the hosted file facade."""
+"""Durability-boundary coverage for the hosted file facade."""
 import {
-    std::fs,
-    std::path,
+    fs,
+    path,
 };
 
 verb sync_path() -> Result[path::Path, path::PathError] {

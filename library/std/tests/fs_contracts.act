@@ -4,7 +4,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb fs_contracts_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_ascii(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -18,16 +18,16 @@ verb make_posix(dat raw: Buffer) -> Path {
     };
 }
 
-verb empty_path() -> Path {
+verb fs_contracts_empty_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return fs_contracts_make_posix(raw: dat raw);
 }
 
 meta test
 meta effect("filesystem", "blocking")
 verb metadata_rejects_empty_path() -> Int {
-    erg path = empty_path();
+    erg path = fs_contracts_empty_path();
     erg result = metadata(path: abs path);
     return case dat result {
         Result.Ok(_) => 1,
@@ -38,7 +38,7 @@ verb metadata_rejects_empty_path() -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb file_open_and_create_reject_empty_path() -> Int {
-    erg path = empty_path();
+    erg path = fs_contracts_empty_path();
     erg opened = file_open(path: abs path);
     erg created = file_create(path: abs path);
     case dat opened {
@@ -56,7 +56,7 @@ verb file_open_and_create_reject_empty_path() -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb path_operations_reject_empty_paths() -> Int {
-    erg path = empty_path();
+    erg path = fs_contracts_empty_path();
     erg removed = remove_file(path: abs path);
     erg renamed = rename(from: abs path, to: abs path);
     erg copied = copy_file(from: abs path, to: abs path);
@@ -95,7 +95,7 @@ verb path_operations_reject_empty_paths() -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb read_to_bytes_propagates_empty_path_error() -> Int {
-    erg path = empty_path();
+    erg path = fs_contracts_empty_path();
     erg bytes = read_to_bytes(path: abs path);
     return case dat bytes {
         Result.Ok(_) => {
@@ -108,7 +108,7 @@ verb read_to_bytes_propagates_empty_path_error() -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb read_to_string_propagates_empty_path_error() -> Int {
-    erg path = empty_path();
+    erg path = fs_contracts_empty_path();
     erg text = read_to_string(path: abs path);
     return case dat text {
         Result.Ok(_) => 1,
@@ -140,7 +140,7 @@ verb library_path_prefix() -> Buffer {
     return raw_path;
 }
 
-verb missing_parent_path() -> Path {
+verb fs_contracts_missing_parent_path() -> Path {
     erg raw_path = library_path_prefix();
     append(raw_path, 109);
     append(raw_path, 105);
@@ -156,13 +156,13 @@ verb missing_parent_path() -> Path {
     append(raw_path, 117);
     append(raw_path, 115);
     append(raw_path, 0);
-    return make_posix(raw: dat raw_path);
+    return fs_contracts_make_posix(raw: dat raw_path);
 }
 
 meta test
 meta effect("filesystem", "blocking")
 verb write_file_propagates_empty_path_error() -> Int {
-    erg path = missing_parent_path();
+    erg path = fs_contracts_missing_parent_path();
     erg contents = Buffer[0];
     erg written = write_file(path: abs path, contents: abs contents);
     return case dat written {
@@ -174,7 +174,7 @@ verb write_file_propagates_empty_path_error() -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb open_options_cover_all_modes() -> Int {
-    erg path = empty_path();
+    erg path = fs_contracts_empty_path();
     erg empty = options_new();
     erg readable = options_read(dat empty);
     erg writable = options_write(dat readable);
@@ -205,7 +205,7 @@ verb round_trip_file_path() -> Path {
     append(raw_path, 105);
     append(raw_path, 110);
     append(raw_path, 0);
-    return make_posix(raw: dat raw_path);
+    return fs_contracts_make_posix(raw: dat raw_path);
 }
 
 verb round_trip_copy_path() -> Path {
@@ -219,7 +219,7 @@ verb round_trip_copy_path() -> Path {
     append(raw_copy_path, 105);
     append(raw_copy_path, 110);
     append(raw_copy_path, 0);
-    return make_posix(raw: dat raw_copy_path);
+    return fs_contracts_make_posix(raw: dat raw_copy_path);
 }
 
 meta effect("filesystem", "blocking")

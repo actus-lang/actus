@@ -31,6 +31,12 @@ pub enum ModuleResolutionError {
         path: PathBuf,
         message: String,
     },
+    /// A test directory breaks the layout rules of ADR-0121; `path` is the
+    /// directory or file that breaks them.
+    TestLayout {
+        path: PathBuf,
+        message: String,
+    },
 }
 
 impl Display for ModuleResolutionError {
@@ -63,6 +69,9 @@ impl Display for ModuleResolutionError {
                 "module `{module}` bypasses parent facade `{}` for `{parent}`",
                 facade.display()
             ),
+            Self::TestLayout { path, message } => {
+                write!(formatter, "invalid test layout at `{}`: {message}", path.display())
+            }
             Self::Io { path, message } => {
                 write!(formatter, "cannot inspect module path `{}`: {message}", path.display())
             }

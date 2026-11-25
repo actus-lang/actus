@@ -2,7 +2,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb path_platform_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -16,7 +16,7 @@ verb make_posix(dat raw: Buffer) -> Path {
     };
 }
 
-verb make_windows(dat raw: Buffer) -> Path {
+verb path_platform_make_windows(dat raw: Buffer) -> Path {
     erg result = path_from_windows_utf16(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -41,7 +41,7 @@ verb posix_bin_path() -> Path {
     append(raw, 105);
     append(raw, 110);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_platform_make_posix(raw: dat raw);
 }
 
 verb posix_usr_path() -> Path {
@@ -51,7 +51,7 @@ verb posix_usr_path() -> Path {
     append(raw, 115);
     append(raw, 114);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_platform_make_posix(raw: dat raw);
 }
 
 verb posix_us_path() -> Path {
@@ -60,7 +60,7 @@ verb posix_us_path() -> Path {
     append(raw, 117);
     append(raw, 115);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_platform_make_posix(raw: dat raw);
 }
 
 meta test
@@ -106,7 +106,7 @@ verb drive_relative_path() -> Path {
     append(raw, 0);
     append(raw, 0);
     append(raw, 0);
-    return make_windows(raw: dat raw);
+    return path_platform_make_windows(raw: dat raw);
 }
 
 verb mixed_separator_path() -> Path {
@@ -125,7 +125,7 @@ verb mixed_separator_path() -> Path {
     append(raw, 0);
     append(raw, 0);
     append(raw, 0);
-    return make_windows(raw: dat raw);
+    return path_platform_make_windows(raw: dat raw);
 }
 
 meta target("windows")
@@ -185,7 +185,7 @@ verb unc_path() -> Path {
     append(raw, 0);
     append(raw, 0);
     append(raw, 0);
-    return make_windows(raw: dat raw);
+    return path_platform_make_windows(raw: dat raw);
 }
 
 verb windows_absolute_prefix() -> Buffer {
@@ -223,7 +223,7 @@ verb normalized_windows_path() -> Path {
     append(raw, 0);
     append(raw, 0);
     append(raw, 0);
-    return make_windows(raw: dat raw);
+    return path_platform_make_windows(raw: dat raw);
 }
 
 meta target("windows")

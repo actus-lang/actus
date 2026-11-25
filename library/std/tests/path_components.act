@@ -2,7 +2,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb path_components_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -38,7 +38,7 @@ verb component_path() -> Path {
     append(raw, 103);
     append(raw, 122);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_components_make_posix(raw: dat raw);
 }
 
 verb verify_path_predicates(abs path: Path) -> Int {

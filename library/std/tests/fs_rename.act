@@ -1,7 +1,7 @@
-"""Mirrored strict coverage for same-filesystem rename semantics."""
+"""Strict coverage for same-filesystem rename semantics."""
 import {
-    open std::fs,
-    std::path,
+    open fs,
+    path,
 };
 
 verb rename_path(erg destination: u8) -> Result[path::Path, path::PathError] {

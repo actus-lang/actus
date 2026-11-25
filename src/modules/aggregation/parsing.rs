@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use crate::ast::Program;
 use crate::session::CompilationSession;
 
-use super::super::resolver::ModuleResolver;
+use super::super::resolver::{ModuleResolver, TESTS_DIRECTORY};
 use super::types::ModuleError;
 use super::validation::{
-    check_declaration_name, validate_configuration_source, validate_import_bindings,
-    validate_open_siblings,
+    check_declaration_name, reject_test_verbs, validate_configuration_source,
+    validate_import_bindings, validate_open_siblings,
 };
 
 pub fn parse_module(resolver: &ModuleResolver, module_path: &str) -> Result<Program, ModuleError> {
@@ -74,6 +74,12 @@ where
             .program()
             .map_err(|error| ModuleError::frontend(&source_path, error))?;
         validate_import_bindings(&program)?;
+        // The files of a module's `tests` directory are compiled as siblings
+        // when tests run; every other source file must not declare tests.
+        if source_path.parent().and_then(Path::file_name) != Some(TESTS_DIRECTORY.as_ref()) {
+            let tests_directory = facade.parent().map(|directory| directory.join(TESTS_DIRECTORY));
+            reject_test_verbs(&source_path, &program, tests_directory.as_deref())?;
+        }
         validate_configuration_source(module_path, &source_path, &program)?;
         if source_index == 0 {
             validate_open_siblings(module_path, facade, siblings, children, &program)?;

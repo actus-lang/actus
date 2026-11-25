@@ -1,6 +1,6 @@
 # ADR-0099: Deterministic and isolated test-runner performance
 
-- **Status:** Proposed
+- **Status:** Proposed. Section 4 is superseded by ADR-0121.
 - **Date:** 2026-11-02
 - **Scope:** Actus test discovery, compilation, native object reuse, process
   isolation, output ordering, and test-runner performance
@@ -78,7 +78,7 @@ in isolated subprocesses. The runner must not combine such tests into a shared
 process or executable unless a later decision specifies equivalent isolation
 and evidence.
 
-### 4. Rust-style grouping is conditional, not implicit
+### 4. Rust-style grouping is conditional, not implicit (superseded by ADR-0121)
 
 Building one dispatcher executable per source file is an optional future
 optimization. It is allowed only when every selected test in the group has a

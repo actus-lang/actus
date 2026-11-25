@@ -1,11 +1,11 @@
-"""Mirrored strict coverage for file I/O, EOF, flush, and failure paths."""
+"""Strict coverage for file I/O, EOF, flush, and failure paths."""
 import {
-    open std::fs,
-    open std::io,
-    std::path,
+    open fs,
+    open io,
+    path,
 };
 
-verb current_directory() -> Result[path::Path, path::PathError] {
+verb fs_io_matrix_current_directory() -> Result[path::Path, path::PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
     append(raw, 0u8);
@@ -25,7 +25,7 @@ verb fixture_prefix() -> Buffer {
     return prefix;
 }
 
-verb empty_path() -> Result[path::Path, path::PathError] {
+verb fs_io_matrix_empty_path() -> Result[path::Path, path::PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 0u8);
     return path::path_from_ascii(storage: dat raw);
@@ -74,7 +74,7 @@ verb inspect_eof(ins reader: fs::File) -> Int {
 
 meta effect("filesystem", "blocking")
 verb invalid_publication() -> Int {
-    erg path_result = empty_path();
+    erg path_result = fs_io_matrix_empty_path();
     return case dat path_result {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -111,7 +111,7 @@ meta test
 meta effect("filesystem", "blocking", "entropy")
 meta capability("filesystem.create_exclusive")
 verb file_io_matrix_covers_flush_eof_and_failure() -> Int {
-    erg root_result = current_directory();
+    erg root_result = fs_io_matrix_current_directory();
     return case dat root_result {
         Result.Err(_) => 1,
         Result.Ok(root) => {

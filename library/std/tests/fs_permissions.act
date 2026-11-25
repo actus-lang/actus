@@ -1,4 +1,4 @@
-"""Mirrored readonly-state error coverage for the hosted filesystem facade."""
+"""Readonly-state error coverage for the hosted filesystem facade."""
 import {
     fs,
     path,

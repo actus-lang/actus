@@ -242,7 +242,7 @@ fn actus_hash_comment_limit_suppression_is_rejected() {
 #[test]
 fn rust_logic_in_library_fixture_tree_is_rejected() {
     let root = std::env::temp_dir().join(format!("actus-fixture-policy-{}", std::process::id()));
-    let fixture = root.join("tests/library/embedded.rs");
+    let fixture = root.join("library/std/tests/embedded.rs");
     fs::create_dir_all(fixture.parent().expect("fixture parent should exist"))
         .expect("fixture directory should be created");
     fs::write(&fixture, "fn hidden_test() {}\n").expect("fixture should be written");

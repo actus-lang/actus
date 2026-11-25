@@ -28,6 +28,7 @@ pub use plan::{
 };
 pub(crate) use plan::{program_with_performance_context, validate_compilation_plan};
 pub(crate) use registry::DeclarationRegistry;
+pub(crate) use scope::validate_plan_scopes;
 pub use types::{
     DuplicateDeclaration, ExportedSymbol, ModuleError, ModuleExports, ModuleLocation,
     OutOfScopeReference, ScopeViolation,
@@ -36,3 +37,4 @@ pub use unit::{
     ModuleIdentity, ModuleSource, ModuleSourceKind, ModuleUnit, load_module_unit,
     load_module_unit_with_overlays,
 };
+pub use validation::{check_unique_declarations, reject_test_verbs};

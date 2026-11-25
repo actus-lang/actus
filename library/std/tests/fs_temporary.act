@@ -1,10 +1,10 @@
-"""Mirrored strict coverage for secure temporary filesystem resources."""
+"""Strict coverage for secure temporary filesystem resources."""
 import {
-    std::fs,
-    std::path,
+    fs,
+    path,
 };
 
-verb current_directory() -> Result[path::Path, path::PathError] {
+verb fs_temporary_current_directory() -> Result[path::Path, path::PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
     append(raw, 0u8);
@@ -53,7 +53,7 @@ meta test
 meta effect("filesystem", "blocking", "entropy")
 meta capability("filesystem.create_exclusive")
 verb secure_temporary_file_is_created_and_cleaned() -> Int {
-    erg root_result = current_directory();
+    erg root_result = fs_temporary_current_directory();
     return case dat root_result {
         Result.Err(_) => 1,
         Result.Ok(root) => {
@@ -92,7 +92,7 @@ verb secure_temporary_file_is_created_and_cleaned() -> Int {
 meta test
 meta effect("filesystem", "blocking", "entropy")
 verb secure_temporary_directory_is_created_and_cleaned() -> Int {
-    erg root_result = current_directory();
+    erg root_result = fs_temporary_current_directory();
     return case dat root_result {
         Result.Err(_) => 1,
         Result.Ok(root) => {
@@ -132,7 +132,7 @@ meta test
 meta effect("filesystem", "blocking", "entropy")
 meta capability("filesystem.create_exclusive")
 verb temporary_prefix_is_validated() -> Int {
-    erg root_result = current_directory();
+    erg root_result = fs_temporary_current_directory();
     return case dat root_result {
         Result.Err(_) => 1,
         Result.Ok(root) => {

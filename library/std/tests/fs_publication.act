@@ -1,4 +1,4 @@
-"""Mirrored atomic-publication coverage for the hosted filesystem facade."""
+"""Atomic-publication coverage for the hosted filesystem facade."""
 import {
     fs,
     path,
@@ -203,7 +203,7 @@ verb atomic_replace_replaces_existing_destination() -> Int {
     };
 }
 
-verb missing_parent_path(erg suffix: u8) -> Result[path::Path, path::PathError] {
+verb fs_publication_missing_parent_path(erg suffix: u8) -> Result[path::Path, path::PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 97u8);
     append(raw, 99u8);
@@ -231,7 +231,7 @@ verb missing_parent_path(erg suffix: u8) -> Result[path::Path, path::PathError] 
 }
 
 meta effect("filesystem", "blocking")
-verb verify_failed_publication(
+verb fs_publication_verify_failed_publication(
     abs destination: path::Path,
     abs staging: path::Path
 ) -> Int {
@@ -265,7 +265,7 @@ meta effect("filesystem", "blocking")
 verb atomic_publication_cleans_failed_rename() -> Int {
     erg destination_suffix: u8 = 61u8;
     erg staging_suffix: u8 = 62u8;
-    erg destination_result = missing_parent_path(suffix: erg destination_suffix);
+    erg destination_result = fs_publication_missing_parent_path(suffix: erg destination_suffix);
     return case dat destination_result {
         Result.Err(_) => 1,
         Result.Ok(destination) => {
@@ -291,7 +291,7 @@ verb atomic_publication_cleans_failed_rename() -> Int {
                                     4;
                                 },
                                 Result.Err(_) => {
-                                    erg result = verify_failed_publication(
+                                    erg result = fs_publication_verify_failed_publication(
                                         destination: abs destination,
                                         staging: abs staging_check
                                     );

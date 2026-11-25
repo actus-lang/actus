@@ -80,3 +80,16 @@ pub(super) fn module_path_for_file(source_root: &Path, file: &Path) -> Option<St
     }
     None
 }
+
+/// Rejects a `meta test` verb in an entry file that is production source:
+/// inside the source root and outside every `tests` directory (ADR-0121).
+pub(super) fn reject_production_tests(
+    configuration: &crate::configuration::CompilerConfiguration,
+    file: &Path,
+    program: &crate::ast::Program,
+) -> Result<(), crate::modules::ModuleError> {
+    let production = file.starts_with(configuration.source_root())
+        && !file.starts_with(configuration.project_root().join("tests"))
+        && !file.components().any(|component| component.as_os_str() == "tests");
+    if production { crate::modules::reject_test_verbs(file, program, None) } else { Ok(()) }
+}

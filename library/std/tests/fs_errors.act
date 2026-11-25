@@ -4,7 +4,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb fs_errors_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_ascii(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -18,7 +18,7 @@ verb make_posix(dat raw: Buffer) -> Path {
     };
 }
 
-verb file_path() -> Path {
+verb fs_errors_file_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 97);
     append(raw, 99);
@@ -45,7 +45,7 @@ verb file_path() -> Path {
     append(raw, 105);
     append(raw, 110);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return fs_errors_make_posix(raw: dat raw);
 }
 
 verb directory_path() -> Path {
@@ -66,7 +66,7 @@ verb directory_path() -> Path {
     append(raw, 105);
     append(raw, 114);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return fs_errors_make_posix(raw: dat raw);
 }
 
 meta effect("filesystem", "blocking")
@@ -139,7 +139,7 @@ verb read_text_buffer(abs path: Path) -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb read_helpers_return_owned_buffers() -> Int {
-    erg path = file_path();
+    erg path = fs_errors_file_path();
     erg prepared = prepare_file(path: abs path);
     case prepared {
         0 => {},
@@ -215,7 +215,7 @@ verb read_invalid_file(abs path: Path) -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb invalid_text_returns_typed_error() -> Int {
-    erg path = file_path();
+    erg path = fs_errors_file_path();
     erg prepared = write_invalid_file(path: abs path);
     case prepared {
         0 => {},
@@ -244,7 +244,7 @@ verb directory_child_path() -> Path {
     append(child_raw, 105);
     append(child_raw, 110);
     append(child_raw, 0);
-    return make_posix(raw: dat child_raw);
+    return fs_errors_make_posix(raw: dat child_raw);
 }
 
 meta effect("filesystem", "blocking")

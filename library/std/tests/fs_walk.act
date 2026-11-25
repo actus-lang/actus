@@ -1,11 +1,11 @@
-"""Mirrored strict coverage for bounded recursive filesystem walking."""
+"""Strict coverage for bounded recursive filesystem walking."""
 import {
-    std::fs,
-    open std::io,
-    std::path,
+    fs,
+    open io,
+    path,
 };
 
-verb current_directory() -> Result[path::Path, path::PathError] {
+verb fs_walk_current_directory() -> Result[path::Path, path::PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
     append(raw, 0u8);
@@ -24,7 +24,7 @@ verb bounded_options() -> fs::WalkOptions {
 
 meta effect("filesystem", "blocking")
 verb open_root_walker() -> Result[fs::Walker, IoError] {
-    erg root_result = current_directory();
+    erg root_result = fs_walk_current_directory();
     return case dat root_result {
         Result.Err(_) => Err(IoError.Failed),
         Result.Ok(root) => {

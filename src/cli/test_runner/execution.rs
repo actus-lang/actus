@@ -12,7 +12,6 @@ use crate::codegen::link_objects;
 use crate::configuration::{CompilerConfiguration, EntryContract};
 use crate::diagnostics::{render_diagnostic, semantic_diagnostic};
 use crate::lexer::SourceSpan;
-use crate::modules::{ModuleResolver, build_test_compilation_plan};
 
 use super::super::conformance::ConformanceMode;
 use super::TestOptions;
@@ -163,7 +162,7 @@ fn run_test(
 ) -> Result<TestProcessResult, String> {
     let verb = test_verb(test)?;
     validate_test_verb(verb)?;
-    let plan = test_compilation_plan(test, configuration)?;
+    let plan = test_compilation_plan(test)?;
     let caller =
         crate::semantic::filter_program_for_target_checked(plan.caller(), configuration.target())
             .map_err(|error| test_diagnostic(test, semantic_diagnostic(&error)))?;
@@ -225,7 +224,6 @@ fn validate_test_verb(verb: &crate::ast::VerbDecl) -> Result<(), String> {
 
 fn test_compilation_plan(
     test: &DiscoveredTest,
-    configuration: &CompilerConfiguration,
 ) -> Result<crate::modules::ModuleCompilationPlan, String> {
     let mut program = test_program(&test.program, &test.name);
     let test_contract = test_verb(test)?
@@ -259,17 +257,7 @@ fn test_compilation_plan(
         }
     }
     program.declarations.push(test_main(&test.name, test.fault, test_contract));
-    if let Some(plan) = &test.compilation_plan {
-        return Ok(plan.with_caller_program(program));
-    }
-    let resolver = ModuleResolver::with_dependencies_and_runtime(
-        configuration.source_root(),
-        configuration.dependency_roots(),
-        configuration.runtime_source_root(),
-        configuration.runtime_module_roots(),
-    )
-    .with_package_identity(configuration.package_identity(), configuration.source_root());
-    build_test_compilation_plan(&program, &resolver).map_err(|error| error.to_string())
+    Ok(test.compilation_plan.with_caller_program(program))
 }
 
 fn test_program(source_program: &crate::ast::Program, test_name: &str) -> crate::ast::Program {

@@ -22,3 +22,4 @@ cargo test --test stdlib_conformance --all-features -- --nocapture
 cargo test --test documentation --all-features -- --nocapture
 cargo run --features test-fault-injection --bin actus -- lock --check
 cargo run --features test-fault-injection --bin actus -- test --strict
+(cd library/std && cargo run --manifest-path "$repo_root/Cargo.toml" --features test-fault-injection --bin actus -- test --strict)

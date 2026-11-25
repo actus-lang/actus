@@ -403,7 +403,7 @@ fn lsp_resolves_std_fs_imports_for_open_documents() {
 
 #[test]
 fn lsp_resolves_std_io_error_hover_and_definition_without_diagnostics() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/fs/io_matrix.act");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/metadata_repr.act");
     let uri = file_uri(&path);
     let source = concat!(
         "import { open std::io };\n",
@@ -426,8 +426,8 @@ fn lsp_resolves_std_io_error_hover_and_definition_without_diagnostics() {
 #[test]
 fn lsp_resolves_standard_library_test_fixture_imports() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let fs_path = root.join("tests/library/fs_contracts.act");
-    let path_path = root.join("tests/library/path_components.act");
+    let fs_path = root.join("library/std/tests/fs_contracts.act");
+    let path_path = root.join("library/std/tests/path_components.act");
     let fs_uri = file_uri(&fs_path);
     let path_uri = file_uri(&path_path);
     let fs_source = fs::read_to_string(&fs_path).expect("read fs fixture");

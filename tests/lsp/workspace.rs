@@ -321,3 +321,48 @@ fn lsp_rejects_oversized_document_overlays() {
     assert!(stdout.contains("\"resultState\":\"unsupported\""), "stdout: {stdout}");
     assert!(stdout.contains("\"workspaceVersion\":0"), "stdout: {stdout}");
 }
+
+/// A file of a module's `tests` directory is analyzed as part of its module
+/// (ADR-0121): it sees the module's private declarations and is held to the
+/// module's scope rules.
+fn module_test_diagnostics(test_source: &str) -> String {
+    let root = temp_root();
+    let inner = root.join("src/math/inner");
+    fs::create_dir_all(root.join("src/math/tests")).expect("create module tests directory");
+    fs::create_dir_all(&inner).expect("create submodule");
+    fs::write(
+        root.join("Actus.toml"),
+        "[package]\nname = \"lsp-module-tests\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
+    )
+    .expect("write manifest");
+    fs::write(
+        root.join("src/main.act"),
+        "import { open math };\nverb main() -> Int { return 0; }\n",
+    )
+    .expect("write main");
+    fs::write(root.join("src/math/math.act"), "open api;\nopen inner;\n").expect("write facade");
+    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+        .expect("write module file");
+    fs::write(inner.join("inner.act"), "open items;\n").expect("write submodule facade");
+    fs::write(inner.join("items.act"), "verb inner_private() -> Int { return 6; }\n")
+        .expect("write submodule file");
+    let test_path = root.join("src/math/tests/case.act");
+    fs::write(&test_path, test_source).expect("write module test");
+    let uri = file_uri(&test_path);
+    let messages = [
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        json!({"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":test_source}}}),
+        json!({"jsonrpc":"2.0","id":2,"method":"shutdown","params":null}),
+        json!({"jsonrpc":"2.0","method":"exit","params":null}),
+    ];
+    run_lsp(messages.to_vec())
+}
+
+#[test]
+fn lsp_analyzes_a_module_test_file_as_part_of_its_module() {
+    let stdout = module_test_diagnostics(
+        "meta test\nverb calls_private() -> Int { return private_value() - 42; }\nmeta test\nverb calls_missing() -> Int { return missing_value(); }\n",
+    );
+    assert!(stdout.contains("missing_value"), "stdout: {stdout}");
+    assert!(!stdout.contains("private_value"), "stdout: {stdout}");
+}

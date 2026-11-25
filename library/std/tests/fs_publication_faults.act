@@ -1,4 +1,4 @@
-"""Mirrored strict coverage for additional atomic-publication fault phases."""
+"""Strict coverage for additional atomic-publication fault phases."""
 import {
     fs,
     path,
@@ -24,7 +24,7 @@ verb publication_fault_path(erg suffix: u8) -> Result[path::Path, path::PathErro
 }
 
 meta effect("filesystem", "blocking")
-verb verify_failed_publication(
+verb fs_publication_faults_verify_failed_publication(
     abs destination: path::Path,
     abs staging: path::Path
 ) -> Int {
@@ -85,7 +85,7 @@ verb injected_prepublication_failure(
                                     4;
                                 },
                                 Result.Err(_) => {
-                                    erg result = verify_failed_publication(
+                                    erg result = fs_publication_faults_verify_failed_publication(
                                         destination: abs destination,
                                         staging: abs staging_check
                                     );

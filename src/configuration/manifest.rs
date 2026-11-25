@@ -305,6 +305,8 @@ pub(crate) fn package_identity_name(
 }
 
 pub(crate) fn is_compiler_owned_std_manifest(path: &Path, manifest: &ActusManifest) -> bool {
+    // `./Actus.toml` has no parent directory name until it is made absolute.
+    let path = &std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
     manifest.package.name == "std"
         && matches!(
             manifest.runtime.as_ref().map(|runtime| runtime.kind),

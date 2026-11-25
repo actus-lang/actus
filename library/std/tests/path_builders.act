@@ -2,7 +2,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb path_builders_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -22,14 +22,14 @@ verb base_path() -> Path {
     append(raw, 47);
     append(raw, 98);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_builders_make_posix(raw: dat raw);
 }
 
 verb child_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 99);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_builders_make_posix(raw: dat raw);
 }
 
 verb extension_path() -> Path {
@@ -38,7 +38,7 @@ verb extension_path() -> Path {
     append(raw, 111);
     append(raw, 103);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_builders_make_posix(raw: dat raw);
 }
 
 verb name_path() -> Path {
@@ -49,7 +49,7 @@ verb name_path() -> Path {
     append(raw, 97);
     append(raw, 108);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_builders_make_posix(raw: dat raw);
 }
 
 verb mutate_joined_path(ins joined: Path, abs child: Path) -> Int {

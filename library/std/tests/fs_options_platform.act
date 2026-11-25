@@ -1,7 +1,7 @@
 """Platform-selected coverage for the non-inheritable file-open contract."""
 import {
-    open std::fs,
-    std::path,
+    open fs,
+    path,
 };
 
 verb platform_root() -> Result[path::Path, path::PathError] {

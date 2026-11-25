@@ -5,7 +5,7 @@ import {
     open path,
 };
 
-verb current_directory() -> Result[Path, PathError] {
+verb fs_directory_current_directory() -> Result[Path, PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
     append(raw, 0u8);
@@ -34,7 +34,7 @@ verb close_directory_entry(
 meta test
 meta effect("filesystem", "blocking")
 verb directory_iteration_returns_entry_and_closes() -> Int {
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -88,7 +88,7 @@ verb verify_filtered_directory(ins directory: Directory) -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb lexicographic_directory_iteration_is_bounded() -> Int {
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -169,7 +169,7 @@ verb verify_repeated_eof(ins directory: Directory) -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb repeated_directory_eof_remains_clean() -> Int {
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -205,7 +205,7 @@ verb repeated_directory_eof_remains_clean() -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb closed_directory_rejects_reuse() -> Int {
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -245,7 +245,7 @@ verb closed_directory_rejects_reuse() -> Int {
 
 meta effect("filesystem", "blocking")
 verb open_directory_then_return_early() -> Int {
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -265,7 +265,7 @@ verb directory_drop_closes_on_early_return() -> Int {
     if early != 0 {
         return early;
     }
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 3,
         Result.Ok(path) => {
@@ -286,7 +286,7 @@ verb directory_drop_closes_on_early_return() -> Int {
 
 meta effect("filesystem", "blocking")
 verb open_directory_then_break() -> Int {
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -313,7 +313,7 @@ verb directory_drop_closes_after_loop_exit() -> Int {
 
 meta effect("filesystem", "blocking")
 verb open_directory_then_error() -> Result[Int, io::IoError] {
-    erg current = current_directory();
+    erg current = fs_directory_current_directory();
     return case dat current {
         Result.Err(_) => Err(io::IoError.InvalidInput),
         Result.Ok(path) => {

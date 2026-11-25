@@ -4,7 +4,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb fs_create_new_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_ascii(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -18,7 +18,7 @@ verb make_posix(dat raw: Buffer) -> Path {
     };
 }
 
-verb file_path() -> Path {
+verb fs_create_new_file_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 97);
     append(raw, 99);
@@ -45,14 +45,14 @@ verb file_path() -> Path {
     append(raw, 105);
     append(raw, 110);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return fs_create_new_make_posix(raw: dat raw);
 }
 
 meta test
 meta effect("filesystem", "blocking")
 meta capability("filesystem.create_exclusive")
 verb create_new_rejects_existing_file() -> Int {
-    erg path = file_path();
+    erg path = fs_create_new_file_path();
     erg stale = remove_file(path: abs path);
     case dat stale {
         Result.Ok(_) => {},

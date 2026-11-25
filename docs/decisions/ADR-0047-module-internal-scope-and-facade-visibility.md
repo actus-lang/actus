@@ -214,7 +214,11 @@ The same two views apply to language tooling:
 - unsaved overlays must rebuild the affected module unit and its interface
   deterministically.
 
-### 8. Test-only internal friend scope
+### 8. Test-only internal friend scope (superseded by ADR-0121)
+
+This section is superseded by ADR-0121: module tests live in a `tests` directory
+next to their module, project tests see only open declarations, and `--mirror`
+is removed.
 
 `meta test` is a test-runner capability, not a production visibility escape
 hatch. A test file under a mirrored `tests/<path>.act` location may be paired

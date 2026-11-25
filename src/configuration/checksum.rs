@@ -52,9 +52,13 @@ fn collect_files(
     Ok(())
 }
 
+/// `tests` directories hold tests, which are not part of a dependency's
+/// content (ADR-0121); a change to a test must not change the checksum.
 fn ignored_dependency_entry(path: &Path) -> bool {
-    path.file_name()
-        .is_some_and(|name| matches!(name.to_str(), Some(".git" | "capsula" | "Actus.lock")))
+    path.file_name().is_some_and(|name| {
+        matches!(name.to_str(), Some(".git" | "capsula" | "Actus.lock"))
+            || (path.is_dir() && name == "tests")
+    })
 }
 
 fn relative_file(root: &Path, path: PathBuf) -> (String, PathBuf) {

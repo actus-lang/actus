@@ -21,7 +21,7 @@ suite does not need to run in full:
 ```sh
 actus test persistence
 actus test --module ie::runtime
-actus test --file ie/runtime/training/auxiliary/cursor.act
+actus test --file ie/runtime/tests/cursor.act
 actus test persistence --module ie::runtime --exact
 actus test --list
 ```
@@ -30,23 +30,21 @@ The positional filter, `--module`, and `--file` are substring filters by
 default. Add `--exact` when the value must match exactly. `--list` discovers
 and prints the selected canonical test identities without executing them.
 
-Tests should mirror the source tree. For example,
-`tests/ie/runtime/training/auxiliary/cursor.act` is paired with the matching
-source path under `src/`, or with that path's canonical facade when the source
-module is a directory module. Use `--mirror` to enforce this mapping:
+Tests live in two places. A module's tests are the `.act` files of the `tests`
+directory next to its facade (`src/ie/runtime/tests/*.act` tests `ie::runtime`);
+they are compiled as part of the module and see its private declarations. The
+project's tests are the `.act` files directly in `tests/`; they see only the
+`open` declarations that facades export. A test is reported as
+`<module path>::<verb>` or `tests::<verb>`, and `--module ie::runtime` selects
+the tests of one module. All files of one `tests` directory share one namespace,
+so they can share helpers; a duplicate name is an error that names both files.
 
-```sh
-actus test --mirror --strict
-```
-
-When a mirrored file contains a `meta test`, the runner compiles that test
-with the corresponding module's internal implementation scope. This permits
-testing private helpers without exporting them through a facade or changing
-ordinary importer visibility. The friend scope exists only in the temporary
-test artifact; it does not make private declarations public.
-
-Package-root test files remain root-scope compatibility fixtures. New nested
-test files should use the mirrored layout and should pass the `--mirror` gate.
+`actus build`, `actus run` and `actus check` ignore every `tests` directory,
+and `actus fmt` formats them. A `meta test` verb in a production source file, a
+`.act` file in a subdirectory of `tests/`, a `src/tests` directory, a
+subdirectory of a `tests` directory, and a `tests/tests.act` facade are layout
+errors (`E1143`, `E1144`) that name where the test belongs. See
+[`meta test`](../meta-attributes/test.md).
 
 Publication failure fixtures may declare one test-only fault, for example
 `meta fault("flush_failure")`. These faults require a compiler built with the

@@ -2,7 +2,7 @@ import {
     open path,
 };
 
-verb make_posix(dat raw: Buffer) -> Path {
+verb path_edge_cases_make_posix(dat raw: Buffer) -> Path {
     erg result = path_from_posix(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -16,7 +16,7 @@ verb make_posix(dat raw: Buffer) -> Path {
     };
 }
 
-verb make_windows(dat raw: Buffer) -> Path {
+verb path_edge_cases_make_windows(dat raw: Buffer) -> Path {
     erg result = path_from_windows_utf16(storage: dat raw);
     return case dat result {
         Result.Ok(path) => path,
@@ -37,14 +37,14 @@ verb hidden_path() -> Path {
     append(raw, 110);
     append(raw, 118);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_edge_cases_make_posix(raw: dat raw);
 }
 
 verb root_path() -> Path {
     erg raw = Buffer[0];
     append(raw, 47);
     append(raw, 0);
-    return make_posix(raw: dat raw);
+    return path_edge_cases_make_posix(raw: dat raw);
 }
 
 verb windows_root_path() -> Path {
@@ -63,7 +63,7 @@ verb windows_root_path() -> Path {
     append(raw, 0);
     append(raw, 0);
     append(raw, 0);
-    return make_windows(raw: dat raw);
+    return path_edge_cases_make_windows(raw: dat raw);
 }
 
 verb verify_hidden_and_root() -> Int {

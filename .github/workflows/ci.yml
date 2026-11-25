@@ -335,7 +335,10 @@ jobs:
 
       - name: Run coordinated publication capability fixture
         shell: bash
-        run: cargo run --features test-fault-injection --bin actus -- test --file tests/library/fs/publication_coordinator.act --strict
+        run: |
+          cargo build --features test-fault-injection --bin actus
+          cd library/std
+          ../../target/debug/actus test --file tests/fs_publication_coordinator.act --strict
 
       - name: Record disk and target usage (Unix)
         if: always() && runner.os != 'Windows'

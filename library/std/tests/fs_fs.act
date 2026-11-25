@@ -1,10 +1,10 @@
 """Canonical facade coverage for qualified hosted filesystem access."""
 import {
-    std::fs,
-    std::path,
+    fs,
+    path,
 };
 
-verb current_directory() -> Result[path::Path, path::PathError] {
+verb fs_fs_current_directory() -> Result[path::Path, path::PathError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
     append(raw, 0u8);
@@ -43,7 +43,7 @@ verb missing_metadata_path() -> Result[path::Path, path::PathError] {
 meta test
 meta effect("filesystem", "blocking")
 verb qualified_filesystem_facade_opens_and_closes_directory() -> Int {
-    erg current = current_directory();
+    erg current = fs_fs_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -73,7 +73,7 @@ verb qualified_filesystem_facade_opens_and_closes_directory() -> Int {
 meta test
 meta effect("filesystem", "blocking")
 verb qualified_filesystem_facade_reports_directory_metadata() -> Int {
-    erg current = current_directory();
+    erg current = fs_fs_current_directory();
     return case dat current {
         Result.Err(_) => 1,
         Result.Ok(path) => {
@@ -82,9 +82,7 @@ verb qualified_filesystem_facade_reports_directory_metadata() -> Int {
                 Result.Err(_) => 2,
                 Result.Ok(metadata) => {
                     if metadata.is_dir == 1 {
-                        if metadata.modified_status == METADATA_VALUE_AVAILABLE &&
-                            metadata.identity_status == METADATA_VALUE_AVAILABLE &&
-                            metadata.identity_kind != METADATA_IDENTITY_NONE {
+                        if metadata.modified_status == METADATA_VALUE_AVAILABLE && metadata.identity_status == METADATA_VALUE_AVAILABLE && metadata.identity_kind != METADATA_IDENTITY_NONE {
                             return 0;
                         }
                     }

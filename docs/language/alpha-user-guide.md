@@ -368,7 +368,7 @@ Accepted native examples live under `examples/`. Positive and negative
 compiler behavior is covered by the organized suites under `tests/semantic/`,
 `tests/codegen/`, `tests/cli*.rs`, `tests/fs.rs`, `tests/std_io.rs`, and
 `tests/frontend_*`. Standard-library Actus fixtures live under
-`tests/library/` and are discovered as `meta test` sources; they do not contain
+`library/std/tests/` and are discovered as `meta test` sources; they do not contain
 Rust implementation logic.
 
 Every documented command in this guide has a corresponding CLI, application,
