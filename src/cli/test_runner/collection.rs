@@ -173,7 +173,12 @@ fn collect_directory_tests(
             .any(|name| raw_test_matches(name, label, &file.relative_path, options))
     });
     if !selected {
-        return Ok(CollectedDirectory { group: None, filtered: 0 });
+        // Not compiled: its tests are counted from the parsed files alone, so
+        // `filtered` is every discovered test that does not run. A file that
+        // fails to read or parse still fails the run above, because its tests
+        // cannot be counted.
+        let filtered = files.iter().map(|file| test_count(&file.program)).sum();
+        return Ok(CollectedDirectory { group: None, filtered });
     }
     let (program, plan) = compile_directory(directory, &files, resolver, &source_map)?;
     let declared = test_count(&program);

@@ -14,10 +14,11 @@ pub(super) fn print_test_header(
     filtered: usize,
     mode: ConformanceMode,
 ) -> Result<(), OutputStopped> {
+    let noun = if total == 1 { "test" } else { "tests" };
     if mode.is_strict() {
-        try_outln!("running {total} tests (strict) ({filtered} filtered)")
+        try_outln!("running {total} {noun} (strict) ({filtered} filtered)")
     } else {
-        try_outln!("running {total} tests ({filtered} filtered)")
+        try_outln!("running {total} {noun} ({filtered} filtered)")
     }
 }
 

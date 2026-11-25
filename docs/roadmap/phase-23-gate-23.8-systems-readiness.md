@@ -31,7 +31,7 @@ actus check --strict
 checked .../src/main.act successfully (strict)
 
 actus test --strict
-running 1 tests (strict) (0 filtered)
+running 1 test (strict) (0 filtered)
 test ./tests/accepted.act::bounded_boolean_state ... ok
 test result: ok 1 passed; 0 failed
 

@@ -82,7 +82,7 @@ fn test_reports_target_filtered_counts_deterministically() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let expected_name = if cfg!(windows) { "windows_smoke" } else { "unix_smoke" };
     assert!(output.status.success(), "stdout: {stdout}");
-    assert!(stdout.contains("running 1 tests (1 filtered)"), "stdout: {stdout}");
+    assert!(stdout.contains("running 1 test (1 filtered)"), "stdout: {stdout}");
     assert!(stdout.contains(expected_name), "stdout: {stdout}");
     assert!(stdout.contains("1 passed; 0 failed"), "stdout: {stdout}");
     let _ = fs::remove_dir_all(root);

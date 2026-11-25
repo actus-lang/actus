@@ -220,7 +220,7 @@ fn a_filter_runs_only_the_selected_test_of_a_group() {
     );
     let (output, stdout) = keeping(&root, &["test", "wanted", "--exact"]);
     assert!(output.status.success(), "stdout: {stdout}");
-    assert!(stdout.contains("running 1 tests (1 filtered)"), "stdout: {stdout}");
+    assert!(stdout.contains("running 1 test (1 filtered)"), "stdout: {stdout}");
     assert!(stdout.contains("tests::wanted ... ok"), "stdout: {stdout}");
     assert!(!stdout.contains("unwanted"), "stdout: {stdout}");
     assert_eq!(kept_artifacts(&root).1, 1, "only the selected test ran");
@@ -526,4 +526,74 @@ fn copy_tree(from: &Path, to: &Path) {
             fs::copy(entry.path(), target).expect("copy file");
         }
     }
+}
+
+/// Three test directories (two module directories and `tests/`) with five
+/// tests; the `shapes` directory parses but cannot be compiled.
+fn counted_project(name: &str) -> PathBuf {
+    project(
+        name,
+        &[
+            (
+                "src/math/tests/a.act",
+                "meta test\nverb add() -> Int { return 0; }\nmeta test\nverb sub() -> Int { return 0; }\n",
+            ),
+            (
+                "src/shapes/tests/a.act",
+                "meta test\nverb broken() -> Int { return missing_name(); }\n",
+            ),
+            (
+                "tests/a.act",
+                "meta test\nverb alpha() -> Int { return 0; }\nmeta test\nverb beta() -> Int { return 0; }\n",
+            ),
+        ],
+    )
+}
+
+#[test]
+fn filtered_counts_every_unselected_test_of_every_directory() {
+    let root = counted_project("count-one");
+    let (output, stdout) = actus(&root, &["test", "add", "--exact"], &[]);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("running 1 test (4 filtered)"), "stdout: {stdout}");
+    assert!(stdout.contains("math::add ... ok"), "stdout: {stdout}");
+}
+
+#[test]
+fn a_filter_matching_nothing_reports_every_test_as_filtered() {
+    let root = counted_project("count-none");
+    let (output, stdout) = actus(&root, &["test", "no_such_test"], &[]);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("running 0 tests (5 filtered)"), "stdout: {stdout}");
+}
+
+#[test]
+fn an_unselected_directory_that_does_not_compile_is_not_compiled() {
+    let root = counted_project("count-uncompiled");
+    let (output, stdout) = keeping(&root, &["test", "alpha"]);
+    assert!(output.status.success(), "stdout: {stdout}");
+    assert!(stdout.contains("running 1 test (4 filtered)"), "stdout: {stdout}");
+    assert_eq!(kept_artifacts(&root).0.len(), 1, "only the selected directory was built");
+    // Selecting it makes the compile error surface, so it was skipped, not ignored.
+    let (output, _) = actus(&root, &["test", "broken"], &[]);
+    assert!(!output.status.success());
+}
+
+#[test]
+fn list_reports_the_same_counts_as_the_run_header() {
+    let root = counted_project("count-list");
+    let header = |arguments: &[&str]| {
+        let (_, stdout) = actus(&root, arguments, &[]);
+        stdout.lines().next().unwrap_or_default().to_owned()
+    };
+    let run = header(&["test", "beta"]);
+    assert_eq!(run, "running 1 test (4 filtered)");
+    assert_eq!(header(&["test", "beta", "--list"]), run);
+}
+
+#[test]
+fn the_header_uses_the_singular_only_for_one_test() {
+    let root = counted_project("count-plural");
+    let (_, stdout) = actus(&root, &["test", "a", "--module", "tests", "--list"], &[]);
+    assert!(stdout.starts_with("running 2 tests (3 filtered)"), "stdout: {stdout}");
 }
