@@ -73,8 +73,11 @@ fn library_fixtures_are_discovered_by_the_test_runner_in_library_std() {
         .expect("run actus test --list in library/std");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
-    assert!(stdout.contains("tests::injected_short_write_is_rejected"), "stdout: {stdout}");
     assert!(stdout.contains("tests::ka_decode_round_trips_mapped_bytes"), "stdout: {stdout}");
+    // The fault fixtures are `meta target("unix")`: listed on Unix hosts and
+    // filtered out elsewhere.
+    let fault_fixture_listed = stdout.contains("tests::injected_short_write_is_rejected");
+    assert_eq!(fault_fixture_listed, cfg!(unix), "stdout: {stdout}");
 }
 
 /// Tests are not part of the shipped standard library: the runtime checksum
