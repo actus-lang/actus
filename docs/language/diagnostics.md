@@ -26,6 +26,8 @@ edition.
 | `E1140` | Arithmetic, bitwise or comparison operator given operands of different integer types |
 | `E1141` | Call to a verb that returns nothing used where a value is needed (binding, assignment, argument, operand, condition, `return`, conditional value or field initializer); such a call is only valid as a statement of its own |
 | `E1142` | Assignment to a constant (`const`); constants are fixed at compile time, use an `erg` binding for a value that changes |
+| `E1143` | Test layout violation (ADR-0121): a `tests` directory with a facade, a `src/tests` directory, a subdirectory inside a `tests` directory, or an `.act` file in a subdirectory of the project `tests/` |
+| `E1144` | `meta test` verb in a production source file; move it to a file of the module's `tests` directory |
 | `E1090` | Cast between types that are not both integer types |
 | `E1091` | Integer literal in a cast is outside the range of the target type |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |
@@ -75,6 +77,19 @@ the `import { open <module> }` that brings the declaration into scope.
 `E1137` is emitted when one facade opens the same sibling file or child
 directory both with `open x;` and with `open unit x;` (ADR-0111). Keep one of
 the two openings.
+
+`E1143` is emitted for a test file or directory that is in the wrong place. Module
+tests live in `src/<module path>/tests/*.act`, directly in that directory;
+project tests live in `tests/*.act`, directly in that directory. A `tests`
+directory is never a module, so it must not contain a facade `tests.act`, and
+the root unit has no `src/tests` directory. The message names the file and,
+for a file of the old mirror layout (`tests/<path>.act`), the module `tests`
+directory it belongs in.
+
+`E1144` is emitted when a `meta test` verb is declared in a production source
+file, that is, anywhere under the source root outside a `tests` directory. The
+message names the module's `tests` directory; the root unit has none, so its
+logic moves into a module or is tested from `tests/` through what it opens.
 
 `E1142` is emitted when an assignment, compound assignment, field assignment
 or indexed assignment names a `const`. A constant is fixed at compile time and

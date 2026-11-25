@@ -145,7 +145,10 @@ fn parse_conformance_mode(
 }
 
 fn source_roots(root: &Path) -> Vec<PathBuf> {
-    ["src", "library/std/src", "tests"].iter().map(|path| root.join(path)).collect()
+    ["src", "library/std/src", "library/std/tests", "tests"]
+        .iter()
+        .map(|path| root.join(path))
+        .collect()
 }
 
 impl ConformanceMode {

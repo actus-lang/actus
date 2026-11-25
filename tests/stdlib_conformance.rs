@@ -18,7 +18,7 @@ fn standard_library_sources_pass_strict_source_limits() {
 
 #[test]
 fn library_fixtures_are_actus_meta_test_sources() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/library");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std/tests");
     let files = source_paths(&[&root]).expect("library fixture sources should be discoverable");
     assert!(!files.is_empty(), "library fixture inventory must not be empty");
     for path in files {
@@ -30,7 +30,7 @@ fn library_fixtures_are_actus_meta_test_sources() {
 
 #[test]
 fn every_registered_fault_has_a_library_fixture() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/library");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std/tests");
     let files = source_paths(&[&root]).expect("library fixture sources should be discoverable");
     let mut covered = HashSet::new();
     for path in files {
@@ -58,4 +58,39 @@ fn diagnostics_for(path: &PathBuf) -> Vec<String> {
         .into_iter()
         .map(|diagnostic| format!("{}: {}", path.display(), diagnostic.message()))
         .collect()
+}
+
+/// The standard library's tests are the project tests of `library/std`
+/// (ADR-0121): the runner must discover them there, every fixture file in one
+/// namespace.
+#[test]
+fn library_fixtures_are_discovered_by_the_test_runner_in_library_std() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("library/std");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["test", "--list"])
+        .current_dir(&root)
+        .output()
+        .expect("run actus test --list in library/std");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(stdout.contains("tests::ka_decode_round_trips_mapped_bytes"), "stdout: {stdout}");
+    // The fault fixtures are `meta target("unix")`: listed on Unix hosts and
+    // filtered out elsewhere.
+    let fault_fixture_listed = stdout.contains("tests::injected_short_write_is_rejected");
+    assert_eq!(fault_fixture_listed, cfg!(unix), "stdout: {stdout}");
+}
+
+/// Tests are not part of the shipped standard library: the runtime checksum
+/// recorded in the repository `Actus.lock` is the content checksum of
+/// `library/std`, and `library/std/tests` must not change it (ADR-0121).
+#[test]
+fn standard_library_tests_do_not_change_the_runtime_checksum() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    assert!(root.join("library/std/tests").is_dir(), "std tests directory must exist");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_actus"))
+        .args(["lock", "--check"])
+        .current_dir(root)
+        .output()
+        .expect("run actus lock --check");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
 }

@@ -1,0 +1,325 @@
+import {
+    open io,
+    open fs,
+    open path,
+};
+
+verb fs_contracts_make_posix(dat raw: Buffer) -> Path {
+    erg result = path_from_ascii(storage: dat raw);
+    return case dat result {
+        Result.Ok(path) => path,
+        Result.Err(_) => Path {
+            storage: Buffer[1],
+            platform: PathPlatform.Posix,
+            length: 0,
+            capacity: 1,
+            terminated: 1,
+        },
+    };
+}
+
+verb fs_contracts_empty_path() -> Path {
+    erg raw = Buffer[0];
+    append(raw, 0);
+    return fs_contracts_make_posix(raw: dat raw);
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb metadata_rejects_empty_path() -> Int {
+    erg path = fs_contracts_empty_path();
+    erg result = metadata(path: abs path);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb file_open_and_create_reject_empty_path() -> Int {
+    erg path = fs_contracts_empty_path();
+    erg opened = file_open(path: abs path);
+    erg created = file_create(path: abs path);
+    case dat opened {
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
+    };
+    return case dat created {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb path_operations_reject_empty_paths() -> Int {
+    erg path = fs_contracts_empty_path();
+    erg removed = remove_file(path: abs path);
+    erg renamed = rename(from: abs path, to: abs path);
+    erg copied = copy_file(from: abs path, to: abs path);
+    erg created = create_dir(path: abs path);
+    erg deleted = remove_dir(path: abs path);
+    case dat removed {
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
+    };
+    case dat renamed {
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
+    };
+    case dat copied {
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
+    };
+    case dat created {
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => {},
+    };
+    return case dat deleted {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb read_to_bytes_propagates_empty_path_error() -> Int {
+    erg path = fs_contracts_empty_path();
+    erg bytes = read_to_bytes(path: abs path);
+    return case dat bytes {
+        Result.Ok(_) => {
+            return 1;
+        },
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb read_to_string_propagates_empty_path_error() -> Int {
+    erg path = fs_contracts_empty_path();
+    erg text = read_to_string(path: abs path);
+    return case dat text {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+verb library_path_prefix() -> Buffer {
+    erg raw_path = Buffer[0];
+    append(raw_path, 97);
+    append(raw_path, 99);
+    append(raw_path, 116);
+    append(raw_path, 117);
+    append(raw_path, 115);
+    append(raw_path, 95);
+    append(raw_path, 109);
+    append(raw_path, 105);
+    append(raw_path, 115);
+    append(raw_path, 115);
+    append(raw_path, 105);
+    append(raw_path, 110);
+    append(raw_path, 103);
+    append(raw_path, 95);
+    append(raw_path, 112);
+    append(raw_path, 97);
+    append(raw_path, 114);
+    append(raw_path, 121);
+    append(raw_path, 95);
+    return raw_path;
+}
+
+verb fs_contracts_missing_parent_path() -> Path {
+    erg raw_path = library_path_prefix();
+    append(raw_path, 109);
+    append(raw_path, 105);
+    append(raw_path, 115);
+    append(raw_path, 115);
+    append(raw_path, 105);
+    append(raw_path, 110);
+    append(raw_path, 103);
+    append(raw_path, 47);
+    append(raw_path, 97);
+    append(raw_path, 99);
+    append(raw_path, 116);
+    append(raw_path, 117);
+    append(raw_path, 115);
+    append(raw_path, 0);
+    return fs_contracts_make_posix(raw: dat raw_path);
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb write_file_propagates_empty_path_error() -> Int {
+    erg path = fs_contracts_missing_parent_path();
+    erg contents = Buffer[0];
+    erg written = write_file(path: abs path, contents: abs contents);
+    return case dat written {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb open_options_cover_all_modes() -> Int {
+    erg path = fs_contracts_empty_path();
+    erg empty = options_new();
+    erg readable = options_read(dat empty);
+    erg writable = options_write(dat readable);
+    erg appendable = options_append(dat writable);
+    erg truncating = options_truncate(dat appendable);
+    erg creatable = options_create(dat truncating);
+    erg exclusive = options_create_new(dat creatable);
+    erg isolated = options_close_on_exec(dat exclusive);
+    erg result = options_open(options: dat isolated, path: abs path);
+    return case dat result {
+        Result.Ok(_) => 1,
+        Result.Err(_) => 0,
+    };
+}
+
+verb round_trip_file_path() -> Path {
+    erg raw_path = library_path_prefix();
+    append(raw_path, 114);
+    append(raw_path, 111);
+    append(raw_path, 117);
+    append(raw_path, 110);
+    append(raw_path, 100);
+    append(raw_path, 114);
+    append(raw_path, 105);
+    append(raw_path, 112);
+    append(raw_path, 46);
+    append(raw_path, 98);
+    append(raw_path, 105);
+    append(raw_path, 110);
+    append(raw_path, 0);
+    return fs_contracts_make_posix(raw: dat raw_path);
+}
+
+verb round_trip_copy_path() -> Path {
+    erg raw_copy_path = library_path_prefix();
+    append(raw_copy_path, 99);
+    append(raw_copy_path, 111);
+    append(raw_copy_path, 112);
+    append(raw_copy_path, 121);
+    append(raw_copy_path, 46);
+    append(raw_copy_path, 98);
+    append(raw_copy_path, 105);
+    append(raw_copy_path, 110);
+    append(raw_copy_path, 0);
+    return fs_contracts_make_posix(raw: dat raw_copy_path);
+}
+
+meta effect("filesystem", "blocking")
+verb write_round_trip_file(abs path: Path) -> Int {
+    remove_file(path: abs path);
+    erg contents = Buffer[0];
+    append(contents, 65);
+    append(contents, 66);
+    erg written = write_file(path: abs path, contents: abs contents);
+    case dat written {
+        Result.Ok(count) => case count {
+            2 => {},
+            _ => {
+                return 1;
+            },
+        },
+        Result.Err(_) => {
+            return 1;
+        },
+    };
+    erg info_result = metadata(path: abs path);
+    case dat info_result {
+        Result.Ok(info) => case info.size {
+            2 => case info.is_file {
+                1 => {},
+                _ => {
+                    return 1;
+                },
+            },
+            _ => {
+                return 1;
+            },
+        },
+        Result.Err(_) => {
+            return 1;
+        },
+    };
+    return 0;
+}
+
+meta effect("filesystem", "blocking")
+verb verify_round_trip_reads(abs path: Path) -> Int {
+    erg bytes = read_to_bytes(path: abs path);
+    erg text = read_to_string(path: abs path);
+    case dat bytes {
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
+    };
+    case dat text {
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
+    };
+    return 0;
+}
+
+meta effect("filesystem", "blocking")
+verb copy_round_trip_file(abs path: Path, abs copy_path: Path) -> Int {
+    erg copied = copy_file(from: abs path, to: abs copy_path);
+    case dat copied {
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
+    };
+    erg renamed = rename(from: abs copy_path, to: abs path);
+    case dat renamed {
+        Result.Ok(_) => {},
+        Result.Err(_) => {
+            return 1;
+        },
+    };
+    erg removed = remove_file(path: abs path);
+    return case dat removed {
+        Result.Ok(_) => 0,
+        Result.Err(_) => 1,
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb filesystem_round_trip_covers_file_metadata_and_cleanup() -> Int {
+    erg path = round_trip_file_path();
+    erg copy_path = round_trip_copy_path();
+    erg written = write_round_trip_file(path: abs path);
+    case written {
+        0 => {},
+        _ => {
+            return 1;
+        },
+    };
+    erg read = verify_round_trip_reads(path: abs path);
+    case read {
+        0 => {},
+        _ => {
+            return 1;
+        },
+    };
+    return copy_round_trip_file(path: abs path, copy_path: abs copy_path);
+}

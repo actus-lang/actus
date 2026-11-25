@@ -132,7 +132,8 @@ def main() -> int:
         copy_file(prefix / f"lib/actus/bin/ld.lld{suffix}", stage / f"lib/actus/bin/ld.lld{suffix}")
         for abi in ("eabihf", "eabi"):
             copy_file(prefix / f"lib/actus/targets/thumbv7em-none-{abi}/libclang_rt.builtins.a", stage / f"lib/actus/targets/thumbv7em-none-{abi}/libclang_rt.builtins.a")
-        shutil.copytree(root / "library/std", stage / "lib/actus/std")
+        # Tests are not part of the shipped standard library (ADR-0121).
+        shutil.copytree(root / "library/std", stage / "lib/actus/std", ignore=shutil.ignore_patterns("tests"))
         copy_file(runtime, stage / f"lib/actus/runtime/{args.target}/libactus_runtime.a")
         copy_file(prefix / "share/actus/toolchain.json", stage / "share/actus/toolchain.json")
         for license_name in ("README.md", "LICENSE-APACHE", "LICENSE-MIT", "NOTICE"):

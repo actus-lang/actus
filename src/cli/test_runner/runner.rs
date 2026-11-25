@@ -1,7 +1,9 @@
 use crate::configuration::CompilerConfiguration;
 
 use super::super::conformance::{ConformanceMode, parse_strict_option};
-use super::{collection, execution};
+use crate::session::CompilationSession;
+
+use super::{collection, execution, layout};
 
 #[derive(Clone)]
 pub(in crate::cli) struct TestOptions {
@@ -11,7 +13,6 @@ pub(in crate::cli) struct TestOptions {
     pub(super) file: Option<String>,
     pub(super) exact: bool,
     pub(super) list: bool,
-    pub(super) mirror: bool,
     pub(super) test_threads: usize,
 }
 
@@ -30,12 +31,17 @@ pub(in crate::cli) fn test_command(arguments: impl Iterator<Item = String>) -> i
             return 1;
         }
     };
-    let mut files = Vec::new();
-    collection::collect_act_files(&configuration.project_root().join("tests"), &mut files);
-    collection::collect_act_files(configuration.source_root(), &mut files);
-    files.sort();
-    files.dedup();
-    let tests = match collection::collect_tests(files, &configuration, &options) {
+    // One session for the complete test run (ADR-0109): layout discovery and
+    // every collection worker share source provenance and parse results.
+    let session = CompilationSession::new();
+    let directories = match layout::discover_test_directories(&configuration, &options, &session) {
+        Ok(directories) => directories,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return 1;
+        }
+    };
+    let tests = match collection::collect_tests(directories, &configuration, &options, &session) {
         Ok(tests) => tests,
         Err(error) => {
             eprintln!("error: {error}");
@@ -52,15 +58,12 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
     let mut file = None;
     let mut exact = false;
     let mut list = false;
-    let mut mirror = false;
     let mut test_threads = default_test_threads();
     while let Some(argument) = arguments.next() {
         if argument == "--exact" {
             exact = true;
         } else if argument == "--list" {
             list = true;
-        } else if argument == "--mirror" {
-            mirror = true;
         } else if argument == "--test-threads" {
             test_threads = parse_test_threads(&next_test_value(&mut arguments, "--test-threads")?)?;
         } else if let Some(value) = argument.strip_prefix("--test-threads=") {
@@ -86,7 +89,7 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
             return Err("`actus test` accepts only one positional filter".to_owned());
         }
     }
-    Ok(TestOptions { mode, filter, module, file, exact, list, mirror, test_threads })
+    Ok(TestOptions { mode, filter, module, file, exact, list, test_threads })
 }
 
 fn default_test_threads() -> usize {

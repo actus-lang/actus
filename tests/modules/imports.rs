@@ -594,7 +594,8 @@ fn target_filtering_applies_before_analyzing_imported_platform_declarations() {
 
 #[test]
 fn resolves_qualified_std_path_types_from_the_project_configuration() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/path_components.act");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/tests/path_components.act");
     let source = fs::read_to_string(&path).expect("read path fixture");
     let (tokens, errors) = scan(&source);
     assert!(errors.is_empty());
@@ -618,7 +619,7 @@ fn resolves_qualified_std_path_types_from_the_project_configuration() {
 
 #[test]
 fn resolves_qualified_types_in_a_standard_facade_signature() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/library/std_fs.act");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("library/std/tests/std_fs.act");
     let source = fs::read_to_string(&path).expect("read std fs fixture");
     let (tokens, errors) = scan(&source);
     assert!(errors.is_empty());

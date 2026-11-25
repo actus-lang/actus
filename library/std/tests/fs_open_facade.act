@@ -1,0 +1,33 @@
+"""Coverage for intentional unqualified filesystem facade access."""
+import {
+    path,
+    open fs,
+};
+
+verb fs_open_facade_current_directory() -> Result[path::Path, path::PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path::path_from_ascii(storage: dat raw);
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb opened_filesystem_facade_reports_directory_metadata() -> Int {
+    erg current = fs_open_facade_current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg inspected = metadata(path: abs path);
+            return case dat inspected {
+                Result.Err(_) => 2,
+                Result.Ok(metadata) => {
+                    if metadata.is_dir == 1 {
+                        return 0;
+                    }
+                    return 3;
+                },
+            };
+        },
+    };
+}

@@ -61,7 +61,10 @@ fn resolve_build_program(
     )
     .with_package_identity(configuration.package_identity(), configuration.source_root())
     .with_session(session.clone());
-    match build_compilation_plan(&program, &resolver) {
+    let plan =
+        crate::cli::input::reject_production_tests(configuration, Path::new(input), &program)
+            .and_then(|()| build_compilation_plan(&program, &resolver));
+    match plan {
         Ok(plan) => Some(plan),
         Err(error) => {
             let diagnostic = module_diagnostic(&error);

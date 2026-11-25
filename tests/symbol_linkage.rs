@@ -118,7 +118,7 @@ fn program_object_keeps_only_the_entry_global() {
 fn test_plans_link_private_verbs_across_objects() {
     let mut sources = linkage_sources();
     sources.push((
-        "../tests/pkg/api.act",
+        "pkg/tests/api.act",
         "meta test\nverb hidden_is_one() -> Int {\n    return hidden_value() - 1;\n}\n",
     ));
     let root = project("test-plan", &sources);

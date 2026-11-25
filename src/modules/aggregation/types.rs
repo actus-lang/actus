@@ -44,6 +44,15 @@ pub enum ModuleError {
         error: Box<ParseError>,
     },
     DuplicateDeclaration(Box<DuplicateDeclaration>),
+    /// A `meta test` verb in a production source file (ADR-0121).
+    /// `tests_directory` is where the module's tests belong; the root unit has
+    /// none.
+    TestVerbInProduction {
+        path: PathBuf,
+        span: SourceSpan,
+        verb: String,
+        tests_directory: Option<PathBuf>,
+    },
     SymbolCollision {
         symbol: String,
         first_module: String,
@@ -159,6 +168,7 @@ impl Display for ModuleError {
                 diagnostic.first.path.display(),
                 diagnostic.second.path.display()
             ),
+            Self::TestVerbInProduction { .. } => write_test_verb_in_production(formatter, self),
             Self::SymbolCollision { symbol, first_module, second_module } => write!(
                 formatter,
                 "native symbol `{symbol}` would collide between modules `{first_module}` and `{second_module}`"
@@ -203,6 +213,24 @@ impl ModuleError {
                 Self::Parse { path: path.to_owned(), error: Box::new(error) }
             }
         }
+    }
+}
+
+fn write_test_verb_in_production(
+    formatter: &mut Formatter<'_>,
+    error: &ModuleError,
+) -> std::fmt::Result {
+    let ModuleError::TestVerbInProduction { path, verb, tests_directory, .. } = error else {
+        unreachable!("test verb display received another module error")
+    };
+    write!(formatter, "`meta test` verb `{verb}` is in production source `{}`; ", path.display())?;
+    match tests_directory {
+        Some(directory) => write!(formatter, "move it to a file in `{}`", directory.display()),
+        None => write!(
+            formatter,
+            "the root unit has no tests directory: move its logic into a module and test it \
+             there, or test it from `tests/` through what it opens"
+        ),
     }
 }
 

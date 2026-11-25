@@ -4,6 +4,8 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use super::dispatcher::{TEST_ENTRY_ERROR_PREFIX, TEST_ENTRY_ERROR_STATUS, TEST_INDEX_ENVIRONMENT};
+
 const DEFAULT_TEST_PROCESS_TIMEOUT_SECONDS: u64 = 30;
 const TEST_PROCESS_TIMEOUT_ENV: &str = "ACTUS_TEST_TIMEOUT_SECONDS";
 const MAX_TEST_DIAGNOSTIC_BYTES: usize = 64 * 1024;
@@ -14,12 +16,21 @@ pub(super) enum TestProcessResult {
     Signaled { signal: Option<i32>, stderr: String },
 }
 
+/// Starts `executable` once in `working_directory`. `test_index` is the test a
+/// shared test executable runs (ADR-0121); `None` starts an executable that
+/// holds a single test and needs no selection.
 pub(super) fn run_test_process(
     executable: &Path,
     working_directory: &Path,
+    test_index: Option<usize>,
 ) -> Result<TestProcessResult, String> {
     let timeout = configured_test_process_timeout()?;
-    let mut child = Command::new(executable)
+    let mut command = Command::new(executable);
+    match test_index {
+        Some(index) => command.env(TEST_INDEX_ENVIRONMENT, index.to_string()),
+        None => command.env_remove(TEST_INDEX_ENVIRONMENT),
+    };
+    let mut child = command
         .current_dir(working_directory)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -37,7 +48,7 @@ pub(super) fn run_test_process(
             let stderr = stderr_reader
                 .join()
                 .map_err(|_| "test process stderr reader panicked".to_owned())??;
-            return Ok(process_result(status, stderr));
+            return reject_entry_failure(process_result(status, stderr));
         }
         if Instant::now() >= deadline {
             let _ = child.kill();
@@ -92,6 +103,20 @@ fn parse_test_process_timeout(value: Option<&str>) -> Result<Duration, String> {
     Ok(Duration::from_secs(seconds))
 }
 
+/// A generated entry that cannot run the requested test is an internal error
+/// of the runner, never a test result. The status alone is not enough: a test
+/// can return it, so the entry also writes a marker line to stderr.
+fn reject_entry_failure(result: TestProcessResult) -> Result<TestProcessResult, String> {
+    match result {
+        TestProcessResult::Exited { code: TEST_ENTRY_ERROR_STATUS, stderr }
+            if stderr.contains(TEST_ENTRY_ERROR_PREFIX) =>
+        {
+            Err(format!("internal error: {}", stderr.trim()))
+        }
+        other => Ok(other),
+    }
+}
+
 fn process_result(status: std::process::ExitStatus, stderr: String) -> TestProcessResult {
     if let Some(code) = status.code() {
         return TestProcessResult::Exited { code, stderr };
@@ -127,8 +152,35 @@ mod tests {
     use std::time::Duration;
 
     use super::{
-        DEFAULT_TEST_PROCESS_TIMEOUT_SECONDS, TEST_PROCESS_TIMEOUT_ENV, parse_test_process_timeout,
+        DEFAULT_TEST_PROCESS_TIMEOUT_SECONDS, TEST_ENTRY_ERROR_PREFIX, TEST_ENTRY_ERROR_STATUS,
+        TEST_PROCESS_TIMEOUT_ENV, TestProcessResult, parse_test_process_timeout,
+        reject_entry_failure,
     };
+
+    #[test]
+    fn entry_failure_is_an_internal_error_not_a_result() {
+        let stderr = format!("{TEST_ENTRY_ERROR_PREFIX}no test with index 9\n");
+        let result = reject_entry_failure(TestProcessResult::Exited {
+            code: TEST_ENTRY_ERROR_STATUS,
+            stderr,
+        });
+        assert!(result.is_err_and(|error| error.starts_with("internal error: ")));
+    }
+
+    #[test]
+    fn a_test_returning_the_entry_status_without_the_marker_is_a_result() {
+        let exited = TestProcessResult::Exited {
+            code: TEST_ENTRY_ERROR_STATUS,
+            stderr: "unrelated".to_owned(),
+        };
+        assert_eq!(
+            reject_entry_failure(exited),
+            Ok(TestProcessResult::Exited {
+                code: TEST_ENTRY_ERROR_STATUS,
+                stderr: "unrelated".to_owned(),
+            })
+        );
+    }
 
     #[test]
     fn default_timeout_is_thirty_seconds() {

@@ -2,157 +2,277 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::SharedSourceMap;
-use crate::ast::{MetaAttribute, Program, TestFault, TopLevelDecl};
+use crate::ast::{ImportDecl, MetaAttribute, Program, TestFault, TopLevelDecl};
 use crate::configuration::CompilerConfiguration;
 use crate::diagnostics::{module_diagnostic, render_diagnostic, semantic_diagnostic};
-use crate::lexer::TokenKind;
 use crate::modules::{
-    ModuleCompilationPlan, ModuleError, ModuleResolver, build_test_compilation_plan,
-    load_module_unit,
+    ModuleCompilationPlan, ModuleError, ModuleResolver, build_compilation_plan,
+    check_unique_declarations, load_module_unit, validate_plan_scopes,
 };
 use crate::semantic::filter_program_for_target_checked;
 use crate::session::{CompilationSession, FrontendError};
 
 use super::super::conformance::{ConformanceMode, validate_source_limits};
 use super::TestOptions;
+use super::layout::{TestDirectory, TestScope};
 
+/// One selected test. What it is compiled with is shared by its group.
 pub(super) struct DiscoveredTest {
     pub(super) path: PathBuf,
-    pub(super) source_map: SharedSourceMap,
     pub(super) module: String,
     pub(super) display_module: String,
     pub(super) relative_path: PathBuf,
     pub(super) name: String,
-    pub(super) program: Program,
-    pub(super) compilation_plan: Option<ModuleCompilationPlan>,
     pub(super) fault: Option<TestFault>,
 }
 
-pub(super) struct TestCollection {
+/// The selected tests of one test directory and the one program they are all
+/// compiled from (ADR-0121): the directory's namespace after target
+/// filtering, still holding every test verb of the directory.
+pub(super) struct TestGroup {
+    pub(super) label: String,
+    pub(super) source_map: SharedSourceMap,
+    pub(super) program: Program,
+    pub(super) compilation_plan: ModuleCompilationPlan,
+    /// The selected tests in program order. The position of a test in this
+    /// list is the index its executable is told to run.
     pub(super) tests: Vec<DiscoveredTest>,
+}
+
+pub(super) struct TestCollection {
+    pub(super) groups: Vec<TestGroup>,
+    /// Every selected test as `(group, position in group)`, in canonical
+    /// order: by file path, then by name.
+    pub(super) order: Vec<(usize, usize)>,
     pub(super) filtered: usize,
 }
 
-struct CollectedFile {
-    tests: Vec<DiscoveredTest>,
+impl TestCollection {
+    pub(super) fn test(&self, (group, position): (usize, usize)) -> &DiscoveredTest {
+        &self.groups[group].tests[position]
+    }
+}
+
+struct CollectedDirectory {
+    group: Option<TestGroup>,
     filtered: usize,
 }
 
-type ParsedTestSource = Option<(Program, Program, Option<ModuleCompilationPlan>, Vec<String>)>;
-
 pub(super) fn collect_tests(
-    files: Vec<PathBuf>,
+    directories: Vec<TestDirectory>,
     configuration: &CompilerConfiguration,
     options: &TestOptions,
+    session: &CompilationSession,
 ) -> Result<TestCollection, String> {
-    if files.is_empty() {
-        return Ok(TestCollection { tests: Vec::new(), filtered: 0 });
+    if directories.is_empty() {
+        return Ok(TestCollection { groups: Vec::new(), order: Vec::new(), filtered: 0 });
     }
     let worker_count =
-        std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(files.len());
-    let chunk_size = files.len().div_ceil(worker_count);
-    let chunks = files.chunks(chunk_size).map(|chunk| chunk.to_vec()).collect::<Vec<_>>();
+        std::thread::available_parallelism().map(usize::from).unwrap_or(1).min(directories.len());
+    let chunk_size = directories.len().div_ceil(worker_count);
     // One session for the complete test run (ADR-0109): every worker shares
     // source provenance and memoized parse results.
-    let session = CompilationSession::new();
     let results = std::thread::scope(|scope| {
-        chunks
-            .into_iter()
+        directories
+            .chunks(chunk_size)
             .map(|chunk| {
-                let configuration = configuration.clone();
-                let options = options.clone();
                 let session = session.clone();
-                scope.spawn(move || {
-                    let resolver = ModuleResolver::with_dependencies_and_runtime(
-                        configuration.source_root(),
-                        configuration.dependency_roots(),
-                        configuration.runtime_source_root(),
-                        configuration.runtime_module_roots(),
-                    )
-                    .with_session(session.clone());
-                    chunk
-                        .into_iter()
-                        .map(|path| {
-                            collect_file_tests(&path, &configuration, &options, &resolver, &session)
-                        })
-                        .collect::<Result<Vec<_>, _>>()
-                })
+                scope.spawn(move || collect_chunk(chunk, configuration, options, &session))
             })
             .collect::<Vec<_>>()
             .into_iter()
             .map(|handle| handle.join().expect("test collection worker panicked"))
             .collect::<Result<Vec<_>, _>>()
     })?;
-    let mut tests = Vec::new();
+    let mut groups = Vec::new();
     let mut filtered = 0;
-    for collected_files in results {
-        for collected in collected_files {
-            tests.extend(collected.tests);
-            filtered += collected.filtered;
-        }
+    for collected in results.into_iter().flatten() {
+        groups.extend(collected.group);
+        filtered += collected.filtered;
     }
-    tests.sort_by(|left, right| left.path.cmp(&right.path).then(left.name.cmp(&right.name)));
-    Ok(TestCollection { tests, filtered })
+    let mut order = (0..groups.len())
+        .flat_map(|group| (0..groups[group].tests.len()).map(move |position| (group, position)))
+        .collect::<Vec<_>>();
+    order.sort_by(|left, right| {
+        let (left, right) = (&groups[left.0].tests[left.1], &groups[right.0].tests[right.1]);
+        left.path.cmp(&right.path).then(left.name.cmp(&right.name))
+    });
+    Ok(TestCollection { groups, order, filtered })
 }
 
-fn collect_file_tests(
-    path: &Path,
+/// One collection worker: the directories of one chunk, in order.
+fn collect_chunk(
+    chunk: &[TestDirectory],
+    configuration: &CompilerConfiguration,
+    options: &TestOptions,
+    session: &CompilationSession,
+) -> Result<Vec<CollectedDirectory>, String> {
+    let resolver = ModuleResolver::with_dependencies_and_runtime(
+        configuration.source_root(),
+        configuration.dependency_roots(),
+        configuration.runtime_source_root(),
+        configuration.runtime_module_roots(),
+    )
+    .with_session(session.clone());
+    chunk
+        .iter()
+        .map(|directory| {
+            collect_directory_tests(directory, configuration, options, &resolver, session)
+        })
+        .collect()
+}
+
+/// One parsed file of a test directory.
+struct TestFile {
+    path: PathBuf,
+    relative_path: PathBuf,
+    program: Program,
+}
+
+/// Reads, validates and parses the files of one test directory.
+fn parse_directory_files(
+    directory: &TestDirectory,
+    configuration: &CompilerConfiguration,
+    options: &TestOptions,
+    session: &CompilationSession,
+) -> Result<Vec<TestFile>, String> {
+    let mut files = Vec::new();
+    for path in &directory.files {
+        let source = fs::read_to_string(path)
+            .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
+        validate_source(path, &source, options.mode, configuration)?;
+        let program = session.parse(path, &source).program().map_err(|error| match error {
+            FrontendError::Lex(_) => format!("cannot lex `{}`", path.display()),
+            FrontendError::Parse(error) => parse_source_error(path, session.source_map(), error),
+        })?;
+        let relative_path =
+            path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
+        files.push(TestFile { path: path.clone(), relative_path, program });
+    }
+    Ok(files)
+}
+
+/// Compiles every file of one test directory together as one namespace and
+/// returns the selected tests of its files.
+fn collect_directory_tests(
+    directory: &TestDirectory,
     configuration: &CompilerConfiguration,
     options: &TestOptions,
     resolver: &ModuleResolver,
     session: &CompilationSession,
-) -> Result<CollectedFile, String> {
-    let source = fs::read_to_string(path)
-        .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
+) -> Result<CollectedDirectory, String> {
     let source_map = session.source_map().clone();
-    if options.mirror && path.starts_with(configuration.project_root().join("tests")) {
-        validate_test_mirror(path, configuration)?;
-    }
-    validate_source(path, &source, options.mode, configuration)?;
-    let Some((_source_program, program, compilation_plan, test_names)) = parse_source(
-        path,
-        &source,
-        session,
-        resolver,
-        configuration.source_root(),
-        configuration.project_root(),
-        options,
-    )?
-    else {
-        return Ok(CollectedFile { tests: Vec::new(), filtered: 0 });
+    let files = parse_directory_files(directory, configuration, options, session)?;
+    let label = match &directory.scope {
+        TestScope::Module(module) => module.as_str(),
+        TestScope::Project => "tests",
     };
+    let selected = files.iter().any(|file| {
+        test_names(&file.program)
+            .iter()
+            .any(|name| raw_test_matches(name, label, &file.relative_path, options))
+    });
+    if !selected {
+        return Ok(CollectedDirectory { group: None, filtered: 0 });
+    }
+    let (program, plan) = compile_directory(directory, &files, resolver, &source_map)?;
     let declared = test_count(&program);
     let program =
         filter_program_for_target_checked(&program, configuration.target()).map_err(|error| {
-            localized_test_diagnostic(path, "", &source_map, semantic_diagnostic(&error))
+            localized_test_diagnostic(&files[0].path, "", &source_map, semantic_diagnostic(&error))
         })?;
     let filtered = declared.saturating_sub(test_count(&program));
     if let Err(error) = crate::semantic::analyze_resolved(&program) {
         let diagnostic = semantic_diagnostic(&error);
-        return Err(localized_test_diagnostic(path, &source, &source_map, diagnostic));
+        return Err(localized_test_diagnostic(&files[0].path, "", &source_map, diagnostic));
     }
-    let module =
-        module_path_for_test(path, configuration.source_root(), configuration.project_root());
-    let relative_path =
-        path.strip_prefix(configuration.project_root()).unwrap_or(path).to_path_buf();
-    let discovered = discover_tests(
-        path,
-        &module,
-        &relative_path,
-        program,
-        compilation_plan,
-        &test_names,
+    let discovered = discover_tests(label, &files, &program);
+    let discovered_count = discovered.len();
+    let tests =
+        discovered.into_iter().filter(|test| test_matches(test, options)).collect::<Vec<_>>();
+    let filtered = filtered + discovered_count - tests.len();
+    let group = (!tests.is_empty()).then(|| TestGroup {
+        label: label.to_owned(),
         source_map,
-    );
-    let selected = discovered.iter().filter(|test| test_matches(test, options)).count();
-    let selection_filtered = discovered.len().saturating_sub(selected);
-    Ok(CollectedFile {
-        tests: discovered.into_iter().filter(|test| test_matches(test, options)).collect(),
-        filtered: filtered + selection_filtered,
-    })
+        program,
+        compilation_plan: plan,
+        tests,
+    });
+    Ok(CollectedDirectory { group, filtered })
 }
 
-fn localized_test_diagnostic(
+/// Merges the files of a test directory into the program they are compiled
+/// as. A module's test files are compiled as sibling files of the module, so
+/// they see its private declarations and are held to the module's scope rules
+/// (ADR-0110); a project's test files form one root program. In both cases
+/// imports are checked as for any importer.
+fn compile_directory(
+    directory: &TestDirectory,
+    files: &[TestFile],
+    resolver: &ModuleResolver,
+    source_map: &SharedSourceMap,
+) -> Result<(Program, ModuleCompilationPlan), String> {
+    let first = &files[0].path;
+    let fail = |error: ModuleError| module_source_error(first, "", source_map, error);
+    let program = match &directory.scope {
+        TestScope::Module(module_path) => {
+            let paths = files.iter().map(|file| file.path.clone()).collect();
+            let resolver = resolver.clone().with_module_tests(module_path, paths);
+            let unit = load_module_unit(&resolver, module_path)
+                .map_err(|error| format!("cannot load module `{module_path}`: {}", fail(error)))?;
+            validate_plan_scopes(std::slice::from_ref(&unit)).map_err(fail)?;
+            let mut program = unit.implementation().clone();
+            remove_internal_module_imports(&mut program, module_path);
+            let plan = build_compilation_plan(&program, &resolver).map_err(fail)?;
+            return Ok((plan.caller().clone(), plan));
+        }
+        TestScope::Project => {
+            let named = files.iter().map(|file| (file.path.as_path(), &file.program));
+            check_unique_declarations(&named.collect::<Vec<_>>()).map_err(fail)?;
+            merge_project_programs(files)
+        }
+    };
+    let plan = build_compilation_plan(&program, resolver).map_err(fail)?;
+    Ok((plan.caller().clone(), plan))
+}
+
+/// The root program of the project tests: every declaration of every file.
+/// Files of one directory share one namespace, so an import of the same module
+/// in several files is one import, `open` when any of them is.
+fn merge_project_programs(files: &[TestFile]) -> Program {
+    let mut declarations: Vec<TopLevelDecl> = Vec::new();
+    for declaration in files.iter().flat_map(|file| &file.program.declarations) {
+        let TopLevelDecl::Import(import) = declaration else {
+            declarations.push(declaration.clone());
+            continue;
+        };
+        let binding = |import: &ImportDecl| {
+            import.alias.clone().or_else(|| import.path.rsplit("::").next().map(str::to_owned))
+        };
+        let existing = declarations.iter_mut().find_map(|candidate| match candidate {
+            TopLevelDecl::Import(other)
+                if other.path == import.path && binding(other) == binding(import) =>
+            {
+                Some(other)
+            }
+            _ => None,
+        });
+        match existing {
+            Some(other) => {
+                other.is_open |= import.is_open;
+                for name in &import.selected {
+                    if !other.selected.contains(name) {
+                        other.selected.push(name.clone());
+                    }
+                }
+            }
+            None => declarations.push(declaration.clone()),
+        }
+    }
+    Program { file_metadata: Vec::new(), declarations }
+}
+
+pub(super) fn localized_test_diagnostic(
     fallback_path: &Path,
     fallback_source: &str,
     source_map: &SharedSourceMap,
@@ -173,34 +293,6 @@ fn localized_test_diagnostic(
         })
 }
 
-fn validate_test_mirror(path: &Path, configuration: &CompilerConfiguration) -> Result<(), String> {
-    let tests_root = configuration.project_root().join("tests");
-    let relative = path
-        .strip_prefix(&tests_root)
-        .map_err(|_| format!("test file `{}` is outside the tests directory", path.display()))?;
-    if !is_nested_test_path(relative) {
-        return Ok(());
-    }
-    let candidate = configuration.source_root().join(relative);
-    if candidate.is_file() {
-        return Ok(());
-    }
-    let Some(stem) = candidate.file_stem().and_then(|value| value.to_str()) else {
-        return Err(format!("test file `{}` has no source mirror", path.display()));
-    };
-    let facade = candidate.with_file_name(stem).join(format!("{stem}.act"));
-    if facade.is_file() {
-        Ok(())
-    } else {
-        Err(format!(
-            "test file `{}` has no source mirror; expected `{}` or `{}`",
-            path.display(),
-            candidate.display(),
-            facade.display()
-        ))
-    }
-}
-
 fn validate_source(
     path: &Path,
     source: &str,
@@ -212,58 +304,6 @@ fn validate_source(
     } else {
         Err(format!("strict source-limit validation failed for `{}`", path.display()))
     }
-}
-
-fn parse_source(
-    path: &Path,
-    source: &str,
-    session: &CompilationSession,
-    resolver: &ModuleResolver,
-    source_root: &Path,
-    project_root: &Path,
-    options: &TestOptions,
-) -> Result<ParsedTestSource, String> {
-    let source_map = session.source_map();
-    let parsed = session.parse(path, source);
-    if !parsed.tokens().iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
-        return Ok(None);
-    }
-    let source_program = parsed.program().map_err(|error| match error {
-        FrontendError::Lex(_) => format!("cannot lex `{}`", path.display()),
-        FrontendError::Parse(error) => parse_source_error(path, source_map, error),
-    })?;
-    let test_names = test_names(&source_program);
-    if test_names.is_empty() {
-        return Ok(None);
-    }
-    let module_path = module_path_for_test(path, source_root, project_root);
-    let module = if module_path.is_empty() { "<root>" } else { &module_path };
-    let relative_path = path.strip_prefix(project_root).unwrap_or(path);
-    if !test_names.iter().any(|name| raw_test_matches(name, module, relative_path, options)) {
-        return Ok(None);
-    }
-    let compilation_source = (!module_path.is_empty())
-        .then_some(module_path.as_str())
-        .map(|module_path| {
-            // The loaded unit binds imports of its own modules (ADR-0110).
-            load_module_unit(resolver, module_path)
-                .map(|unit| unit.implementation().clone())
-                .map_err(|error| format!("cannot load module `{module_path}`: {error}"))
-        })
-        .transpose()?
-        .map(|mut program| {
-            if !path.starts_with(source_root) {
-                append_mirrored_test_declarations(&mut program, &source_program, &module_path);
-            }
-            remove_internal_module_imports(&mut program, &module_path);
-            program
-        })
-        .unwrap_or_else(|| source_program.clone());
-    let resolved = build_test_compilation_plan(&compilation_source, resolver)
-        .map(|plan| (plan.caller().clone(), Some(plan)));
-    resolved
-        .map(|(program, plan)| Some((compilation_source, program, plan, test_names)))
-        .map_err(|error| module_source_error(path, source, source_map, error))
 }
 
 fn parse_source_error(
@@ -295,24 +335,6 @@ fn module_source_error(
     )
 }
 
-fn append_mirrored_test_declarations(
-    module_program: &mut Program,
-    test_program: &Program,
-    module_path: &str,
-) {
-    module_program.declarations.extend(
-        test_program
-            .declarations
-            .iter()
-            .filter(|declaration| match declaration {
-                TopLevelDecl::Import(import) => import.path != module_path,
-                TopLevelDecl::OpenSibling(_) => false,
-                _ => true,
-            })
-            .cloned(),
-    );
-}
-
 fn remove_internal_module_imports(program: &mut Program, module_path: &str) {
     program.declarations.retain(|declaration| {
         let TopLevelDecl::Import(import) = declaration else { return true };
@@ -324,109 +346,35 @@ fn is_internal_module_path(import_path: &str, module_path: &str) -> bool {
     import_path == module_path || module_path.starts_with(&format!("{import_path}::"))
 }
 
-fn module_path_for_test(path: &Path, source_root: &Path, project_root: &Path) -> String {
-    let source_path = if path.starts_with(source_root) {
-        Some(path.to_path_buf())
-    } else {
-        let relative = path.strip_prefix(project_root.join("tests")).ok();
-        relative.and_then(|relative| {
-            if !is_nested_test_path(relative) {
-                return None;
-            }
-            let candidate = source_root.join(relative);
-            candidate.is_file().then_some(candidate.clone()).or_else(|| {
-                let stem = candidate.file_stem()?.to_str()?;
-                let facade = candidate.with_file_name(stem).join(format!("{stem}.act"));
-                facade.is_file().then_some(facade)
-            })
-        })
-    };
-    let Some(source_path) = source_path else { return String::new() };
-    module_source(&source_path, source_root).unwrap_or_default()
-}
-
-fn is_nested_test_path(path: &Path) -> bool {
-    path.parent().is_some_and(|parent| !parent.as_os_str().is_empty())
-}
-
-fn module_source(path: &Path, source_root: &Path) -> Option<String> {
-    let mut directory = path.parent()?.to_owned();
-    let mut segments = Vec::new();
-    while directory.starts_with(source_root) && directory != source_root {
-        let module_name = directory.file_name()?.to_str()?.to_owned();
-        if !directory.join(format!("{module_name}.act")).is_file() {
-            break;
-        }
-        segments.push(module_name);
-        directory = directory.parent()?.to_owned();
-    }
-    if segments.is_empty() {
-        None
-    } else {
-        segments.reverse();
-        Some(segments.join("::"))
-    }
-}
-
-fn discover_tests(
-    path: &Path,
-    module: &str,
-    relative_path: &Path,
-    program: Program,
-    compilation_plan: Option<ModuleCompilationPlan>,
-    names: &[String],
-    source_map: SharedSourceMap,
-) -> Vec<DiscoveredTest> {
+/// The tests of a directory: its files' `meta test` verbs, named
+/// `<module path>::<verb>` or `tests::<verb>`.
+fn discover_tests(label: &str, files: &[TestFile], program: &Program) -> Vec<DiscoveredTest> {
+    let declared = files
+        .iter()
+        .flat_map(|file| test_names(&file.program).into_iter().map(move |name| (name, file)))
+        .collect::<Vec<_>>();
     program
         .declarations
         .iter()
-        .filter_map(|declaration| match declaration {
-            TopLevelDecl::Verb(verb)
-                if names.contains(&verb.name) && verb.metadata.contains(&MetaAttribute::Test) =>
-            {
-                Some(DiscoveredTest {
-                    path: path.to_path_buf(),
-                    source_map: source_map.clone(),
-                    module: if module.is_empty() { "<root>".to_owned() } else { module.to_owned() },
-                    display_module: display_module(module, relative_path),
-                    relative_path: relative_path.to_path_buf(),
-                    name: verb.name.clone(),
-                    program: program.clone(),
-                    compilation_plan: compilation_plan.clone(),
-                    fault: verb.metadata.iter().find_map(|attribute| match attribute {
-                        MetaAttribute::Fault(fault) => Some(*fault),
-                        _ => None,
-                    }),
-                })
+        .filter_map(|declaration| {
+            let TopLevelDecl::Verb(verb) = declaration else { return None };
+            if !verb.metadata.contains(&MetaAttribute::Test) {
+                return None;
             }
-            _ => None,
+            let (_, file) = declared.iter().find(|(name, _)| *name == verb.name)?;
+            Some(DiscoveredTest {
+                path: file.path.clone(),
+                module: label.to_owned(),
+                display_module: label.to_owned(),
+                relative_path: file.relative_path.clone(),
+                name: verb.name.clone(),
+                fault: verb.metadata.iter().find_map(|attribute| match attribute {
+                    MetaAttribute::Fault(fault) => Some(*fault),
+                    _ => None,
+                }),
+            })
         })
         .collect()
-}
-
-fn display_module(module: &str, relative_path: &Path) -> String {
-    if !module.is_empty() {
-        return module.to_owned();
-    }
-    let mut parts = relative_path
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    if let Some(last) = parts.last_mut()
-        && let Some((stem, _)) = last.rsplit_once('.')
-    {
-        *last = stem.to_owned();
-    }
-    parts
-        .into_iter()
-        .map(|part| {
-            part.chars()
-                .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
-                .collect::<String>()
-        })
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("::")
 }
 
 fn test_matches(test: &DiscoveredTest, options: &TestOptions) -> bool {
@@ -470,22 +418,4 @@ fn test_count(program: &Program) -> usize {
             matches!(declaration, TopLevelDecl::Verb(verb) if verb.metadata.contains(&MetaAttribute::Test))
         })
         .count()
-}
-
-pub(super) fn collect_act_files(directory: &Path, paths: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(directory) else { return };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            if !is_excluded_directory(&path) {
-                collect_act_files(&path, paths);
-            }
-        } else if path.extension().is_some_and(|extension| extension == "act") {
-            paths.push(path);
-        }
-    }
-}
-
-fn is_excluded_directory(path: &Path) -> bool {
-    path.file_name().is_some_and(|name| matches!(name.to_str(), Some("fixtures" | "snapshots")))
 }

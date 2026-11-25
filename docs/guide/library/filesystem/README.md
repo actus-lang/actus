@@ -66,6 +66,7 @@ uses them for one call and does not retain or copy them as part of a `File`.
 - [API](api.md) documents the public facade, not private C ABI bridges.
 - The implementation is in
   [`library/std/src/fs/`](../../../../library/std/src/fs/).
-- Contract fixtures are in
-  [`tests/library/`](../../../../tests/library/), including `fs_contracts.act`,
-  `fs_handles.act`, `fs_errors.act`, and `fs_create_new.act`.
+- Contract fixtures are the standard library's project tests in
+  [`library/std/tests/`](../../../../library/std/tests/), including
+  `fs_contracts.act`, `fs_handles.act`, `fs_errors.act`, and `fs_create_new.act`.
+  Run them with `actus test` in `library/std`.

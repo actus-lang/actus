@@ -53,6 +53,42 @@ fn import_binding(import: &ImportDecl) -> String {
         .unwrap_or_else(|| import.path.clone())
 }
 
+/// Rejects declarations that share a name across the given files, naming both
+/// files (E1106). Production sources come first, so a test file that redeclares
+/// a module name is the second location.
+pub fn check_unique_declarations(files: &[(&Path, &Program)]) -> Result<(), ModuleError> {
+    let mut locations = HashMap::new();
+    for (path, program) in files {
+        for declaration in &program.declarations {
+            check_declaration_name(declaration, path, &mut locations)?;
+        }
+    }
+    Ok(())
+}
+
+/// Rejects a `meta test` verb in a production source file (ADR-0121).
+/// `tests_directory` is the `tests` directory of the module that owns the
+/// file, or `None` for the root unit.
+pub fn reject_test_verbs(
+    path: &Path,
+    program: &Program,
+    tests_directory: Option<&Path>,
+) -> Result<(), ModuleError> {
+    let test = program.declarations.iter().find_map(|declaration| match declaration {
+        TopLevelDecl::Verb(verb) if verb.metadata.contains(&MetaAttribute::Test) => Some(verb),
+        _ => None,
+    });
+    match test {
+        Some(verb) => Err(ModuleError::TestVerbInProduction {
+            path: path.to_owned(),
+            span: verb.span,
+            verb: verb.name.clone(),
+            tests_directory: tests_directory.map(Path::to_owned),
+        }),
+        None => Ok(()),
+    }
+}
+
 pub(super) fn check_declaration_name(
     declaration: &TopLevelDecl,
     path: &Path,

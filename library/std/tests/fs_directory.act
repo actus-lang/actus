@@ -1,0 +1,389 @@
+"""Minimal hosted directory enumeration contract tests."""
+import {
+    open fs,
+    open io,
+    open path,
+};
+
+verb fs_directory_current_directory() -> Result[Path, PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 46u8);
+    append(raw, 0u8);
+    return path_from_ascii(storage: dat raw);
+}
+
+meta effect("filesystem", "blocking")
+verb close_directory_entry(
+    ins directory: Directory,
+    dat value: Option[DirectoryEntry]
+) -> Int {
+    erg entry_code = case dat value {
+        Option.None => 5,
+        Option.Some(entry) => case entry.name.length {
+            0 => 6,
+            _ => 0,
+        },
+    };
+    erg closed = close_dir(directory: ins directory);
+    return case dat closed {
+        Result.Err(_) => 4,
+        Result.Ok(_) => entry_code,
+    };
+}
+
+"""Create a one-byte regular file named by one ASCII byte in the working directory."""
+meta effect("filesystem", "blocking")
+verb create_marker_file(erg name: u8) -> Int {
+    erg raw: Buffer = Buffer[0];
+    append(raw, name);
+    append(raw, 0u8);
+    erg made = path_from_ascii(storage: dat raw);
+    return case dat made {
+        Result.Err(_) => 1,
+        Result.Ok(target) => {
+            erg payload: Buffer = Buffer[0];
+            append(payload, 120u8);
+            erg written = write_file(path: abs target, contents: abs payload);
+            drop(target);
+            drop(payload);
+            return case dat written {
+                Result.Ok(_) => 0,
+                Result.Err(_) => 7,
+            };
+        },
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb directory_iteration_returns_entry_and_closes() -> Int {
+    erg letter: u8 = 97u8;
+    erg created = create_marker_file(name: erg letter);
+    if created != 0 {
+        return created + 20;
+    }
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    erg entry = next_dir_entry(directory: ins directory);
+                    return case dat entry {
+                        Result.Err(_) => 3,
+                        Result.Ok(value) => close_directory_entry(
+                            directory: ins directory,
+                            value: dat value
+                        ),
+                    };
+                },
+            };
+        },
+    };
+}
+
+"""
+Return the first byte of the next entry name, `-1` at the end of the
+directory and `-2` when iteration fails.
+"""
+meta effect("filesystem", "blocking")
+verb next_first_name_byte(ins directory: Directory) -> Int {
+    erg entry = next_dir_entry(directory: ins directory);
+    return case dat entry {
+        Result.Err(_) => -2,
+        Result.Ok(value) => case dat value {
+            Option.None => -1,
+            Option.Some(found) => {
+                erg first: u8 = found.name.storage[0];
+                drop(found);
+                first as Int;
+            },
+        },
+    };
+}
+
+meta effect("filesystem", "blocking")
+verb verify_filtered_directory(ins directory: Directory) -> Int {
+    erg first = next_first_name_byte(directory: ins directory);
+    erg second = next_first_name_byte(directory: ins directory);
+    erg third = next_first_name_byte(directory: ins directory);
+    erg end = next_first_name_byte(directory: ins directory);
+    erg closed = close_dir(directory: ins directory);
+    return case dat closed {
+        Result.Err(_) => 5,
+        Result.Ok(_) => {
+            if first != 97 { return 10; }
+            if second != 98 { return 11; }
+            if third != 99 { return 12; }
+            if end != -1 { return 13; }
+            0;
+        },
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb lexicographic_directory_iteration_is_bounded() -> Int {
+    erg names = Buffer[0];
+    append(names, 99u8);
+    append(names, 97u8);
+    append(names, 98u8);
+    erg index: Int = 0;
+    loop {
+        if index >= 3 { break; }
+        erg letter: u8 = names[index];
+        erg created = create_marker_file(name: erg letter);
+        if created != 0 {
+            return created + 20;
+        }
+        index += 1;
+    }
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg filter = DirectoryFilter {
+                regular_files_only: true,
+                include_directories: false,
+                include_symlinks: false,
+                include_hidden: false,
+                extension: Option[Path].None,
+            };
+            erg selected_order = DirectoryOrder.Lexicographic;
+            erg opened = read_dir_filtered(
+                path: abs path,
+                order: erg selected_order,
+                filter: dat filter
+            );
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => verify_filtered_directory(directory: ins directory),
+            };
+        },
+    };
+}
+
+verb missing_directory_path() -> Result[Path, PathError] {
+    erg raw: Buffer = Buffer[0];
+    append(raw, 47u8);
+    append(raw, 120u8);
+    append(raw, 121u8);
+    append(raw, 0u8);
+    return path_from_posix(storage: dat raw);
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb directory_iteration_rejects_missing_directory() -> Int {
+    erg path = missing_directory_path();
+    return case dat path {
+        Result.Err(_) => 1,
+        Result.Ok(value) => {
+            erg opened = read_dir(path: abs value);
+            return case dat opened {
+                Result.Err(_) => 0,
+                Result.Ok(directory) => {
+                    close_dir(directory: ins directory);
+                    2;
+                },
+            };
+        },
+    };
+}
+
+meta effect("filesystem", "blocking")
+verb verify_repeated_eof(ins directory: Directory) -> Int {
+    erg repeated = next_dir_entry(directory: ins directory);
+    return case dat repeated {
+        Result.Err(_) => {
+            close_dir(directory: ins directory);
+            1;
+        },
+        Result.Ok(second) => case dat second {
+            Option.None => {
+                erg closed = close_dir(directory: ins directory);
+                return case dat closed {
+                    Result.Ok(_) => 0,
+                    Result.Err(_) => 2,
+                };
+            },
+            Option.Some(entry) => {
+                drop(entry);
+                close_dir(directory: ins directory);
+                3;
+            },
+        },
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb repeated_directory_eof_remains_clean() -> Int {
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    for erg attempt: u32 in 0u32..4096u32 {
+                        erg entry = next_dir_entry(directory: ins directory);
+                        case dat entry {
+                            Result.Err(_) => {
+                                close_dir(directory: ins directory);
+                                return 3;
+                            },
+                            Result.Ok(value) => case dat value {
+                                Option.Some(item) => {
+                                    drop(item);
+                                },
+                                Option.None => {
+                                    return verify_repeated_eof(directory: ins directory);
+                                },
+                            },
+                        };
+                    }
+                    close_dir(directory: ins directory);
+                    7;
+                },
+            };
+        },
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb closed_directory_rejects_reuse() -> Int {
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    erg closed = close_dir(directory: ins directory);
+                    return case dat closed {
+                        Result.Err(_) => 3,
+                        Result.Ok(_) => {
+                            erg next = next_dir_entry(directory: ins directory);
+                            case dat next {
+                                Result.Ok(value) => {
+                                    case dat value {
+                                        Option.Some(entry) => {
+                                            drop(entry);
+                                        },
+                                        Option.None => {},
+                                    };
+                                    return 4;
+                                },
+                                Result.Err(_) => {},
+                            };
+                            erg closed_again = close_dir(directory: ins directory);
+                            return case dat closed_again {
+                                Result.Err(_) => 0,
+                                Result.Ok(_) => 5,
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta effect("filesystem", "blocking")
+verb open_directory_then_return_early() -> Int {
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(_) => 0,
+            };
+        },
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb directory_drop_closes_on_early_return() -> Int {
+    erg early = open_directory_then_return_early();
+    if early != 0 {
+        return early;
+    }
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => 3,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 4,
+                Result.Ok(directory) => {
+                    erg closed = close_dir(directory: ins directory);
+                    case dat closed {
+                        Result.Ok(_) => 0,
+                        Result.Err(_) => 5,
+                    };
+                },
+            };
+        },
+    };
+}
+
+meta effect("filesystem", "blocking")
+verb open_directory_then_break() -> Int {
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => 1,
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(_) => 2,
+                Result.Ok(directory) => {
+                    loop {
+                        break;
+                    }
+                    0;
+                },
+            };
+        },
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb directory_drop_closes_after_loop_exit() -> Int {
+    erg result = open_directory_then_break();
+    return result;
+}
+
+meta effect("filesystem", "blocking")
+verb open_directory_then_error() -> Result[Int, io::IoError] {
+    erg current = fs_directory_current_directory();
+    return case dat current {
+        Result.Err(_) => Err(io::IoError.InvalidInput),
+        Result.Ok(path) => {
+            erg opened = read_dir(path: abs path);
+            return case dat opened {
+                Result.Err(error) => Err(error),
+                Result.Ok(_) => Err(io::IoError.Failed),
+            };
+        },
+    };
+}
+
+meta test
+meta effect("filesystem", "blocking")
+verb directory_drop_closes_on_typed_error() -> Int {
+    erg result = open_directory_then_error();
+    return case dat result {
+        Result.Err(_) => 0,
+        Result.Ok(_) => 1,
+    };
+}

@@ -5,7 +5,7 @@ use crate::diagnostics::{Diagnostic, DiagnosticPhase, STRICT_ACTUS_FIXTURE_RUST_
 
 /// Finds Rust implementation files embedded in the Actus fixture tree.
 pub fn fixture_tree_diagnostics(root: &Path) -> io::Result<Vec<Diagnostic>> {
-    let fixture_root = root.join("tests/library");
+    let fixture_root = root.join("library/std/tests");
     let mut paths = Vec::new();
     collect_files(&fixture_root, &mut paths)?;
     Ok(paths
@@ -15,14 +15,14 @@ pub fn fixture_tree_diagnostics(root: &Path) -> io::Result<Vec<Diagnostic>> {
             Diagnostic::error(
                 STRICT_ACTUS_FIXTURE_RUST_SOURCE,
                 crate::lexer::SourceSpan::new(0, 0),
-                "Rust source is forbidden in `tests/library/` fixtures",
+                "Rust source is forbidden in `library/std/tests/` fixtures",
             )
             .with_source_path(path.display().to_string())
             .with_phase(DiagnosticPhase::Conformance)
             .with_explanation(
                 "Standard-library fixture behavior must be expressed as Actus source; Rust test logic belongs under `tests/`.",
             )
-            .with_suggestion("Move Rust integration logic outside `tests/library/` and keep the fixture in Actus." )
+            .with_suggestion("Move Rust integration logic outside `library/std/tests/` and keep the fixture in Actus." )
         })
         .collect())
 }

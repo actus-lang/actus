@@ -11,10 +11,12 @@ pub use aggregation::{
     ScopeViolation, analyze_module, analyze_module_unit, analyze_module_with_overlays,
     analyze_module_with_overlays_for_target, analyze_with_imports, analyze_with_imports_for_target,
     analyze_with_imports_with_overlays_for_target, build_compilation_plan,
-    build_compilation_plan_with_overlays, build_test_compilation_plan, exports_module,
-    exports_module_with_overlays, load_module_unit, load_module_unit_with_overlays, parse_module,
-    resolve_imports,
+    build_compilation_plan_with_overlays, build_test_compilation_plan, check_unique_declarations,
+    exports_module, exports_module_with_overlays, load_module_unit, load_module_unit_with_overlays,
+    parse_module, reject_test_verbs, resolve_imports,
 };
-pub(crate) use aggregation::{program_with_performance_context, validate_compilation_plan};
+pub(crate) use aggregation::{
+    program_with_performance_context, validate_compilation_plan, validate_plan_scopes,
+};
 pub use package_sources::{PackageRole, PackageSourceIdentity};
 pub use resolver::{ModuleResolutionError, ModuleResolver, ResolvedChildModule, ResolvedModule};
