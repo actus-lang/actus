@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -17,14 +18,14 @@ pub(super) fn fmt_command(arguments: impl Iterator<Item = String>) -> i32 {
                 input = Some(PathBuf::from(argument));
             }
             _ => {
-                eprintln!("error: {}", super::input::argument_error("fmt", &argument));
+                errln!("error: {}", super::input::argument_error("fmt", &argument));
                 return 2;
             }
         }
     }
     let paths = input.map_or_else(project_sources, |path| vec![path]);
     if paths.is_empty() {
-        eprintln!("error: no Actus source files found");
+        errln!("error: no Actus source files found");
         return 1;
     }
     let project_wide = paths.len() > 1;
@@ -38,7 +39,7 @@ pub(super) fn fmt_command(arguments: impl Iterator<Item = String>) -> i32 {
     }
     if project_wide && !check_only && code == 0 {
         let files = if written == 1 { "file" } else { "files" };
-        println!("formatted {written} {files}, {unchanged} already formatted");
+        outln!("formatted {written} {files}, {unchanged} already formatted");
     }
     code
 }
@@ -47,7 +48,7 @@ fn project_sources() -> Vec<PathBuf> {
     let configuration = match CompilerConfiguration::from_current_manifest() {
         Ok(configuration) => configuration,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return Vec::new();
         }
     };
@@ -82,7 +83,7 @@ fn format_file(path: &Path, check_only: bool) -> (i32, bool) {
     let Some(source) = read_format_source(path) else { return (1, false) };
     let (tokens, lex_errors) = scan(&source);
     if let Some(error) = lex_errors.first() {
-        eprintln!("{display}: {}", render_lex_error(&source, error));
+        errln!("{display}: {}", render_lex_error(&source, error));
         return (1, false);
     }
     let comments = source_comments(&source, &tokens);
@@ -94,7 +95,7 @@ fn read_format_source(path: &Path) -> Option<String> {
     match fs::read_to_string(path) {
         Ok(source) => Some(source),
         Err(error) => {
-            eprintln!("error: cannot read `{}`: {error}", path.display());
+            errln!("error: cannot read `{}`: {error}", path.display());
             None
         }
     }
@@ -108,7 +109,7 @@ fn parse_format_source(
     match parse(tokens) {
         Ok(program) => Some(program),
         Err(error) => {
-            eprintln!("{}: {}", path.display(), render_parse_error(source, &error));
+            errln!("{}: {}", path.display(), render_parse_error(source, &error));
             None
         }
     }
@@ -125,23 +126,23 @@ fn format_program_source(
     let formatted = format_program_with_comments(program, comments);
     if check_only {
         if formatted == source {
-            println!("{display} is formatted");
+            outln!("{display} is formatted");
             (0, false)
         } else {
-            eprintln!("{display} is not formatted");
+            errln!("{display} is not formatted");
             (1, false)
         }
     } else if formatted == source {
-        println!("`{display}` is already formatted");
+        outln!("`{display}` is already formatted");
         (0, false)
     } else {
         match fs::write(path, formatted) {
             Ok(()) => {
-                println!("formatted `{display}`");
+                outln!("formatted `{display}`");
                 (0, true)
             }
             Err(error) => {
-                eprintln!("error: cannot write `{display}`: {error}");
+                errln!("error: cannot write `{display}`: {error}");
                 (1, false)
             }
         }

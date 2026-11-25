@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -35,14 +36,14 @@ pub(super) fn conformance_command(arguments: impl Iterator<Item = String>) -> i3
     let mode = match parse_conformance_mode(arguments) {
         Ok(mode) => mode,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     let paths = match conformance_paths() {
         Ok(paths) => paths,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
@@ -50,19 +51,19 @@ pub(super) fn conformance_command(arguments: impl Iterator<Item = String>) -> i3
         let root = match env::current_dir() {
             Ok(root) => root,
             Err(error) => {
-                eprintln!("error: cannot determine repository root: {error}");
+                errln!("error: cannot determine repository root: {error}");
                 return 1;
             }
         };
         if let Err(error) = crate::conformance::validate_repository_source_exceptions(&root) {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     }
     let configuration = match crate::configuration::CompilerConfiguration::from_current_manifest() {
         Ok(configuration) => configuration,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
@@ -72,11 +73,11 @@ pub(super) fn conformance_command(arguments: impl Iterator<Item = String>) -> i3
     {
         Ok(counts) => counts,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
-    println!(
+    outln!(
         "conformance: scanned {} source files; {} diagnostics; {} accepted limitless scopes{}",
         paths.len(),
         diagnostics_count,

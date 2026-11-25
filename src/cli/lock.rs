@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use std::fs;
 use std::path::Path;
 
@@ -7,12 +8,12 @@ pub(super) fn lock_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let check_only = match parse_options(&mut arguments) {
         Ok(check_only) => check_only,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     let Some(manifest) = crate::configuration::manifest_path_in_directory(Path::new(".")) else {
-        eprintln!("error: cannot find `Actus.toml` in the current project");
+        errln!("error: cannot find `Actus.toml` in the current project");
         return 1;
     };
     if check_only {
@@ -20,7 +21,7 @@ pub(super) fn lock_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     }
     match ActusLock::sync(&manifest) {
         Ok(path) => {
-            println!("updated `{}`", path.display());
+            outln!("updated `{}`", path.display());
             0
         }
         Err(error) => report_lock_error(error),
@@ -46,13 +47,13 @@ fn check_lockfile(manifest: &Path) -> i32 {
     let source = match fs::read_to_string(&path) {
         Ok(source) => source,
         Err(error) => {
-            eprintln!("error: cannot read `{}`: {error}", path.display());
+            errln!("error: cannot read `{}`: {error}", path.display());
             return 1;
         }
     };
     match ActusLock::parse(&source).and_then(|lock| lock.validate_against_manifest(manifest)) {
         Ok(()) => {
-            println!("checked `{}` successfully", path.display());
+            outln!("checked `{}` successfully", path.display());
             0
         }
         Err(error) => report_lock_error(error),
@@ -60,6 +61,6 @@ fn check_lockfile(manifest: &Path) -> i32 {
 }
 
 fn report_lock_error(error: LockfileError) -> i32 {
-    eprintln!("error: {error}");
+    errln!("error: {error}");
     1
 }

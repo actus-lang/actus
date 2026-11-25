@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::errln;
 use std::io::{self, IsTerminal};
 use std::path::Path;
 
@@ -20,7 +21,7 @@ pub(super) fn report_diagnostics(path: &Path, source: &str, mut diagnostics: Vec
 
 pub(super) fn report_diagnostic(path: &Path, source: &str, diagnostic: Diagnostic) {
     let colored = io::stderr().is_terminal();
-    eprintln!("{}: {}", path.display(), render_colored_diagnostic(source, &diagnostic, colored));
+    errln!("{}: {}", path.display(), render_colored_diagnostic(source, &diagnostic, colored));
 }
 
 pub(super) fn report_mapped_diagnostic(

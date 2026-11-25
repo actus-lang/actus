@@ -8,8 +8,9 @@
 //! unit's tests, and running is preferred to building so executables are
 //! removed early. Results are reported in canonical test order.
 
+use crate::cli::terminal_output::{OutputStopped, try_outln};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -31,32 +32,47 @@ pub(super) fn run_tests(
     configuration: &CompilerConfiguration,
     options: &TestOptions,
 ) -> i32 {
+    match report_tests(collection, configuration, options) {
+        Ok(status) => status,
+        // The reader of the report went away: the run has been stopped and its
+        // artifacts removed, so all that is left is the status.
+        Err(OutputStopped(status)) => status,
+    }
+}
+
+fn report_tests(
+    collection: TestCollection,
+    configuration: &CompilerConfiguration,
+    options: &TestOptions,
+) -> Result<i32, OutputStopped> {
     let output_style = TestOutputStyle::detect();
     let total = collection.order.len();
-    print_test_header(total, collection.filtered, options.mode);
+    print_test_header(total, collection.filtered, options.mode)?;
     if options.list {
         for position in &collection.order {
             let test = collection.test(*position);
-            println!("{}::{}", test.display_module, test.name);
+            try_outln!("{}::{}", test.display_module, test.name)?;
         }
-        return 0;
+        return Ok(0);
     }
     let run_started = Instant::now();
     if total == 0 {
         return print_test_summary(0, 0, run_started.elapsed(), &output_style);
     }
-    let passed = execute_tests(&collection, configuration, options.test_threads, &output_style);
+    let passed = execute_tests(&collection, configuration, options.test_threads, &output_style)?;
     print_test_summary(total, passed, run_started.elapsed(), &output_style)
 }
 
 /// Builds and runs every selected test and reports the results in canonical
-/// order. Returns the number of tests that passed.
+/// order. Returns the number of tests that passed. When the report cannot be
+/// written any more, the workers stop taking jobs, the jobs in progress finish
+/// and every executable that was built is removed before the error returns.
 fn execute_tests(
     collection: &TestCollection,
     configuration: &CompilerConfiguration,
     test_threads: usize,
     output_style: &TestOutputStyle,
-) -> usize {
+) -> Result<usize, OutputStopped> {
     let total = collection.order.len();
     let schedule = Schedule::new(collection, configuration);
     let (sender, receiver) = mpsc::channel();
@@ -64,7 +80,7 @@ fn execute_tests(
         let _ = sender.send((*flat, Err(defect.clone()), Duration::ZERO));
     }
     let context = Context::new(collection, configuration, schedule);
-    std::thread::scope(|scope| {
+    let reported = std::thread::scope(|scope| {
         let handles = (0..test_threads.min(total))
             .map(|_| {
                 let sender = sender.clone();
@@ -73,21 +89,32 @@ fn execute_tests(
             })
             .collect::<Vec<_>>();
         drop(sender);
-        let passed = report_in_order(&receiver, collection, output_style);
+        let reported = report_in_order(&receiver, collection, output_style);
+        if reported.is_err() {
+            context.cancel();
+        }
         for handle in handles {
             handle.join().expect("test execution worker panicked");
         }
-        passed
-    })
+        reported
+    });
+    if reported.is_err() {
+        // Tests that never ran leave their executables behind otherwise.
+        for executable in context.executables.iter().filter_map(OnceLock::get) {
+            let _ = remove_artifacts(&executable.directory);
+        }
+    }
+    reported
 }
 
 /// Reports results as they arrive, in canonical test order: a result waits
-/// until every test before it has been reported. Returns the passed count.
+/// until every test before it has been reported. Returns the passed count, or
+/// stops at the first result that cannot be written.
 fn report_in_order(
     receiver: &Receiver<(usize, TestResult, Duration)>,
     collection: &TestCollection,
     output_style: &TestOutputStyle,
-) -> usize {
+) -> Result<usize, OutputStopped> {
     let total = collection.order.len();
     let mut pending: Vec<Option<(TestResult, Duration)>> = (0..total).map(|_| None).collect();
     let (mut next, mut passed) = (0, 0);
@@ -95,11 +122,11 @@ fn report_in_order(
         pending[flat] = Some((result, elapsed));
         while let Some(Some((result, elapsed))) = pending.get_mut(next).map(Option::take) {
             let test = collection.test(collection.order[next]);
-            passed += usize::from(report_test_result(test, result, elapsed, output_style));
+            passed += usize::from(report_test_result(test, result, elapsed, output_style)?);
             next += 1;
         }
     }
-    passed
+    Ok(passed)
 }
 
 /// One executable to build and the tests it runs.
@@ -199,6 +226,8 @@ struct Context<'a> {
     schedule: Schedule,
     queue: Mutex<Queue>,
     changed: Condvar,
+    /// Set when the report cannot be written; workers take no further job.
+    cancelled: AtomicBool,
     executables: Vec<OnceLock<TestExecutable>>,
     /// Tests of each unit that have not finished yet.
     remaining: Vec<AtomicUsize>,
@@ -220,6 +249,7 @@ impl<'a> Context<'a> {
                 building: 0,
             }),
             changed: Condvar::new(),
+            cancelled: AtomicBool::new(false),
             executables: (0..units).map(|_| OnceLock::new()).collect(),
             remaining: (0..units).map(|_| AtomicUsize::new(0)).collect(),
             schedule,
@@ -242,11 +272,22 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Stops the workers from taking further jobs. The queue lock is held while
+    /// the flag is set so that no worker misses the wake-up.
+    fn cancel(&self) {
+        let _queue = self.queue.lock().expect("test queue poisoned");
+        self.cancelled.store(true, Ordering::SeqCst);
+        self.changed.notify_all();
+    }
+
     /// The next job, waiting while a running build may still queue tests;
     /// `None` when all work is done.
     fn next_job(&self) -> Option<Job> {
         let mut queue = self.queue.lock().expect("test queue poisoned");
         loop {
+            if self.cancelled.load(Ordering::SeqCst) {
+                return None;
+            }
             if let Some((unit, position)) = queue.runs.pop_front() {
                 return Some(Job::Run { unit, position });
             }

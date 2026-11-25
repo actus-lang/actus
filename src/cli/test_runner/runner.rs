@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::errln;
 use crate::configuration::CompilerConfiguration;
 
 use super::super::conformance::{ConformanceMode, parse_strict_option};
@@ -20,14 +21,14 @@ pub(in crate::cli) fn test_command(arguments: impl Iterator<Item = String>) -> i
     let options = match parse_test_options(arguments) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     let configuration = match load_test_configuration(options.mode) {
         Ok(configuration) => configuration,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
@@ -37,14 +38,14 @@ pub(in crate::cli) fn test_command(arguments: impl Iterator<Item = String>) -> i
     let directories = match layout::discover_test_directories(&configuration, &options, &session) {
         Ok(directories) => directories,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
     let tests = match collection::collect_tests(directories, &configuration, &options, &session) {
         Ok(tests) => tests,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };

@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use std::env;
 use std::fs;
 
@@ -13,7 +14,10 @@ mod run {
     pub(super) use super::super::run::run_command;
 }
 
+/// The entry of the `actus` binary. Unlike `run_with_args`, it stops quietly when
+/// the reader of stdout or stderr closes the pipe (`terminal_output`).
 pub fn run() -> i32 {
+    super::terminal_output::enable_closed_stream_policy();
     run_with_args(env::args().skip(1))
 }
 
@@ -58,23 +62,23 @@ fn dispatch_command(command: &str, arguments: Vec<String>) -> i32 {
 }
 
 fn unknown_command(command: &str) -> i32 {
-    eprintln!("error: unknown command `{command}`");
+    errln!("error: unknown command `{command}`");
     print_usage();
     2
 }
 
 fn parse_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let Some(path) = arguments.next() else {
-        eprintln!("error: missing input file");
+        errln!("error: missing input file");
         print_usage();
         return 2;
     };
     if super::input::is_option_like(&path) {
-        eprintln!("error: {}", super::input::argument_error("parse", &path));
+        errln!("error: {}", super::input::argument_error("parse", &path));
         return 2;
     }
     if let Some(extra) = arguments.next() {
-        eprintln!("error: {}", super::input::argument_error("parse", &extra));
+        errln!("error: {}", super::input::argument_error("parse", &extra));
         return 2;
     }
     parse_file(&path, true)
@@ -84,7 +88,7 @@ fn parse_file(path: &str, print_ast: bool) -> i32 {
     let source = match fs::read_to_string(path) {
         Ok(source) => source,
         Err(error) => {
-            eprintln!("error: cannot read `{path}`: {error}");
+            errln!("error: cannot read `{path}`: {error}");
             return 1;
         }
     };
@@ -92,48 +96,48 @@ fn parse_file(path: &str, print_ast: bool) -> i32 {
     let (tokens, lex_errors) = scan(&source);
     if !lex_errors.is_empty() {
         for error in &lex_errors {
-            eprintln!("{path}: {}", render_lex_error(&source, error));
+            errln!("{path}: {}", render_lex_error(&source, error));
         }
         return 1;
     }
 
     match parse(tokens) {
         Ok(program) if print_ast => {
-            println!("{program:#?}");
+            outln!("{program:#?}");
             0
         }
         Ok(program) => match crate::semantic::analyze(&program) {
             Ok(_) => {
-                println!("checked `{path}` successfully");
+                outln!("checked `{path}` successfully");
                 0
             }
             Err(error) => {
-                eprintln!("{path}: {}", render_semantic_error(&source, &error));
+                errln!("{path}: {}", render_semantic_error(&source, &error));
                 1
             }
         },
         Err(error) => {
-            eprintln!("{path}: {}", render_parse_error(&source, &error));
+            errln!("{path}: {}", render_parse_error(&source, &error));
             1
         }
     }
 }
 
 fn print_usage() {
-    eprintln!("{}", usage_text());
+    errln!("{}", usage_text());
 }
 
 fn print_help() {
-    println!("{}", usage_text());
+    outln!("{}", usage_text());
 }
 
 fn print_command_help(command: &str) -> i32 {
     let Some(text) = command_help_text(command) else {
-        eprintln!("error: unknown command `{command}`");
+        errln!("error: unknown command `{command}`");
         print_usage();
         return 2;
     };
-    println!("{text}");
+    outln!("{text}");
     0
 }
 

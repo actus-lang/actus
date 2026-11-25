@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::errln;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -16,14 +17,14 @@ pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_run_options(&mut arguments) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     let configuration = match super::input::configuration_for_input(options.input.as_deref()) {
         Ok(configuration) => configuration,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
@@ -35,7 +36,7 @@ pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         Some(backend) => match configuration.with_backend(backend) {
             Ok(configuration) => configuration,
             Err(error) => {
-                eprintln!("error: {error}");
+                errln!("error: {error}");
                 return 1;
             }
         },
@@ -52,11 +53,11 @@ pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     match result {
         Ok(status) => {
             let code = status.code().unwrap_or(1);
-            eprintln!("process exited with status {code}");
+            errln!("process exited with status {code}");
             code
         }
         Err(error) => {
-            eprintln!("error: cannot run `{}`: {error}", output.display());
+            errln!("error: cannot run `{}`: {error}", output.display());
             1
         }
     }

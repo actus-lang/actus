@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use serde::Serialize;
 
 pub(super) fn version_command(arguments: impl Iterator<Item = String>) -> i32 {
@@ -20,10 +21,10 @@ fn parse_json_flag(arguments: impl Iterator<Item = String>) -> Result<bool, ()> 
         if argument == "--json" && !json {
             json = true;
         } else if argument == "--json" {
-            eprintln!("error: duplicate --json option");
+            errln!("error: duplicate --json option");
             return Err(());
         } else {
-            eprintln!("error: {}", super::input::argument_error("version", &argument));
+            errln!("error: {}", super::input::argument_error("version", &argument));
             return Err(());
         }
     }
@@ -32,9 +33,9 @@ fn parse_json_flag(arguments: impl Iterator<Item = String>) -> Result<bool, ()> 
 
 fn print_json(identity: &VersionIdentity) -> i32 {
     match serde_json::to_string_pretty(identity) {
-        Ok(output) => println!("{output}"),
+        Ok(output) => outln!("{output}"),
         Err(error) => {
-            eprintln!("error: cannot serialize toolchain identity: {error}");
+            errln!("error: cannot serialize toolchain identity: {error}");
             return 1;
         }
     }
@@ -42,8 +43,8 @@ fn print_json(identity: &VersionIdentity) -> i32 {
 }
 
 fn print_human(identity: &VersionIdentity) {
-    println!("actus {} ({})", identity.actus_version, identity.commit);
-    println!(
+    outln!("actus {} ({})", identity.actus_version, identity.commit);
+    outln!(
         "llvm {} {}{}",
         identity.llvm.version,
         identity.llvm.status,
@@ -57,8 +58,8 @@ fn print_human(identity: &VersionIdentity) {
             ))
             .unwrap_or_default()
     );
-    println!("host {}", identity.host);
-    println!("backends {}", identity.backends.join(", "));
+    outln!("host {}", identity.host);
+    outln!("backends {}", identity.backends.join(", "));
 }
 
 #[derive(Serialize)]

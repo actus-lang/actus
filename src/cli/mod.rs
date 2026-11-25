@@ -10,6 +10,7 @@ mod lsp;
 mod project;
 mod publish;
 mod run;
+mod terminal_output;
 mod test_runner;
 mod version;
 mod watch;

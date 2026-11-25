@@ -1,4 +1,5 @@
 use crate::SharedSourceMap;
+use crate::cli::terminal_output::{errln, outln};
 use crate::diagnostics::{module_diagnostic, render_diagnostic};
 use crate::modules::{
     ModuleError, ModuleResolver, build_compilation_plan, parse_module, validate_compilation_plan,
@@ -13,7 +14,7 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
     let options = match parse_check_options(&mut arguments) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
@@ -24,7 +25,7 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
     ) {
         Ok(configuration) => configuration,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
@@ -91,7 +92,7 @@ fn read_check_source(input: &std::path::Path) -> Option<String> {
     match fs::read_to_string(input) {
         Ok(source) => Some(source),
         Err(error) => {
-            eprintln!("error: cannot read `{}`: {error}", input.display());
+            errln!("error: cannot read `{}`: {error}", input.display());
             None
         }
     }
@@ -151,9 +152,9 @@ fn analyze_check_program(
         return 1;
     }
     if mode.is_strict() {
-        println!("checked `{}` successfully (strict)", input.display());
+        outln!("checked `{}` successfully (strict)", input.display());
     } else {
-        println!("checked `{}` successfully", input.display());
+        outln!("checked `{}` successfully", input.display());
     }
     0
 }
@@ -187,9 +188,9 @@ fn check_module(
         return 1;
     }
     if mode.is_strict() {
-        println!("checked `{}` successfully (strict)", input_path.display());
+        outln!("checked `{}` successfully (strict)", input_path.display());
     } else {
-        println!("checked `{}` successfully", input_path.display());
+        outln!("checked `{}` successfully", input_path.display());
     }
     0
 }
@@ -197,9 +198,9 @@ fn check_module(
 fn report_module_error(module_path: &str, error: ModuleError, source_map: &SharedSourceMap) -> i32 {
     let diagnostic = module_diagnostic(&error);
     if let Some((path, source, diagnostic)) = source_map.lock().localize(&diagnostic) {
-        eprintln!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic));
+        errln!("{}: {}", path.display(), render_diagnostic(&source, &diagnostic));
     } else {
-        eprintln!("{module_path}: {}", render_diagnostic("", &diagnostic));
+        errln!("{module_path}: {}", render_diagnostic("", &diagnostic));
     }
     1
 }
