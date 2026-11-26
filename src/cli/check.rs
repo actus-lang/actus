@@ -149,7 +149,11 @@ fn analyze_check_program(
     mode: ConformanceMode,
     plan: crate::modules::ModuleCompilationPlan,
 ) -> i32 {
-    if let Err(error) = validate_compilation_plan(&plan, configuration.target()) {
+    if let Err(error) = validate_compilation_plan(
+        &plan,
+        configuration.target(),
+        configuration.native_backend().backend().name(),
+    ) {
         report_mapped_diagnostic(source_map, input, source, module_diagnostic(&error));
         return 1;
     }
@@ -188,7 +192,11 @@ fn check_module(
         Ok(plan) => plan,
         Err(error) => return report_module_error(module_path, error, source_map),
     };
-    if let Err(error) = validate_compilation_plan(&plan, configuration.target()) {
+    if let Err(error) = validate_compilation_plan(
+        &plan,
+        configuration.target(),
+        configuration.native_backend().backend().name(),
+    ) {
         report_mapped_diagnostic(source_map, input_path, "", module_diagnostic(&error));
         return 1;
     }

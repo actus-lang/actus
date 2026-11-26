@@ -282,7 +282,12 @@ where
         &instance.arguments,
         definition.span(),
     )
-    .map_err(|error| BackendEmitError(format!("generic substitution failed: {error:?}")))
+    .map_err(|error| {
+        BackendEmitError(format!(
+            "generic substitution failed: {}",
+            crate::diagnostics::render_unlocated_semantic_error(&error)
+        ))
+    })
 }
 
 trait GenericDefinition {

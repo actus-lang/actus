@@ -52,6 +52,12 @@ pub fn render_semantic_error(source: &str, error: &SemanticError) -> String {
     render_diagnostic(source, &semantic_diagnostic(error))
 }
 
+/// Renders a semantic error that is met after validation, where no source is
+/// at hand, as `error[E####]: message`, never as Debug output.
+pub fn render_unlocated_semantic_error(error: &SemanticError) -> String {
+    render_unlocated_diagnostic(&semantic_diagnostic(error))
+}
+
 /// Renders one diagnostic for the terminal while preserving its stable code
 /// and source location.
 pub fn render_diagnostic(source: &str, diagnostic: &Diagnostic) -> String {

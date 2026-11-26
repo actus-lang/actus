@@ -79,10 +79,11 @@ pub(super) fn validate_plan(
     input: &str,
     source: &str,
     plan: &ModuleCompilationPlan,
-    target: &crate::target::TargetSpec,
+    configuration: &CompilerConfiguration,
     source_map: &SharedSourceMap,
 ) -> bool {
-    if let Err(error) = validate_compilation_plan(plan, target) {
+    let backend = configuration.native_backend().backend().name();
+    if let Err(error) = validate_compilation_plan(plan, configuration.target(), backend) {
         report_mapped_diagnostic(source_map, Path::new(input), source, module_diagnostic(&error));
         return false;
     }

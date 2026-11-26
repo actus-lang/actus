@@ -16,9 +16,15 @@ use super::super::validation::{
 /// generated serialization verbs, but before generic specialization. The
 /// caller, object units, and imported units with the root performance context
 /// are checked here; later semantic failures are compiler invariants.
+///
+/// `backend` is the name of the selected native backend: whether a
+/// `meta stack_limit` contract can be proved depends on it and on `target`
+/// alone, so a program that cannot be built is rejected here, by `actus check`
+/// as well as by `actus build`.
 pub(crate) fn validate_compilation_plan(
     plan: &super::compilation::ModuleCompilationPlan,
     target: &TargetSpec,
+    backend: &str,
 ) -> Result<(), ModuleError> {
     let caller = filter_program(plan.caller(), target)?;
     validate_program(&caller)?;
@@ -31,6 +37,8 @@ pub(crate) fn validate_compilation_plan(
     for (index, unit) in object_plan.units().iter().enumerate() {
         let targeted = filter_program(unit.program(), target)?;
         validate_program(&targeted)?;
+        crate::semantic::validate_stack_limit_backend_target(&targeted, target, backend)
+            .map_err(|error| ModuleError::Semantic(Box::new(error)))?;
         if index != 0 {
             let contextual = super::performance_context::program_with_performance_context(
                 &targeted,

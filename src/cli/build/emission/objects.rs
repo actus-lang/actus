@@ -60,19 +60,20 @@ fn build_file_with_report(
     if !validate_source_limits(Path::new(input), &source, mode, configuration) {
         return 1;
     }
+    if !validate_plan(input, &source, &plan, configuration, &source_map) {
+        return 1;
+    }
+    // `validate_plan` already reported a target error with its location.
     let caller = match crate::semantic::filter_program_for_target_checked(
         plan.caller(),
         configuration.target(),
     ) {
         Ok(caller) => caller,
         Err(error) => {
-            errln!("error: semantic analysis failed: {error:?}");
+            errln!("{}", crate::diagnostics::render_unlocated_semantic_error(&error));
             return 1;
         }
     };
-    if !validate_plan(input, &source, &plan, configuration.target(), &source_map) {
-        return 1;
-    }
     if !validate_package_documentation(Path::new(input), &plan, mode) {
         return 1;
     }

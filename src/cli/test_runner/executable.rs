@@ -54,8 +54,12 @@ fn emit_unit_object(
             .map_err(|error| diagnostic(semantic_diagnostic(&error)))?;
     crate::semantic::analyze_resolved(&caller)
         .map_err(|error| diagnostic(semantic_diagnostic(&error)))?;
-    crate::modules::validate_compilation_plan(&plan, configuration.target())
-        .map_err(|error| diagnostic(crate::diagnostics::module_diagnostic(&error)))?;
+    crate::modules::validate_compilation_plan(
+        &plan,
+        configuration.target(),
+        configuration.native_backend().backend().name(),
+    )
+    .map_err(|error| diagnostic(crate::diagnostics::module_diagnostic(&error)))?;
     // A hosted test executable reports a failed runtime check with its source
     // location, as `actus build` does (ADR-0117); freestanding tests trap.
     let check_locations = matches!(configuration.entry_contract(), EntryContract::Hosted)
