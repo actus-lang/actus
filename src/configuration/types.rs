@@ -20,19 +20,72 @@ pub struct PackageIdentity {
     pub version: String,
 }
 
+/// A configuration failure: what is wrong, its stable code, and where it is.
+///
+/// The code is part of the failure and not of the mode it was found in, so a
+/// manifest error has the same code with and without `--strict` (ADR-0041).
+/// A failure that names no code of its own is `E1800`. Where it is decides how
+/// [`ConfigurationError::report`] prints it: in the manifest, at the key or
+/// value it is about, or in the environment, with no file.
 #[derive(Debug)]
 pub struct ConfigurationError {
     pub(super) message: String,
     pub(super) code: Option<&'static str>,
+    pub(super) place: ErrorPlace,
+}
+
+/// Where a configuration failure is.
+#[derive(Debug, Default)]
+pub(super) struct ErrorPlace {
+    /// The manifest the failure is in; the loader of that manifest fills it in.
+    pub(super) manifest: Option<PathBuf>,
+    /// The failure is about the toolchain or the environment, not a file.
+    pub(super) environment: bool,
+    /// The dotted manifest key (`build.runtime`) the failure is about.
+    pub(super) key: Option<&'static str>,
+    /// The byte offset in the manifest, when the TOML parser gave one.
+    pub(super) offset: Option<usize>,
 }
 
 impl ConfigurationError {
     pub(super) fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into(), code: None }
+        Self { message: message.into(), code: None, place: ErrorPlace::default() }
     }
 
     pub(super) fn coded(code: &'static str, message: impl Into<String>) -> Self {
-        Self { message: message.into(), code: Some(code) }
+        Self { message: message.into(), code: Some(code), place: ErrorPlace::default() }
+    }
+
+    /// A failure of the toolchain or the environment: it names no file.
+    pub(super) fn environment(code: &'static str, message: impl Into<String>) -> Self {
+        let place = ErrorPlace { environment: true, ..ErrorPlace::default() };
+        Self { message: message.into(), code: Some(code), place }
+    }
+
+    /// Locates the failure at the value of a manifest key such as `build.runtime`.
+    pub(super) fn at_key(mut self, key: &'static str) -> Self {
+        self.place.key = Some(key);
+        self
+    }
+
+    /// Locates the failure at a byte offset of the manifest.
+    pub(super) fn at_offset(mut self, offset: Option<usize>) -> Self {
+        self.place.offset = offset;
+        self
+    }
+
+    /// Says that the failure is in `manifest`, unless it is already in a
+    /// manifest or in the environment.
+    pub(super) fn in_manifest(mut self, manifest: &std::path::Path) -> Self {
+        if self.place.manifest.is_none() && !self.place.environment {
+            self.place.manifest = Some(manifest.to_owned());
+        }
+        self
+    }
+
+    /// The stable diagnostic code of the failure.
+    pub fn code(&self) -> &'static str {
+        self.code.unwrap_or(crate::diagnostics::STRICT_CONFIGURATION_FAILURE)
     }
 }
 

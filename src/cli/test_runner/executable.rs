@@ -86,7 +86,7 @@ pub(super) fn build_executable(
         .map_err(|error| format!("cannot write test object: {error}"))
         .and_then(|()| {
             link_objects(&[object_path.as_path()], &built.executable, configuration)
-                .map_err(|error| error.to_string())
+                .map_err(|error| error.report().unwrap_or_else(|| error.to_string()))
         });
     if keep_artifacts() {
         return linked.map(|()| built);

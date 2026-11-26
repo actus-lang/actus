@@ -25,7 +25,7 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
     ) {
         Ok(configuration) => configuration,
         Err(error) => {
-            errln!("error: {error}");
+            errln!("{error}");
             return 1;
         }
     };

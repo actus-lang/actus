@@ -136,7 +136,7 @@ fn emit_and_write(
         }
     };
     if let Err(error) = write_artifact(input, &output, object, emit, configuration) {
-        errln!("error: {error}");
+        errln!("{error}");
         return 1;
     }
     if let Some(mode) = report_mode {

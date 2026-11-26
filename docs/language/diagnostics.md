@@ -11,6 +11,16 @@ checks the catalog against the registry of codes, so an entry cannot drift from
 the compiler. Codes without an entry are listed in `diagnostics/missing.txt`
 until their entry is written.
 
+Every diagnostic prints in one format, whatever finds it. A diagnostic that
+points into a file is `<path>: error[E####] at line:column: message`. A
+manifest error names the manifest (`Actus.toml`) and the line and column of the
+key or value it is about, and `<path>: error[E####]: message` when the manifest
+cannot say where. An error of the toolchain or the environment names no file:
+`error[E####]: message`. The code belongs to the error, not to the mode, so a
+manifest error has the same code with and without `--strict`. A finding that
+fails the run is an `error`; strict mode makes every finding an error
+(ADR-0041), and a `warning` never changes the exit status.
+
 | Code range | Category |
 | --- | --- |
 | `E0001`–`E0002`, `E0024`–`E0027` | Lexer errors: unexpected character, unterminated string, unterminated doc string, invalid integer type, invalid hexadecimal literal, invalid float type |
@@ -133,7 +143,8 @@ comments are ignored after the code on their line has been counted. Actus
 triple-quoted `""" ... """` documentation blocks remain counted because they
 are language constructs. `E1850` is reported when a file exceeds the preferred
 500 code-line size or `E1853` when a function exceeds the preferred 50
-code-line size.
+code-line size. These two are warnings in the report of `actus conformance`,
+which does not fail the run, and errors under `--strict`.
 `E1851` and `E1854` are strict split-required failures at 600 file lines and
 60 function lines. `E1852` and `E1855` reject files above 800 lines and
 functions above 80 lines respectively.

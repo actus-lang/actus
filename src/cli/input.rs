@@ -11,6 +11,8 @@ pub(super) fn configuration_for_input(
     configuration_for_input_with_mode(input, ConformanceMode::Standard)
 }
 
+/// Loads the configuration for the project of `input`, or of the current
+/// directory. The error is the complete line to print.
 pub(super) fn configuration_for_input_with_mode(
     input: Option<&str>,
     mode: ConformanceMode,
@@ -18,15 +20,25 @@ pub(super) fn configuration_for_input_with_mode(
     let path = input.map_or_else(
         || {
             std::env::current_dir()
-                .map_err(|error| format!("cannot read current directory: {error}"))
+                .map_err(|error| format!("error: cannot read current directory: {error}"))
         },
         |path| Ok(PathBuf::from(path)),
     )?;
+    configuration_for_path(&path, mode)
+}
+
+/// Loads the configuration of the manifest that governs `path`. The error is
+/// the complete line to print: a configuration failure keeps its own code and
+/// place, in strict mode and outside it (ADR-0041, ADR-0123).
+pub(super) fn configuration_for_path(
+    path: &Path,
+    mode: ConformanceMode,
+) -> Result<CompilerConfiguration, String> {
     if mode.is_strict() {
-        return CompilerConfiguration::from_input_path_strict(&path)
+        return CompilerConfiguration::from_input_path_strict(path)
             .map_err(|error| error.to_string());
     }
-    CompilerConfiguration::from_input_path(&path).map_err(|error| error.to_string())
+    CompilerConfiguration::from_input_path(path).map_err(|error| error.report())
 }
 
 pub(super) fn entry_path(configuration: &CompilerConfiguration, input: Option<&str>) -> PathBuf {

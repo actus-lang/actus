@@ -61,18 +61,22 @@ impl CompilerConfiguration {
         path: &Path,
         sync_missing_lockfile: bool,
     ) -> Result<Self, ConfigurationError> {
+        // A failure belongs to this manifest unless it says that it is in
+        // another manifest or in the environment.
+        let in_manifest = |error: ConfigurationError| error.in_manifest(path);
         let manifest = manifest::read(path)?;
-        let dependency_graph = super::dependencies::resolve(path)?;
+        let dependency_graph = super::dependencies::resolve(path).map_err(in_manifest)?;
         let compiler_std_source_root = super::resolution::compiler_owned_std_canonical_root();
         validate_package_identities(
             path,
             &manifest,
             &dependency_graph,
             compiler_std_source_root.as_deref(),
-        )?;
-        validate_lockfile(path, sync_missing_lockfile)?;
+        )
+        .map_err(in_manifest)?;
+        validate_lockfile(path, sync_missing_lockfile).map_err(in_manifest)?;
         let environment = Self::from_environment();
-        build_from_manifest(path, manifest, dependency_graph, environment)
+        build_from_manifest(path, manifest, dependency_graph, environment).map_err(in_manifest)
     }
 
     pub fn from_current_manifest() -> Result<Self, ConfigurationError> {
@@ -180,7 +184,7 @@ fn validate_explicit_backend(
         backend
             .backend()
             .validate_target(target)
-            .map_err(|error| ConfigurationError::new(error.to_string()))?;
+            .map_err(|error| ConfigurationError::new(error.to_string()).at_key("build.backend"))?;
     }
     Ok(())
 }
@@ -195,7 +199,7 @@ fn resolve_time_provider(
         .clone()
         .map(crate::target::TimeProviderContract::validate)
         .transpose()
-        .map_err(|error| ConfigurationError::new(error.to_string()))
+        .map_err(|error| ConfigurationError::new(error.to_string()).at_key("build.time_provider"))
         .map(|provider| {
             provider.or_else(|| {
                 (entry_contract == super::EntryContract::Hosted)
@@ -248,9 +252,11 @@ fn validate_runtime_profile(
         crate::target::EntryContract::Hosted => "hosted",
         crate::target::EntryContract::Freestanding => "freestanding",
     };
-    Err(ConfigurationError::new(format!(
-        "runtime profile `{runtime}` is incompatible with {target_kind} target"
-    )))
+    Err(ConfigurationError::coded(
+        crate::diagnostics::STRICT_RUNTIME_TARGET_INCOMPATIBLE,
+        format!("runtime profile `{runtime}` is incompatible with {target_kind} target"),
+    )
+    .at_key("build.runtime"))
 }
 
 fn validated_source_root(
@@ -264,7 +270,8 @@ fn validated_source_root(
     Err(ConfigurationError::new(format!(
         "InvalidSourceRoot: Actus.toml package.source_root `{}` does not exist",
         source_root.display()
-    )))
+    ))
+    .at_key("package.source_root"))
 }
 
 pub(crate) fn manifest_path_in_directory(path: &Path) -> Option<PathBuf> {

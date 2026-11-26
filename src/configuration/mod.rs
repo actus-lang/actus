@@ -4,6 +4,7 @@ mod dependencies;
 mod loading;
 mod lockfile;
 mod manifest;
+mod report;
 pub(crate) mod resolution;
 mod strict;
 mod types;

@@ -521,3 +521,24 @@ fn moving_a_field_out_of_a_zero_on_drop_owner_has_its_own_code() {
     assert!(matches!(error.kind, SemanticErrorKind::ZeroOnDropFieldMove { .. }));
     assert_eq!(semantic_diagnostic(&error).code(), "E1145");
 }
+
+#[test]
+fn a_diagnostic_without_a_location_renders_without_line_and_column() {
+    let diagnostic = Diagnostic::error("E1806", SourceSpan::new(0, 0), "unverified toolchain")
+        .with_suggestion("run the bootstrap script");
+
+    assert_eq!(
+        actus::diagnostics::render_unlocated_diagnostic(&diagnostic),
+        "error[E1806]: unverified toolchain; help: run the bootstrap script"
+    );
+}
+
+#[test]
+fn strict_policy_promotes_a_warning_to_an_error() {
+    let warning = Diagnostic::warning("E1850", SourceSpan::new(0, 4), "large file");
+    let promoted = warning.clone().promoted_to_error();
+
+    assert_eq!(warning.severity(), DiagnosticSeverity::Warning);
+    assert_eq!(promoted.severity(), DiagnosticSeverity::Error);
+    assert_eq!(render_diagnostic("text", &promoted), "error[E1850] at 1:1: large file");
+}

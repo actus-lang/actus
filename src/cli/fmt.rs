@@ -48,7 +48,7 @@ fn project_sources() -> Vec<PathBuf> {
     let configuration = match CompilerConfiguration::from_current_manifest() {
         Ok(configuration) => configuration,
         Err(error) => {
-            errln!("error: {error}");
+            errln!("{}", error.report());
             return Vec::new();
         }
     };

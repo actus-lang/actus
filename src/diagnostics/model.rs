@@ -141,6 +141,13 @@ impl Diagnostic {
         Self::new(code, DiagnosticSeverity::Warning, span, message)
     }
 
+    /// Makes a warning an error, as strict mode requires (ADR-0041: every
+    /// warning is an error). An error stays as it is.
+    pub const fn promoted_to_error(mut self) -> Self {
+        self.severity = DiagnosticSeverity::Error;
+        self
+    }
+
     /// Attaches the canonical source path associated with this diagnostic.
     pub fn with_source_path(mut self, path: impl Into<String>) -> Self {
         self.source_path = Some(path.into());

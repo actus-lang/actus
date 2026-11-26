@@ -57,8 +57,25 @@ pub fn render_semantic_error(source: &str, error: &SemanticError) -> String {
 pub fn render_diagnostic(source: &str, diagnostic: &Diagnostic) -> String {
     let (line, column) = line_column(source, diagnostic.span().start);
     let severity = severity_name(diagnostic.severity());
-    let mut rendered =
+    let head =
         format!("{severity}[{}] at {line}:{column}: {}", diagnostic.code(), diagnostic.message());
+    with_explanation_and_suggestion(head, diagnostic)
+}
+
+/// Renders a diagnostic that has no source location, such as a toolchain or
+/// environment failure, or a finding about a whole file: `error[E####]: message`.
+///
+/// It is the same line as [`render_diagnostic`] without the ` at line:column`
+/// part, so a reader finds the severity, the code and the message in the same
+/// place whether or not the diagnostic points into a file. The caller puts the
+/// path in front when the diagnostic belongs to a file.
+pub fn render_unlocated_diagnostic(diagnostic: &Diagnostic) -> String {
+    let severity = severity_name(diagnostic.severity());
+    let head = format!("{severity}[{}]: {}", diagnostic.code(), diagnostic.message());
+    with_explanation_and_suggestion(head, diagnostic)
+}
+
+fn with_explanation_and_suggestion(mut rendered: String, diagnostic: &Diagnostic) -> String {
     if let Some(explanation) = diagnostic.explanation() {
         rendered.push_str(&format!("; note: {explanation}"));
     }

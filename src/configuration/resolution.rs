@@ -65,7 +65,9 @@ pub(super) fn resolve_manifest_target(
         .as_deref()
         .map(TargetSpec::parse)
         .transpose()
-        .map_err(|error: TargetSpecError| ConfigurationError::new(error.to_string()))?
+        .map_err(|error: TargetSpecError| {
+            ConfigurationError::new(error.to_string()).at_key("build.target")
+        })?
         .unwrap_or_else(|| environment.target.clone());
     let linker_flavor = manifest.build.linker_flavor.unwrap_or(target.linker_flavor());
     let entry_contract = manifest.build.entry_contract.unwrap_or_else(|| target.entry_contract());
@@ -92,7 +94,7 @@ pub(crate) fn bundled_component(
     component: &str,
 ) -> Result<OsString, ConfigurationError> {
     let root = bundled_toolchain_root(target).ok_or_else(|| {
-        ConfigurationError::coded(
+        ConfigurationError::environment(
             STRICT_BUNDLED_COMPONENT_MISSING,
             format!("bundled component `{component}` is missing for freestanding target `{}`; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1", target.triple()),
         )
@@ -100,7 +102,7 @@ pub(crate) fn bundled_component(
     let candidate =
         root.join("lib/actus/bin").join(format!("{component}{}", std::env::consts::EXE_SUFFIX));
     if !candidate.is_file() {
-        return Err(ConfigurationError::coded(
+        return Err(ConfigurationError::environment(
             STRICT_BUNDLED_COMPONENT_MISSING,
             format!(
                 "bundled component `{component}` is missing for freestanding target `{}`; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1",
@@ -116,7 +118,7 @@ pub(crate) fn bundled_component(
 
 fn validate_bundled_linker_version(path: &Path) -> Result<(), ConfigurationError> {
     let output = std::process::Command::new(path).arg("--version").output().map_err(|error| {
-        ConfigurationError::coded(
+        ConfigurationError::environment(
             STRICT_LINKER_IDENTITY_MISMATCH,
             format!("cannot verify bundled linker `{}`: {error}", path.display()),
         )
@@ -125,7 +127,7 @@ fn validate_bundled_linker_version(path: &Path) -> Result<(), ConfigurationError
     if output.status.success() && version.contains("LLD 23.1.2") {
         return Ok(());
     }
-    Err(ConfigurationError::coded(
+    Err(ConfigurationError::environment(
         STRICT_LINKER_IDENTITY_MISMATCH,
         format!("bundled linker `{}` is not LLVM LLD 23.1.2: {}", path.display(), version.trim()),
     ))
@@ -133,20 +135,20 @@ fn validate_bundled_linker_version(path: &Path) -> Result<(), ConfigurationError
 
 pub(crate) fn bundled_builtins(target: &TargetSpec) -> Result<PathBuf, ConfigurationError> {
     let root = bundled_toolchain_root(target).ok_or_else(|| {
-        ConfigurationError::coded(
+        ConfigurationError::environment(
             STRICT_BUNDLED_COMPONENT_MISSING,
             format!("bundled component `libclang_rt.builtins.a` is missing for freestanding target `{}`; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1", target.triple()),
         )
     })?;
     let manifest = root.join("share/actus/toolchain.json");
     let contents = std::fs::read_to_string(&manifest).map_err(|error| {
-        ConfigurationError::coded(
+        ConfigurationError::environment(
             STRICT_BUNDLED_COMPONENT_MISSING,
             format!("cannot read bundled toolchain manifest `{}`: {error}", manifest.display()),
         )
     })?;
     let value: serde_json::Value = serde_json::from_str(&contents).map_err(|error| {
-        ConfigurationError::coded(
+        ConfigurationError::environment(
             STRICT_BUNDLED_COMPONENT_MISSING,
             format!("cannot parse bundled toolchain manifest `{}`: {error}", manifest.display()),
         )
@@ -157,14 +159,14 @@ pub(crate) fn bundled_builtins(target: &TargetSpec) -> Result<PathBuf, Configura
         .and_then(|entries| entries.get(&target_name))
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| {
-            ConfigurationError::coded(
+            ConfigurationError::environment(
                 STRICT_LINKER_IDENTITY_MISMATCH,
                 format!("bundled toolchain has no builtins entry for target `{target_name}`"),
             )
         })?;
     let builtins = root.join(relative);
     if !builtins.is_file() {
-        return Err(ConfigurationError::coded(
+        return Err(ConfigurationError::environment(
             STRICT_BUNDLED_COMPONENT_MISSING,
             format!(
                 "bundled component `libclang_rt.builtins.a` is missing at `{}`",
@@ -198,7 +200,8 @@ pub(super) fn runtime_source_root(
         return Ok(None);
     }
     compiler_owned_std_source_root().map(Some).ok_or_else(|| {
-        ConfigurationError::new(
+        ConfigurationError::environment(
+            crate::diagnostics::STRICT_RUNTIME_METADATA_MISSING,
             "runtime profile `std` cannot locate the compiler-owned standard library".to_owned(),
         )
     })
@@ -227,7 +230,10 @@ pub(super) fn runtime_identity(
         return Ok((None, None));
     };
     let package_root = source_root.parent().ok_or_else(|| {
-        ConfigurationError::new("builtin standard-library root has no package parent".to_owned())
+        ConfigurationError::environment(
+            crate::diagnostics::STRICT_RUNTIME_METADATA_MISSING,
+            "builtin standard-library root has no package parent".to_owned(),
+        )
     })?;
     let manifest_path = package_root.join("Actus.toml");
     let manifest = super::manifest::read_with_compiler_std(&manifest_path, Some(&manifest_path))?;
@@ -246,12 +252,16 @@ pub(super) fn runtime_module_roots(
         return Ok(std::collections::BTreeMap::new());
     };
     let package_root = source_root.parent().ok_or_else(|| {
-        ConfigurationError::new("builtin standard-library root has no package parent".to_owned())
+        ConfigurationError::environment(
+            crate::diagnostics::STRICT_RUNTIME_METADATA_MISSING,
+            "builtin standard-library root has no package parent".to_owned(),
+        )
     })?;
     let manifest_path = package_root.join("Actus.toml");
     let manifest = super::manifest::read_with_compiler_std(&manifest_path, Some(&manifest_path))?;
     let Some(runtime_manifest) = manifest.runtime else {
-        return Err(ConfigurationError::new(
+        return Err(ConfigurationError::environment(
+            crate::diagnostics::STRICT_RUNTIME_METADATA_MISSING,
             "builtin standard library is missing its runtime registry".to_owned(),
         ));
     };
@@ -262,11 +272,14 @@ pub(super) fn runtime_module_roots(
         }
         let module_root = package_root.join(module.path);
         if !module_root.is_dir() {
-            return Err(ConfigurationError::new(format!(
-                "builtin standard-library module `{}` path does not exist: {}",
-                module.name,
-                module_root.display()
-            )));
+            return Err(ConfigurationError::environment(
+                crate::diagnostics::STRICT_CONFIGURATION_FAILURE,
+                format!(
+                    "builtin standard-library module `{}` path does not exist: {}",
+                    module.name,
+                    module_root.display()
+                ),
+            ));
         }
         roots.insert(module.name, module_root);
     }
@@ -307,5 +320,17 @@ mod tests {
         let error = validate_bundled_linker_version(&path).expect_err("wrong version must fail");
         assert_eq!(error.code, Some(crate::diagnostics::STRICT_LINKER_IDENTITY_MISMATCH));
         let _ = std::fs::remove_file(path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_bundled_linker_failure_prints_without_a_file() {
+        let path = std::env::temp_dir().join(format!("actus-missing-ld-{}", std::process::id()));
+        let error = validate_bundled_linker_version(&path).expect_err("a missing linker must fail");
+        assert!(
+            error.report().starts_with("error[E1881]: cannot verify bundled linker `"),
+            "{}",
+            error.report()
+        );
     }
 }

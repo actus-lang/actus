@@ -13,19 +13,27 @@ pub(super) fn write_artifact(
     emit: EmitKind,
     configuration: &CompilerConfiguration,
 ) -> Result<(), String> {
+    // The error is the complete line to print: a toolchain failure prints as
+    // its own diagnostic, every other failure as `error: message`.
     let persistent_capsula_artifact = output.starts_with(configuration.capsula_target_directory());
     let path =
         object_path(output, emit, persistent_capsula_artifact, configuration.linker_flavor());
-    write_object(&path, &object)?;
+    write_object(&path, &object).map_err(|error| format!("error: {error}"))?;
     if matches!(emit, EmitKind::Executable) {
         let result = crate::codegen::link_objects(&[path.as_path()], output, configuration)
-            .map_err(|error| format!("cannot link `{input}`: {error}"));
+            .map_err(|error| {
+                error.report().unwrap_or_else(|| format!("error: cannot link `{input}`: {error}"))
+            });
         if !persistent_capsula_artifact {
             let _ = fs::remove_file(&path);
         }
-        result.and_then(|()| write_success_metadata(output, &object, configuration))
+        result.and_then(|()| {
+            write_success_metadata(output, &object, configuration)
+                .map_err(|error| format!("error: {error}"))
+        })
     } else {
         write_success_metadata(output, &object, configuration)
+            .map_err(|error| format!("error: {error}"))
     }
 }
 

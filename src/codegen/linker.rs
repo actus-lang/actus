@@ -5,11 +5,42 @@ use std::process::Command;
 use crate::configuration::CompilerConfiguration;
 
 #[derive(Debug)]
-pub struct NativeLinkError(String);
+pub struct NativeLinkError {
+    message: String,
+    code: Option<&'static str>,
+}
+
+impl NativeLinkError {
+    fn plain(message: impl Into<String>) -> Self {
+        Self { message: message.into(), code: None }
+    }
+
+    /// The code of a toolchain failure (E1880, E1881), if this is one.
+    pub fn code(&self) -> Option<&'static str> {
+        self.code
+    }
+
+    /// The complete line to print for a toolchain failure, which names no file:
+    /// `error[E####]: message`. `None` for a failure of the link itself.
+    pub fn report(&self) -> Option<String> {
+        let diagnostic = crate::diagnostics::Diagnostic::error(
+            self.code?,
+            crate::lexer::SourceSpan::new(0, 0),
+            &self.message,
+        );
+        Some(crate::diagnostics::render_unlocated_diagnostic(&diagnostic))
+    }
+}
+
+impl From<crate::configuration::ConfigurationError> for NativeLinkError {
+    fn from(error: crate::configuration::ConfigurationError) -> Self {
+        Self { message: error.to_string(), code: Some(error.code()) }
+    }
+}
 
 impl std::fmt::Display for NativeLinkError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.message)
     }
 }
 
@@ -28,7 +59,7 @@ impl LinkerPlan {
         configuration: &CompilerConfiguration,
     ) -> Result<Self, NativeLinkError> {
         if objects.is_empty() {
-            return Err(NativeLinkError("link requires at least one object".to_owned()));
+            return Err(NativeLinkError::plain("link requires at least one object".to_owned()));
         }
         let linker = configuration.linker().to_os_string();
         let mut arguments = Vec::new();
@@ -39,7 +70,7 @@ impl LinkerPlan {
         }
         if let Some(linker_script) = configuration.linker_script() {
             if configuration.linker_flavor() != crate::configuration::LinkerFlavor::Gnu {
-                return Err(NativeLinkError(
+                return Err(NativeLinkError::plain(
                     "linker_script is currently supported only by the GNU linker flavor".to_owned(),
                 ));
             }
@@ -102,7 +133,7 @@ pub fn link_objects(
         .map(|argument| argument.to_string_lossy())
         .collect::<Vec<_>>()
         .join(" ");
-    Err(NativeLinkError(format!(
+    Err(NativeLinkError::plain(format!(
         "linker `{}` failed with status {status}: stderr=`{}` stdout=`{}` command=`{} {arguments}`",
         plan.linker.to_string_lossy(),
         stderr.trim(),
@@ -140,11 +171,11 @@ fn append_runtime_inputs(
 ) -> Result<(), NativeLinkError> {
     if configuration.host_runtime_enabled()
         && let Some(runtime_archive) =
-            crate::runtime::runtime_archive_path().map_err(|message| {
-                NativeLinkError(format!(
-                    "{}: {message}",
-                    crate::diagnostics::DiagnosticCode::STRICT_BUNDLED_COMPONENT_MISSING.as_str()
-                ))
+            crate::runtime::runtime_archive_path().map_err(|message| NativeLinkError {
+                message,
+                code: Some(
+                    crate::diagnostics::DiagnosticCode::STRICT_BUNDLED_COMPONENT_MISSING.as_str(),
+                ),
             })?
     {
         arguments.push(runtime_archive.as_os_str().to_os_string());
@@ -157,7 +188,7 @@ fn append_runtime_inputs(
         && configuration.target().arm32_profile().is_some()
     {
         let builtins = crate::configuration::resolution::bundled_builtins(configuration.target())
-            .map_err(|error| NativeLinkError(error.to_string()))?;
+            .map_err(NativeLinkError::from)?;
         arguments.push(builtins.into_os_string());
     }
     Ok(())
@@ -165,7 +196,9 @@ fn append_runtime_inputs(
 
 fn run_link_command(plan: &LinkerPlan) -> Result<std::process::Output, NativeLinkError> {
     let mut command = plan.command();
-    command.output().map_err(|error| NativeLinkError(format!("cannot execute linker: {error}")))
+    command
+        .output()
+        .map_err(|error| NativeLinkError::plain(format!("cannot execute linker: {error}")))
 }
 
 fn is_rust_lld(linker: &std::ffi::OsStr) -> bool {
