@@ -355,6 +355,10 @@ pub enum SemanticErrorKind {
         arena: String,
         reference: String,
     },
+    ArenaReferenceReleased {
+        arena: String,
+        reference: String,
+    },
     InvalidFieldAssignmentTarget {
         field: String,
     },

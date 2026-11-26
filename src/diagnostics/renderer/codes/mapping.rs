@@ -131,7 +131,8 @@ fn expression_value_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
         SemanticErrorKind::InvalidArenaCapacity { .. } => DiagnosticCode::INVALID_ARENA_CAPACITY,
         SemanticErrorKind::ArenaReferenceEscape { .. } => DiagnosticCode::ARENA_REFERENCE_ESCAPE,
         SemanticErrorKind::CrossArenaReference { .. } => DiagnosticCode::CROSS_ARENA_REFERENCE,
-        SemanticErrorKind::ArenaReferenceLive { .. } => DiagnosticCode::ARENA_REFERENCE_LIVE,
+        SemanticErrorKind::ArenaReferenceLive { .. }
+        | SemanticErrorKind::ArenaReferenceReleased { .. } => DiagnosticCode::ARENA_REFERENCE_LIVE,
         SemanticErrorKind::ReturnTypeMismatch { .. } => DiagnosticCode::RETURN_TYPE_MISMATCH,
         SemanticErrorKind::BindingTypeMismatch { .. } => DiagnosticCode::BINDING_TYPE_MISMATCH,
         SemanticErrorKind::MissingReturnValue => DiagnosticCode::MISSING_RETURN_VALUE,

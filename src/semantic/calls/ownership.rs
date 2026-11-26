@@ -50,6 +50,7 @@ impl Analyzer {
                 span,
             });
         }
+        self.ensure_arena_references_inactive(index, name, span)?;
         self.update_dat_ownership(index, name, span)
     }
 

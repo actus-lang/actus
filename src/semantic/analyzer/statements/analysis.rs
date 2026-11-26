@@ -154,6 +154,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, span)?;
         self.ensure_mutable(index, name, span)?;
+        self.ensure_arena_references_inactive(index, name, span)?;
         self.reject_void_value(value)?;
         self.validate_binding_assignment(index, name, value, span)?;
         if let Some(expected) = self.binding_type_names.get(&index) {
@@ -200,6 +201,8 @@ impl Analyzer {
         }
         let Some(type_name) = self.expression_type_name(expression) else { return false };
         type_name == "Buffer"
+            || type_name == "Arena"
+            || type_name.starts_with("Arena[")
             || type_name == "Array"
             || self.struct_types.contains_key(&type_name)
             || self.enum_types.contains_key(&type_name)

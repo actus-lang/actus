@@ -104,6 +104,9 @@ fn arena_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ArenaReferenceLive { arena, reference } => {
             format!("cannot move or drop arena `{arena}` while reference `{reference}` is live")
         }
+        SemanticErrorKind::ArenaReferenceReleased { arena, reference } => {
+            format!("`{reference}` is used after arena `{arena}` was moved or dropped")
+        }
         _ => return None,
     };
     Some(message)
