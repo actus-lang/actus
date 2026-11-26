@@ -256,6 +256,10 @@ pub enum SemanticErrorKind {
         declaration: String,
         reason: String,
     },
+    InvalidCopyType {
+        declaration: String,
+        reason: String,
+    },
     FrozenStructField {
         struct_name: String,
         field: String,

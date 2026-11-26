@@ -79,5 +79,6 @@ fn declaration_matches_target(
         crate::ast::MetaAttribute::Repr(_) => true,
         crate::ast::MetaAttribute::Volatile => true,
         crate::ast::MetaAttribute::ZeroOnDrop => true,
+        crate::ast::MetaAttribute::Copy => true,
     })
 }

@@ -14,8 +14,10 @@ its contract.
 
 An `erg` parameter is a new owner inside the callee. Passing a buffer, an
 arena, or another resource-holding value to it moves the argument, as for
-`dat`; the caller cannot use it afterwards. Plain scalars and plain data are
-read and stay usable.
+`dat`; the caller cannot use it afterwards. A struct or an enum moves in the
+same way even when it holds only plain data (ADR-0124); to keep the source,
+pass `copy(value: abs x)` of a `meta copy` type. Plain scalars are read and stay
+usable.
 
 An owner can create a read-only `abs` view for a nested call. It cannot be
 mutated while a conflicting view or loan remains active.

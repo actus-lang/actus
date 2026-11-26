@@ -126,10 +126,11 @@ impl Analyzer {
             .and_then(|type_name| self.specialized_field_type(&type_name, field))
             .unwrap_or_else(|| struct_field.ty.clone());
         self.validate_field_value_type(struct_name, &struct_field, &expected, value, span)?;
-        // A resource moves out of its source exactly as in a struct literal
-        // (ADR-0046 2.2, 3); an `abs` field only views it.
+        // A struct, an enum or a resource moves out of its source exactly as
+        // in a struct literal (ADR-0046 2.2, 3, ADR-0124); an `abs` field only
+        // views it.
         let owning = struct_field.role != crate::ast::StructFieldRole::Abs
-            && self.argument_holds_resource(value, &expected);
+            && self.argument_moves_source(value, &expected);
         if owning {
             self.consume_owned_source(value, span)?;
         }

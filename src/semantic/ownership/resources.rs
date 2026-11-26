@@ -15,21 +15,35 @@ impl Analyzer {
         self.type_holds_resource_within(type_name, 0)
     }
 
-    /// Whether an argument or stored value holds a resource, judged by the
-    /// declared type it is received as or, for a binding, by its own type.
-    pub(in crate::semantic) fn argument_holds_resource(
+    /// Whether a value of this type moves out of its source when it is stored
+    /// or passed to an owner (ADR-0124): every struct and enum, a resource,
+    /// and an array that holds one. A scalar is not moved here.
+    pub(in crate::semantic) fn type_moves_on_store(&self, type_name: &TypeName) -> bool {
+        if self.type_holds_resource(type_name) {
+            return true;
+        }
+        if matches!(type_name.reference_role, Some(Role::Abs | Role::Ins)) {
+            return false;
+        }
+        let head = type_name.name.split('[').next().unwrap_or(&type_name.name);
+        self.struct_types.contains_key(head) || self.enum_types.contains_key(head)
+    }
+
+    /// Whether an argument or stored value moves out of its source, judged by
+    /// the declared type it is received as or, for a binding, by its own type.
+    pub(in crate::semantic) fn argument_moves_source(
         &self,
         expression: &Expr,
         declared: &TypeName,
     ) -> bool {
-        if self.type_holds_resource(declared) {
+        if self.type_moves_on_store(declared) {
             return true;
         }
         let Expr::Identifier { name, span } = expression else { return false };
         self.binding(name, *span)
             .ok()
             .and_then(|index| self.binding_type_names.get(&index))
-            .is_some_and(|type_name| self.type_holds_resource(type_name))
+            .is_some_and(|type_name| self.type_moves_on_store(type_name))
     }
 
     fn type_holds_resource_within(&self, type_name: &TypeName, depth: usize) -> bool {

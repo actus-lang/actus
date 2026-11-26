@@ -13,7 +13,10 @@ Common situations include:
 - dropping a moved or already-dropped value;
 - joining branches with incompatible ownership states;
 - omitting a required role at a call site;
-- passing an aggregate or resource to scalar-copy syntax.
+- passing an aggregate or resource to scalar-copy syntax;
+- reading a struct or an enum after it moved into a binding, field, payload or
+  `erg` argument (`E1005`), which `meta copy` and `copy(value: abs x)` resolve
+  for plain data.
 
 The stable diagnostic code identifies the compiler category. The source span
 identifies the argument, binding, field, or branch that needs attention. Do

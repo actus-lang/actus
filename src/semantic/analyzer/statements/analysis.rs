@@ -219,11 +219,11 @@ impl Analyzer {
         self.visit_expression(index)?;
         self.reject_void_value(value)?;
         let element = self.validate_index_access(target, index)?;
-        self.validate_index_value(target, index, value)?;
+        // Visit the value first: an explicit `copy` is typed by its operand.
         self.visit_expression(value)?;
-        // A resource stored in an element moves out of its source
-        // (ADR-0046 3): the array owns it, not the source binding.
-        if self.argument_holds_resource(value, &element) {
+        self.validate_index_value(target, index, value)?;
+        // A struct, enum or resource stored in an element moves (ADR-0124).
+        if self.argument_moves_source(value, &element) {
             self.consume_owned_source(value, super::super::validation::expression_span(value))?;
         }
         self.plan_try_unwind(value);
@@ -319,7 +319,8 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         if *role == Role::Erg {
-            self.initialize_owner(initializer, span)?;
+            // A struct or enum read from a field moves by its field path.
+            self.consume_owned_source(initializer, span)?;
         }
         if *role == Role::Abs {
             self.register_borrow(initializer, span)?;

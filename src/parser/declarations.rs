@@ -454,5 +454,6 @@ fn target_selector(attribute: &crate::ast::MetaAttribute) -> Option<&str> {
         crate::ast::MetaAttribute::Repr(_) => None,
         crate::ast::MetaAttribute::Volatile => None,
         crate::ast::MetaAttribute::ZeroOnDrop => None,
+        crate::ast::MetaAttribute::Copy => None,
     }
 }

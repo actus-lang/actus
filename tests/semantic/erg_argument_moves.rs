@@ -6,7 +6,7 @@ use actus::lexer::scan;
 use actus::parser::parse;
 use actus::semantic::{SemanticErrorKind, analyze};
 
-const PRELUDE: &str = "struct Node { value: Int, } struct Inner { number: Int, } \
+const PRELUDE: &str = "struct Node { value: Int, } meta copy struct Inner { number: Int, } \
 struct HoldBuffer { erg held: Buffer, } \
 verb hold_buffer(erg held: Buffer) {} verb hold_arena(erg held: Arena[64]) {} \
 verb hold_array(erg held: Array[Buffer, 2]) {} \
@@ -124,8 +124,8 @@ fn an_erg_parameter_still_accepts_scalars_and_unused_owners() {
             "erg count: Int = 1; hold_scalar(held: count); hold_scalar(held: count); print(count);",
         ),
         (
-            "plain data struct keeps value semantics",
-            "erg plain = Inner { number: 1, }; hold_plain(held: plain); print(plain.number);",
+            "plain data struct copied explicitly",
+            "erg plain = Inner { number: 1, }; erg duplicate = copy(value: abs plain); hold_plain(held: duplicate); print(plain.number);",
         ),
         (
             "moved and not read again",

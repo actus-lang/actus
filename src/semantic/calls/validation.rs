@@ -160,11 +160,12 @@ impl Analyzer {
                     self.move_dat_argument(&argument.expression, argument_span(argument))?;
                 }
                 // An `erg` parameter is a new owner inside the callee, which
-                // cleans it up at its scope end (ADR-0016, ADR-0059). An
-                // argument that holds a resource therefore leaves the caller
-                // as for `dat`; plain data is read and stays usable.
+                // cleans it up at its scope end (ADR-0016, ADR-0059). A struct,
+                // an enum or an argument that holds a resource therefore
+                // leaves the caller as for `dat` (ADR-0124); a scalar is read
+                // and stays usable.
                 Role::Erg
-                    if self.argument_holds_resource(
+                    if self.argument_moves_source(
                         &argument.expression,
                         &signature.params[*parameter_index].2,
                     ) =>

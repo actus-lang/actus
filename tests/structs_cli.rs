@@ -258,7 +258,7 @@ fn executes_explicit_result_err_with_user_enum_natively() {
 #[test]
 fn executes_result_constructors_inside_nested_case_blocks() {
     build_and_run(
-        "enum Failure { Failed, } verb outer() -> Result[Int, Failure] { erg result = Result[Int, Failure].Ok(1); case result { Result.Ok(_) => { erg nested = Result[Int, Failure].Ok(0); return case dat nested { Result.Ok(value) => Ok(value), Result.Err(error) => Err(error), }; }, Result.Err(error) => { return Err(error); }, }; return Err(Failure.Failed); } verb main() -> Int { erg result = outer(); return case dat result { Result.Ok(value) => value, Result.Err(_) => 1, }; }\n",
+        "meta copy enum Failure { Failed, } verb outer() -> Result[Int, Failure] { erg result = Result[Int, Failure].Ok(1); case result { Result.Ok(_) => { erg nested = Result[Int, Failure].Ok(0); return case dat nested { Result.Ok(value) => Ok(value), Result.Err(error) => Err(error), }; }, Result.Err(error) => { return Err(copy(value: abs error)); }, }; return Err(Failure.Failed); } verb main() -> Int { erg result = outer(); return case dat result { Result.Ok(value) => value, Result.Err(_) => 1, }; }\n",
         "nested-result-constructors",
         0,
     );

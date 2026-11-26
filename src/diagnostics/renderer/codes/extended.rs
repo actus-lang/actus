@@ -245,6 +245,9 @@ fn struct_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidReprC { declaration, reason } => {
             format!("invalid `repr(C)` declaration `{declaration}`: {reason}")
         }
+        SemanticErrorKind::InvalidCopyType { declaration, reason } => {
+            format!("`meta copy` on `{declaration}` is invalid: {reason}")
+        }
         _ => return None,
     };
     Some(message)

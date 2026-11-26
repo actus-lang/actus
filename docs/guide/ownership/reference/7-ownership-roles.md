@@ -19,7 +19,9 @@ state.
 
 Passing a resource to an `erg` parameter moves it into the callee, which
 cleans it up; the caller binding becomes `Moved`. A value stored in an enum
-payload or assigned to a field or element moves in the same way.
+payload or assigned to a field or element moves in the same way. A struct or an
+enum moves whether or not it holds a resource (ADR-0124); only a type declared
+`meta copy` can be duplicated, and only by a written `copy(value: abs x)`.
 
 ### 7.2 `abs`: read-only view
 

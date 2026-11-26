@@ -189,9 +189,9 @@ impl Analyzer {
         })
     }
 
-    /// Stores a constructor argument in an enum payload. A move-only value
-    /// (a buffer, an arena, a struct, or any type that holds a resource)
-    /// moves into the enum value (ADR-0046 3, ADR-0059).
+    /// Stores a constructor argument in an enum payload. A struct, an enum, a
+    /// buffer, an arena, or any type that holds a resource moves into the
+    /// enum value (ADR-0046 3, ADR-0059, ADR-0124).
     /// An `abs` payload is a read-only view instead: it freezes its source for
     /// the rest of the block, as for an `abs` binding (ADR-0016, ADR-0046 2.3).
     pub(in crate::semantic) fn store_enum_payload(
@@ -203,11 +203,7 @@ impl Analyzer {
         if payload_type.reference_role == Some(Role::Abs) {
             return self.register_view_borrow(expression, span);
         }
-        let owns = payload_type.reference_role.is_none()
-            && (matches!(payload_type.name.as_str(), "Buffer")
-                || self.struct_types.contains_key(&payload_type.name)
-                || self.drop_types.contains(&payload_type.name)
-                || self.type_holds_resource(payload_type));
+        let owns = payload_type.reference_role.is_none() && self.type_moves_on_store(payload_type);
         if owns {
             return self.consume_owned_source(expression, span);
         }

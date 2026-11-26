@@ -204,7 +204,7 @@ fn hosted_nested_facade_preserves_borrowed_string_arguments() {
         root.join("src/text/tokenizer/byte.act"),
         r#"import { open std::string };
 open const TOKEN_VERSION: u16 = 1u16;
-"""One scanned byte with its identifier, offset, length and version.""" open struct ByteRecord { """The identifier of the scanned byte.""" id: u32, """The byte offset of the record in the text.""" offset: u32, """The length in bytes of the record.""" length: u16, """The version of the token format.""" version: u16, }
+"""One scanned byte with its identifier, offset, length and version.""" meta copy open struct ByteRecord { """The identifier of the scanned byte.""" id: u32, """The byte offset of the record in the text.""" offset: u32, """The length in bytes of the record.""" length: u16, """The version of the token format.""" version: u16, }
 """The scanned records of a text with their count, validity and status.""" open struct TokenSequence { """The fixed array of scanned byte records.""" records: Array[ByteRecord, 256], """The count of scanned records.""" length: u32, """The flag that tells whether every byte scanned.""" valid: Bool, """The integer status where 0 means success.""" status: Int, }
 """Borrow the abs text read-only, scan its bytes and return a TokenSequence value whose status reports the outcome.""" open verb inspect(abs text: String) -> TokenSequence {
     erg sequence: TokenSequence = TokenSequence { records: Array[ByteRecord, 256](), length: 0u32, valid: true, status: 1 };
@@ -222,7 +222,7 @@ open const TOKEN_VERSION: u16 = 1u16;
         case dat result {
             Result.Ok(byte) => {
                 token = ByteRecord { id: byte as u32, offset: position, length: 1u16, version: TOKEN_VERSION };
-                sequence.records[position as Usize] = token;
+                sequence.records[position as Usize] = copy(value: abs token);
             },
             Result.Err(_) => {},
         };

@@ -47,6 +47,7 @@ fails the run is an `error`; strict mode makes every finding an error
 | `E1143` | Test layout violation (ADR-0121): a `tests` directory with a facade, a `src/tests` directory, a subdirectory inside a `tests` directory, or an `.act` file in a subdirectory of the project `tests/` |
 | `E1144` | `meta test` verb in a production source file; move it to a file of the module's `tests` directory |
 | `E1145` | Move of a field out of a `zero_on_drop` owner; the owner is zeroed as a whole, so a field cannot leave it |
+| `E1146` | `meta copy` on a struct or enum with a field or payload that is not a copy type (ADR-0124) |
 | `E1090` | Cast between types that are not both integer types |
 | `E1091` | Integer literal in a cast is outside the range of the target type |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |

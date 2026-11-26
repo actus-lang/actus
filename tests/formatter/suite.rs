@@ -97,6 +97,15 @@ fn preserves_zero_on_drop_metadata_on_value_types_idempotently() {
 }
 
 #[test]
+fn preserves_copy_metadata_on_structs_and_enums_idempotently() {
+    let formatted = format_source(
+        "meta copy struct Header { kind: u8, } meta copy enum Mode { Idle, Run(u8), }",
+    );
+    assert_eq!(formatted.matches("meta copy").count(), 2);
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_deterministic_metadata_idempotently() {
     let formatted = format_source("meta deterministic verb stable() -> Int { return 0; }");
     assert!(formatted.contains("meta deterministic"));

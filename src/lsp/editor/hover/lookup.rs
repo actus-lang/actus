@@ -241,7 +241,7 @@ fn intrinsic_info(name: &str) -> Option<SymbolInfo> {
         ),
         "copy" => (
             "copy(abs value: scalar) -> scalar",
-            "Explicitly reuses an eligible integer or boolean scalar without consuming the caller.",
+            "Explicitly reuses an integer or boolean scalar or a `meta copy` struct or enum without consuming the caller.",
         ),
         _ => return None,
     };

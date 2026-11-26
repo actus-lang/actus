@@ -20,6 +20,8 @@ mod enum_payload_moves;
 mod enums;
 #[path = "semantic/erg_argument_moves.rs"]
 mod erg_argument_moves;
+#[path = "semantic/explicit_copy_types.rs"]
+mod explicit_copy_types;
 #[path = "semantic/float_negation.rs"]
 mod float_negation;
 #[path = "semantic/generics.rs"]

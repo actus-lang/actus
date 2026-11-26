@@ -462,7 +462,7 @@ fn imported_facades_preserve_effectful_public_signatures() {
 #[test]
 fn name_resolution_rules_have_positive_and_negative_fixtures() {
     analyze_source(
-        "struct Point { x: Int, } verb known(erg point: Point) { } verb main() -> Int { erg point = Point { x: 1, }; known(point: point); return point.x; }",
+        "meta copy struct Point { x: Int, } verb known(erg point: Point) { } verb main() -> Int { erg point = Point { x: 1, }; erg duplicate = copy(value: abs point); known(point: duplicate); return point.x; }",
     )
     .expect("known types, fields, and verbs should pass");
 

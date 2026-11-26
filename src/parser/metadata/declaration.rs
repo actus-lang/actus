@@ -92,7 +92,10 @@ fn ensure_type_metadata_target(
         || (metadata.iter().any(|attribute| {
             matches!(
                 attribute,
-                MetaAttribute::Repr(_) | MetaAttribute::Volatile | MetaAttribute::ZeroOnDrop
+                MetaAttribute::Repr(_)
+                    | MetaAttribute::Volatile
+                    | MetaAttribute::ZeroOnDrop
+                    | MetaAttribute::Copy
             )
         }) && !is_type)
     {
@@ -112,7 +115,10 @@ fn ensure_repr_type_metadata(
     if metadata.iter().all(|attribute| {
         matches!(
             attribute,
-            MetaAttribute::Repr(_) | MetaAttribute::Volatile | MetaAttribute::ZeroOnDrop
+            MetaAttribute::Repr(_)
+                | MetaAttribute::Volatile
+                | MetaAttribute::ZeroOnDrop
+                | MetaAttribute::Copy
         )
     }) {
         return Ok(());

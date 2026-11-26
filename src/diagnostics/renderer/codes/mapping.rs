@@ -90,6 +90,7 @@ fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode>
         SemanticErrorKind::FrozenStructField { .. } => DiagnosticCode::FROZEN_STRUCT_FIELD,
         SemanticErrorKind::SelfAssignment { .. } => DiagnosticCode::SELF_ASSIGNMENT,
         SemanticErrorKind::InvalidReprC { .. } => DiagnosticCode::INVALID_REPR_C,
+        SemanticErrorKind::InvalidCopyType { .. } => DiagnosticCode::INVALID_COPY_TYPE,
         _ => return None,
     })
 }

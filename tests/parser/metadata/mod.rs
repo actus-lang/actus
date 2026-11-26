@@ -15,6 +15,7 @@ fn parse_error(source: &str) -> ParseError {
 }
 
 mod capability;
+mod copy;
 mod effect;
 mod fault;
 mod limitless;

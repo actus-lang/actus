@@ -35,6 +35,13 @@ impl Parser {
                 Some("zero_on_drop")
             } else if metadata
                 .iter()
+                .filter(|attribute| matches!(attribute, MetaAttribute::Copy))
+                .nth(1)
+                .is_some()
+            {
+                Some("copy")
+            } else if metadata
+                .iter()
                 .filter(|attribute| matches!(attribute, MetaAttribute::StackLimit(_)))
                 .nth(1)
                 .is_some()

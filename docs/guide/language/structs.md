@@ -100,6 +100,44 @@ Whole-struct assignment and transfer follow the same ownership rules. A
 resource-bearing aggregate is not silently duplicated just because its fields
 are laid out together.
 
+## Structs are moved, not copied
+
+A struct is never duplicated implicitly (ADR-0124). A binding, an assignment,
+a struct field initializer, an enum payload, an `erg` or `dat` argument and a
+return move the struct, whether it holds a resource or only plain data, and the
+source cannot be used again:
+
+```actus fails=E1005
+struct Header {
+    length: u16,
+}
+
+verb main() {
+    erg first = Header { length: 4u16, };
+    erg second = first;
+    print(int: first.length);
+}
+```
+
+Reading does not move. A field read such as `first.length`, a comparison and an
+`abs` argument leave the source usable. A struct that holds only plain data can
+declare [`meta copy`](../meta-attributes/copy.md) and be duplicated by a written
+`copy(value: abs x)`; the declaration is rejected with `E1146` when a field is a
+`Buffer`, an `Arena`, a view or a type that is not itself a copy type:
+
+```actus
+meta copy
+struct Header {
+    length: u16,
+}
+
+verb main() {
+    erg first = Header { length: 4u16, };
+    erg second = copy(value: abs first);
+    print(int: first.length);
+}
+```
+
 ## Fields that receive a resource
 
 A field without a role is a value field, but a value that is not copyable is
@@ -245,7 +283,8 @@ A struct does not automatically provide:
 - a serialized byte layout;
 - a dynamic collection or unbounded capacity;
 - a garbage-collected lifetime;
-- implicit copying of owned fields;
+- implicit copying of the struct or of its fields (`meta copy` allows a written
+  `copy(value: abs x)` only);
 - permission to use a field after it has moved.
 
 Use the type, ownership role, `pack`, `Array`, or `Arena` contract that matches

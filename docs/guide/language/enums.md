@@ -43,6 +43,45 @@ type. The comparison uses the enum discriminant and is lowered consistently by
 the Cranelift and LLVM backends. Enums with payloads do not support whole-value
 equality; compare their selected payloads explicitly after pattern matching.
 
+## Enums are moved, not copied
+
+An enum value is never duplicated implicitly (ADR-0124). A binding, an
+assignment, a struct field initializer, an enum payload, an `erg` or `dat`
+argument and a return move the enum, even when it is a plain unit-only enum.
+Reading does not: a comparison, an `abs` argument and a `case` on an `abs`
+subject leave the source usable.
+
+```actus fails=E1005
+enum Mode {
+    Idle,
+    Busy,
+}
+
+verb main() {
+    erg mode = Mode.Idle;
+    erg other = mode;
+    print(bool: mode == Mode.Idle);
+}
+```
+
+An enum whose payloads are copy types can declare
+[`meta copy`](../meta-attributes/copy.md) and be duplicated by a written
+`copy(value: abs mode)`:
+
+```actus
+meta copy
+enum Mode {
+    Idle,
+    Busy,
+}
+
+verb main() {
+    erg mode = Mode.Idle;
+    erg other = copy(value: abs mode);
+    print(bool: mode == Mode.Idle);
+}
+```
+
 ## Payload ownership
 
 A value placed in a payload moves into the enum value. A buffer or an arena
