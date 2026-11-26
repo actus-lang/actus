@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,19 +16,19 @@ pub(super) fn publish_command(arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_options(arguments) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     match publish_project(&options) {
         Ok(report) => {
-            println!("published {}@{}", report.name, report.version);
-            println!("checksum: {}", report.checksum);
-            println!("registry archive: {}", report.destination.display());
+            outln!("published {}@{}", report.name, report.version);
+            outln!("checksum: {}", report.checksum);
+            outln!("registry archive: {}", report.destination.display());
             0
         }
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             1
         }
     }

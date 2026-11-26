@@ -2,17 +2,23 @@
 //! order and a summary.
 
 use crate::ast::TestFault;
+use crate::cli::terminal_output::{OutputStopped, try_outln};
 
 use super::super::conformance::ConformanceMode;
 use super::collection::DiscoveredTest;
 use super::output::TestOutputStyle;
 use super::process::{TestProcessResult, append_stderr_for_report};
 
-pub(super) fn print_test_header(total: usize, filtered: usize, mode: ConformanceMode) {
+pub(super) fn print_test_header(
+    total: usize,
+    filtered: usize,
+    mode: ConformanceMode,
+) -> Result<(), OutputStopped> {
+    let noun = if total == 1 { "test" } else { "tests" };
     if mode.is_strict() {
-        println!("running {total} tests (strict) ({filtered} filtered)");
+        try_outln!("running {total} {noun} (strict) ({filtered} filtered)")
     } else {
-        println!("running {total} tests ({filtered} filtered)");
+        try_outln!("running {total} {noun} ({filtered} filtered)")
     }
 }
 
@@ -21,45 +27,36 @@ pub(super) fn report_test_result(
     result: Result<TestProcessResult, String>,
     elapsed: std::time::Duration,
     output_style: &TestOutputStyle,
-) -> bool {
+) -> Result<bool, OutputStopped> {
     let elapsed = elapsed.as_millis();
     let label = format!("test {}::{}", test.display_module, test.name);
-    match result {
+    let (status, passed) = match result {
         Ok(TestProcessResult::Exited { code: 0, .. }) => {
-            let status = output_style.success(&format!("ok ({elapsed} ms, exit code 0)"));
-            println!("{label} ... {status}");
-            true
+            (output_style.success(&format!("ok ({elapsed} ms, exit code 0)")), true)
         }
         Ok(TestProcessResult::Exited { code, stderr }) => {
             let mut detail = format!("FAILED ({elapsed} ms, exit code {code})");
             append_stderr_for_report(&mut detail, &stderr);
-            let status = output_style.failure(&detail);
-            println!("{label} ... {status}");
-            false
+            (output_style.failure(&detail), false)
         }
-        Ok(TestProcessResult::Signaled { signal, stderr }) => {
+        Ok(TestProcessResult::Signaled { .. })
             if matches!(
                 test.fault,
                 Some(TestFault::InterruptedBeforeRename | TestFault::InterruptedPublication)
-            ) {
-                let status =
-                    output_style.success(&format!("ok ({elapsed} ms, expected interruption)"));
-                println!("{label} ... {status}");
-                return true;
-            }
+            ) =>
+        {
+            (output_style.success(&format!("ok ({elapsed} ms, expected interruption)")), true)
+        }
+        Ok(TestProcessResult::Signaled { signal, stderr }) => {
             let signal = signal.map_or_else(|| "unknown".to_owned(), |value| value.to_string());
             let mut detail = format!("FAILED ({elapsed} ms, terminated by signal {signal})");
             append_stderr_for_report(&mut detail, &stderr);
-            let status = output_style.failure(&detail);
-            println!("{label} ... {status}");
-            false
+            (output_style.failure(&detail), false)
         }
-        Err(error) => {
-            let status = output_style.failure(&format!("FAILED ({elapsed} ms, {error})"));
-            println!("{label} ... {status}");
-            false
-        }
-    }
+        Err(error) => (output_style.failure(&format!("FAILED ({elapsed} ms, {error})")), false),
+    };
+    try_outln!("{label} ... {status}")?;
+    Ok(passed)
 }
 
 pub(super) fn print_test_summary(
@@ -67,15 +64,15 @@ pub(super) fn print_test_summary(
     passed: usize,
     elapsed: std::time::Duration,
     output_style: &TestOutputStyle,
-) -> i32 {
+) -> Result<i32, OutputStopped> {
     let failed = total - passed;
     let result =
         if failed == 0 { output_style.success("ok") } else { output_style.failure("FAILED") };
-    println!(
+    try_outln!(
         "test result: {result}. {passed} passed; {failed} failed; finished in {}",
         format_duration(elapsed)
-    );
-    i32::from(failed != 0)
+    )?;
+    Ok(i32::from(failed != 0))
 }
 
 fn format_duration(duration: std::time::Duration) -> String {

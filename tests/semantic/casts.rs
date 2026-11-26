@@ -62,7 +62,7 @@ fn constant_cast_overflow_renders_a_diagnostic_at_the_literal() {
         ("verb main() { erg a: u16 = (-5) as u16; }", "-5", "u16", "(-5)"),
         ("verb main() { erg a: Int = 3000000000 as Int; }", "3000000000", "Int", "3000000000"),
         ("verb main() { print(int: (300 as u8) as Int); }", "300", "u8", "300"),
-        ("verb main() { erg a: i8 = -128 as i8; }", "128", "i8", "128"),
+        ("verb main() { erg a: u8 = -1 as u8; }", "-1", "u8", "-1"),
     ];
     for (source, literal, target, pointed_at) in cases {
         let (code, message, span_text) = rendered_cast_error(source);
@@ -83,7 +83,7 @@ fn constant_casts_that_fit_and_non_literal_operands_are_accepted() {
         "verb main() { erg a: i8 = (-128) as i8; }",
         "verb main() { erg a: i8 = 127 as i8; }",
         "verb main() { erg a: u8 = 300 as Int as u8; }",
-        "verb main() { erg a: u8 = -1 as u8; }",
+        "verb main() { erg a: i8 = -128 as i8; }",
     ] {
         analyze_source(source).unwrap_or_else(|error| panic!("{source}: {error:?}"));
     }
@@ -96,4 +96,32 @@ fn invalid_primitive_cast_renders_a_diagnostic() {
     assert_eq!(code, "E1090");
     assert_eq!(message, "cannot cast `Buffer` to `Int`; casts convert between integer types");
     assert_eq!(span_text, "bytes as Int");
+}
+
+#[test]
+fn a_negated_literal_cast_is_checked_as_one_signed_literal() {
+    for source in [
+        "verb main() { erg a: i8 = -128 as i8; }",
+        "verb main() { erg a: i8 = -128i32 as i8; }",
+        "verb main() { erg a: i16 = -32768 as i16; }",
+        "verb main() { erg a: i32 = - -1 as i32; }",
+        "verb main() { erg a: u8 = -(1 as u8) as u8; }",
+    ] {
+        analyze_source(source).unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    }
+    let cases = [
+        ("verb main() { erg a: u8 = -1 as u8; }", "-1", "u8", "-1"),
+        ("verb main() { erg a: i8 = -129 as i8; }", "-129", "i8", "-129"),
+        ("verb main() { erg a: u32 = -0x1 as u32; }", "-0x1", "u32", "-0x1"),
+    ];
+    for (source, literal, target, pointed_at) in cases {
+        let (code, message, span_text) = rendered_cast_error(source);
+        assert_eq!(code, "E1091", "{source}");
+        assert_eq!(
+            message,
+            format!("literal `{literal}` is outside the range of `{target}` in a cast"),
+            "{source}"
+        );
+        assert_eq!(span_text, pointed_at, "{source}");
+    }
 }

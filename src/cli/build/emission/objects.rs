@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use std::path::{Path, PathBuf};
 
 use crate::build_graph::invalidate_stale_artifact;
@@ -63,7 +64,7 @@ fn build_file_with_report(
     ) {
         Ok(caller) => caller,
         Err(error) => {
-            eprintln!("error: semantic analysis failed: {error:?}");
+            errln!("error: semantic analysis failed: {error:?}");
             return 1;
         }
     };
@@ -71,7 +72,7 @@ fn build_file_with_report(
         return 1;
     }
     let Some(fallback_symbol) = first_defined_verb(&caller) else {
-        eprintln!("error: `{input}` contains no verb declarations");
+        errln!("error: `{input}` contains no verb declarations");
         return 1;
     };
     let symbol = configuration
@@ -94,7 +95,7 @@ fn validate_llvm_identity() -> bool {
     #[cfg(feature = "llvm")]
     {
         if let Some(error) = crate::codegen::llvm::strict_identity_error() {
-            eprintln!("{error}");
+            errln!("{error}");
             return false;
         }
     }
@@ -113,13 +114,13 @@ fn emit_and_write(
     let plan = program.plan;
     if let Err(error) = validate_entry(plan.caller(), symbol, emit, configuration.entry_contract())
     {
-        eprintln!("error: {error}");
+        errln!("error: {error}");
         return 1;
     }
     let output =
         output.map(PathBuf::from).unwrap_or_else(|| default_output(input, emit, configuration));
     if let Err(error) = invalidate_stale_artifact(&output, configuration) {
-        eprintln!("error: {error}");
+        errln!("error: {error}");
         return 1;
     }
     // A hosted executable runs with the runtime, which reports a failed
@@ -130,22 +131,22 @@ fn emit_and_write(
     let object = match emit_object(plan, symbol, configuration, check_locations) {
         Ok(object) => object,
         Err(error) => {
-            eprintln!("error: cannot build `{input}`: {error}");
+            errln!("error: cannot build `{input}`: {error}");
             return 1;
         }
     };
     if let Err(error) = write_artifact(input, &output, object, emit, configuration) {
-        eprintln!("error: {error}");
+        errln!("error: {error}");
         return 1;
     }
     if let Some(mode) = report_mode {
         if mode.is_strict() {
-            println!("built `{}` (strict)", output.display());
+            outln!("built `{}` (strict)", output.display());
         } else {
-            println!("built `{}`", output.display());
+            outln!("built `{}`", output.display());
         }
         if configuration.native_backend().verifies_no_float_ir() {
-            println!("verified generated native IR: no floating-point instructions");
+            outln!("verified generated native IR: no floating-point instructions");
         }
     }
     0

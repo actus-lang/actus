@@ -15,6 +15,12 @@ change ownership. Constant values outside the target range are rejected
 during semantic analysis. Dynamic values use a native range check and fail
 deterministically on overflow or underflow.
 
+Prefix operators bind tighter than `as`: `-x as i64` is `(-x) as i64`, so the
+negation happens in the type of `x` and traps if it overflows. A negated
+literal is a single signed constant, which makes `-128 as i8` valid and
+`-1 as u8` the compile error `E1091`. Use `-(x as i64)` to cast first and
+negate afterwards.
+
 There is no general implicit numeric conversion. If a `u32` operation needs a
 `u32` operand, write `1u32` or use an explicit cast. This includes arithmetic
 and bitwise operators: `a + b` with `a: u8` and `b: u32` is rejected (`E1140`)

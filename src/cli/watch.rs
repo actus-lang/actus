@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, out, outln};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,19 +34,19 @@ pub(super) fn watch_command(arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_watch_options(arguments) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     let (options, configuration) = match resolve_watch_options(options) {
         Ok(resolved) => resolved,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };
     if options.once {
-        println!("watching `{}`", options.input.as_deref().expect("watch input is resolved"));
+        outln!("watching `{}`", options.input.as_deref().expect("watch input is resolved"));
         return execute_once(&options, &configuration);
     }
     run_watch_loop(options, configuration)
@@ -77,11 +78,11 @@ fn run_watch_loop(options: WatchOptions, configuration: CompilerConfiguration) -
     let interrupted = match install_interrupt_handler() {
         Ok(interrupted) => interrupted,
         Err(error) => {
-            eprintln!("error: cannot install watch interrupt handler: {error}");
+            errln!("error: cannot install watch interrupt handler: {error}");
             return 1;
         }
     };
-    println!("watching `{input}`");
+    outln!("watching `{input}`");
     execute_once(&options, &configuration);
     while !interrupted.load(Ordering::Relaxed) {
         thread::sleep(options.interval);
@@ -97,13 +98,13 @@ fn run_watch_loop(options: WatchOptions, configuration: CompilerConfiguration) -
         }
         snapshot = current;
         clear_refresh_output();
-        println!("change detected; checking `{input}`");
+        outln!("change detected; checking `{input}`");
         let refresh_status = execute_once(&options, &configuration);
         if refresh_status == 0 {
-            println!("watch check passed");
+            outln!("watch check passed");
         }
     }
-    eprintln!("watch interrupted");
+    errln!("watch interrupted");
     130
 }
 
@@ -116,7 +117,7 @@ fn install_interrupt_handler() -> Result<Arc<AtomicBool>, String> {
 }
 
 fn clear_refresh_output() {
-    print!("\x1b[2J\x1b[H");
+    out!("\x1b[2J\x1b[H");
 }
 
 fn parse_watch_options(

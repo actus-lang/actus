@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::{errln, outln};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,22 +17,22 @@ struct ProjectOptions {
 
 pub(super) fn new_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let Some(name) = arguments.next() else {
-        eprintln!("error: missing project name");
+        errln!("error: missing project name");
         return 2;
     };
     if super::input::is_option_like(&name) {
-        eprintln!("error: {}", super::input::argument_error("new", &name));
+        errln!("error: {}", super::input::argument_error("new", &name));
         return 2;
     }
     let options = match parse_options(&name, arguments, true) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     if options.path.exists() {
-        eprintln!("error: project path `{}` already exists", options.path.display());
+        errln!("error: project path `{}` already exists", options.path.display());
         return 1;
     }
     let package_name = Path::new(&name)
@@ -40,10 +41,10 @@ pub(super) fn new_command(mut arguments: impl Iterator<Item = String>) -> i32 {
         .filter(|name| !name.is_empty())
         .unwrap_or(&name);
     if let Err(error) = create_project(&options.path, package_name, &options) {
-        eprintln!("error: {error}");
+        errln!("error: {error}");
         return 1;
     }
-    println!("created `{}`", options.path.display());
+    outln!("created `{}`", options.path.display());
     print_next_steps(&options.path, true);
     0
 }
@@ -52,29 +53,29 @@ pub(super) fn init_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_options("project", arguments.by_ref(), false) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     if let Err(error) = initialize_project(&options.path, &options) {
-        eprintln!("error: {error}");
+        errln!("error: {error}");
         return 1;
     }
-    println!("initialized `{}`", options.path.display());
+    outln!("initialized `{}`", options.path.display());
     print_next_steps(&options.path, false);
     0
 }
 
 fn print_next_steps(path: &Path, include_directory_change: bool) {
-    println!();
-    println!("Next steps:");
+    outln!("");
+    outln!("Next steps:");
     if include_directory_change {
-        println!("  cd {}", path.display());
+        outln!("  cd {}", path.display());
     }
-    println!("  actus check");
-    println!("  actus build --emit exe");
-    println!("  actus build --release --emit exe");
-    println!("  actus run");
+    outln!("  actus check");
+    outln!("  actus build --emit exe");
+    outln!("  actus build --release --emit exe");
+    outln!("  actus run");
 }
 
 fn parse_options(

@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::errln;
 use std::path::Path;
 
 use crate::configuration::{BackendKind, BuildProfile, CompilerConfiguration};
@@ -24,14 +25,14 @@ pub(crate) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
     let options = match parse_build_options(arguments) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 2;
         }
     };
     let input_configuration = match configured_build(&options) {
         Ok(configuration) => configuration,
         Err(error) => {
-            eprintln!("error: {error}");
+            errln!("error: {error}");
             return 1;
         }
     };

@@ -21,6 +21,11 @@ a `u8`. The literal must fit that type: `small + 300` is rejected. A suffixed
 literal such as `4u32`, a cast, and a constant expression such as `2 * 3`
 keep their own type. Shift counts are not part of this rule.
 
+Prefix operators bind tighter than `as`, and `as` binds tighter than every
+binary operator. `-x as i64` negates `x` in its own type and then casts;
+`-(x as i64)` casts first. `-128 as i8` is valid, `-1 as u8` is rejected with
+`E1091`, and `a - 1 as u8` is `a - (1 as u8)`.
+
 ## Comparisons
 
 Comparisons produce `Bool`. Two integer operands of `<`, `<=`, `>`, `>=`, `==`

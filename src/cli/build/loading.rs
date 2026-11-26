@@ -1,3 +1,4 @@
+use crate::cli::terminal_output::errln;
 use std::fs;
 use std::path::Path;
 
@@ -26,7 +27,7 @@ fn read_build_source(input: &str) -> Option<String> {
     match fs::read_to_string(input) {
         Ok(source) => Some(source),
         Err(error) => {
-            eprintln!("error: cannot read `{input}`: {error}");
+            errln!("error: cannot read `{input}`: {error}");
             None
         }
     }

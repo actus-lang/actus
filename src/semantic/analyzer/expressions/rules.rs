@@ -115,7 +115,7 @@ pub(in crate::semantic::analyzer) fn integer_literal(expression: &Expr) -> Optio
     }
 }
 
-/// The literal a cast operand is written as (`300`, `(300)`, `-(300)`). Unlike `integer_literal`
+/// The literal a cast operand is written as (`300`, `(300)`, `-300`, `-(300)`; a prefix `-` binds tighter than `as`). Unlike `integer_literal`
 /// it does not look through a nested cast: `300 as Int as u8` casts a runtime-checked `Int`, so
 /// the range check belongs to the run-time trap, not to the literal.
 pub(in crate::semantic::analyzer) fn cast_operand_literal(

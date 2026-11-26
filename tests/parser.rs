@@ -1,3 +1,5 @@
+#[path = "parser/cast_precedence.rs"]
+mod cast_precedence;
 #[path = "parser/expressions.rs"]
 mod expressions;
 #[path = "parser/imports.rs"]
