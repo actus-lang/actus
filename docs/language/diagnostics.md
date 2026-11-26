@@ -4,6 +4,13 @@ Semantic diagnostics use stable `E####` identifiers. Messages may become
 more descriptive, but a code keeps its meaning within an Alpha language
 edition.
 
+The catalog in [`diagnostics/`](diagnostics/) holds one entry per code, named
+after it (`diagnostics/E1140.md`): what the code means, a program that
+triggers it and the fix. The compiler's test suite builds every example and
+checks the catalog against the registry of codes, so an entry cannot drift from
+the compiler. Codes without an entry are listed in `diagnostics/missing.txt`
+until their entry is written.
+
 | Code range | Category |
 | --- | --- |
 | `E0001`–`E0002`, `E0024`–`E0027` | Lexer errors: unexpected character, unterminated string, unterminated doc string, invalid integer type, invalid hexadecimal literal, invalid float type |
