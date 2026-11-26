@@ -159,6 +159,7 @@ impl Analyzer {
                 span: expression_span(target),
             })?;
         if target_type.name == "Buffer" && target_type.arguments.is_empty() {
+            self.validate_default_integer_literal(index)?;
             self.validate_integer_index(index)?;
             return Ok(TypeName::builtin("u8", Vec::new(), None, expression_span(index)));
         }
@@ -189,7 +190,7 @@ impl Analyzer {
                 .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { .. }))
                 && integer_literal(value).is_some())
         {
-            return Ok(());
+            return self.validate_expected_literal(value, &element);
         }
         Err(SemanticError {
             kind: SemanticErrorKind::IndexedElementTypeMismatch { expected, found },

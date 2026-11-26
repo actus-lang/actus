@@ -83,14 +83,24 @@ impl Analyzer {
         }
         self.visit_expression(&constant.initializer)?;
         self.validate_expected_literal(&constant.initializer, &constant.ty)?;
-        let literal_initializer = matches!(
-            constant.initializer,
-            crate::ast::Expr::BoolLiteral { .. }
-                | crate::ast::Expr::Integer { .. }
-                | crate::ast::Expr::FloatLiteral { .. }
-        );
-        if !literal_initializer
-            && let Some(found) = self.expression_type_name(&constant.initializer)
+        // A literal has the type its text allows (`1` is no `Bool`, `1.5` is no `Int`), so it is
+        // checked like the initializer of a binding.
+        let literal_initializer = constant.initializer.is_plain_integer_literal()
+            || matches!(
+                constant.initializer,
+                crate::ast::Expr::BoolLiteral { .. }
+                    | crate::ast::Expr::Integer { .. }
+                    | crate::ast::Expr::FloatLiteral { .. }
+            );
+        if literal_initializer {
+            return self.validate_named_value_type(
+                &constant.name,
+                &constant.ty,
+                &constant.initializer,
+                constant.span,
+            );
+        }
+        if let Some(found) = self.expression_type_name(&constant.initializer)
             && found != super::canonical_type_name(&constant.ty)
         {
             return Err(SemanticError {

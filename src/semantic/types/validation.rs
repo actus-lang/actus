@@ -162,7 +162,7 @@ impl Analyzer {
         Some(type_name.clone())
     }
 
-    fn validate_named_value_type(
+    pub(crate) fn validate_named_value_type(
         &self,
         binding: &str,
         expected: &TypeName,

@@ -170,6 +170,7 @@ impl Analyzer {
         let expected_name =
             self.normalize_imported_type_key(&type_parsing::canonical_type_name(expected));
         if found == expected_name || found == variants::strip_reference_role(&expected_name) {
+            self.validate_expected_literal(&argument.expression, expected)?;
             if self.enum_payload_owns_value(expected) {
                 self.initialize_owner(&argument.expression, variants::argument_span(argument))?;
             }

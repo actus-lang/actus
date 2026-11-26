@@ -64,7 +64,10 @@ impl Analyzer {
         let mut operand_type = left_type;
         if right.is_plain_integer_literal() {
             self.validate_literal_fits(right, left_type)?;
-        } else if left_type != right_type && left.is_plain_integer_literal() {
+            if left.is_plain_integer_literal() {
+                self.validate_literal_fits(left, left_type)?;
+            }
+        } else if left.is_plain_integer_literal() {
             self.validate_literal_fits(left, right_type)?;
             operand_type = right_type;
         } else if left_type != right_type {

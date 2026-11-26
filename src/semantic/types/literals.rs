@@ -85,17 +85,10 @@ impl Analyzer {
             return Ok(());
         }
         let span = crate::semantic::analyzer::expression_span(expression);
-        // `Int` is a 32-bit signed integer; report the error under its own name.
         self.validate_expected_literal(
             expression,
-            &TypeName::builtin("i32", Vec::new(), None, span),
+            &TypeName::builtin("Int", Vec::new(), None, span),
         )
-        .map_err(|mut error| {
-            if let SemanticErrorKind::NumericLiteralOutOfRange { ty, .. } = &mut error.kind {
-                *ty = "Int".to_owned();
-            }
-            error
-        })
     }
 
     pub(crate) fn validate_expected_literal(
@@ -103,9 +96,13 @@ impl Analyzer {
         expression: &Expr,
         expected: &TypeName,
     ) -> Result<(), SemanticError> {
-        let Some(PrimitiveType::Integer { signed, width }) = primitive_type(&expected.name) else {
-            return Ok(());
+        // `Int` is not a primitive name but has the range of `i32`; it is checked under its own name.
+        let integer = if expected.name == "Int" {
+            Some(PrimitiveType::Integer { signed: true, width: 32 })
+        } else {
+            primitive_type(&expected.name)
         };
+        let Some(PrimitiveType::Integer { signed, width }) = integer else { return Ok(()) };
         let Some((literal, negative)) = integer_literal(expression) else { return Ok(()) };
         let magnitude = parse_integer_magnitude(&literal).ok_or_else(|| SemanticError {
             kind: SemanticErrorKind::NumericLiteralOutOfRange {

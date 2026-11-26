@@ -20,6 +20,8 @@ mod generics;
 mod integer_comparisons;
 #[path = "semantic/integer_operands.rs"]
 mod integer_operands;
+#[path = "semantic/literal_range.rs"]
+mod literal_range;
 #[path = "semantic/loans.rs"]
 mod loans;
 #[path = "semantic/misleading_messages.rs"]

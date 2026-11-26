@@ -483,6 +483,8 @@ impl Analyzer {
         self.discarded_expression = previous;
         self.expression_value_consumed = previous_consumed;
         result?;
+        // A bare literal statement, such as the tail of an `if` branch, is an `Int`.
+        self.validate_default_integer_literal(expression)?;
         if matches!(expression, Expr::Try { .. }) {
             self.plan_return_unwind(span);
         }

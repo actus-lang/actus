@@ -129,7 +129,7 @@ impl Analyzer {
             normalized_found == expected_name
         };
         if matches {
-            return Ok(());
+            return self.validate_expected_literal(value, expected_type);
         }
         Err(SemanticError {
             kind: SemanticErrorKind::StructFieldTypeMismatch {

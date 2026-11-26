@@ -158,7 +158,7 @@ impl Analyzer {
                 let (digits, negative) = literal
                     .strip_prefix('-')
                     .map_or((literal.as_str(), false), |rest| (rest, true));
-                ("Int", subject_type == "Int" || cast_literal_fits(digits, negative, subject_type))
+                ("Int", cast_literal_fits(digits, negative, subject_type))
             }
             LiteralPattern::Bool(_) => ("Bool", subject_type == "Bool"),
         };
