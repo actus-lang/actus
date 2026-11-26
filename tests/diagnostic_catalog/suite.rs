@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use actus::diagnostics::DiagnosticCode;
 
 use super::entry::{Block, Entry, is_code, parse_entry};
-use super::project::{TempProject, first_error, groups, inside_example};
+use super::project::{FirstError, Run, TempProject, first_error, groups, is_expected};
 
 fn catalog_directory() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docs/language/diagnostics")
@@ -96,15 +96,20 @@ fn every_failing_example_reports_its_code_first_inside_the_example() {
                 continue;
             };
             let command = Block::command_for(&group);
+            let strict = Block::strict_for(&group);
             let project = TempProject::create(&group).expect("project should be created");
-            let run = project.run(command);
+            let run = project.run(command, strict);
             let files: Vec<&str> = group.iter().map(|block| block.target()).collect();
             match first_error(&run) {
-                Some((code, location))
-                    if code == entry.code && inside_example(&location, &files) => {}
-                Some((code, location)) => problems.push(format!(
-                    "{}: line {}: `actus {command}` reported {code} at `{location}`, expected {} in one of {files:?}\n{}",
-                    entry.code, failing.line, entry.code, run.output
+                Some(error) if is_expected(&error, &entry.code, &files) => {}
+                Some(FirstError { code, location }) => problems.push(format!(
+                    "{}: line {}: `actus {command}{}` reported {code} at `{}`, expected {} in one of {files:?}\n{}",
+                    entry.code,
+                    failing.line,
+                    if strict { " --strict" } else { "" },
+                    location.as_deref().unwrap_or("no file"),
+                    entry.code,
+                    run.output
                 )),
                 None => problems.push(format!(
                     "{}: line {}: `actus {command}` reported no error\n{}",
@@ -128,11 +133,15 @@ fn every_compiling_block_passes_check() {
             };
             let project = TempProject::create(&group).expect("project should be created");
             let command = Block::command_for(&group);
-            let run = project.run(command);
+            let strict = Block::strict_for(&group);
+            let run = project.run(command, strict);
             if !run.success {
                 problems.push(format!(
-                    "{}: line {}: the block does not pass `actus {command}`\n{}",
-                    entry.code, compiling.line, run.output
+                    "{}: line {}: the block does not pass `actus {command}{}`\n{}",
+                    entry.code,
+                    compiling.line,
+                    if strict { " --strict" } else { "" },
+                    run.output
                 ));
             }
         }
@@ -209,4 +218,104 @@ fn a_failing_example_keeps_the_command_of_its_marker_even_with_a_test_file() {
 fn an_unknown_marker_is_rejected() {
     let text = VALID_ENTRY.replace("actus compiles", "actus compiles typo");
     assert!(parse_entry("E1140", &text).is_err());
+}
+
+fn strict_flags(text: &str) -> (bool, bool, bool) {
+    let entry = parse_entry("E1140", text).expect("entry should parse");
+    let failing: Vec<&Block> = entry.blocks.iter().filter(|block| block.fails.is_some()).collect();
+    let fix: Vec<&Block> = entry.blocks.iter().filter(|block| block.compiles).collect();
+    (Block::strict_for(&failing), Block::strict_for(&fix), failing[0].build)
+}
+
+#[test]
+fn the_strict_marker_is_accepted_combined_and_selects_the_strict_run() {
+    assert_eq!(strict_flags(VALID_ENTRY), (false, false, false));
+    let strict = VALID_ENTRY.replace("fails=E1140", "fails=E1140,strict");
+    assert_eq!(strict_flags(&strict), (true, false, false));
+    let build = VALID_ENTRY.replace("fails=E1140", "fails=E1140,build,strict");
+    assert_eq!(strict_flags(&build), (true, false, true));
+    let fix = VALID_ENTRY.replace("actus compiles", "actus compiles strict");
+    assert_eq!(strict_flags(&fix), (false, true, false));
+}
+
+#[test]
+fn a_misplaced_strict_marker_is_rejected() {
+    for text in [
+        VALID_ENTRY.replace("fails=E1140", "fails=E1140,strict,build"),
+        VALID_ENTRY.replace("fails=E1140", "fails=E1140,build,test"),
+        VALID_ENTRY.replace("fails=E1140", "fails=E1140 strict"),
+        VALID_ENTRY.replace("actus compiles", "actus compiles,strict"),
+    ] {
+        assert!(parse_entry("E1140", &text).is_err(), "{text}");
+    }
+    let alone = VALID_ENTRY.replace("```actus compiles\n", "```actus strict file=src/other.act\n");
+    assert!(parse_entry("E1140", &alone).is_err());
+}
+
+fn run_of(output: &str) -> Run {
+    Run { success: false, output: output.to_owned() }
+}
+
+#[test]
+fn the_first_error_is_read_from_the_one_diagnostic_format() {
+    let located = first_error(&run_of("src/main.act: error[E1140] at 3:5: operands\n"))
+        .expect("a located error line");
+    assert_eq!(
+        (located.code.as_str(), located.location.as_deref()),
+        ("E1140", Some("src/main.act"))
+    );
+    let manifest = first_error(&run_of("a/Actus.toml: error[E1801]: no location\n"))
+        .expect("a manifest error line without a location");
+    assert_eq!(
+        (manifest.code.as_str(), manifest.location.as_deref()),
+        ("E1801", Some("a/Actus.toml"))
+    );
+    let environment = first_error(&run_of("noise\nerror[E1806]: strict LLVM build\n"))
+        .expect("an error line without a file");
+    assert_eq!((environment.code.as_str(), environment.location), ("E1806", None));
+    assert!(first_error(&run_of("error: cannot read\nwarning[E1850]: x\n")).is_none());
+}
+
+#[test]
+fn a_line_without_a_file_is_accepted_only_for_an_environment_code() {
+    let files = ["src/main.act"];
+    let without_file = |code: &str| FirstError { code: code.to_owned(), location: None };
+    assert!(is_expected(&without_file("E1880"), "E1880", &files));
+    assert!(!is_expected(&without_file("E1140"), "E1140", &files));
+    assert!(!is_expected(&without_file("E1880"), "E1881", &files));
+    let located =
+        FirstError { code: "E1140".to_owned(), location: Some("src/main.act".to_owned()) };
+    assert!(is_expected(&located, "E1140", &files));
+    assert!(!is_expected(&located, "E1141", &files));
+    let elsewhere =
+        FirstError { code: "E1140".to_owned(), location: Some("src/other.act".to_owned()) };
+    assert!(!is_expected(&elsewhere, "E1140", &files));
+}
+
+#[test]
+fn a_repeat_region_is_written_n_times_with_a_padded_index() {
+    let body = "head\n# catalog: repeat 10\nverb step_{n}() {\n}\n# catalog: end\ntail\n";
+    let text = super::repeat::expand(body).expect("a region should expand");
+    assert_eq!(text.matches("verb step_").count(), 10);
+    assert!(text.starts_with("head\n# catalog: repeat 10\nverb step_01() {\n}\nverb step_02()"));
+    assert!(text.ends_with("verb step_10() {\n}\n# catalog: end\ntail\n"));
+    let single = super::repeat::expand("# catalog: repeat 3\n{n}\n# catalog: end\n").unwrap();
+    assert_eq!(single, "# catalog: repeat 3\n1\n2\n3\n# catalog: end\n");
+    assert_eq!(super::repeat::expand("plain\n").unwrap(), "plain\n");
+}
+
+#[test]
+fn a_malformed_repeat_region_is_an_entry_shape_error() {
+    for body in [
+        "# catalog: repeat 2\nx\n",
+        "# catalog: repeat 2\n# catalog: repeat 2\n# catalog: end\n# catalog: end\n",
+        "# catalog: repeat 0\nx\n# catalog: end\n",
+        "# catalog: repeat many\nx\n# catalog: end\n",
+        "x\n# catalog: end\n",
+    ] {
+        assert!(super::repeat::expand(body).is_err(), "{body}");
+        let text =
+            VALID_ENTRY.replace("verb main() {}\n```\n\n## Fix", &format!("{body}```\n\n## Fix"));
+        assert!(parse_entry("E1140", &text).is_err(), "{body}");
+    }
 }

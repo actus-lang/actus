@@ -110,6 +110,22 @@ The marker `fails=E####,test` says the example fails in `actus test`, which
 is the only command that reads a `tests` directory (ADR-0121). A `compiles`
 group that holds a file under a `tests` directory is verified with `actus test`
 and must exit 0, so every test of it passes.
+The marker `fails=E####,strict`, also written `fails=E####,build,strict` or
+`fails=E####,test,strict`, runs the command with `--strict` (ADR-0041), and a
+`compiles` group written `actus compiles strict` is verified with `--strict`.
+Every diagnostic prints as `<path>: error[E####] at line:column: message`, or
+`error[E####]: message` when it names no file, which only an error of the
+toolchain or the environment does; the test skips the location check of such a
+line only for E1803, E1806, E1880 and E1881, and any other code must name a file
+inside the example.
+A comment line that holds `catalog: repeat N` starts a region of a block and a
+comment line that holds `catalog: end` ends it, using the line comment of the
+block's language (`#` in Actus and TOML). When the test builds the project it
+writes the lines of the region N times and replaces `{n}` in them by the
+1-based index, zero-padded to the width of N, so an example that needs hundreds
+of lines of filler shows the pattern once. The marker lines are written as they
+are; regions do not nest, and an unclosed region, a count of zero or a count
+that is not a number is an error of the entry.
 
 ### One registry of codes
 

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::entry::Block;
+use super::entry::{Block, is_code};
 
 static NEXT_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
 
@@ -70,18 +70,21 @@ impl TempProject {
             let path = project.root.join(block.target());
             let parent = path.parent().expect("a block target has a parent directory");
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-            fs::write(&path, &block.body).map_err(|error| error.to_string())?;
+            let body = super::repeat::expand(&block.body)?;
+            fs::write(&path, body).map_err(|error| error.to_string())?;
         }
         Ok(project)
     }
 
-    /// Runs `actus <command>` in the project and joins both output streams.
-    pub fn run(&self, command: &str) -> Run {
-        let output = Command::new(env!("CARGO_BIN_EXE_actus"))
-            .arg(command)
-            .current_dir(&self.root)
-            .output()
-            .expect("the actus binary should start");
+    /// Runs `actus <command>` (with `--strict` when `strict`) in the project
+    /// and joins both output streams.
+    pub fn run(&self, command: &str, strict: bool) -> Run {
+        let mut process = Command::new(env!("CARGO_BIN_EXE_actus"));
+        process.arg(command).current_dir(&self.root);
+        if strict {
+            process.arg("--strict");
+        }
+        let output = process.output().expect("the actus binary should start");
         let output_text = format!(
             "{}{}",
             String::from_utf8_lossy(&output.stderr),
@@ -91,12 +94,44 @@ impl TempProject {
     }
 }
 
-/// The code and location of the first `error[E####]` line of a run.
-pub fn first_error(run: &Run) -> Option<(String, String)> {
-    let line = run.output.lines().find(|line| line.contains(": error[E"))?;
-    let (location, rest) = line.split_once(": error[")?;
-    let code = rest.split(']').next()?;
-    Some((code.to_owned(), location.replace('\\', "/")))
+/// The first error line of a run: its code and, when the line names a file,
+/// the location in front of it. A line has the one format of every diagnostic,
+/// `<location>: error[E####] ...`, or `error[E####]: ...` when it names no
+/// file (an error of the toolchain or the environment).
+pub struct FirstError {
+    pub code: String,
+    pub location: Option<String>,
+}
+
+pub fn first_error(run: &Run) -> Option<FirstError> {
+    run.output.lines().find_map(|line| {
+        let (location, rest) = match line.strip_prefix("error[") {
+            Some(rest) => (None, rest),
+            None => {
+                let (location, rest) = line.split_once(": error[")?;
+                (Some(location.replace('\\', "/")), rest)
+            }
+        };
+        let code = rest.split(']').next().filter(|code| is_code(code))?;
+        Some(FirstError { code: code.to_owned(), location })
+    })
+}
+
+/// The codes of errors of the toolchain or the environment. They name no file,
+/// so their first error line has no location to check (ADR-0123).
+const ENVIRONMENT_CODES: [&str; 4] = ["E1803", "E1806", "E1880", "E1881"];
+
+/// Whether the first error of a run is the one the entry of `code` promises:
+/// its code, at a location inside the example. A line without a file is
+/// accepted only for a code that is an environment code.
+pub fn is_expected(error: &FirstError, code: &str, files: &[&str]) -> bool {
+    if error.code != code {
+        return false;
+    }
+    match &error.location {
+        Some(location) => inside_example(location, files),
+        None => ENVIRONMENT_CODES.contains(&code),
+    }
 }
 
 /// Whether the reported `location` lies inside the example: it is one of the
