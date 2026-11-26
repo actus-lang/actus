@@ -3,6 +3,7 @@
 
 use crate::ast::TestFault;
 use crate::cli::terminal_output::{OutputStopped, try_outln};
+use crate::configuration::BuildProfile;
 
 use super::super::conformance::ConformanceMode;
 use super::collection::DiscoveredTest;
@@ -13,13 +14,17 @@ pub(super) fn print_test_header(
     total: usize,
     filtered: usize,
     mode: ConformanceMode,
+    profile: BuildProfile,
 ) -> Result<(), OutputStopped> {
     let noun = if total == 1 { "test" } else { "tests" };
-    if mode.is_strict() {
-        try_outln!("running {total} {noun} (strict) ({filtered} filtered)")
-    } else {
-        try_outln!("running {total} {noun} ({filtered} filtered)")
-    }
+    // The run names what is not the default: a strict run and a profile other
+    // than `debug` (ADR-0122).
+    let strict = if mode.is_strict() { " (strict)" } else { "" };
+    let profile = match profile {
+        BuildProfile::Debug => String::new(),
+        other => format!(" ({})", other.directory_name()),
+    };
+    try_outln!("running {total} {noun}{strict}{profile} ({filtered} filtered)")
 }
 
 pub(super) fn report_test_result(

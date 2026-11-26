@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use crate::configuration::BackendKind;
 use crate::configuration::CompilerConfiguration;
+use crate::configuration::{BackendKind, BuildProfile};
 
 use super::conformance::ConformanceMode;
 
@@ -62,6 +62,29 @@ pub(super) fn parse_backend(name: &str) -> Result<BackendKind, String> {
         "llvm" => Ok(BackendKind::Llvm),
         _ => Err(format!("unsupported backend `{name}`; expected `cranelift` or `llvm`")),
     }
+}
+
+/// Parses `--release` and `--profile <name>` for the commands that build
+/// (ADR-0114, ADR-0122). Returns whether `argument` was a profile option; a
+/// second profile option, a missing value or an unknown name is an error.
+pub(super) fn parse_profile_option(
+    argument: &str,
+    arguments: &mut impl Iterator<Item = String>,
+    profile: &mut Option<BuildProfile>,
+) -> Result<bool, String> {
+    let selected = match argument {
+        "--release" => BuildProfile::Release,
+        "--profile" => {
+            let name =
+                arguments.next().ok_or_else(|| "missing value after `--profile`".to_owned())?;
+            BuildProfile::from_name(&name)?
+        }
+        _ => return Ok(false),
+    };
+    if profile.replace(selected).is_some() {
+        return Err("duplicate or conflicting profile option".to_owned());
+    }
+    Ok(true)
 }
 
 pub(super) fn module_path_for_file(source_root: &Path, file: &Path) -> Option<String> {

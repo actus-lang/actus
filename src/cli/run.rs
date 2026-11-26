@@ -73,14 +73,10 @@ fn parse_run_options(arguments: &mut impl Iterator<Item = String>) -> Result<Run
             program_arguments.extend(arguments);
             break;
         }
+        if super::input::parse_profile_option(&argument, arguments, &mut profile)? {
+            continue;
+        }
         match argument.as_str() {
-            "--release" => profile = Some(BuildProfile::Release),
-            "--profile" => {
-                profile = match arguments.next() {
-                    Some(name) => Some(BuildProfile::from_name(&name)?),
-                    None => return Err("missing value after `--profile`".to_owned()),
-                };
-            }
             "--backend" => {
                 let name =
                     arguments.next().ok_or_else(|| "missing value after `--backend`".to_owned())?;

@@ -30,6 +30,30 @@ The positional filter, `--module`, and `--file` are substring filters by
 default. Add `--exact` when the value must match exactly. `--list` discovers
 and prints the selected canonical test identities without executing them.
 
+## Test build profiles
+
+Without an option `actus test` builds with the manifest's `[build] profile`,
+`debug` when it names none. It accepts the profile options of `actus build`,
+with the same meaning and the same errors:
+
+```sh
+actus test --release
+actus test --profile size
+```
+
+`--release` selects the `release` profile and `--profile <name>` selects
+`debug`, `release` or `size`; a `[profile.<name>]` table in `Actus.toml`
+overrides the optimization level of that profile. The two options are
+exclusive, and an unknown profile is an error. The profile applies to every
+test executable of the run on both back ends, so a heavy test runs at the
+optimization level the project ships with and a CI job can check that tests
+pass at `O0` and at `O3`. It changes how a test is optimized, never what it
+means: runtime checks stay on and trap with the same report, and fault
+injection, the per-test process, the empty working directory, the timeout, the
+exit-status contract and `--strict` do not depend on the profile. The run
+header names a profile other than `debug`:
+`running 12 tests (release) (0 filtered)`. See ADR-0122.
+
 Tests live in two places. A module's tests are the `.act` files of the `tests`
 directory next to its facade (`src/ie/runtime/tests/*.act` tests `ie::runtime`);
 they are compiled as part of the module and see its private declarations. The
