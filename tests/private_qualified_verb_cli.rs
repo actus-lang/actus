@@ -6,8 +6,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const FACADE: &str = "open api;\n";
-const API: &str = "verb helper() -> Int { return 1; }\nopen verb shown() -> Int { return 2; }\nconst K: Int = 3;\n";
+const FACADE: &str =
+    "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n";
+const API: &str = "verb helper() -> Int { return 1; }\n\"\"\"Return the fixed integer value 2 for the qualified call fixture.\"\"\" open verb shown() -> Int { return 2; }\nconst K: Int = 3;\n";
 
 fn project(name: &str, main: &str) -> PathBuf {
     let root =

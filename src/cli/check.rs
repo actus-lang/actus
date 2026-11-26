@@ -7,7 +7,9 @@ use crate::modules::{
 use crate::session::CompilationSession;
 use std::fs;
 
-use super::conformance::{ConformanceMode, parse_strict_option, validate_source_limits};
+use super::conformance::{
+    ConformanceMode, parse_strict_option, validate_package_documentation, validate_source_limits,
+};
 use super::diagnostics::{report_frontend_error, report_mapped_diagnostic};
 
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
@@ -151,6 +153,9 @@ fn analyze_check_program(
         report_mapped_diagnostic(source_map, input, source, module_diagnostic(&error));
         return 1;
     }
+    if !validate_package_documentation(input, &plan, mode) {
+        return 1;
+    }
     if mode.is_strict() {
         outln!("checked `{}` successfully (strict)", input.display());
     } else {
@@ -185,6 +190,9 @@ fn check_module(
     };
     if let Err(error) = validate_compilation_plan(&plan, configuration.target()) {
         report_mapped_diagnostic(source_map, input_path, "", module_diagnostic(&error));
+        return 1;
+    }
+    if !validate_package_documentation(input_path, &plan, mode) {
         return 1;
     }
     if mode.is_strict() {

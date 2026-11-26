@@ -40,10 +40,9 @@ fn stderr(output: &Output) -> String {
 
 const MAIN: &str = "import alpha as a;\nimport {\n    open beta,\n};\n\nverb main() -> Int {\n    erg one = 1;\n    erg two = 2;\n    erg three = 3;\n    erg four = 4;\n    erg five = 5;\n    erg six = 6;\n    erg yes = true;\n    erg no = false;\n    erg kept = a::twice(value: erg yes, other: erg no);\n    erg base = a::pick(first: erg one, second: erg two) * 100\n        + choose(first: erg three, second: erg four) * 10;\n    if kept {\n        return base + a::twice(value: erg five, other: erg six);\n    }\n    return 0;\n}\n";
 
-const ALPHA: &str = "open verb pick[T](erg first: T, erg second: T) -> T {\n    return first;\n}\n\nopen verb twice[T](erg value: T, erg other: T) -> T {\n    return pick(first: erg value, second: erg other);\n}\n";
+const ALPHA: &str = "\"\"\"Return the first of two owned values of the same generic type by value and drop the second.\"\"\" open verb pick[T](erg first: T, erg second: T) -> T {\n    return first;\n}\n\n\"\"\"Return the value chosen by pick for two owned arguments of the same generic type by value.\"\"\" open verb twice[T](erg value: T, erg other: T) -> T {\n    return pick(first: erg value, second: erg other);\n}\n";
 
-const BETA: &str =
-    "open verb choose[T](erg first: T, erg second: T) -> T {\n    return second;\n}\n";
+const BETA: &str = "\"\"\"Return the second of two owned values of the same generic type by value and drop the first.\"\"\" open verb choose[T](erg first: T, erg second: T) -> T {\n    return second;\n}\n";
 
 /// A generic verb reached through an aliased import, an open import, and a
 /// nested call from another generic verb specializes and links by identity:
@@ -54,9 +53,15 @@ fn generic_verbs_link_through_every_import_binding() {
         "bindings",
         &[
             ("main.act", MAIN),
-            ("alpha/alpha.act", "open api;\n"),
+            (
+                "alpha/alpha.act",
+                "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+            ),
             ("alpha/api.act", ALPHA),
-            ("beta/beta.act", "open api;\n"),
+            (
+                "beta/beta.act",
+                "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+            ),
             ("beta/api.act", BETA),
         ],
     );

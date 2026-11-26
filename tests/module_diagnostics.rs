@@ -67,19 +67,19 @@ fn neutral_reexport_project() -> PathBuf {
         "import app;\nverb main() -> Int { return app::start(); }\n",
     )
     .expect("write neutral re-export entry");
-    fs::write(root.join("src/app/app.act"), "open start;\n").expect("write neutral app facade");
-    fs::write(root.join("src/app/start.act"), "import interface;\nopen verb start() -> Int {\n    erg result: Result[Int, interface::ParseError] = interface::parse();\n    return 0;\n}\n")
+    fs::write(root.join("src/app/app.act"), "\"\"\"Re-export the start module declarations for the fixture project.\"\"\" open start;\n").expect("write neutral app facade");
+    fs::write(root.join("src/app/start.act"), "import interface;\n\"\"\"Return the integer value 0 after it parses the interface into a typed Result.\"\"\" open verb start() -> Int {\n    erg result: Result[Int, interface::ParseError] = interface::parse();\n    return 0;\n}\n")
         .expect("write neutral start source");
-    fs::write(root.join("src/interface/interface.act"), "open config;\nopen parser;\n")
+    fs::write(root.join("src/interface/interface.act"), "\"\"\"Re-export the config module declarations for the fixture project.\"\"\" open config;\n\"\"\"Re-export the parser module declarations for the fixture project.\"\"\" open parser;\n")
         .expect("write neutral interface facade");
-    fs::write(root.join("src/interface/config/config.act"), "open contract;\n")
+    fs::write(root.join("src/interface/config/config.act"), "\"\"\"Re-export the contract module declarations for the fixture project.\"\"\" open contract;\n")
         .expect("write neutral config facade");
     fs::write(
         root.join("src/interface/config/contract.act"),
-        "open enum ParseError { Invalid, }\n",
+        "\"\"\"Fixture error enum that names the typed parse failures of the interface.\"\"\" open enum ParseError { \"\"\"The input was invalid.\"\"\" Invalid, }\n",
     )
     .expect("write neutral contract source");
-    fs::write(root.join("src/interface/parser.act"), "import interface::config;\nopen verb parse() -> Result[Int, config::ParseError] {\n    return Result[Int, config::ParseError].Ok(0);\n}\n")
+    fs::write(root.join("src/interface/parser.act"), "import interface::config;\n\"\"\"Return a Result whose Ok holds the integer value 0 and whose Err reports a typed ParseError.\"\"\" open verb parse() -> Result[Int, config::ParseError] {\n    return Result[Int, config::ParseError].Ok(0);\n}\n")
         .expect("write neutral parser source");
     root
 }
@@ -133,7 +133,7 @@ fn conflicting_reexport_project() -> PathBuf {
         .expect("write conflicting app facade");
     fs::write(
         root.join("src/app/start.act"),
-        "import interface;\nopen verb start() -> Int {\n    erg result: Result[Int, app::AppParseError] = interface::parse();\n    return 0;\n}\n",
+        "import interface;\n\"\"\"Return the integer value 0 after it parses the interface into a typed Result.\"\"\" open verb start() -> Int {\n    erg result: Result[Int, app::AppParseError] = interface::parse();\n    return 0;\n}\n",
     )
     .expect("write conflicting start source");
     fs::write(root.join("src/app/contract.act"), "open enum AppParseError { Missing, }\n")
@@ -262,9 +262,17 @@ fn duplicate_facade_project() -> PathBuf {
         "import left; import right; verb main() -> Int { return 0; }\n",
     )
     .expect("write duplicate entry");
-    fs::write(root.join("src/left/left.act"), "open api;\n").expect("write left facade");
-    fs::write(root.join("src/right/right.act"), "open api;\n").expect("write right facade");
-    let api = "open enum SharedError { Missing, } unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;\n";
+    fs::write(
+        root.join("src/left/left.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .expect("write left facade");
+    fs::write(
+        root.join("src/right/right.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .expect("write right facade");
+    let api = "\"\"\"Fixture error enum that both facades declare identically.\"\"\" open enum SharedError { \"\"\"The shared resource was missing.\"\"\" Missing, } unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;\n";
     fs::write(root.join("src/left/api.act"), api).expect("write left declarations");
     fs::write(root.join("src/right/api.act"), api).expect("write right declarations");
     root

@@ -213,14 +213,22 @@ form above.
 
 ### Source limits
 
-Strict validation must enforce the repository limits as errors:
+Strict validation enforces these limits on Actus sources, counted in code
+lines, as errors:
 
-- files above 300 lines require decomposition planning;
-- files at or above the 400-line warning threshold fail strict validation;
-- files above the 500-line hard limit are always rejected;
-- functions above 30 lines require decomposition planning;
-- functions at or above the 40-line warning threshold fail strict validation;
-- functions above the 60-line hard limit are always rejected.
+- files above 500 lines are above the preferred size (`E1850`);
+- files of 600 lines or more must be split (`E1851`);
+- files above the 800-line hard limit are always rejected (`E1852`);
+- functions above 50 lines are above the preferred size (`E1853`);
+- functions of 60 lines or more must be split (`E1854`);
+- functions above the 80-line hard limit are always rejected (`E1855`).
+
+Because every strict warning is an error, a strict run accepts a file of at
+most 500 code lines and a function of at most 50, unless ADR-0048 lifts the
+limit for it with `meta limitless("file")`, `meta limitless("verb")` or
+`source_limits = "limitless"`. These numbers are the compiler's
+(`SourceLimitPolicy`); the limits for the compiler's own Rust sources are a
+separate repository rule in `AGENTS.md`.
 
 Generated files and explicitly identified tabular fixtures may be exempt only
 through a repository-level validator rule. A local comment cannot suppress a

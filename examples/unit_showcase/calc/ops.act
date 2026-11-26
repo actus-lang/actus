@@ -1,7 +1,15 @@
+"""
+Add two owned integers and return their sum as an integer value. The verb
+takes both operands by value, allocates nothing and has no side effects.
+"""
 open verb add(erg left: Int, erg right: Int) -> Int {
     return left + right;
 }
 
+"""
+Return the sum of two owned integers by calling `add` with both operands by
+value. The verb allocates nothing and has no side effects.
+"""
 open verb calc_sum(erg left: Int, erg right: Int) -> Int {
     return add(left: left, right: right);
 }

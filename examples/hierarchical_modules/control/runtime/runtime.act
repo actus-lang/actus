@@ -1,1 +1,2 @@
+"""Re-export the safety declarations of the control runtime module."""
 open safety;

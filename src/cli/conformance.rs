@@ -40,6 +40,74 @@ pub(super) fn validate_source_limits(
     false
 }
 
+/// Strict mode validates the public documentation of every source file of the
+/// package (ADR-0041): the entry file and every module file of the compilation
+/// plan that belongs to the package, not the dependencies or the runtime.
+/// Outside strict mode nothing is checked. A file that does not lex or parse is
+/// reported by the frontend, so it is skipped here.
+pub(super) fn validate_package_documentation(
+    entry: &Path,
+    plan: &crate::modules::ModuleCompilationPlan,
+    mode: ConformanceMode,
+) -> bool {
+    if !mode.is_strict() {
+        return true;
+    }
+    let mut paths = std::collections::BTreeSet::from([entry.to_path_buf()]);
+    for unit in plan.units() {
+        if unit.identity().package() == plan.package_identity() {
+            paths.extend(unit.sources().iter().map(|source| source.path().to_path_buf()));
+        }
+    }
+    let mut valid = true;
+    for path in paths {
+        if let Ok(source) = fs::read_to_string(&path) {
+            valid &= validate_file_documentation(&path, &source, mode);
+        }
+    }
+    valid
+}
+
+/// Reports the public-documentation findings of one source file as errors.
+pub(super) fn validate_file_documentation(
+    path: &Path,
+    source: &str,
+    mode: ConformanceMode,
+) -> bool {
+    if !mode.is_strict() {
+        return true;
+    }
+    let (tokens, errors) = crate::lexer::scan(source);
+    let Ok(program) = crate::parser::parse(tokens) else { return true };
+    if !errors.is_empty() {
+        return true;
+    }
+    let diagnostics = crate::documentation::validate_public_documentation(&program)
+        .into_iter()
+        // Phase 56 goal 5 redesigns the content contract: the keyword checks
+        // E1841 (missing contract part) and E1842 (short or restating summary)
+        // are not reliable yet, so strict mode reports only E1840, E1844 and
+        // E1845.
+        .filter(|issue| {
+            issue.code != crate::diagnostics::STRICT_DOCUMENTATION_SECTION
+                && issue.code != crate::diagnostics::STRICT_DOCUMENTATION_RESTATEMENT
+        })
+        .map(|issue| {
+            Diagnostic::error(
+                issue.code,
+                issue.span,
+                format!("{}: {}", issue.declaration, issue.message),
+            )
+            .with_phase(crate::diagnostics::DiagnosticPhase::Conformance)
+        })
+        .collect::<Vec<_>>();
+    if diagnostics.is_empty() {
+        return true;
+    }
+    report_diagnostics(path, source, diagnostics);
+    false
+}
+
 pub(super) fn conformance_command(arguments: impl Iterator<Item = String>) -> i32 {
     let mode = match parse_conformance_mode(arguments) {
         Ok(mode) => mode,

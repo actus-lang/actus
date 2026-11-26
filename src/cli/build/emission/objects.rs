@@ -5,7 +5,9 @@ use crate::build_graph::invalidate_stale_artifact;
 use crate::codegen::BackendEmitError;
 use crate::configuration::{CompilerConfiguration, EntryContract};
 
-use super::super::super::conformance::{ConformanceMode, validate_source_limits};
+use super::super::super::conformance::{
+    ConformanceMode, validate_package_documentation, validate_source_limits,
+};
 use super::super::artifacts::{default_output, write_artifact};
 use super::super::loading::{load_build_program, validate_plan};
 use super::super::options::EmitKind;
@@ -69,6 +71,9 @@ fn build_file_with_report(
         }
     };
     if !validate_plan(input, &source, &plan, configuration.target(), &source_map) {
+        return 1;
+    }
+    if !validate_package_documentation(Path::new(input), &plan, mode) {
         return 1;
     }
     let Some(fallback_symbol) = first_defined_verb(&caller) else {

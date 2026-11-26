@@ -167,7 +167,7 @@ fn std_io_native_labelled_print_works_on_llvm() {
 fn native_string_collection_covers_case_blocks_and_else_if() {
     let (root, input, output) = project(
         "string-control-flow",
-        "open stdout;\nopen error;\n",
+        "\"\"\"Re-export the stdout module declarations for the fixture project.\"\"\" open stdout;\n\"\"\"Re-export the error module declarations for the fixture project.\"\"\" open error;\n",
         &["stdout.act", "error.act"],
         r#"import { open io };
 verb main() -> Int {

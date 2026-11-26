@@ -45,7 +45,14 @@ pages from them.
    return type and the variants of its errors. It runs on the standard library
    and on any user project. An ADR fixes the output format and what a
    documentation block must contain to pass a strict check (every open
-   declaration documented, every `Result` error variant named).
+   declaration documented, every `Result` error variant named). Strict mode
+   already requires a docstring on every public declaration (`E1840`) and
+   rejects docstrings that contradict a role or a `Result` (`E1844`,
+   `E1845`). The content checks `E1841` and `E1842` exist but search for
+   keywords as substrings and are not reliable, so strict mode does not
+   report them yet; this ADR replaces them with a documented structure, such
+   as named sections for returns and errors, and enables them. Until then
+   `E1841` and `E1842` stay in `missing.txt`.
 6. **Release assets.** The release archive or the repository at the release
    tag carries the generated catalog and standard-library pages, so the
    website can take the pages of the exact version it documents.

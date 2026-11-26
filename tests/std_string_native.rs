@@ -194,16 +194,19 @@ fn hosted_nested_facade_preserves_borrowed_string_arguments() {
         "[package]\nname = \"nested_string\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\nruntime = \"std\"\nverify_no_float_ir = true\n",
     )
     .expect("manifest");
-    fs::write(root.join("src/text/text.act"), "open tokenizer;\n").expect("facade");
-    fs::write(root.join("src/text/tokenizer/tokenizer.act"), "open byte;\n")
-        .expect("nested facade");
+    fs::write(root.join("src/text/text.act"), "\"\"\"Re-export the tokenizer module declarations for the fixture project.\"\"\" open tokenizer;\n").expect("facade");
+    fs::write(
+        root.join("src/text/tokenizer/tokenizer.act"),
+        "\"\"\"Re-export the byte module declarations for the fixture project.\"\"\" open byte;\n",
+    )
+    .expect("nested facade");
     fs::write(
         root.join("src/text/tokenizer/byte.act"),
         r#"import { open std::string };
 open const TOKEN_VERSION: u16 = 1u16;
-open struct ByteRecord { id: u32, offset: u32, length: u16, version: u16, }
-open struct TokenSequence { records: Array[ByteRecord, 256], length: u32, valid: Bool, status: Int, }
-open verb inspect(abs text: String) -> TokenSequence {
+"""One scanned byte with its identifier, offset, length and version.""" open struct ByteRecord { """The identifier of the scanned byte.""" id: u32, """The byte offset of the record in the text.""" offset: u32, """The length in bytes of the record.""" length: u16, """The version of the token format.""" version: u16, }
+"""The scanned records of a text with their count, validity and status.""" open struct TokenSequence { """The fixed array of scanned byte records.""" records: Array[ByteRecord, 256], """The count of scanned records.""" length: u32, """The flag that tells whether every byte scanned.""" valid: Bool, """The integer status where 0 means success.""" status: Int, }
+"""Borrow the abs text read-only, scan its bytes and return a TokenSequence value whose status reports the outcome.""" open verb inspect(abs text: String) -> TokenSequence {
     erg sequence: TokenSequence = TokenSequence { records: Array[ByteRecord, 256](), length: 0u32, valid: true, status: 1 };
     erg length_result = string_length(text: abs text);
     erg text_length: u32 = case dat length_result {

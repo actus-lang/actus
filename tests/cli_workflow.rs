@@ -327,10 +327,10 @@ fn native_build_propagates_nested_generic_instances_through_an_imported_module()
     .expect("write manifest");
     fs::write(root.join("src/main.act"), "import { open aie }; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n")
         .expect("write root source");
-    fs::write(module.join("aie.act"), "open engine;\n").expect("write module facade");
+    fs::write(module.join("aie.act"), "\"\"\"Re-export the engine module declarations for the fixture project.\"\"\" open engine;\n").expect("write module facade");
     fs::write(
         module.join("engine.act"),
-        "open struct Storage[N: Usize] { erg values: Array[u32, N], } open verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } open verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
+        "\"\"\"Fixed-capacity storage that holds N unsigned values for the fixture.\"\"\" open struct Storage[N: Usize] { \"\"\"The owned value array of the storage.\"\"\" erg values: Array[u32, N], } \"\"\"Borrow the storage through an exclusive ins loan and return its capacity N as an unsigned value.\"\"\" open verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } \"\"\"Loan the storage through ins to inner and return the capacity value that inner reports.\"\"\" open verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
     )
     .expect("write generic module source");
     let output = root.join("nested-generic-module");
@@ -362,11 +362,11 @@ fn native_build_propagates_nested_generics_through_a_child_facade() {
         "import { open aie }; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n",
     )
     .expect("write root source");
-    fs::write(root.join("src/aie/aie.act"), "open runtime;\n").expect("write parent facade");
-    fs::write(child.join("runtime.act"), "open engine;\n").expect("write child facade");
+    fs::write(root.join("src/aie/aie.act"), "\"\"\"Re-export the runtime module declarations for the fixture project.\"\"\" open runtime;\n").expect("write parent facade");
+    fs::write(child.join("runtime.act"), "\"\"\"Re-export the engine module declarations for the fixture project.\"\"\" open engine;\n").expect("write child facade");
     fs::write(
         child.join("engine.act"),
-        "open struct Storage[N: Usize] { erg values: Array[u32, N], } open verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } open verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
+        "\"\"\"Fixed-capacity storage that holds N unsigned values for the fixture.\"\"\" open struct Storage[N: Usize] { \"\"\"The owned value array of the storage.\"\"\" erg values: Array[u32, N], } \"\"\"Borrow the storage through an exclusive ins loan and return its capacity N as an unsigned value.\"\"\" open verb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; } \"\"\"Loan the storage through ins to inner and return the capacity value that inner reports.\"\"\" open verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
     )
     .expect("write nested generic source");
 
@@ -399,12 +399,12 @@ fn native_build_specializes_root_generic_calls_through_nested_facades() {
         "import { open device }; verb wrapper[N: Usize](ins value: Storage[N]) -> u32 { return forward(value: ins value); } verb main() -> Int { erg value: Storage[4] = Storage[4] { values: Array[u32, 4]() }; return wrapper(value: ins value) as Int; }\n",
     )
     .expect("write root source");
-    fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
-    fs::write(root.join("src/device/runtime/runtime.act"), "open implementation;\n")
+    fs::write(root.join("src/device/device.act"), "\"\"\"Re-export the runtime module declarations for the fixture project.\"\"\" open runtime;\n").expect("write parent facade");
+    fs::write(root.join("src/device/runtime/runtime.act"), "\"\"\"Re-export the implementation module declarations for the fixture project.\"\"\" open implementation;\n")
         .expect("write child facade");
     fs::write(
         implementation.join("implementation.act"),
-        "open struct Storage[N: Usize] { erg values: Array[u32, N], } open verb forward[N: Usize](ins value: Storage[N]) -> u32 { return N as u32; }\n",
+        "\"\"\"Fixed-capacity storage that holds N unsigned values for the fixture.\"\"\" open struct Storage[N: Usize] { \"\"\"The owned value array of the storage.\"\"\" erg values: Array[u32, N], } \"\"\"Borrow the storage through an exclusive ins loan and return its capacity N as an unsigned value.\"\"\" open verb forward[N: Usize](ins value: Storage[N]) -> u32 { return N as u32; }\n",
     )
     .expect("write generic implementation");
 
