@@ -214,7 +214,7 @@ verb main() -> Int {
 fn native_string_data_is_deduplicated_and_deterministic() {
     let (root, input, output) = project(
         "string-data",
-        "open stdout;\nopen error;\n",
+        "\"\"\"Re-export the standard output declarations.\"\"\"\nopen stdout;\n\n\"\"\"Re-export the input and output error declarations.\"\"\"\nopen error;\n",
         &["stdout.act", "error.act"],
         r#"import { open io };
 verb main() -> Int {

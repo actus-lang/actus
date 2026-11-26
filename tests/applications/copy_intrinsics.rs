@@ -27,25 +27,35 @@ fn nested_facade_keeps_scalar_copy_intrinsic_separate_from_imported_io_copy() {
     let source = "import { open feature }; verb main() -> Int { return scalar_copy(); }\n";
     let (root, input, output) = project("nested-imported-io-copy-intrinsic", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature module");
-    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
-        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/feature.act"),
+        r#""""Re-export the feature implementation."""
+open implementation;
+"#,
+    )
+    .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
         r#"import { open io };
 
+"""A storage cell that holds one 32-bit value."""
 open struct Storage[N: Usize] {
+    """The stored value."""
     erg value: u32,
 }
 
+"""Store the index in the storage and return it; the storage is loaned for the call."""
 open verb configure(ins storage: Storage[64], erg index: u32) -> u32 {
     storage.value = index;
     return index;
 }
 
+"""Return `Some(41)`; the storage is loaned for the call and left unchanged."""
 open verb produce[N: Usize](ins storage: Storage[N]) -> Option[u32] {
     return Option[u32].Some(41u32);
 }
 
+"""Copy a scalar selected from a produced option and return it as an integer."""
 open verb scalar_copy() -> Int {
     erg storage: Storage[64] = Storage[64] { value: 0u32, };
     erg created: Option[u32] = produce(storage: ins storage);
