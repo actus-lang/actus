@@ -98,3 +98,15 @@ pub fn first_error(run: &Run) -> Option<(String, String)> {
     let code = rest.split(']').next()?;
     Some((code.to_owned(), location.replace('\\', "/")))
 }
+
+/// Whether the reported `location` lies inside the example: it is one of the
+/// example's files, or a directory that holds one. `actus test` names the
+/// directory or file of a layout error, with an `error: ` prefix and a `./`.
+pub fn inside_example(location: &str, files: &[&str]) -> bool {
+    let location = location.strip_prefix("error: ").unwrap_or(location);
+    let location = location.strip_prefix("./").unwrap_or(location);
+    files.iter().any(|file| {
+        location.ends_with(file)
+            || file.starts_with(&format!("{}/", location.trim_end_matches('/')))
+    })
+}

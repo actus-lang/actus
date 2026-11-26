@@ -106,6 +106,10 @@ The list is deleted when it is empty.
 The examples run on both back ends when the code is a back-end or build error
 rather than a check error; the marker `fails=E####,build` says the example
 fails in `actus build` instead of `actus check`.
+The marker `fails=E####,test` says the example fails in `actus test`, which
+is the only command that reads a `tests` directory (ADR-0121). A `compiles`
+group that holds a file under a `tests` directory is verified with `actus test`
+and must exit 0, so every test of it passes.
 
 ### One registry of codes
 

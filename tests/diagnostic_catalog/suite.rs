@@ -12,8 +12,8 @@ use std::path::PathBuf;
 
 use actus::diagnostics::DiagnosticCode;
 
-use super::entry::{Entry, is_code, parse_entry};
-use super::project::{TempProject, first_error, groups};
+use super::entry::{Block, Entry, is_code, parse_entry};
+use super::project::{TempProject, first_error, groups, inside_example};
 
 fn catalog_directory() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docs/language/diagnostics")
@@ -95,13 +95,13 @@ fn every_failing_example_reports_its_code_first_inside_the_example() {
             let Some(failing) = group.iter().find(|block| block.fails.is_some()) else {
                 continue;
             };
-            let command = if failing.build { "build" } else { "check" };
+            let command = Block::command_for(&group);
             let project = TempProject::create(&group).expect("project should be created");
             let run = project.run(command);
             let files: Vec<&str> = group.iter().map(|block| block.target()).collect();
             match first_error(&run) {
                 Some((code, location))
-                    if code == entry.code && files.iter().any(|file| location.ends_with(file)) => {}
+                    if code == entry.code && inside_example(&location, &files) => {}
                 Some((code, location)) => problems.push(format!(
                     "{}: line {}: `actus {command}` reported {code} at `{location}`, expected {} in one of {files:?}\n{}",
                     entry.code, failing.line, entry.code, run.output
@@ -127,10 +127,11 @@ fn every_compiling_block_passes_check() {
                 continue;
             };
             let project = TempProject::create(&group).expect("project should be created");
-            let run = project.run("check");
+            let command = Block::command_for(&group);
+            let run = project.run(command);
             if !run.success {
                 problems.push(format!(
-                    "{}: line {}: the block does not pass `actus check`\n{}",
+                    "{}: line {}: the block does not pass `actus {command}`\n{}",
                     entry.code, compiling.line, run.output
                 ));
             }
@@ -170,6 +171,38 @@ fn an_entry_without_a_fix_is_rejected() {
 fn an_example_that_names_another_code_is_rejected() {
     let text = VALID_ENTRY.replace("fails=E1140", "fails=E1141");
     assert!(parse_entry("E1140", &text).is_err());
+}
+
+#[test]
+fn the_test_marker_is_accepted_and_selects_actus_test() {
+    let text = VALID_ENTRY.replace("fails=E1140", "fails=E1140,test");
+    let entry = parse_entry("E1140", &text).expect("the `,test` marker should parse");
+    let group: Vec<&Block> = entry.blocks.iter().take(1).collect();
+    assert_eq!(Block::command_for(&group), "test");
+}
+
+#[test]
+fn a_group_with_a_test_file_is_verified_by_actus_test() {
+    let text = VALID_ENTRY.replace(
+        "```actus compiles\nverb main() {}",
+        "```actus compiles file=tests/main_test.act\nverb main() {}",
+    );
+    let entry = parse_entry("E1140", &text).expect("entry should parse");
+    let fix: Vec<&Block> = entry.blocks.iter().filter(|block| block.compiles).collect();
+    assert_eq!(Block::command_for(&fix), "test");
+    let plain: Vec<&Block> = entry.blocks.iter().filter(|block| block.fails.is_some()).collect();
+    assert_eq!(Block::command_for(&plain), "check");
+}
+
+#[test]
+fn a_failing_example_keeps_the_command_of_its_marker_even_with_a_test_file() {
+    let text = VALID_ENTRY.replace(
+        "```actus fails=E1140\nverb main() {}",
+        "```actus fails=E1140 file=tests/main_test.act\nverb main() {}",
+    );
+    let entry = parse_entry("E1140", &text).expect("entry should parse");
+    let failing: Vec<&Block> = entry.blocks.iter().filter(|block| block.fails.is_some()).collect();
+    assert_eq!(Block::command_for(&failing), "check");
 }
 
 #[test]

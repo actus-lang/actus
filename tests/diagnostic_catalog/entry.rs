@@ -11,6 +11,7 @@ pub struct Block {
     pub section: String,
     pub fails: Option<String>,
     pub build: bool,
+    pub test: bool,
     pub compiles: bool,
     pub file: Option<String>,
     pub body: String,
@@ -21,6 +22,27 @@ impl Block {
     /// The project-relative file this block is written to.
     pub fn target(&self) -> &str {
         self.file.as_deref().unwrap_or(DEFAULT_SOURCE)
+    }
+
+    /// Whether the file lies under a `tests` directory, which `actus check`
+    /// skips and only `actus test` compiles (ADR-0121).
+    pub fn is_test_file(&self) -> bool {
+        self.target().split('/').any(|part| part == "tests")
+    }
+
+    /// The `actus` command that verifies a group of blocks. A failing example
+    /// names its command with its marker. A `compiles` group is verified by
+    /// its content: with a test file it is run by `actus test`, which is the
+    /// only command that reads a `tests` directory, so it cannot be accepted
+    /// by `actus check` alone.
+    pub fn command_for(group: &[&Block]) -> &'static str {
+        match group.iter().find(|block| block.fails.is_some()) {
+            Some(block) if block.test => "test",
+            Some(block) if block.build => "build",
+            Some(_) => "check",
+            None if group.iter().any(|block| block.is_test_file()) => "test",
+            None => "check",
+        }
     }
 }
 
@@ -106,11 +128,12 @@ fn parse_info(info: &str, section: &str, line: usize) -> Result<Option<Block>, S
     for word in words {
         if let Some(value) = word.strip_prefix("fails=") {
             let (code, flag) = value.split_once(',').map_or((value, ""), |pair| pair);
-            if !is_code(code) || !(flag.is_empty() || flag == "build") {
+            if !is_code(code) || !(flag.is_empty() || flag == "build" || flag == "test") {
                 return Err(format!("line {line}: bad marker `{word}`"));
             }
             block.fails = Some(code.to_owned());
             block.build = flag == "build";
+            block.test = flag == "test";
         } else if word == "compiles" {
             block.compiles = true;
         } else if let Some(path) = word.strip_prefix("file=") {
