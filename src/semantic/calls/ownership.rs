@@ -61,7 +61,10 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         match self.model.bindings[index].ownership.clone() {
-            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership = OwnershipState::Moved;
+                self.ownership_change_spans.insert(index, span);
+            }
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved
             | OwnershipState::Dropped => {
@@ -124,6 +127,7 @@ impl Analyzer {
             OwnershipState::Active => {
                 self.model.bindings[index].ownership =
                     OwnershipState::PartiallyMoved { fields: vec![field_path] };
+                self.ownership_change_spans.insert(index, span);
                 Ok(())
             }
             OwnershipState::PartiallyMoved { fields } => {
@@ -157,6 +161,7 @@ impl Analyzer {
         let mut updated = fields;
         updated.push(field_path);
         self.model.bindings[index].ownership = OwnershipState::PartiallyMoved { fields: updated };
+        self.ownership_change_spans.insert(index, span);
         Ok(())
     }
 

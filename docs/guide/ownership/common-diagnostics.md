@@ -9,7 +9,10 @@ Common situations include:
 - mutating through an `abs` view;
 - creating an `ins` loan from an `abs` binding;
 - creating two conflicting loans for one owner;
-- returning or storing a view beyond its source scope;
+- returning or storing a view beyond its source scope, including a struct,
+  `Option` or `Result` that holds a view of a local (`E1018`);
+- moving a value inside a loop that runs again (`E1005`, moved in a previous
+  iteration), unless the path leaves the loop with `break` or `return`;
 - dropping a moved or already-dropped value;
 - joining branches with incompatible ownership states;
 - omitting a required role at a call site;

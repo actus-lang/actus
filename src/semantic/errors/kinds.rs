@@ -15,6 +15,9 @@ pub enum SemanticErrorKind {
     UseAfterMove {
         name: String,
     },
+    MovedInPreviousIteration {
+        name: String,
+    },
     UseAfterDrop {
         name: String,
     },

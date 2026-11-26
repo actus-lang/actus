@@ -179,6 +179,41 @@ verb main() {
 }
 ```
 
+A struct that holds a view can leave a verb, by `return` or through a field of
+an `ins` parameter, only when every view in it comes from an `abs` parameter of
+that verb. A view of a local, of an owned parameter or of a temporary would
+dangle after the return, so it is rejected with `E1018`. The same holds for an
+`Option`, a `Result` or an enum payload that holds a view, for a struct nested
+in another struct, and for a struct that is first stored in a binding:
+
+```actus fails=E1018
+struct Header {
+    abs bytes: Buffer,
+}
+
+verb open_header() -> Header {
+    erg data: Buffer = Buffer[4];
+    erg header = Header { bytes: data, };
+    return header;
+}
+
+verb main() {
+}
+```
+
+```actus
+struct Header {
+    abs bytes: Buffer,
+}
+
+verb open_header(abs source: Buffer) -> Header {
+    return Header { bytes: source, };
+}
+
+verb main() {
+}
+```
+
 A call-scope `ins` loan cannot be stored in an `abs` field. Assigning a
 resource (a buffer, an arena, or a type that holds one) to a field or an array
 element moves it out of the source binding. Plain data keeps value semantics.

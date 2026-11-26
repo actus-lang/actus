@@ -17,10 +17,12 @@ impl Analyzer {
         }
         self.enter_scope(block.span);
         self.loop_boundaries.push(self.scopes.len() - 1);
-        self.visit_block(block)?;
+        self.enter_loop_ownership();
+        let result = self.visit_block(block);
+        let result = self.leave_loop_ownership(block, result);
         self.loop_boundaries.pop();
         self.leave_scope();
-        Ok(())
+        result
     }
 
     pub(in crate::semantic::analyzer) fn visit_loop_control(
@@ -28,6 +30,9 @@ impl Analyzer {
         is_break: bool,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        if !is_break {
+            self.reject_moves_into_next_iteration()?;
+        }
         let kind = if is_break {
             super::super::cleanup::LoopExitKind::Break
         } else {

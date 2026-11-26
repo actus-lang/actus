@@ -179,7 +179,8 @@ fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
         SemanticErrorKind::ShadowedBinding { .. } => DiagnosticCode::SHADOWED_BINDING,
         SemanticErrorKind::UndeclaredIdentifier { .. } => DiagnosticCode::UNDECLARED_IDENTIFIER,
         SemanticErrorKind::InvalidBorrowTarget { .. } => DiagnosticCode::INVALID_BORROW_TARGET,
-        SemanticErrorKind::UseAfterMove { .. } => DiagnosticCode::USE_AFTER_MOVE,
+        SemanticErrorKind::UseAfterMove { .. }
+        | SemanticErrorKind::MovedInPreviousIteration { .. } => DiagnosticCode::USE_AFTER_MOVE,
         SemanticErrorKind::UseAfterDrop { .. } => DiagnosticCode::USE_AFTER_DROP,
         SemanticErrorKind::DoubleDrop { .. } => DiagnosticCode::DOUBLE_DROP,
         SemanticErrorKind::DropBorrow { .. } => DiagnosticCode::DROP_BORROW,

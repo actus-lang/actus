@@ -20,6 +20,8 @@ mod enum_payload_moves;
 mod enums;
 #[path = "semantic/erg_argument_moves.rs"]
 mod erg_argument_moves;
+#[path = "semantic/escaping_views.rs"]
+mod escaping_views;
 #[path = "semantic/explicit_copy_types.rs"]
 mod explicit_copy_types;
 #[path = "semantic/float_negation.rs"]
@@ -34,6 +36,8 @@ mod integer_operands;
 mod literal_range;
 #[path = "semantic/loans.rs"]
 mod loans;
+#[path = "semantic/loop_moves.rs"]
+mod loop_moves;
 #[path = "semantic/misleading_messages.rs"]
 mod misleading_messages;
 #[path = "semantic/move_only_fields.rs"]

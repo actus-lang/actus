@@ -163,7 +163,7 @@ impl Analyzer {
         self.visit_expression(value)?;
         self.move_aggregate_assignment_source(name, value, span)?;
         self.validate_arena_provenance_target(index, name, value, span)?;
-        self.record_binding_arena_provenance(index, value);
+        self.record_binding_provenance(index, value)?;
         self.plan_try_unwind(value);
         Ok(())
     }
@@ -354,7 +354,7 @@ impl Analyzer {
         } else {
             self.record_inferred_binding_type(binding_index, initializer, span);
         }
-        self.record_binding_arena_provenance(binding_index, initializer);
+        self.record_binding_provenance(binding_index, initializer)?;
         self.record_arena_binding(declared_type, binding_index);
         self.record_origin_binding(role, name, initializer, span)
     }
@@ -407,14 +407,6 @@ impl Analyzer {
     fn plan_try_unwind(&mut self, expression: &Expr) {
         if let Expr::Try { span, .. } = expression {
             self.plan_return_unwind(*span);
-        }
-    }
-
-    fn record_binding_arena_provenance(&mut self, binding_index: usize, expression: &Expr) {
-        self.binding_arena_provenance.remove(&binding_index);
-        let arenas = self.arena_provenances(expression);
-        if arenas.len() == 1 {
-            self.binding_arena_provenance.insert(binding_index, *arenas.iter().next().unwrap());
         }
     }
 

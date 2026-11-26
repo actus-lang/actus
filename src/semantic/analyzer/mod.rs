@@ -5,6 +5,7 @@ mod declarations;
 mod expressions;
 mod for_loops;
 mod lifecycle;
+mod loop_moves;
 mod operator_validation;
 mod state;
 mod statements;

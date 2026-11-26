@@ -13,7 +13,10 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let (index, name) = self.validate_dat_case_subject(subject, span)?;
         match self.model.bindings[index].ownership {
-            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership = OwnershipState::Moved;
+                self.ownership_change_spans.insert(index, span);
+            }
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved
             | OwnershipState::Dropped => {
@@ -72,7 +75,10 @@ impl Analyzer {
             return Ok(());
         };
         match self.model.bindings[index].ownership {
-            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership = OwnershipState::Moved;
+                self.ownership_change_spans.insert(index, span);
+            }
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved
             | OwnershipState::Dropped => {
@@ -213,6 +219,7 @@ impl Analyzer {
         match binding.ownership {
             OwnershipState::Active => {
                 self.model.bindings[index].ownership = OwnershipState::Dropped;
+                self.ownership_change_spans.insert(index, span);
                 self.model
                     .explicit_drops
                     .push(crate::semantic::model::ExplicitDrop { binding_index: index, span });

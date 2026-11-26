@@ -18,7 +18,8 @@ impl Analyzer {
         }
         self.ensure_struct_field_mutable(&struct_name, field, span)?;
         self.validate_struct_field_assignment(object, &struct_name, field, value, span)?;
-        self.record_field_arena_provenance(object, field, value, span)
+        self.record_field_arena_provenance(object, field, value, span)?;
+        self.record_field_view_provenance(object, value)
     }
 
     fn validate_assignment_target(

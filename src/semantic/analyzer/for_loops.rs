@@ -33,11 +33,13 @@ impl Analyzer {
         self.visit_expression_with_expected(end, Some(&type_name))?;
         self.enter_scope(body.span);
         self.loop_boundaries.push(self.scopes.len() - 1);
+        self.enter_loop_ownership();
         let binding_type = self.resolve_binding_type(Some(&type_name), start, span)?;
         self.bind(Role::Erg, binding.name.clone(), binding_type, binding.span)?;
         let index = self.binding(&binding.name, binding.span)?;
         self.binding_type_names.insert(index, self.normalize_imported_type_name(&type_name));
         let result = self.visit_block(body);
+        let result = self.leave_loop_ownership(body, result);
         self.loop_boundaries.pop();
         self.leave_scope();
         result
