@@ -186,12 +186,12 @@ fn semantic_analysis_rejects_unknown_parameter_types() {
 }
 
 #[test]
-fn codegen_rejects_integer_values_outside_native_width() {
+fn semantic_analysis_rejects_integer_literals_outside_the_int_range() {
     let (tokens, errors) = scan("verb main() -> Int { return 2147483648; }");
     assert!(errors.is_empty());
     let program = parse(tokens).expect("source should parse");
     let error = emit_program_object(&program, "main").expect_err("literal exceeds i32");
-    assert!(error.to_string().contains("invalid integer literal"));
+    assert!(error.to_string().contains("NumericLiteralOutOfRange"));
 }
 
 fn assert_native_object(bytes: &[u8]) {
