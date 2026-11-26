@@ -100,6 +100,31 @@ Whole-struct assignment and transfer follow the same ownership rules. A
 resource-bearing aggregate is not silently duplicated just because its fields
 are laid out together.
 
+## Fields that receive a resource
+
+A field without a role is a value field, but a value that is not copyable is
+never duplicated by a struct literal. A `Buffer`, an `Arena[N]`, a struct or an
+enum that is written into a field is moved into the new aggregate, exactly as
+for an `erg` field, and the source binding cannot be used again:
+
+```actus fails=E1005
+struct Holder {
+    held: Buffer,
+}
+
+verb main() {
+    erg data: Buffer = Buffer[4];
+    erg holder = Holder { held: data, };
+    append(data, 1u8);
+}
+```
+
+Scalars are the exception: a scalar source stays readable because it is plain
+data. A value field cannot be moved out of its struct again: only an `erg` field
+is a movable place, so `Holder { held: other.held, }` is accepted when
+`other.held` is declared `erg` and rejected when it is a plain field. Declare
+the field `erg` when the aggregate should hand its resource on.
+
 ## Cleanup and custom drop behavior
 
 Struct cleanup is planned at scope boundaries and on return or error paths. If

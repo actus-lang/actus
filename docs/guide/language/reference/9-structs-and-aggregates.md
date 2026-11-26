@@ -34,6 +34,9 @@ erg x = point.x;
 point.x = x + 1;
 ```
 
+A move-only source in a struct literal field, whether the field is `erg` or a
+plain value field, is moved into the new aggregate and cannot be used again.
+
 Field access uses `.`. Field assignment is ownership-checked. Partial field
 moves are tracked. Whole-struct assignment transfers ownership rather than
 implicitly copying a resource-bearing aggregate.

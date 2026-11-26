@@ -193,7 +193,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn is_move_only_aggregate(&self, expression: &Expr) -> bool {
+    pub(in crate::semantic) fn is_move_only_aggregate(&self, expression: &Expr) -> bool {
         if let Expr::FieldAccess { object, .. } = expression
             && self.enum_receiver_name(object).is_some()
         {

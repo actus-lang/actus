@@ -43,7 +43,10 @@ depend on the native backend or on a garbage collector.
 - `open` controls whether a struct declaration crosses a module facade; fields
   do not have a separate visibility modifier.
 - Unmarked fields are value fields. `erg` fields are owned mutable subresources
-  and are included in the containing owner's cleanup plan.
+  and are included in the containing owner's cleanup plan. A move-only source
+  (a `Buffer`, an `Arena[N]`, a struct or an enum) written into a value field is
+  moved into the aggregate like an `erg` field, so no second owner of the same
+  resource remains.
 - `abs` fields are read-only, non-owning views. Mutation of the field or any
   nested path through it is rejected.
 - `ins` fields are rejected because an exclusive loan is call-scoped and cannot

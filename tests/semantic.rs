@@ -1,3 +1,5 @@
+#[path = "semantic/arena_cleanup.rs"]
+mod arena_cleanup;
 #[path = "semantic/arenas.rs"]
 mod arenas;
 #[path = "semantic/arrays.rs"]
@@ -26,6 +28,8 @@ mod literal_range;
 mod loans;
 #[path = "semantic/misleading_messages.rs"]
 mod misleading_messages;
+#[path = "semantic/move_only_fields.rs"]
+mod move_only_fields;
 #[path = "semantic/origins.rs"]
 mod origins;
 #[path = "semantic/packs.rs"]

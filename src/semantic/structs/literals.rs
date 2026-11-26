@@ -81,7 +81,17 @@ impl Analyzer {
             &initializer.value,
             initializer.span,
         )?;
-        if matches!(field.role, crate::ast::StructFieldRole::Erg) {
+        // An `erg` field takes ownership of its source (ADR-0046 2.2). A plain
+        // field has no ownership marker, but a move-only value placed in it is
+        // part of the new aggregate's move and cleanup plan (ADR-0046 2.1, 3),
+        // so the source is consumed as for an `erg` field and cannot stay
+        // behind as a second owner of the same store (ADR-0030).
+        let move_only = self.is_move_only_aggregate(&initializer.value);
+        let owning = field.role == crate::ast::StructFieldRole::Erg
+            || (field.role == crate::ast::StructFieldRole::Value && move_only);
+        if owning && move_only && matches!(initializer.value, Expr::FieldAccess { .. }) {
+            self.move_dat_argument(&initializer.value, initializer.span)?;
+        } else if owning {
             self.initialize_owner(&initializer.value, initializer.span)?;
         }
         Ok(())

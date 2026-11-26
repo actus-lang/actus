@@ -141,6 +141,12 @@ verb valid_lifetime() -> Int {
 }
 ```
 
+An arena is a resource with exactly one owner, so every field that receives it
+moves it, whether the field is declared `erg` or has no role. After
+`erg holder = Holder { held: arena, };` the name `arena` is moved, cannot place
+or be dropped, and is not reset again at the end of its scope: only the owner
+that is still live at the end of a scope releases the arena, exactly once.
+
 A value placed in the arena, such as `node`, must not be read after the arena
 was moved away or dropped. Do not copy a reference into a separate owner to
 bypass the lifetime check.
