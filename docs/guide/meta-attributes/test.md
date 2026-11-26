@@ -69,6 +69,19 @@ actus test --list
 
 Use `--exact` when a filter must match exactly.
 
+## Profiles
+
+Without an option `actus test` uses the manifest's `[build] profile`, `debug`
+when it names none. `--release` and `--profile <name>` select another profile
+exactly as they do for `actus build`; runtime checks, fault injection and the
+exit-status contract are the same in every profile, and the run header names a
+profile other than `debug`:
+
+```sh
+actus test --release
+actus test --profile size
+```
+
 ## Constraints
 
 - The attribute is valid only on supported test declarations.

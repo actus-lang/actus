@@ -129,15 +129,12 @@ fn parse_watch_options(
     let mut interval = Duration::from_millis(200);
     let mut profile = None;
     while let Some(argument) = arguments.next() {
+        if super::input::parse_profile_option(&argument, &mut arguments, &mut profile)? {
+            continue;
+        }
         match argument.as_str() {
             "--build" if !build => build = true,
             "--once" if !once => once = true,
-            "--release" => profile = replace_profile(profile, BuildProfile::Release)?,
-            "--profile" => {
-                let name = arguments.next().ok_or("missing value after `--profile`".to_owned())?;
-                let selected = BuildProfile::from_name(&name)?;
-                profile = replace_profile(profile, selected)?;
-            }
             "--interval" => {
                 let value =
                     arguments.next().ok_or("missing value after `--interval`".to_owned())?;
@@ -154,16 +151,6 @@ fn parse_watch_options(
         }
     }
     Ok(WatchOptions { input, build, once, interval, profile })
-}
-
-fn replace_profile(
-    current: Option<BuildProfile>,
-    selected: BuildProfile,
-) -> Result<Option<BuildProfile>, String> {
-    if current.is_some() {
-        return Err("duplicate or conflicting profile option".to_owned());
-    }
-    Ok(Some(selected))
 }
 
 fn execute_once(options: &WatchOptions, configuration: &CompilerConfiguration) -> i32 {

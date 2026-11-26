@@ -47,7 +47,7 @@ fn report_tests(
 ) -> Result<i32, OutputStopped> {
     let output_style = TestOutputStyle::detect();
     let total = collection.order.len();
-    print_test_header(total, collection.filtered, options.mode)?;
+    print_test_header(total, collection.filtered, options.mode, configuration.profile())?;
     if options.list {
         for position in &collection.order {
             let test = collection.test(*position);

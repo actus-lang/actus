@@ -115,10 +115,11 @@ fn parse_build_argument(
     arguments: &mut impl Iterator<Item = String>,
     options: &mut BuildOptions,
 ) -> Result<(), String> {
+    if super::super::input::parse_profile_option(&argument, arguments, &mut options.profile)? {
+        return Ok(());
+    }
     match argument.as_str() {
         "--strict" => parse_strict_option(&argument, &mut options.mode).map(|_| ())?,
-        "--release" => set_profile(options, BuildProfile::Release)?,
-        "--profile" => set_profile(options, parse_profile(arguments)?)?,
         "--backend" => {
             let backend =
                 arguments.next().ok_or_else(|| "missing value after `--backend`".to_owned())?;
@@ -134,25 +135,11 @@ fn parse_build_argument(
     Ok(())
 }
 
-fn set_profile(options: &mut BuildOptions, profile: BuildProfile) -> Result<(), String> {
-    if options.profile.replace(profile).is_some() {
-        return Err("duplicate or conflicting profile option".to_owned());
-    }
-    Ok(())
-}
-
 fn set_backend(options: &mut BuildOptions, backend: BackendKind) -> Result<(), String> {
     if options.backend.replace(backend).is_some() {
         return Err("duplicate backend option".to_owned());
     }
     Ok(())
-}
-
-fn parse_profile(arguments: &mut impl Iterator<Item = String>) -> Result<BuildProfile, String> {
-    let Some(name) = arguments.next() else {
-        return Err("missing value after `--profile`".to_owned());
-    };
-    BuildProfile::from_name(&name)
 }
 
 fn set_output(options: &mut BuildOptions, output: Option<String>) -> Result<(), String> {

@@ -1,7 +1,8 @@
 use crate::cli::terminal_output::errln;
-use crate::configuration::CompilerConfiguration;
+use crate::configuration::{BuildProfile, CompilerConfiguration};
 
 use super::super::conformance::{ConformanceMode, parse_strict_option};
+use super::super::input::parse_profile_option;
 use crate::session::CompilationSession;
 
 use super::{collection, execution, layout};
@@ -15,6 +16,9 @@ pub(in crate::cli) struct TestOptions {
     pub(super) exact: bool,
     pub(super) list: bool,
     pub(super) test_threads: usize,
+    /// The profile of `--release` or `--profile`; `None` keeps the profile
+    /// of the configuration, `debug` unless the manifest says otherwise.
+    pub(super) profile: Option<BuildProfile>,
 }
 
 pub(in crate::cli) fn test_command(arguments: impl Iterator<Item = String>) -> i32 {
@@ -26,7 +30,10 @@ pub(in crate::cli) fn test_command(arguments: impl Iterator<Item = String>) -> i
         }
     };
     let configuration = match load_test_configuration(options.mode) {
-        Ok(configuration) => configuration,
+        Ok(configuration) => match options.profile {
+            Some(profile) => configuration.with_profile(profile),
+            None => configuration,
+        },
         Err(error) => {
             errln!("error: {error}");
             return 1;
@@ -60,7 +67,11 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
     let mut exact = false;
     let mut list = false;
     let mut test_threads = default_test_threads();
+    let mut profile = None;
     while let Some(argument) = arguments.next() {
+        if parse_profile_option(&argument, &mut arguments, &mut profile)? {
+            continue;
+        }
         if argument == "--exact" {
             exact = true;
         } else if argument == "--list" {
@@ -90,7 +101,7 @@ fn parse_test_options(mut arguments: impl Iterator<Item = String>) -> Result<Tes
             return Err("`actus test` accepts only one positional filter".to_owned());
         }
     }
-    Ok(TestOptions { mode, filter, module, file, exact, list, test_threads })
+    Ok(TestOptions { mode, filter, module, file, exact, list, test_threads, profile })
 }
 
 fn default_test_threads() -> usize {
