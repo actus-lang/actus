@@ -1,237 +1,319 @@
+use crate::diagnostics::DiagnosticCode;
 use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::ParseErrorCode;
 use crate::semantic::SemanticErrorKind;
 
 use super::packing;
 
-pub(crate) fn lex_code(error: &LexError) -> u8 {
+pub(crate) fn lex_code(error: &LexError) -> DiagnosticCode {
     match error.kind {
-        LexErrorKind::UnexpectedCharacter(_) => 1,
-        LexErrorKind::UnterminatedString => 2,
-        LexErrorKind::UnterminatedDocString => 3,
-        LexErrorKind::InvalidIntegerType(_) => 4,
-        LexErrorKind::InvalidHexLiteral(_) => 5,
-        LexErrorKind::InvalidFloatType(_) => 6,
+        LexErrorKind::UnexpectedCharacter(_) => DiagnosticCode::LEX_UNEXPECTED_CHARACTER,
+        LexErrorKind::UnterminatedString => DiagnosticCode::LEX_UNTERMINATED_STRING,
+        LexErrorKind::UnterminatedDocString => DiagnosticCode::LEX_UNTERMINATED_DOC_STRING,
+        LexErrorKind::InvalidIntegerType(_) => DiagnosticCode::LEX_INVALID_INTEGER_TYPE,
+        LexErrorKind::InvalidHexLiteral(_) => DiagnosticCode::LEX_INVALID_HEX_LITERAL,
+        LexErrorKind::InvalidFloatType(_) => DiagnosticCode::LEX_INVALID_FLOAT_TYPE,
     }
 }
 
-pub(crate) fn parse_code(code: ParseErrorCode) -> &'static str {
+pub(crate) fn parse_code(code: ParseErrorCode) -> DiagnosticCode {
     match code {
-        ParseErrorCode::UnexpectedToken => "E0003",
-        ParseErrorCode::UnexpectedEndOfInput => "E0004",
-        ParseErrorCode::DuplicateName => "E0005",
-        ParseErrorCode::UnknownKeyword => "E0009",
-        ParseErrorCode::UnknownMetadata => "E0006",
-        ParseErrorCode::UnsupportedTargetPlatform => "E0007",
-        ParseErrorCode::ConflictingTargetPlatforms => "E0010",
-        ParseErrorCode::MetadataTargetNotAllowed => "E0008",
-        ParseErrorCode::MetadataFileScopeNotAllowed => "E0011",
-        ParseErrorCode::UnsupportedLimitlessScope => "E0012",
-        ParseErrorCode::DuplicateMetadata => "E0013",
-        ParseErrorCode::FaultRequiresTest => "E0016",
-        ParseErrorCode::TestMetadataRequiresVerb => "E0017",
-        ParseErrorCode::MalformedVerbContract => "E0014",
-        ParseErrorCode::OpenImportRequiresBlock => "E0015",
-        ParseErrorCode::MustUseRequiresReturn => "E0018",
-        ParseErrorCode::UnsupportedEffect => "E0019",
-        ParseErrorCode::InvalidBoundedLimit => "E0020",
-        ParseErrorCode::InvalidStackLimit => "E0023",
-        ParseErrorCode::UnsupportedCapability => "E0021",
-        ParseErrorCode::UnsupportedRepresentation => "E0022",
+        ParseErrorCode::UnexpectedToken => DiagnosticCode::PARSE_UNEXPECTED_TOKEN,
+        ParseErrorCode::UnexpectedEndOfInput => DiagnosticCode::PARSE_UNEXPECTED_END_OF_INPUT,
+        ParseErrorCode::DuplicateName => DiagnosticCode::PARSE_DUPLICATE_NAME,
+        ParseErrorCode::UnknownKeyword => DiagnosticCode::PARSE_UNKNOWN_KEYWORD,
+        ParseErrorCode::UnknownMetadata => DiagnosticCode::PARSE_UNKNOWN_METADATA,
+        ParseErrorCode::UnsupportedTargetPlatform => {
+            DiagnosticCode::PARSE_UNSUPPORTED_TARGET_PLATFORM
+        }
+        ParseErrorCode::ConflictingTargetPlatforms => {
+            DiagnosticCode::PARSE_CONFLICTING_TARGET_PLATFORMS
+        }
+        ParseErrorCode::MetadataTargetNotAllowed => {
+            DiagnosticCode::PARSE_METADATA_TARGET_NOT_ALLOWED
+        }
+        ParseErrorCode::MetadataFileScopeNotAllowed => {
+            DiagnosticCode::PARSE_METADATA_FILE_SCOPE_NOT_ALLOWED
+        }
+        ParseErrorCode::UnsupportedLimitlessScope => {
+            DiagnosticCode::PARSE_UNSUPPORTED_LIMITLESS_SCOPE
+        }
+        ParseErrorCode::DuplicateMetadata => DiagnosticCode::PARSE_DUPLICATE_METADATA,
+        ParseErrorCode::FaultRequiresTest => DiagnosticCode::PARSE_FAULT_REQUIRES_TEST,
+        ParseErrorCode::TestMetadataRequiresVerb => {
+            DiagnosticCode::PARSE_TEST_METADATA_REQUIRES_VERB
+        }
+        ParseErrorCode::MalformedVerbContract => DiagnosticCode::PARSE_MALFORMED_VERB_CONTRACT,
+        ParseErrorCode::OpenImportRequiresBlock => DiagnosticCode::PARSE_OPEN_IMPORT_REQUIRES_BLOCK,
+        ParseErrorCode::MustUseRequiresReturn => DiagnosticCode::PARSE_MUST_USE_REQUIRES_RETURN,
+        ParseErrorCode::UnsupportedEffect => DiagnosticCode::PARSE_UNSUPPORTED_EFFECT,
+        ParseErrorCode::InvalidBoundedLimit => DiagnosticCode::PARSE_INVALID_BOUNDED_LIMIT,
+        ParseErrorCode::InvalidStackLimit => DiagnosticCode::PARSE_INVALID_STACK_LIMIT,
+        ParseErrorCode::UnsupportedCapability => DiagnosticCode::PARSE_UNSUPPORTED_CAPABILITY,
+        ParseErrorCode::UnsupportedRepresentation => {
+            DiagnosticCode::PARSE_UNSUPPORTED_REPRESENTATION
+        }
     }
 }
 
 pub(crate) fn semantic_code(kind: &SemanticErrorKind) -> &'static str {
-    if let Some(code) = packing::code(kind) {
-        return code;
-    }
-    if let Some(code) = role_semantic_code(kind) {
-        return code;
-    }
-    if let Some(code) = type_semantic_code(kind) {
-        return code;
-    }
-    if let Some(code) = ownership_semantic_code(kind) {
-        return code;
-    }
-    declaration_semantic_code(kind)
+    packing::code(kind)
+        .or_else(|| role_semantic_code(kind))
+        .or_else(|| type_semantic_code(kind))
+        .or_else(|| ownership_semantic_code(kind))
+        .or_else(|| declaration_semantic_code(kind))
         .or_else(|| expression_semantic_code(kind))
         .unwrap_or_else(|| unreachable!("extended semantic diagnostic code handled above"))
+        .as_str()
 }
 
-fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
-        SemanticErrorKind::DuplicateVerbName { .. } => "E1024",
-        SemanticErrorKind::DuplicateStructName { .. } => "E1029",
-        SemanticErrorKind::DuplicateEnumName { .. } => "E1039",
-        SemanticErrorKind::DuplicatePackName { .. } => "E1081",
-        SemanticErrorKind::InvalidSerializationContract { .. } => "E1098",
-        SemanticErrorKind::EmptyEnum { .. } => "E1810",
-        SemanticErrorKind::DuplicateConstantName { .. } => "E1117",
-        SemanticErrorKind::ConstantCycle { .. } => "E1118",
-        SemanticErrorKind::DuplicateStructField { .. } => "E1030",
-        SemanticErrorKind::UnknownStructField { .. } => "E1031",
-        SemanticErrorKind::MissingStructField { .. } => "E1032",
-        SemanticErrorKind::StructFieldTypeMismatch { .. } => "E1033",
-        SemanticErrorKind::InvalidStructFieldRole { .. } => "E1094",
-        SemanticErrorKind::FrozenStructField { .. } => "E1095",
-        SemanticErrorKind::SelfAssignment { .. } => "E1096",
-        SemanticErrorKind::InvalidReprC { .. } => "E1134",
+        SemanticErrorKind::DuplicateVerbName { .. } => DiagnosticCode::DUPLICATE_VERB_NAME,
+        SemanticErrorKind::DuplicateStructName { .. } => DiagnosticCode::DUPLICATE_STRUCT_NAME,
+        SemanticErrorKind::DuplicateEnumName { .. } => DiagnosticCode::DUPLICATE_ENUM_NAME,
+        SemanticErrorKind::DuplicatePackName { .. } => DiagnosticCode::DUPLICATE_PACK_NAME,
+        SemanticErrorKind::InvalidSerializationContract { .. } => {
+            DiagnosticCode::INVALID_SERIALIZATION_CONTRACT
+        }
+        SemanticErrorKind::EmptyEnum { .. } => DiagnosticCode::EMPTY_ENUM,
+        SemanticErrorKind::DuplicateConstantName { .. } => DiagnosticCode::DUPLICATE_CONSTANT_NAME,
+        SemanticErrorKind::ConstantCycle { .. } => DiagnosticCode::CONSTANT_CYCLE,
+        SemanticErrorKind::DuplicateStructField { .. } => DiagnosticCode::DUPLICATE_STRUCT_FIELD,
+        SemanticErrorKind::UnknownStructField { .. } => DiagnosticCode::UNKNOWN_STRUCT_FIELD,
+        SemanticErrorKind::MissingStructField { .. } => DiagnosticCode::MISSING_STRUCT_FIELD,
+        SemanticErrorKind::StructFieldTypeMismatch { .. } => {
+            DiagnosticCode::STRUCT_FIELD_TYPE_MISMATCH
+        }
+        SemanticErrorKind::InvalidStructFieldRole { .. } => {
+            DiagnosticCode::INVALID_STRUCT_FIELD_ROLE
+        }
+        SemanticErrorKind::FrozenStructField { .. } => DiagnosticCode::FROZEN_STRUCT_FIELD,
+        SemanticErrorKind::SelfAssignment { .. } => DiagnosticCode::SELF_ASSIGNMENT,
+        SemanticErrorKind::InvalidReprC { .. } => DiagnosticCode::INVALID_REPR_C,
         _ => return None,
     })
 }
 
-fn expression_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn expression_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     expression_value_code(kind).or_else(|| expression_pattern_code(kind))
 }
 
-fn expression_value_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn expression_value_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
-        SemanticErrorKind::TypeMismatch { .. } => "E1025",
-        SemanticErrorKind::UnknownVerb { .. } => "E1069",
-        SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
-        SemanticErrorKind::NumericLiteralOutOfRange { .. } => "E1068",
-        SemanticErrorKind::InvalidPrimitiveCast { .. } => "E1090",
-        SemanticErrorKind::PrintIntegerTooWide { .. } => "E1139",
-        SemanticErrorKind::PrimitiveCastOutOfRange { .. } => "E1091",
-        SemanticErrorKind::ConstantRemainderByZero => "E1092",
-        SemanticErrorKind::ConstantArithmeticOverflow { .. } => "E1138",
-        SemanticErrorKind::ConstantShiftCountOutOfRange { .. } => "E1093",
-        SemanticErrorKind::MixedIntegerOperands { .. } => "E1140",
-        SemanticErrorKind::VoidValue { .. } => "E1141",
-        SemanticErrorKind::AssignToConstant { .. } => "E1142",
-        SemanticErrorKind::ConstantRuntimeDependency { .. } => "E1097",
-        SemanticErrorKind::InvalidArenaCapacity { .. } => "E1076",
-        SemanticErrorKind::ArenaReferenceEscape { .. } => "E1077",
-        SemanticErrorKind::CrossArenaReference { .. } => "E1078",
-        SemanticErrorKind::ArenaReferenceLive { .. } => "E1079",
-        SemanticErrorKind::ReturnTypeMismatch { .. } => "E1026",
-        SemanticErrorKind::BindingTypeMismatch { .. } => "E1027",
-        SemanticErrorKind::MissingReturnValue => "E1028",
-        SemanticErrorKind::InvalidFieldAssignmentTarget { .. } => "E1034",
-        SemanticErrorKind::FieldBorrowConflict { .. } => "E1035",
+        SemanticErrorKind::TypeMismatch { .. } => DiagnosticCode::TYPE_MISMATCH,
+        SemanticErrorKind::UnknownVerb { .. } => DiagnosticCode::UNKNOWN_VERB,
+        SemanticErrorKind::UnresolvedResultConstructor { .. } => {
+            DiagnosticCode::UNRESOLVED_RESULT_CONSTRUCTOR
+        }
+        SemanticErrorKind::NumericLiteralOutOfRange { .. } => {
+            DiagnosticCode::NUMERIC_LITERAL_OUT_OF_RANGE
+        }
+        SemanticErrorKind::InvalidPrimitiveCast { .. } => DiagnosticCode::INVALID_PRIMITIVE_CAST,
+        SemanticErrorKind::PrintIntegerTooWide { .. } => DiagnosticCode::PRINT_INTEGER_TOO_WIDE,
+        SemanticErrorKind::PrimitiveCastOutOfRange { .. } => {
+            DiagnosticCode::PRIMITIVE_CAST_OUT_OF_RANGE
+        }
+        SemanticErrorKind::ConstantRemainderByZero => DiagnosticCode::CONSTANT_REMAINDER_BY_ZERO,
+        SemanticErrorKind::ConstantArithmeticOverflow { .. } => {
+            DiagnosticCode::CONSTANT_ARITHMETIC_OVERFLOW
+        }
+        SemanticErrorKind::ConstantShiftCountOutOfRange { .. } => {
+            DiagnosticCode::CONSTANT_SHIFT_COUNT_OUT_OF_RANGE
+        }
+        SemanticErrorKind::MixedIntegerOperands { .. } => {
+            DiagnosticCode::OPERANDS_OF_DIFFERENT_INTEGER_TYPES
+        }
+        SemanticErrorKind::VoidValue { .. } => DiagnosticCode::VOID_VALUE,
+        SemanticErrorKind::AssignToConstant { .. } => DiagnosticCode::ASSIGN_TO_CONSTANT,
+        SemanticErrorKind::ConstantRuntimeDependency { .. } => {
+            DiagnosticCode::CONSTANT_RUNTIME_DEPENDENCY
+        }
+        SemanticErrorKind::InvalidArenaCapacity { .. } => DiagnosticCode::INVALID_ARENA_CAPACITY,
+        SemanticErrorKind::ArenaReferenceEscape { .. } => DiagnosticCode::ARENA_REFERENCE_ESCAPE,
+        SemanticErrorKind::CrossArenaReference { .. } => DiagnosticCode::CROSS_ARENA_REFERENCE,
+        SemanticErrorKind::ArenaReferenceLive { .. } => DiagnosticCode::ARENA_REFERENCE_LIVE,
+        SemanticErrorKind::ReturnTypeMismatch { .. } => DiagnosticCode::RETURN_TYPE_MISMATCH,
+        SemanticErrorKind::BindingTypeMismatch { .. } => DiagnosticCode::BINDING_TYPE_MISMATCH,
+        SemanticErrorKind::MissingReturnValue => DiagnosticCode::MISSING_RETURN_VALUE,
+        SemanticErrorKind::InvalidFieldAssignmentTarget { .. } => {
+            DiagnosticCode::INVALID_FIELD_ASSIGNMENT_TARGET
+        }
+        SemanticErrorKind::FieldBorrowConflict { .. } => DiagnosticCode::FIELD_BORROW_CONFLICT,
         _ => return None,
     })
 }
 
-fn expression_pattern_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn expression_pattern_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
-        SemanticErrorKind::UnknownMethod { .. } => "E1036",
-        SemanticErrorKind::InvalidReceiver { .. } => "E1037",
-        SemanticErrorKind::ReceiverTypeMismatch { .. } => "E1038",
-        SemanticErrorKind::UnknownEnumVariant { .. } => "E1040",
-        SemanticErrorKind::EnumVariantArgumentCount { .. } => "E1041",
-        SemanticErrorKind::EnumVariantArgumentName { .. } => "E1042",
-        SemanticErrorKind::EnumVariantArgumentTypeMismatch { .. } => "E1043",
-        SemanticErrorKind::RecursiveType { .. } => "E1044",
-        SemanticErrorKind::NonExhaustiveMatch { .. } => "E1045",
-        SemanticErrorKind::UnreachablePattern { .. } => "E1046",
-        SemanticErrorKind::DuplicatePattern { .. } => "E1047",
-        SemanticErrorKind::PatternTypeMismatch { .. } => "E1048",
-        SemanticErrorKind::PatternBindingTypeMismatch { .. } => "E1049",
+        SemanticErrorKind::UnknownMethod { .. } => DiagnosticCode::UNKNOWN_METHOD,
+        SemanticErrorKind::InvalidReceiver { .. } => DiagnosticCode::INVALID_RECEIVER,
+        SemanticErrorKind::ReceiverTypeMismatch { .. } => DiagnosticCode::RECEIVER_TYPE_MISMATCH,
+        SemanticErrorKind::UnknownEnumVariant { .. } => DiagnosticCode::UNKNOWN_ENUM_VARIANT,
+        SemanticErrorKind::EnumVariantArgumentCount { .. } => {
+            DiagnosticCode::ENUM_VARIANT_ARGUMENT_COUNT
+        }
+        SemanticErrorKind::EnumVariantArgumentName { .. } => {
+            DiagnosticCode::ENUM_VARIANT_ARGUMENT_NAME
+        }
+        SemanticErrorKind::EnumVariantArgumentTypeMismatch { .. } => {
+            DiagnosticCode::ENUM_VARIANT_ARGUMENT_TYPE_MISMATCH
+        }
+        SemanticErrorKind::RecursiveType { .. } => DiagnosticCode::RECURSIVE_TYPE,
+        SemanticErrorKind::NonExhaustiveMatch { .. } => DiagnosticCode::NON_EXHAUSTIVE_MATCH,
+        SemanticErrorKind::UnreachablePattern { .. } => DiagnosticCode::UNREACHABLE_PATTERN,
+        SemanticErrorKind::DuplicatePattern { .. } => DiagnosticCode::DUPLICATE_PATTERN,
+        SemanticErrorKind::PatternTypeMismatch { .. } => DiagnosticCode::PATTERN_TYPE_MISMATCH,
+        SemanticErrorKind::PatternBindingTypeMismatch { .. } => {
+            DiagnosticCode::PATTERN_BINDING_TYPE_MISMATCH
+        }
         _ => return None,
     })
 }
 
-fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn ownership_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     ownership_binding_code(kind).or_else(|| ownership_call_code(kind))
 }
 
-fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
-        SemanticErrorKind::DuplicateBinding { .. } => "E1001",
-        SemanticErrorKind::ShadowedBinding { .. } => "E1002",
-        SemanticErrorKind::UndeclaredIdentifier { .. } => "E1003",
-        SemanticErrorKind::InvalidBorrowTarget { .. } => "E1004",
-        SemanticErrorKind::UseAfterMove { .. } => "E1005",
-        SemanticErrorKind::UseAfterDrop { .. } => "E1006",
-        SemanticErrorKind::DoubleDrop { .. } => "E1007",
-        SemanticErrorKind::DropBorrow { .. } => "E1008",
-        SemanticErrorKind::DropFrozen { .. } => "E1009",
-        SemanticErrorKind::InvalidDatArgument { .. } => "E1010",
-        SemanticErrorKind::ZeroOnDropFieldMove { .. } => "E1136",
-        SemanticErrorKind::MoveFrozen { .. } | SemanticErrorKind::MutateFrozen { .. } => "E1011",
-        SemanticErrorKind::UnknownParameter { .. } => "E1012",
-        SemanticErrorKind::DuplicateArgument { .. } => "E1013",
-        SemanticErrorKind::MixedArgumentModes { .. } => "E1014",
-        SemanticErrorKind::WrongArgumentCount { .. } => "E1015",
-        SemanticErrorKind::InvalidArgumentRole { .. } => "E1016",
+        SemanticErrorKind::DuplicateBinding { .. } => DiagnosticCode::DUPLICATE_BINDING,
+        SemanticErrorKind::ShadowedBinding { .. } => DiagnosticCode::SHADOWED_BINDING,
+        SemanticErrorKind::UndeclaredIdentifier { .. } => DiagnosticCode::UNDECLARED_IDENTIFIER,
+        SemanticErrorKind::InvalidBorrowTarget { .. } => DiagnosticCode::INVALID_BORROW_TARGET,
+        SemanticErrorKind::UseAfterMove { .. } => DiagnosticCode::USE_AFTER_MOVE,
+        SemanticErrorKind::UseAfterDrop { .. } => DiagnosticCode::USE_AFTER_DROP,
+        SemanticErrorKind::DoubleDrop { .. } => DiagnosticCode::DOUBLE_DROP,
+        SemanticErrorKind::DropBorrow { .. } => DiagnosticCode::DROP_BORROW,
+        SemanticErrorKind::DropFrozen { .. } => DiagnosticCode::DROP_FROZEN,
+        SemanticErrorKind::InvalidDatArgument { .. } => DiagnosticCode::INVALID_DAT_ARGUMENT,
+        SemanticErrorKind::ZeroOnDropFieldMove { .. } => DiagnosticCode::ZERO_ON_DROP_FIELD_MOVE,
+        SemanticErrorKind::MoveFrozen { .. } | SemanticErrorKind::MutateFrozen { .. } => {
+            DiagnosticCode::MOVE_OR_MUTATE_FROZEN
+        }
+        SemanticErrorKind::UnknownParameter { .. } => DiagnosticCode::UNKNOWN_PARAMETER,
+        SemanticErrorKind::DuplicateArgument { .. } => DiagnosticCode::DUPLICATE_ARGUMENT,
+        SemanticErrorKind::MixedArgumentModes { .. } => DiagnosticCode::MIXED_ARGUMENT_MODES,
+        SemanticErrorKind::WrongArgumentCount { .. } => DiagnosticCode::WRONG_ARGUMENT_COUNT,
+        SemanticErrorKind::InvalidArgumentRole { .. } => DiagnosticCode::INVALID_ARGUMENT_ROLE,
         _ => return None,
     })
 }
 
-fn ownership_call_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn ownership_call_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
-        SemanticErrorKind::InvalidAbsReturnOrigin { .. } => "E1066",
-        SemanticErrorKind::InvalidIntrinsicArgument { .. } => "E1021",
-        SemanticErrorKind::AmbiguousPositionalCall { .. } => "E1017",
-        SemanticErrorKind::BorrowedReturn { .. } => "E1018",
-        SemanticErrorKind::InvalidOwnerInitializer { .. } => "E1019",
-        SemanticErrorKind::LoopControlOutsideLoop { .. } => "E1020",
-        SemanticErrorKind::ReservedIntrinsicName { .. } => "E1022",
-        SemanticErrorKind::SuspendedAccess { .. } => "E1064",
-        SemanticErrorKind::ExclusiveLoanAlias { .. } => "E1065",
-        SemanticErrorKind::EscapingLoan { .. } => "E1082",
-        SemanticErrorKind::MustUseIgnored { .. } => "E1120",
-        SemanticErrorKind::UndeclaredEffect { .. } => "E1121",
-        SemanticErrorKind::UndeclaredCapability { .. } => "E1131",
-        SemanticErrorKind::UnsupportedCapability { .. } => "E1132",
-        SemanticErrorKind::NondeterministicCall { .. } => "E1124",
-        SemanticErrorKind::DeterministicFloatingPoint => "E1135",
-        SemanticErrorKind::RealtimeEffect { .. } => "E1125",
-        SemanticErrorKind::RealtimeUnboundedLoop => "E1126",
-        SemanticErrorKind::RealtimeFloatingPoint => "E1127",
-        SemanticErrorKind::RealtimeUnboundedRecursion => "E1129",
-        SemanticErrorKind::StackLimitRecursion => "E1858",
-        SemanticErrorKind::MissingStackLimitClaim { .. } => "E1861",
-        SemanticErrorKind::MissingImportedStackLimitClaim { .. } => "E1864",
-        SemanticErrorKind::UnsupportedStackLimitTarget { .. } => "E1863",
-        SemanticErrorKind::OpenStackLimitDispatch { .. } => "E1862",
-        SemanticErrorKind::BoundedBudgetExceeded { .. } => "E1130",
-        SemanticErrorKind::RoleMethodMustUseMismatch { .. } => "E1123",
+        SemanticErrorKind::InvalidAbsReturnOrigin { .. } => {
+            DiagnosticCode::INVALID_ABS_RETURN_ORIGIN
+        }
+        SemanticErrorKind::InvalidIntrinsicArgument { .. } => {
+            DiagnosticCode::INVALID_INTRINSIC_ARGUMENT
+        }
+        SemanticErrorKind::AmbiguousPositionalCall { .. } => {
+            DiagnosticCode::AMBIGUOUS_POSITIONAL_CALL
+        }
+        SemanticErrorKind::BorrowedReturn { .. } => DiagnosticCode::BORROWED_RETURN,
+        SemanticErrorKind::InvalidOwnerInitializer { .. } => {
+            DiagnosticCode::INVALID_OWNER_INITIALIZER
+        }
+        SemanticErrorKind::LoopControlOutsideLoop { .. } => {
+            DiagnosticCode::LOOP_CONTROL_OUTSIDE_LOOP
+        }
+        SemanticErrorKind::ReservedIntrinsicName { .. } => DiagnosticCode::RESERVED_INTRINSIC_NAME,
+        SemanticErrorKind::SuspendedAccess { .. } => DiagnosticCode::SUSPENDED_ACCESS,
+        SemanticErrorKind::ExclusiveLoanAlias { .. } => DiagnosticCode::EXCLUSIVE_LOAN_ALIAS,
+        SemanticErrorKind::EscapingLoan { .. } => DiagnosticCode::ESCAPING_LOAN,
+        SemanticErrorKind::MustUseIgnored { .. } => DiagnosticCode::MUST_USE_IGNORED,
+        SemanticErrorKind::UndeclaredEffect { .. } => DiagnosticCode::UNDECLARED_EFFECT,
+        SemanticErrorKind::UndeclaredCapability { .. } => DiagnosticCode::UNDECLARED_CAPABILITY,
+        SemanticErrorKind::UnsupportedCapability { .. } => DiagnosticCode::UNSUPPORTED_CAPABILITY,
+        SemanticErrorKind::NondeterministicCall { .. } => DiagnosticCode::NONDETERMINISTIC_CALL,
+        SemanticErrorKind::DeterministicFloatingPoint => {
+            DiagnosticCode::DETERMINISTIC_FLOATING_POINT
+        }
+        SemanticErrorKind::RealtimeEffect { .. } => DiagnosticCode::REALTIME_EFFECT,
+        SemanticErrorKind::RealtimeUnboundedLoop => DiagnosticCode::REALTIME_UNBOUNDED_LOOP,
+        SemanticErrorKind::RealtimeFloatingPoint => DiagnosticCode::REALTIME_FLOATING_POINT,
+        SemanticErrorKind::RealtimeUnboundedRecursion => {
+            DiagnosticCode::REALTIME_UNBOUNDED_RECURSION
+        }
+        SemanticErrorKind::StackLimitRecursion => DiagnosticCode::STACK_LIMIT_RECURSION,
+        SemanticErrorKind::MissingStackLimitClaim { .. } => {
+            DiagnosticCode::MISSING_STACK_LIMIT_CLAIM
+        }
+        SemanticErrorKind::MissingImportedStackLimitClaim { .. } => {
+            DiagnosticCode::MISSING_IMPORTED_STACK_LIMIT_CLAIM
+        }
+        SemanticErrorKind::UnsupportedStackLimitTarget { .. } => {
+            DiagnosticCode::UNSUPPORTED_STACK_LIMIT_TARGET
+        }
+        SemanticErrorKind::OpenStackLimitDispatch { .. } => {
+            DiagnosticCode::OPEN_STACK_LIMIT_DISPATCH
+        }
+        SemanticErrorKind::BoundedBudgetExceeded { .. } => DiagnosticCode::BOUNDED_BUDGET_EXCEEDED,
+        SemanticErrorKind::RoleMethodMustUseMismatch { .. } => {
+            DiagnosticCode::ROLE_METHOD_MUST_USE_MISMATCH
+        }
         _ => return None,
     })
 }
 
-fn type_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn type_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
-        SemanticErrorKind::UnknownType { .. } => "E1023",
-        SemanticErrorKind::MalformedTypeName { .. } => "E1080",
-        SemanticErrorKind::UnknownTypeParameter { .. } => "E1052",
-        SemanticErrorKind::GenericArityMismatch { .. } => "E1053",
-        SemanticErrorKind::GenericConstraintMismatch { .. } => "E1054",
-        SemanticErrorKind::InvalidMutation { .. } => "E1051",
-        SemanticErrorKind::InvalidArrayCapacity { .. } => "E1083",
-        SemanticErrorKind::InvalidRegionElementType { .. } => "E1088",
-        SemanticErrorKind::InvalidIndexType { .. } => "E1084",
-        SemanticErrorKind::IndexOutOfBounds { .. } => "E1085",
-        SemanticErrorKind::NonIndexableTarget { .. } => "E1086",
-        SemanticErrorKind::IndexedElementTypeMismatch { .. } => "E1087",
-        SemanticErrorKind::UnresolvedResultConstructor { .. } => "E1067",
-        SemanticErrorKind::InvalidCaseRole { .. } => "E1050",
-        SemanticErrorKind::InvalidGuardAccess { .. } => "E1062",
+        SemanticErrorKind::UnknownType { .. } => DiagnosticCode::UNKNOWN_TYPE,
+        SemanticErrorKind::MalformedTypeName { .. } => DiagnosticCode::MALFORMED_TYPE_NAME,
+        SemanticErrorKind::UnknownTypeParameter { .. } => DiagnosticCode::UNKNOWN_TYPE_PARAMETER,
+        SemanticErrorKind::GenericArityMismatch { .. } => DiagnosticCode::GENERIC_ARITY_MISMATCH,
+        SemanticErrorKind::GenericConstraintMismatch { .. } => {
+            DiagnosticCode::GENERIC_CONSTRAINT_MISMATCH
+        }
+        SemanticErrorKind::InvalidMutation { .. } => DiagnosticCode::INVALID_MUTATION,
+        SemanticErrorKind::InvalidArrayCapacity { .. } => DiagnosticCode::INVALID_ARRAY_CAPACITY,
+        SemanticErrorKind::InvalidRegionElementType { .. } => {
+            DiagnosticCode::INVALID_REGION_ELEMENT_TYPE
+        }
+        SemanticErrorKind::InvalidIndexType { .. } => DiagnosticCode::INVALID_INDEX_TYPE,
+        SemanticErrorKind::IndexOutOfBounds { .. } => DiagnosticCode::INDEX_OUT_OF_BOUNDS,
+        SemanticErrorKind::NonIndexableTarget { .. } => DiagnosticCode::NON_INDEXABLE_TARGET,
+        SemanticErrorKind::IndexedElementTypeMismatch { .. } => {
+            DiagnosticCode::INDEXED_ELEMENT_TYPE_MISMATCH
+        }
+        SemanticErrorKind::UnresolvedResultConstructor { .. } => {
+            DiagnosticCode::UNRESOLVED_RESULT_CONSTRUCTOR
+        }
+        SemanticErrorKind::InvalidCaseRole { .. } => DiagnosticCode::INVALID_CASE_ROLE,
+        SemanticErrorKind::InvalidGuardAccess { .. } => DiagnosticCode::INVALID_GUARD_ACCESS,
         SemanticErrorKind::GuardTypeMismatch { .. }
-        | SemanticErrorKind::ConditionTypeMismatch { .. } => "E1063",
-        SemanticErrorKind::BranchStateMismatch { .. } => "E1061",
-        SemanticErrorKind::DynamicRequiresAbs { .. } => "E1089",
-        SemanticErrorKind::UnknownDynamicRole { .. } => "E1099",
-        SemanticErrorKind::DynamicRoleMismatch { .. } => "E1116",
+        | SemanticErrorKind::ConditionTypeMismatch { .. } => {
+            DiagnosticCode::GUARD_OR_CONDITION_TYPE_MISMATCH
+        }
+        SemanticErrorKind::BranchStateMismatch { .. } => DiagnosticCode::BRANCH_STATE_MISMATCH,
+        SemanticErrorKind::DynamicRequiresAbs { .. } => DiagnosticCode::DYNAMIC_REQUIRES_ABS,
+        SemanticErrorKind::UnknownDynamicRole { .. } => DiagnosticCode::UNKNOWN_DYNAMIC_ROLE,
+        SemanticErrorKind::DynamicRoleMismatch { .. } => DiagnosticCode::DYNAMIC_ROLE_MISMATCH,
         _ => return None,
     })
 }
 
-fn role_semantic_code(kind: &SemanticErrorKind) -> Option<&'static str> {
+fn role_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
-        SemanticErrorKind::DuplicateRoleName { .. } => "E1055",
-        SemanticErrorKind::UnknownRole { .. } => "E1056",
-        SemanticErrorKind::DuplicateRoleMethod { .. } => "E1057",
-        SemanticErrorKind::MissingRoleMethod { .. } => "E1058",
-        SemanticErrorKind::RoleMethodMismatch { .. } => "E1059",
-        SemanticErrorKind::RoleMethodEffectMismatch { .. } => "E1122",
-        SemanticErrorKind::RoleMethodCapabilityMismatch { .. } => "E1133",
-        SemanticErrorKind::RoleMethodRealtimeMismatch { .. } => "E1128",
-        SemanticErrorKind::RoleMethodDeterministicMismatch { .. } => "E1136",
-        SemanticErrorKind::InvalidRoleReceiver { .. } => "E1060",
+        SemanticErrorKind::DuplicateRoleName { .. } => DiagnosticCode::DUPLICATE_ROLE_NAME,
+        SemanticErrorKind::UnknownRole { .. } => DiagnosticCode::UNKNOWN_ROLE,
+        SemanticErrorKind::DuplicateRoleMethod { .. } => DiagnosticCode::DUPLICATE_ROLE_METHOD,
+        SemanticErrorKind::MissingRoleMethod { .. } => DiagnosticCode::MISSING_ROLE_METHOD,
+        SemanticErrorKind::RoleMethodMismatch { .. } => DiagnosticCode::ROLE_METHOD_MISMATCH,
+        SemanticErrorKind::RoleMethodEffectMismatch { .. } => {
+            DiagnosticCode::ROLE_METHOD_EFFECT_MISMATCH
+        }
+        SemanticErrorKind::RoleMethodCapabilityMismatch { .. } => {
+            DiagnosticCode::ROLE_METHOD_CAPABILITY_MISMATCH
+        }
+        SemanticErrorKind::RoleMethodRealtimeMismatch { .. } => {
+            DiagnosticCode::ROLE_METHOD_REALTIME_MISMATCH
+        }
+        SemanticErrorKind::RoleMethodDeterministicMismatch { .. } => {
+            DiagnosticCode::ROLE_METHOD_DETERMINISTIC_MISMATCH
+        }
+        SemanticErrorKind::InvalidRoleReceiver { .. } => DiagnosticCode::INVALID_ROLE_RECEIVER,
         _ => return None,
     })
 }

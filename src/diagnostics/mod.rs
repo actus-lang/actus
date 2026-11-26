@@ -1,7 +1,9 @@
+mod code;
 mod model;
 mod renderer;
 mod strict_codes;
 
+pub use code::DiagnosticCode;
 pub use model::{
     Diagnostic, DiagnosticCatalogError, DiagnosticDefinition, DiagnosticPhase,
     DiagnosticRelatedLocation, DiagnosticSeverity, sort_diagnostics, validate_diagnostic_catalog,

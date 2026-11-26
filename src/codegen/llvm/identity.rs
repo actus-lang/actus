@@ -45,7 +45,8 @@ pub fn strict_identity_error() -> Option<String> {
     let prefix = std::env::var("LLVM_SYS_231_PREFIX")
         .unwrap_or_else(|_| ".actus-toolchain/llvm-23.1.2".to_owned());
     Some(format!(
-        "error[E1806]: strict LLVM build requires a verified toolchain; selected prefix {prefix} is unverified; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1"
+        "error[{code}]: strict LLVM build requires a verified toolchain; selected prefix {prefix} is unverified; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1",
+        code = crate::diagnostics::DiagnosticCode::STRICT_LLVM_UNVERIFIED.as_str()
     ))
 }
 

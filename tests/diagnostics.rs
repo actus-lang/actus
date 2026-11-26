@@ -59,7 +59,7 @@ fn renders_malformed_float_suffix_with_a_stable_lexical_code() {
     let error = errors.first().expect("invalid float suffix should be diagnosed");
     let diagnostic = lex_diagnostic(error);
 
-    assert_eq!(diagnostic.code(), "E0006");
+    assert_eq!(diagnostic.code(), "E0027");
     assert_eq!(diagnostic.phase(), DiagnosticPhase::Lexical);
     assert_eq!(diagnostic.span(), SourceSpan::new(31, 34));
 }
@@ -482,4 +482,42 @@ fn renders_exclusive_loan_alias_diagnostic() {
         render_semantic_error(source, &error),
         "error[E1065] at 1:124: exclusive loan aliases resource `buffer` more than once"
     );
+}
+
+fn lexical_code(source: &str) -> String {
+    let (_, errors) = scan(source);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    lex_diagnostic(&errors[0]).code().to_owned()
+}
+
+#[test]
+fn unterminated_doc_string_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("\"\"\"missing terminator"), "E0024");
+}
+
+#[test]
+fn invalid_integer_type_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("u0"), "E0025");
+}
+
+#[test]
+fn invalid_hexadecimal_literal_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("0x12G"), "E0026");
+}
+
+#[test]
+fn invalid_float_type_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("1.5f16"), "E0027");
+}
+
+#[test]
+fn moving_a_field_out_of_a_zero_on_drop_owner_has_its_own_code() {
+    let source = "meta repr(C) meta zero_on_drop struct Secret { key_a: u64, } verb take(dat value: u64) { } verb main() { erg secret = Secret { key_a: 1u64 }; take(value: dat secret.key_a); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = analyze(&program).expect_err("moving a zero_on_drop field must fail");
+
+    assert!(matches!(error.kind, SemanticErrorKind::ZeroOnDropFieldMove { .. }));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1145");
 }

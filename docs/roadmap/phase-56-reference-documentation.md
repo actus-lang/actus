@@ -9,7 +9,8 @@ offers. Both exist only in the compiler repository, and only in part:
 - The compiler emits about 190 `E####` codes. `docs/language/diagnostics.md`
   lists ranges of them with a category each; no code has an example or a fix,
   and nothing checks the list against the compiler. Four lexer errors share
-  their codes with parser errors (`E0003`–`E0006`).
+  their codes with parser errors (`E0003`–`E0006`), and two semantic errors
+  share `E1136`.
 - The standard library has ten modules with about 350 open declarations, each
   with a `"""` documentation block, and no tool that turns those blocks into
   pages. The website has no standard-library section.
@@ -23,7 +24,8 @@ pages from them.
 
 1. **One registry of codes.** A `DiagnosticCode` type holds every code; every
    diagnostic is built from it. The four colliding lexer codes become
-   `E0024`–`E0027` (ADR-0123).
+   `E0024`–`E0027`, and the zero-on-drop field move becomes `E1145`
+   (ADR-0123).
 2. **Catalog check first.** The test of ADR-0123 exists before the entries:
    every emitted code has an entry, every `fails=` example reports its code
    and every `compiles` block checks. Until all entries exist, the test lists

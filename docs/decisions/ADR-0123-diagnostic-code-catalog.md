@@ -74,6 +74,9 @@ verb main() {
   their file: `actus fails=E1109 file=src/engine/engine.act`,
   `toml file=Actus.toml`. A group is built as one project. A block without
   `file=` is `src/main.act` of a project with the default manifest.
+  The blocks of one section form one project, in order; a block whose file
+  is already in the project starts the next one, so a section can show
+  several single-file examples.
 - An error that no program can produce on purpose, such as a source file that
   cannot be read, has no `## Example`. It has `## Cause` instead, which says
   what triggers it, and `## Fix` without a `compiles` block.
@@ -125,8 +128,13 @@ next after the last parser code:
 | Invalid hexadecimal literal | `E0005` | `E0026` |
 | Invalid float type | `E0006` | `E0027` |
 
+The move of a field out of a `zero_on_drop` owner (ADR-0102) shares `E1136`
+with the dropped `deterministic` contract of a role method (ADR-0100). It gets
+a code of its own, `E1145`; `E1136` keeps the meaning that ADR-0100, the guide
+and the tests give it.
+
 `E0001` and `E0002` keep their meaning, and `E0003` to `E0006` keep the
-parser's. The stability rule protects a code's meaning; these four codes never
+parser's. The stability rule protects a code's meaning; these five codes never
 had one meaning, so the change restores the rule instead of breaking it.
 
 ### `actus explain`
@@ -164,8 +172,8 @@ copy of the text.
   against the compiler on every test run.
 - A change that adds a code must add its entry, and a change that alters a
   rule must keep its examples true, in the same commit.
-- Programs or scripts that match the four renumbered lexer codes must match
-  the new ones; the tests and documents that name them change with this
+- Programs or scripts that match the five renumbered codes must match the
+  new ones; the tests and documents that name them change with this
   decision.
 - Every test that compares the full stderr of a failing command gains the
   `actus explain` line.

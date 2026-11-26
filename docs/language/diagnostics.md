@@ -6,9 +6,10 @@ edition.
 
 | Code range | Category |
 | --- | --- |
-| `E0001`–`E0002` | Lexer errors |
+| `E0001`–`E0002`, `E0024`–`E0027` | Lexer errors: unexpected character, unterminated string, unterminated doc string, invalid integer type, invalid hexadecimal literal, invalid float type |
 | `E0003`–`E0004` | Parser token and end-of-input errors |
 | `E0005`–`E0009` | Parser declaration, keyword, and metadata errors |
+| `E0010`–`E0023` | Parser target, metadata scope, contract, effect, capability, representation, and limit errors |
 | `E1001`–`E1028` | Bindings, ownership, calls, types, and returns |
 | `E1029`–`E1033` | Struct declarations and initialization |
 | `E1034`–`E1035` | Struct mutation and field borrow conflicts |
@@ -28,6 +29,7 @@ edition.
 | `E1142` | Assignment to a constant (`const`); constants are fixed at compile time, use an `erg` binding for a value that changes |
 | `E1143` | Test layout violation (ADR-0121): a `tests` directory with a facade, a `src/tests` directory, a subdirectory inside a `tests` directory, or an `.act` file in a subdirectory of the project `tests/` |
 | `E1144` | `meta test` verb in a production source file; move it to a file of the module's `tests` directory |
+| `E1145` | Move of a field out of a `zero_on_drop` owner; the owner is zeroed as a whole, so a field cannot leave it |
 | `E1090` | Cast between types that are not both integer types |
 | `E1091` | Integer literal in a cast is outside the range of the target type |
 | `E1116`–`E1118` | Dynamic role dispatch and constant declaration validation |

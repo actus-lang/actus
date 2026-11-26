@@ -1,3 +1,4 @@
+use crate::diagnostics::DiagnosticCode;
 use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::{ParseError, ParseErrorKind};
 use crate::semantic::SemanticError;
@@ -7,7 +8,7 @@ use super::{Diagnostic, DiagnosticPhase, DiagnosticSeverity};
 
 /// Converts a lexical failure into the stable diagnostic model.
 pub fn lex_diagnostic(error: &LexError) -> Diagnostic {
-    Diagnostic::error(format!("E000{}", lex_code(error)), error.span, lex_message(error))
+    Diagnostic::error(lex_code(error).as_str(), error.span, lex_message(error))
         .with_phase(DiagnosticPhase::Lexical)
 }
 
@@ -15,8 +16,10 @@ pub fn lex_diagnostic(error: &LexError) -> Diagnostic {
 pub fn parse_diagnostic(error: &ParseError) -> Diagnostic {
     let code = match error.kind {
         ParseErrorKind::UnexpectedToken { found: crate::lexer::TokenKind::Eof, .. }
-        | ParseErrorKind::UnexpectedEndOfInput { .. } => "E0004",
-        _ => parse_code(error.code),
+        | ParseErrorKind::UnexpectedEndOfInput { .. } => {
+            DiagnosticCode::PARSE_UNEXPECTED_END_OF_INPUT.as_str()
+        }
+        _ => parse_code(error.code).as_str(),
     };
     let diagnostic = Diagnostic::error(code, error.span, parse_message(error))
         .with_phase(DiagnosticPhase::Parser);

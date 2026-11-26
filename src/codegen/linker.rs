@@ -140,7 +140,12 @@ fn append_runtime_inputs(
 ) -> Result<(), NativeLinkError> {
     if configuration.host_runtime_enabled()
         && let Some(runtime_archive) =
-            crate::runtime::runtime_archive_path().map_err(NativeLinkError)?
+            crate::runtime::runtime_archive_path().map_err(|message| {
+                NativeLinkError(format!(
+                    "{}: {message}",
+                    crate::diagnostics::DiagnosticCode::STRICT_BUNDLED_COMPONENT_MISSING.as_str()
+                ))
+            })?
     {
         arguments.push(runtime_archive.as_os_str().to_os_string());
         arguments.extend(

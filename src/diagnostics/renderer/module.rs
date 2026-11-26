@@ -1,3 +1,4 @@
+use crate::diagnostics::DiagnosticCode;
 use crate::lexer::SourceSpan;
 use crate::modules::{ModuleError, ModuleResolutionError, PrivateCause};
 
@@ -15,45 +16,21 @@ use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, seman
 pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
     match error {
         ModuleError::Resolution(error) => resolution_diagnostic(error),
-        ModuleError::UnknownSiblingModule { .. } => {
-            module_error("E1104", error.to_string(), SourceSpan::new(0, 0))
-        }
-        ModuleError::ConfigurationImport { span, path, .. } => {
-            module_error("E1113", error.to_string(), *span)
-                .with_source_path(path.display().to_string())
-        }
-        ModuleError::ConfigurationRuntimeDeclaration { span, path, .. } => {
-            module_error("E1114", error.to_string(), *span)
-                .with_source_path(path.display().to_string())
-        }
-        ModuleError::Read { path, .. } => {
-            module_error("E1105", error.to_string(), SourceSpan::new(0, 0))
-                .with_source_path(path.display().to_string())
-        }
         ModuleError::Lex { path, errors } => errors
             .first()
             .map(lex_diagnostic)
-            .unwrap_or_else(|| module_error("E1107", error.to_string(), SourceSpan::new(0, 0)))
+            .unwrap_or_else(|| {
+                module_error(
+                    DiagnosticCode::MODULE_LEX_FAILURE,
+                    error.to_string(),
+                    SourceSpan::new(0, 0),
+                )
+            })
             .with_source_path(path.display().to_string()),
         ModuleError::Parse { path, error: parse_error } => {
             parse_diagnostic(parse_error).with_source_path(path.display().to_string())
         }
         ModuleError::DuplicateDeclaration(duplicate) => duplicate_diagnostic(error, duplicate),
-        ModuleError::TestVerbInProduction { path, span, .. } => {
-            module_error("E1144", error.to_string(), *span)
-                .with_source_path(path.display().to_string())
-        }
-        ModuleError::SymbolCollision { .. } => {
-            module_error("E1110", error.to_string(), SourceSpan::new(0, 0))
-        }
-        ModuleError::ImportBindingCollision { first, second, .. } => {
-            module_error("E1115", error.to_string(), *second).with_related_location(
-                DiagnosticRelatedLocation::new(None, *first, "first import binding is here"),
-            )
-        }
-        ModuleError::DuplicateObjectOwner { .. } => {
-            module_error("E1111", error.to_string(), SourceSpan::new(0, 0))
-        }
         ModuleError::PrivateDeclarationAccess { .. } => private_access_diagnostic(error),
         ModuleError::ConflictingOpening { span, facade: path, .. } => {
             module_error(visibility_code(error), error.to_string(), *span)
@@ -63,7 +40,74 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
             module_error(visibility_code(error), error.to_string(), violation.span)
                 .with_source_path(violation.path.display().to_string())
         }
+        ModuleError::ConfigurationImport { .. }
+        | ModuleError::ConfigurationRuntimeDeclaration { .. }
+        | ModuleError::Read { .. }
+        | ModuleError::TestVerbInProduction { .. } => located_failure_diagnostic(error),
+        ModuleError::UnknownSiblingModule { .. }
+        | ModuleError::SymbolCollision { .. }
+        | ModuleError::ImportBindingCollision { .. }
+        | ModuleError::DuplicateObjectOwner { .. } => unlocated_failure_diagnostic(error),
         ModuleError::Semantic(error) => semantic_diagnostic(error),
+    }
+}
+
+/// Failures that name one module source file.
+fn located_failure_diagnostic(error: &ModuleError) -> Diagnostic {
+    match error {
+        ModuleError::ConfigurationImport { span, path, .. } => {
+            module_error(DiagnosticCode::MODULE_CONFIGURATION_IMPORT, error.to_string(), *span)
+                .with_source_path(path.display().to_string())
+        }
+        ModuleError::ConfigurationRuntimeDeclaration { span, path, .. } => module_error(
+            DiagnosticCode::MODULE_CONFIGURATION_RUNTIME_DECLARATION,
+            error.to_string(),
+            *span,
+        )
+        .with_source_path(path.display().to_string()),
+        ModuleError::Read { path, .. } => module_error(
+            DiagnosticCode::MODULE_READ_FAILURE,
+            error.to_string(),
+            SourceSpan::new(0, 0),
+        )
+        .with_source_path(path.display().to_string()),
+        ModuleError::TestVerbInProduction { path, span, .. } => {
+            module_error(DiagnosticCode::MODULE_TEST_VERB_IN_PRODUCTION, error.to_string(), *span)
+                .with_source_path(path.display().to_string())
+        }
+        _ => unreachable!("located failure diagnostic received another module error"),
+    }
+}
+
+/// Failures between declarations, reported without a source file of their own.
+fn unlocated_failure_diagnostic(error: &ModuleError) -> Diagnostic {
+    match error {
+        ModuleError::UnknownSiblingModule { .. } => module_error(
+            DiagnosticCode::MODULE_UNKNOWN_SIBLING,
+            error.to_string(),
+            SourceSpan::new(0, 0),
+        ),
+        ModuleError::SymbolCollision { .. } => module_error(
+            DiagnosticCode::MODULE_SYMBOL_COLLISION,
+            error.to_string(),
+            SourceSpan::new(0, 0),
+        ),
+        ModuleError::ImportBindingCollision { first, second, .. } => module_error(
+            DiagnosticCode::MODULE_IMPORT_BINDING_COLLISION,
+            error.to_string(),
+            *second,
+        )
+        .with_related_location(DiagnosticRelatedLocation::new(
+            None,
+            *first,
+            "first import binding is here",
+        )),
+        ModuleError::DuplicateObjectOwner { .. } => module_error(
+            DiagnosticCode::MODULE_DUPLICATE_OBJECT_OWNER,
+            error.to_string(),
+            SourceSpan::new(0, 0),
+        ),
+        _ => unreachable!("unlocated failure diagnostic received another module error"),
     }
 }
 
@@ -71,20 +115,24 @@ fn duplicate_diagnostic(
     error: &ModuleError,
     duplicate: &crate::modules::DuplicateDeclaration,
 ) -> Diagnostic {
-    module_error("E1106", error.to_string(), duplicate.second.span)
-        .with_source_path(duplicate.second.path.display().to_string())
-        .with_related_location(DiagnosticRelatedLocation::new(
-            Some(duplicate.first.path.display().to_string()),
-            duplicate.first.span,
-            "first declaration is here",
-        ))
+    module_error(
+        DiagnosticCode::MODULE_DUPLICATE_DECLARATION,
+        error.to_string(),
+        duplicate.second.span,
+    )
+    .with_source_path(duplicate.second.path.display().to_string())
+    .with_related_location(DiagnosticRelatedLocation::new(
+        Some(duplicate.first.path.display().to_string()),
+        duplicate.first.span,
+        "first declaration is here",
+    ))
 }
 
 fn private_access_diagnostic(error: &ModuleError) -> Diagnostic {
     let ModuleError::PrivateDeclarationAccess { symbol, span, facade, cause, .. } = error else {
         unreachable!("private access diagnostic received another module error")
     };
-    module_error("E1109", error.to_string(), *span)
+    module_error(DiagnosticCode::MODULE_PRIVATE_DECLARATION_ACCESS, error.to_string(), *span)
         .with_source_path(facade.display().to_string())
         .with_suggestion(match &**cause {
             PrivateCause::NotOpen => {
@@ -101,33 +149,37 @@ fn private_access_diagnostic(error: &ModuleError) -> Diagnostic {
         })
 }
 
-fn visibility_code(error: &ModuleError) -> &'static str {
+fn visibility_code(error: &ModuleError) -> DiagnosticCode {
     match error {
-        ModuleError::ConflictingOpening { .. } => "E1137",
-        ModuleError::OutOfScopeReference(_) => "E1119",
-        _ => "E1109",
+        ModuleError::ConflictingOpening { .. } => DiagnosticCode::MODULE_CONFLICTING_OPENING,
+        ModuleError::OutOfScopeReference(_) => DiagnosticCode::MODULE_OUT_OF_SCOPE_REFERENCE,
+        _ => DiagnosticCode::MODULE_PRIVATE_DECLARATION_ACCESS,
     }
 }
 
 fn resolution_diagnostic(error: &ModuleResolutionError) -> Diagnostic {
     let (code, path) = match error {
         ModuleResolutionError::InvalidPath(_)
-        | ModuleResolutionError::StandardLibraryUnavailable(_) => ("E1100", None),
+        | ModuleResolutionError::StandardLibraryUnavailable(_) => {
+            (DiagnosticCode::MODULE_PATH_UNRESOLVED, None)
+        }
         ModuleResolutionError::MissingFacade { expected, .. } => {
-            ("E1101", Some(expected.display().to_string()))
+            (DiagnosticCode::MODULE_MISSING_FACADE, Some(expected.display().to_string()))
         }
         ModuleResolutionError::IncompatibleRuntime { expected, .. } => {
-            ("E1112", Some(expected.display().to_string()))
+            (DiagnosticCode::MODULE_INCOMPATIBLE_RUNTIME, Some(expected.display().to_string()))
         }
         ModuleResolutionError::AmbiguousModule { directory, .. } => {
-            ("E1102", Some(directory.display().to_string()))
+            (DiagnosticCode::MODULE_AMBIGUOUS_MODULE, Some(directory.display().to_string()))
         }
         ModuleResolutionError::BypassesFacade { facade, .. } => {
-            ("E1108", Some(facade.display().to_string()))
+            (DiagnosticCode::MODULE_BYPASSES_FACADE, Some(facade.display().to_string()))
         }
-        ModuleResolutionError::Io { path, .. } => ("E1103", Some(path.display().to_string())),
+        ModuleResolutionError::Io { path, .. } => {
+            (DiagnosticCode::MODULE_IO_FAILURE, Some(path.display().to_string()))
+        }
         ModuleResolutionError::TestLayout { path, .. } => {
-            ("E1143", Some(path.display().to_string()))
+            (DiagnosticCode::MODULE_TEST_LAYOUT, Some(path.display().to_string()))
         }
     };
     let diagnostic = module_error(code, error.to_string(), SourceSpan::new(0, 0));
@@ -137,6 +189,6 @@ fn resolution_diagnostic(error: &ModuleResolutionError) -> Diagnostic {
     }
 }
 
-fn module_error(code: &'static str, message: String, span: SourceSpan) -> Diagnostic {
-    Diagnostic::error(code, span, message).with_phase(DiagnosticPhase::Module)
+fn module_error(code: DiagnosticCode, message: String, span: SourceSpan) -> Diagnostic {
+    Diagnostic::error(code.as_str(), span, message).with_phase(DiagnosticPhase::Module)
 }
