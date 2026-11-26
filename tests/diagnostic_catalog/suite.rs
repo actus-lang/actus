@@ -1,7 +1,9 @@
 //! The check of ADR-0123, "The catalog is checked".
 //!
 //! 1. every code of the registry has an entry or is on `missing.txt`, and
-//!    every entry and listed code is in the registry;
+//!    every entry and listed code is in the registry; a retired code is
+//!    neither required nor allowed as an entry or a listed code, and
+//!    `diagnostics.md` names each retired code;
 //! 2. every `fails=` example reports its code first, inside the example;
 //! 3. every `compiles` group passes `actus check`;
 //! 4. every entry has the documented shape.
@@ -48,6 +50,22 @@ fn assert_no_problems(problems: &[String]) {
 }
 
 #[test]
+fn every_retired_code_is_named_in_the_diagnostics_document() {
+    let document = fs::read_to_string(catalog_directory().with_file_name("diagnostics.md"))
+        .expect("the diagnostics document should exist");
+    let section = document
+        .split("## Retired codes")
+        .nth(1)
+        .expect("diagnostics.md must have a `## Retired codes` section");
+    let missing: Vec<&str> = DiagnosticCode::RETIRED
+        .iter()
+        .map(DiagnosticCode::as_str)
+        .filter(|code| !section.contains(&format!("`{code}`")))
+        .collect();
+    assert!(missing.is_empty(), "retired codes missing from `## Retired codes`: {missing:?}");
+}
+
+#[test]
 fn every_entry_has_the_documented_shape() {
     assert_no_problems(&load_entries().1);
 }
@@ -64,15 +82,21 @@ fn the_catalog_and_the_registry_list_the_same_codes() {
     }
     let (entries, _) = load_entries();
     let entered: BTreeSet<&str> = entries.iter().map(|entry| entry.code.as_str()).collect();
+    let retired: BTreeSet<&str> =
+        DiagnosticCode::RETIRED.iter().map(DiagnosticCode::as_str).collect();
     for code in &listed {
-        if !registry.contains(code) {
+        if retired.contains(code) {
+            problems.push(format!("{code}: is retired, remove it from missing.txt"));
+        } else if !registry.contains(code) {
             problems.push(format!("{code}: listed in missing.txt but not in the registry"));
         } else if entered.contains(code) {
             problems.push(format!("{code}: has an entry, remove it from missing.txt"));
         }
     }
     for code in &entered {
-        if !registry.contains(code) {
+        if retired.contains(code) {
+            problems.push(format!("{code}: is retired, delete its entry"));
+        } else if !registry.contains(code) {
             problems.push(format!("{code}: has an entry but is not in the registry"));
         }
     }

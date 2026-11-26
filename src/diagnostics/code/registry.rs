@@ -3,6 +3,10 @@
 //! Every constant is declared once in the table at the end of this file; the
 //! constants and [`DiagnosticCode::ALL`] come from the same macro invocation,
 //! so a code cannot be defined without being enumerated.
+//!
+//! A code the compiler can no longer emit is retired (ADR-0123): its constant
+//! leaves the table and its number joins [`DiagnosticCode::RETIRED`], where it
+//! stays, so no later diagnostic can take the number.
 
 /// A stable `E####` diagnostic code. Every diagnostic is built from one of the
 /// associated constants; no other source file spells a code.
@@ -14,6 +18,19 @@ impl DiagnosticCode {
     pub const fn as_str(&self) -> &'static str {
         self.0
     }
+
+    /// Codes the compiler can no longer emit, sorted. A retired code is not in
+    /// [`DiagnosticCode::ALL`], has no catalog entry and is never reused;
+    /// `docs/language/diagnostics.md` names the code that covers its case.
+    pub const RETIRED: &'static [DiagnosticCode] = &[
+        DiagnosticCode("E1039"),
+        DiagnosticCode("E1049"),
+        DiagnosticCode("E1064"),
+        DiagnosticCode("E1075"),
+        DiagnosticCode("E1080"),
+        DiagnosticCode("E1107"),
+        DiagnosticCode("E1111"),
+    ];
 }
 
 macro_rules! diagnostic_codes {
@@ -96,7 +113,6 @@ diagnostic_codes! {
     UNKNOWN_METHOD = "E1036",
     INVALID_RECEIVER = "E1037",
     RECEIVER_TYPE_MISMATCH = "E1038",
-    DUPLICATE_ENUM_NAME = "E1039",
     UNKNOWN_ENUM_VARIANT = "E1040",
     ENUM_VARIANT_ARGUMENT_COUNT = "E1041",
     ENUM_VARIANT_ARGUMENT_NAME = "E1042",
@@ -106,7 +122,6 @@ diagnostic_codes! {
     UNREACHABLE_PATTERN = "E1046",
     DUPLICATE_PATTERN = "E1047",
     PATTERN_TYPE_MISMATCH = "E1048",
-    PATTERN_BINDING_TYPE_MISMATCH = "E1049",
     INVALID_CASE_ROLE = "E1050",
     INVALID_MUTATION = "E1051",
     UNKNOWN_TYPE_PARAMETER = "E1052",
@@ -121,7 +136,6 @@ diagnostic_codes! {
     BRANCH_STATE_MISMATCH = "E1061",
     INVALID_GUARD_ACCESS = "E1062",
     GUARD_OR_CONDITION_TYPE_MISMATCH = "E1063",
-    SUSPENDED_ACCESS = "E1064",
     EXCLUSIVE_LOAN_ALIAS = "E1065",
     INVALID_ABS_RETURN_ORIGIN = "E1066",
     UNRESOLVED_RESULT_CONSTRUCTOR = "E1067",
@@ -132,12 +146,10 @@ diagnostic_codes! {
     PACK_FIELD_OUT_OF_BOUNDS = "E1072",
     PACK_FIELD_OVERLAP = "E1073",
     PACK_UNCOVERED_BITS = "E1074",
-    INVALID_PACK_FIELD_ROLE = "E1075",
     INVALID_ARENA_CAPACITY = "E1076",
     ARENA_REFERENCE_ESCAPE = "E1077",
     CROSS_ARENA_REFERENCE = "E1078",
     ARENA_REFERENCE_LIVE = "E1079",
-    MALFORMED_TYPE_NAME = "E1080",
     DUPLICATE_PACK_NAME = "E1081",
     ESCAPING_LOAN = "E1082",
     INVALID_ARRAY_CAPACITY = "E1083",
@@ -164,11 +176,9 @@ diagnostic_codes! {
     MODULE_UNKNOWN_SIBLING = "E1104",
     MODULE_READ_FAILURE = "E1105",
     MODULE_DUPLICATE_DECLARATION = "E1106",
-    MODULE_LEX_FAILURE = "E1107",
     MODULE_BYPASSES_FACADE = "E1108",
     MODULE_PRIVATE_DECLARATION_ACCESS = "E1109",
     MODULE_SYMBOL_COLLISION = "E1110",
-    MODULE_DUPLICATE_OBJECT_OWNER = "E1111",
     MODULE_INCOMPATIBLE_RUNTIME = "E1112",
     MODULE_CONFIGURATION_IMPORT = "E1113",
     MODULE_CONFIGURATION_RUNTIME_DECLARATION = "E1114",

@@ -33,7 +33,6 @@ impl Analyzer {
             return Ok(());
         };
         let owner_index = self.binding(name, *owner_span)?;
-        self.ensure_access_available(owner_index, name, span)?;
         let arena_reference = self.binding_arena_provenance.contains_key(&owner_index);
         let field = borrow_field(expression);
         self.validate_borrow_target(

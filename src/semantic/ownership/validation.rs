@@ -41,7 +41,6 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, *subject_span)?;
-        self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidCaseRole {
@@ -96,7 +95,6 @@ impl Analyzer {
             return Ok(None);
         }
         let index = self.binding(name, *identifier_span)?;
-        self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Ins {
             return Err(SemanticError {
                 kind: SemanticErrorKind::EscapingLoan { name: name.clone() },
@@ -127,7 +125,6 @@ impl Analyzer {
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.ensure_access_available(index, name, span)?;
         match self.model.bindings[index].ownership {
             OwnershipState::Moved => Err(SemanticError {
                 kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
@@ -143,21 +140,6 @@ impl Analyzer {
             }),
             OwnershipState::Active => Ok(()),
         }
-    }
-
-    pub(in crate::semantic) fn ensure_access_available(
-        &self,
-        index: usize,
-        name: &str,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        if let AccessState::Suspended { loan_id } = self.model.bindings[index].access {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::SuspendedAccess { name: name.to_owned(), loan_id },
-                span,
-            });
-        }
-        Ok(())
     }
 
     pub(in crate::semantic) fn ensure_mutable(
@@ -191,7 +173,6 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, span)?;
-        self.ensure_access_available(index, name, span)?;
         let binding = &self.model.bindings[index];
         if matches!(binding.role, Role::Abs | Role::Ins) {
             return Err(SemanticError {

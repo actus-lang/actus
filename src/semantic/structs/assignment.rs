@@ -82,7 +82,6 @@ impl Analyzer {
         field: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.ensure_access_available(binding_index, name, span)?;
         if !matches!(self.model.bindings[binding_index].role, Role::Erg | Role::Ins) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },

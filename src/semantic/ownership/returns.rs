@@ -47,7 +47,6 @@ impl Analyzer {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.ensure_access_available(index, name, span)?;
         self.reject_ins_return(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {

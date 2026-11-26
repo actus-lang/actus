@@ -71,7 +71,6 @@ fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode>
     Some(match kind {
         SemanticErrorKind::DuplicateVerbName { .. } => DiagnosticCode::DUPLICATE_VERB_NAME,
         SemanticErrorKind::DuplicateStructName { .. } => DiagnosticCode::DUPLICATE_STRUCT_NAME,
-        SemanticErrorKind::DuplicateEnumName { .. } => DiagnosticCode::DUPLICATE_ENUM_NAME,
         SemanticErrorKind::DuplicatePackName { .. } => DiagnosticCode::DUPLICATE_PACK_NAME,
         SemanticErrorKind::InvalidSerializationContract { .. } => {
             DiagnosticCode::INVALID_SERIALIZATION_CONTRACT
@@ -164,9 +163,6 @@ fn expression_pattern_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
         SemanticErrorKind::UnreachablePattern { .. } => DiagnosticCode::UNREACHABLE_PATTERN,
         SemanticErrorKind::DuplicatePattern { .. } => DiagnosticCode::DUPLICATE_PATTERN,
         SemanticErrorKind::PatternTypeMismatch { .. } => DiagnosticCode::PATTERN_TYPE_MISMATCH,
-        SemanticErrorKind::PatternBindingTypeMismatch { .. } => {
-            DiagnosticCode::PATTERN_BINDING_TYPE_MISMATCH
-        }
         _ => return None,
     })
 }
@@ -219,7 +215,6 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
             DiagnosticCode::LOOP_CONTROL_OUTSIDE_LOOP
         }
         SemanticErrorKind::ReservedIntrinsicName { .. } => DiagnosticCode::RESERVED_INTRINSIC_NAME,
-        SemanticErrorKind::SuspendedAccess { .. } => DiagnosticCode::SUSPENDED_ACCESS,
         SemanticErrorKind::ExclusiveLoanAlias { .. } => DiagnosticCode::EXCLUSIVE_LOAN_ALIAS,
         SemanticErrorKind::EscapingLoan { .. } => DiagnosticCode::ESCAPING_LOAN,
         SemanticErrorKind::MustUseIgnored { .. } => DiagnosticCode::MUST_USE_IGNORED,
@@ -260,7 +255,6 @@ fn ownership_call_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
 fn type_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
     Some(match kind {
         SemanticErrorKind::UnknownType { .. } => DiagnosticCode::UNKNOWN_TYPE,
-        SemanticErrorKind::MalformedTypeName { .. } => DiagnosticCode::MALFORMED_TYPE_NAME,
         SemanticErrorKind::UnknownTypeParameter { .. } => DiagnosticCode::UNKNOWN_TYPE_PARAMETER,
         SemanticErrorKind::GenericArityMismatch { .. } => DiagnosticCode::GENERIC_ARITY_MISMATCH,
         SemanticErrorKind::GenericConstraintMismatch { .. } => {

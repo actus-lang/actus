@@ -19,7 +19,6 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let Some((name, object_span)) = root_binding(object) else { return Ok(()) };
         let index = self.binding(name, object_span)?;
-        self.ensure_access_available(index, name, span)?;
         let field_path = format_field_path(object, field);
         match &self.model.bindings[index].ownership {
             OwnershipState::Active => Ok(()),

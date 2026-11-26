@@ -31,3 +31,29 @@ fn registry_is_sorted_by_value() {
     sorted.sort_unstable();
     assert_eq!(values, sorted);
 }
+
+#[test]
+fn no_active_code_is_a_retired_code() {
+    let reused: Vec<_> = DiagnosticCode::RETIRED
+        .iter()
+        .filter(|retired| DiagnosticCode::ALL.contains(retired))
+        .map(DiagnosticCode::as_str)
+        .collect();
+    assert!(reused.is_empty(), "retired codes that are active again: {reused:?}");
+}
+
+#[test]
+fn retired_codes_are_sorted_unique_and_well_formed() {
+    let values: Vec<_> = DiagnosticCode::RETIRED.iter().map(DiagnosticCode::as_str).collect();
+    let mut sorted = values.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(values, sorted);
+    for text in values {
+        let digits = text.strip_prefix('E').unwrap_or("");
+        assert!(
+            digits.len() == 4 && digits.bytes().all(|byte| byte.is_ascii_digit()),
+            "`{text}` is not E followed by four digits"
+        );
+    }
+}

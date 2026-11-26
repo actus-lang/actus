@@ -62,10 +62,6 @@ pub enum SemanticErrorKind {
     InvalidAbsReturnOrigin {
         reason: String,
     },
-    SuspendedAccess {
-        name: String,
-        loan_id: usize,
-    },
     ExclusiveLoanAlias {
         name: String,
     },
@@ -139,9 +135,6 @@ pub enum SemanticErrorKind {
         name: String,
     },
     UnknownType {
-        name: String,
-    },
-    MalformedTypeName {
         name: String,
     },
     UnknownTypeParameter {
@@ -228,9 +221,6 @@ pub enum SemanticErrorKind {
         name: String,
     },
     DuplicateStructName {
-        name: String,
-    },
-    DuplicateEnumName {
         name: String,
     },
     DuplicatePackName {
@@ -422,11 +412,6 @@ pub enum SemanticErrorKind {
         expected: String,
         found: String,
     },
-    PatternBindingTypeMismatch {
-        binding: String,
-        expected: String,
-        found: String,
-    },
     InvalidCaseRole {
         mode: String,
         subject: String,
@@ -483,11 +468,6 @@ pub enum SemanticErrorKind {
         pack: String,
         start: u16,
         end: u16,
-    },
-    InvalidPackFieldRole {
-        pack: String,
-        field: String,
-        role: String,
     },
     InvalidSerializationContract {
         contract: String,

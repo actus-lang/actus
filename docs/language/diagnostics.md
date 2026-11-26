@@ -33,7 +33,7 @@ fails the run is an `error`; strict mode makes every finding an error
 | `E1094`–`E1096` | Struct field-role, frozen-field, and self-assignment rules |
 | `E1036`–`E1038` | Method lookup and receiver validation |
 | `E1040`–`E1079` | Enum patterns, roles, generics, packs, and arenas |
-| `E1080`–`E1082` | Malformed generic names, duplicate packed layouts, and escaping loans |
+| `E1081`–`E1082` | Duplicate packed layouts and escaping loans |
 | `E1083`–`E1099` | Bounded arrays, arenas, dynamic roles, and compile-time expressions |
 | `E1100`–`E1108` | Module paths, facades, sibling visibility, and module I/O |
 | `E1109` | Private module declaration or public-signature visibility violation; reached unqualified or qualified (`module::name`); the help names the cause: mark the declaration `open`, or, when it is already `open`, change `open unit x;` to `open x;` or add `open x;` in the named facade |
@@ -54,7 +54,6 @@ fails the run is an `error`; strict mode makes every finding an error
 | `E1104` | Unknown sibling referenced by a module facade |
 | `E1105` | Module source read failure or defensive module-source fallback |
 | `E1106` | Duplicate declaration aggregated across module sources |
-| `E1107` | Invalid empty lexical failure reported by a module boundary |
 | `E1800`–`E1809` | Strict configuration and policy |
 | `E1810`–`E1819` | Strict frontend validation |
 | `E1820`–`E1829` | Strict semantic validation |
@@ -153,3 +152,19 @@ which does not fail the run, and errors under `--strict`.
 `E1851` and `E1854` are strict split-required failures at 600 file lines and
 60 function lines. `E1852` and `E1855` reject files above 800 lines and
 functions above 80 lines respectively.
+
+## Retired codes
+
+A code the compiler can no longer emit is retired (ADR-0123). Its number stays
+in the registry's `RETIRED` list and is never given to another diagnostic; it
+has no catalog entry. The table names the code that reports the case now.
+
+| Code | Former meaning | Reported now by |
+| --- | --- | --- |
+| `E1039` | Duplicate enum declaration found by semantic analysis | `E0005` for one file, `E1106` for two files of one module, `E1110` for two modules |
+| `E1049` | Type of a pattern binding differs from the expected type | `E1048`; a binding takes the type of its payload, so only the pattern as a whole can differ from the subject |
+| `E1064` | Binding used while an exclusive loan suspends it | `E1065` for a second use of the owner in the call that borrows it |
+| `E1075` | Pack field with an access role other than `erg` or `abs` | `E0003`, from the parser |
+| `E1080` | Malformed internal type name of a `for` range binding | `E1025`, the binding is not an integer type |
+| `E1107` | Lexical failure with no error at a module boundary | The lexical error itself (`E0001`, `E0002`, `E0024`–`E0027`), with the path of the module file |
+| `E1111` | One module owning two object units | None; a module that is imported more than once is loaded once |

@@ -615,11 +615,6 @@ fn conditional_and_compound_syntax_fail_with_stable_parser_diagnostics() {
 fn malformed_generic_keys_and_primitive_rules_have_fixtures() {
     analyze_source("struct Box[T] { item: T, } verb main(erg item: Box[Int]) { }")
         .expect("well-formed generic key should pass");
-    let malformed = SemanticError {
-        kind: SemanticErrorKind::MalformedTypeName { name: "Box[".to_owned() },
-        span: actus::lexer::SourceSpan::new(0, 4),
-    };
-    assert_eq!(semantic_diagnostic(&malformed).code(), "E1080");
 
     analyze_source("verb main(erg bits: u1, erg signed: i8, erg decimal: f32) { }")
         .expect("supported widths and signedness should pass");

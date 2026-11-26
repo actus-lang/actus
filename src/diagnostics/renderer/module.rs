@@ -16,17 +16,12 @@ use super::{Diagnostic, DiagnosticPhase, lex_diagnostic, parse_diagnostic, seman
 pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
     match error {
         ModuleError::Resolution(error) => resolution_diagnostic(error),
-        ModuleError::Lex { path, errors } => errors
-            .first()
-            .map(lex_diagnostic)
-            .unwrap_or_else(|| {
-                module_error(
-                    DiagnosticCode::MODULE_LEX_FAILURE,
-                    error.to_string(),
-                    SourceSpan::new(0, 0),
-                )
-            })
-            .with_source_path(path.display().to_string()),
+        // A lexical failure always carries its errors: a module source is
+        // reported as `ModuleError::Lex` only when the scanner found some.
+        ModuleError::Lex { path, errors } => lex_diagnostic(
+            errors.first().expect("a module lexical failure carries at least one error"),
+        )
+        .with_source_path(path.display().to_string()),
         ModuleError::Parse { path, error: parse_error } => {
             parse_diagnostic(parse_error).with_source_path(path.display().to_string())
         }
@@ -46,8 +41,7 @@ pub fn module_diagnostic(error: &ModuleError) -> Diagnostic {
         | ModuleError::TestVerbInProduction { .. } => located_failure_diagnostic(error),
         ModuleError::UnknownSiblingModule { .. }
         | ModuleError::SymbolCollision { .. }
-        | ModuleError::ImportBindingCollision { .. }
-        | ModuleError::DuplicateObjectOwner { .. } => unlocated_failure_diagnostic(error),
+        | ModuleError::ImportBindingCollision { .. } => unlocated_failure_diagnostic(error),
         ModuleError::Semantic(error) => semantic_diagnostic(error),
     }
 }
@@ -102,11 +96,6 @@ fn unlocated_failure_diagnostic(error: &ModuleError) -> Diagnostic {
             *first,
             "first import binding is here",
         )),
-        ModuleError::DuplicateObjectOwner { .. } => module_error(
-            DiagnosticCode::MODULE_DUPLICATE_OBJECT_OWNER,
-            error.to_string(),
-            SourceSpan::new(0, 0),
-        ),
         _ => unreachable!("unlocated failure diagnostic received another module error"),
     }
 }

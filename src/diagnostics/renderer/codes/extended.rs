@@ -144,9 +144,6 @@ fn enum_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
 
 fn enum_type_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
-        SemanticErrorKind::DuplicateEnumName { name } => {
-            format!("duplicate enum declaration `{name}`")
-        }
         SemanticErrorKind::EmptyEnum { name } => {
             format!("enum `{name}` must declare at least one variant")
         }
@@ -197,9 +194,6 @@ fn enum_pattern_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::DuplicatePattern { pattern } => format!("duplicate pattern `{pattern}`"),
         SemanticErrorKind::PatternTypeMismatch { expected, found } => {
             format!("pattern type mismatch: expected `{expected}`, found `{found}`")
-        }
-        SemanticErrorKind::PatternBindingTypeMismatch { binding, expected, found } => {
-            format!("pattern binding `{binding}` has type `{found}`, expected `{expected}`")
         }
         SemanticErrorKind::InvalidCaseRole { mode, subject } => {
             format!("cannot use `{mode}` case deconstruction on `{subject}`")
@@ -373,7 +367,6 @@ fn type_result_message(kind: &SemanticErrorKind) -> Option<String> {
 fn type_contract_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
-        SemanticErrorKind::MalformedTypeName { name } => format!("malformed type name `{name}`"),
         SemanticErrorKind::UnknownTypeParameter { name } => {
             format!("undeclared generic type parameter `{name}`")
         }

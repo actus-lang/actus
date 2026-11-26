@@ -34,7 +34,6 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, identifier_span)?;
-        self.ensure_access_available(index, name, span)?;
         self.reject_ins_dat_transfer(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
@@ -87,7 +86,6 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, object_span)?;
-        self.ensure_access_available(index, name, span)?;
         self.reject_ins_dat_transfer(index, name, span)?;
         self.validate_struct_field_move(object, field, span)?;
         let field_path = format_field_path(object, field);

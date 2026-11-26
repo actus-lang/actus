@@ -15,16 +15,17 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         for declaration in &program.declarations {
             let TopLevelDecl::Enum(definition) = declaration else { continue };
-            if let Some(existing) = self.enum_types.get(&definition.name) {
-                if existing == definition {
-                    continue;
-                }
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::DuplicateEnumName { name: definition.name.clone() },
-                    span: definition.span,
-                });
-            }
-            self.enum_types.insert(definition.name.clone(), definition.clone());
+            // A conflicting second declaration of one enum name never reaches
+            // this point: the parser rejects it in one file (E0005) and the
+            // module plan rejects it across files and modules (E1106, E1110).
+            // An identical repeat is allowed; the first declaration stays.
+            let existing = self.enum_types.get(&definition.name);
+            debug_assert!(
+                existing.is_none_or(|existing| existing == definition),
+                "enum `{}` is declared twice with different definitions; E0005, E1106 or E1110 must reject this earlier",
+                definition.name
+            );
+            self.enum_types.entry(definition.name.clone()).or_insert_with(|| definition.clone());
         }
         for definition in builtin_enum_definitions() {
             self.enum_types.entry(definition.name.clone()).or_insert(definition);

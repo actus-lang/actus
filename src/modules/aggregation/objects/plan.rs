@@ -28,8 +28,6 @@ pub(in crate::modules::aggregation) fn build_object_plan(
     compilation: &ModuleCompilationPlan,
     generic_types: &[crate::ast::TypeName],
 ) -> Result<ModuleObjectPlan, ModuleError> {
-    let mut owners = HashSet::new();
-    owners.insert(String::new());
     let mut units = vec![ModuleObjectUnit {
         owner: ModuleObjectOwner::Root,
         namespace: ModuleNamespace::root(),
@@ -41,9 +39,6 @@ pub(in crate::modules::aggregation) fn build_object_plan(
         .sort_by(|left, right| left.identity().module_path().cmp(right.identity().module_path()));
     for module in imported {
         let module_path = module.identity().module_path().to_owned();
-        if !owners.insert(module_path.clone()) {
-            return Err(ModuleError::DuplicateObjectOwner { module_path });
-        }
         let internal_scope = module_is_reachable_from_friend_scope(compilation, module);
         let exported_verbs = exported_implementation_names(module, internal_scope);
         let program = implementation_declarations(module, compilation, generic_types);

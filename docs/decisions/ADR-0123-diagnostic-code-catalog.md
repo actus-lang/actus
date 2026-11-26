@@ -157,6 +157,15 @@ and the tests give it.
 parser's. The stability rule protects a code's meaning; these five codes never
 had one meaning, so the change restores the rule instead of breaking it.
 
+### Retired codes
+
+A code the compiler can no longer emit is retired: its constant leaves the
+registry, its number stays in the registry's `RETIRED` list and is never given
+to another diagnostic, and it has no catalog entry. A test checks that no
+active code is retired and that no retired code has an entry or is listed in
+`missing.txt`. `docs/language/diagnostics.md` names each retired code, with the
+code that now covers its case.
+
 ### `actus explain`
 
 `actus explain E1140` prints the entry for a code: the title, the text, the

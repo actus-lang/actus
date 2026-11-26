@@ -188,9 +188,6 @@ fn ownership_loan_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ReservedIntrinsicName { name } => {
             format!("`{name}` is reserved for a built-in intrinsic")
         }
-        SemanticErrorKind::SuspendedAccess { name, loan_id } => {
-            format!("binding `{name}` is suspended by exclusive loan #{loan_id}")
-        }
         SemanticErrorKind::ExclusiveLoanAlias { name } => {
             format!("exclusive loan aliases resource `{name}` more than once")
         }

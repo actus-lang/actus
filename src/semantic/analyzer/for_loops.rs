@@ -51,38 +51,31 @@ impl Analyzer {
         start: &Expr,
     ) -> Result<crate::ast::TypeName, SemanticError> {
         let declared = match binding.ty.as_deref() {
-            Some(name) => Some(name.to_owned()),
+            Some(name) => name.to_owned(),
             None => {
                 self.visit_expression(start)?;
-                Some(self.expression_type_name(start).unwrap_or_else(|| "Int".to_owned()))
+                self.expression_type_name(start).unwrap_or_else(|| "Int".to_owned())
             }
         };
-        let parsed_type = declared
-            .as_deref()
-            .and_then(|name| super::super::calls::parse_type_name_key(name, binding.span))
-            .ok_or_else(|| SemanticError {
-                kind: SemanticErrorKind::MalformedTypeName {
-                    name: "for range binding requires an integer type".to_owned(),
-                },
-                span: binding.span,
-            })?;
-        if parsed_type.name == "Int"
-            || matches!(
-                crate::ast::primitive_type(&parsed_type.name),
-                Some(crate::ast::PrimitiveType::Integer { .. })
-            )
-        {
-            Ok(parsed_type)
-        } else {
-            Err(SemanticError {
+        let parsed_type = super::super::calls::parse_type_name_key(&declared, binding.span);
+        let is_integer = |parsed: &crate::ast::TypeName| {
+            parsed.name == "Int"
+                || matches!(
+                    crate::ast::primitive_type(&parsed.name),
+                    Some(crate::ast::PrimitiveType::Integer { .. })
+                )
+        };
+        match parsed_type {
+            Some(parsed) if is_integer(&parsed) => Ok(parsed),
+            other => Err(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     callee: "for".to_owned(),
                     parameter: "range binding".to_owned(),
                     expected: "integer".to_owned(),
-                    found: parsed_type.name,
+                    found: other.map_or(declared, |parsed| parsed.name),
                 },
                 span: binding.span,
-            })
+            }),
         }
     }
 
