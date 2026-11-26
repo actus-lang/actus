@@ -28,6 +28,8 @@ mod misleading_messages;
 mod origins;
 #[path = "semantic/packs.rs"]
 mod packs;
+#[path = "semantic/pattern_literals.rs"]
+mod pattern_literals;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
 #[path = "semantic/repr.rs"]
