@@ -1,3 +1,5 @@
+#[path = "semantic/abs_field_views.rs"]
+mod abs_field_views;
 #[path = "semantic/arena_cleanup.rs"]
 mod arena_cleanup;
 #[path = "semantic/arenas.rs"]
@@ -12,8 +14,12 @@ mod casts;
 mod drop;
 #[path = "semantic/dynamic.rs"]
 mod dynamic;
+#[path = "semantic/enum_payload_moves.rs"]
+mod enum_payload_moves;
 #[path = "semantic/enums.rs"]
 mod enums;
+#[path = "semantic/erg_argument_moves.rs"]
+mod erg_argument_moves;
 #[path = "semantic/float_negation.rs"]
 mod float_negation;
 #[path = "semantic/generics.rs"]

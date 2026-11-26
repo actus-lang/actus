@@ -169,3 +169,33 @@ fn a_plain_field_still_accepts_fresh_values_and_scalar_sources() {
         analyze_main(body).unwrap_or_else(|error| panic!("{label}: {error:?}"));
     }
 }
+
+#[test]
+fn assigning_a_resource_to_a_field_or_an_element_moves_its_source() {
+    let store = "struct HoldBuffer { erg held: Buffer, } ";
+    for (label, body) in [
+        (
+            "field",
+            "erg source: Buffer = Buffer[4]; erg holder = HoldBuffer { held: Buffer[4], }; holder.held = source; drop(source);",
+        ),
+        (
+            "element",
+            "erg source: Buffer = Buffer[4]; erg slots: Array[Buffer, 2] = Array[Buffer, 2](); slots[0u32] = source; drop(source);",
+        ),
+    ] {
+        let source = format!("{store}verb main() {{ {body} }}");
+        let (tokens, _) = scan(&source);
+        let error = analyze(&parse(tokens).expect("source should parse")).expect_err(label).kind;
+        assert!(
+            matches!(error, SemanticErrorKind::DoubleDrop { name } if name == "source"),
+            "{label}"
+        );
+    }
+}
+
+#[test]
+fn assigning_plain_data_to_a_field_or_an_element_keeps_the_source() {
+    let source = "struct Point { x: Int, } struct Holder { point: Point, } verb main() { erg point = Point { x: 1, }; erg holder = Holder { point: Point { x: 0, }, }; holder.point = point; erg points: Array[Point, 2] = Array[Point, 2](); points[0u32] = point; print(point.x); }";
+    let (tokens, _) = scan(source);
+    analyze(&parse(tokens).expect("source should parse")).expect("plain data is copied by value");
+}

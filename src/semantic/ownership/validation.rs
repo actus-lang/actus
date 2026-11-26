@@ -85,6 +85,24 @@ impl Analyzer {
         Ok(())
     }
 
+    /// Moves the source of a value that is stored into an owning slot: an
+    /// `erg` or move-only struct field, an enum payload, or an `erg` argument.
+    /// A field of an owner moves by its field path (ADR-0046 2.2); any other
+    /// source is consumed as for an `erg` binding.
+    pub(in crate::semantic) fn consume_owned_source(
+        &mut self,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if matches!(expression, Expr::FieldAccess { .. })
+            && self.root_binding_index(expression).is_some()
+            && self.is_move_only_aggregate(expression)
+        {
+            return self.move_dat_argument(expression, span);
+        }
+        self.initialize_owner(expression, span)
+    }
+
     fn validate_owner_source(
         &self,
         expression: &Expr,

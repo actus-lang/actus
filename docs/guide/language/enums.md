@@ -45,7 +45,10 @@ equality; compare their selected payloads explicitly after pattern matching.
 
 ## Payload ownership
 
-A payload binding follows the subject's ownership contract. A `dat` subject may
+A value placed in a payload moves into the enum value. A buffer or an arena
+given to `Option`, `Result`, or a user enum cannot be used again through its
+source binding, and the source of an `abs` payload stays frozen while the enum
+value lives. A payload binding follows the subject's ownership contract. A `dat` subject may
 be consumed by the match; an `abs` subject remains available as a read-only
 owner after the branch. Payload moves are branch-local and cleanup is planned
 for every path.

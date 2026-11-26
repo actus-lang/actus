@@ -125,6 +125,26 @@ is a movable place, so `Holder { held: other.held, }` is accepted when
 `other.held` is declared `erg` and rejected when it is a plain field. Declare
 the field `erg` when the aggregate should hand its resource on.
 
+An `abs` field is a view of its source, so the source is frozen until the end
+of the block that builds the struct. Within that block it can be read but not
+moved, dropped, or changed:
+
+```actus fails=E1009
+struct Header {
+    abs bytes: Buffer,
+}
+
+verb main() {
+    erg data: Buffer = Buffer[4];
+    erg header = Header { bytes: data, };
+    drop(data);
+}
+```
+
+A call-scope `ins` loan cannot be stored in an `abs` field. Assigning a
+resource (a buffer, an arena, or a type that holds one) to a field or an array
+element moves it out of the source binding. Plain data keeps value semantics.
+
 ## Cleanup and custom drop behavior
 
 Struct cleanup is planned at scope boundaries and on return or error paths. If

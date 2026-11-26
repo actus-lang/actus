@@ -29,7 +29,45 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let Expr::Borrow { expression, .. } = initializer else { return Ok(()) };
-        let Some((name, owner_span)) = borrow_base(expression.as_ref()) else {
+        self.register_borrow_of(expression, span)
+    }
+
+    /// Registers the borrow that an `abs` struct field takes on its source
+    /// (ADR-0046 2.3). The source is frozen like the owner of an `abs`
+    /// binding, until the end of the block that builds the holder. A bare
+    /// source is a view like `ref source`; an `abs` binding is already a view,
+    /// so it is passed on, and an `ins` loan cannot be stored (2.4).
+    pub(in crate::semantic) fn register_view_borrow(
+        &mut self,
+        source: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let (explicit, source) = match source {
+            Expr::Borrow { expression, .. } => (true, expression.as_ref()),
+            other => (false, other),
+        };
+        let Some((name, _)) = borrow_base(source) else { return Ok(()) };
+        // A constant, a unit variant, or a fresh value has no binding to freeze.
+        let Some(owner_index) = self.root_binding_index(source) else { return Ok(()) };
+        match self.model.bindings[owner_index].role {
+            Role::Ins => {
+                return Err(SemanticError {
+                    kind: SemanticErrorKind::EscapingLoan { name: name.clone() },
+                    span,
+                });
+            }
+            Role::Abs if !explicit => return Ok(()),
+            _ => {}
+        }
+        self.register_borrow_of(source, span)
+    }
+
+    fn register_borrow_of(
+        &mut self,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        let Some((name, owner_span)) = borrow_base(expression) else {
             return Ok(());
         };
         let owner_index = self.binding(name, *owner_span)?;

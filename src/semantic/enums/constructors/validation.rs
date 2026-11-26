@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{Argument, EnumPayload, Expr, PrimitiveType, TypeName, primitive_type};
+use crate::ast::{Argument, EnumPayload, Expr, PrimitiveType, Role, TypeName, primitive_type};
 use crate::lexer::SourceSpan;
 
 use crate::semantic::TypeSubstitution;
@@ -171,9 +171,11 @@ impl Analyzer {
             self.normalize_imported_type_key(&type_parsing::canonical_type_name(expected));
         if found == expected_name || found == variants::strip_reference_role(&expected_name) {
             self.validate_expected_literal(&argument.expression, expected)?;
-            if self.enum_payload_owns_value(expected) {
-                self.initialize_owner(&argument.expression, variants::argument_span(argument))?;
-            }
+            self.store_enum_payload(
+                expected,
+                &argument.expression,
+                variants::argument_span(argument),
+            )?;
             return Ok(());
         }
         Err(SemanticError {
@@ -187,9 +189,28 @@ impl Analyzer {
         })
     }
 
-    pub(in crate::semantic) fn enum_payload_owns_value(&self, type_name: &TypeName) -> bool {
-        type_name.name == "Buffer"
-            || self.struct_types.contains_key(&type_name.name)
-            || self.drop_types.contains(&type_name.name)
+    /// Stores a constructor argument in an enum payload. A move-only value
+    /// (a buffer, an arena, a struct, or any type that holds a resource)
+    /// moves into the enum value (ADR-0046 3, ADR-0059).
+    /// An `abs` payload is a read-only view instead: it freezes its source for
+    /// the rest of the block, as for an `abs` binding (ADR-0016, ADR-0046 2.3).
+    pub(in crate::semantic) fn store_enum_payload(
+        &mut self,
+        payload_type: &TypeName,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if payload_type.reference_role == Some(Role::Abs) {
+            return self.register_view_borrow(expression, span);
+        }
+        let owns = payload_type.reference_role.is_none()
+            && (matches!(payload_type.name.as_str(), "Buffer")
+                || self.struct_types.contains_key(&payload_type.name)
+                || self.drop_types.contains(&payload_type.name)
+                || self.type_holds_resource(payload_type));
+        if owns {
+            return self.consume_owned_source(expression, span);
+        }
+        Ok(())
     }
 }

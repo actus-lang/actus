@@ -200,12 +200,12 @@ impl Analyzer {
             return false;
         }
         let Some(type_name) = self.expression_type_name(expression) else { return false };
-        type_name == "Buffer"
-            || type_name == "Arena"
-            || type_name.starts_with("Arena[")
-            || type_name == "Array"
-            || self.struct_types.contains_key(&type_name)
-            || self.enum_types.contains_key(&type_name)
+        // A generic instance such as `Array[Int, 4]` or `Option[Buffer]` is
+        // move-only like its declaration, so only the head of the name counts.
+        let head = type_name.split('[').next().unwrap_or(&type_name);
+        matches!(head, "Buffer" | "Arena" | "Array")
+            || self.struct_types.contains_key(head)
+            || self.enum_types.contains_key(head)
     }
 
     fn visit_index_assignment(
@@ -218,8 +218,14 @@ impl Analyzer {
         self.visit_expression(target)?;
         self.visit_expression(index)?;
         self.reject_void_value(value)?;
+        let element = self.validate_index_access(target, index)?;
         self.validate_index_value(target, index, value)?;
         self.visit_expression(value)?;
+        // A resource stored in an element moves out of its source
+        // (ADR-0046 3): the array owns it, not the source binding.
+        if self.argument_holds_resource(value, &element) {
+            self.consume_owned_source(value, super::super::validation::expression_span(value))?;
+        }
         self.plan_try_unwind(value);
         Ok(())
     }
