@@ -55,11 +55,17 @@ open pack WireHeader {
         erg version: u8 at 16;
         """Negotiated frame flags at wire offset three."""
         erg flags: u8 at 24;
-        """Owned erg scalar containing the application-neutral message identifier at wire offset four."""
+        """
+        Owned erg scalar containing the application-neutral message identifier at wire offset four.
+        """
         erg message_id: u8 at 32;
-        """Owned erg scalar containing the application-neutral channel identifier at wire offset five."""
+        """
+        Owned erg scalar containing the application-neutral channel identifier at wire offset five.
+        """
         erg channel_id: u8 at 40;
-        """Owned erg scalar containing the little-endian direction-scoped sequence at wire offset six."""
+        """
+        Owned erg scalar containing the little-endian direction-scoped sequence at wire offset six.
+        """
         erg sequence_num: u32 at 48;
         """Little-endian payload byte count at wire offset ten."""
         erg payload_len: u16 at 80;

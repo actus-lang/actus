@@ -17,17 +17,28 @@ open pack WireFragmentHeader {
     erg storage: Array[u8, 17];
     layout little;
     fields {
-        """Owned erg version selected by the fragmentation format; it is scalar metadata without cleanup."""
+        """
+        Owned erg version selected by the fragmentation format; it is scalar metadata without
+        cleanup.
+        """
         erg version: u8 at 0;
-        """Owned erg position of this fragment in the message; it is scalar metadata without cleanup."""
+        """
+        Owned erg position of this fragment in the message; it is scalar metadata without cleanup.
+        """
         erg fragment_index: u16 at 8;
-        """Owned erg total fragment count used for bounds checks; it is scalar metadata without cleanup."""
+        """
+        Owned erg total fragment count used for bounds checks; it is scalar metadata without
+        cleanup.
+        """
         erg fragment_count: u16 at 24;
         """Owned complete message length."""
         erg total_length: u32 at 40;
         """Owned fragment placement offset."""
         erg offset: u32 at 72;
-        """Owned erg lifecycle generation used to reject stale fragments; it is scalar metadata without cleanup."""
+        """
+        Owned erg lifecycle generation used to reject stale fragments; it is scalar metadata without
+        cleanup.
+        """
         erg generation: u32 at 104;
     }
 }

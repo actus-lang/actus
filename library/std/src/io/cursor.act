@@ -18,14 +18,19 @@ open verb cursor(dat buffer: Buffer) -> Cursor {
     };
 }
 
-"""Read bytes through the C ABI from a buffer position into a caller-owned destination, returning count or failure."""
+"""
+Read bytes through the C ABI from a buffer position into a caller-owned destination, returning count
+or failure.
+"""
 unsafe extern "C" verb actus_cursor_read(
     abs source: Buffer,
     erg position: Int,
     ins target: Buffer
 ) -> Int;
 
-"""Write a borrowed source buffer through the C ABI at a buffer position, returning count or failure."""
+"""
+Write a borrowed source buffer through the C ABI at a buffer position, returning count or failure.
+"""
 unsafe extern "C" verb actus_cursor_write(
     ins target: Buffer,
     erg position: Int,

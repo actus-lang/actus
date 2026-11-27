@@ -5,7 +5,9 @@ import {
 };
 
 """
-Map the result of a timer poll to a small integer so the fixture can compare outcomes: 0 for pending, 1 for fired, 2 for canceled, 3 for completed and 9 for any time error. The result is consumed, and the verb performs no allocation and has no side effects.
+Map the result of a timer poll to a small integer so the fixture can compare outcomes: 0 for
+pending, 1 for fired, 2 for canceled, 3 for completed and 9 for any time error. The result is
+consumed, and the verb performs no allocation and has no side effects.
 """
 verb poll_code(erg result: Result[TimerPoll, TimeError]) -> Int {
     return case dat result {
@@ -20,7 +22,9 @@ verb poll_code(erg result: Result[TimerPoll, TimeError]) -> Int {
 }
 
 """
-Map a missed-tick policy to its numeric code: 0 for coalesce, 1 for catch-up and 2 for skip. The policy is an immutable `abs` view that is not modified. The verb exists to check that every policy variant can be matched.
+Map a missed-tick policy to its numeric code: 0 for coalesce, 1 for catch-up and 2 for skip. The
+policy is an immutable `abs` view that is not modified. The verb exists to check that every policy
+variant can be matched.
 """
 verb policy_probe(abs policy: MissedTickPolicy) -> Int {
     return case abs policy {
@@ -31,7 +35,9 @@ verb policy_probe(abs policy: MissedTickPolicy) -> Int {
 }
 
 """
-Classify the result of configuring a periodic timer: 0 when it failed with the invalid-period error, 1 when it failed with another time error and 2 when it unexpectedly succeeded. The result is consumed and nothing is allocated.
+Classify the result of configuring a periodic timer: 0 when it failed with the invalid-period error,
+1 when it failed with another time error and 2 when it unexpectedly succeeded. The result is
+consumed and nothing is allocated.
 """
 verb invalid_period_code(erg result: Result[Int, TimeError]) -> Int {
     return case dat result {
@@ -44,7 +50,8 @@ verb invalid_period_code(erg result: Result[Int, TimeError]) -> Int {
 }
 
 """
-Arm a fresh one-shot timer at tick 100 with a delay of 10 ticks and report 0 when arming succeeds and 1 otherwise. The timer is a local value and no clock is read.
+Arm a fresh one-shot timer at tick 100 with a delay of 10 ticks and report 0 when arming succeeds
+and 1 otherwise. The timer is a local value and no clock is read.
 """
 verb one_shot_check() -> Int {
     erg start: Instant = Instant {
@@ -66,7 +73,9 @@ verb one_shot_check() -> Int {
 }
 
 """
-Arm a one-shot timer, cancel it and poll it, and return 0 only when arming and cancelling succeed and the poll reports the canceled state; otherwise return 1. The timer is a local value and no clock is read.
+Arm a one-shot timer, cancel it and poll it, and return 0 only when arming and cancelling succeed
+and the poll reports the canceled state; otherwise return 1. The timer is a local value and no clock
+is read.
 """
 verb cancel_check() -> Int {
     erg start: Instant = Instant {
@@ -99,7 +108,9 @@ verb cancel_check() -> Int {
 }
 
 """
-Arm a one-shot timer with a zero delay, poll it until it fires and completes, and try to arm it again. It returns 0 only when the first arm succeeds, the polls report fired and then completed, and the re-arm is rejected; otherwise 1.
+Arm a one-shot timer with a zero delay, poll it until it fires and completes, and try to arm it
+again. It returns 0 only when the first arm succeeds, the polls report fired and then completed, and
+the re-arm is rejected; otherwise 1.
 """
 verb reuse_rejection_check() -> Int {
     erg start: Instant = Instant {
@@ -138,7 +149,10 @@ verb reuse_rejection_check() -> Int {
 }
 
 """
-Configure a periodic timer with the given missed-tick policy and a 10-tick period, arm it at tick 100, poll it at tick 135 and then at tick 105, and compare the first poll code with `expected`. It returns 0 when arming succeeds, the first poll equals the expected code and the second poll is pending; otherwise 1. Both arguments are immutable `abs` views.
+Configure a periodic timer with the given missed-tick policy and a 10-tick period, arm it at tick
+100, poll it at tick 135 and then at tick 105, and compare the first poll code with `expected`. It
+returns 0 when arming succeeds, the first poll equals the expected code and the second poll is
+pending; otherwise 1. Both arguments are immutable `abs` views.
 """
 verb policy_check(abs policy: MissedTickPolicy, abs expected: Int) -> Int {
     erg start: Instant = Instant {
@@ -187,7 +201,10 @@ verb policy_check(abs policy: MissedTickPolicy, abs expected: Int) -> Int {
 }
 
 """
-Configure a periodic timer with the catch-up policy and a 10-tick period, arm it at tick 100 and poll it twice at tick 135. Catch-up reports one tick per elapsed period, so both polls must report fired. It returns 0 on success and otherwise a code built from the two poll codes, or 1 when the timer cannot be configured.
+Configure a periodic timer with the catch-up policy and a 10-tick period, arm it at tick 100 and
+poll it twice at tick 135. Catch-up reports one tick per elapsed period, so both polls must report
+fired. It returns 0 on success and otherwise a code built from the two poll codes, or 1 when the
+timer cannot be configured.
 """
 verb catch_up_check() -> Int {
     erg start: Instant = Instant {
@@ -234,7 +251,9 @@ verb catch_up_check() -> Int {
 }
 
 """
-Run every timer scenario of the fixture: the invalid-period rejection, the one-shot, cancel and reuse checks and the coalesce, catch-up and skip policies. It returns the sum of their codes, which is 0 when every scenario behaves as specified, and reads no clock.
+Run every timer scenario of the fixture: the invalid-period rejection, the one-shot, cancel and
+reuse checks and the coalesce, catch-up and skip policies. It returns the sum of their codes, which
+is 0 when every scenario behaves as specified, and reads no clock.
 """
 verb main() -> Int {
     erg zero: Duration = Duration {

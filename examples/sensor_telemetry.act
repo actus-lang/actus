@@ -4,14 +4,16 @@ enum TelemetryError {
 }
 
 """
-Return the unit value. It exists so that validation and processing can report success through a `Result` with a void payload.
+Return the unit value. It exists so that validation and processing can report success through a
+`Result` with a void payload.
 """
 verb complete() -> Void {
     return;
 }
 
 """
-Accept a telemetry frame lent as an immutable `abs` view and report success. The example does not inspect the bytes; it shows the signature of a validator that cannot modify or retain its input.
+Accept a telemetry frame lent as an immutable `abs` view and report success. The example does not
+inspect the bytes; it shows the signature of a validator that cannot modify or retain its input.
 """
 verb validate_frame(abs frame: Buffer) -> Result[Void, String] {
     """The caller lends the frame as an abs view; validation allocates nothing."""
@@ -19,7 +21,8 @@ verb validate_frame(abs frame: Buffer) -> Result[Void, String] {
 }
 
 """
-Validate a frame and propagate a failure with `?`, otherwise report success. The frame is an immutable `abs` view that is passed on to `validate_frame`.
+Validate a frame and propagate a failure with `?`, otherwise report success. The frame is an
+immutable `abs` view that is passed on to `validate_frame`.
 """
 verb process_frame(abs frame: Buffer) -> Result[Void, String] {
     """`?` preserves the Result contract and unwinds the current scope on error."""
@@ -28,7 +31,8 @@ verb process_frame(abs frame: Buffer) -> Result[Void, String] {
 }
 
 """
-Declare the width-qualified wire fields and floating point values of a telemetry packet, fill a buffer with six sample bytes, process it and return 0 on success or 1 on failure as the exit status.
+Declare the width-qualified wire fields and floating point values of a telemetry packet, fill a
+buffer with six sample bytes, process it and return 0 on success or 1 on failure as the exit status.
 """
 verb main() -> Int {
     """Width-qualified wire fields."""

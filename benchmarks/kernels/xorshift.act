@@ -1,4 +1,7 @@
-"""xorshift32 over 20 000 000 steps: shifts, xor and a bounded sum. Wrapping arithmetic, as in its C twin."""
+"""
+xorshift32 over 20 000 000 steps: shifts, xor and a bounded sum. Wrapping arithmetic, as in its C
+twin.
+"""
 verb main() -> Int {
     erg state: u32 = 2463534242;
     erg sum: u64 = 0;

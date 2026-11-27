@@ -1,5 +1,6 @@
 """
-Native C `rand` declaration: it takes no arguments and returns an integer pseudo-random number. It is an unsafe external call with no Actus ownership transfer.
+Native C `rand` declaration: it takes no arguments and returns an integer pseudo-random number. It
+is an unsafe external call with no Actus ownership transfer.
 """
 unsafe extern "C" verb rand() -> Int;
 
@@ -18,7 +19,8 @@ verb observe_buffer(abs view: Buffer) -> Int {
 }
 
 """
-Take ownership of a buffer, drop it and return 1. It demonstrates a `dat` parameter that moves the buffer.
+Take ownership of a buffer, drop it and return 1. It demonstrates a `dat` parameter that moves the
+buffer.
 """
 verb consume(dat packet: Buffer) -> Int {
     drop(packet);
@@ -26,7 +28,8 @@ verb consume(dat packet: Buffer) -> Int {
 }
 
 """
-Show borrowed views of a scalar and a buffer, a loop, a native call and an ownership move, then print and return the final value plus the consumed marker, 42.
+Show borrowed views of a scalar and a buffer, a loop, a native call and an ownership move, then
+print and return the final value plus the consumed marker, 42.
 """
 verb main() -> Int {
     erg value = 40;
