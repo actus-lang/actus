@@ -5,7 +5,8 @@ struct Box[T] {
 }
 
 """
-Take ownership of a buffer, drop it explicitly and return 1. It demonstrates a `dat` parameter, which moves the owner into the callee so the caller cannot use the buffer afterwards.
+Take ownership of a buffer, drop it explicitly and return 1. It demonstrates a `dat` parameter,
+which moves the owner into the callee so the caller cannot use the buffer afterwards.
 """
 verb consume_buffer(dat buffer: Buffer) -> Int {
     drop(buffer);
@@ -13,14 +14,17 @@ verb consume_buffer(dat buffer: Buffer) -> Int {
 }
 
 """
-Take ownership of an integer item and return it unchanged. It demonstrates moving a field out of a generic `Box` into a `dat` parameter.
+Take ownership of an integer item and return it unchanged. It demonstrates moving a field out of a
+generic `Box` into a `dat` parameter.
 """
 verb consume_item(dat item: Int) -> Int {
     return item;
 }
 
 """
-Exercise generic structs with a nested option, an option view, a boxed integer, an owned result and a buffer that is consumed, and return the sum of the pieces: 41 from the boxed item, 1 from the buffer cleanup, 39 from the result, 40 from the option view and 2 from the nested label.
+Exercise generic structs with a nested option, an option view, a boxed integer, an owned result and
+a buffer that is consumed, and return the sum of the pieces: 41 from the boxed item, 1 from the
+buffer cleanup, 39 from the result, 40 from the option view and 2 from the nested label.
 """
 verb main() -> Int {
     erg nested = Box[Option[Int]] {

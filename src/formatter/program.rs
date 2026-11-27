@@ -2,6 +2,7 @@ use crate::ast::{Program, Role, TopLevelDecl};
 use crate::lexer::SourceSpan;
 
 use super::SourceComment;
+use super::doc_wrap::wrap_documentation;
 
 pub fn format_program(program: &Program) -> String {
     format_program_with_comments(program, &[])
@@ -144,21 +145,23 @@ impl Formatter<'_> {
         }
         let Some(doc) = doc else { return };
         let lines = doc.lines().collect::<Vec<_>>();
-        self.line_indent();
+        let indent = "    ".repeat(self.indent);
+        let mut text = String::from("\"\"\"");
         if lines.len() == 1 {
-            self.output.push_str("\"\"\"");
-            self.output.push_str(lines[0]);
-            self.output.push_str("\"\"\"\n");
-            return;
+            text.push_str(lines[0]);
+        } else {
+            text.push('\n');
+            for line in lines {
+                text.push_str(&indent);
+                text.push_str(line);
+                text.push('\n');
+            }
+            text.push_str(&indent);
         }
-        self.output.push_str("\"\"\"\n");
-        for line in lines {
-            self.line_indent();
-            self.output.push_str(line);
-            self.output.push('\n');
-        }
-        self.line_indent();
-        self.output.push_str("\"\"\"\n");
+        text.push_str("\"\"\"");
+        self.output.push_str(&indent);
+        self.output.push_str(&wrap_documentation(&text, &indent));
+        self.output.push('\n');
     }
 
     pub(super) fn type_name(&mut self, type_name: &crate::ast::TypeName) {
@@ -218,8 +221,9 @@ impl Formatter<'_> {
             if !self.output.is_empty() && !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
-            self.line_indent();
-            self.output.push_str(text.trim_end_matches('\r'));
+            let indent = "    ".repeat(self.indent);
+            self.output.push_str(&indent);
+            self.output.push_str(&wrap_documentation(text.trim_end_matches('\r'), &indent));
             self.output.push('\n');
         }
     }
@@ -259,8 +263,9 @@ impl Formatter<'_> {
             if !self.output.is_empty() && !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
-            self.line_indent();
-            self.output.push_str(text.trim_end_matches('\r'));
+            let indent = "    ".repeat(self.indent);
+            self.output.push_str(&indent);
+            self.output.push_str(&wrap_documentation(text.trim_end_matches('\r'), &indent));
             self.output.push('\n');
         }
     }

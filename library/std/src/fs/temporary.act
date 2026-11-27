@@ -245,7 +245,10 @@ path. Drop cannot return an error, so explicit `temporary_file_cleanup` is
 required when cleanup failure must be observed. File close is idempotent.
 """
 open perform Drop for TemporaryFile {
-    """Consume an `ins` loan of the owner, close the handle, and attempt path removal without masking another error."""
+    """
+    Consume an `ins` loan of the owner, close the handle, and attempt path removal without masking
+    another error.
+    """
     meta effect("filesystem", "blocking")
     verb drop(ins self: TemporaryFile) {
         file_close(self: ins self.file);
@@ -261,7 +264,10 @@ need a typed cleanup result must use `temporary_directory_cleanup`; recursive
 removal is never performed.
 """
 open perform Drop for TemporaryDirectory {
-    """Consume an `ins` loan of the owner and attempt removal without converting cleanup failure into a new throw path."""
+    """
+    Consume an `ins` loan of the owner and attempt removal without converting cleanup failure into a
+    new throw path.
+    """
     meta effect("filesystem", "blocking")
     verb drop(ins self: TemporaryDirectory) {
         remove_dir(path: abs self.path);

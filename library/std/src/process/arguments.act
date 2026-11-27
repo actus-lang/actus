@@ -30,7 +30,9 @@ open struct Arguments {
     erg next_index: Int,
     """Owned `erg` total count in the snapshot, including the executable path."""
     erg count: Int,
-    """Owned `erg` state marker; invalid state causes a typed error and preserves the destination."""
+    """
+    Owned `erg` state marker; invalid state causes a typed error and preserves the destination.
+    """
     erg valid: Bool,
 }
 

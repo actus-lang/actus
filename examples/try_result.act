@@ -3,28 +3,32 @@ enum IoError {
 }
 
 """
-Return `Ok(7)` as a result whose error type is `IoError`. It is the successful source for the `?` propagation example.
+Return `Ok(7)` as a result whose error type is `IoError`. It is the successful source for the `?`
+propagation example.
 """
 verb success_source() -> Result[Int, IoError] {
     return Result[Int, IoError].Ok(7);
 }
 
 """
-Return `Err(IoError.Failed)` as a result whose success type is an integer. It is the failing source for the `?` propagation example.
+Return `Err(IoError.Failed)` as a result whose success type is an integer. It is the failing source
+for the `?` propagation example.
 """
 verb failure_source() -> Result[Int, IoError] {
     return Result[Int, IoError].Err(IoError.Failed);
 }
 
 """
-Forward the result of `success_source` with `?`; because it is successful, the integer 7 is returned in `Ok`.
+Forward the result of `success_source` with `?`; because it is successful, the integer 7 is returned
+in `Ok`.
 """
 verb forward_success() -> Result[Int, IoError] {
     return success_source()?;
 }
 
 """
-Forward the result of `failure_source` with `?`; because it fails, the verb returns the error to its caller without running later code.
+Forward the result of `failure_source` with `?`; because it fails, the verb returns the error to its
+caller without running later code.
 """
 verb forward_failure() -> Result[Int, IoError] {
     return failure_source()?;

@@ -48,6 +48,27 @@ The compiler ignores ordinary `#` comments while preserving documentation
 blocks as structured `DocString` tokens. Formatter, LSP, and documentation
 tools must preserve their source spans and text.
 
+### 1.0 Wrapping documentation
+
+`actus fmt` keeps documentation lines within the 100-column target width,
+measured in characters of the final line including indentation:
+
+- A single-line `"""text"""` that fits is unchanged. One that does not fit
+  becomes the block form at the declaration's indentation, with the text
+  wrapped at word boundaries.
+- Lines of a multi-line block are never joined. Only a line wider than 100
+  columns is split at word boundaries, and its continuation keeps the line's
+  own leading whitespace. An indented `name: text` item (such as an `inputs:`
+  entry of a contract) continues 4 columns deeper, and a `- text` list item
+  continues 2 columns deeper than its dash.
+- Lines inside a fenced block (between lines starting with three backticks)
+  are never changed.
+- A word wider than the available width, such as a URL, stays whole on its
+  own line. The formatter never breaks inside a word, adds an empty line, or
+  leaves trailing whitespace.
+
+Formatting is idempotent, and `#` comments are not wrapped.
+
 ### 1.1 Structured verb contracts
 
 Phase 33.6 defines an optional structured form for a verb's leading

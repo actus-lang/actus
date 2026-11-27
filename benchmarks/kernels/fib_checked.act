@@ -1,4 +1,7 @@
-"""Recursive Fibonacci of 30: call overhead and return values. Trapping arithmetic: the cost of overflow checks."""
+"""
+Recursive Fibonacci of 30: call overhead and return values. Trapping arithmetic: the cost of
+overflow checks.
+"""
 verb fib(erg n: u64) -> u64 {
     if n < 2 {
         return n;

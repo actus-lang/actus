@@ -623,7 +623,10 @@ open verb close_dir(ins directory: Directory) -> Result[Int, io::IoError] {
 
 """Close a live directory handle during deterministic scope cleanup."""
 open perform Drop for Directory {
-    """Close the owned Directory resource through an ins loan during best-effort early return, branch exit, and implicit scope cleanup."""
+    """
+    Close the owned Directory resource through an ins loan during best-effort early return, branch
+    exit, and implicit scope cleanup.
+    """
     meta effect("filesystem", "blocking")
     verb drop(ins self: Directory) {
         close_dir(directory: ins self);

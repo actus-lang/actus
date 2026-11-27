@@ -65,7 +65,9 @@ unsafe extern "C" verb actus_file_sync_all_buffer(abs handle: Int) -> Int;
 meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_close_buffer(abs handle: Int) -> Int;
 
-"""Move a file cursor through the C ABI and return its resulting absolute byte position or failure."""
+"""
+Move a file cursor through the C ABI and return its resulting absolute byte position or failure.
+"""
 meta effect("filesystem", "blocking")
 unsafe extern "C" verb actus_file_seek_buffer(
     abs handle: Int,

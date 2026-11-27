@@ -1,4 +1,7 @@
-"""Collatz steps for every start below 300 000: branchy u64 loops. Wrapping arithmetic, as in its C twin."""
+"""
+Collatz steps for every start below 300 000: branchy u64 loops. Wrapping arithmetic, as in its C
+twin.
+"""
 verb steps(erg start: u64) -> u64 {
     erg value = start;
     erg count: u64 = 0;

@@ -1,4 +1,7 @@
-"""xorshift32 over 20 000 000 steps: shifts, xor and a bounded sum. Trapping arithmetic: the cost of overflow checks."""
+"""
+xorshift32 over 20 000 000 steps: shifts, xor and a bounded sum. Trapping arithmetic: the cost of
+overflow checks.
+"""
 verb main() -> Int {
     erg state: u32 = 2463534242;
     erg sum: u64 = 0;

@@ -15,7 +15,9 @@ pack ControlRegister {
 }
 
 """
-Set the enable bit, the prescaler 5 and the mode 2 of a zeroed control register and return the sum of the enabled, ready, prescaler and mode fields. The `ready` field is read-only, so it stays 0. The register is a local value; no hardware is touched.
+Set the enable bit, the prescaler 5 and the mode 2 of a zeroed control register and return the sum
+of the enabled, ready, prescaler and mode fields. The `ready` field is read-only, so it stays 0. The
+register is a local value; no hardware is touched.
 """
 verb configure_control() -> Int {
     erg control = ControlRegister {
@@ -29,7 +31,8 @@ verb configure_control() -> Int {
 }
 
 """
-Program entry point: configure the example control register and return the field sum as the exit status.
+Program entry point: configure the example control register and return the field sum as the exit
+status.
 """
 verb main() -> Int {
     return configure_control();

@@ -1,4 +1,7 @@
-"""Collatz steps for every start below 300 000: branchy u64 loops. Trapping arithmetic: the cost of overflow checks."""
+"""
+Collatz steps for every start below 300 000: branchy u64 loops. Trapping arithmetic: the cost of
+overflow checks.
+"""
 verb steps(erg start: u64) -> u64 {
     erg value = start;
     erg count: u64 = 0;

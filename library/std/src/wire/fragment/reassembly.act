@@ -8,13 +8,17 @@ open struct WireReassembly {
     erg ranges_length: Array[u32, 64],
     """Declared complete message length."""
     erg total_length: u32,
-    """Owned erg count of fragments in the active message; it is scalar metadata and needs no cleanup."""
+    """
+    Owned erg count of fragments in the active message; it is scalar metadata and needs no cleanup.
+    """
     erg fragment_count: u16,
     """Owned erg count of accepted fragments; it is scalar metadata and needs no cleanup."""
     erg received_count: u16,
     """Number of payload bytes copied into storage."""
     erg received_bytes: u32,
-    """Owned erg generation used to reject stale fragments; it is scalar metadata and needs no cleanup."""
+    """
+    Owned erg generation used to reject stale fragments; it is scalar metadata and needs no cleanup.
+    """
     erg generation: u32,
     """Lifecycle state: zero idle, one collecting, two complete."""
     erg state: u8,
