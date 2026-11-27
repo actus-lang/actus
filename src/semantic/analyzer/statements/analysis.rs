@@ -36,7 +36,7 @@ impl Analyzer {
             Stmt::CompoundAssignment { target, operator, value, span } => {
                 self.visit_compound_assignment(target, *operator, value, *span)
             }
-            Stmt::Expression { expression, span } => self.visit_expr_statement(expression, *span),
+            Stmt::Expression { expression, .. } => self.visit_expr_statement(expression),
             Stmt::If { condition, then_branch, else_branch, span } => {
                 let expression = Expr::If {
                     condition: Box::new(condition.clone()),
@@ -165,6 +165,7 @@ impl Analyzer {
         self.validate_arena_provenance_target(index, name, value, span)?;
         self.record_binding_provenance(index, value)?;
         self.plan_try_unwind(value);
+        self.replace_owned_value(index, span);
         Ok(())
     }
 
@@ -470,11 +471,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn visit_expr_statement(
-        &mut self,
-        expression: &Expr,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
+    fn visit_expr_statement(&mut self, expression: &Expr) -> Result<(), SemanticError> {
         let previous = self.discarded_expression;
         let previous_consumed = self.expression_value_consumed;
         self.discarded_expression = true;
@@ -486,9 +483,9 @@ impl Analyzer {
         result?;
         // A bare literal statement, such as the tail of an `if` branch, is an `Int`.
         self.validate_default_integer_literal(expression)?;
-        if matches!(expression, Expr::Try { .. }) {
-            self.plan_return_unwind(span);
-        }
+        // The failure exit of a `?` statement is planned under the span of
+        // the `?` expression, as every other `?` exit is (ADR-0125).
+        self.plan_try_unwind(expression);
         Ok(())
     }
 }

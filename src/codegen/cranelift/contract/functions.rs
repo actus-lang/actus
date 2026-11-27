@@ -246,6 +246,7 @@ fn instruction_inputs(instruction: &BackendInstruction) -> Vec<BackendValueId> {
             vec![*base, *index, *value]
         }
         BackendInstruction::Cleanup { operand, .. } => operand.iter().map(|c| c.value).collect(),
+        BackendInstruction::CleanupWhen { condition, operand: o, .. } => vec![*condition, o.value],
         BackendInstruction::Constant { .. }
         | BackendInstruction::FloatConstant { .. }
         | BackendInstruction::StringLiteral { .. }

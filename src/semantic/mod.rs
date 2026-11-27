@@ -37,7 +37,9 @@ pub(crate) use analyzer::{
     validate_stack_limit_recursion,
 };
 pub(crate) use calls::{parse_type_name_key, print_uses_label};
-pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
+pub use cleanup::{
+    CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan, VerbCleanup,
+};
 pub use errors::{SemanticError, SemanticErrorKind};
 pub(crate) use generated_locals::normalize_program as normalize_generated_locals;
 pub(crate) use generics::substitution::TypeSubstitution;

@@ -29,6 +29,7 @@ pub fn lower_verb_body_with_expressions(
         block_exit_bindings: BTreeMap::new(),
         loop_targets: Vec::new(),
         carried_scopes: Vec::new(),
+        open_scopes: Vec::new(),
         implicit_unit_return: verb
             .return_type
             .as_ref()
@@ -84,6 +85,11 @@ pub(in crate::codegen) struct BodyLowering<'a, P> {
     pub(super) block_exit_bindings: BTreeMap<BackendBlockId, BTreeMap<String, BackendValueId>>,
     pub(super) loop_targets: Vec<LoopTargets>,
     pub(super) carried_scopes: Vec<Vec<String>>,
+    /// The open lexical scopes, innermost last, each with the block its
+    /// fallthrough path jumps to (`None` for the verb body, which returns).
+    /// Falling through to that block leaves the scope, so that is where its
+    /// cleanup runs (ADR-0125).
+    pub(super) open_scopes: Vec<(SourceSpan, Option<BackendBlockId>)>,
     implicit_unit_return: bool,
 }
 
@@ -151,26 +157,11 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         fallthrough: Option<BackendBlockId>,
     ) -> Result<BackendBlock, BackendContractError> {
         self.provider.enter_scope(block.span);
+        self.open_scopes.push((block.span, fallthrough));
         let result = self.lower_block_in_scope(id, block, fallthrough);
-        match result {
-            Ok(mut lowered) => {
-                let structured_transfer = matches!(
-                    lowered.instructions.last(),
-                    Some(BackendInstruction::Jump { .. } | BackendInstruction::Branch { .. })
-                );
-                if fallthrough.is_none() && structured_transfer {
-                    self.provider.exit_scope_without_cleanup()?;
-                } else {
-                    self.provider.exit_scope(block.span, &mut lowered.instructions)?;
-                }
-                Ok(lowered)
-            }
-            Err(error) => {
-                let mut discarded = Vec::new();
-                let _ = self.provider.exit_scope(block.span, &mut discarded);
-                Err(error)
-            }
-        }
+        self.open_scopes.pop();
+        self.provider.exit_scope_without_cleanup()?;
+        result
     }
 
     pub(super) fn lower_block_in_scope(
@@ -233,21 +224,37 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         if !terminates(instructions.last())
             && let Some(target) = fallthrough
         {
+            self.emit_fallthrough_cleanup(Some(target), &mut instructions);
             self.block_exit_bindings.insert(id, self.provider.snapshot_bindings());
             instructions.push(BackendInstruction::Jump { target, arguments: Vec::new(), span });
         } else if !terminates(instructions.last()) && self.implicit_unit_return {
+            self.emit_fallthrough_cleanup(None, &mut instructions);
             self.provider.append_parameter_writebacks(&mut instructions);
             instructions.push(BackendInstruction::Return { value: None, span });
         }
         BackendBlock { parameters: Vec::new(), id, instructions }
     }
 
-    pub(in crate::codegen) fn distribute_scope_cleanup(
+    /// Ends every open scope that a fallthrough to `target` leaves, innermost
+    /// first: the scopes lowered with that fallthrough. A scope that the
+    /// lowering opened twice under one span ends once.
+    pub(super) fn emit_fallthrough_cleanup(
         &mut self,
-        span: SourceSpan,
-        start: usize,
-    ) -> Result<(), BackendContractError> {
-        self.provider.distribute_scope_cleanup(span, &mut self.blocks, start, &self.block_bindings)
+        target: Option<BackendBlockId>,
+        instructions: &mut Vec<BackendInstruction>,
+    ) {
+        let mut ended = Vec::new();
+        for (span, scope_target) in self.open_scopes.iter().rev() {
+            if *scope_target != target {
+                break;
+            }
+            if !ended.contains(span) {
+                ended.push(*span);
+            }
+        }
+        for span in ended {
+            self.provider.emit_scope_end(span, instructions);
+        }
     }
 
     pub(super) fn lower_statement(
@@ -268,16 +275,19 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             }
             Stmt::Return { value, span } => {
                 let Some(expression) = value else {
+                    self.provider.emit_return_cleanup(*span, instructions)?;
                     self.provider.append_parameter_writebacks(instructions);
                     instructions.push(BackendInstruction::Return { value: None, span: *span });
                     return Ok(());
                 };
                 if let Some(failure) = self.provider.failure_for(expression)? {
+                    self.provider.emit_return_cleanup(*span, instructions)?;
                     self.provider.append_parameter_writebacks(instructions);
                     instructions.push(BackendInstruction::Fail { failure, span: *span });
                 } else {
                     let value = self.provider.lower_expression(expression, instructions)?;
                     let value = self.provider.coerce_return_value(value, *span, instructions)?;
+                    self.provider.emit_return_cleanup(*span, instructions)?;
                     self.provider.append_parameter_writebacks(instructions);
                     instructions
                         .push(BackendInstruction::Return { value: Some(value), span: *span });

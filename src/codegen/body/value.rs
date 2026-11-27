@@ -244,6 +244,8 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             self.lower_statement(statement, &mut instructions)?;
         }
         let value = self.provider.lower_expression(expression, &mut instructions)?;
+        // The branch hands its value to the merge block here, which ends its scope.
+        self.provider.emit_scope_end(branch.span, &mut instructions);
         self.provider.exit_scope(branch.span, &mut instructions)?;
         Ok((BackendBlock { parameters: Vec::new(), id, instructions }, value))
     }
@@ -292,8 +294,20 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
         let Some(last) = branch.statements.last_mut() else {
             return Err(unsupported(span, "value-producing if branch is empty"));
         };
-        if let Stmt::Expression { expression, span: expression_span } = last {
-            *last = Stmt::Return { value: Some(expression.clone()), span: *expression_span };
+        // The branch leaves the verb with a `return` of its own, whose exit
+        // list the analyzer planned under the branch's span (ADR-0125): its
+        // value is returned, or, in a verb without a result, the branch runs
+        // as statements and then returns. A branch the lowering synthesised
+        // has no list and leaves through the `return` statement at `span`.
+        let exit_span = if self.provider.has_return_exit(branch.span) { branch.span } else { span };
+        let exit = Stmt::Return { value: None, span: exit_span };
+        match last {
+            Stmt::Expression { expression, .. } if !self.returns_unit() => {
+                *last = Stmt::Return { value: Some(expression.clone()), span: exit_span };
+            }
+            Stmt::Return { .. } | Stmt::Break { .. } | Stmt::Continue { .. } => {}
+            _ if self.returns_unit() => branch.statements.push(exit),
+            _ => {}
         }
         self.lower_block(id, &branch, None)
     }

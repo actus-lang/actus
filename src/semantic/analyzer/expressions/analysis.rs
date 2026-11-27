@@ -252,7 +252,11 @@ impl Analyzer {
         right: &Expr,
     ) -> Result<(), SemanticError> {
         self.visit_consumed_expression(left)?;
-        self.visit_consumed_expression(right)?;
+        if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
+            self.visit_conditional_operand(right)?;
+        } else {
+            self.visit_consumed_expression(right)?;
+        }
         self.validate_binary_operator(*operator, left, right)
     }
 

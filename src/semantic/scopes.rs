@@ -37,12 +37,14 @@ impl Analyzer {
     }
 
     pub(super) fn binding(&self, name: &str, span: SourceSpan) -> Result<usize, SemanticError> {
-        self.scopes.iter().rev().find_map(|scope| scope.bindings.get(name).copied()).ok_or_else(
-            || SemanticError {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.bindings.get(name).or_else(|| scope.retired.get(name)).copied())
+            .ok_or_else(|| SemanticError {
                 kind: SemanticErrorKind::UndeclaredIdentifier { name: name.to_owned() },
                 span,
-            },
-        )
+            })
     }
 
     pub(super) fn enter_scope(&mut self, span: SourceSpan) {
@@ -52,7 +54,31 @@ impl Analyzer {
             borrow_ids: Vec::new(),
             declaration_indices: Vec::new(),
             payload_cleanup: Vec::new(),
+            retired: std::collections::HashMap::new(),
         });
+    }
+
+    /// Closes the scope of one branch block of an `if` (ADR-0125). The owners
+    /// declared in the branch are released where the branch ends, by its own
+    /// exit list, so a path that never runs the branch never releases them.
+    /// Like any scope, the branch's names may be declared again outside it.
+    /// They stay resolvable from the enclosing scope, as they were before
+    /// branches had scopes of their own, for the type queries that judge the
+    /// `if` value after its branches closed; they own nothing there.
+    pub(super) fn leave_branch_scope(&mut self) {
+        let names = {
+            let frame = self.scopes.last().expect("branch scope cannot be empty");
+            frame
+                .bindings
+                .iter()
+                .chain(frame.retired.iter())
+                .map(|(name, index)| (name.clone(), *index))
+                .collect::<Vec<_>>()
+        };
+        self.leave_scope();
+        if let Some(parent) = self.scopes.last_mut() {
+            parent.retired.extend(names);
+        }
     }
 
     pub(super) fn register_payload_cleanup(

@@ -60,6 +60,9 @@ fn validate_instruction_kind(instruction: &BackendInstruction) -> Result<(), Bac
         BackendInstruction::Cleanup { action, operand, .. } => {
             validate_cleanup_operand(action, operand.clone())
         }
+        BackendInstruction::CleanupWhen { action, operand, .. } => {
+            validate_cleanup_operand(action, Some(operand.clone()))
+        }
         BackendInstruction::MemoryCopy { size, alignment, .. }
             if *size == 0
                 || *alignment == 0

@@ -28,6 +28,8 @@ mod enums;
 mod erg_argument_moves;
 #[path = "semantic/escaping_views.rs"]
 mod escaping_views;
+#[path = "semantic/exit_lists.rs"]
+mod exit_lists;
 #[path = "semantic/explicit_copy_packs.rs"]
 mod explicit_copy_packs;
 #[path = "semantic/explicit_copy_types.rs"]

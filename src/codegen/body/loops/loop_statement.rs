@@ -179,8 +179,10 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
             }
         }
         self.provider.enter_scope(span);
+        self.open_scopes.push((span, Some(header_id)));
         let nested_block_start = self.blocks.len();
         let body_result = self.lower_block_in_scope(body_id, nested, Some(header_id));
+        self.open_scopes.pop();
         self.provider.exit_loop();
         self.loop_targets.pop();
         let mut body = match body_result {

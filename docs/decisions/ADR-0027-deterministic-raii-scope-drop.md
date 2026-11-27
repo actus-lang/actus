@@ -43,10 +43,20 @@ Scope cleanup respects access state. An owner cannot be dropped while it is
 `Frozen` by a live view or `Suspended` by an active `ins` loan. The compiler
 reports the conflict at the operation that would violate the state machine.
 
+## Exit lists and value cleanup
+
+[ADR-0125](ADR-0125-static-cleanup-at-every-exit.md) specifies this decision
+in detail: every exit (scope end, `return`, `break`, `continue`, `?`) releases
+exactly the owners live there, as one list the analyzer computes; `erg` and
+`dat` parameters are owners of the verb's scope; and the cleanup of a value
+runs its own `Drop` first, then its owned fields in reverse declaration order,
+an enum by its active variant and an array last element first.
+
 ## Lowering contract
 
-The semantic analyzer produces an ordered cleanup plan. Code generation emits
-the corresponding native release calls on every exit edge. Cleanup is not a
+The semantic analyzer produces an ordered cleanup plan for every exit. Code
+generation emits the corresponding native release calls on that exit edge and
+derives nothing itself (ADR-0125). Cleanup is not a
 background task, does not require a collector thread, and does not allocate a
 drop record at runtime.
 

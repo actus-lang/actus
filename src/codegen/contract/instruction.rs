@@ -191,6 +191,15 @@ pub enum BackendInstruction {
         operand: Option<BackendCleanupOperand>,
         span: SourceSpan,
     },
+    /// Runs the cleanup `operand` only when the boolean `condition` holds.
+    /// It releases a payload of an enum, which only the active variant owns:
+    /// the condition compares the variant tag the value carries (ADR-0125).
+    CleanupWhen {
+        condition: super::BackendValueId,
+        action: LoweredCleanupInstruction,
+        operand: BackendCleanupOperand,
+        span: SourceSpan,
+    },
     MemoryCopy {
         destination: super::BackendValueId,
         source: super::BackendValueId,
@@ -306,4 +315,16 @@ pub enum BackendInstruction {
         big_endian: bool,
         span: SourceSpan,
     },
+}
+
+impl BackendInstruction {
+    /// The cleanup bridge operand of a `Cleanup` or `CleanupWhen`
+    /// instruction, which a back end declares and calls.
+    pub fn cleanup_operand(&self) -> Option<&BackendCleanupOperand> {
+        match self {
+            Self::Cleanup { operand, .. } => operand.as_ref(),
+            Self::CleanupWhen { operand, .. } => Some(operand),
+            _ => None,
+        }
+    }
 }

@@ -49,6 +49,11 @@ impl Analyzer {
     }
 
     fn type_holds_resource_within(&self, type_name: &TypeName, depth: usize) -> bool {
+        // A type named through an import alias (`path::Path`) is the declaration
+        // it names, so a resource is recognised however it is spelled: a value
+        // of it moves when it is stored or passed to an owner, and the callee
+        // that receives it releases it (ADR-0125).
+        let type_name = &self.normalize_imported_type_name(type_name);
         if depth > RESOURCE_SEARCH_DEPTH
             || matches!(type_name.reference_role, Some(Role::Abs | Role::Ins))
         {

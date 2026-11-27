@@ -11,6 +11,11 @@ pub(crate) struct ScopeFrame {
     pub(crate) borrow_ids: Vec<usize>,
     pub(crate) declaration_indices: Vec<usize>,
     pub(crate) payload_cleanup: Vec<(usize, String, String, String)>,
+    /// Names declared in the closed branch scopes of an `if` directly inside
+    /// this scope. They own nothing here any more (their branch released
+    /// them) and may be declared again, but they still resolve for the type
+    /// queries that run after the `if`.
+    pub(crate) retired: HashMap<String, usize>,
 }
 
 pub(crate) type ExpressionCacheKey = (usize, usize, usize);
@@ -87,6 +92,10 @@ pub(crate) struct Analyzer {
     pub(crate) case_result_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) type_registry: super::super::types::TypeRegistry,
     pub(crate) discarded_expression: bool,
+    /// The span of the `case` or `if` whose value a `return` returns. Each of
+    /// its arms leaves the verb by a `return` of its own, so each arm gets an
+    /// exit list of its own (ADR-0125); the `case` or `if` takes it.
+    pub(crate) returned_arms: Option<crate::lexer::SourceSpan>,
     pub(crate) expression_value_consumed: bool,
     /// Set by a parent just before it visits the one child whose value is
     /// dropped: a statement expression, the inside of a grouping, or an arm

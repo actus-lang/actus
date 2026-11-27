@@ -220,7 +220,8 @@ fn validate_cleanup_action(
 ) -> Result<(), String> {
     match action {
         CleanupAction::EndBorrow { borrow_id } => validate_borrow(*borrow_id, model, state),
-        CleanupAction::DropBinding { binding_index } => {
+        CleanupAction::DropBinding { binding_index }
+        | CleanupAction::DropRemainingFields { binding_index, .. } => {
             validate_binding(*binding_index, model, &mut state.bindings)
         }
         CleanupAction::DropPayloadField { binding_index, field, .. } => {
@@ -303,6 +304,13 @@ fn lower_action(action: &CleanupAction, model: &SemanticModel) -> LoweredCleanup
             }
         }
         CleanupAction::DropBinding { binding_index } => lower_binding_drop(*binding_index, model),
+        CleanupAction::DropRemainingFields { binding_index, moved_fields } => {
+            LoweredCleanupInstruction::DropBindingFields {
+                binding_index: *binding_index,
+                name: model.bindings[*binding_index].name.clone(),
+                moved_fields: moved_fields.clone(),
+            }
+        }
         CleanupAction::ResetArena { binding_index } => LoweredCleanupInstruction::ResetArena {
             binding_index: *binding_index,
             name: model.bindings[*binding_index].name.clone(),
@@ -343,6 +351,8 @@ mod tests {
                 actions: vec![action],
             }],
             explicit_drops: Vec::new(),
+            replacement_drops: Vec::new(),
+            verb_cleanups: Vec::new(),
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),
@@ -391,6 +401,8 @@ mod tests {
                 ],
             }],
             explicit_drops: Vec::new(),
+            replacement_drops: Vec::new(),
+            verb_cleanups: Vec::new(),
             return_unwind_plans: Vec::new(),
             loop_unwind_plans: Vec::new(),
             generic_instances: Vec::new(),

@@ -6,6 +6,7 @@ mod constructors;
 mod declarations;
 mod enum_payload;
 mod errors;
+mod exits;
 mod expression;
 mod functions;
 mod layout;
@@ -28,6 +29,7 @@ pub(super) use super::{
     lower_verb_with_expressions_as,
 };
 pub(super) use declarations::SharedDeclarations;
+use exits::CleanupInputs;
 pub(super) use expression::SharedExpressionProvider;
 pub(super) use functions::lower_shared_verb;
 #[cfg(test)]

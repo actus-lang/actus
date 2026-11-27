@@ -4,7 +4,6 @@ use crate::ast::{TypeName, VerbDecl};
 
 use super::errors::unsupported;
 use super::expression::SharedExpressionProvider;
-use super::performance;
 use super::{
     BackendBlockId, BackendContractError, BackendLayoutProvider, BackendPassingMode,
     BackendSymbolBindings, BackendValueType, SymbolIdentity, SymbolKind,
@@ -16,7 +15,7 @@ pub(crate) fn lower_shared_verb(
     verb: &VerbDecl,
     entry_name: Option<&str>,
     layouts: &impl BackendLayoutProvider,
-    cleanup_plans: &[super::BackendCleanupPlan],
+    (cleanup_plans, schedule): super::CleanupInputs<'_>,
     return_types: &BTreeMap<String, Option<BackendValueType>>,
     return_nominal_types: &BTreeMap<String, Option<TypeName>>,
     return_payload_types: &BTreeMap<String, [Option<BackendValueType>; 2]>,
@@ -44,7 +43,7 @@ pub(crate) fn lower_shared_verb(
         performance_return_nominal_types,
         external_symbols,
         bindings,
-        cleanup_plans,
+        schedule.verb(&verb.name, verb.span),
     );
     let mut function = match entry_name.filter(|name| *name == verb.name) {
         Some(_) => lower_verb_with_expressions_as(
@@ -63,7 +62,7 @@ pub(crate) fn lower_shared_verb(
         prologue.append(&mut entry.instructions);
         entry.instructions = prologue;
     }
-    assign_cleanup_and_performance(&mut function, verb, cleanup_plans, &provider);
+    assign_cleanup(&mut function, verb, cleanup_plans);
     function.validate()?;
     Ok(function)
 }
@@ -80,16 +79,16 @@ fn symbol_for_verb(
     .map_err(|error| unsupported(verb.span, error.to_string()))
 }
 
-fn assign_cleanup_and_performance(
+/// Records the cleanup plans of the verb on its function as metadata. The
+/// instructions that release owners were emitted where each exit is lowered.
+fn assign_cleanup(
     function: &mut super::BackendFunction,
     verb: &VerbDecl,
     cleanup_plans: &[super::BackendCleanupPlan],
-    provider: &SharedExpressionProvider<'_>,
 ) {
     function.cleanup = cleanup_plans
         .iter()
         .filter(|plan| plan.span.start >= verb.span.start && plan.span.end <= verb.span.end)
         .cloned()
         .collect();
-    performance::append_parameter_cleanup(function, provider);
 }

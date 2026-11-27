@@ -1,5 +1,10 @@
 use serde_json::{Value, json};
 
+use super::cancellation::CancellationToken;
+use super::documents::DocumentStore;
+use super::masking::mask;
+use super::position::{LineIndex, LspRange};
+use super::query_cache::ParseSnapshot;
 use crate::ast::{
     MetaAttribute, PackStorage, Program, SerializeSection, TopLevelDecl, TypeName, VerbContract,
     VerbContractSectionKind, primitive_type,
@@ -10,12 +15,6 @@ use crate::semantic::{
     filter_program_for_target_checked,
 };
 use crate::target::{EntryContract, TargetSpec};
-
-use super::cancellation::CancellationToken;
-use super::documents::DocumentStore;
-use super::masking::mask;
-use super::position::{LineIndex, LspRange};
-use super::query_cache::ParseSnapshot;
 
 /// Builds the compiler-owned semantic snapshot exposed by `actus/semanticModel`.
 pub(super) fn query(
@@ -224,6 +223,8 @@ fn cleanup_action(action: &CleanupAction) -> Value {
         CleanupAction::DropBinding { binding_index } => {
             json!({"kind":"dropBinding","bindingIndex":binding_index})
         }
+        CleanupAction::DropRemainingFields { binding_index, moved_fields: moved } => json!({
+            "kind":"dropRemainingFields", "bindingIndex":binding_index, "movedFields":moved }),
         CleanupAction::ResetArena { binding_index } => {
             json!({"kind":"resetArena","bindingIndex":binding_index})
         }

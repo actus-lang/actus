@@ -21,6 +21,11 @@ impl Analyzer {
         self.validate_pattern_coverage(subject, branches, span)?;
         let subject_type =
             self.expression_type_name(subject).unwrap_or_else(|| "unknown".to_owned());
+        // The value of a returned `case` leaves through each arm (ADR-0125).
+        let returning = self.returned_arms == Some(span);
+        if returning {
+            self.returned_arms = None;
+        }
         self.enter_scope(span);
         match mode {
             crate::ast::CaseMode::Plain if is_plain_case_type(&subject_type) => {}
@@ -31,7 +36,7 @@ impl Analyzer {
         let branch_state = self.snapshot_binding_states();
         let branch_count = branch_state.len();
         let branch_results = self.validate_case_branches(
-            mode,
+            (mode, returning),
             subject,
             branches,
             &subject_type,
@@ -50,7 +55,7 @@ impl Analyzer {
     #[allow(clippy::too_many_arguments)]
     fn validate_case_branches(
         &mut self,
-        mode: crate::ast::CaseMode,
+        (mode, returning): (crate::ast::CaseMode, bool),
         subject: &Expr,
         branches: &[CaseBranch],
         subject_type: &str,
@@ -74,7 +79,7 @@ impl Analyzer {
             if let Some(guard) = &branch.guard {
                 self.validate_case_guard(guard, branch.span)?;
             }
-            self.visit_case_body(&branch.body)?;
+            let leaves = self.visit_case_arm(branch, returning)?;
             if let Some(candidate) = super::analyzer::case_branch_type(self, &branch.body)
                 .map(|candidate| self.normalize_imported_type_key(&candidate))
             {
@@ -94,7 +99,7 @@ impl Analyzer {
                 result_type = Some(candidate);
             }
             self.leave_scope();
-            if !case_branch_diverges(&branch.body) {
+            if !leaves && !case_branch_diverges(&branch.body) {
                 branch_results.push(self.snapshot_binding_prefix(branch_count));
             }
         }
@@ -176,6 +181,53 @@ impl Analyzer {
         Ok(())
     }
 
+    /// Analyses the body of one arm inside its scope. The value of the arm
+    /// leaves it when the `case` value is used (the `case` is no statement),
+    /// so an owner named as that value is moved out before the arm's scope
+    /// releases what it owns.
+    ///
+    /// When the `case` is the value of a `return` (`returning`), the arm
+    /// leaves the verb where it ends: it gets an exit list of its own, under
+    /// the span of the arm, unless the verb returns a value and the arm's
+    /// value is itself a returned `case` or `if`, whose arms get theirs
+    /// (ADR-0125). Returns whether the arm left the verb that way, so that it
+    /// takes no part in the join.
+    fn visit_case_arm(
+        &mut self,
+        branch: &CaseBranch,
+        returning: bool,
+    ) -> Result<bool, SemanticError> {
+        // A statement `case` discards the value of its arms.
+        let value_used = !self.discarded_expression;
+        let tail = case_body_tail(&branch.body);
+        let nested = returning && self.returns_value() && {
+            let tail_if = match &branch.body {
+                CaseBody::Block(block) => match block.statements.last() {
+                    Some(Stmt::If { span, .. }) => Some(*span),
+                    _ => None,
+                },
+                CaseBody::Expression(_) => None,
+            };
+            self.returned_arms = tail_if.or_else(|| {
+                tail.and_then(|(expression, _)| {
+                    crate::semantic::ownership::returned_arms_span(expression)
+                })
+            });
+            self.returned_arms.is_some()
+        };
+        self.visit_case_body(&branch.body)?;
+        if (value_used || returning)
+            && let Some((expression, span)) = tail
+        {
+            self.consume_value_tail(expression, span)?;
+        }
+        let leaves = returning && (nested || !case_branch_diverges(&branch.body));
+        if leaves && !nested {
+            self.plan_return_unwind(branch.span);
+        }
+        Ok(leaves)
+    }
+
     fn visit_case_body(&mut self, body: &CaseBody) -> Result<(), SemanticError> {
         match body {
             CaseBody::Expression(expression) => {
@@ -185,6 +237,20 @@ impl Analyzer {
             }
             CaseBody::Block(block) => self.visit_block(block),
         }
+    }
+}
+
+/// The expression whose value an arm produces: an expression arm itself, or
+/// the unterminated tail of a block arm.
+fn case_body_tail(body: &CaseBody) -> Option<(&Expr, SourceSpan)> {
+    match body {
+        CaseBody::Expression(expression) => {
+            Some((expression.as_ref(), crate::parser::expression_span(expression)))
+        }
+        CaseBody::Block(block) => match block.statements.last() {
+            Some(Stmt::Expression { expression, span }) => Some((expression, *span)),
+            _ => None,
+        },
     }
 }
 

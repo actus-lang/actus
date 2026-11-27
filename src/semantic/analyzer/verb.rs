@@ -12,12 +12,14 @@ impl Analyzer {
         self.configure_return_state(verb);
         self.validate_restricted_float_signature(verb)?;
         self.initialize_origin_parameter_map(&verb.params);
+        self.begin_verb_cleanup(&verb.name, verb.span);
         self.enter_scope(verb.body.span);
         self.bind_parameters(&verb.params)?;
         self.visit_block(&verb.body)?;
         self.validate_bounded_contract(verb)?;
         self.validate_missing_return(verb)?;
         self.leave_scope();
+        self.end_verb_cleanup();
         Ok(())
     }
 

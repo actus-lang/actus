@@ -12,6 +12,7 @@ pub(in crate::codegen::body) fn is_loop_carried_type(ty: BackendValueType) -> bo
         BackendValueType::Bool
             | BackendValueType::Integer { .. }
             | BackendValueType::Aggregate { .. }
+            | BackendValueType::Pointer
     )
 }
 

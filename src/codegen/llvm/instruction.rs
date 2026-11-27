@@ -93,6 +93,7 @@ fn emit_non_control_instruction(
         | BackendInstruction::Trap { .. }
         | BackendInstruction::Fail { .. } => emit_terminal_instruction(context, instruction),
         BackendInstruction::Cleanup { .. }
+        | BackendInstruction::CleanupWhen { .. }
         | BackendInstruction::MemoryCopy { .. }
         | BackendInstruction::AggregateFieldStore { .. } => {
             emit_runtime_instruction(context, instruction)
@@ -167,6 +168,16 @@ fn emit_runtime_instruction(
             context.declarations,
             context.values,
         ),
+        BackendInstruction::CleanupWhen { condition, action, operand, .. } => {
+            super::cleanup::emit_conditional_cleanup(
+                context.context,
+                context.builder,
+                context.pointer_width,
+                (*condition, action, operand.clone()),
+                context.declarations,
+                context.values,
+            )
+        }
         BackendInstruction::MemoryCopy { .. } => emit_memory_copy_instruction(
             context.context,
             context.builder,

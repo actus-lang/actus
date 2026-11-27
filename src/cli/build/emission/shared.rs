@@ -30,21 +30,20 @@ fn retain_reachable_functions(
         let Some(function) = functions.get(&symbol) else { continue };
         for block in &function.blocks {
             for instruction in &block.instructions {
-                let crate::codegen::BackendInstruction::Call { callee, .. } = instruction else {
-                    continue;
+                // A call, or a cleanup that runs a `Drop` performance.
+                let callee = match instruction {
+                    crate::codegen::BackendInstruction::Call { callee, .. } => callee,
+                    _ => match instruction
+                        .cleanup_operand()
+                        .and_then(|operand| operand.performance_symbol.as_ref())
+                    {
+                        Some(symbol) => symbol,
+                        None => continue,
+                    },
                 };
                 let callee = callee.as_str();
                 if functions.contains_key(callee) {
                     pending.push_back(callee.to_owned());
-                }
-            }
-        }
-        for cleanup in &function.cleanup {
-            for descriptor in cleanup.resolved_bridges.iter().flatten() {
-                let Some(symbol) = descriptor.performance_symbol.as_ref() else { continue };
-                let symbol = symbol.as_str();
-                if functions.contains_key(symbol) {
-                    pending.push_back(symbol.to_owned());
                 }
             }
         }
@@ -283,7 +282,7 @@ fn reachable_module_symbols(
 fn called_symbols_in_function(
     function: &crate::codegen::BackendFunction,
 ) -> std::collections::BTreeSet<String> {
-    let mut called = function
+    function
         .blocks
         .iter()
         .flat_map(|block| block.instructions.iter())
@@ -291,18 +290,13 @@ fn called_symbols_in_function(
             crate::codegen::BackendInstruction::Call { callee, .. } => {
                 Some(callee.as_str().to_owned())
             }
-            _ => None,
+            // A cleanup that runs a `Drop` performance calls it.
+            _ => instruction
+                .cleanup_operand()
+                .and_then(|operand| operand.performance_symbol.as_ref())
+                .map(|symbol| symbol.as_str().to_owned()),
         })
-        .collect::<std::collections::BTreeSet<_>>();
-    called.extend(
-        function
-            .cleanup
-            .iter()
-            .flat_map(|cleanup| cleanup.resolved_bridges.iter().flatten())
-            .filter_map(|descriptor| descriptor.performance_symbol.as_ref())
-            .map(|symbol| symbol.as_str().to_owned()),
-    );
-    called
+        .collect()
 }
 
 fn retain_referenced_externals(module: &mut crate::codegen::BackendModule) {
@@ -315,18 +309,13 @@ fn retain_referenced_externals(module: &mut crate::codegen::BackendModule) {
             crate::codegen::BackendInstruction::Call { callee, .. } => {
                 Some(callee.as_str().to_owned())
             }
-            _ => None,
+            // A cleanup that runs a `Drop` performance references it.
+            _ => instruction
+                .cleanup_operand()
+                .and_then(|operand| operand.performance_symbol.as_ref())
+                .map(|symbol| symbol.as_str().to_owned()),
         })
         .collect::<std::collections::BTreeSet<_>>();
-    referenced.extend(
-        module
-            .functions
-            .iter()
-            .flat_map(|function| function.cleanup.iter())
-            .flat_map(|cleanup| cleanup.resolved_bridges.iter().flatten())
-            .filter_map(|descriptor| descriptor.performance_symbol.as_ref())
-            .map(|symbol| symbol.as_str().to_owned()),
-    );
     if referenced.contains(crate::runtime::REGION_OPEN_SYMBOL)
         || module.functions.iter().any(|function| {
             function.parameters.iter().any(|parameter| {

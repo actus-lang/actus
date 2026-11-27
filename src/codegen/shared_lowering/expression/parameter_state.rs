@@ -1,6 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use crate::ast::{Role, VerbDecl};
+use crate::ast::VerbDecl;
 
 use super::super::BackendPassingMode;
 use super::{aggregate, state};
@@ -12,7 +12,6 @@ pub(super) struct ProviderParameterState {
         Vec<(String, BackendValueId, BackendValueId, BackendValueType)>,
     pub(super) aggregate_loan_parameters:
         BTreeMap<String, (BackendValueId, crate::codegen::BackendLayout)>,
-    pub(super) owned_parameters: BTreeSet<String>,
     pub(super) value_types: BTreeMap<BackendValueId, BackendValueType>,
     pub(super) nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
     pub(super) enum_payload_types: BTreeMap<(BackendValueId, u32), BackendValueType>,
@@ -29,12 +28,6 @@ pub(super) fn initialize(
         .enumerate()
         .map(|(index, parameter)| (parameter.name.clone(), BackendValueId(index as u32)))
         .collect::<BTreeMap<_, _>>();
-    let owned_parameters = verb
-        .params
-        .iter()
-        .filter(|parameter| parameter.role == Role::Erg)
-        .map(|parameter| parameter.name.clone())
-        .collect();
     let mut value_types = state::parameter_types(verb, layouts);
     let mut nominal_types = aggregate::parameter_nominal_types(verb, layouts);
     for (index, parameter) in verb.params.iter().enumerate() {
@@ -68,7 +61,6 @@ pub(super) fn initialize(
         parameters,
         scalar_loan_parameters,
         aggregate_loan_parameters,
-        owned_parameters,
         value_types,
         nominal_types,
         enum_payload_types,
