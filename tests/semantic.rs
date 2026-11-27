@@ -42,6 +42,8 @@ mod integer_operands;
 mod literal_range;
 #[path = "semantic/loans.rs"]
 mod loans;
+#[path = "semantic/loop_breaks.rs"]
+mod loop_breaks;
 #[path = "semantic/loop_moves.rs"]
 mod loop_moves;
 #[path = "semantic/misleading_messages.rs"]

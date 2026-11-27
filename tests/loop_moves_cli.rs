@@ -80,7 +80,6 @@ fn check_accepts_moves_that_leave_the_loop_or_belong_to_the_body() {
             "erg x: Buffer = Buffer[4]; erg n: Int = 0; loop { n += 1; if n > 2 { eat(packet: x); break; } }",
         ),
         ("return", "erg x: Buffer = Buffer[4]; loop { eat(packet: x); return; }"),
-        ("for-break", "erg x: Buffer = Buffer[4]; for erg i in 0..3 { eat(packet: x); break; }"),
         ("declared-inside", "for erg i in 0..3 { erg y: Buffer = Buffer[4]; eat(packet: y); }"),
         (
             "declared-inside-nested",
@@ -104,4 +103,15 @@ loop {{ n += 1; if n > 2 {{ eat(packet: x); break; }} }} return n; }}"
     let status = Command::new(&output).status().expect("run fixture");
     assert_eq!(status.code(), Some(3));
     let _ = fs::remove_file(output);
+}
+
+#[test]
+fn check_rejects_a_move_before_a_break_of_a_for_loop() {
+    let source = format!(
+        "{PRELUDE}verb main() {{ erg x: Buffer = Buffer[4]; for erg i in 0..3 {{ eat(packet: x); break; }} }}"
+    );
+    let output = actus("for-break", &["check"], &source);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "must be rejected");
+    assert!(stderr.contains("E1061"), "{stderr}");
 }
