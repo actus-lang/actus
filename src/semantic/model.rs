@@ -105,6 +105,9 @@ pub struct GenericInstance {
 pub struct ExplicitDrop {
     pub binding_index: usize,
     pub span: SourceSpan,
+    /// The field paths already moved out when the drop runs; empty when the
+    /// whole owner is dropped.
+    pub moved_fields: Vec<String>,
 }
 
 impl GenericInstance {

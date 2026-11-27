@@ -216,23 +216,26 @@ impl Analyzer {
         }
         self.ensure_arena_alive(index, name, span)?;
         self.ensure_arena_references_inactive(index, name, span)?;
-        match binding.ownership {
-            OwnershipState::Active => {
-                self.model.bindings[index].ownership = OwnershipState::Dropped;
-                self.ownership_change_spans.insert(index, span);
-                self.model
-                    .explicit_drops
-                    .push(crate::semantic::model::ExplicitDrop { binding_index: index, span });
-            }
-            OwnershipState::PartiallyMoved { .. }
-            | OwnershipState::Moved
-            | OwnershipState::Dropped => {
+        // Dropping a partially moved owner releases only the paths that are
+        // still owned (ADR-0016 invariant 3); the moved paths are recorded so
+        // that the backends skip exactly those.
+        let moved_fields = match &binding.ownership {
+            OwnershipState::Active => Vec::new(),
+            OwnershipState::PartiallyMoved { fields } => fields.clone(),
+            OwnershipState::Moved | OwnershipState::Dropped => {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::DoubleDrop { name: name.to_owned() },
                     span,
                 });
             }
-        }
+        };
+        self.model.bindings[index].ownership = OwnershipState::Dropped;
+        self.ownership_change_spans.insert(index, span);
+        self.model.explicit_drops.push(crate::semantic::model::ExplicitDrop {
+            binding_index: index,
+            span,
+            moved_fields,
+        });
         Ok(())
     }
 }

@@ -85,22 +85,19 @@ impl Analyzer {
                 self.model.bindings[index].access = super::state::AccessState::Mutable;
             }
         }
+        // A view ends with its block: the owner it froze is released by its own
+        // binding index, never by name, so an owner of the same name in another
+        // verb or an outer scope is not mistaken for it.
         for borrow_id in &frame.borrow_ids {
-            let Some(record) = self.model.borrows.iter().find(|record| record.id == *borrow_id)
-            else {
+            let Some(owner_index) = self.borrow_owner_indices.get(borrow_id).copied() else {
                 continue;
             };
-            let owner = record.owner.clone();
             self.active_borrow_ids.remove(borrow_id);
-            let still_borrowed =
-                self.model.borrows.iter().any(|other| {
-                    other.owner == owner && self.active_borrow_ids.contains(&other.id)
-                });
-            if !still_borrowed
-                && let Some(index) =
-                    self.model.bindings.iter().position(|binding| binding.name == owner)
-            {
-                self.model.bindings[index].access = AccessState::Mutable;
+            let still_borrowed = self.active_borrow_ids.iter().any(|other| {
+                self.borrow_owner_indices.get(other).is_some_and(|index| *index == owner_index)
+            });
+            if !still_borrowed {
+                self.model.bindings[owner_index].access = AccessState::Mutable;
             }
         }
         self.model.cleanup_plans.push(super::cleanup::plan_scope_cleanup(

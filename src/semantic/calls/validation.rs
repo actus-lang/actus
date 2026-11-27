@@ -23,10 +23,10 @@ impl Analyzer {
         let field_path = format_field_path(object, field);
         match &self.model.bindings[index].ownership {
             OwnershipState::Active => Ok(()),
+            // Moves are tracked per field path (ADR-0016, ADR-0046 2.2): only a
+            // path that overlaps a moved one is unusable; disjoint fields stay.
             OwnershipState::PartiallyMoved { fields }
-                if field_path.contains('.')
-                    && fields.iter().all(|moved| moved.contains('.'))
-                    && !fields.iter().any(|moved| paths_overlap(moved, &field_path)) =>
+                if !fields.iter().any(|moved| paths_overlap(moved, &field_path)) =>
             {
                 Ok(())
             }

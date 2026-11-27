@@ -208,7 +208,7 @@ fn rejects_whole_struct_use_after_dat_transfer() {
 #[test]
 fn rejects_partial_struct_use_after_field_move() {
     let error = analyze_source(
-        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) { drop(payload); } verb broken() { erg holder = Holder { payload: Buffer[4], value: 1, }; consume(payload: holder.payload); inspect(holder.value); }",
+        "struct Holder { erg payload: Buffer, value: Int, } verb consume(dat payload: Buffer) { drop(payload); } verb broken() { erg holder = Holder { payload: Buffer[4], value: 1, }; consume(payload: holder.payload); inspect(holder.payload); }",
     )
     .expect_err("partially moved structs must not be reused");
     assert!(matches!(

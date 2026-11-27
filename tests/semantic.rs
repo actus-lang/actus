@@ -4,10 +4,14 @@ mod abs_field_views;
 mod arena_cleanup;
 #[path = "semantic/arenas.rs"]
 mod arenas;
+#[path = "semantic/array_copy.rs"]
+mod array_copy;
 #[path = "semantic/arrays.rs"]
 mod arrays;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
+#[path = "semantic/case_view_scope.rs"]
+mod case_view_scope;
 #[path = "semantic/casts.rs"]
 mod casts;
 #[path = "semantic/drop.rs"]
@@ -48,6 +52,8 @@ mod move_only_fields;
 mod origins;
 #[path = "semantic/packs.rs"]
 mod packs;
+#[path = "semantic/partial_field_moves.rs"]
+mod partial_field_moves;
 #[path = "semantic/pattern_literals.rs"]
 mod pattern_literals;
 #[path = "semantic/pattern_ownership.rs"]

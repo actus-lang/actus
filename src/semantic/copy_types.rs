@@ -30,8 +30,8 @@ impl Analyzer {
 
     /// Whether the named type is a scalar or a struct, enum or pack declared
     /// `meta copy`; the head of a generic instance such as `Pair[Int]` names
-    /// the declaration. Arrays are copy types only as fields, not as `copy`
-    /// operands.
+    /// the declaration. An array is judged by its element type in
+    /// `type_is_copy`, not by this name.
     pub(in crate::semantic) fn named_type_is_copy_operand(&self, name: &str) -> bool {
         let head = name.split('[').next().unwrap_or(name);
         if head == "Int"

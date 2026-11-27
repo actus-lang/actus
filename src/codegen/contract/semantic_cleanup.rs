@@ -13,16 +13,17 @@ pub fn lower_semantic_cleanup_with_provider(
         .into_iter()
         .map(|plan| (plan, BackendCleanupOrigin::Scope))
         .chain(model.explicit_drops.iter().filter_map(|drop| {
-            super::super::model::lower_explicit_drop(drop.binding_index, model).map(|action| {
-                (
-                    super::super::model::LoweredCleanupPlan {
-                        depth: 0,
-                        span: drop.span,
-                        instructions: vec![action],
-                    },
-                    BackendCleanupOrigin::Explicit { span: drop.span },
-                )
-            })
+            super::super::model::lower_explicit_drop(drop.binding_index, &drop.moved_fields, model)
+                .map(|action| {
+                    (
+                        super::super::model::LoweredCleanupPlan {
+                            depth: 0,
+                            span: drop.span,
+                            instructions: vec![action],
+                        },
+                        BackendCleanupOrigin::Explicit { span: drop.span },
+                    )
+                })
         }))
         .chain(super::super::model::lower_return_unwind_plans(model).into_iter().flat_map(
             |unwind| {

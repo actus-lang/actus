@@ -43,7 +43,11 @@ comparison, an `abs` argument or a `case` on an `abs` subject, does not move
 the source, so the original stays usable.
 
 `copy` on a type that is not a copy type is rejected with `E1021`. Scalars are
-copy types without a declaration and keep the rules of ADR-0059.
+copy types without a declaration and keep the rules of ADR-0059. An `Array` is a
+copy type when its element type is one, so `copy(value: abs values)` of an
+`Array[Int, 3]`, of an array of `meta copy` structs, enums or packs, or of an
+array of such arrays gives a new array with storage of its own; an array of a
+`Buffer` or of a type that is not `meta copy` is rejected with `E1021`.
 
 ## What may be `meta copy`
 

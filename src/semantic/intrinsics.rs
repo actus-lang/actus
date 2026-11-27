@@ -309,7 +309,14 @@ impl Analyzer {
         let type_name = self
             .expression_type_name(&argument.expression)
             .map(|name| self.normalize_imported_type_key(&name));
-        if !type_name.as_deref().is_some_and(|name| self.named_type_is_copy_operand(name)) {
+        // An array of copy types is a copy type (ADR-0124); its type carries the
+        // element type and the capacity, which the copy keeps.
+        let array_type = self
+            .resolved_type_name(&argument.expression)
+            .filter(|resolved| resolved.name == "Array" && self.type_is_copy(resolved));
+        let copyable = array_type.is_some()
+            || type_name.as_deref().is_some_and(|name| self.named_type_is_copy_operand(name));
+        if !copyable {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidIntrinsicArgument {
                     callee: callee.to_owned(),
@@ -324,9 +331,9 @@ impl Analyzer {
         let aggregate = self.struct_types.contains_key(head)
             || self.enum_types.contains_key(head)
             || self.pack_types.contains_key(head);
-        let result_type = aggregate
-            .then(|| self.resolved_type_name(&argument.expression))
+        let result_type = (aggregate.then(|| self.resolved_type_name(&argument.expression)))
             .flatten()
+            .or(array_type)
             .or_else(|| type_name.map(|name| TypeName::builtin(name, Vec::new(), None, span)));
         if let Some(result_type) = result_type {
             self.inferred_expression_types.insert(self.expression_cache_key(span), result_type);
