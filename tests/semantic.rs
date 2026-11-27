@@ -10,6 +10,8 @@ mod array_copy;
 mod arrays;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
+#[path = "semantic/call_result_views.rs"]
+mod call_result_views;
 #[path = "semantic/case_view_scope.rs"]
 mod case_view_scope;
 #[path = "semantic/casts.rs"]

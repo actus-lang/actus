@@ -179,6 +179,27 @@ verb main() {
 }
 ```
 
+A call whose result can hold a view freezes its `abs` arguments the same way,
+because the callee may return a holder of any of them. The source stays frozen
+until the end of the block that receives the result; a result that cannot hold
+a view, such as an `Int`, freezes nothing:
+
+```actus fails=E1009
+struct Header {
+    abs bytes: Buffer,
+}
+
+verb open_header(abs source: Buffer) -> Header {
+    return Header { bytes: source, };
+}
+
+verb main() {
+    erg data: Buffer = Buffer[4];
+    erg header = open_header(source: abs data);
+    drop(data);
+}
+```
+
 A struct that holds a view can leave a verb, by `return` or through a field of
 an `ins` parameter, only when every view in it comes from an `abs` parameter of
 that verb. A view of a local, of an owned parameter or of a temporary would
