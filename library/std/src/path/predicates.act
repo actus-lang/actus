@@ -2,10 +2,16 @@
 """Inspect absolute-root state without consuming or allocating the path."""
 unsafe extern "C" verb actus_path_is_absolute(abs self: Path) -> Bool;
 
-"""Inspect relative-root state through the C ABI and return a Boolean without consuming or allocating the path."""
+"""
+Inspect relative-root state through the C ABI and return a Boolean without consuming or allocating
+the path.
+"""
 unsafe extern "C" verb actus_path_is_relative(abs self: Path) -> Bool;
 
-"""Inspect through the C ABI whether the path has any platform root and return a Boolean without allocation."""
+"""
+Inspect through the C ABI whether the path has any platform root and return a Boolean without
+allocation.
+"""
 unsafe extern "C" verb actus_path_has_root(abs self: Path) -> Bool;
 
 """Compare complete borrowed path components at the Rust ABI boundary."""

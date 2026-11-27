@@ -92,7 +92,10 @@ unsafe extern "C" verb actus_buffer_append_range(
     erg length: Int
 ) -> Int;
 
-"""Clear an ins buffer's logical length through the C ABI while retaining capacity; return cleared byte count or `-1`."""
+"""
+Clear an ins buffer's logical length through the C ABI while retaining capacity; return cleared byte
+count or `-1`.
+"""
 unsafe extern "C" verb actus_buffer_clear(ins buffer: Buffer) -> Int;
 
 """

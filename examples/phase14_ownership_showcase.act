@@ -18,7 +18,8 @@ role Writer {
 
 perform Writer for File {
     """
-    Implementation of the `Writer` role for `File`: return the file value plus one. The file is an immutable `abs` view and is not modified.
+    Implementation of the `Writer` role for `File`: return the file value plus one. The file is an
+    immutable `abs` view and is not modified.
     """
     verb write(abs self: File) -> Int {
         return self.value + 1;
@@ -36,7 +37,8 @@ enum Message {
 }
 
 """
-Take ownership of a buffer, drop it and return 0. It is used to move nested buffer fields out of a struct one at a time.
+Take ownership of a buffer, drop it and return 0. It is used to move nested buffer fields out of a
+struct one at a time.
 """
 verb consume(dat item: Buffer) -> Int {
     drop(item);
@@ -44,7 +46,8 @@ verb consume(dat item: Buffer) -> Int {
 }
 
 """
-Exercise static role dispatch, an enum match, nested struct field moves and an enum with a payload, and return 42 plus 1 plus the payload 1, 44, as the exit status.
+Exercise static role dispatch, an enum match, nested struct field moves and an enum with a payload,
+and return 42 plus 1 plus the payload 1, 44, as the exit status.
 """
 verb main() -> Int {
     erg file = File {

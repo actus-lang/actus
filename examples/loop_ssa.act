@@ -1,5 +1,6 @@
 """
-Assign 41 inside an unconditional loop that breaks at once, then return the variable plus one, 42. It shows that an assignment inside a loop body is visible after the loop.
+Assign 41 inside an unconditional loop that breaks at once, then return the variable plus one, 42.
+It shows that an assignment inside a loop body is visible after the loop.
 """
 verb main() -> Int {
     erg value = 0;

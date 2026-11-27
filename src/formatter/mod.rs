@@ -1,5 +1,6 @@
 mod comments;
 mod declarations;
+mod doc_wrap;
 mod expressions;
 mod imports;
 mod program;
