@@ -44,6 +44,8 @@ pub enum SemanticErrorKind {
         loan: bool,
         copyable: bool,
     },
+    /// A resource moved out of the array element at this path (twice released).
+    MoveOutOfElement(String),
     ZeroOnDropFieldMove {
         owner: String,
         field: String,

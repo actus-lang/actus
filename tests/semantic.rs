@@ -66,6 +66,8 @@ mod partial_field_moves;
 mod pattern_literals;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
+#[path = "semantic/place_replacements.rs"]
+mod place_replacements;
 #[path = "semantic/repr.rs"]
 mod repr;
 #[path = "semantic/roles.rs"]
@@ -78,5 +80,7 @@ mod state;
 mod structs;
 #[path = "semantic/suite.rs"]
 mod suite;
+#[path = "semantic/temporaries.rs"]
+mod temporaries;
 #[path = "semantic/void_values.rs"]
 mod void_values;

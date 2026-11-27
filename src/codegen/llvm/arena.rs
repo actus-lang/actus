@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use llvm_sys::LLVMIntPredicate;
 use llvm_sys::core::{
-    LLVMAppendBasicBlockInContext, LLVMBuildAdd, LLVMBuildArrayAlloca, LLVMBuildCondBr,
-    LLVMBuildGEP2, LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
+    LLVMAppendBasicBlockInContext, LLVMArrayType2, LLVMBuildAdd, LLVMBuildCondBr, LLVMBuildGEP2,
+    LLVMBuildICmp, LLVMBuildLoad2, LLVMBuildMemMove, LLVMBuildStore, LLVMConstInt,
     LLVMGetBasicBlockParent, LLVMGetInsertBlock, LLVMInt8TypeInContext, LLVMInt32TypeInContext,
     LLVMInt64TypeInContext, LLVMPositionBuilderAtEnd, LLVMSetAlignment,
 };
@@ -48,13 +48,13 @@ fn emit_construct(
     let total = capacity
         .checked_add(u32::from(*width))
         .ok_or_else(|| BackendEmitError("arena storage size overflow".to_owned()))?;
+    // The storage is a static slot of the function, as on Cranelift: an
+    // arena declared in a loop reuses it on every iteration instead of
+    // growing the stack (bug #94). Its construction and its release at every
+    // exit empty it (ADR-0030, ADR-0125).
     let byte_type = unsafe { LLVMInt8TypeInContext(context) };
-    let count = unsafe { LLVMConstInt(LLVMInt64TypeInContext(context), u64::from(total), 0) };
-    let address =
-        unsafe { LLVMBuildArrayAlloca(builder, byte_type, count, c"arena".as_ptr().cast()) };
-    if address.is_null() {
-        return Err(BackendEmitError("LLVM failed to allocate arena storage".to_owned()));
-    }
+    let storage_type = unsafe { LLVMArrayType2(byte_type, u64::from(total)) };
+    let address = super::memory::entry_slot(builder, storage_type, c"arena")?;
     unsafe { LLVMSetAlignment(address, *width as u32) };
     let offset_address = byte_address(context, builder, address, *capacity)?;
     let offset_type = pointer_integer_type(context, *width)?;

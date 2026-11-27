@@ -10,6 +10,8 @@
 //! twice (a block that stdio keeps reachable is not a leak).
 #![cfg(unix)]
 
+#[path = "struct_cleanup_native/arenas.rs"]
+mod arenas;
 #[path = "struct_cleanup_native/arrays.rs"]
 mod arrays;
 #[path = "struct_cleanup_native/enums.rs"]
@@ -18,5 +20,11 @@ mod enums;
 mod exits;
 #[path = "struct_cleanup_native/harness.rs"]
 mod harness;
+#[path = "struct_cleanup_native/large_aggregates.rs"]
+mod large_aggregates;
+#[path = "struct_cleanup_native/place_assignments.rs"]
+mod place_assignments;
 #[path = "struct_cleanup_native/structs.rs"]
 mod structs;
+#[path = "struct_cleanup_native/temporaries.rs"]
+mod temporaries;

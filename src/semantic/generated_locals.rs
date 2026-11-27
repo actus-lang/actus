@@ -141,6 +141,14 @@ fn normalize_statement(
     context: &mut NormalizationContext<'_>,
     generated: &mut Vec<Stmt>,
 ) {
+    // A `?` nested in the value of a statement is bound first (bug #128).
+    if let Stmt::OwnerDecl { initializer: value, .. }
+    | Stmt::Return { value: Some(value), .. }
+    | Stmt::Expression { expression: value, .. }
+    | Stmt::Assignment { value, .. } = statement
+    {
+        generated.extend(super::nested_tries::hoist(value, &mut || fresh_name(context)));
+    }
     match statement {
         Stmt::OwnerDecl { initializer, .. } | Stmt::Return { value: Some(initializer), .. } => {
             let (prefix, expression) = normalize_expression(initializer, context);
@@ -264,13 +272,7 @@ fn materialize_arguments(
         {
             continue;
         }
-        let name = loop {
-            let candidate = format!("__actus_generated_{}", context.counter);
-            context.counter += 1;
-            if context.used_names.insert(candidate.clone()) {
-                break candidate;
-            }
-        };
+        let name = fresh_name(context);
         let initializer = argument.expression.clone();
         let span = expression_span(&initializer).unwrap_or(call_span);
         prefix.push(Stmt::OwnerDecl {
@@ -282,6 +284,17 @@ fn materialize_arguments(
             span,
         });
         argument.expression = Expr::Identifier { name, span };
+    }
+}
+
+/// A local name that no source name and no earlier generated local uses.
+fn fresh_name(context: &mut NormalizationContext<'_>) -> String {
+    loop {
+        let candidate = format!("__actus_generated_{}", context.counter);
+        context.counter += 1;
+        if context.used_names.insert(candidate.clone()) {
+            return candidate;
+        }
     }
 }
 

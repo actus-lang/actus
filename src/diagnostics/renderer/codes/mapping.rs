@@ -190,6 +190,7 @@ fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
         SemanticErrorKind::MoveOutOfView { loan: false, .. } => {
             DiagnosticCode::INVALID_DAT_ARGUMENT
         }
+        SemanticErrorKind::MoveOutOfElement(_) => DiagnosticCode::INVALID_DAT_ARGUMENT,
         SemanticErrorKind::ZeroOnDropFieldMove { .. } => DiagnosticCode::ZERO_ON_DROP_FIELD_MOVE,
         SemanticErrorKind::MoveFrozen { .. } | SemanticErrorKind::MutateFrozen { .. } => {
             DiagnosticCode::MOVE_OR_MUTATE_FROZEN

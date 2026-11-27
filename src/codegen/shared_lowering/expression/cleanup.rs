@@ -155,6 +155,86 @@ pub(super) fn emit_replacement(
     }
 }
 
+/// Releases the value a field or an array element held before the
+/// assignment at `span` stores a new one into it. `place` is the value the
+/// steps address: the field's owner for a field, the old element for an
+/// element. A step that releases a whole value (a buffer element) applies
+/// only when the value has that representation.
+pub(super) fn emit_place_replacement(
+    provider: &mut SharedExpressionProvider<'_>,
+    span: SourceSpan,
+    place: BackendValueId,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    let Some(release) = provider.exits.and_then(|exits| exits.place_replacement(span)) else {
+        return;
+    };
+    emit_steps(provider, place, &release.action, &release.steps, span, instructions);
+}
+
+/// Keeps the value of the expression at `span` when it is a temporary that
+/// an exit list releases, and releases every temporary whose last reader is
+/// the expression at `span`, now that `value`, its result, exists.
+pub(super) fn track_temporaries(
+    provider: &mut SharedExpressionProvider<'_>,
+    span: SourceSpan,
+    value: BackendValueId,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    let Some(exits) = provider.exits else { return };
+    if exits.temporary(span).is_some() {
+        provider.temporaries.retain(|(at, _)| *at != span);
+        provider.temporaries.push((span, value));
+    }
+    for (temporary, release) in exits.temporaries_released_after(span) {
+        let Some(index) = provider.temporaries.iter().position(|(at, _)| *at == temporary) else {
+            continue;
+        };
+        let (_, held) = provider.temporaries.remove(index);
+        emit_steps(provider, held, &release.action, &release.steps, span, instructions);
+    }
+}
+
+/// Frees the heap block of a large aggregate `value` whose bytes were just
+/// copied into the storage of another owner: a struct literal field, a field
+/// or an element that the value was stored into (bug #127). The value moved
+/// there, so its parts are owned by the destination now; only the block that
+/// held them is left, and nothing else releases it. A value that does not own
+/// a heap block, such as a place inside another value, is left alone.
+pub(super) fn release_moved_storage(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: BackendValueId,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    if !provider.is_heap_owned_aggregate(value) {
+        return;
+    }
+    let Some(BackendValueType::Aggregate { layout }) = provider.value_type(value) else { return };
+    let descriptor = super::super::super::BackendCleanupResolvedDescriptor {
+        descriptor: super::super::super::BackendCleanupBridgeDescriptor {
+            bridge: super::super::super::BackendCleanupBridge::AggregateDrop {
+                size: layout.size,
+                alignment: layout.alignment,
+            },
+            argument: super::super::super::BackendCleanupArgument::Value,
+            result: super::super::super::BackendCleanupResult::Ignored,
+        },
+        layout,
+        field: None,
+        performance_symbol: None,
+    };
+    instructions.push(BackendInstruction::Cleanup {
+        action: crate::codegen::model::LoweredCleanupInstruction::DropBinding {
+            binding_index: usize::MAX,
+            name: "moved storage".to_owned(),
+        },
+        operand: Some(descriptor.operand(value)),
+        span,
+    });
+    provider.forget_heap_owned_aggregate(value);
+}
+
 fn emit_scope_release(
     provider: &mut SharedExpressionProvider<'_>,
     scope: &ScopeRelease,
@@ -163,6 +243,34 @@ fn emit_scope_release(
     for owner in &scope.owners {
         emit_owner_release(provider, owner, scope.span, instructions);
     }
+    for arena in &scope.arenas {
+        emit_arena_release(provider, arena, scope.span, instructions);
+    }
+}
+
+/// Empties an arena in one bulk step (ADR-0030): its offset word, stored
+/// after its storage, is set back to zero, so every placement ends at once.
+/// A placed value is an owner of its own and was released by its binding.
+fn emit_arena_release(
+    provider: &mut SharedExpressionProvider<'_>,
+    arena: &super::super::exits::ArenaRelease,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    let Some(base) = provider.binding_value(&arena.name) else { return };
+    let Ok(width) = u8::try_from(arena.width * 8) else { return };
+    let ty = BackendValueType::Integer { signed: false, width };
+    let zero = provider.allocate_value(ty);
+    instructions.push(BackendInstruction::Constant { result: zero, ty, value: 0, span });
+    instructions.push(BackendInstruction::AggregateFieldStore {
+        base,
+        aggregate_layout: BackendLayout { size: arena.capacity + arena.width, alignment: 1 },
+        offset: arena.capacity,
+        field_layout: BackendLayout { size: arena.width, alignment: 1 },
+        value: zero,
+        ty,
+        span,
+    });
 }
 
 /// Emits the steps that release one owner, addressed from the value the
@@ -177,7 +285,19 @@ fn emit_owner_release(
     instructions: &mut Vec<BackendInstruction>,
 ) {
     let Some(value) = provider.binding_value(&owner.name) else { return };
-    for step in &owner.steps {
+    emit_steps(provider, value, &owner.action, &owner.steps, span, instructions);
+}
+
+/// Emits `steps` on `value`, each under the variant tests it carries.
+fn emit_steps(
+    provider: &mut SharedExpressionProvider<'_>,
+    value: BackendValueId,
+    action: &crate::codegen::model::LoweredCleanupInstruction,
+    steps: &[super::super::exits::CleanupStep],
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    for step in steps {
         if step.descriptor.field.is_none() && !descriptor_applies(provider, value, &step.descriptor)
         {
             continue;
@@ -185,7 +305,7 @@ fn emit_owner_release(
         let operand = step.descriptor.operand(value);
         if step.guards.is_empty() {
             instructions.push(BackendInstruction::Cleanup {
-                action: owner.action.clone(),
+                action: action.clone(),
                 operand: Some(operand),
                 span,
             });
@@ -201,7 +321,7 @@ fn emit_owner_release(
         );
         instructions.push(BackendInstruction::CleanupWhen {
             condition,
-            action: owner.action.clone(),
+            action: action.clone(),
             operand,
             span,
         });

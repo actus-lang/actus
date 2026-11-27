@@ -266,7 +266,9 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         let Expr::StructLit { fields, .. } = value else {
             return Err(unsupported(span, "aggregate assignment requires a struct literal"));
         };
-        cleanup::emit_replacement(self, span, instructions);
+        if self.exits.and_then(|exits| exits.replacement(span)).is_some() {
+            return aggregate::assign_struct_literal_owner(self, name, fields, span, instructions);
+        }
         let object = Expr::Identifier { name: name.to_owned(), span };
         for field in fields {
             aggregate::lower_field_assignment(

@@ -55,6 +55,25 @@ impl ProgramLayouts<'_> {
         validated(walk.steps)
     }
 
+    /// The steps that release the field `field` of a value of `owner_type`,
+    /// addressed from that value, except the paths in `moved_fields`
+    /// (relative to the field), which were moved out before; a field with a
+    /// moved part does not run its own drop contract. An assignment to the
+    /// field runs them before it stores the new value (ADR-0125).
+    pub(in crate::codegen::shared_lowering) fn field_release_steps(
+        &self,
+        owner_type: &TypeName,
+        field: &str,
+        moved_fields: &[String],
+    ) -> Result<Vec<CleanupStep>, BackendContractError> {
+        let owner_type = self.normalize_type_name(owner_type);
+        let Some(root_layout) = self.value_layout(&owner_type) else { return Ok(Vec::new()) };
+        let Some(slot) = self.field_for(&owner_type, field) else { return Ok(Vec::new()) };
+        let mut walk = ReleaseWalk { root_layout, steps: Vec::new() };
+        self.collect_release(&mut walk, &slot.ty, slot.offset, &[], (moved_fields, ""), 0);
+        validated(walk.steps)
+    }
+
     /// The steps that release the payload field `field` of the variant
     /// `variant` of an enum of `enum_type`, which a `case dat` branch took
     /// over without binding the field. The variant `_` releases the whole

@@ -37,7 +37,10 @@ impl Analyzer {
         self.reject_constant_assignment(name, object_span)?;
         let binding_index = self.binding(name, object_span)?;
         self.validate_assignment_owner(binding_index, name, field, span)?;
-        self.ensure_mutable(binding_index, name, object_span)?;
+        // A field that was moved out may be given a value again (ADR-0125).
+        if !self.assignment_restores_field(binding_index, object, field) {
+            self.ensure_mutable(binding_index, name, object_span)?;
+        }
         if !matches!(object, Expr::Identifier { .. }) {
             self.validate_mutable_field_path(object, span)?;
             self.visit_expression(object)?;
@@ -137,6 +140,12 @@ impl Analyzer {
             && self.argument_moves_source(value, &expected);
         if owning {
             self.consume_owned_source(value, span)?;
+        }
+        if !matches!(
+            struct_field.role,
+            crate::ast::StructFieldRole::Abs | crate::ast::StructFieldRole::Ins
+        ) {
+            self.replace_owned_field(object, field, &expected, span);
         }
         Ok(())
     }

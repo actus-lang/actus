@@ -13,6 +13,18 @@ pub(super) fn lower_expression(
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
 ) -> Result<BackendValueId, BackendContractError> {
+    let value = lower_expression_kind(provider, expression, instructions)?;
+    // A value no binding receives is released after the expression that
+    // last reads it (ADR-0125, bug #128).
+    super::cleanup::track_temporaries(provider, expression_span(expression), value, instructions);
+    Ok(value)
+}
+
+fn lower_expression_kind(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
     match expression {
         Expr::Identifier { name, span } => provider
             .binding_value(name)

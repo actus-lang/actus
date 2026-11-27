@@ -36,7 +36,11 @@ impl Analyzer {
             Stmt::CompoundAssignment { target, operator, value, span } => {
                 self.visit_compound_assignment(target, *operator, value, *span)
             }
-            Stmt::Expression { expression, .. } => self.visit_expr_statement(expression),
+            Stmt::Expression { expression, span } => {
+                self.visit_expr_statement(expression)?;
+                self.release_discarded_value(expression, *span);
+                Ok(())
+            }
             Stmt::If { condition, then_branch, else_branch, span } => {
                 let expression = Expr::If {
                     condition: Box::new(condition.clone()),
@@ -101,7 +105,7 @@ impl Analyzer {
                     span,
                 };
                 self.precheck_compound_operands(binary_operator, &left, value)?;
-                self.visit_index_assignment(&target_expression, index, value)?;
+                self.visit_index_assignment(&target_expression, index, value, span)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
         }
@@ -141,7 +145,7 @@ impl Analyzer {
             }
             Place::Index { target, index, .. } => {
                 let target = target.to_expr();
-                self.visit_index_assignment(&target, index, value)
+                self.visit_index_assignment(&target, index, value, span)
             }
         }
     }
@@ -188,6 +192,9 @@ impl Analyzer {
                 span,
             });
         }
+        if matches!(value, Expr::Index { .. }) {
+            self.reject_move_out_of_view(value, span)?;
+        }
         if matches!(value, Expr::Identifier { .. } | Expr::FieldAccess { .. }) {
             self.move_dat_argument(value, span)?;
         }
@@ -215,6 +222,7 @@ impl Analyzer {
         target: &Expr,
         index: &Expr,
         value: &Expr,
+        span: SourceSpan,
     ) -> Result<(), SemanticError> {
         self.validate_index_assignment_owner(target)?;
         self.visit_expression(target)?;
@@ -230,6 +238,7 @@ impl Analyzer {
             self.consume_owned_source(value, super::super::validation::expression_span(value))?;
         }
         self.plan_try_unwind(value);
+        self.replace_owned_element(target, &element, span);
         Ok(())
     }
 

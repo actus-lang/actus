@@ -59,6 +59,50 @@ pub struct VerbCleanup {
     pub drops: std::ops::Range<usize>,
     /// Assignments that release the value an owner held, in `replacement_drops`.
     pub replacements: std::ops::Range<usize>,
+    /// Assignments to a field or an element that release the value the place
+    /// held, in `place_replacements`.
+    pub places: std::ops::Range<usize>,
+    /// Temporaries that no binding receives, in `temporary_releases`.
+    pub temporaries: std::ops::Range<usize>,
+}
+
+/// A value that an expression produces and no binding receives (ADR-0125,
+/// bug #128): the result of a call whose value a statement discards
+/// (`make();`), or the call a field or an element is read from
+/// (`pair().a.id`). It is released once the expression at `release_after`
+/// has been evaluated: the call itself for a discarded value, the outermost
+/// read of the path otherwise.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemporaryRelease {
+    pub span: SourceSpan,
+    pub release_after: SourceSpan,
+    pub type_name: TypeName,
+}
+
+/// The place whose value an assignment releases before it stores the new one
+/// (ADR-0125).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReplacedPlace {
+    /// The field `field` of a value of `owner_type`, the type of the
+    /// expression the field is read from (`c` in `c.b = ...`, `c.inner` in
+    /// `c.inner.b = ...`). `moved_fields` are the paths inside the field,
+    /// relative to it, that were moved out before the assignment: they are
+    /// not released, and neither is the field's own drop contract, because
+    /// the field no longer holds a whole value (ADR-0046).
+    Field { owner_type: TypeName, field: String, moved_fields: Vec<String> },
+    /// An element of an array whose elements are of `element_type`. An
+    /// element is always owned: a value cannot be moved out of an element.
+    Element { element_type: TypeName },
+}
+
+/// An assignment at `span` to a place inside the binding `binding_index` (an
+/// owner or an `ins` loan) that releases the value the place held, after the
+/// assigned expression was evaluated and before the new value is stored.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PlaceReplacement {
+    pub span: SourceSpan,
+    pub binding_index: usize,
+    pub place: ReplacedPlace,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -157,6 +201,8 @@ impl Analyzer {
             loops: model.loop_unwind_plans.len()..model.loop_unwind_plans.len(),
             drops: model.explicit_drops.len()..model.explicit_drops.len(),
             replacements: model.replacement_drops.len()..model.replacement_drops.len(),
+            places: model.place_replacements.len()..model.place_replacements.len(),
+            temporaries: model.temporary_releases.len()..model.temporary_releases.len(),
         };
         self.model.verb_cleanups.push(record);
     }
@@ -164,12 +210,14 @@ impl Analyzer {
     /// Closes the record opened by `begin_verb_cleanup` after the body was
     /// analysed, so that it covers every exit list the body produced.
     pub(super) fn end_verb_cleanup(&mut self) {
-        let (scopes, returns, loops, drops, replacements) = (
+        let temporaries = self.model.temporary_releases.len();
+        let (scopes, returns, loops, drops, replacements, places) = (
             self.model.cleanup_plans.len(),
             self.model.return_unwind_plans.len(),
             self.model.loop_unwind_plans.len(),
             self.model.explicit_drops.len(),
             self.model.replacement_drops.len(),
+            self.model.place_replacements.len(),
         );
         if let Some(record) = self.model.verb_cleanups.last_mut() {
             record.scopes.end = scopes;
@@ -177,6 +225,8 @@ impl Analyzer {
             record.loops.end = loops;
             record.drops.end = drops;
             record.replacements.end = replacements;
+            record.places.end = places;
+            record.temporaries.end = temporaries;
         }
     }
 

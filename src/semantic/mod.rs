@@ -13,6 +13,7 @@ mod intrinsics;
 mod loans;
 mod methods;
 mod model;
+mod nested_tries;
 mod origins;
 mod ownership;
 mod packs;
@@ -38,7 +39,8 @@ pub(crate) use analyzer::{
 };
 pub(crate) use calls::{parse_type_name_key, print_uses_label};
 pub use cleanup::{
-    CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan, VerbCleanup,
+    CleanupAction, LoopExitKind, LoopUnwindPlan, PlaceReplacement, ReplacedPlace, ScopeCleanup,
+    TemporaryRelease, UnwindPlan, VerbCleanup,
 };
 pub use errors::{SemanticError, SemanticErrorKind};
 pub(crate) use generated_locals::normalize_program as normalize_generated_locals;

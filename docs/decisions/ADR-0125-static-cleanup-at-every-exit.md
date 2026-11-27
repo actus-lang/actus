@@ -67,6 +67,16 @@ Cleaning up a value means, in this order:
    cleaned up by this same rule;
 3. for a `Buffer`, releasing its storage; for an `Arena`, releasing the arena.
 
+An arena is released in one bulk step (ADR-0030): it is emptied, so every
+placement in it ends at once. Its storage is a fixed slot of the verb on every
+back end, emptied when the arena is built and when it is released, so an arena
+declared in a loop reuses the same storage on each iteration. A value placed in
+an arena is an owner of its own and is released by its binding like any other
+owner. A large aggregate (64 KiB or more) is held in a heap block of its own;
+when its value moves by being copied into the storage of another owner (a
+struct literal field, a field or an element it is stored into), its block is
+freed after the copy, and the destination releases the parts.
+
 An enum is cleaned up by its active variant: the variant tag, which the value
 already carries, selects the payload to clean up, and a variant without a
 resource does nothing. The tag is part of the value, not a hidden flag.
@@ -74,6 +84,69 @@ An array is cleaned up element by element, last element first.
 
 `drop(x)` runs the same cleanup at the point where it is written and ends the
 ownership of `x`.
+
+### Assignment releases the value it replaces
+
+An assignment to an owner, to a field of an owner or of an `ins` loan
+(`c.b = ...`, `c.inner.b = ...`) or to an array element (`xs[i] = ...`)
+releases the value the place held, by the rule above, before it stores the new
+one. The order is fixed: the assigned expression is evaluated first, then the
+old value is released, then the new value is stored. An expression that reads
+the old value, such as `p.a = Tracker { id: next(t: abs p.a) }` or a struct
+literal assigned to the whole owner, therefore reads it before it is released.
+The analyzer records the release of each such assignment from the ownership
+state after the assigned expression, like the other lists:
+
+- a field that was moved out before (`sink(b: dat c.b); c.b = Buffer[4];`, or
+  `c.b = grow(b: dat c.b)`) holds nothing, so nothing is released, and the
+  assignment makes the field owned again; the owner is whole again once no
+  moved path is left;
+- a field of which a part was moved out releases the rest without running its
+  own drop contract, as a partially moved owner does, and is whole again;
+- an assignment into a value that was moved out (`c.inner.b = ...` after
+  `c.inner` moved) is a use after move;
+- an array element is always owned, at a constant and at a run-time index
+  alike: the language does not track moves of single elements, so moving a
+  value that holds a resource out of an element (`erg b = xs[i]`, a `dat` or
+  `erg` argument, a field initializer, a payload, a return, a branch value)
+  is rejected with `E1010`. The element can be borrowed with `abs` or replaced
+  in place by an assignment.
+
+### Temporaries
+
+A value that an expression produces and no binding receives is a temporary.
+It is released, by the rule above, as soon as the expression that last reads
+it has been evaluated:
+
+- the result of a call that a statement discards (`make();`, also in a branch)
+  is released at the end of that statement;
+- a call that a field or an element is read from (`pair().a.id`,
+  `filled()[0u32]`) is released after the outermost read of the path.
+
+The analyzer records each temporary with the expression after which it is
+released; code generation keeps the temporary's value until then and runs the
+release there. A `case` on a call (`case dat make()`) and a view of a call
+(`f(x: abs make())`) are rejected (`E1050`, `E1016`), so they produce no
+temporary.
+
+### A `?` nested in an expression
+
+A `?` inside an expression (`Pair { a: track(id: one), b: load()? }`,
+`count()? + count()?`) leaves the verb in the middle of a statement. Before
+analysis the statement is written as the same steps one per statement: each
+operand that is evaluated before the `?` and produces a value is bound, in
+evaluation order, to a generated `erg` local, then the `?` itself is bound to
+one, and the statement reads those locals. The order of evaluation does not
+change. The generated locals are ordinary owners, so the exit list of the `?`
+releases exactly the values already evaluated, and a generated local the
+statement moves is not released again. This applies to the operands that are
+always evaluated: the payload of an enum constructor, the fields of a struct
+literal, the operands of an arithmetic or comparison operator and the operand
+of a field read, an index, a cast or a unary operator. The arguments of a verb
+or a method must be places that their roles bind, with or without a `?`, and a
+`?` inside an `if`, a `case` or the right operand of `&&` and `||` runs on one
+path only; neither is rewritten. A value that a nested `?` yields lives in its
+generated local until the end of the scope, like any owner.
 
 A drop contract receives its value through `ins self` and must not take
 ownership of it again: a contract that builds or passes on an owner of the

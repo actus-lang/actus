@@ -54,6 +54,11 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
                  would be shared silently; {fix}"
             )
         }
+        SemanticErrorKind::MoveOutOfElement(path) => format!(
+            "cannot move `{path}` out of an array element: moves of single elements are not \
+             tracked, so the array would still release it; borrow it with `abs`, or assign a \
+             new value to the element in place"
+        ),
         SemanticErrorKind::ZeroOnDropFieldMove { owner, field } => {
             format!("cannot move field `{field}` out of zero_on_drop owner `{owner}`")
         }

@@ -89,14 +89,67 @@ pub(super) fn lower_field_assignment(
             instructions,
         );
     }
-    let metadata = provider.layouts.field_for(&type_name, field).ok_or_else(|| {
+    let value = provider.lower_expression(value, instructions)?;
+    store_field_value(provider, base, &type_name, field, value, span, instructions)
+}
+
+/// Assigns a struct literal to the whole owner `name` that holds a resource:
+/// every field value is evaluated first, then the value the owner held is
+/// released, then the new fields are stored (ADR-0125), so a field value
+/// that reads the old value (`p = Pair { a: f(t: abs p.a), ... }`) reads it
+/// before it is released, as any other assignment does.
+pub(super) fn assign_struct_literal_owner(
+    provider: &mut SharedExpressionProvider<'_>,
+    name: &str,
+    fields: &[crate::ast::StructFieldInit],
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    let mut values = Vec::with_capacity(fields.len());
+    for field in fields {
+        values.push(provider.lower_expression(&field.value, instructions)?);
+    }
+    super::super::cleanup::emit_replacement(provider, span, instructions);
+    let base = provider
+        .lower_expression(&Expr::Identifier { name: name.to_owned(), span }, instructions)?;
+    let type_name = provider
+        .nominal_type(base)
+        .cloned()
+        .ok_or_else(|| unsupported(span, "aggregate assignment has no nominal type"))?;
+    for (field, value) in fields.iter().zip(values) {
+        store_field_value(
+            provider,
+            base,
+            &type_name,
+            &field.name,
+            value,
+            field.span,
+            instructions,
+        )?;
+    }
+    Ok(())
+}
+
+/// Stores the lowered `value` into the field `field` of `base`, a value of
+/// `type_name`. The value the field held is released first when the
+/// analyzer planned it for the assignment at `span` (ADR-0125): the new value
+/// was evaluated already.
+fn store_field_value(
+    provider: &mut SharedExpressionProvider<'_>,
+    base: BackendValueId,
+    type_name: &TypeName,
+    field: &str,
+    value: BackendValueId,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    let metadata = provider.layouts.field_for(type_name, field).ok_or_else(|| {
         unsupported(span, format!("aggregate field `{field}` has no neutral layout"))
     })?;
     let declared_ty =
         super::super::super::scalar_types::backend_value_type(provider.layouts, &metadata.ty)
             .ok_or_else(|| unsupported(span, "aggregate field type has no neutral layout"))?;
     let ty = indirect_field_type(metadata.indirect, declared_ty);
-    let value = provider.lower_expression(value, instructions)?;
     let value =
         super::super::state::coerce_value_to_type(provider, value, Some(ty), span, instructions)?;
     if provider.value_type(value) != Some(ty) {
@@ -104,8 +157,9 @@ pub(super) fn lower_field_assignment(
     }
     let aggregate_layout = provider
         .layouts
-        .layout_for(&type_name)
+        .layout_for(type_name)
         .ok_or_else(|| unsupported(span, "aggregate base has no neutral layout"))?;
+    super::super::cleanup::emit_place_replacement(provider, span, base, instructions);
     instructions.push(BackendInstruction::AggregateFieldStore {
         base,
         aggregate_layout,
@@ -115,6 +169,9 @@ pub(super) fn lower_field_assignment(
         ty,
         span,
     });
+    if matches!(ty, BackendValueType::Aggregate { .. }) {
+        super::super::cleanup::release_moved_storage(provider, value, span, instructions);
+    }
     Ok(())
 }
 

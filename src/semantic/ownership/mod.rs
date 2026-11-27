@@ -1,7 +1,9 @@
 mod arena_release;
 mod escaping_views;
+mod place_replacements;
 mod resources;
 mod returns;
+mod temporaries;
 mod validation;
 mod view_reads;
 

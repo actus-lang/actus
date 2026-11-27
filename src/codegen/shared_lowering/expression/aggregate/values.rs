@@ -74,6 +74,16 @@ pub(in crate::codegen::shared_lowering::expression) fn lower_field_assignment(
     fields::lower_field_assignment(provider, object, field, value, span, instructions)
 }
 
+pub(in crate::codegen::shared_lowering::expression) fn assign_struct_literal_owner(
+    provider: &mut SharedExpressionProvider<'_>,
+    name: &str,
+    fields: &[crate::ast::StructFieldInit],
+    span: crate::lexer::SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<(), BackendContractError> {
+    fields::assign_struct_literal_owner(provider, name, fields, span, instructions)
+}
+
 pub(in crate::codegen::shared_lowering::expression) fn lower_field_compound_assignment(
     provider: &mut SharedExpressionProvider<'_>,
     object: &Expr,

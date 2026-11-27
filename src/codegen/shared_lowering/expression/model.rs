@@ -32,6 +32,9 @@ pub(crate) struct SharedExpressionProvider<'a> {
     pub(super) bindings: Option<&'a BackendSymbolBindings>,
     /// The analyzer's exit lists of this verb body (ADR-0125).
     pub(super) exits: Option<&'a super::super::exits::VerbExits>,
+    /// The values of the temporaries the exit lists release, by the span of
+    /// the expression that produced them, until they are released.
+    pub(super) temporaries: Vec<(crate::lexer::SourceSpan, BackendValueId)>,
     value_types: BTreeMap<BackendValueId, BackendValueType>,
     nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
     array_big_endian: BTreeMap<BackendValueId, bool>,
@@ -72,6 +75,7 @@ impl<'a> SharedExpressionProvider<'a> {
             scalar_loan_parameters: parameter_state.scalar_loan_parameters,
             aggregate_loan_parameters: parameter_state.aggregate_loan_parameters,
             locals: Vec::new(),
+            temporaries: Vec::new(),
             scope_spans: Vec::new(),
             verb_name: verb.name.clone(),
             return_types,
@@ -281,6 +285,13 @@ impl<'a> SharedExpressionProvider<'a> {
         if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
             self.heap_owned_aggregate_values.insert(value);
         }
+    }
+    /// Forgets that `value` owns a heap block, once the block was freed.
+    pub(in crate::codegen::shared_lowering) fn forget_heap_owned_aggregate(
+        &mut self,
+        value: BackendValueId,
+    ) {
+        self.heap_owned_aggregate_values.remove(&value);
     }
     pub(in crate::codegen::shared_lowering) fn is_heap_owned_aggregate(
         &self,

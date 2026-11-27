@@ -120,9 +120,14 @@ impl Analyzer {
         expression: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        // The tail is the block's value, even when it is written with `;`,
+        // so a call there is received, not discarded (bug #128).
+        self.keep_tail_value(expression);
         let index = match expression {
             // A field moves by its path only when its type is move-only.
             Expr::FieldAccess { .. } => return self.consume_owned_source(expression, span),
+            // An element cannot leave its array by value (bug #126).
+            Expr::Index { .. } => return self.reject_move_out_of_view(expression, span),
             Expr::Identifier { name, span } => match self.binding(name, *span) {
                 Ok(index) => index,
                 Err(_) => return Ok(()),

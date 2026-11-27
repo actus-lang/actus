@@ -10,7 +10,10 @@
 use crate::codegen::model::LoweredCleanupInstruction;
 use crate::codegen::{BackendCleanupResolvedDescriptor, BackendContractError};
 use crate::lexer::SourceSpan;
-use crate::semantic::{CleanupAction, LoopExitKind, ScopeCleanup, SemanticModel};
+use crate::semantic::{
+    CleanupAction, LoopExitKind, PlaceReplacement, ReplacedPlace, ScopeCleanup, SemanticModel,
+    TemporaryRelease,
+};
 
 use super::layout::ProgramLayouts;
 
@@ -48,11 +51,34 @@ pub(crate) struct OwnerRelease {
     pub(crate) steps: Vec<CleanupStep>,
 }
 
+/// The release of the value a field or an array element held, run by the
+/// assignment that replaces it (ADR-0125). For a field, the steps address the
+/// field from the value the lowering holds for the field's owner (`c` in
+/// `c.b = ...`); for an element, from the element the lowering loads before
+/// it stores the new one. `action` names the binding the place lies in.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PlaceRelease {
+    pub(crate) action: LoweredCleanupInstruction,
+    pub(crate) steps: Vec<CleanupStep>,
+}
+
 /// The owners one scope releases, in reverse declaration order.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ScopeRelease {
     pub(crate) span: SourceSpan,
     pub(crate) owners: Vec<OwnerRelease>,
+    /// The arenas the scope releases after its owners (ADR-0030, ADR-0125).
+    pub(crate) arenas: Vec<ArenaRelease>,
+}
+
+/// The release of an arena owner: its placements end in one bulk step that
+/// empties the arena, by setting the offset word of `width` bytes that
+/// follows its `capacity` bytes of storage back to zero.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ArenaRelease {
+    pub(crate) name: String,
+    pub(crate) capacity: u32,
+    pub(crate) width: u32,
 }
 
 /// Every exit of one verb body with what it releases. A scope end releases
@@ -65,6 +91,8 @@ pub(crate) struct VerbExits {
     loops: Vec<(SourceSpan, LoopExitKind, Vec<ScopeRelease>)>,
     drops: Vec<(SourceSpan, OwnerRelease)>,
     replacements: Vec<(SourceSpan, OwnerRelease)>,
+    places: Vec<(SourceSpan, PlaceRelease)>,
+    temporaries: Vec<(SourceSpan, SourceSpan, PlaceRelease)>,
 }
 
 impl VerbExits {
@@ -99,6 +127,30 @@ impl VerbExits {
     pub(crate) fn replacement(&self, span: SourceSpan) -> Option<&OwnerRelease> {
         self.replacements.iter().find(|(at, _)| *at == span).map(|(_, owner)| owner)
     }
+
+    /// What the assignment to a field or an element at `span` releases
+    /// before it stores the new value.
+    pub(crate) fn place_replacement(&self, span: SourceSpan) -> Option<&PlaceRelease> {
+        self.places.iter().find(|(at, _)| *at == span).map(|(_, place)| place)
+    }
+
+    /// The release of the temporary produced by the expression at `span`.
+    pub(crate) fn temporary(&self, span: SourceSpan) -> Option<&PlaceRelease> {
+        self.temporaries.iter().find(|(at, _, _)| *at == span).map(|(_, _, release)| release)
+    }
+
+    /// The temporaries released once the expression at `span` is evaluated,
+    /// each with the span of the expression that produced it.
+    pub(crate) fn temporaries_released_after(
+        &self,
+        span: SourceSpan,
+    ) -> Vec<(SourceSpan, &PlaceRelease)> {
+        self.temporaries
+            .iter()
+            .filter(|(_, after, _)| *after == span)
+            .map(|(at, _, release)| (*at, release))
+            .collect()
+    }
 }
 
 /// The exits of every verb body of a program, by the body's name and span.
@@ -132,6 +184,9 @@ impl CleanupSchedule {
                 drops: resolver.drops(&model.explicit_drops[record.drops.clone()])?,
                 replacements: resolver
                     .drops(&model.replacement_drops[record.replacements.clone()])?,
+                places: resolver.places(&model.place_replacements[record.places.clone()])?,
+                temporaries: resolver
+                    .temporaries(&model.temporary_releases[record.temporaries.clone()])?,
             };
             verbs.push((record.name.clone(), record.span, exits));
         }
@@ -159,12 +214,36 @@ impl Resolver<'_, '_> {
 
     fn scope(&self, scope: &ScopeCleanup) -> Result<ScopeRelease, BackendContractError> {
         let mut owners = Vec::new();
+        let mut arenas = Vec::new();
         for action in &scope.actions {
-            if let Some(owner) = self.action(action)? {
+            if let CleanupAction::ResetArena { binding_index } = action {
+                arenas.extend(self.arena(*binding_index)?);
+            } else if let Some(owner) = self.action(action)? {
                 owners.push(owner);
             }
         }
-        Ok(ScopeRelease { span: scope.span, owners })
+        Ok(ScopeRelease { span: scope.span, owners, arenas })
+    }
+
+    /// The release of the arena owner `binding_index`, from the capacity its
+    /// type names and the pointer width of the target; `None` when the type
+    /// names no concrete capacity.
+    fn arena(&self, binding_index: usize) -> Result<Option<ArenaRelease>, BackendContractError> {
+        let Some(type_name) = self.model.binding_type_names.get(&binding_index) else {
+            return Ok(None);
+        };
+        let Some(capacity) =
+            type_name.arguments.first().and_then(|capacity| capacity.name.parse::<u32>().ok())
+        else {
+            return Ok(None);
+        };
+        let Some(layout) =
+            crate::codegen::BackendLayoutProvider::layout_for(self.layouts, type_name)
+        else {
+            return Ok(None);
+        };
+        let name = self.name(binding_index)?;
+        Ok(Some(ArenaRelease { name, capacity, width: layout.size }))
     }
 
     fn drops(
@@ -188,9 +267,59 @@ impl Resolver<'_, '_> {
         Ok(releases)
     }
 
+    fn places(
+        &self,
+        places: &[PlaceReplacement],
+    ) -> Result<Vec<(SourceSpan, PlaceRelease)>, BackendContractError> {
+        let mut releases = Vec::new();
+        for place in places {
+            let steps = match &place.place {
+                ReplacedPlace::Field { owner_type, field, moved_fields } => {
+                    self.layouts.field_release_steps(owner_type, field, moved_fields)?
+                }
+                ReplacedPlace::Element { element_type } => {
+                    self.layouts.release_steps(Some(element_type), None, &[])?
+                }
+            };
+            if steps.is_empty() {
+                continue;
+            }
+            let action = LoweredCleanupInstruction::DropBinding {
+                binding_index: place.binding_index,
+                name: self.name(place.binding_index)?,
+            };
+            releases.push((place.span, PlaceRelease { action, steps }));
+        }
+        Ok(releases)
+    }
+
+    /// The release of each temporary, addressed from the value of the
+    /// expression that produced it. A temporary belongs to no binding, so its
+    /// action names none (`usize::MAX`); the action only tells the back ends
+    /// that a value is released.
+    fn temporaries(
+        &self,
+        temporaries: &[TemporaryRelease],
+    ) -> Result<Vec<(SourceSpan, SourceSpan, PlaceRelease)>, BackendContractError> {
+        let mut releases = Vec::new();
+        for temporary in temporaries {
+            let steps = self.layouts.release_steps(Some(&temporary.type_name), None, &[])?;
+            if steps.is_empty() {
+                continue;
+            }
+            let action = LoweredCleanupInstruction::DropBinding {
+                binding_index: usize::MAX,
+                name: "temporary".to_owned(),
+            };
+            let release = PlaceRelease { action, steps };
+            releases.push((temporary.span, temporary.release_after, release));
+        }
+        Ok(releases)
+    }
+
     /// The release of one action, or `None` when it releases nothing at run
-    /// time: a view ends, an arena's storage ends with its frame, and an
-    /// owner of a plain data type owns no resource.
+    /// time: a view ends, and an owner of a plain data type owns no resource.
+    /// An arena is released by `arena`.
     fn action(&self, action: &CleanupAction) -> Result<Option<OwnerRelease>, BackendContractError> {
         let (binding_index, steps, action) = match action {
             CleanupAction::EndBorrow { .. } | CleanupAction::ResetArena { .. } => return Ok(None),
