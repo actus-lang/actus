@@ -17,6 +17,9 @@ Common situations include:
 - joining branches with incompatible ownership states;
 - omitting a required role at a call site;
 - passing an aggregate or resource to scalar-copy syntax;
+- reading a struct, enum, pack, array or buffer field or element by value
+  through an `abs` view or an `ins` loan (`E1010`, `E1082`), which
+  `copy(value: abs view.field)` resolves for a `meta copy` type;
 - reading a struct or an enum after it moved into a binding, field, payload or
   `erg` argument (`E1005`), which `meta copy` and `copy(value: abs x)` resolve
   for plain data.

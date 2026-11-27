@@ -27,6 +27,7 @@ impl Analyzer {
             return Ok(());
         }
         let returned_expression = unwrap_grouping(expression);
+        self.reject_move_out_of_view(returned_expression, expression_span(returned_expression))?;
         let Expr::Identifier { name, span } = returned_expression else {
             if contains_returned_borrow(expression) {
                 return Err(SemanticError {

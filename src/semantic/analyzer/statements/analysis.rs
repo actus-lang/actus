@@ -223,6 +223,7 @@ impl Analyzer {
         // Visit the value first: an explicit `copy` is typed by its operand.
         self.visit_expression(value)?;
         self.validate_index_value(target, index, value)?;
+        self.reject_move_out_of_view(value, super::super::validation::expression_span(value))?;
         // A struct, enum or resource stored in an element moves (ADR-0124).
         if self.argument_moves_source(value, &element) {
             self.consume_owned_source(value, super::super::validation::expression_span(value))?;

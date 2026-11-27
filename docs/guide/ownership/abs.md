@@ -21,5 +21,15 @@ it comes from an `abs` parameter of the verb, as for a direct `-> abs` return
 (ADR-0021). A view of a local or of a value the verb owns is rejected with
 `E1018`.
 
+A view owns nothing, so a struct, enum, pack, array or buffer read from one of
+its fields or elements cannot be taken by value: `return parser.header;`,
+`erg x = parser.header;` or passing `parser.header` on would share the value
+silently. The compiler rejects these reads with `E1010` (`E1082` through an
+`ins` loan) and names the path. For a type declared
+[`meta copy`](../meta-attributes/copy.md) write the duplication,
+`copy(value: abs parser.header)`; for any other type keep borrowing it with
+`abs` (`abs h = ref parser.header;`, an `abs` argument) or take ownership of the
+parser instead. Scalar fields read through a view are unchanged.
+
 An `abs` view cannot be used as an `erg` owner, a `dat` transfer, or an `ins`
 loan. If a callee needs one of those meanings, declare that contract explicitly.

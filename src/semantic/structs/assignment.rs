@@ -130,6 +130,9 @@ impl Analyzer {
         // A struct, an enum or a resource moves out of its source exactly as
         // in a struct literal (ADR-0046 2.2, 3, ADR-0124); an `abs` field only
         // views it.
+        if struct_field.role != crate::ast::StructFieldRole::Abs {
+            self.reject_move_out_of_view(value, span)?;
+        }
         let owning = struct_field.role != crate::ast::StructFieldRole::Abs
             && self.argument_moves_source(value, &expected);
         if owning {

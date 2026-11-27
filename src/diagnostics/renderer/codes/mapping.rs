@@ -186,6 +186,10 @@ fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
         SemanticErrorKind::DropBorrow { .. } => DiagnosticCode::DROP_BORROW,
         SemanticErrorKind::DropFrozen { .. } => DiagnosticCode::DROP_FROZEN,
         SemanticErrorKind::InvalidDatArgument { .. } => DiagnosticCode::INVALID_DAT_ARGUMENT,
+        SemanticErrorKind::MoveOutOfView { loan: true, .. } => DiagnosticCode::ESCAPING_LOAN,
+        SemanticErrorKind::MoveOutOfView { loan: false, .. } => {
+            DiagnosticCode::INVALID_DAT_ARGUMENT
+        }
         SemanticErrorKind::ZeroOnDropFieldMove { .. } => DiagnosticCode::ZERO_ON_DROP_FIELD_MOVE,
         SemanticErrorKind::MoveFrozen { .. } | SemanticErrorKind::MutateFrozen { .. } => {
             DiagnosticCode::MOVE_OR_MUTATE_FROZEN

@@ -52,6 +52,8 @@ mod loop_moves;
 mod misleading_messages;
 #[path = "semantic/move_only_fields.rs"]
 mod move_only_fields;
+#[path = "semantic/move_out_of_view.rs"]
+mod move_out_of_view;
 #[path = "semantic/origins.rs"]
 mod origins;
 #[path = "semantic/packs.rs"]

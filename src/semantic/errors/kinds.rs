@@ -34,6 +34,16 @@ pub enum SemanticErrorKind {
     InvalidDatArgument {
         name: String,
     },
+    /// A struct, enum, pack, array or resource read by value through an `abs`
+    /// view or an `ins` loan. A view is not an owner (ADR-0016), so the read
+    /// would share the value silently (ADR-0124). `loan` is true for an
+    /// `ins` root, `copyable` when the field type is a copy type and
+    /// `copy(value: abs path)` is the fix.
+    MoveOutOfView {
+        path: String,
+        loan: bool,
+        copyable: bool,
+    },
     ZeroOnDropFieldMove {
         owner: String,
         field: String,

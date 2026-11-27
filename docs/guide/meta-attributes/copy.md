@@ -42,6 +42,11 @@ the copy does not change the original. A read, such as `header.payload_len`, a
 comparison, an `abs` argument or a `case` on an `abs` subject, does not move
 the source, so the original stays usable.
 
+A copy of a field is written the same way when the field is read through a view:
+`copy(value: abs parser.header)` with `abs parser`. Reading `parser.header` by
+value through an `abs` view or an `ins` loan without it is rejected (`E1010`,
+`E1082`), because a view cannot give up ownership and nothing was copied.
+
 `copy` on a type that is not a copy type is rejected with `E1021`. Scalars are
 copy types without a declaration and keep the rules of ADR-0059. An `Array` is a
 copy type when its element type is one, so `copy(value: abs values)` of an

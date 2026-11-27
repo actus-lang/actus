@@ -3,3 +3,4 @@ mod escaping_views;
 mod resources;
 mod returns;
 mod validation;
+mod view_reads;
