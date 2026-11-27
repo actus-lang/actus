@@ -194,7 +194,7 @@ fn assigning_a_resource_to_a_field_or_an_element_moves_its_source() {
 }
 
 #[test]
-fn assigning_plain_data_to_a_field_or_an_element_keeps_the_source() {
+fn assigning_an_explicit_copy_to_a_field_or_an_element_keeps_the_source() {
     let source = "meta copy struct Point { x: Int, } struct Holder { point: Point, } verb main() { erg point = Point { x: 1, }; erg holder = Holder { point: Point { x: 0, }, }; holder.point = copy(value: abs point); erg points: Array[Point, 2] = Array[Point, 2](); points[0u32] = copy(value: abs point); print(point.x); }";
     let (tokens, _) = scan(source);
     analyze(&parse(tokens).expect("source should parse"))

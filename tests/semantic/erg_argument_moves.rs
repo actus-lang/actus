@@ -124,7 +124,7 @@ fn an_erg_parameter_still_accepts_scalars_and_unused_owners() {
             "erg count: Int = 1; hold_scalar(held: count); hold_scalar(held: count); print(count);",
         ),
         (
-            "plain data struct copied explicitly",
+            "an explicit copy of a struct keeps the source",
             "erg plain = Inner { number: 1, }; erg duplicate = copy(value: abs plain); hold_plain(held: duplicate); print(plain.number);",
         ),
         (
