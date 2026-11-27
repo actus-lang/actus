@@ -186,30 +186,36 @@ fn fixture_resolves_nested_sibling_aliases_and_qualified_types() {
     fs::create_dir_all(root.join("src/parent/right/contract"))
         .expect("create right contract directory");
 
-    fs::write(root.join("src/parent/parent.act"), "open left; open right;\n")
+    fs::write(root.join("src/parent/parent.act"), "\"\"\"Re-export the left module declarations for the fixture project.\"\"\" open left; \"\"\"Re-export the right module declarations for the fixture project.\"\"\" open right;\n")
         .expect("write parent facade");
-    fs::write(root.join("src/parent/left/left.act"), "open contract;\n")
+    fs::write(root.join("src/parent/left/left.act"), "\"\"\"Re-export the contract module declarations for the fixture project.\"\"\" open contract;\n")
         .expect("write left facade");
-    fs::write(root.join("src/parent/right/right.act"), "open contract;\n")
+    fs::write(root.join("src/parent/right/right.act"), "\"\"\"Re-export the contract module declarations for the fixture project.\"\"\" open contract;\n")
         .expect("write right facade");
-    fs::write(root.join("src/parent/left/contract/contract.act"), "open api;\n")
-        .expect("write left contract facade");
+    fs::write(
+        root.join("src/parent/left/contract/contract.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .expect("write left contract facade");
     fs::write(
         root.join("src/parent/left/contract/api.act"),
-        "open verb left_value() -> Int { return 20; }\n",
+        "\"\"\"Return the fixed Int value that the left value fixture check expects.\"\"\" open verb left_value() -> Int { return 20; }\n",
     )
     .expect("write left contract");
-    fs::write(root.join("src/parent/right/contract/contract.act"), "open api;\n")
-        .expect("write right contract facade");
+    fs::write(
+        root.join("src/parent/right/contract/contract.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .expect("write right contract facade");
     fs::write(
         root.join("src/parent/right/contract/api.act"),
-        "open verb right_value() -> Int { return 22; }\n",
+        "\"\"\"Return the fixed Int value that the right value fixture check expects.\"\"\" open verb right_value() -> Int { return 22; }\n",
     )
     .expect("write right contract");
     fs::create_dir_all(root.join("src/types")).expect("create qualified type module");
-    fs::write(root.join("src/types/types.act"), "open envelope;\n")
+    fs::write(root.join("src/types/types.act"), "\"\"\"Re-export the envelope module declarations for the fixture project.\"\"\" open envelope;\n")
         .expect("write qualified type facade");
-    fs::write(root.join("src/types/envelope.act"), "open struct Envelope { value: Int, }\n")
+    fs::write(root.join("src/types/envelope.act"), "\"\"\"A fixture struct that holds one integer value.\"\"\" open struct Envelope { \"\"\"The integer value held by the envelope.\"\"\" value: Int, }\n")
         .expect("write qualified type");
     fs::write(
         root.join("tests/qualified_consumer.act"),
@@ -245,29 +251,35 @@ fn module_test_preserves_descendant_canonical_imports() {
         .expect("create right contract directory");
     fs::create_dir_all(root.join("src/types")).expect("create qualified type module");
 
-    fs::write(root.join("src/parent/parent.act"), "open left; open right;\n")
+    fs::write(root.join("src/parent/parent.act"), "\"\"\"Re-export the left module declarations for the fixture project.\"\"\" open left; \"\"\"Re-export the right module declarations for the fixture project.\"\"\" open right;\n")
         .expect("write parent facade");
-    fs::write(root.join("src/parent/left/left.act"), "open contract;\n")
+    fs::write(root.join("src/parent/left/left.act"), "\"\"\"Re-export the contract module declarations for the fixture project.\"\"\" open contract;\n")
         .expect("write left facade");
-    fs::write(root.join("src/parent/right/right.act"), "open contract;\n")
+    fs::write(root.join("src/parent/right/right.act"), "\"\"\"Re-export the contract module declarations for the fixture project.\"\"\" open contract;\n")
         .expect("write right facade");
-    fs::write(root.join("src/parent/left/contract/contract.act"), "open api;\n")
-        .expect("write left contract facade");
+    fs::write(
+        root.join("src/parent/left/contract/contract.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .expect("write left contract facade");
     fs::write(
         root.join("src/parent/left/contract/api.act"),
-        "open verb left_value() -> Int { return 20; }\n",
+        "\"\"\"Return the fixed Int value that the left value fixture check expects.\"\"\" open verb left_value() -> Int { return 20; }\n",
     )
     .expect("write left contract");
-    fs::write(root.join("src/parent/right/contract/contract.act"), "open api;\n")
-        .expect("write right contract facade");
+    fs::write(
+        root.join("src/parent/right/contract/contract.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .expect("write right contract facade");
     fs::write(
         root.join("src/parent/right/contract/api.act"),
-        "open verb right_value() -> Int { return 22; }\n",
+        "\"\"\"Return the fixed Int value that the right value fixture check expects.\"\"\" open verb right_value() -> Int { return 22; }\n",
     )
     .expect("write right contract");
-    fs::write(root.join("src/types/types.act"), "open envelope;\n")
+    fs::write(root.join("src/types/types.act"), "\"\"\"Re-export the envelope module declarations for the fixture project.\"\"\" open envelope;\n")
         .expect("write qualified type facade");
-    fs::write(root.join("src/types/envelope.act"), "open struct Envelope { value: Int, }\n")
+    fs::write(root.join("src/types/envelope.act"), "\"\"\"A fixture struct that holds one integer value.\"\"\" open struct Envelope { \"\"\"The integer value held by the envelope.\"\"\" value: Int, }\n")
         .expect("write qualified type");
     fs::write(
         root.join("src/parent/consumer.act"),

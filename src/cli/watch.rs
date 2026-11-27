@@ -41,7 +41,7 @@ pub(super) fn watch_command(arguments: impl Iterator<Item = String>) -> i32 {
     let (options, configuration) = match resolve_watch_options(options) {
         Ok(resolved) => resolved,
         Err(error) => {
-            errln!("error: {error}");
+            errln!("{error}");
             return 1;
         }
     };

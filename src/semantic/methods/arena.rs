@@ -60,6 +60,18 @@ impl Analyzer {
         self.arena_provenances(expression).into_iter().next()
     }
 
+    pub(in crate::semantic) fn record_binding_arena_provenance(
+        &mut self,
+        binding_index: usize,
+        expression: &Expr,
+    ) {
+        self.binding_arena_provenance.remove(&binding_index);
+        let arenas = self.arena_provenances(expression);
+        if arenas.len() == 1 {
+            self.binding_arena_provenance.insert(binding_index, *arenas.iter().next().unwrap());
+        }
+    }
+
     pub(crate) fn arena_provenances(&self, expression: &Expr) -> HashSet<usize> {
         match expression {
             Expr::Identifier { name, span } => self

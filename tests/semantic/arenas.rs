@@ -74,3 +74,108 @@ fn preserves_arena_provenance_through_ins_and_abs_bindings() {
     let view = model.bindings.iter().position(|binding| binding.name == "view").unwrap();
     assert_eq!(model.arena_provenance.get(&node), model.arena_provenance.get(&view));
 }
+
+const MOVE_PRELUDE: &str = "struct Node { value: Int, } struct Holder { erg held: Arena[64], } verb take(dat arena: Arena[64]) {} verb peek(ins arena: Arena[64]) {} verb look(abs arena: Arena[64]) {} ";
+
+fn analyze_with_prelude(body: &str) -> Result<actus::semantic::SemanticModel, SemanticErrorKind> {
+    analyze_source(&format!("{MOVE_PRELUDE}verb main() {{ {body} }}"))
+}
+
+const PLACE_NODE: &str =
+    "erg arena: Arena[64] = Arena[64](); erg node = arena.place(value: Node { value: 1, }); ";
+
+#[test]
+fn rejects_every_arena_move_while_a_view_is_live() {
+    for (label, consume) in [
+        ("dat argument", "take(arena: arena);"),
+        ("owner binding", "erg other = arena;"),
+        ("declared owner binding", "erg other: Arena[64] = arena;"),
+        ("assignment", "erg other: Arena[64] = Arena[64](); other = arena;"),
+        ("struct field", "erg holder = Holder { held: arena, };"),
+        ("overwrite", "arena = Arena[64]();"),
+        ("explicit drop", "drop(arena);"),
+        ("nested block drop", "{ drop(arena); }"),
+    ] {
+        let error = analyze_with_prelude(&format!(
+            "{PLACE_NODE}abs view = ref node; print(view.value); {consume}"
+        ))
+        .expect_err(label);
+        assert!(
+            matches!(&error, SemanticErrorKind::ArenaReferenceLive { arena, reference }
+                if arena == "arena" && reference == "view"),
+            "{label}: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn rejects_an_arena_move_while_an_ins_view_is_live() {
+    let error = analyze_with_prelude(
+        "erg arena: Arena[64] = Arena[64](); ins node = arena.place(value: Node { value: 1, }); abs view = ref node; take(arena: arena); print(view.value);",
+    )
+    .expect_err("an ins placement is a live view of the arena");
+    assert!(
+        matches!(error, SemanticErrorKind::ArenaReferenceLive { reference, .. } if reference == "node")
+    );
+}
+
+#[test]
+fn rejects_a_placed_value_read_after_its_arena_is_released() {
+    for (label, consume) in [
+        ("move", "take(arena: arena);"),
+        ("drop", "drop(arena);"),
+        ("block move", "{ erg other = arena; }"),
+    ] {
+        for read in ["print(node.value);", "abs again = ref node;", "erg copy = node;"] {
+            let error =
+                analyze_with_prelude(&format!("{PLACE_NODE}{consume} {read}")).expect_err(label);
+            assert!(
+                matches!(&error, SemanticErrorKind::ArenaReferenceReleased { arena, reference }
+                    if arena == "arena" && reference == "node"),
+                "{label} {read}: {error:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rejects_the_reported_move_with_a_live_view_and_a_later_read() {
+    let error = analyze_source(
+        "struct Node { value: Int, } verb take(dat arena: Arena[64]) {} verb main() { erg arena: Arena[64] = Arena[64](); erg node = arena.place(value: Node { value: 1, }); abs view = ref node; take(arena: arena); print(view.value); }",
+    )
+    .expect_err("the reported program must be rejected");
+    assert!(matches!(error, SemanticErrorKind::ArenaReferenceLive { arena, reference }
+        if arena == "arena" && reference == "view"));
+}
+
+#[test]
+fn ends_a_view_with_the_block_that_holds_it() {
+    for (label, consume) in [
+        ("drop", "drop(arena);"),
+        ("dat argument", "take(arena: arena);"),
+        ("owner binding", "erg other = arena;"),
+    ] {
+        analyze_with_prelude(&format!(
+            "{PLACE_NODE}{{ abs view = ref node; print(view.value); }} {consume}"
+        ))
+        .unwrap_or_else(|error| panic!("{label}: a closed block must not block: {error:?}"));
+    }
+}
+
+#[test]
+fn accepts_arena_uses_that_the_adr_allows() {
+    for (label, body) in [
+        (
+            "loan and view while a view is live",
+            "abs view = ref node; peek(arena: ins arena); look(arena: abs arena); print(view.value);",
+        ),
+        ("placed value read before the drop", "print(node.value); drop(arena);"),
+        ("placed value kept by the new owner", "erg other = arena; print(node.value);"),
+        ("unused placed value before a move", "take(arena: arena);"),
+        ("view in a nested block", "{ { abs view = ref node; print(view.value); } } drop(arena);"),
+        ("scope end release", "abs view = ref node; print(view.value);"),
+    ] {
+        analyze_with_prelude(&format!("{PLACE_NODE}{body}"))
+            .unwrap_or_else(|error| panic!("{label}: {error:?}"));
+    }
+}

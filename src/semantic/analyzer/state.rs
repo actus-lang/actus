@@ -31,12 +31,21 @@ pub(crate) struct Analyzer {
     pub(crate) constants: HashMap<String, crate::ast::TypeName>,
     pub(crate) constant_initializers: HashMap<String, crate::ast::Expr>,
     pub(crate) loop_boundaries: Vec<usize>,
+    /// Ownership of every binding when each enclosing loop was entered, so a
+    /// move that survives to the next iteration can be found (ADR-0016).
+    pub(crate) loop_entry_ownership: Vec<Vec<crate::semantic::state::OwnershipState>>,
+    /// The span of the latest move or drop of each binding, for the diagnostic
+    /// that reports a move carried into the next loop iteration.
+    pub(crate) ownership_change_spans: HashMap<usize, SourceSpan>,
     pub(crate) current_return_type: Option<BuiltinType>,
     pub(crate) current_return_type_name: Option<crate::ast::TypeName>,
     pub(crate) current_return_is_builtin_result: bool,
     pub(crate) current_return_access: Option<ReturnAccess>,
     pub(crate) current_abs_origins: HashMap<String, usize>,
     pub(crate) binding_origins: HashMap<usize, Origin>,
+    /// The origin of every view that an aggregate binding holds, so a returned
+    /// or stored value can be checked against its sources (ADR-0046 2.3).
+    pub(crate) binding_held_views: HashMap<usize, Vec<Origin>>,
     pub(crate) struct_types: HashMap<String, StructDef>,
     pub(crate) pack_types: HashMap<String, crate::ast::PackDecl>,
     pub(crate) enum_types: HashMap<String, EnumDef>,

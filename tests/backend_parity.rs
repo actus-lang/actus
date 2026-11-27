@@ -509,9 +509,12 @@ fn hosted_cli_backends_lower_qualified_imports_identically() {
         let root = fixture_root("qualified-imports", backend);
         let input = write_fixture(&root, backend, None, None, source);
         fs::create_dir_all(root.join("src/config")).expect("create config module directory");
-        fs::write(root.join("src/config/config.act"), "open values;\n")
-            .expect("write config facade");
-        fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
+        fs::write(
+            root.join("src/config/config.act"),
+            "\"\"\"Re-export the constants of the config module.\"\"\"\nopen values;\n",
+        )
+        .expect("write config facade");
+        fs::write(root.join("src/config/values.act"), "\"\"\"The limit that the qualified import fixture returns.\"\"\"\nopen const LIMIT: u8 = 30u8;\n")
             .expect("write config values");
         let output = root.join("main");
         let build = build(&root, &input, &output, "exe");
@@ -533,10 +536,14 @@ fn hosted_cli_backends_lower_qualified_enum_values_identically() {
         let root = fixture_root("qualified-enum", backend);
         let input = write_fixture(&root, backend, None, None, source);
         fs::create_dir_all(root.join("src/colors")).expect("create colors module directory");
-        fs::write(root.join("src/colors/colors.act"), "open api;\n").expect("write colors facade");
+        fs::write(
+            root.join("src/colors/colors.act"),
+            "\"\"\"Re-export the color declarations.\"\"\"\nopen api;\n",
+        )
+        .expect("write colors facade");
         fs::write(
             root.join("src/colors/api.act"),
-            "open enum Color { Red, Blue, } open verb score(erg value: Color) -> Int { return case dat value { Color.Red => 42, Color.Blue => 1, }; }\n",
+            "\"\"\"A color of the fixture palette.\"\"\"\nopen enum Color {\n    \"\"\"The red color.\"\"\"\n    Red,\n    \"\"\"The blue color.\"\"\"\n    Blue,\n}\n\n\"\"\"Score a color: 42 for red, 1 for blue; the verb consumes the color.\"\"\"\nopen verb score(erg value: Color) -> Int { return case dat value { Color.Red => 42, Color.Blue => 1, }; }\n",
         )
         .expect("write colors API");
         let output = root.join("main");
@@ -559,8 +566,12 @@ fn hosted_cli_backends_lower_qualified_aggregate_constructors_identically() {
         let root = fixture_root("qualified-aggregate", backend);
         let input = write_fixture(&root, backend, None, None, source);
         fs::create_dir_all(root.join("src/shapes")).expect("create shapes module directory");
-        fs::write(root.join("src/shapes/shapes.act"), "open api;\n").expect("write shapes facade");
-        fs::write(root.join("src/shapes/api.act"), "open struct Packet { value: Int, }\n")
+        fs::write(
+            root.join("src/shapes/shapes.act"),
+            "\"\"\"Re-export the packet declarations.\"\"\"\nopen api;\n",
+        )
+        .expect("write shapes facade");
+        fs::write(root.join("src/shapes/api.act"), "\"\"\"A packet that carries one integer.\"\"\"\nopen struct Packet {\n    \"\"\"The carried integer.\"\"\"\n    value: Int,\n}\n")
             .expect("write shapes API");
         let output = root.join("main");
         let build = build(&root, &input, &output, "exe");
@@ -582,11 +593,14 @@ fn hosted_cli_backends_lower_qualified_generic_calls_identically() {
         let root = fixture_root("qualified-generic", backend);
         let input = write_fixture(&root, backend, None, None, source);
         fs::create_dir_all(root.join("src/generic")).expect("create generic module directory");
-        fs::write(root.join("src/generic/generic.act"), "open api;\n")
-            .expect("write generic facade");
+        fs::write(
+            root.join("src/generic/generic.act"),
+            "\"\"\"Re-export the generic identity verb.\"\"\"\nopen api;\n",
+        )
+        .expect("write generic facade");
         fs::write(
             root.join("src/generic/api.act"),
-            "open verb identity[T](erg value: T) -> T { return value; }\n",
+            "\"\"\"Return the given value unchanged; the verb returns the owner it received.\"\"\"\nopen verb identity[T](erg value: T) -> T { return value; }\n",
         )
         .expect("write generic API");
         let output = root.join("main");

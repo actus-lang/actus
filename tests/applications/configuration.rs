@@ -7,10 +7,20 @@ fn package_configuration_module_emits_without_an_anchor_verb() {
     let source = "import { open config }; verb main() -> Int { return LIMIT as Int; }\n";
     let (root, input, output) = project("const-only-config", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
-    fs::write(root.join("src/config/values.act"), "open const LIMIT: u8 = 30u8;\n")
-        .expect("write configuration values");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        r#""""The limit that the application returns as its exit status."""
+open const LIMIT: u8 = 30u8;
+"#,
+    )
+    .expect("write configuration values");
 
     build(&root, &input, &output);
     let execution = run(&root, &output, b"");
@@ -45,11 +55,21 @@ fn package_configuration_supports_all_compile_time_consumers() {
     let source = "import { open config }; struct Settings { erg threshold: u8, } struct Storage[N: Usize] { erg values: Array[u8, N], } verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = LIMIT; erg settings = Settings { threshold: values[0], }; erg storage: Storage[2] = Storage[2] { values: Array[u8, 2](), }; storage.values[0] = settings.threshold; erg result = storage.values[0] as Int; if ENABLED == true { return result; } return 2; }\n";
     let (root, input, output) = project("config-acceptance", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
     fs::write(
         root.join("src/config/values.act"),
-        "open const LIMIT: u8 = 30u8; open const ENABLED: Bool = true;\n",
+        r#""""The limit that the application returns as its exit status."""
+open const LIMIT: u8 = 30u8;
+
+"""The switch that enables returning the limit."""
+open const ENABLED: Bool = true;
+"#,
     )
     .expect("write configuration values");
 
@@ -64,15 +84,35 @@ fn imported_module_can_lower_a_configuration_constant() {
     let source = "import { open worker }; verb main() -> Int { return read_magic(); }\n";
     let (root, input, output) = project("config-imported-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
-    fs::write(root.join("src/config/values.act"), "open const BRAIN_MAGIC: u32 = 42u32;\n")
-        .expect("write configuration values");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        r#""""The magic number that the worker module reads."""
+open const BRAIN_MAGIC: u32 = 42u32;
+"#,
+    )
+    .expect("write configuration values");
     fs::create_dir_all(root.join("src/worker")).expect("create worker module");
-    fs::write(root.join("src/worker/worker.act"), "open api;\n").expect("write worker facade");
+    fs::write(
+        root.join("src/worker/worker.act"),
+        r#""""Re-export the worker API."""
+open api;
+"#,
+    )
+    .expect("write worker facade");
     fs::write(
         root.join("src/worker/api.act"),
-        "import { open config }; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
+        r#"import { open config };
+
+"""Return the configured magic number as an integer."""
+open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }
+"#,
     )
     .expect("write worker implementation");
 
@@ -87,17 +127,42 @@ fn nested_imported_module_can_lower_a_configuration_constant() {
     let source = "import { open aie }; verb main() -> Int { return read_magic(); }\n";
     let (root, input, output) = project("config-nested-imported-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
-    fs::write(root.join("src/config/values.act"), "open const BRAIN_MAGIC: u32 = 42u32;\n")
-        .expect("write configuration values");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        r#""""The magic number that the worker module reads."""
+open const BRAIN_MAGIC: u32 = 42u32;
+"#,
+    )
+    .expect("write configuration values");
     fs::create_dir_all(root.join("src/aie/persistence")).expect("create nested module");
-    fs::write(root.join("src/aie/aie.act"), "open persistence;\n").expect("write aie facade");
-    fs::write(root.join("src/aie/persistence/persistence.act"), "open serialization;\n")
-        .expect("write persistence facade");
+    fs::write(
+        root.join("src/aie/aie.act"),
+        r#""""Re-export the persistence module."""
+open persistence;
+"#,
+    )
+    .expect("write aie facade");
+    fs::write(
+        root.join("src/aie/persistence/persistence.act"),
+        r#""""Re-export the serialization declarations."""
+open serialization;
+"#,
+    )
+    .expect("write persistence facade");
     fs::write(
         root.join("src/aie/persistence/serialization.act"),
-        "import { open config }; open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }\n",
+        r#"import { open config };
+
+"""Return the configured magic number as an integer."""
+open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }
+"#,
     )
     .expect("write serialization implementation");
 
@@ -112,16 +177,35 @@ fn canonical_parent_facade_exposes_nested_configuration_constant() {
     let source = "import { open feature }; verb main() -> Int { return stride() as Int; }\n";
     let (root, input, output) = project("canonical-constant-facade", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
-    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
-        .expect("write configuration values");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        r#""""The buffer stride, in bytes, that the feature module reads."""
+open const BUFFER_STRIDE: u16 = 24u16;
+"#,
+    )
+    .expect("write configuration values");
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
-    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
-        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/feature.act"),
+        r#""""Re-export the feature implementation."""
+open implementation;
+"#,
+    )
+    .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
-        "import { open config }; open verb stride() -> u16 { return BUFFER_STRIDE; }\n",
+        r#"import { open config };
+
+"""Return the configured buffer stride."""
+open verb stride() -> u16 { return BUFFER_STRIDE; }
+"#,
     )
     .expect("write feature implementation");
 
@@ -136,21 +220,39 @@ fn nested_facade_constant_has_object_and_executable_parity() {
     let source = "import { open feature }; verb main() -> Int { return inspect() as Int; }\n";
     let (root, input, output) = project("constant-native-parity", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
-    fs::write(root.join("src/config/values.act"), "open const BUFFER_STRIDE: u16 = 24u16;\n")
-        .expect("write configuration values");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        r#""""The buffer stride, in bytes, that the feature module reads."""
+open const BUFFER_STRIDE: u16 = 24u16;
+"#,
+    )
+    .expect("write configuration values");
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
-    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
-        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/feature.act"),
+        r#""""Re-export the feature implementation."""
+open implementation;
+"#,
+    )
+    .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
         r#"import { open config };
 
+"""A holder of the configured buffer stride."""
 open struct Settings {
+    """The stride copied from the configuration constant."""
     erg stride: u16,
 }
 
+"""Return the stride stored in a settings value built from the configuration constant."""
 open verb inspect() -> u16 {
     erg settings = Settings { stride: BUFFER_STRIDE, };
     if BUFFER_STRIDE == 24u16 {

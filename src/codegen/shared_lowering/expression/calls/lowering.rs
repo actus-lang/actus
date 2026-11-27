@@ -1,5 +1,6 @@
 use super::super::super::super::{
     BackendContractError, BackendExpressionProvider, BackendInstruction, BackendValueId,
+    BackendValueType,
 };
 use super::super::super::errors::{expression_span, unsupported};
 use super::super::SharedExpressionProvider;
@@ -139,7 +140,20 @@ fn lower_copy_call(
     let [argument] = arguments else {
         return Err(unsupported(span, "copy requires one value"));
     };
-    provider.lower_expression(&argument.expression, instructions)
+    let source = provider.lower_expression(&argument.expression, instructions)?;
+    // A struct or a pack is stored in memory that the source and the copy
+    // would share, so the copy gets storage of its own (ADR-0124). A scalar or
+    // an enum is a value, and an enum is never modified in place.
+    let Some(BackendValueType::Aggregate { layout }) = provider.value_type(source) else {
+        return Ok(source);
+    };
+    let copy = provider.allocate_value(BackendValueType::Aggregate { layout });
+    if let Some(type_name) = provider.nominal_type(source).cloned() {
+        provider.remember_nominal_type(copy, type_name);
+    }
+    instructions.push(BackendInstruction::AggregateCopy { result: copy, source, layout, span });
+    provider.remember_heap_owned_aggregate(copy, layout);
+    Ok(copy)
 }
 
 fn remember_return_metadata(

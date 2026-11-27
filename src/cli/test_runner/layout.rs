@@ -13,7 +13,7 @@ use crate::lexer::TokenKind;
 use crate::modules::{ModuleError, ModuleResolutionError, reject_test_verbs};
 use crate::session::CompilationSession;
 
-use super::super::conformance::validate_source_limits;
+use super::super::conformance::{validate_file_documentation, validate_source_limits};
 use super::TestOptions;
 use super::collection::localized_test_diagnostic;
 
@@ -218,6 +218,9 @@ fn validate_production_source(
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
     if !validate_source_limits(path, &source, options.mode, configuration) {
         return Err(format!("strict source-limit validation failed for `{}`", path.display()));
+    }
+    if !validate_file_documentation(path, &source, options.mode) {
+        return Err(format!("strict documentation validation failed for `{}`", path.display()));
     }
     let parsed = session.parse(path, &source);
     if !parsed.tokens().iter().any(|token| matches!(token.kind, TokenKind::Meta)) {

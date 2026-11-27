@@ -32,7 +32,7 @@ pub(crate) fn build_command(arguments: impl Iterator<Item = String>) -> i32 {
     let input_configuration = match configured_build(&options) {
         Ok(configuration) => configuration,
         Err(error) => {
-            errln!("error: {error}");
+            errln!("{error}");
             return 1;
         }
     };
@@ -53,7 +53,9 @@ fn configured_build(options: &BuildOptions) -> Result<CompilerConfiguration, Str
         |profile| configuration.clone().with_profile(profile),
     );
     match options.backend {
-        Some(backend) => configuration.with_backend(backend).map_err(|error| error.to_string()),
+        Some(backend) => {
+            configuration.with_backend(backend).map_err(|error| format!("error: {error}"))
+        }
         None => Ok(configuration),
     }
 }
@@ -65,30 +67,14 @@ fn build_input(options: &BuildOptions, configuration: &CompilerConfiguration) ->
         .unwrap_or_else(|| configuration.default_entry_path().display().to_string())
 }
 
+/// The error is the complete line to print.
 fn configuration_for_build(
     input: Option<&str>,
     mode: ConformanceMode,
 ) -> Result<CompilerConfiguration, String> {
-    let configuration = match input {
-        Some(path) if mode.is_strict() => {
-            CompilerConfiguration::from_input_path_strict(Path::new(path))
-                .map_err(|error| error.to_string())
-        }
-        Some(path) => CompilerConfiguration::from_input_path(Path::new(path))
-            .map_err(|error| error.to_string()),
-        None => {
-            let current = std::env::current_dir()
-                .map_err(|error| format!("cannot read current directory: {error}"))?;
-            if mode.is_strict() {
-                CompilerConfiguration::from_input_path_strict(&current)
-                    .map_err(|error| error.to_string())
-            } else {
-                CompilerConfiguration::from_input_path(&current).map_err(|error| error.to_string())
-            }
-        }
-    }?;
+    let configuration = super::super::input::configuration_for_input_with_mode(input, mode)?;
     if input.is_none() && !configuration.has_manifest() {
-        return Err("cannot discover Actus.toml from the current directory".to_owned());
+        return Err("error: cannot discover Actus.toml from the current directory".to_owned());
     }
     Ok(configuration)
 }

@@ -63,9 +63,6 @@ pub enum ModuleError {
         first: SourceSpan,
         second: SourceSpan,
     },
-    DuplicateObjectOwner {
-        module_path: String,
-    },
     PrivateDeclarationAccess {
         module: String,
         symbol: String,
@@ -189,9 +186,6 @@ impl Display for ModuleError {
             ),
             Self::ImportBindingCollision { binding, .. } => {
                 write_import_binding_error(formatter, binding)
-            }
-            Self::DuplicateObjectOwner { module_path } => {
-                write!(formatter, "duplicate object ownership for module `{module_path}`")
             }
             Self::PrivateDeclarationAccess { module, symbol, facade, .. } => {
                 write_private_access(formatter, module, symbol, facade)

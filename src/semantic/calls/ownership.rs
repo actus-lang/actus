@@ -34,7 +34,6 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, identifier_span)?;
-        self.ensure_access_available(index, name, span)?;
         self.reject_ins_dat_transfer(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
@@ -51,6 +50,7 @@ impl Analyzer {
                 span,
             });
         }
+        self.ensure_arena_references_inactive(index, name, span)?;
         self.update_dat_ownership(index, name, span)
     }
 
@@ -61,7 +61,10 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         match self.model.bindings[index].ownership.clone() {
-            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership = OwnershipState::Moved;
+                self.ownership_change_spans.insert(index, span);
+            }
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved
             | OwnershipState::Dropped => {
@@ -87,7 +90,6 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, object_span)?;
-        self.ensure_access_available(index, name, span)?;
         self.reject_ins_dat_transfer(index, name, span)?;
         self.validate_struct_field_move(object, field, span)?;
         let field_path = format_field_path(object, field);
@@ -125,6 +127,7 @@ impl Analyzer {
             OwnershipState::Active => {
                 self.model.bindings[index].ownership =
                     OwnershipState::PartiallyMoved { fields: vec![field_path] };
+                self.ownership_change_spans.insert(index, span);
                 Ok(())
             }
             OwnershipState::PartiallyMoved { fields } => {
@@ -158,6 +161,7 @@ impl Analyzer {
         let mut updated = fields;
         updated.push(field_path);
         self.model.bindings[index].ownership = OwnershipState::PartiallyMoved { fields: updated };
+        self.ownership_change_spans.insert(index, span);
         Ok(())
     }
 

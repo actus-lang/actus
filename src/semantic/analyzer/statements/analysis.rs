@@ -154,6 +154,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, span)?;
         self.ensure_mutable(index, name, span)?;
+        self.ensure_arena_references_inactive(index, name, span)?;
         self.reject_void_value(value)?;
         self.validate_binding_assignment(index, name, value, span)?;
         if let Some(expected) = self.binding_type_names.get(&index) {
@@ -162,7 +163,7 @@ impl Analyzer {
         self.visit_expression(value)?;
         self.move_aggregate_assignment_source(name, value, span)?;
         self.validate_arena_provenance_target(index, name, value, span)?;
-        self.record_binding_arena_provenance(index, value);
+        self.record_binding_provenance(index, value)?;
         self.plan_try_unwind(value);
         Ok(())
     }
@@ -192,17 +193,20 @@ impl Analyzer {
         Ok(())
     }
 
-    fn is_move_only_aggregate(&self, expression: &Expr) -> bool {
+    pub(in crate::semantic) fn is_move_only_aggregate(&self, expression: &Expr) -> bool {
         if let Expr::FieldAccess { object, .. } = expression
             && self.enum_receiver_name(object).is_some()
         {
             return false;
         }
         let Some(type_name) = self.expression_type_name(expression) else { return false };
-        type_name == "Buffer"
-            || type_name == "Array"
-            || self.struct_types.contains_key(&type_name)
-            || self.enum_types.contains_key(&type_name)
+        // A generic instance such as `Array[Int, 4]` or `Option[Buffer]` is
+        // move-only like its declaration, so only the head of the name counts.
+        let head = type_name.split('[').next().unwrap_or(&type_name);
+        matches!(head, "Buffer" | "Arena" | "Array")
+            || self.struct_types.contains_key(head)
+            || self.enum_types.contains_key(head)
+            || self.pack_types.contains_key(head)
     }
 
     fn visit_index_assignment(
@@ -215,8 +219,14 @@ impl Analyzer {
         self.visit_expression(target)?;
         self.visit_expression(index)?;
         self.reject_void_value(value)?;
-        self.validate_index_value(target, index, value)?;
+        let element = self.validate_index_access(target, index)?;
+        // Visit the value first: an explicit `copy` is typed by its operand.
         self.visit_expression(value)?;
+        self.validate_index_value(target, index, value)?;
+        // A struct, enum or resource stored in an element moves (ADR-0124).
+        if self.argument_moves_source(value, &element) {
+            self.consume_owned_source(value, super::super::validation::expression_span(value))?;
+        }
         self.plan_try_unwind(value);
         Ok(())
     }
@@ -310,7 +320,8 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         if *role == Role::Erg {
-            self.initialize_owner(initializer, span)?;
+            // A struct or enum read from a field moves by its field path.
+            self.consume_owned_source(initializer, span)?;
         }
         if *role == Role::Abs {
             self.register_borrow(initializer, span)?;
@@ -344,7 +355,7 @@ impl Analyzer {
         } else {
             self.record_inferred_binding_type(binding_index, initializer, span);
         }
-        self.record_binding_arena_provenance(binding_index, initializer);
+        self.record_binding_provenance(binding_index, initializer)?;
         self.record_arena_binding(declared_type, binding_index);
         self.record_origin_binding(role, name, initializer, span)
     }
@@ -397,14 +408,6 @@ impl Analyzer {
     fn plan_try_unwind(&mut self, expression: &Expr) {
         if let Expr::Try { span, .. } = expression {
             self.plan_return_unwind(*span);
-        }
-    }
-
-    fn record_binding_arena_provenance(&mut self, binding_index: usize, expression: &Expr) {
-        self.binding_arena_provenance.remove(&binding_index);
-        let arenas = self.arena_provenances(expression);
-        if arenas.len() == 1 {
-            self.binding_arena_provenance.insert(binding_index, *arenas.iter().next().unwrap());
         }
     }
 
@@ -480,6 +483,8 @@ impl Analyzer {
         self.discarded_expression = previous;
         self.expression_value_consumed = previous_consumed;
         result?;
+        // A bare literal statement, such as the tail of an `if` branch, is an `Int`.
+        self.validate_default_integer_literal(expression)?;
         if matches!(expression, Expr::Try { .. }) {
             self.plan_return_unwind(span);
         }

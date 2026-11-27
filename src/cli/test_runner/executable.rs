@@ -54,8 +54,12 @@ fn emit_unit_object(
             .map_err(|error| diagnostic(semantic_diagnostic(&error)))?;
     crate::semantic::analyze_resolved(&caller)
         .map_err(|error| diagnostic(semantic_diagnostic(&error)))?;
-    crate::modules::validate_compilation_plan(&plan, configuration.target())
-        .map_err(|error| diagnostic(crate::diagnostics::module_diagnostic(&error)))?;
+    crate::modules::validate_compilation_plan(
+        &plan,
+        configuration.target(),
+        configuration.native_backend().backend().name(),
+    )
+    .map_err(|error| diagnostic(crate::diagnostics::module_diagnostic(&error)))?;
     // A hosted test executable reports a failed runtime check with its source
     // location, as `actus build` does (ADR-0117); freestanding tests trap.
     let check_locations = matches!(configuration.entry_contract(), EntryContract::Hosted)
@@ -86,7 +90,7 @@ pub(super) fn build_executable(
         .map_err(|error| format!("cannot write test object: {error}"))
         .and_then(|()| {
             link_objects(&[object_path.as_path()], &built.executable, configuration)
-                .map_err(|error| error.to_string())
+                .map_err(|error| error.report().unwrap_or_else(|| error.to_string()))
         });
     if keep_artifacts() {
         return linked.map(|()| built);

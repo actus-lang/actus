@@ -15,6 +15,9 @@ pub enum SemanticErrorKind {
     UseAfterMove {
         name: String,
     },
+    MovedInPreviousIteration {
+        name: String,
+    },
     UseAfterDrop {
         name: String,
     },
@@ -61,10 +64,6 @@ pub enum SemanticErrorKind {
     },
     InvalidAbsReturnOrigin {
         reason: String,
-    },
-    SuspendedAccess {
-        name: String,
-        loan_id: usize,
     },
     ExclusiveLoanAlias {
         name: String,
@@ -139,9 +138,6 @@ pub enum SemanticErrorKind {
         name: String,
     },
     UnknownType {
-        name: String,
-    },
-    MalformedTypeName {
         name: String,
     },
     UnknownTypeParameter {
@@ -230,9 +226,6 @@ pub enum SemanticErrorKind {
     DuplicateStructName {
         name: String,
     },
-    DuplicateEnumName {
-        name: String,
-    },
     DuplicatePackName {
         name: String,
     },
@@ -263,6 +256,10 @@ pub enum SemanticErrorKind {
         role: String,
     },
     InvalidReprC {
+        declaration: String,
+        reason: String,
+    },
+    InvalidCopyType {
         declaration: String,
         reason: String,
     },
@@ -365,6 +362,10 @@ pub enum SemanticErrorKind {
         arena: String,
         reference: String,
     },
+    ArenaReferenceReleased {
+        arena: String,
+        reference: String,
+    },
     InvalidFieldAssignmentTarget {
         field: String,
     },
@@ -419,11 +420,6 @@ pub enum SemanticErrorKind {
         pattern: String,
     },
     PatternTypeMismatch {
-        expected: String,
-        found: String,
-    },
-    PatternBindingTypeMismatch {
-        binding: String,
         expected: String,
         found: String,
     },
@@ -483,11 +479,6 @@ pub enum SemanticErrorKind {
         pack: String,
         start: u16,
         end: u16,
-    },
-    InvalidPackFieldRole {
-        pack: String,
-        field: String,
-        role: String,
     },
     InvalidSerializationContract {
         contract: String,

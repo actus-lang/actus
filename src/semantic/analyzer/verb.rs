@@ -117,6 +117,11 @@ impl Analyzer {
                 let index = self.binding(&parameter.name, parameter.span)?;
                 self.binding_dynamic_roles.insert(index, parameter.ty.name.clone());
             }
+            if matches!(parameter.role, crate::ast::Role::Erg | crate::ast::Role::Dat)
+                && self.type_holds_view(&parameter_type)
+            {
+                self.binding_held_views.insert(index, vec![super::super::model::Origin::Unknown]);
+            }
             self.record_struct_binding(&parameter.name, &parameter_type, parameter.span)?;
             self.record_enum_binding(&parameter.name, &parameter_type, parameter.span)?;
             if let Ok(index) = self.binding(&parameter.name, parameter.span)

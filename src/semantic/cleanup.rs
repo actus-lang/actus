@@ -61,21 +61,33 @@ pub(super) fn plan_scope_cleanup(
             field: field.clone(),
         },
     ));
-    actions.extend(binding_indices.iter().rev().filter_map(|index| {
-        let binding = &bindings[*index];
-        let owned = matches!(binding.role, Role::Erg | Role::Dat);
-        let live = matches!(
-            binding.ownership,
-            OwnershipState::Active | OwnershipState::PartiallyMoved { .. }
-        );
-        (owned && live).then_some(CleanupAction::DropBinding { binding_index: *index })
-    }));
-    actions.extend(binding_indices.iter().rev().filter_map(|index| {
-        binding_type_names
-            .get(index)
-            .filter(|type_name| type_name.name == "Arena")
-            .map(|_| CleanupAction::ResetArena { binding_index: *index })
-    }));
+    // Only the live owner of a resource is cleaned up, exactly once (ADR-0027).
+    // A moved or dropped owner and an `abs` or `ins` view hand the resource to
+    // someone else, so neither a drop nor an arena reset is planned for them.
+    let live_owners = binding_indices
+        .iter()
+        .rev()
+        .copied()
+        .filter(|index| {
+            let binding = &bindings[*index];
+            matches!(binding.role, Role::Erg | Role::Dat)
+                && matches!(
+                    binding.ownership,
+                    OwnershipState::Active | OwnershipState::PartiallyMoved { .. }
+                )
+        })
+        .collect::<Vec<_>>();
+    actions.extend(
+        live_owners.iter().map(|index| CleanupAction::DropBinding { binding_index: *index }),
+    );
+    actions.extend(
+        live_owners
+            .iter()
+            .filter(|index| {
+                binding_type_names.get(*index).is_some_and(|type_name| type_name.name == "Arena")
+            })
+            .map(|index| CleanupAction::ResetArena { binding_index: *index }),
+    );
     ScopeCleanup { depth, span, actions }
 }
 

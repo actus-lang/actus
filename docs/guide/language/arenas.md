@@ -122,9 +122,34 @@ verb invalid_lifetime() -> Int {
 ```
 
 The compiler rejects this program because `view` is still live when `arena` is
-explicitly dropped. The same rule applies at an ordinary scope boundary. Move
-or end the view before destroying the arena; do not copy a reference into a
-separate owner to bypass the lifetime check.
+explicitly dropped (E1079). The same rule applies to every move of the arena: a
+`dat` argument, `erg other = arena`, an assignment, or a struct field that
+takes it. A view is live until the end of the block that holds it, so end the
+view in its own block before the arena is moved or dropped:
+
+```actus
+verb valid_lifetime() -> Int {
+    erg arena: Arena[128] = Arena[128]();
+    erg node = arena.place(value: Node { value: 1, });
+    erg seen: Int = 0;
+    {
+        abs view = ref node;
+        seen = view.value;
+    }
+    drop(arena);
+    return seen;
+}
+```
+
+An arena is a resource with exactly one owner, so every field that receives it
+moves it, whether the field is declared `erg` or has no role. After
+`erg holder = Holder { held: arena, };` the name `arena` is moved, cannot place
+or be dropped, and is not reset again at the end of its scope: only the owner
+that is still live at the end of a scope releases the arena, exactly once.
+
+A value placed in the arena, such as `node`, must not be read after the arena
+was moved away or dropped. Do not copy a reference into a separate owner to
+bypass the lifetime check.
 
 Arena cleanup is deterministic and follows Actus scope cleanup. It does not
 scan the program for unreachable objects and does not reclaim individual nodes

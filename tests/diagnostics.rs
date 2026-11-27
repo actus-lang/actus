@@ -59,7 +59,7 @@ fn renders_malformed_float_suffix_with_a_stable_lexical_code() {
     let error = errors.first().expect("invalid float suffix should be diagnosed");
     let diagnostic = lex_diagnostic(error);
 
-    assert_eq!(diagnostic.code(), "E0006");
+    assert_eq!(diagnostic.code(), "E0027");
     assert_eq!(diagnostic.phase(), DiagnosticPhase::Lexical);
     assert_eq!(diagnostic.span(), SourceSpan::new(31, 34));
 }
@@ -77,20 +77,6 @@ fn renders_unknown_verb_diagnostics_with_a_stable_code() {
         "error[E1069] at 1:15: unknown verb `missing_verb`"
     );
     assert_eq!(semantic_diagnostic(&error).code(), "E1069");
-}
-
-#[test]
-fn renders_malformed_type_name_diagnostics_with_a_stable_code() {
-    let error = actus::semantic::SemanticError {
-        kind: SemanticErrorKind::MalformedTypeName { name: "Box[".to_owned() },
-        span: SourceSpan::new(0, 4),
-    };
-
-    assert_eq!(
-        render_semantic_error("Box[", &error),
-        "error[E1080] at 1:1: malformed type name `Box[`"
-    );
-    assert_eq!(semantic_diagnostic(&error).code(), "E1080");
 }
 
 #[test]
@@ -482,4 +468,63 @@ fn renders_exclusive_loan_alias_diagnostic() {
         render_semantic_error(source, &error),
         "error[E1065] at 1:124: exclusive loan aliases resource `buffer` more than once"
     );
+}
+
+fn lexical_code(source: &str) -> String {
+    let (_, errors) = scan(source);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    lex_diagnostic(&errors[0]).code().to_owned()
+}
+
+#[test]
+fn unterminated_doc_string_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("\"\"\"missing terminator"), "E0024");
+}
+
+#[test]
+fn invalid_integer_type_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("u0"), "E0025");
+}
+
+#[test]
+fn invalid_hexadecimal_literal_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("0x12G"), "E0026");
+}
+
+#[test]
+fn invalid_float_type_has_its_own_lexical_code() {
+    assert_eq!(lexical_code("1.5f16"), "E0027");
+}
+
+#[test]
+fn moving_a_field_out_of_a_zero_on_drop_owner_has_its_own_code() {
+    let source = "meta repr(C) meta zero_on_drop struct Secret { key_a: u64, } verb take(dat value: u64) { } verb main() { erg secret = Secret { key_a: 1u64 }; take(value: dat secret.key_a); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty());
+    let program = parse(tokens).expect("source should parse");
+    let error = analyze(&program).expect_err("moving a zero_on_drop field must fail");
+
+    assert!(matches!(error.kind, SemanticErrorKind::ZeroOnDropFieldMove { .. }));
+    assert_eq!(semantic_diagnostic(&error).code(), "E1145");
+}
+
+#[test]
+fn a_diagnostic_without_a_location_renders_without_line_and_column() {
+    let diagnostic = Diagnostic::error("E1806", SourceSpan::new(0, 0), "unverified toolchain")
+        .with_suggestion("run the bootstrap script");
+
+    assert_eq!(
+        actus::diagnostics::render_unlocated_diagnostic(&diagnostic),
+        "error[E1806]: unverified toolchain; help: run the bootstrap script"
+    );
+}
+
+#[test]
+fn strict_policy_promotes_a_warning_to_an_error() {
+    let warning = Diagnostic::warning("E1850", SourceSpan::new(0, 4), "large file");
+    let promoted = warning.clone().promoted_to_error();
+
+    assert_eq!(warning.severity(), DiagnosticSeverity::Warning);
+    assert_eq!(promoted.severity(), DiagnosticSeverity::Error);
+    assert_eq!(render_diagnostic("text", &promoted), "error[E1850] at 1:1: large file");
 }

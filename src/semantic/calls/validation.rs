@@ -19,7 +19,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let Some((name, object_span)) = root_binding(object) else { return Ok(()) };
         let index = self.binding(name, object_span)?;
-        self.ensure_access_available(index, name, span)?;
+        self.ensure_arena_alive(index, name, span)?;
         let field_path = format_field_path(object, field);
         match &self.model.bindings[index].ownership {
             OwnershipState::Active => Ok(()),
@@ -144,8 +144,36 @@ impl Analyzer {
                 span: argument_span(argument),
             });
         }
-        if self.enum_payload_owns_value(payload_type) {
-            self.initialize_owner(&argument.expression, argument_span(argument))?;
+        self.store_enum_payload(payload_type, &argument.expression, argument_span(argument))
+    }
+
+    /// Moves every argument that a `dat` or `erg` parameter takes over.
+    fn move_transferred_arguments(
+        &mut self,
+        arguments: &[Argument],
+        parameter_indices: &[usize],
+        signature: &VerbSignature,
+    ) -> Result<(), SemanticError> {
+        for (argument, parameter_index) in arguments.iter().zip(parameter_indices) {
+            match signature.params[*parameter_index].1 {
+                Role::Dat => {
+                    self.move_dat_argument(&argument.expression, argument_span(argument))?;
+                }
+                // An `erg` parameter is a new owner inside the callee, which
+                // cleans it up at its scope end (ADR-0016, ADR-0059). A struct,
+                // an enum or an argument that holds a resource therefore
+                // leaves the caller as for `dat` (ADR-0124); a scalar is read
+                // and stays usable.
+                Role::Erg
+                    if self.argument_moves_source(
+                        &argument.expression,
+                        &signature.params[*parameter_index].2,
+                    ) =>
+                {
+                    self.consume_owned_source(&argument.expression, argument_span(argument))?;
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
@@ -173,11 +201,7 @@ impl Analyzer {
             self.validate_call_argument(callee, argument, *parameter_index, signature)?;
         }
         self.validate_exclusive_aliases(&resolved_arguments, &parameter_indices, signature)?;
-        for (argument, parameter_index) in resolved_arguments.iter().zip(&parameter_indices) {
-            if signature.params[*parameter_index].1 == Role::Dat {
-                self.move_dat_argument(&argument.expression, argument_span(argument))?;
-            }
-        }
+        self.move_transferred_arguments(&resolved_arguments, &parameter_indices, signature)?;
         self.execute_exclusive_loans(callee, &resolved_arguments, &parameter_indices, signature)?;
         if let Some(return_type) = &signature.return_type_name {
             let return_type = self.normalize_imported_type_name(return_type);

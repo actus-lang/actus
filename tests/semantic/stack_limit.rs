@@ -88,3 +88,16 @@ fn accepts_stack_limit_with_closed_dynamic_dispatch() {
     let source = "struct File { value: Int, } role Writer { verb write(abs self: File) -> Int; } perform Writer for File { verb write(abs self: File) -> Int { return self.value; } } meta stack_limit(bytes: 256u32) verb send(abs writer: dynamic Writer) -> Int { return writer.write(); }";
     analyze_source(source).expect("a closed dynamic dispatch set should be accepted");
 }
+
+#[test]
+fn the_unsupported_stack_limit_target_error_points_at_the_declaration() {
+    let source = "verb first() -> Int { return 1; } meta stack_limit(bytes: 256u32) verb main() -> Int { return 0; }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let program = parse(tokens).expect("fixture should parse");
+    let target = TargetSpec::parse("aarch64-unknown-linux-gnu").expect("target should parse");
+    let error = validate_stack_limit_backend_target(&program, &target, "llvm")
+        .expect_err("llvm does not prove stack_limit for aarch64");
+    assert!(error.span.start > 0, "the error must not carry the empty span 0..0");
+    assert!(source[error.span.start..].starts_with("verb main"));
+}

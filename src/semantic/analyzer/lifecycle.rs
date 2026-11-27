@@ -91,6 +91,7 @@ impl Analyzer {
         self.validate_repr_declarations()?;
         self.validate_role_declarations()?;
         self.validate_performances(program)?;
+        self.validate_copy_declarations()?;
         self.validate_recursive_types()?;
         self.register_declarations(program)?;
         self.collect_dynamic_roles(program);

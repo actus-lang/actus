@@ -59,13 +59,27 @@ pub(super) struct LinkedProgram {
     pub(super) local_symbols: std::collections::BTreeSet<String>,
 }
 
+/// A semantic error met while emitting, after the plan was validated, as
+/// `error[E####]: message` and never as Debug output.
+fn semantic_failure(error: crate::semantic::SemanticError) -> BackendEmitError {
+    BackendEmitError(format!(
+        "semantic analysis failed: {}",
+        crate::diagnostics::render_unlocated_semantic_error(&error)
+    ))
+}
+
 pub(super) fn generic_inputs(
     plan: &crate::modules::ModuleCompilationPlan,
     configuration: &CompilerConfiguration,
 ) -> Result<(Vec<crate::ast::TypeName>, Vec<crate::semantic::GenericInstance>), BackendEmitError> {
-    let object_plan = plan
-        .object_plan()
-        .map_err(|error| BackendEmitError(format!("module object planning failed: {error:?}")))?;
+    let object_plan = plan.object_plan().map_err(|error| {
+        BackendEmitError(format!(
+            "module object planning failed: {}",
+            crate::diagnostics::render_unlocated_diagnostic(
+                &crate::diagnostics::module_diagnostic(&error)
+            )
+        ))
+    })?;
     let mut unique_instances = Vec::new();
     let mut combined_program =
         crate::ast::Program { file_metadata: Vec::new(), declarations: Vec::new() };
@@ -74,11 +88,11 @@ pub(super) fn generic_inputs(
             unit.program(),
             configuration.target(),
         )
-        .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
+        .map_err(semantic_failure)?;
         let expansion_program = crate::codegen::normalize_program(&targeted);
         combined_program.declarations.extend(expansion_program.declarations.clone());
         let generic_instances = crate::semantic::analyze_resolved(&expansion_program)
-            .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?
+            .map_err(semantic_failure)?
             .generic_instances;
         let expanded_instances =
             crate::codegen::expand_generic_instances(&expansion_program, &generic_instances)?;
@@ -163,13 +177,13 @@ fn lower_unit_module(
         unit.program(),
         context.configuration.target(),
     )
-    .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
+    .map_err(semantic_failure)?;
     crate::semantic::validate_stack_limit_backend_target(
         &targeted_program,
         context.configuration.target(),
         context.backend,
     )
-    .map_err(|error| BackendEmitError(format!("semantic analysis failed: {error:?}")))?;
+    .map_err(semantic_failure)?;
     let targeted = crate::codegen::normalize_program(&targeted_program);
     let program = crate::codegen::specialize_program(&targeted, context.generic_instances)?;
     let performance_context = (index != 0).then(|| {

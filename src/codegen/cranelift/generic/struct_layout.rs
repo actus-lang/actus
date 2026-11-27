@@ -22,7 +22,12 @@ impl GenericLayoutRegistry {
             arguments,
             definition.span,
         )
-        .map_err(|error| BackendEmitError(format!("generic substitution failed: {error:?}")))?;
+        .map_err(|error| {
+            BackendEmitError(format!(
+                "generic substitution failed: {}",
+                crate::diagnostics::render_unlocated_semantic_error(&error)
+            ))
+        })?;
         let result = self.layout_struct_fields(definition, &substitution, visiting);
         visiting.pop();
         result.map(|(size, alignment, fields)| GenericStructLayout {

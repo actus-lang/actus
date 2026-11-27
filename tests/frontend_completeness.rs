@@ -462,7 +462,7 @@ fn imported_facades_preserve_effectful_public_signatures() {
 #[test]
 fn name_resolution_rules_have_positive_and_negative_fixtures() {
     analyze_source(
-        "struct Point { x: Int, } verb known(erg point: Point) { } verb main() -> Int { erg point = Point { x: 1, }; known(point: point); return point.x; }",
+        "meta copy struct Point { x: Int, } verb known(erg point: Point) { } verb main() -> Int { erg point = Point { x: 1, }; erg duplicate = copy(value: abs point); known(point: duplicate); return point.x; }",
     )
     .expect("known types, fields, and verbs should pass");
 
@@ -615,11 +615,6 @@ fn conditional_and_compound_syntax_fail_with_stable_parser_diagnostics() {
 fn malformed_generic_keys_and_primitive_rules_have_fixtures() {
     analyze_source("struct Box[T] { item: T, } verb main(erg item: Box[Int]) { }")
         .expect("well-formed generic key should pass");
-    let malformed = SemanticError {
-        kind: SemanticErrorKind::MalformedTypeName { name: "Box[".to_owned() },
-        span: actus::lexer::SourceSpan::new(0, 4),
-    };
-    assert_eq!(semantic_diagnostic(&malformed).code(), "E1080");
 
     analyze_source("verb main(erg bits: u1, erg signed: i8, erg decimal: f32) { }")
         .expect("supported widths and signedness should pass");

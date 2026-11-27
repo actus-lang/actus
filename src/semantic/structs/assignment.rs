@@ -18,7 +18,8 @@ impl Analyzer {
         }
         self.ensure_struct_field_mutable(&struct_name, field, span)?;
         self.validate_struct_field_assignment(object, &struct_name, field, value, span)?;
-        self.record_field_arena_provenance(object, field, value, span)
+        self.record_field_arena_provenance(object, field, value, span)?;
+        self.record_field_view_provenance(object, value)
     }
 
     fn validate_assignment_target(
@@ -82,7 +83,6 @@ impl Analyzer {
         field: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.ensure_access_available(binding_index, name, span)?;
         if !matches!(self.model.bindings[binding_index].role, Role::Erg | Role::Ins) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidFieldAssignmentTarget { field: field.to_owned() },
@@ -126,7 +126,16 @@ impl Analyzer {
             .resolved_type_name(object)
             .and_then(|type_name| self.specialized_field_type(&type_name, field))
             .unwrap_or_else(|| struct_field.ty.clone());
-        self.validate_field_value_type(struct_name, &struct_field, &expected, value, span)
+        self.validate_field_value_type(struct_name, &struct_field, &expected, value, span)?;
+        // A struct, an enum or a resource moves out of its source exactly as
+        // in a struct literal (ADR-0046 2.2, 3, ADR-0124); an `abs` field only
+        // views it.
+        let owning = struct_field.role != crate::ast::StructFieldRole::Abs
+            && self.argument_moves_source(value, &expected);
+        if owning {
+            self.consume_owned_source(value, span)?;
+        }
+        Ok(())
     }
 
     fn validate_pack_field_assignment(

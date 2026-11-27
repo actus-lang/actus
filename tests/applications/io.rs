@@ -96,10 +96,21 @@ fn module_application_executes_public_wrapper_with_private_implementation() {
     let source = "import { open math }; verb main() -> Int { return add(); }\n";
     let (root, input, output) = project("module-wrapper", source);
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
-    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
+    fs::write(
+        root.join("src/math/math.act"),
+        r#""""Re-export the math API."""
+open api;
+"#,
+    )
+    .expect("write module facade");
     fs::write(
         root.join("src/math/api.act"),
-        "open verb add() -> Int { return hidden(); } verb hidden() -> Int { return 42; }\n",
+        r#""""Return 42 by calling the private implementation."""
+open verb add() -> Int { return hidden(); }
+
+"""Return the constant 42 for the public wrapper."""
+verb hidden() -> Int { return 42; }
+"#,
     )
     .expect("write module implementation");
     build(&root, &input, &output);

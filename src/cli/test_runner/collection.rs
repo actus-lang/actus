@@ -318,7 +318,7 @@ fn parse_source_error(
 ) -> String {
     let diagnostic = crate::diagnostics::parse_diagnostic(&error);
     source_map.lock().localize(&diagnostic).map_or_else(
-        || format!("cannot parse `{}`: {error:?}", path.display()),
+        || format!("{}: {}", path.display(), render_diagnostic("", &diagnostic)),
         |(localized_path, source, diagnostic)| {
             format!("{}: {}", localized_path.display(), render_diagnostic(&source, &diagnostic))
         },

@@ -5,7 +5,9 @@ use crate::build_graph::invalidate_stale_artifact;
 use crate::codegen::BackendEmitError;
 use crate::configuration::{CompilerConfiguration, EntryContract};
 
-use super::super::super::conformance::{ConformanceMode, validate_source_limits};
+use super::super::super::conformance::{
+    ConformanceMode, validate_package_documentation, validate_source_limits,
+};
 use super::super::artifacts::{default_output, write_artifact};
 use super::super::loading::{load_build_program, validate_plan};
 use super::super::options::EmitKind;
@@ -58,17 +60,21 @@ fn build_file_with_report(
     if !validate_source_limits(Path::new(input), &source, mode, configuration) {
         return 1;
     }
+    if !validate_plan(input, &source, &plan, configuration, &source_map) {
+        return 1;
+    }
+    // `validate_plan` already reported a target error with its location.
     let caller = match crate::semantic::filter_program_for_target_checked(
         plan.caller(),
         configuration.target(),
     ) {
         Ok(caller) => caller,
         Err(error) => {
-            errln!("error: semantic analysis failed: {error:?}");
+            errln!("{}", crate::diagnostics::render_unlocated_semantic_error(&error));
             return 1;
         }
     };
-    if !validate_plan(input, &source, &plan, configuration.target(), &source_map) {
+    if !validate_package_documentation(Path::new(input), &plan, mode) {
         return 1;
     }
     let Some(fallback_symbol) = first_defined_verb(&caller) else {
@@ -136,7 +142,7 @@ fn emit_and_write(
         }
     };
     if let Err(error) = write_artifact(input, &output, object, emit, configuration) {
-        errln!("error: {error}");
+        errln!("{error}");
         return 1;
     }
     if let Some(mode) = report_mode {

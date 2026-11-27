@@ -1,3 +1,8 @@
+"""
+Return the control value of the example as an integer. The value is the
+private safe default, so the verb takes no parameters, allocates nothing and
+has no side effects.
+"""
 open verb control_value() -> Int {
     return safe_default();
 }

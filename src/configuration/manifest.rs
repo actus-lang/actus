@@ -217,24 +217,37 @@ pub(crate) fn read_with_compiler_std(
 ) -> Result<ActusManifest, ConfigurationError> {
     let source = std::fs::read_to_string(path).map_err(|error| {
         ConfigurationError::new(format!("cannot read `{}`: {error}", path.display()))
+            .in_manifest(path)
     })?;
     let manifest = toml::from_str::<ActusManifest>(&source).map_err(|error| {
-        let message = error.to_string();
-        if message.contains("unknown variant")
+        // The parser's own message has no path and no code frame: the report
+        // names the manifest and the place (ADR-0123, one diagnostic format).
+        let message = error.message();
+        let failure = if message.contains("unknown variant")
             && message.contains("core")
             && message.contains("std")
         {
-            ConfigurationError::new(format!(
-                "unsupported runtime profile in `{}`: {message}",
-                path.display()
-            ))
+            ConfigurationError::coded(
+                crate::diagnostics::STRICT_RUNTIME_UNSUPPORTED,
+                format!("unsupported runtime profile: {message}"),
+            )
         } else {
-            ConfigurationError::new(format!("cannot parse `{}`: {message}", path.display()))
-        }
+            ConfigurationError::new(format!("cannot parse the manifest: {message}"))
+        };
+        let offset = error.span().map(|span| span.start);
+        // The parser's message does not always name the key it is about.
+        let key = offset.and_then(|offset| super::report::key_at(&source, offset));
+        let failure = match key {
+            Some(key) if !failure.message.contains(key.rsplit('.').next().unwrap_or(&key)) => {
+                ConfigurationError { message: format!("{} in `{key}`", failure.message), ..failure }
+            }
+            _ => failure,
+        };
+        failure.at_offset(offset).in_manifest(path)
     })?;
     let is_compiler_std = compiler_std_manifest.is_some_and(|allowed| same_path(path, allowed))
         || is_compiler_owned_std_manifest(path, &manifest);
-    validate(&manifest, is_compiler_std)?;
+    validate(&manifest, is_compiler_std).map_err(|error| error.in_manifest(path))?;
     Ok(manifest)
 }
 
@@ -257,23 +270,33 @@ fn validate_package(
     allow_compiler_owned_std: bool,
 ) -> Result<(), ConfigurationError> {
     if manifest.package.name.trim().is_empty() || manifest.package.version.trim().is_empty() {
+        let key = if manifest.package.name.trim().is_empty() {
+            "package.name"
+        } else {
+            "package.version"
+        };
         return Err(ConfigurationError::new(
             "Actus.toml package name and version must not be empty".to_owned(),
-        ));
+        )
+        .at_key(key));
     }
-    package_identity_name(&manifest.package.name, allow_compiler_owned_std)?;
+    package_identity_name(&manifest.package.name, allow_compiler_owned_std)
+        .map_err(|error| error.at_key("package.name"))?;
     if manifest.package.edition.as_deref().unwrap_or(DEFAULT_EDITION) != DEFAULT_EDITION {
         return Err(ConfigurationError::new(format!(
             "unsupported Actus edition; expected `{DEFAULT_EDITION}`"
-        )));
+        ))
+        .at_key("package.edition"));
     }
     if manifest.package.entry.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError::new("Actus.toml entry must not be empty".to_owned()));
+        return Err(ConfigurationError::new("Actus.toml entry must not be empty".to_owned())
+            .at_key("package.entry"));
     }
     if manifest.package.source_root.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError::new(
             "Actus.toml package.source_root must not be empty".to_owned(),
-        ));
+        )
+        .at_key("package.source_root"));
     }
     Ok(())
 }
@@ -323,22 +346,26 @@ pub(crate) fn is_compiler_owned_std_manifest(path: &Path, manifest: &ActusManife
 
 fn validate_build(manifest: &ActusManifest) -> Result<(), ConfigurationError> {
     if manifest.build.linker.as_deref().is_some_and(|value| value.trim().is_empty()) {
-        return Err(ConfigurationError::new("Actus.toml linker must not be empty".to_owned()));
+        return Err(ConfigurationError::new("Actus.toml linker must not be empty".to_owned())
+            .at_key("build.linker"));
     }
     if manifest.build.linker_script.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError::new(
             "Actus.toml linker_script must not be empty".to_owned(),
-        ));
+        )
+        .at_key("build.linker_script"));
     }
     if manifest.build.native_module.as_deref().is_some_and(|value| value.trim().is_empty()) {
         return Err(ConfigurationError::new(
             "Actus.toml native_module must not be empty".to_owned(),
-        ));
+        )
+        .at_key("build.native_module"));
     }
     if manifest.build.library_paths.iter().any(|path| path.trim().is_empty()) {
         return Err(ConfigurationError::new(
             "Actus.toml library_paths must not contain empty paths".to_owned(),
-        ));
+        )
+        .at_key("build.library_paths"));
     }
     Ok(())
 }

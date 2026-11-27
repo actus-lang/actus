@@ -1,1 +1,2 @@
+"""Re-export the arithmetic operations of the calc module."""
 open ops;

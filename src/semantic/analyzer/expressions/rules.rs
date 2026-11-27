@@ -91,7 +91,7 @@ pub(crate) fn cast_literal_fits(literal: &str, negative: bool, target: &str) -> 
         return !negative && magnitude <= u64::MAX as u128;
     }
     let Some(PrimitiveType::Integer { signed, width }) = primitive_type(target) else {
-        return true;
+        return false;
     };
     if signed {
         let positive_limit = (1u128 << (width - 1)) - 1;

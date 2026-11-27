@@ -104,6 +104,9 @@ fn arena_semantic_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::ArenaReferenceLive { arena, reference } => {
             format!("cannot move or drop arena `{arena}` while reference `{reference}` is live")
         }
+        SemanticErrorKind::ArenaReferenceReleased { arena, reference } => {
+            format!("`{reference}` is used after arena `{arena}` was moved or dropped")
+        }
         _ => return None,
     };
     Some(message)
@@ -144,9 +147,6 @@ fn enum_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
 
 fn enum_type_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
-        SemanticErrorKind::DuplicateEnumName { name } => {
-            format!("duplicate enum declaration `{name}`")
-        }
         SemanticErrorKind::EmptyEnum { name } => {
             format!("enum `{name}` must declare at least one variant")
         }
@@ -198,9 +198,6 @@ fn enum_pattern_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::PatternTypeMismatch { expected, found } => {
             format!("pattern type mismatch: expected `{expected}`, found `{found}`")
         }
-        SemanticErrorKind::PatternBindingTypeMismatch { binding, expected, found } => {
-            format!("pattern binding `{binding}` has type `{found}`, expected `{expected}`")
-        }
         SemanticErrorKind::InvalidCaseRole { mode, subject } => {
             format!("cannot use `{mode}` case deconstruction on `{subject}`")
         }
@@ -247,6 +244,9 @@ fn struct_declaration_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::InvalidReprC { declaration, reason } => {
             format!("invalid `repr(C)` declaration `{declaration}`: {reason}")
+        }
+        SemanticErrorKind::InvalidCopyType { declaration, reason } => {
+            format!("`meta copy` on `{declaration}` is invalid: {reason}")
         }
         _ => return None,
     };
@@ -373,7 +373,6 @@ fn type_result_message(kind: &SemanticErrorKind) -> Option<String> {
 fn type_contract_message(kind: &SemanticErrorKind) -> Option<String> {
     let message = match kind {
         SemanticErrorKind::UnknownType { name } => format!("unknown type `{name}`"),
-        SemanticErrorKind::MalformedTypeName { name } => format!("malformed type name `{name}`"),
         SemanticErrorKind::UnknownTypeParameter { name } => {
             format!("undeclared generic type parameter `{name}`")
         }

@@ -1,1 +1,2 @@
+"""Re-export the generic storage implementation of the runtime module."""
 open implementation;

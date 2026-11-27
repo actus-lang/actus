@@ -40,7 +40,10 @@ pub(crate) fn specialize_program(
                     crate::lexer::SourceSpan::new(0, 0),
                 )
                 .map_err(|error| {
-                    BackendEmitError(format!("call specialization failed: {error:?}"))
+                    BackendEmitError(format!(
+                        "call specialization failed: {}",
+                        crate::diagnostics::render_unlocated_semantic_error(&error)
+                    ))
                 })?;
                 let substitution = substitution
                     .with_call_bindings(&call_bindings)
@@ -152,7 +155,10 @@ fn expand_transitive_once(
             crate::lexer::SourceSpan::new(0, 0),
         )
         .map_err(|error| {
-            BackendEmitError(format!("generic instance expansion failed: {error:?}"))
+            BackendEmitError(format!(
+                "generic instance expansion failed: {}",
+                crate::diagnostics::render_unlocated_semantic_error(&error)
+            ))
         })?;
         for nested_template in snapshot
             .iter()
@@ -245,7 +251,12 @@ fn specialize_external_verb(
         &instance.arguments,
         verb.span,
     )
-    .map_err(|error| BackendEmitError(format!("generic verb substitution failed: {error:?}")))?;
+    .map_err(|error| {
+        BackendEmitError(format!(
+            "generic verb substitution failed: {}",
+            crate::diagnostics::render_unlocated_semantic_error(&error)
+        ))
+    })?;
     let call_bindings = nested_call_bindings(
         &verb.name,
         &verb.generic_parameters,
@@ -310,7 +321,12 @@ fn specialize_verb(
         &instance.arguments,
         verb.span,
     )
-    .map_err(|error| BackendEmitError(format!("generic verb substitution failed: {error:?}")))?;
+    .map_err(|error| {
+        BackendEmitError(format!(
+            "generic verb substitution failed: {}",
+            crate::diagnostics::render_unlocated_semantic_error(&error)
+        ))
+    })?;
     let call_bindings = nested_call_bindings(
         &verb.name,
         &verb.generic_parameters,
@@ -350,7 +366,12 @@ fn nested_call_bindings(
         &caller_instance.arguments,
         crate::lexer::SourceSpan::new(0, 0),
     )
-    .map_err(|error| BackendEmitError(format!("nested generic substitution failed: {error:?}")))?;
+    .map_err(|error| {
+        BackendEmitError(format!(
+            "nested generic substitution failed: {}",
+            crate::diagnostics::render_unlocated_semantic_error(&error)
+        ))
+    })?;
     let mut bindings = inherited.clone();
     for template in instances.iter().filter(|instance| {
         super::identity::called_from(instance, caller_instance)

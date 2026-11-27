@@ -6,22 +6,46 @@ fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
     let source = "import { open aie }; verb main() -> Int { return snapshot_is_valid(); }\n";
     let (root, input, output) = project("config-snapshot-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
-    fs::write(root.join("src/config/values.act"), "open const BRAIN_MAGIC: u32 = 42u32;\n")
-        .expect("write configuration values");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/values.act"),
+        r#""""The magic number that the worker module reads."""
+open const BRAIN_MAGIC: u32 = 42u32;
+"#,
+    )
+    .expect("write configuration values");
     fs::create_dir_all(root.join("src/aie/persistence")).expect("create nested module");
-    fs::write(root.join("src/aie/aie.act"), "open persistence;\n").expect("write aie facade");
-    fs::write(root.join("src/aie/persistence/persistence.act"), "open serialization;\n")
-        .expect("write persistence facade");
+    fs::write(
+        root.join("src/aie/aie.act"),
+        r#""""Re-export the persistence module."""
+open persistence;
+"#,
+    )
+    .expect("write aie facade");
+    fs::write(
+        root.join("src/aie/persistence/persistence.act"),
+        r#""""Re-export the serialization declarations."""
+open serialization;
+"#,
+    )
+    .expect("write persistence facade");
     fs::write(
         root.join("src/aie/persistence/serialization.act"),
         r#"import { open config };
 
+"""A snapshot that records the configured magic number."""
 open struct Snapshot {
+    """The recorded magic number."""
     erg magic: u32,
 }
 
+"""Return 42 when a snapshot records the configured magic number."""
 open verb snapshot_is_valid() -> Int {
     erg snapshot = Snapshot {
         magic: BRAIN_MAGIC,
@@ -46,20 +70,36 @@ fn nested_facade_constants_lower_inside_indexed_snapshot_loops() {
     let source = "import { open feature }; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("constant-indexed-loop", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
-    fs::write(root.join("src/config/config.act"), "open values;\n")
-        .expect("write configuration facade");
+    fs::write(
+        root.join("src/config/config.act"),
+        r#""""Re-export the configuration constants."""
+open values;
+"#,
+    )
+    .expect("write configuration facade");
     fs::write(
         root.join("src/config/values.act"),
-        "open const STRIDE: u16 = 24u16; open const COUNT: u32 = 4u32;\n",
+        r#""""The stride, in bytes, of one snapshot element."""
+open const STRIDE: u16 = 24u16;
+
+"""The number of elements that the loop fills."""
+open const COUNT: u32 = 4u32;
+"#,
     )
     .expect("write configuration values");
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
-    fs::write(root.join("src/feature/feature.act"), "open implementation;\n")
-        .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/feature.act"),
+        r#""""Re-export the feature implementation."""
+open implementation;
+"#,
+    )
+    .expect("write feature facade");
     fs::write(
         root.join("src/feature/implementation.act"),
         r#"import { open config };
 
+"""Fill the leading elements of a byte array in a loop and return the fourth element plus the stride."""
 open verb emit() -> Int {
     erg bytes: Array[u8, 24] = Array[u8, 24]();
     erg index: u32 = 0u32;

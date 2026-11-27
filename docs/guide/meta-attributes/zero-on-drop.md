@@ -32,6 +32,9 @@ released or becomes unreachable. The operation uses the native runtime's
 volatile byte-store bridge so an optimizer cannot remove it as a dead ordinary
 store.
 
+Moving a field out of a `zero_on_drop` owner (`dat owner.field`) is rejected
+with `E1145`, because the owner is zeroed as a whole.
+
 `zero_on_drop` is not a substitute for key rotation, process isolation, or
 hardware-backed key storage. It protects the Actus-owned storage lifetime and
 does not promise that copies made outside the contract or prior allocator

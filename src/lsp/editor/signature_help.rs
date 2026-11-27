@@ -139,7 +139,7 @@ fn intrinsic_signatures(name: &str) -> Option<Vec<Value>> {
         )]),
         "copy" => Some(vec![signature_value(
             "copy(abs value: scalar) -> scalar",
-            "Explicitly reuses an eligible integer or boolean scalar.",
+            "Explicitly reuses an integer or boolean scalar or a `meta copy` struct, enum or pack.",
             &[("abs value".to_owned(), "scalar".to_owned())],
         )]),
         _ => None,

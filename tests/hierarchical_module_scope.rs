@@ -70,29 +70,35 @@ const MAIN: &str = "import { open pkg };\n\
      return train(holder: ins small) as Int - 4;\n}\n";
 
 const LAYOUT: [(&str, &str); 2] = [
-    ("pkg/layout/layout.act", "open shape;\n"),
-    ("pkg/layout/shape.act", "open struct Holder[N: Usize] { erg values: Array[u32, N], }\n"),
+    (
+        "pkg/layout/layout.act",
+        "\"\"\"Re-export the shape module declarations for the fixture project.\"\"\" open shape;\n",
+    ),
+    (
+        "pkg/layout/shape.act",
+        "\"\"\"Fixed-capacity holder of N unsigned values for the scope fixture.\"\"\" open struct Holder[N: Usize] { \"\"\"The owned value array of the holder.\"\"\" erg values: Array[u32, N], }\n",
+    ),
 ];
 
 fn r2_sources(count_imports: &str, helper_imports: &str) -> Vec<(&'static str, String)> {
     vec![
         ("main.act", MAIN.to_owned()),
-        ("pkg/pkg.act", "open layout;\nopen runtime;\n".to_owned()),
+        ("pkg/pkg.act", "\"\"\"Re-export the layout module declarations for the fixture project.\"\"\" open layout;\n\"\"\"Re-export the runtime module declarations for the fixture project.\"\"\" open runtime;\n".to_owned()),
         (LAYOUT[0].0, LAYOUT[0].1.to_owned()),
         (LAYOUT[1].0, LAYOUT[1].1.to_owned()),
-        ("pkg/runtime/runtime.act", "open count;\nopen training;\n".to_owned()),
+        ("pkg/runtime/runtime.act", "\"\"\"Re-export the count module declarations for the fixture project.\"\"\" open count;\n\"\"\"Re-export the training module declarations for the fixture project.\"\"\" open training;\n".to_owned()),
         (
             "pkg/runtime/count.act",
             format!(
-                "{count_imports}open verb count[N: Usize](ins holder: Holder[N]) -> u32 {{ return N as u32; }}\n"
+                "{count_imports}\"\"\"Borrow the holder through an exclusive ins loan and return its capacity N as an unsigned value.\"\"\" open verb count[N: Usize](ins holder: Holder[N]) -> u32 {{ return N as u32; }}\n"
             ),
         ),
-        ("pkg/runtime/training/training.act", "open helper;\n".to_owned()),
+        ("pkg/runtime/training/training.act", "\"\"\"Re-export the helper module declarations for the fixture project.\"\"\" open helper;\n".to_owned()),
         (
             "pkg/runtime/training/helper.act",
             format!(
                 "import {{ pkg::runtime, {helper_imports} }};\n\
-                 open verb train[N: Usize](ins holder: Holder[N]) -> u32 {{ return runtime::count(holder: ins holder); }}\n"
+                 \"\"\"Loan the holder through ins to the runtime count verb and return the capacity value it reports.\"\"\" open verb train[N: Usize](ins holder: Holder[N]) -> u32 {{ return runtime::count(holder: ins holder); }}\n"
             ),
         ),
     ]
@@ -138,10 +144,19 @@ fn child_module_sees_private_ancestor_declarations() {
         "ancestor-private",
         &[
             ("main.act", "import { open pkg };\nverb main() -> Int { return run() as Int - 7; }\n"),
-            ("pkg/pkg.act", "open base;\nopen worker;\n"),
+            (
+                "pkg/pkg.act",
+                "\"\"\"Re-export the base module declarations for the fixture project.\"\"\" open base;\n\"\"\"Re-export the worker module declarations for the fixture project.\"\"\" open worker;\n",
+            ),
             ("pkg/base.act", "verb seven() -> u32 { return 7u32; }\n"),
-            ("pkg/worker/worker.act", "open job;\n"),
-            ("pkg/worker/job.act", "open verb run() -> u32 { return seven(); }\n"),
+            (
+                "pkg/worker/worker.act",
+                "\"\"\"Re-export the job module declarations for the fixture project.\"\"\" open job;\n",
+            ),
+            (
+                "pkg/worker/job.act",
+                "\"\"\"Return the unsigned 32-bit value that the private ancestor verb seven reports.\"\"\" open verb run() -> u32 { return seven(); }\n",
+            ),
         ],
     );
     assert_eq!(check_build_run(&root), Some(0));
@@ -154,9 +169,15 @@ fn parent_module_cannot_use_a_private_child_declaration() {
         "private-child",
         &[
             ("main.act", "import { open pkg };\nverb main() -> Int { return run() as Int; }\n"),
-            ("pkg/pkg.act", "open entry;\nopen worker;\n"),
+            (
+                "pkg/pkg.act",
+                "\"\"\"Re-export the entry module declarations for the fixture project.\"\"\" open entry;\n\"\"\"Re-export the worker module declarations for the fixture project.\"\"\" open worker;\n",
+            ),
             ("pkg/entry.act", "open verb run() -> u32 { return hidden(); }\n"),
-            ("pkg/worker/worker.act", "open job;\n"),
+            (
+                "pkg/worker/worker.act",
+                "\"\"\"Re-export the job module declarations for the fixture project.\"\"\" open job;\n",
+            ),
             ("pkg/worker/job.act", "verb hidden() -> u32 { return 0u32; }\n"),
         ],
     );
@@ -170,10 +191,22 @@ fn parent_module_uses_the_exports_of_an_opened_child() {
         "opened-child",
         &[
             ("main.act", "import { open pkg };\nverb main() -> Int { return run() as Int - 3; }\n"),
-            ("pkg/pkg.act", "open entry;\nopen worker;\n"),
-            ("pkg/entry.act", "open verb run() -> u32 { return three(); }\n"),
-            ("pkg/worker/worker.act", "open job;\n"),
-            ("pkg/worker/job.act", "open verb three() -> u32 { return 3u32; }\n"),
+            (
+                "pkg/pkg.act",
+                "\"\"\"Re-export the entry module declarations for the fixture project.\"\"\" open entry;\n\"\"\"Re-export the worker module declarations for the fixture project.\"\"\" open worker;\n",
+            ),
+            (
+                "pkg/entry.act",
+                "\"\"\"Return the unsigned 32-bit value that the opened child verb three reports.\"\"\" open verb run() -> u32 { return three(); }\n",
+            ),
+            (
+                "pkg/worker/worker.act",
+                "\"\"\"Re-export the job module declarations for the fixture project.\"\"\" open job;\n",
+            ),
+            (
+                "pkg/worker/job.act",
+                "\"\"\"Return the unsigned 32-bit value 3 for the parent module fixture.\"\"\" open verb three() -> u32 { return 3u32; }\n",
+            ),
         ],
     );
     assert_eq!(check_build_run(&root), Some(0));
@@ -193,7 +226,10 @@ fn qualified_call_through_an_unimported_binding_is_rejected() {
             ),
             ("pkg/tools/tools.act", "open five;\n"),
             ("pkg/tools/five.act", "open verb five() -> u32 { return 5u32; }\n"),
-            ("pkg/worker/worker.act", "open job;\n"),
+            (
+                "pkg/worker/worker.act",
+                "\"\"\"Re-export the job module declarations for the fixture project.\"\"\" open job;\n",
+            ),
             ("pkg/worker/job.act", "open verb six() -> u32 { return tools::five() + 1u32; }\n"),
         ],
     );

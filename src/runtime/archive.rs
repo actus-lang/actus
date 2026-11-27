@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+/// Finds the runtime archive. The error text carries no diagnostic code: the
+/// runtime crate is also built on its own, so the compiler adds the code.
 pub fn runtime_archive_path() -> Result<Option<PathBuf>, String> {
     if let Ok(executable) = std::env::current_exe()
         && let Some(parent) = executable.parent()
@@ -20,10 +22,7 @@ pub fn runtime_archive_path() -> Result<Option<PathBuf>, String> {
                             && path.file_stem().is_some_and(|name| name == "libactus_runtime")
                     });
                 return archive.map(Some).ok_or_else(|| {
-                    format!(
-                        "E1880: installed runtime archive is missing under `{}`",
-                        installed.display()
-                    )
+                    format!("installed runtime archive is missing under `{}`", installed.display())
                 });
             }
         }

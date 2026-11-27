@@ -311,19 +311,6 @@ fn storage_capacity(pack: &PackDecl) -> Result<u16, SemanticError> {
 }
 
 fn field_width(pack: &PackDecl, field: &PackField) -> Result<u16, SemanticError> {
-    match &field.role {
-        Role::Erg | Role::Abs => {}
-        role => {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::InvalidPackFieldRole {
-                    pack: pack.name.clone(),
-                    field: field.name.clone(),
-                    role: role_name(role).to_owned(),
-                },
-                span: field.span,
-            });
-        }
-    }
     if let Some(PrimitiveType::Integer { width, .. }) = primitive_type(&field.ty.name) {
         return Ok(width as u16);
     }

@@ -24,7 +24,7 @@ pub(super) fn run_command(mut arguments: impl Iterator<Item = String>) -> i32 {
     let configuration = match super::input::configuration_for_input(options.input.as_deref()) {
         Ok(configuration) => configuration,
         Err(error) => {
-            errln!("error: {error}");
+            errln!("{error}");
             return 1;
         }
     };

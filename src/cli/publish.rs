@@ -20,7 +20,15 @@ pub(super) fn publish_command(arguments: impl Iterator<Item = String>) -> i32 {
             return 2;
         }
     };
-    match publish_project(&options) {
+    let manifest = manifest_path(&options.input);
+    let configuration = match CompilerConfiguration::from_manifest(&manifest) {
+        Ok(configuration) => configuration,
+        Err(error) => {
+            errln!("{}", error.report());
+            return 1;
+        }
+    };
+    match publish_project(&manifest, &configuration, &options) {
         Ok(report) => {
             outln!("published {}@{}", report.name, report.version);
             outln!("checksum: {}", report.checksum);
@@ -41,14 +49,15 @@ struct PublishReport {
     destination: PathBuf,
 }
 
-fn publish_project(options: &PublishOptions) -> Result<PublishReport, String> {
-    let manifest = manifest_path(&options.input);
-    let configuration =
-        CompilerConfiguration::from_manifest(&manifest).map_err(|error| error.to_string())?;
-    let identity = package_identity(&manifest).map_err(|error| error.to_string())?;
+fn publish_project(
+    manifest: &Path,
+    configuration: &CompilerConfiguration,
+    options: &PublishOptions,
+) -> Result<PublishReport, String> {
+    let identity = package_identity(manifest).map_err(|error| error.to_string())?;
     let output = temporary_archive(&identity.name);
     let result =
-        publish_archive(&output, &identity.name, &identity.version, &configuration, options);
+        publish_archive(&output, &identity.name, &identity.version, configuration, options);
     remove_temporary_archive(&output);
     result
 }

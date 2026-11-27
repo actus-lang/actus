@@ -1,3 +1,4 @@
+use crate::diagnostics::DiagnosticCode;
 use crate::lexer::{LexError, LexErrorKind};
 use crate::parser::{ParseError, ParseErrorKind};
 use crate::semantic::SemanticError;
@@ -7,7 +8,7 @@ use super::{Diagnostic, DiagnosticPhase, DiagnosticSeverity};
 
 /// Converts a lexical failure into the stable diagnostic model.
 pub fn lex_diagnostic(error: &LexError) -> Diagnostic {
-    Diagnostic::error(format!("E000{}", lex_code(error)), error.span, lex_message(error))
+    Diagnostic::error(lex_code(error).as_str(), error.span, lex_message(error))
         .with_phase(DiagnosticPhase::Lexical)
 }
 
@@ -15,8 +16,10 @@ pub fn lex_diagnostic(error: &LexError) -> Diagnostic {
 pub fn parse_diagnostic(error: &ParseError) -> Diagnostic {
     let code = match error.kind {
         ParseErrorKind::UnexpectedToken { found: crate::lexer::TokenKind::Eof, .. }
-        | ParseErrorKind::UnexpectedEndOfInput { .. } => "E0004",
-        _ => parse_code(error.code),
+        | ParseErrorKind::UnexpectedEndOfInput { .. } => {
+            DiagnosticCode::PARSE_UNEXPECTED_END_OF_INPUT.as_str()
+        }
+        _ => parse_code(error.code).as_str(),
     };
     let diagnostic = Diagnostic::error(code, error.span, parse_message(error))
         .with_phase(DiagnosticPhase::Parser);
@@ -49,13 +52,36 @@ pub fn render_semantic_error(source: &str, error: &SemanticError) -> String {
     render_diagnostic(source, &semantic_diagnostic(error))
 }
 
+/// Renders a semantic error that is met after validation, where no source is
+/// at hand, as `error[E####]: message`, never as Debug output.
+pub fn render_unlocated_semantic_error(error: &SemanticError) -> String {
+    render_unlocated_diagnostic(&semantic_diagnostic(error))
+}
+
 /// Renders one diagnostic for the terminal while preserving its stable code
 /// and source location.
 pub fn render_diagnostic(source: &str, diagnostic: &Diagnostic) -> String {
     let (line, column) = line_column(source, diagnostic.span().start);
     let severity = severity_name(diagnostic.severity());
-    let mut rendered =
+    let head =
         format!("{severity}[{}] at {line}:{column}: {}", diagnostic.code(), diagnostic.message());
+    with_explanation_and_suggestion(head, diagnostic)
+}
+
+/// Renders a diagnostic that has no source location, such as a toolchain or
+/// environment failure, or a finding about a whole file: `error[E####]: message`.
+///
+/// It is the same line as [`render_diagnostic`] without the ` at line:column`
+/// part, so a reader finds the severity, the code and the message in the same
+/// place whether or not the diagnostic points into a file. The caller puts the
+/// path in front when the diagnostic belongs to a file.
+pub fn render_unlocated_diagnostic(diagnostic: &Diagnostic) -> String {
+    let severity = severity_name(diagnostic.severity());
+    let head = format!("{severity}[{}]: {}", diagnostic.code(), diagnostic.message());
+    with_explanation_and_suggestion(head, diagnostic)
+}
+
+fn with_explanation_and_suggestion(mut rendered: String, diagnostic: &Diagnostic) -> String {
     if let Some(explanation) = diagnostic.explanation() {
         rendered.push_str(&format!("; note: {explanation}"));
     }

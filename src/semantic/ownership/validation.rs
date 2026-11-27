@@ -13,7 +13,10 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         let (index, name) = self.validate_dat_case_subject(subject, span)?;
         match self.model.bindings[index].ownership {
-            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership = OwnershipState::Moved;
+                self.ownership_change_spans.insert(index, span);
+            }
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved
             | OwnershipState::Dropped => {
@@ -41,7 +44,6 @@ impl Analyzer {
             });
         };
         let index = self.binding(name, *subject_span)?;
-        self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidCaseRole {
@@ -73,7 +75,10 @@ impl Analyzer {
             return Ok(());
         };
         match self.model.bindings[index].ownership {
-            OwnershipState::Active => self.model.bindings[index].ownership = OwnershipState::Moved,
+            OwnershipState::Active => {
+                self.model.bindings[index].ownership = OwnershipState::Moved;
+                self.ownership_change_spans.insert(index, span);
+            }
             OwnershipState::PartiallyMoved { .. }
             | OwnershipState::Moved
             | OwnershipState::Dropped => {
@@ -86,6 +91,24 @@ impl Analyzer {
         Ok(())
     }
 
+    /// Moves the source of a value that is stored into an owning slot: an
+    /// `erg` or move-only struct field, an enum payload, or an `erg` argument.
+    /// A field of an owner moves by its field path (ADR-0046 2.2); any other
+    /// source is consumed as for an `erg` binding.
+    pub(in crate::semantic) fn consume_owned_source(
+        &mut self,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if matches!(expression, Expr::FieldAccess { .. })
+            && self.root_binding_index(expression).is_some()
+            && self.is_move_only_aggregate(expression)
+        {
+            return self.move_dat_argument(expression, span);
+        }
+        self.initialize_owner(expression, span)
+    }
+
     fn validate_owner_source(
         &self,
         expression: &Expr,
@@ -96,7 +119,6 @@ impl Analyzer {
             return Ok(None);
         }
         let index = self.binding(name, *identifier_span)?;
-        self.ensure_access_available(index, name, span)?;
         if self.model.bindings[index].role == Role::Ins {
             return Err(SemanticError {
                 kind: SemanticErrorKind::EscapingLoan { name: name.clone() },
@@ -118,6 +140,7 @@ impl Analyzer {
                 span,
             });
         }
+        self.ensure_arena_references_inactive(index, name, span)?;
         Ok(Some((index, name.clone())))
     }
 
@@ -127,7 +150,6 @@ impl Analyzer {
         name: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        self.ensure_access_available(index, name, span)?;
         match self.model.bindings[index].ownership {
             OwnershipState::Moved => Err(SemanticError {
                 kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
@@ -141,23 +163,8 @@ impl Analyzer {
                 kind: SemanticErrorKind::UseAfterMove { name: name.to_owned() },
                 span,
             }),
-            OwnershipState::Active => Ok(()),
+            OwnershipState::Active => self.ensure_arena_alive(index, name, span),
         }
-    }
-
-    pub(in crate::semantic) fn ensure_access_available(
-        &self,
-        index: usize,
-        name: &str,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        if let AccessState::Suspended { loan_id } = self.model.bindings[index].access {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::SuspendedAccess { name: name.to_owned(), loan_id },
-                span,
-            });
-        }
-        Ok(())
     }
 
     pub(in crate::semantic) fn ensure_mutable(
@@ -191,7 +198,6 @@ impl Analyzer {
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
         let index = self.binding(name, span)?;
-        self.ensure_access_available(index, name, span)?;
         let binding = &self.model.bindings[index];
         if matches!(binding.role, Role::Abs | Role::Ins) {
             return Err(SemanticError {
@@ -208,10 +214,12 @@ impl Analyzer {
                 span,
             });
         }
+        self.ensure_arena_alive(index, name, span)?;
         self.ensure_arena_references_inactive(index, name, span)?;
         match binding.ownership {
             OwnershipState::Active => {
                 self.model.bindings[index].ownership = OwnershipState::Dropped;
+                self.ownership_change_spans.insert(index, span);
                 self.model
                     .explicit_drops
                     .push(crate::semantic::model::ExplicitDrop { binding_index: index, span });
@@ -224,35 +232,6 @@ impl Analyzer {
                     span,
                 });
             }
-        }
-        Ok(())
-    }
-
-    fn ensure_arena_references_inactive(
-        &self,
-        arena_index: usize,
-        arena_name: &str,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        let Some(arena_id) = self.binding_arena_provenance.get(&arena_index).copied() else {
-            return Ok(());
-        };
-        if let Some((reference_index, _)) = self
-            .binding_arena_provenance
-            .iter()
-            .filter(|(index, provenance)| **provenance == arena_id && **index != arena_index)
-            .find(|(index, _)| {
-                let binding = &self.model.bindings[**index];
-                matches!(binding.role, Role::Abs | Role::Ins) && binding.ownership.is_live()
-            })
-        {
-            return Err(SemanticError {
-                kind: SemanticErrorKind::ArenaReferenceLive {
-                    arena: arena_name.to_owned(),
-                    reference: self.model.bindings[*reference_index].name.clone(),
-                },
-                span,
-            });
         }
         Ok(())
     }

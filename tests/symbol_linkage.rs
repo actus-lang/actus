@@ -82,12 +82,18 @@ fn linkage_sources() -> Vec<(&'static str, &'static str)> {
             "main.act",
             "import {\n    open pkg,\n};\n\nverb main() -> Int {\n    return public_value() - 3;\n}\n",
         ),
-        ("pkg/pkg.act", "open api;\n\nopen unit shared;\n"),
+        (
+            "pkg/pkg.act",
+            "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n\n\"\"\"Re-export the shared module declarations for this unit only.\"\"\" open unit shared;\n",
+        ),
         (
             "pkg/api.act",
-            "open verb public_value() -> Int {\n    return hidden_value() + shared_value();\n}\n\nverb hidden_value() -> Int {\n    return 1;\n}\n",
+            "\"\"\"Return the integer value 3 that sums the private hidden value and the unit shared value.\"\"\" open verb public_value() -> Int {\n    return hidden_value() + shared_value();\n}\n\nverb hidden_value() -> Int {\n    return 1;\n}\n",
         ),
-        ("pkg/shared.act", "open verb shared_value() -> Int {\n    return 2;\n}\n"),
+        (
+            "pkg/shared.act",
+            "\"\"\"Return the fixed integer value 2 that the unit shared sibling reports.\"\"\" open verb shared_value() -> Int {\n    return 2;\n}\n",
+        ),
     ]
 }
 

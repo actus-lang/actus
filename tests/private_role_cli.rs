@@ -7,17 +7,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const FACADE: &str = "open api;\n";
+const FACADE: &str =
+    "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n";
 const API: &str = "struct File { value: Int, }
 role R { verb write(abs self: File) -> Int; }
 perform R for File { verb write(abs self: File) -> Int { return self.value; } }
 enum E { A, B, }
 open verb shown() -> Int { return 2; }
 ";
-const OPEN_API: &str = "open struct File { value: Int, }
-open role R { verb write(abs self: File) -> Int; }
-open perform R for File { verb write(abs self: File) -> Int { return self.value; } }
-open verb shown() -> Int { return 2; }
+const OPEN_API: &str = "\"\"\"Fixture struct that holds one integer value.\"\"\" open struct File { \"\"\"The integer value held by the file.\"\"\" value: Int, }
+\"\"\"Fixture role that writes a value from a borrowed file.\"\"\" open role R { \"\"\"Borrow the file through the abs self role and return its integer value.\"\"\" verb write(abs self: File) -> Int; }
+\"\"\"Performance that binds the write role to the file struct.\"\"\" open perform R for File { \"\"\"Borrow the file through the abs self role and return its integer value.\"\"\" verb write(abs self: File) -> Int { return self.value; } }
+\"\"\"Return the fixed integer value 2 for the role fixture.\"\"\" open verb shown() -> Int { return 2; }
 ";
 const MAIN_TAIL: &str = "verb main() -> Int { return 0; }\n";
 

@@ -4,7 +4,8 @@ use std::path::Path;
 
 use crate::SharedSourceMap;
 use crate::diagnostics::{
-    Diagnostic, lex_diagnostic, parse_diagnostic, render_colored_diagnostic, sort_diagnostics,
+    Diagnostic, lex_diagnostic, parse_diagnostic, render_colored_diagnostic,
+    render_unlocated_diagnostic, sort_diagnostics,
 };
 use crate::session::FrontendError;
 
@@ -22,6 +23,13 @@ pub(super) fn report_diagnostics(path: &Path, source: &str, mut diagnostics: Vec
 pub(super) fn report_diagnostic(path: &Path, source: &str, diagnostic: Diagnostic) {
     let colored = io::stderr().is_terminal();
     errln!("{}: {}", path.display(), render_colored_diagnostic(source, &diagnostic, colored));
+}
+
+/// Reports a finding about a whole file, which has no line and column:
+/// `<path>: error[E####]: message`. The path is the diagnostic's own.
+pub(super) fn report_unlocated_diagnostic(diagnostic: &Diagnostic) {
+    let path = diagnostic.source_path().unwrap_or("<unknown>");
+    errln!("{path}: {}", render_unlocated_diagnostic(diagnostic));
 }
 
 pub(super) fn report_mapped_diagnostic(

@@ -47,3 +47,56 @@ fn traps_deterministically_when_arena_capacity_is_exhausted() {
     );
     assert!(!status.success(), "arena overflow must terminate through a native trap");
 }
+
+#[cfg(unix)]
+fn check_arena_program(body: &str, label: &str) -> i32 {
+    let input = std::env::temp_dir()
+        .join(format!("actus-arena-check-{label}-{}", std::process::id()))
+        .with_extension("act");
+    let prelude = "struct Node { value: Int, } verb take(dat arena: Arena[64]) {} ";
+    fs::write(&input, format!("{prelude}verb main() {{ {body} }}")).expect("write arena fixture");
+    let result = run_with_args(vec!["check".to_owned(), input.display().to_string()].into_iter());
+    let _ = fs::remove_file(input);
+    result
+}
+
+#[cfg(unix)]
+#[test]
+fn check_rejects_an_arena_moved_while_a_view_is_live() {
+    let place = "erg arena: Arena[64] = Arena[64](); erg node = arena.place(value: Node { value: 1, }); abs view = ref node; ";
+    for (label, consume) in
+        [("take", "take(arena: arena);"), ("bind", "erg other = arena;"), ("drop", "drop(arena);")]
+    {
+        for body in [
+            format!("{place}{consume} print(view.value);"),
+            format!("{place}print(view.value); {consume}"),
+        ] {
+            let result = check_arena_program(&body, label);
+            assert_ne!(result, 0, "{label}: a moved arena with a live view must fail `check`");
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn check_accepts_an_arena_released_after_its_view_block_ends() {
+    let place =
+        "erg arena: Arena[64] = Arena[64](); erg node = arena.place(value: Node { value: 1, }); ";
+    for (label, consume) in [("take", "take(arena: arena);"), ("drop", "drop(arena);")] {
+        let result = check_arena_program(
+            &format!("{place}{{ abs view = ref node; print(view.value); }} {consume}"),
+            label,
+        );
+        assert_eq!(result, 0, "{label}: a view in a closed block must not block the release");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn runs_a_program_that_drops_its_arena_after_the_view_block() {
+    let status = build_and_run(
+        "struct Node { value: Int, } verb main() -> Int { erg arena: Arena[64] = Arena[64](); erg node = arena.place(value: Node { value: 42, }); erg seen: Int = 0; { abs view = ref node; seen = view.value; } drop(arena); return seen; }",
+        "closed-view",
+    );
+    assert_eq!(status.code(), Some(42));
+}

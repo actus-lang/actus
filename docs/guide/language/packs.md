@@ -129,6 +129,37 @@ Field roles are part of the access contract. Mark a field `abs` when it is
 read-only or reserved for observation. A reserved field is still part of the
 layout and must be declared even when application code never changes it.
 
+## Moving and copying a pack
+
+A pack is never duplicated implicitly (ADR-0124). A binding, an assignment, a
+struct field initializer, an enum payload, an `erg` or `dat` argument and a
+return move it, exactly as they move a struct; a field read and an `abs`
+argument leave it usable. To keep the source, declare the pack `meta copy` and
+write the copy:
+
+```actus
+meta copy
+pack Flags {
+    erg storage: u8;
+    layout little;
+    fields {
+        erg enabled: u1 at 0;
+        abs _reserved: u7 at 1 = 0;
+    }
+}
+
+verb main() -> Int {
+    erg original = Flags { storage: 0u8, };
+    erg duplicate = copy(value: abs original);
+    duplicate.enabled = 1u8;
+    return (original.enabled as Int) + (duplicate.enabled as Int);
+}
+```
+
+The copy has storage of its own, for an integer-backed pack and for a pack
+backed by `Array[u8, N]`. `meta copy` is the only attribute a pack accepts, and
+without it `copy` is rejected. See [`meta copy`](../meta-attributes/copy.md).
+
 ## Indexed pack fields
 
 A pack field can itself be a fixed array. Its elements retain ordinary bounded
@@ -190,6 +221,7 @@ in the filesystem layer rather than hiding I/O inside pack field access.
 | Uncovered bits | A storage region is not represented by a field. | Add an explicit reserved field with a documented default. |
 | Invalid storage | The backing type is unsupported or has runtime extent. | Use a supported fixed integer or byte array. |
 | Read-only mutation | An `abs` pack or field is written. | Use an owned mutable value or an `ins` loan. |
+| Use after move | A pack was stored or passed and then read. | Declare `meta copy` and write `copy(value: abs pack)`. |
 | Index out of bounds | A pack array field is indexed outside its fixed extent. | Use a checked index within the declared capacity. |
 
 ## Related reference material

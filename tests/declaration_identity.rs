@@ -64,8 +64,14 @@ fn size_of_generic_parameter_with_an_imported_struct() {
                  if alignment[Wide]() != 8u64 { return 2; }\n\
                  return 0;\n}\n",
             ),
-            ("shapes/shapes.act", "open wide;\n"),
-            ("shapes/wide.act", "open struct Wide { erg a: u64, erg b: u32, erg c: u64, }\n"),
+            (
+                "shapes/shapes.act",
+                "\"\"\"Re-export the wide module declarations for the fixture project.\"\"\" open wide;\n",
+            ),
+            (
+                "shapes/wide.act",
+                "\"\"\"Fixture struct with three unsigned integer fields used to measure size and alignment.\"\"\" open struct Wide { \"\"\"The owned first value field of the struct.\"\"\" erg a: u64, \"\"\"The owned second value field of the struct.\"\"\" erg b: u32, \"\"\"The owned third value field of the struct.\"\"\" erg c: u64, }\n",
+            ),
         ],
     );
     assert_eq!(check_build_run(&root), Some(0));

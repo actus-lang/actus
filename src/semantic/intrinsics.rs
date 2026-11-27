@@ -306,14 +306,10 @@ impl Analyzer {
                 span: expression_span(&argument.expression),
             });
         }
-        let type_name = self.expression_type_name(&argument.expression);
-        let eligible = type_name.as_deref().is_some_and(|name| {
-            name == "Int"
-                || name == "Bool"
-                || primitive_type(name)
-                    .is_some_and(|primitive| matches!(primitive, PrimitiveType::Integer { .. }))
-        });
-        if !eligible {
+        let type_name = self
+            .expression_type_name(&argument.expression)
+            .map(|name| self.normalize_imported_type_key(&name));
+        if !type_name.as_deref().is_some_and(|name| self.named_type_is_copy_operand(name)) {
             return Err(SemanticError {
                 kind: SemanticErrorKind::InvalidIntrinsicArgument {
                     callee: callee.to_owned(),
@@ -322,11 +318,18 @@ impl Analyzer {
                 span: expression_span(&argument.expression),
             });
         }
-        if let Some(name) = type_name {
-            self.inferred_expression_types.insert(
-                self.expression_cache_key(span),
-                TypeName::builtin(name, Vec::new(), None, span),
-            );
+        // The copy has the type of its operand, including the type arguments
+        // of a generic `meta copy` declaration.
+        let head = type_name.as_deref().and_then(|name| name.split('[').next()).unwrap_or("");
+        let aggregate = self.struct_types.contains_key(head)
+            || self.enum_types.contains_key(head)
+            || self.pack_types.contains_key(head);
+        let result_type = aggregate
+            .then(|| self.resolved_type_name(&argument.expression))
+            .flatten()
+            .or_else(|| type_name.map(|name| TypeName::builtin(name, Vec::new(), None, span)));
+        if let Some(result_type) = result_type {
+            self.inferred_expression_types.insert(self.expression_cache_key(span), result_type);
         }
         Ok(true)
     }

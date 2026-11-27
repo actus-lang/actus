@@ -1,17 +1,33 @@
 meta limitless("file")
 
+"""A fixed-capacity storage that holds N unsigned 32-bit values."""
 open struct Storage[N: Usize] {
+    """The owned value array of the storage."""
     erg values: Array[u32, N],
 }
 
+"""
+Borrow the storage through an exclusive `ins` loan and return its capacity
+N as an unsigned value. The verb does not mutate the storage and allocates
+nothing.
+"""
 open verb first[N: Usize](ins storage: Storage[N]) -> u32 {
     return N as u32;
 }
 
+"""
+Loan the storage through `ins` to `first` and return the capacity value it
+reports. The verb does not mutate the storage and allocates nothing.
+"""
 open verb second[N: Usize](ins storage: Storage[N]) -> u32 {
     return first(storage: ins storage);
 }
 
+"""
+Loan the storage through `ins` to `first` and `second` and return the sum of
+the two capacity values. The verb does not mutate the storage and allocates
+nothing.
+"""
 open verb root[N: Usize](ins storage: Storage[N]) -> u32 {
     return first(storage: ins storage) + second(storage: ins storage);
 }

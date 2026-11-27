@@ -8,10 +8,21 @@ fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
     let source = "import { open output }; verb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("module-runtime-bridge", source);
     fs::create_dir_all(root.join("src/output")).expect("create output module directory");
-    fs::write(root.join("src/output/output.act"), "open api;\n").expect("write output facade");
+    fs::write(
+        root.join("src/output/output.act"),
+        r#""""Re-export the output API."""
+open api;
+"#,
+    )
+    .expect("write output facade");
     fs::write(
         root.join("src/output/api.act"),
-        "open unsafe extern \"C\" verb actus_print_int(erg value: Int) -> Int; open verb emit() -> Int { erg value = 79; actus_print_int(value: value); return 0; }\n",
+        r#""""The runtime bridge that prints an integer; the integer is passed by value."""
+open unsafe extern "C" verb actus_print_int(erg value: Int) -> Int;
+
+"""Print 79 through the runtime bridge and return 0."""
+open verb emit() -> Int { erg value = 79; actus_print_int(value: value); return 0; }
+"#,
     )
     .expect("write output implementation");
     build(&root, &input, &output);
@@ -28,10 +39,21 @@ fn unresolved_external_bridge_fails_during_multi_object_link() {
     let source = "import { open missing }; verb main() -> Int { return invoke(); }\n";
     let (root, input, output) = project("unresolved-bridge", source);
     fs::create_dir_all(root.join("src/missing")).expect("create missing module directory");
-    fs::write(root.join("src/missing/missing.act"), "open api;\n").expect("write missing facade");
+    fs::write(
+        root.join("src/missing/missing.act"),
+        r#""""Re-export the missing-bridge API."""
+open api;
+"#,
+    )
+    .expect("write missing facade");
     fs::write(
         root.join("src/missing/api.act"),
-        "open unsafe extern \"C\" verb absent_bridge() -> Int; open verb invoke() -> Int { return absent_bridge(); }\n",
+        r#""""A bridge to a native symbol that no object provides."""
+open unsafe extern "C" verb absent_bridge() -> Int;
+
+"""Call the absent bridge and return its result."""
+open verb invoke() -> Int { return absent_bridge(); }
+"#,
     )
     .expect("write unresolved bridge implementation");
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -62,9 +84,20 @@ fn freestanding_object_keeps_only_the_configured_entry_global() {
     )
     .expect("write freestanding manifest");
     fs::create_dir_all(root.join("src/math")).expect("create math module directory");
-    fs::write(root.join("src/math/math.act"), "open api;\n").expect("write math facade");
-    fs::write(root.join("src/math/api.act"), "open verb add() -> Int { return 7; }\n")
-        .expect("write math implementation");
+    fs::write(
+        root.join("src/math/math.act"),
+        r#""""Re-export the math API."""
+open api;
+"#,
+    )
+    .expect("write math facade");
+    fs::write(
+        root.join("src/math/api.act"),
+        r#""""Return the constant 7."""
+open verb add() -> Int { return 7; }
+"#,
+    )
+    .expect("write math implementation");
     let object = output.with_extension("obj");
     let build_result = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["build", input.to_str().expect("source path"), "--strict", "--emit", "obj", "-o"])

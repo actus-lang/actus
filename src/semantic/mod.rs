@@ -3,6 +3,7 @@ mod array_capacity;
 mod borrowing;
 mod calls;
 mod cleanup;
+mod copy_types;
 mod dynamic;
 mod enums;
 mod errors;

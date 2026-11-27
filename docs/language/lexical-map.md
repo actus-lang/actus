@@ -145,7 +145,7 @@ written directly after the digits with no separator: `255u8`, `0xFFu8`,
 (`0x100u8` and `0xFFi8` are E1068, as are `256u8` and `255i8`). Because `f` is a
 hex digit, hex literals take no float suffix and there are no hex floats:
 `0x1f32` is the integer `0x1f32`. A hex literal with no digits (`0xu8`) or an
-unknown suffix (`0x12G`, `0xFFu`) is E0005.
+unknown suffix (`0x12G`, `0xFFu`) is E0026.
 
 `Option[T]` and `Result[T, E]` depend on the generic type phase and exhaustive
 pattern semantics. They must not be documented as fully built-in until their

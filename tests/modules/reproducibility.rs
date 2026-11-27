@@ -15,10 +15,18 @@ fn write_fixture(root: &Path) {
         "import zeta; import alpha; verb main() -> Int { return alpha::aye() + zeta::zed(); }\n",
     )
     .unwrap();
-    fs::write(root.join("src/alpha/alpha.act"), "open api;\n").unwrap();
-    fs::write(root.join("src/alpha/api.act"), "open verb aye() -> Int { return 1; }\n").unwrap();
-    fs::write(root.join("src/zeta/zeta.act"), "open api;\n").unwrap();
-    fs::write(root.join("src/zeta/api.act"), "open verb zed() -> Int { return 2; }\n").unwrap();
+    fs::write(
+        root.join("src/alpha/alpha.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .unwrap();
+    fs::write(root.join("src/alpha/api.act"), "\"\"\"Return the fixed integer value 1 for the reproducibility fixture.\"\"\" open verb aye() -> Int { return 1; }\n").unwrap();
+    fs::write(
+        root.join("src/zeta/zeta.act"),
+        "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
+    )
+    .unwrap();
+    fs::write(root.join("src/zeta/api.act"), "\"\"\"Return the fixed integer value 2 for the reproducibility fixture.\"\"\" open verb zed() -> Int { return 2; }\n").unwrap();
 }
 
 fn build_objects(root: &Path, input: &Path, output: &Path) {

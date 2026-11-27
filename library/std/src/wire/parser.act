@@ -95,7 +95,7 @@ the fixed-width header, performs no allocation or I/O, and does not publish
 partial metadata before frame validation completes.
 """
 open verb wire_parser_header(abs parser: WireParser) -> WireHeader {
-    return parser.header;
+    return copy(value: abs parser.header);
 }
 
 verb wire_parser_store(ins parser: WireParser, erg byte: u8) -> Result[Int, WireError] {
@@ -118,7 +118,7 @@ verb wire_parser_decode_header(ins parser: WireParser) -> Result[Int, WireError]
             return Result[Int, WireError].Err(error);
         },
         Result.Ok(header) => {
-            parser.header = header;
+            parser.header = copy(value: abs header);
             parser.expected_length = WIRE_HEADER_BYTES + (header.payload_len as u32) + WIRE_CRC_BYTES;
             parser.state = 2u8;
             return Result[Int, WireError].Ok(0);

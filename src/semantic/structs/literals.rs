@@ -81,8 +81,18 @@ impl Analyzer {
             &initializer.value,
             initializer.span,
         )?;
-        if matches!(field.role, crate::ast::StructFieldRole::Erg) {
-            self.initialize_owner(&initializer.value, initializer.span)?;
+        // An `erg` field takes ownership of its source (ADR-0046 2.2). A plain
+        // field has no ownership marker, but a move-only value placed in it is
+        // part of the new aggregate's move and cleanup plan (ADR-0046 2.1, 3),
+        // so the source is consumed as for an `erg` field and cannot stay
+        // behind as a second owner of the same store (ADR-0030).
+        let owning = field.role == crate::ast::StructFieldRole::Erg
+            || (field.role == crate::ast::StructFieldRole::Value
+                && self.is_move_only_aggregate(&initializer.value));
+        if owning {
+            self.consume_owned_source(&initializer.value, initializer.span)?;
+        } else if field.role == crate::ast::StructFieldRole::Abs {
+            self.register_view_borrow(&initializer.value, initializer.span)?;
         }
         Ok(())
     }
@@ -129,7 +139,7 @@ impl Analyzer {
             normalized_found == expected_name
         };
         if matches {
-            return Ok(());
+            return self.validate_expected_literal(value, expected_type);
         }
         Err(SemanticError {
             kind: SemanticErrorKind::StructFieldTypeMismatch {

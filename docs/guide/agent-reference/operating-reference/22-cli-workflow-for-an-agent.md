@@ -46,6 +46,15 @@ actus watch --once
 `--strict` is a release/conformance validation mode for supported `check`,
 `build`, and `test` workflows. It validates fail-closed source, ownership,
 architecture, documentation, target, lockfile, and execution contracts.
+The documentation check covers every public declaration of every source file
+of the package: `check` and `build` validate the entry file and each module
+file of the compilation plan, and `test` validates every production file. A
+public declaration without a `"""` block docstring fails with `E1840`, a
+docstring that contradicts an ownership role with `E1844`, and one that
+promises a `Result` cannot fail with `E1845`. The content contract (`E1841`,
+`E1842`: required contract parts and short or restating summaries) is not
+enforced yet; it comes with phase 56. Without `--strict` the documentation is
+not checked.
 It is not an argument for `run`, `fmt`, or `watch`.
 Every subcommand rejects an option it does not define with
 ``error: unknown option `--strict` for `actus run` `` and exit status 2; it never
@@ -524,8 +533,9 @@ contract.
 #### Explicit scalar reuse
 
 Use `copy(value: abs value)` when an eligible scalar must be reused at an
-owning call boundary. The compiler accepts `Int`, `Bool`, and fixed-width
-integer values. The `abs` role is explicit for this intrinsic and the operation
+owning call boundary. The compiler accepts `Int`, `Bool`, fixed-width
+integer and float values, and structs, enums and packs declared
+`meta copy` (ADR-0124). The `abs` role is explicit for this intrinsic and the operation
 does not consume the caller. Do not use identity arithmetic such as `value + 0u32` to express
 reuse. Buffers, strings, resources, cleanup-bearing aggregates, and
 unsupported user-defined values are rejected with `E1021`; a missing explicit

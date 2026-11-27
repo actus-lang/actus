@@ -20,7 +20,7 @@ impl Analyzer {
 
     pub(super) fn require_buffer_length(&self, expression: &Expr) -> Result<(), SemanticError> {
         if self.expression_type(expression) == Some(BuiltinType::Int) {
-            return Ok(());
+            return self.validate_default_integer_literal(expression);
         }
         Err(SemanticError {
             kind: SemanticErrorKind::InvalidIntrinsicArgument {

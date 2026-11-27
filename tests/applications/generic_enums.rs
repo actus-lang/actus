@@ -19,23 +19,98 @@ fn generic_result_facade_project_named(
     )
     .expect("enable hosted standard library");
     fs::create_dir_all(root.join("src/feature/runtime")).expect("create nested facade");
-    fs::write(root.join("src/feature/feature.act"), "open runtime;\n")
-        .expect("write feature facade");
-    fs::write(root.join("src/feature/runtime/runtime.act"), "open api; open save;\n")
-        .expect("write runtime facade");
+    fs::write(
+        root.join("src/feature/feature.act"),
+        r#""""Re-export the runtime module."""
+open runtime;
+"#,
+    )
+    .expect("write feature facade");
+    fs::write(
+        root.join("src/feature/runtime/runtime.act"),
+        r#""""Re-export the staging verbs."""
+open api;
+
+"""Re-export the forwarding verb and its state."""
+open save;
+"#,
+    )
+    .expect("write runtime facade");
     fs::write(
         root.join("src/feature/runtime/api.act"),
-        "import std::io; import std::fs; import std::path; open io; open fs; open path; meta effect(\"filesystem\", \"blocking\") open verb write_stage(abs staged: Path, abs payload: Buffer) -> Result[Int, IoError] { return write_file(path: abs staged, contents: abs payload); } meta effect(\"filesystem\", \"blocking\") open verb publish_stage(abs staged: Path, abs active: Path) -> Result[Int, IoError] { erg loaded = read_to_bytes(path: abs staged); return case dat loaded { Result.Err(error) => Err(error), Result.Ok(bytes) => { drop(bytes); return rename(from: abs staged, to: abs active); }, }; }\n",
+        r#"import std::io;
+import std::fs;
+import std::path;
+
+"""Re-export the standard input and output module."""
+open io;
+
+"""Re-export the standard file system module."""
+open fs;
+
+"""Re-export the standard path module."""
+open path;
+
+"""Write the payload to the staged path and return the result of the write."""
+meta effect("filesystem", "blocking")
+open verb write_stage(abs staged: Path, abs payload: Buffer) -> Result[Int, IoError] { return write_file(path: abs staged, contents: abs payload); }
+
+"""Read the staged file back and rename it to the active path, returning the error of the first step that fails."""
+meta effect("filesystem", "blocking")
+open verb publish_stage(abs staged: Path, abs active: Path) -> Result[Int, IoError] { erg loaded = read_to_bytes(path: abs staged); return case dat loaded { Result.Err(error) => Err(error), Result.Ok(bytes) => { drop(bytes); return rename(from: abs staged, to: abs active); }, }; }
+"#
+,
     )
     .expect("write result producer");
     fs::write(
         root.join("src/feature/runtime/flush.act"),
-        "import std::io; import std::path; open io; open path; open api; meta effect(\"filesystem\", \"blocking\") open verb flush_stage(abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg written = write_stage(staged: abs staged, payload: abs payload); return case dat written { Result.Err(error) => Err(error), Result.Ok(_) => publish_stage(staged: abs staged, active: abs active), }; }\n",
+        r#"import std::io;
+import std::path;
+
+"""Re-export the standard input and output module."""
+open io;
+
+"""Re-export the standard path module."""
+open path;
+
+"""Re-export the staging verbs."""
+open api;
+
+"""Write the payload to the staged path, then publish it to the active path."""
+meta effect("filesystem", "blocking")
+open verb flush_stage(abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg written = write_stage(staged: abs staged, payload: abs payload); return case dat written { Result.Err(error) => Err(error), Result.Ok(_) => publish_stage(staged: abs staged, active: abs active), }; }
+"#
+,
     )
     .expect("write result flusher");
     fs::write(
         root.join("src/feature/runtime/save.act"),
-        "import std::io; import std::path; open io; open path; open flush; open struct State { erg value: Int, } verb complete(ins state: State, dat flushed: Result[Int, IoError]) -> Result[Int, IoError] { return case dat flushed { Result.Err(error) => Err(error), Result.Ok(bytes) => { state.value = bytes; return Ok(bytes); }, }; } meta effect(\"filesystem\", \"blocking\") open verb forward(ins state: State, abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg flushed = flush_stage(staged: abs staged, active: abs active, payload: abs payload); return complete(state: ins state, flushed: dat flushed); }\n",
+        r#"import std::io;
+import std::path;
+
+"""Re-export the standard input and output module."""
+open io;
+
+"""Re-export the standard path module."""
+open path;
+
+"""Re-export the flushing verb."""
+open flush;
+
+"""A holder of the number of bytes that the last flush wrote."""
+open struct State {
+    """The number of bytes written by the last flush."""
+    erg value: Int,
+}
+
+"""Record the written byte count in the state and return it, or return the error of the flush."""
+verb complete(ins state: State, dat flushed: Result[Int, IoError]) -> Result[Int, IoError] { return case dat flushed { Result.Err(error) => Err(error), Result.Ok(bytes) => { state.value = bytes; return Ok(bytes); }, }; }
+
+"""Flush the payload from the staged path to the active path and record the written byte count in the state."""
+meta effect("filesystem", "blocking")
+open verb forward(ins state: State, abs staged: Path, abs active: Path, abs payload: Buffer) -> Result[Int, IoError] { erg flushed = flush_stage(staged: abs staged, active: abs active, payload: abs payload); return complete(state: ins state, flushed: dat flushed); }
+"#
+,
     )
     .expect("write result forwarder");
 
@@ -279,10 +354,33 @@ fn nested_facade_generic_result_preserves_aggregate_payload_natively() {
     let source = "import { open feature }; verb main() -> Int { erg result = forward[4](); return case dat result { Result.Ok(payload) => payload.value as Int, Result.Err(_) => 0, }; }\n";
     let (root, input, output) = project("nested-facade-aggregate-enum", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature facade");
-    fs::write(root.join("src/feature/feature.act"), "open api;\n").expect("write feature facade");
+    fs::write(
+        root.join("src/feature/feature.act"),
+        r#""""Re-export the feature API."""
+open api;
+"#,
+    )
+    .expect("write feature facade");
     fs::write(
         root.join("src/feature/api.act"),
-        "open struct Payload { erg value: u32, } open enum Failure { Failed, } open verb produce[N: Usize]() -> Result[Payload, Failure] { return Result[Payload, Failure].Ok(Payload { value: 41u32, }); } open verb forward[N: Usize]() -> Result[Payload, Failure] { erg result = produce[N](); return case dat result { Result.Ok(payload) => Result[Payload, Failure].Ok(payload), Result.Err(error) => Result[Payload, Failure].Err(error), }; }\n",
+        r#""""A payload that carries one 32-bit value."""
+open struct Payload {
+    """The carried value."""
+    erg value: u32,
+}
+
+"""The failure of the payload producers."""
+open enum Failure {
+    """The producer failed."""
+    Failed,
+}
+
+"""Return a payload that carries 41 in the Ok case."""
+open verb produce[N: Usize]() -> Result[Payload, Failure] { return Result[Payload, Failure].Ok(Payload { value: 41u32, }); }
+
+"""Return the payload that produce returns, or its failure."""
+open verb forward[N: Usize]() -> Result[Payload, Failure] { erg result = produce[N](); return case dat result { Result.Ok(payload) => Result[Payload, Failure].Ok(payload), Result.Err(error) => Result[Payload, Failure].Err(error), }; }
+"#,
     )
     .expect("write nested facade implementation");
     build(&root, &input, &output);
@@ -378,17 +476,49 @@ fn nested_facade_result_case_with_aggregate_payload_preserves_native_identity() 
     let source = "import { open feature }; verb main() -> Int { return run(); }\n";
     let (root, input, output) = project("nested-facade-result-aggregate-case", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
-    fs::write(root.join("src/feature/feature.act"), "open api;\n").expect("write feature facade");
-    fs::write(root.join("src/feature/api.act"), "open types; open encoding; open verb run() -> Int { erg result = encode(); return case dat result { Result.Ok(code) => code.mask_low as Int, Result.Err(_) => 0, }; }\n")
+    fs::write(
+        root.join("src/feature/feature.act"),
+        r#""""Re-export the feature API."""
+open api;
+"#,
+    )
+    .expect("write feature facade");
+    fs::write(root.join("src/feature/api.act"), r#""""Re-export the token types."""
+open types;
+
+"""Re-export the token encoding verbs."""
+open encoding;
+
+"""Encode a token and return its low mask, or 0 when encoding fails."""
+open verb run() -> Int { erg result = encode(); return case dat result { Result.Ok(code) => code.mask_low as Int, Result.Err(_) => 0, }; }
+"#)
         .expect("write feature api");
     fs::write(
         root.join("src/feature/types.act"),
-        "open struct TokenCode { erg mask_low: u64, erg mask_high: u64, } open enum Failure { Invalid, }\n",
+        r#""""A token code of two 64-bit masks."""
+open struct TokenCode {
+    """The low mask."""
+    erg mask_low: u64,
+    """The high mask."""
+    erg mask_high: u64,
+}
+
+"""The failure of token encoding."""
+open enum Failure {
+    """The token is invalid."""
+    Invalid,
+}
+"#,
     )
     .expect("write feature types");
     fs::write(
         root.join("src/feature/encoding.act"),
-        "open verb validate() -> Result[u64, Failure] { return Result[u64, Failure].Ok(41u64); } open verb encode() -> Result[TokenCode, Failure] { erg admission = validate(); return case dat admission { Result.Err(error) => Result[TokenCode, Failure].Err(error), Result.Ok(value) => Result[TokenCode, Failure].Ok(TokenCode { mask_low: value, mask_high: 0u64, }), }; }\n",
+        r#""""Return 41 in the Ok case."""
+open verb validate() -> Result[u64, Failure] { return Result[u64, Failure].Ok(41u64); }
+
+"""Encode the validated value as the low mask of a token code, or return the validation failure."""
+open verb encode() -> Result[TokenCode, Failure] { erg admission = validate(); return case dat admission { Result.Err(error) => Result[TokenCode, Failure].Err(error), Result.Ok(value) => Result[TokenCode, Failure].Ok(TokenCode { mask_low: value, mask_high: 0u64, }), }; }
+"#,
     )
     .expect("write feature encoding");
     build(&root, &input, &output);

@@ -1,3 +1,7 @@
+#[path = "semantic/abs_field_views.rs"]
+mod abs_field_views;
+#[path = "semantic/arena_cleanup.rs"]
+mod arena_cleanup;
 #[path = "semantic/arenas.rs"]
 mod arenas;
 #[path = "semantic/arrays.rs"]
@@ -10,8 +14,18 @@ mod casts;
 mod drop;
 #[path = "semantic/dynamic.rs"]
 mod dynamic;
+#[path = "semantic/enum_payload_moves.rs"]
+mod enum_payload_moves;
 #[path = "semantic/enums.rs"]
 mod enums;
+#[path = "semantic/erg_argument_moves.rs"]
+mod erg_argument_moves;
+#[path = "semantic/escaping_views.rs"]
+mod escaping_views;
+#[path = "semantic/explicit_copy_packs.rs"]
+mod explicit_copy_packs;
+#[path = "semantic/explicit_copy_types.rs"]
+mod explicit_copy_types;
 #[path = "semantic/float_negation.rs"]
 mod float_negation;
 #[path = "semantic/generics.rs"]
@@ -20,14 +34,22 @@ mod generics;
 mod integer_comparisons;
 #[path = "semantic/integer_operands.rs"]
 mod integer_operands;
+#[path = "semantic/literal_range.rs"]
+mod literal_range;
 #[path = "semantic/loans.rs"]
 mod loans;
+#[path = "semantic/loop_moves.rs"]
+mod loop_moves;
 #[path = "semantic/misleading_messages.rs"]
 mod misleading_messages;
+#[path = "semantic/move_only_fields.rs"]
+mod move_only_fields;
 #[path = "semantic/origins.rs"]
 mod origins;
 #[path = "semantic/packs.rs"]
 mod packs;
+#[path = "semantic/pattern_literals.rs"]
+mod pattern_literals;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
 #[path = "semantic/repr.rs"]

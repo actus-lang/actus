@@ -375,6 +375,7 @@ fn declarations(
                 MetaAttribute::Repr(_) => true,
                 MetaAttribute::Volatile => true,
                 MetaAttribute::ZeroOnDrop => true,
+                MetaAttribute::Copy => true,
             });
             let limitless = if program.file_metadata.contains(&crate::ast::LimitlessScope::File) {
                 Some("file")

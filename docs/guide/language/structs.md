@@ -100,6 +100,124 @@ Whole-struct assignment and transfer follow the same ownership rules. A
 resource-bearing aggregate is not silently duplicated just because its fields
 are laid out together.
 
+## Structs are moved, not copied
+
+A struct is never duplicated implicitly (ADR-0124). A binding, an assignment,
+a struct field initializer, an enum payload, an `erg` or `dat` argument and a
+return move the struct, whether it holds a resource or only plain data, and the
+source cannot be used again:
+
+```actus fails=E1005
+struct Header {
+    length: u16,
+}
+
+verb main() {
+    erg first = Header { length: 4u16, };
+    erg second = first;
+    print(int: first.length);
+}
+```
+
+Reading does not move. A field read such as `first.length`, a comparison and an
+`abs` argument leave the source usable. A struct that holds only plain data can
+declare [`meta copy`](../meta-attributes/copy.md) and be duplicated by a written
+`copy(value: abs x)`; the declaration is rejected with `E1146` when a field is a
+`Buffer`, an `Arena`, a view or a type that is not itself a copy type:
+
+```actus
+meta copy
+struct Header {
+    length: u16,
+}
+
+verb main() {
+    erg first = Header { length: 4u16, };
+    erg second = copy(value: abs first);
+    print(int: first.length);
+}
+```
+
+## Fields that receive a resource
+
+A field without a role is a value field, but a value that is not copyable is
+never duplicated by a struct literal. A `Buffer`, an `Arena[N]`, a struct or an
+enum that is written into a field is moved into the new aggregate, exactly as
+for an `erg` field, and the source binding cannot be used again:
+
+```actus fails=E1005
+struct Holder {
+    held: Buffer,
+}
+
+verb main() {
+    erg data: Buffer = Buffer[4];
+    erg holder = Holder { held: data, };
+    append(data, 1u8);
+}
+```
+
+Scalars are the exception: a scalar source stays readable because it is plain
+data. A value field cannot be moved out of its struct again: only an `erg` field
+is a movable place, so `Holder { held: other.held, }` is accepted when
+`other.held` is declared `erg` and rejected when it is a plain field. Declare
+the field `erg` when the aggregate should hand its resource on.
+
+An `abs` field is a view of its source, so the source is frozen until the end
+of the block that builds the struct. Within that block it can be read but not
+moved, dropped, or changed:
+
+```actus fails=E1009
+struct Header {
+    abs bytes: Buffer,
+}
+
+verb main() {
+    erg data: Buffer = Buffer[4];
+    erg header = Header { bytes: data, };
+    drop(data);
+}
+```
+
+A struct that holds a view can leave a verb, by `return` or through a field of
+an `ins` parameter, only when every view in it comes from an `abs` parameter of
+that verb. A view of a local, of an owned parameter or of a temporary would
+dangle after the return, so it is rejected with `E1018`. The same holds for an
+`Option`, a `Result` or an enum payload that holds a view, for a struct nested
+in another struct, and for a struct that is first stored in a binding:
+
+```actus fails=E1018
+struct Header {
+    abs bytes: Buffer,
+}
+
+verb open_header() -> Header {
+    erg data: Buffer = Buffer[4];
+    erg header = Header { bytes: data, };
+    return header;
+}
+
+verb main() {
+}
+```
+
+```actus
+struct Header {
+    abs bytes: Buffer,
+}
+
+verb open_header(abs source: Buffer) -> Header {
+    return Header { bytes: source, };
+}
+
+verb main() {
+}
+```
+
+A call-scope `ins` loan cannot be stored in an `abs` field. Assigning a
+resource (a buffer, an arena, or a type that holds one) to a field or an array
+element moves it out of the source binding. Plain data keeps value semantics.
+
 ## Cleanup and custom drop behavior
 
 Struct cleanup is planned at scope boundaries and on return or error paths. If
@@ -200,7 +318,8 @@ A struct does not automatically provide:
 - a serialized byte layout;
 - a dynamic collection or unbounded capacity;
 - a garbage-collected lifetime;
-- implicit copying of owned fields;
+- implicit copying of the struct or of its fields (`meta copy` allows a written
+  `copy(value: abs x)` only);
 - permission to use a field after it has moved.
 
 Use the type, ownership role, `pack`, `Array`, or `Arena` contract that matches

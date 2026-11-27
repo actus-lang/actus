@@ -17,6 +17,12 @@ An `erg` binding may be read, mutated, borrowed, passed by explicit role,
 moved into another owner, or dropped. It is the normal local role for mutable
 state.
 
+Passing a resource to an `erg` parameter moves it into the callee, which
+cleans it up; the caller binding becomes `Moved`. A value stored in an enum
+payload or assigned to a field or element moves in the same way. A struct or an
+enum moves whether or not it holds a resource (ADR-0124); only a type declared
+`meta copy` can be duplicated, and only by a written `copy(value: abs x)`.
+
 ### 7.2 `abs`: read-only view
 
 `abs` creates or accepts a non-owning read-only view:
@@ -28,7 +34,9 @@ verb checksum(abs packet: Buffer) -> Int {
 ```
 
 The view does not consume the source, cannot mutate it, and cannot outlive its
-origin. An owner with an active `abs` borrow is frozen until the borrow ends.
+origin. An owner with an active `abs` borrow is frozen until the borrow ends. An `abs`
+struct field or `abs` enum payload built from a local freezes that local in
+the same way, until the end of the block that builds the holder.
 
 Explicit borrow construction uses `ref`:
 

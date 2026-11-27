@@ -110,9 +110,10 @@ Array slots may be passed as exclusive `ins` loans without copying the array.
 
 Eligible scalar values can be reused explicitly with `copy(value: abs value)`.
 The operation requires the `abs` role and is limited to compiler-approved
-integer and boolean scalars. It preserves the scalar type and does not consume
-the caller. Buffers, strings, resources, cleanup-bearing aggregates, and
-unsupported user-defined types are rejected.
+integer and boolean scalars and to structs and enums declared `meta copy`
+(ADR-0124). It preserves the type and does not consume the caller. Buffers,
+strings, resources, cleanup-bearing aggregates, and other user-defined types
+are rejected.
 
 Pack fields are read and written through native shift/mask lowering. Source
 code uses field access rather than manually reproducing the packed layout.

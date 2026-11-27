@@ -7,7 +7,9 @@ use crate::modules::{
 use crate::session::CompilationSession;
 use std::fs;
 
-use super::conformance::{ConformanceMode, parse_strict_option, validate_source_limits};
+use super::conformance::{
+    ConformanceMode, parse_strict_option, validate_package_documentation, validate_source_limits,
+};
 use super::diagnostics::{report_frontend_error, report_mapped_diagnostic};
 
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
@@ -25,7 +27,7 @@ pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 
     ) {
         Ok(configuration) => configuration,
         Err(error) => {
-            errln!("error: {error}");
+            errln!("{error}");
             return 1;
         }
     };
@@ -147,8 +149,15 @@ fn analyze_check_program(
     mode: ConformanceMode,
     plan: crate::modules::ModuleCompilationPlan,
 ) -> i32 {
-    if let Err(error) = validate_compilation_plan(&plan, configuration.target()) {
+    if let Err(error) = validate_compilation_plan(
+        &plan,
+        configuration.target(),
+        configuration.native_backend().backend().name(),
+    ) {
         report_mapped_diagnostic(source_map, input, source, module_diagnostic(&error));
+        return 1;
+    }
+    if !validate_package_documentation(input, &plan, mode) {
         return 1;
     }
     if mode.is_strict() {
@@ -183,8 +192,15 @@ fn check_module(
         Ok(plan) => plan,
         Err(error) => return report_module_error(module_path, error, source_map),
     };
-    if let Err(error) = validate_compilation_plan(&plan, configuration.target()) {
+    if let Err(error) = validate_compilation_plan(
+        &plan,
+        configuration.target(),
+        configuration.native_backend().backend().name(),
+    ) {
         report_mapped_diagnostic(source_map, input_path, "", module_diagnostic(&error));
+        return 1;
+    }
+    if !validate_package_documentation(input_path, &plan, mode) {
         return 1;
     }
     if mode.is_strict() {

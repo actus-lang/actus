@@ -152,17 +152,17 @@ impl Analyzer {
         subject_type: &str,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        let pattern_type = match pattern {
-            LiteralPattern::Integer(_) => "Int",
-            LiteralPattern::Bool(_) => "Bool",
+        let (pattern_type, fits) = match pattern {
+            LiteralPattern::Integer(literal) => {
+                // The parser keeps the sign of a negative literal pattern in the text.
+                let (digits, negative) = literal
+                    .strip_prefix('-')
+                    .map_or((literal.as_str(), false), |rest| (rest, true));
+                ("Int", cast_literal_fits(digits, negative, subject_type))
+            }
+            LiteralPattern::Bool(_) => ("Bool", subject_type == "Bool"),
         };
-        if pattern_type == subject_type
-            || matches!(pattern, LiteralPattern::Integer(literal) if cast_literal_fits(literal, false, subject_type))
-        {
-            Ok(())
-        } else {
-            Err(pattern_type_mismatch(subject_type, pattern_type, span))
-        }
+        if fits { Ok(()) } else { Err(pattern_type_mismatch(subject_type, pattern_type, span)) }
     }
 
     fn validate_variant_payload(

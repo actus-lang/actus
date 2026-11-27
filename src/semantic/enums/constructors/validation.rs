@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{Argument, EnumPayload, Expr, PrimitiveType, TypeName, primitive_type};
+use crate::ast::{Argument, EnumPayload, Expr, PrimitiveType, Role, TypeName, primitive_type};
 use crate::lexer::SourceSpan;
 
 use crate::semantic::TypeSubstitution;
@@ -170,9 +170,12 @@ impl Analyzer {
         let expected_name =
             self.normalize_imported_type_key(&type_parsing::canonical_type_name(expected));
         if found == expected_name || found == variants::strip_reference_role(&expected_name) {
-            if self.enum_payload_owns_value(expected) {
-                self.initialize_owner(&argument.expression, variants::argument_span(argument))?;
-            }
+            self.validate_expected_literal(&argument.expression, expected)?;
+            self.store_enum_payload(
+                expected,
+                &argument.expression,
+                variants::argument_span(argument),
+            )?;
             return Ok(());
         }
         Err(SemanticError {
@@ -186,9 +189,24 @@ impl Analyzer {
         })
     }
 
-    pub(in crate::semantic) fn enum_payload_owns_value(&self, type_name: &TypeName) -> bool {
-        type_name.name == "Buffer"
-            || self.struct_types.contains_key(&type_name.name)
-            || self.drop_types.contains(&type_name.name)
+    /// Stores a constructor argument in an enum payload. A struct, an enum, a
+    /// buffer, an arena, or any type that holds a resource moves into the
+    /// enum value (ADR-0046 3, ADR-0059, ADR-0124).
+    /// An `abs` payload is a read-only view instead: it freezes its source for
+    /// the rest of the block, as for an `abs` binding (ADR-0016, ADR-0046 2.3).
+    pub(in crate::semantic) fn store_enum_payload(
+        &mut self,
+        payload_type: &TypeName,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if payload_type.reference_role == Some(Role::Abs) {
+            return self.register_view_borrow(expression, span);
+        }
+        let owns = payload_type.reference_role.is_none() && self.type_moves_on_store(payload_type);
+        if owns {
+            return self.consume_owned_source(expression, span);
+        }
+        Ok(())
     }
 }

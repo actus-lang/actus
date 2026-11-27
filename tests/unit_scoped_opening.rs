@@ -65,6 +65,40 @@ fn unit_sources(main: &str) -> Vec<(&'static str, String)> {
     ]
 }
 
+/// The same sources with the `"""` documentation that strict mode requires for
+/// every public declaration. The formatter test keeps the undocumented text.
+fn documented(sources: Vec<(&'static str, String)>) -> Vec<(&'static str, String)> {
+    const DOCUMENTATION: [(&str, &str); 9] = [
+        ("open store;", "Re-export the store module declarations for the fixture project."),
+        ("open shard;", "Re-export the shard module declarations for the fixture project."),
+        ("open log;", "Re-export the log module declarations for the fixture project."),
+        ("open fixed;", "Re-export the fixed module declarations for the fixture project."),
+        ("open unit codec;", "Re-export the codec module declarations for this unit only."),
+        ("open entry;", "Re-export the entry module declarations for the fixture project."),
+        (
+            "open verb fixed_width()",
+            "Return the unsigned 32-bit width value 8 that the fixed codec uses.",
+        ),
+        (
+            "open verb encode_width()",
+            "Return the unsigned 32-bit width value 4 that the unit codec uses.",
+        ),
+        (
+            "open verb entry_width()",
+            "Return the unsigned 32-bit value that sums the encode and fixed widths.",
+        ),
+    ];
+    sources
+        .into_iter()
+        .map(|(path, source)| {
+            let source = DOCUMENTATION.iter().fold(source, |text, (declaration, documentation)| {
+                text.replace(declaration, &format!("\"\"\"{documentation}\"\"\" {declaration}"))
+            });
+            (path, source)
+        })
+        .collect()
+}
+
 fn borrowed<'a>(sources: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str)> {
     sources.iter().map(|(path, source)| (*path, source.as_str())).collect()
 }
@@ -73,7 +107,7 @@ const PUBLIC_MAIN: &str = "import {\n    open pkg,\n};\n\nverb main() -> Int {\n
 
 #[test]
 fn unit_scoped_opening_is_visible_inside_the_unit() {
-    let sources = unit_sources(PUBLIC_MAIN);
+    let sources = documented(unit_sources(PUBLIC_MAIN));
     let root = project("inside", &borrowed(&sources));
     assert_eq!(check_build_run(&root), Some(0));
     fs::remove_dir_all(root).expect("remove inside fixture");
@@ -124,11 +158,11 @@ fn opening_one_name_both_ways_is_rejected() {
 
 #[test]
 fn a_sibling_named_unit_is_still_opened_by_open_unit() {
-    let mut sources = unit_sources(PUBLIC_MAIN);
-    sources[3].1 = "open fixed;\nopen unit codec;\nopen unit;\n".to_owned();
+    let mut sources = documented(unit_sources(PUBLIC_MAIN));
+    sources[3].1 = "\"\"\"Re-export the fixed module declarations for the fixture project.\"\"\" open fixed;\n\"\"\"Re-export the codec module declarations for this unit only.\"\"\" open unit codec;\n\"\"\"Re-export the unit sibling declarations for this unit only.\"\"\" open unit;\n".to_owned();
     sources.push((
         "pkg/store/shard/unit.act",
-        "open verb unit_width() -> u32 {\n    return 0u32;\n}\n".to_owned(),
+        "\"\"\"Return the unsigned 32-bit value 0 that the unit sibling reports.\"\"\" open verb unit_width() -> u32 {\n    return 0u32;\n}\n".to_owned(),
     ));
     sources[0].1 = "import {\n    open pkg,\n};\n\nverb main() -> Int {\n    return (entry_width() + unit_width()) as Int - 12;\n}\n".to_owned();
     let root = project("named-unit", &borrowed(&sources));

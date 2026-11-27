@@ -82,6 +82,10 @@ impl StructDef {
         self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::ZeroOnDrop))
     }
 
+    pub fn is_copy(&self) -> bool {
+        self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Copy))
+    }
+
     pub fn repr(&self) -> Option<Repr> {
         self.metadata
             .iter()
@@ -94,6 +98,10 @@ impl StructDef {
 }
 
 impl EnumDef {
+    pub fn is_copy(&self) -> bool {
+        self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Copy))
+    }
+
     pub fn repr(&self) -> Option<Repr> {
         self.metadata
             .iter()
@@ -106,6 +114,10 @@ impl EnumDef {
 }
 
 impl PackDecl {
+    pub fn is_copy(&self) -> bool {
+        self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Copy))
+    }
+
     pub fn layout_identity(&self) -> String {
         let fields = self
             .fields

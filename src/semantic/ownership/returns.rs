@@ -47,7 +47,6 @@ impl Analyzer {
             return Ok(());
         }
         let index = self.binding(name, span)?;
-        self.ensure_access_available(index, name, span)?;
         self.reject_ins_return(index, name, span)?;
         if self.model.bindings[index].role == Role::Abs {
             return Err(SemanticError {
@@ -89,7 +88,11 @@ impl Analyzer {
             self.validate_abs_return(expression)?;
         }
         self.validate_return_type(expression)?;
-        self.reject_arena_escape(expression)
+        self.reject_arena_escape(expression)?;
+        if self.current_return_access != Some(crate::ast::ReturnAccess::Abs) {
+            self.reject_escaping_views(expression)?;
+        }
+        Ok(())
     }
 
     fn reject_arena_escape(&self, expression: &Expr) -> Result<(), SemanticError> {

@@ -30,6 +30,11 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
             format!("invalid borrow target `{name}`")
         }
         SemanticErrorKind::UseAfterMove { name } => format!("use of moved binding `{name}`"),
+        SemanticErrorKind::MovedInPreviousIteration { name } => format!(
+            "use of binding `{name}` moved in a previous loop iteration; this move runs again on \
+             the next iteration, so leave the loop with `break` or `return` after it or declare \
+             the value inside the loop"
+        ),
         SemanticErrorKind::UseAfterDrop { name } => format!("use of dropped binding `{name}`"),
         SemanticErrorKind::DoubleDrop { name } => format!("binding `{name}` was dropped twice"),
         SemanticErrorKind::DropBorrow { name } => format!("cannot drop borrow `{name}` directly"),
@@ -187,9 +192,6 @@ fn ownership_loan_message(kind: &SemanticErrorKind) -> Option<String> {
         }
         SemanticErrorKind::ReservedIntrinsicName { name } => {
             format!("`{name}` is reserved for a built-in intrinsic")
-        }
-        SemanticErrorKind::SuspendedAccess { name, loan_id } => {
-            format!("binding `{name}` is suspended by exclusive loan #{loan_id}")
         }
         SemanticErrorKind::ExclusiveLoanAlias { name } => {
             format!("exclusive loan aliases resource `{name}` more than once")

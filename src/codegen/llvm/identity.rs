@@ -38,15 +38,22 @@ pub fn toolchain_identity() -> ToolchainIdentity {
     }
 }
 
+/// The complete line to print when a strict build selects an unverified LLVM
+/// toolchain (E1806). It names no file: `error[E1806]: message`.
 pub fn strict_identity_error() -> Option<String> {
     if option_env!("ACTUS_LLVM_STATUS") != Some("unverified") {
         return None;
     }
     let prefix = std::env::var("LLVM_SYS_231_PREFIX")
         .unwrap_or_else(|_| ".actus-toolchain/llvm-23.1.2".to_owned());
-    Some(format!(
-        "error[E1806]: strict LLVM build requires a verified toolchain; selected prefix {prefix} is unverified; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1"
-    ))
+    let diagnostic = crate::diagnostics::Diagnostic::error(
+        crate::diagnostics::DiagnosticCode::STRICT_LLVM_UNVERIFIED.as_str(),
+        crate::lexer::SourceSpan::new(0, 0),
+        format!(
+            "strict LLVM build requires a verified toolchain; selected prefix {prefix} is unverified; run scripts/bootstrap_llvm.sh or scripts/bootstrap_llvm.ps1"
+        ),
+    );
+    Some(crate::diagnostics::render_unlocated_diagnostic(&diagnostic))
 }
 
 fn optional_identity_value(value: Option<&'static str>) -> Option<String> {

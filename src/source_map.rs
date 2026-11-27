@@ -181,7 +181,7 @@ mod tests {
         let first = map.register("source-map-related-first.act", "first");
         let second = map.register("source-map-related-second.act", "second");
         let diagnostic = crate::diagnostics::Diagnostic::error(
-            "E1106",
+            crate::diagnostics::DiagnosticCode::MODULE_DUPLICATE_DECLARATION.as_str(),
             SourceSpan::new(second, second + 1),
             "duplicate declaration",
         )

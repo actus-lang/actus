@@ -35,7 +35,7 @@ pub(in crate::cli) fn test_command(arguments: impl Iterator<Item = String>) -> i
             None => configuration,
         },
         Err(error) => {
-            errln!("error: {error}");
+            errln!("{error}");
             return 1;
         }
     };
@@ -130,10 +130,11 @@ fn non_empty_test_value(value: &str, option: &str) -> Result<String, String> {
     if value.is_empty() { Err(format!("empty value for `{option}`")) } else { Ok(value.to_owned()) }
 }
 
+/// The error is the complete line to print.
 fn load_test_configuration(mode: ConformanceMode) -> Result<CompilerConfiguration, String> {
     if mode.is_strict() {
         CompilerConfiguration::from_current_manifest_strict().map_err(|error| error.to_string())
     } else {
-        CompilerConfiguration::from_current_manifest().map_err(|error| error.to_string())
+        CompilerConfiguration::from_current_manifest().map_err(|error| error.report())
     }
 }
