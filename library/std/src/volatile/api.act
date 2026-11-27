@@ -20,6 +20,14 @@ unsafe extern "C" verb actus_volatile_read_u8[T](
     erg target_alignment: u64
 ) -> Result[u8, VolatileError];
 
+"""
+Private bridge that performs one volatile load of a `u16` value from a provider-owned
+register block. The address is an immutable `abs` view of a `VolatileAddress`
+that is not consumed. The runtime validates the descriptor, the checked offset,
+the bounds and the alignment named by `target_size` and `target_alignment`
+before the native volatile load. It returns `Ok(value)` or a typed
+`VolatileError`, carries the `volatile` effect and never allocates the target.
+"""
 meta effect("volatile")
 unsafe extern "C" verb actus_volatile_read_u16[T](
     abs address: VolatileAddress[T],
@@ -28,6 +36,14 @@ unsafe extern "C" verb actus_volatile_read_u16[T](
     erg target_alignment: u64
 ) -> Result[u16, VolatileError];
 
+"""
+Private bridge that performs one volatile load of a `u32` value from a provider-owned
+register block. The address is an immutable `abs` view of a `VolatileAddress`
+that is not consumed. The runtime validates the descriptor, the checked offset,
+the bounds and the alignment named by `target_size` and `target_alignment`
+before the native volatile load. It returns `Ok(value)` or a typed
+`VolatileError`, carries the `volatile` effect and never allocates the target.
+"""
 meta effect("volatile")
 unsafe extern "C" verb actus_volatile_read_u32[T](
     abs address: VolatileAddress[T],
@@ -36,6 +52,14 @@ unsafe extern "C" verb actus_volatile_read_u32[T](
     erg target_alignment: u64
 ) -> Result[u32, VolatileError];
 
+"""
+Private bridge that performs one volatile load of a `u64` value from a provider-owned
+register block. The address is an immutable `abs` view of a `VolatileAddress`
+that is not consumed. The runtime validates the descriptor, the checked offset,
+the bounds and the alignment named by `target_size` and `target_alignment`
+before the native volatile load. It returns `Ok(value)` or a typed
+`VolatileError`, carries the `volatile` effect and never allocates the target.
+"""
 meta effect("volatile")
 unsafe extern "C" verb actus_volatile_read_u64[T](
     abs address: VolatileAddress[T],
@@ -44,6 +68,15 @@ unsafe extern "C" verb actus_volatile_read_u64[T](
     erg target_alignment: u64
 ) -> Result[u64, VolatileError];
 
+"""
+Private bridge that performs one volatile store of a `u8` value into a provider-owned
+register block. The address is an exclusive `ins` loan of a writable
+`VolatileWriteAddress`; the value is a copied scalar. The runtime validates the
+writable descriptor, the checked offset, the bounds and the alignment named by
+`target_size` and `target_alignment` before the native volatile store. It returns
+`Ok` or a typed `VolatileError`, carries the `volatile` effect and requires the
+`volatile.write` capability.
+"""
 meta effect("volatile")
 unsafe extern "C" verb actus_volatile_write_u8[T](
     ins address: VolatileWriteAddress[T],
@@ -53,6 +86,15 @@ unsafe extern "C" verb actus_volatile_write_u8[T](
     erg value: u8
 ) -> Result[Void, VolatileError];
 
+"""
+Private bridge that performs one volatile store of a `u16` value into a provider-owned
+register block. The address is an exclusive `ins` loan of a writable
+`VolatileWriteAddress`; the value is a copied scalar. The runtime validates the
+writable descriptor, the checked offset, the bounds and the alignment named by
+`target_size` and `target_alignment` before the native volatile store. It returns
+`Ok` or a typed `VolatileError`, carries the `volatile` effect and requires the
+`volatile.write` capability.
+"""
 meta effect("volatile")
 unsafe extern "C" verb actus_volatile_write_u16[T](
     ins address: VolatileWriteAddress[T],
@@ -62,6 +104,15 @@ unsafe extern "C" verb actus_volatile_write_u16[T](
     erg value: u16
 ) -> Result[Void, VolatileError];
 
+"""
+Private bridge that performs one volatile store of a `u32` value into a provider-owned
+register block. The address is an exclusive `ins` loan of a writable
+`VolatileWriteAddress`; the value is a copied scalar. The runtime validates the
+writable descriptor, the checked offset, the bounds and the alignment named by
+`target_size` and `target_alignment` before the native volatile store. It returns
+`Ok` or a typed `VolatileError`, carries the `volatile` effect and requires the
+`volatile.write` capability.
+"""
 meta effect("volatile")
 unsafe extern "C" verb actus_volatile_write_u32[T](
     ins address: VolatileWriteAddress[T],
@@ -71,6 +122,15 @@ unsafe extern "C" verb actus_volatile_write_u32[T](
     erg value: u32
 ) -> Result[Void, VolatileError];
 
+"""
+Private bridge that performs one volatile store of a `u64` value into a provider-owned
+register block. The address is an exclusive `ins` loan of a writable
+`VolatileWriteAddress`; the value is a copied scalar. The runtime validates the
+writable descriptor, the checked offset, the bounds and the alignment named by
+`target_size` and `target_alignment` before the native volatile store. It returns
+`Ok` or a typed `VolatileError`, carries the `volatile` effect and requires the
+`volatile.write` capability.
+"""
 meta effect("volatile")
 unsafe extern "C" verb actus_volatile_write_u64[T](
     ins address: VolatileWriteAddress[T],

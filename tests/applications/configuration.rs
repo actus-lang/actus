@@ -4,7 +4,7 @@ use std::fs;
 use std::process::Command;
 #[test]
 fn package_configuration_module_emits_without_an_anchor_verb() {
-    let source = "import { open config }; verb main() -> Int { return LIMIT as Int; }\n";
+    let source = "import { open config };\n\"\"\"Entry point that returns the value of the imported configuration constant LIMIT, converted to Int, as the process exit status.\"\"\"\nverb main() -> Int { return LIMIT as Int; }\n";
     let (root, input, output) = project("const-only-config", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -52,7 +52,7 @@ open const LIMIT: u8 = 30u8;
 
 #[test]
 fn package_configuration_supports_all_compile_time_consumers() {
-    let source = "import { open config }; struct Settings { erg threshold: u8, } struct Storage[N: Usize] { erg values: Array[u8, N], } verb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = LIMIT; erg settings = Settings { threshold: values[0], }; erg storage: Storage[2] = Storage[2] { values: Array[u8, 2](), }; storage.values[0] = settings.threshold; erg result = storage.values[0] as Int; if ENABLED == true { return result; } return 2; }\n";
+    let source = "import { open config }; struct Settings { erg threshold: u8, } struct Storage[N: Usize] { erg values: Array[u8, N], }\n\"\"\"Entry point that writes the constant LIMIT into a fixed array, copies it through a settings struct and a storage struct, and returns the stored value as Int when ENABLED is true, or 2 otherwise.\"\"\"\nverb main() -> Int { erg values: Array[u8, 2] = Array[u8, 2](); values[0] = LIMIT; erg settings = Settings { threshold: values[0], }; erg storage: Storage[2] = Storage[2] { values: Array[u8, 2](), }; storage.values[0] = settings.threshold; erg result = storage.values[0] as Int; if ENABLED == true { return result; } return 2; }\n";
     let (root, input, output) = project("config-acceptance", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -81,7 +81,7 @@ open const ENABLED: Bool = true;
 
 #[test]
 fn imported_module_can_lower_a_configuration_constant() {
-    let source = "import { open worker }; verb main() -> Int { return read_magic(); }\n";
+    let source = "import { open worker };\n\"\"\"Entry point that returns the result of read_magic, which lowers a configuration constant inside the imported worker module.\"\"\"\nverb main() -> Int { return read_magic(); }\n";
     let (root, input, output) = project("config-imported-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -124,7 +124,7 @@ open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }
 
 #[test]
 fn nested_imported_module_can_lower_a_configuration_constant() {
-    let source = "import { open aie }; verb main() -> Int { return read_magic(); }\n";
+    let source = "import { open aie };\n\"\"\"Entry point that returns the result of read_magic, which lowers a configuration constant inside the imported worker module.\"\"\"\nverb main() -> Int { return read_magic(); }\n";
     let (root, input, output) = project("config-nested-imported-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -174,7 +174,7 @@ open verb read_magic() -> Int { return BRAIN_MAGIC as Int; }
 
 #[test]
 fn canonical_parent_facade_exposes_nested_configuration_constant() {
-    let source = "import { open feature }; verb main() -> Int { return stride() as Int; }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the Int conversion of stride, a configuration constant reached through the canonical parent facade.\"\"\"\nverb main() -> Int { return stride() as Int; }\n";
     let (root, input, output) = project("canonical-constant-facade", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -217,7 +217,7 @@ open verb stride() -> u16 { return BUFFER_STRIDE; }
 
 #[test]
 fn nested_facade_constant_has_object_and_executable_parity() {
-    let source = "import { open feature }; verb main() -> Int { return inspect() as Int; }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the Int conversion of inspect, which reads a configuration constant exposed by a nested facade module.\"\"\"\nverb main() -> Int { return inspect() as Int; }\n";
     let (root, input, output) = project("constant-native-parity", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(

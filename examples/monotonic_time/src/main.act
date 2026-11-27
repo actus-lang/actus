@@ -10,6 +10,13 @@ import {
     open std::time,
 };
 
+"""
+Extract the duration from a result that the example expects to succeed. A
+successful result yields its duration; an error yields a zero-nanosecond
+duration so the example can continue and report the failure through its exit
+status. The candidate is consumed, and the function allocates nothing and has no
+side effects.
+"""
 verb unwrap_duration(erg candidate: Result[Duration, TimeError]) -> Duration {
     return case dat candidate {
         Result.Ok(value) => value,
@@ -19,6 +26,13 @@ verb unwrap_duration(erg candidate: Result[Duration, TimeError]) -> Duration {
     };
 }
 
+"""
+Extract the deadline from a result that the example expects to succeed. A
+successful result yields its deadline; an error yields a deadline that expires
+at tick zero so the example can continue and report the failure through its exit
+status. The candidate is consumed, and the function allocates nothing and has no
+side effects.
+"""
 verb unwrap_deadline(erg candidate: Result[Deadline, TimeError]) -> Deadline {
     return case dat candidate {
         Result.Ok(value) => value,
@@ -28,6 +42,17 @@ verb unwrap_deadline(erg candidate: Result[Deadline, TimeError]) -> Deadline {
     };
 }
 
+"""
+contract:
+purpose:
+    Run the monotonic timing example: capture an instant, build a one
+    millisecond duration, derive a deadline from it, check that the deadline
+    has not expired and that a deadline past the largest instant overflows.
+outputs:
+    Exit status 0 when every check holds and 2 otherwise.
+side_effects:
+    Reads the monotonic clock and prints one summary line to standard output.
+"""
 meta effect("clock")
 verb main() -> Int {
     erg started: Instant = now();

@@ -17,6 +17,19 @@ struct Table[N: Usize] {
     erg links: Array[u32, 8],
 }
 
+"""
+contract:
+purpose:
+    Pop the first free record index off the free list stored in the table links, or report that none is free.
+inputs:
+    table: exclusive ins loan of Table of capacity N whose links array holds the free list.
+outputs:
+    Option.Some with the record index taken from the list, or Option.None when the list head is the NULL_INDEX sentinel.
+ownership:
+    The table is an exclusive ins loan and its links array is relinked.
+side_effects:
+    Rewrites the head and the taken link in the table.
+"""
 verb take_record[N: Usize](ins table: Table[N]) -> Option[u32] {
     if table.links[0u32] == NULL_INDEX {
         return Option[u32].None;
@@ -27,6 +40,21 @@ verb take_record[N: Usize](ins table: Table[N]) -> Option[u32] {
     return Option[u32].Some(index);
 }
 
+"""
+contract:
+purpose:
+    Allocate a record index from the table and reject sentinel and out-of-range results.
+inputs:
+    table: exclusive ins loan of Table of capacity N.
+outputs:
+    Result.Ok with the record index, or Result.Err with LinkError.Capacity.
+ownership:
+    The table stays an exclusive ins loan and is passed on to take_record.
+errors:
+    LinkError.Capacity when no record is free or the index is not below CAPACITY.
+side_effects:
+    Relinks the free list in the table.
+"""
 verb acquire[N: Usize](ins table: Table[N]) -> Result[u32, LinkError] {
     erg allocated = take_record[N](table: ins table);
     erg record_index: u32 = case dat allocated {
@@ -39,6 +67,7 @@ verb acquire[N: Usize](ins table: Table[N]) -> Result[u32, LinkError] {
     return Result[u32, LinkError].Ok(record_index);
 }
 
+"""Entry point that builds a table with the free list 1, 2, end, acquires one record and returns 0 when the index is 1, 2 when it is another index, and 1 on error."""
 verb main() -> Int {
     erg table: Table[64] = Table[64] { links: Array[u32, 8](), };
     table.links[0u32] = 1u32;

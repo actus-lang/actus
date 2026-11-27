@@ -26,7 +26,7 @@ fn write_strict_metadata_project(root: &Path) {
         "[package]\nname = \"strict-metadata\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "verb main() -> Int { return 0; }\n")
+    fs::write(root.join("src/main.act"), "\"\"\"Entry point of the strict metadata fixture; it returns the exit status 0.\"\"\"\nverb main() -> Int { return 0; }\n")
         .expect("write entry source");
     fs::write(root.join("tests/smoke.act"), "meta test\nverb smoke() -> Int { return 0; }\n")
         .expect("write test source");

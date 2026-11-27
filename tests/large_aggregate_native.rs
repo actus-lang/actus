@@ -8,7 +8,7 @@ use actus::cli::run_with_args;
 fn large_fixed_array_uses_runtime_storage(backend: &str) {
     const LARGE_ARRAY_CAPACITY: usize = 64 * 1024;
     let source = format!(
-        "struct Cell {{ erg value: u8, }} verb main() -> Int {{ erg cells: Array[Cell, {LARGE_ARRAY_CAPACITY}] = Array[Cell, {LARGE_ARRAY_CAPACITY}](); cells[{last_index}].value = 41u8; return cells[{last_index}].value as Int + 1; }}\n",
+        "struct Cell {{ erg value: u8, }}\n\"\"\"Entry point that creates an array of Cell structs of the largest supported capacity, stores 41 in its last cell and returns that value plus 1.\"\"\"\nverb main() -> Int {{ erg cells: Array[Cell, {LARGE_ARRAY_CAPACITY}] = Array[Cell, {LARGE_ARRAY_CAPACITY}](); cells[{last_index}].value = 41u8; return cells[{last_index}].value as Int + 1; }}\n",
         last_index = LARGE_ARRAY_CAPACITY - 1,
     );
     let root = std::env::temp_dir()
@@ -57,7 +57,7 @@ fn large_fixed_array_uses_runtime_storage_with_llvm() {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn freestanding_target_rejects_implicit_large_aggregate_allocation() {
-    let source = "struct Cell { erg value: u8, } verb main() -> Int { erg cells: Array[Cell, 131072] = Array[Cell, 131072](); return cells[0].value as Int; }\n";
+    let source = "struct Cell { erg value: u8, }\n\"\"\"Entry point that creates an array of 131072 Cell structs and returns the value of the first cell as Int.\"\"\"\nverb main() -> Int { erg cells: Array[Cell, 131072] = Array[Cell, 131072](); return cells[0].value as Int; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir()
             .join(format!("actus-large-aggregate-freestanding-{backend}-{}", std::process::id()));

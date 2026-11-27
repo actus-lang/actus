@@ -7,6 +7,14 @@ compiler or domain-specific runtime path.
 """
 import std::io;
 
+"""
+contract:
+purpose:
+    Demonstrate that string literals are usable in `case` and `if` branches by
+    printing one readable line from each branch that is taken.
+side_effects:
+    Writes the taken branch messages to standard output through `io::println`.
+"""
 verb main() -> Void {
     erg ready: Bool = true;
     case ready {

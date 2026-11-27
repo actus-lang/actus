@@ -3,7 +3,7 @@ use std::fs;
 
 #[test]
 fn nested_snapshot_module_can_lower_facade_constants_in_struct_and_predicate() {
-    let source = "import { open aie }; verb main() -> Int { return snapshot_is_valid(); }\n";
+    let source = "import { open aie };\n\"\"\"Entry point that returns the result of snapshot_is_valid as the process exit status.\"\"\"\nverb main() -> Int { return snapshot_is_valid(); }\n";
     let (root, input, output) = project("config-snapshot-module", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -67,7 +67,7 @@ open verb snapshot_is_valid() -> Int {
 
 #[test]
 fn nested_facade_constants_lower_inside_indexed_snapshot_loops() {
-    let source = "import { open feature }; verb main() -> Int { return emit(); }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the result of emit as the process exit status.\"\"\"\nverb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("constant-indexed-loop", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(

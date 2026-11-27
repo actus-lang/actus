@@ -52,7 +52,9 @@ pages from them.
    keywords as substrings and are not reliable, so strict mode does not
    report them yet; this ADR replaces them with a documented structure, such
    as named sections for returns and errors, and enables them. Until then
-   `E1841` and `E1842` stay in `missing.txt`.
+   `E1841` and `E1842` stay in `missing.txt`. Strict mode already requires
+   a docstring on every verb, private ones included; the same ADR decides
+   whether private structs, enums, fields and constants are required too.
 6. **Release assets.** The release archive or the repository at the release
    tag carries the generated catalog and standard-library pages, so the
    website can take the pages of the exact version it documents.

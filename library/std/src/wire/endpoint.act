@@ -62,18 +62,42 @@ open pack WireEndpoint {
     }
 }
 
+"""
+Decide whether one byte may appear in the authority part of a `wire://`
+endpoint: it must be a printable non-space byte other than the delimiters `/`,
+`:`, `?` and `#`. The byte is a copied scalar; the function performs no I/O and
+no allocation.
+"""
 verb wire_endpoint_is_authority_byte(erg byte: u8) -> Bool {
     return byte > 32u8 && byte != 47u8 && byte != 58u8 && byte != 63u8 && byte != 35u8;
 }
 
+"""
+Decide whether one byte may appear in the path part of a `wire://` endpoint: it
+must be a printable byte of value 32 or above, which excludes NUL and control
+bytes. The byte is a copied scalar; the function performs no I/O and no
+allocation.
+"""
 verb wire_endpoint_is_path_byte(erg byte: u8) -> Bool {
     return byte >= 32u8 && byte != 0u8;
 }
 
+"""
+Check that the buffer starts with the seven bytes `wire://`. The input is an
+immutable `abs` view; the caller must already have verified that it is at least
+as long as the scheme, because the function reads the first seven bytes without
+a bounds check of its own. It returns `true` only for an exact match.
+"""
 verb wire_endpoint_check_scheme(abs input: Buffer) -> Bool {
     return input[0] == 119u8 && input[1] == 105u8 && input[2] == 114u8 && input[3] == 101u8 && input[4] == 58u8 && input[5] == 47u8 && input[6] == 47u8;
 }
 
+"""
+Find where the current endpoint component ends: the index of the first `/` or
+`:` at or after `start`, or the input length when neither occurs. The input is
+an immutable `abs` view; the scan is bounded by the maximum endpoint size, so
+the loop always terminates. The function reads only and allocates nothing.
+"""
 verb wire_endpoint_find_boundary(abs input: Buffer, erg start: u32) -> u32 {
     erg length: u32 = buffer_length(buffer: abs input) as u32;
     for erg index: u32 in start..WIRE_ENDPOINT_MAX_BYTES {
@@ -84,6 +108,13 @@ verb wire_endpoint_find_boundary(abs input: Buffer, erg start: u32) -> u32 {
     return length;
 }
 
+"""
+Check that every byte of the authority range `start..end` is allowed by
+`wire_endpoint_is_authority_byte`. The input is an immutable `abs` view; the scan
+is bounded by the maximum authority size. It returns `false` at the first
+disallowed byte and `true` when the whole range is acceptable. The function
+reads only and allocates nothing.
+"""
 verb wire_endpoint_validate_authority(
     abs input: Buffer,
     erg start: u32,
@@ -101,6 +132,20 @@ verb wire_endpoint_validate_authority(
     return true;
 }
 
+"""
+contract:
+purpose:
+    Parse the decimal port that follows the authority colon.
+inputs:
+    input: the endpoint text; start and end: the byte range of the digits.
+outputs:
+    `Ok(port)` in the range 1 to 65535, or a typed `WireEndpointError`.
+ownership:
+    The input is an immutable `abs` view and is not modified.
+errors:
+    `InvalidPort` for an empty range, more than five digits or a non-digit
+    byte; `PortOutOfRange` for zero or a value above 65535.
+"""
 verb wire_endpoint_parse_port(
     abs input: Buffer,
     erg start: u32,
@@ -126,6 +171,13 @@ verb wire_endpoint_parse_port(
     return Result[u32, WireEndpointError].Ok(value);
 }
 
+"""
+Check that the path range `start..end` is no longer than the maximum path size
+and that every byte passes `wire_endpoint_is_path_byte`. The input is an
+immutable `abs` view; the scan is bounded. It returns `false` for an over-long
+path or the first disallowed byte and `true` otherwise. The function reads only
+and allocates nothing.
+"""
 verb wire_endpoint_validate_path(abs input: Buffer, erg start: u32, erg end: u32) -> Bool {
     if end - start > WIRE_ENDPOINT_MAX_PATH_BYTES {
         return false;
@@ -142,6 +194,25 @@ verb wire_endpoint_validate_path(abs input: Buffer, erg start: u32, erg end: u32
     return true;
 }
 
+"""
+contract:
+purpose:
+    Read an optional `:port` after the authority and record it in the endpoint
+    metadata.
+inputs:
+    input: the endpoint text; authority_end: offset after the authority;
+    endpoint: the metadata being filled.
+outputs:
+    `Ok(offset)` of the first byte after the port, which is `authority_end`
+    when no port is present, or a typed `WireEndpointError`.
+ownership:
+    The input is an immutable `abs` view; the endpoint is an exclusive `ins`
+    loan.
+side_effects:
+    Sets `port` and `has_port` of the endpoint when a port is present.
+errors:
+    Any port error from `wire_endpoint_parse_port`.
+"""
 verb wire_endpoint_apply_port(
     abs input: Buffer,
     erg authority_end: u32,
@@ -167,6 +238,26 @@ verb wire_endpoint_apply_port(
     return Result[u32, WireEndpointError].Ok(path_start);
 }
 
+"""
+contract:
+purpose:
+    Validate the optional path that follows the authority and port and record
+    its position in the endpoint metadata.
+inputs:
+    input: the endpoint text; suffix_start: offset where the suffix begins;
+    length: total endpoint length; endpoint: the metadata being filled.
+outputs:
+    `Ok(0)` when there is no suffix or the path is accepted, or a typed
+    `WireEndpointError`.
+ownership:
+    The input is an immutable `abs` view; the endpoint is an exclusive `ins`
+    loan.
+side_effects:
+    Sets `path_offset` and `path_length` of the endpoint when a path exists.
+errors:
+    `InvalidAuthority` when the suffix does not start with `/`, and
+    `InvalidPath` when the path is too long or has a disallowed byte.
+"""
 verb wire_endpoint_apply_path(
     abs input: Buffer,
     erg suffix_start: u32,
@@ -191,6 +282,25 @@ verb wire_endpoint_apply_path(
     return Result[Int, WireEndpointError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Parse everything after the authority: the optional port and then the
+    optional path.
+inputs:
+    input: the endpoint text; authority_end: offset after the authority;
+    length: total endpoint length; endpoint: the metadata being filled.
+outputs:
+    `Ok(0)` when the suffix is valid, or a typed `WireEndpointError`.
+ownership:
+    The input is an immutable `abs` view; the endpoint is an exclusive `ins`
+    loan.
+side_effects:
+    Fills the port and path fields of the endpoint.
+errors:
+    The first error of `wire_endpoint_apply_port` or
+    `wire_endpoint_apply_path`.
+"""
 verb wire_endpoint_apply_suffix(
     abs input: Buffer,
     erg authority_end: u32,
@@ -216,6 +326,13 @@ verb wire_endpoint_apply_suffix(
     );
 }
 
+"""
+Create the endpoint metadata record for an already validated authority: it
+stores the source length, the authority offset and length, the default port, no
+explicit port and no path, and marks the record valid. The arguments are copied
+scalars. The result is a new owned `WireEndpoint` whose storage is a fixed
+array, so nothing is allocated dynamically and no input is read.
+"""
 verb wire_endpoint_initialize(
     erg length: u32,
     erg authority_start: u32,
@@ -235,6 +352,22 @@ verb wire_endpoint_initialize(
     return endpoint;
 }
 
+"""
+contract:
+purpose:
+    Validate the `wire://` scheme and locate the authority part of an endpoint.
+inputs:
+    input: the endpoint text; length: its byte length.
+outputs:
+    `Ok(authority_end)`, the offset just after the authority, or a typed
+    `WireEndpointError`.
+ownership:
+    The input is an immutable `abs` view and is not modified.
+errors:
+    `TooLong` above the maximum size, `InvalidScheme` for a missing or wrong
+    scheme, `MissingAuthority` for an empty authority, and `InvalidAuthority`
+    for an over-long authority or a disallowed byte.
+"""
 verb wire_endpoint_find_authority(
     abs input: Buffer,
     erg length: u32

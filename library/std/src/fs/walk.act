@@ -209,6 +209,12 @@ release operation as a best-effort fallback.
 """
 unsafe extern "C" verb actus_walker_close(abs handle: Int) -> Int;
 
+"""
+Map the public `DirectoryOrder` to the integer code the runtime traversal
+bridge expects: `0` for native provider order and `1` for lexicographic order.
+The order is an immutable `abs` view; the function performs no I/O and no
+allocation.
+"""
 verb walk_order_code(abs order: DirectoryOrder) -> Int {
     return case order {
         DirectoryOrder.Native => 0,
@@ -216,6 +222,11 @@ verb walk_order_code(abs order: DirectoryOrder) -> Int {
     };
 }
 
+"""
+Map the public `WalkErrorPolicy` to the integer code the runtime traversal
+bridge expects: `0` for fail-fast and `1` for emit-error. The policy is an
+immutable `abs` view; the function performs no I/O and no allocation.
+"""
 verb walk_error_policy_code(abs policy: WalkErrorPolicy) -> Int {
     return case policy {
         WalkErrorPolicy.FailFast => 0,
@@ -223,6 +234,21 @@ verb walk_error_policy_code(abs policy: WalkErrorPolicy) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Build the owned `.` path used as the initial output buffer of a walk event,
+    because the bridge needs a valid path value to fill in on every call.
+outputs:
+    `Ok(path)` for the single-dot path, or a typed `IoError`.
+ownership:
+    The result is a newly owned path.
+side_effects:
+    Allocates a two-byte buffer and the path wrapping it.
+errors:
+    `InvalidInput` if the path module rejects the placeholder, which indicates
+    a defect in the module rather than a caller error.
+"""
 verb walk_path_placeholder() -> Result[path_module::Path, io::IoError] {
     erg raw: Buffer = Buffer[0];
     append(raw, 46u8);
@@ -234,10 +260,21 @@ verb walk_path_placeholder() -> Result[path_module::Path, io::IoError] {
     };
 }
 
+"""
+Consume an integer walker handle that was rejected before it became a `Walker`
+and return it unchanged. The handle is a copied scalar with no resource behind
+it for the error codes; the function exists to mark that consumption so the
+error branches of `walk` do not leak a live owner.
+"""
 verb discard_walk_handle(dat handle: Int) -> Int {
     return handle;
 }
 
+"""
+Consume and drop an owned path the caller no longer needs, such as an event
+path left over after a walk event was discarded. The path is moved in and
+released when the function returns; there is no result and no other effect.
+"""
 verb discard_walk_path(dat path: path_module::Path) {}
 
 """Start a bounded recursive traversal from `path`.
@@ -291,6 +328,12 @@ open verb walk(
     };
 }
 
+"""
+Map the integer event kind the runtime bridge writes to the public
+`WalkEventKind`: `0` enter, `1` file, `2` symlink, `3` leave, and any other
+value is reported as `Error`. The code is an immutable `abs` scalar; the
+function performs no I/O and no allocation.
+"""
 verb walk_event_kind(abs kind: i32) -> WalkEventKind {
     return case kind {
         0 => WalkEventKind.EnterDirectory,
@@ -301,6 +344,12 @@ verb walk_event_kind(abs kind: i32) -> WalkEventKind {
     };
 }
 
+"""
+Map the integer error class the runtime bridge writes for an emitted walk
+error to an `IoError`: `2` is `PermissionDenied`, `4` is `Unsupported`, and
+every other value, including `1`, is `Failed`. The code is an immutable `abs`
+scalar; the function performs no I/O and no allocation.
+"""
 verb walk_event_error(abs error: i32) -> io::IoError {
     return case error {
         1 => io::IoError.Failed,

@@ -9,6 +9,12 @@ import {
     open std::wire,
 };
 
+"""
+Build the 25-byte endpoint `wire://robot:8080/control` as a new owned buffer,
+writing each ASCII byte explicitly so the example does not depend on string
+support. The buffer is returned to the caller, who owns it; there are no other
+side effects.
+"""
 verb address_bytes() -> Buffer {
     erg address = Buffer[25];
     address[0] = 119u8;
@@ -39,6 +45,17 @@ verb address_bytes() -> Buffer {
     return address;
 }
 
+"""
+contract:
+purpose:
+    Parse an endpoint buffer and check the authority, port and path metadata.
+inputs:
+    address: the endpoint bytes, borrowed read-only.
+outputs:
+    0 when the endpoint has port 8080, an explicit port, a five-byte authority
+    and an eight-byte path; 1 when parsing failed; 2 for a wrong port; 3 for
+    wrong authority or path lengths.
+"""
 verb parse_address(abs address: Buffer) -> Int {
     erg parsed = wire_endpoint_parse(input: abs address);
     return case dat parsed {
@@ -55,6 +72,12 @@ verb parse_address(abs address: Buffer) -> Int {
     };
 }
 
+"""
+Build the example endpoint, check it with `parse_address` and print two
+observable lines: the parsed authority, port and path, and a note that no
+transport is selected. It returns 0 on success and 1 when the endpoint check
+fails. The only side effect is the printed output.
+"""
 verb main() -> Int {
     erg address = address_bytes();
     if parse_address(address: abs address) != 0 {

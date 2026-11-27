@@ -67,6 +67,13 @@ open verb wire_reassembly_begin(
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+Report whether the byte range starting at `candidate_offset` with
+`payload_length` bytes intersects the range of any fragment already received.
+The reassembly state is an immutable `abs` view and is not modified; the scan is
+bounded by the maximum fragment count. It returns `true` at the first overlap
+and `false` otherwise, and allocates nothing.
+"""
 verb wire_reassembly_overlaps(
     abs reassembly: WireReassembly,
     erg candidate_offset: u32,
@@ -86,6 +93,21 @@ verb wire_reassembly_overlaps(
     return false;
 }
 
+"""
+contract:
+purpose:
+    Check that a fragment belongs to the message being reassembled.
+inputs:
+    reassembly: the active reassembly state; header: the fragment header.
+outputs:
+    `Ok(0)` when generation, total length and fragment count agree, or a
+    `WireError`.
+ownership:
+    Both arguments are immutable `abs` views.
+errors:
+    `FragmentStale` for another generation and `FragmentRangeInvalid` when the
+    total length or the fragment count differs.
+"""
 verb wire_reassembly_check_identity(
     abs reassembly: WireReassembly,
     abs header: WireFragmentHeader
@@ -99,6 +121,21 @@ verb wire_reassembly_check_identity(
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Check that the slot and byte range of a fragment are still free.
+inputs:
+    reassembly: the active state; header: the fragment header;
+    payload_length: the fragment payload size.
+outputs:
+    `Ok(0)` when the slot is free and the range is disjoint, or a `WireError`.
+ownership:
+    Both arguments are immutable `abs` views.
+errors:
+    `FragmentDuplicate` when the index was received and `FragmentOverlap` when
+    the range intersects a received fragment.
+"""
 verb wire_reassembly_check_slot(
     abs reassembly: WireReassembly,
     abs header: WireFragmentHeader,
@@ -119,6 +156,14 @@ verb wire_reassembly_check_slot(
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+Copy a validated fragment payload into the reassembly storage at the offset
+named by its header, then record its range and update the received fragment and
+byte counts. The reassembly state is an exclusive `ins` loan; the fragment and
+header are immutable `abs` views. The caller must already have validated
+identity, slot and bounds, so the function checks nothing and cannot fail. It
+allocates nothing and mutates only the reassembly state.
+"""
 verb wire_reassembly_copy_fragment(
     ins reassembly: WireReassembly,
     abs fragment: Buffer,

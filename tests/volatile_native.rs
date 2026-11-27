@@ -53,8 +53,32 @@ struct Registers {
     data: u32,
 }
 
+"""
+contract:
+purpose:
+    Declare the foreign C symbol provider, which returns the address of a register block that can be read with volatile loads.
+outputs:
+    A VolatileAddress of Registers.
+ownership:
+    The address is a read-only capability value.
+abi:
+    unsafe extern C symbol provider with no parameters.
+"""
 unsafe extern "C" verb provider() -> VolatileAddress[Registers];
 
+"""
+contract:
+purpose:
+    Read a u32 register at offset 4 through a volatile load and return it as Int, or -1 on failure.
+outputs:
+    The register value as Int, or -1 when the read fails.
+ownership:
+    The address is borrowed by the volatile read.
+errors:
+    A volatile read error maps to -1.
+side_effects:
+    Performs a volatile read of device memory.
+"""
 meta effect("volatile")
 verb main() -> Int {
     erg address = provider();
@@ -119,8 +143,32 @@ struct Registers {
     data: u32,
 }
 
+"""
+contract:
+purpose:
+    Declare the foreign C symbol provider, which returns the address of a register block that can be written with volatile stores.
+outputs:
+    A VolatileWriteAddress of Registers.
+ownership:
+    The address is a write capability value.
+abi:
+    unsafe extern C symbol provider with no parameters.
+"""
 unsafe extern "C" verb provider() -> VolatileWriteAddress[Registers];
 
+"""
+contract:
+purpose:
+    Write the u32 value 7 to a register at offset 4 through a volatile store and report success.
+outputs:
+    0 when the write succeeds, 1 when it fails.
+ownership:
+    The address is an exclusive ins loan used by the volatile write.
+errors:
+    A volatile write error maps to 1.
+side_effects:
+    Performs a volatile write to device memory; requires the volatile.write capability.
+"""
 meta effect("volatile")
 meta capability("volatile.write")
 verb main() -> Int {

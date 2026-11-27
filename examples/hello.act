@@ -1,8 +1,14 @@
+"""
+Program entry point: pass the value 41 to `consume` by ownership and return its result, 42, as the exit status.
+"""
 verb main() -> Int {
     erg value = 41;
     return consume(value: value);
 }
 
+"""
+Take an integer by ownership and return it plus one. The value is a copied scalar, so the caller keeps no obligation after the call.
+"""
 verb consume(dat value: Int) -> Int {
     return value + 1;
 }

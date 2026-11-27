@@ -5,12 +5,14 @@ use std::fs;
 fn imported_io_copy_does_not_capture_scalar_copy_intrinsic() {
     let source = r#"import { open io };
 
+"""Copies a u32 value with the scalar copy intrinsic and returns the copy as Int, so the imported io copy name cannot be mistaken for the intrinsic."""
 verb scalar_copy() -> Int {
     erg value: u32 = 41u32;
     erg reused: u32 = copy(value: abs value);
     return reused as Int;
 }
 
+"""Entry point that returns the result of scalar_copy as the process exit status."""
 verb main() -> Int {
     return scalar_copy();
 }
@@ -24,7 +26,7 @@ verb main() -> Int {
 
 #[test]
 fn nested_facade_keeps_scalar_copy_intrinsic_separate_from_imported_io_copy() {
-    let source = "import { open feature }; verb main() -> Int { return scalar_copy(); }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the result of scalar_copy as the process exit status.\"\"\"\nverb main() -> Int { return scalar_copy(); }\n";
     let (root, input, output) = project("nested-imported-io-copy-intrinsic", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature module");
     fs::write(

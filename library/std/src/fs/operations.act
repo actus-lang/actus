@@ -163,6 +163,22 @@ open verb remove_file(abs path: path_module::Path) -> Result[Int, io::IoError] {
     return fs_status(status: erg status);
 }
 
+"""
+contract:
+purpose:
+    Turn the status of the native canonicalization call into a typed result
+    that either carries the resolved path or reports failure.
+inputs:
+    output: the path buffer the bridge filled; status: zero on success, any
+    other value on failure.
+outputs:
+    `Ok(path)` when the status is zero, otherwise `Err(IoError.Failed)`.
+ownership:
+    The output path is consumed: it moves into the result on success and is
+    dropped on failure so no half-written path escapes.
+errors:
+    `Failed` for every non-zero status.
+"""
 verb finish_canonicalize(
     dat output: path_module::Path,
     erg status: Int

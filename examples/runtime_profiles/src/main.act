@@ -8,6 +8,15 @@ import {
     open std::io,
 };
 
+"""
+contract:
+purpose:
+    Show the `std` profile output verbs: print a string with and without a
+    newline and print a byte buffer with and without a newline.
+side_effects:
+    Writes to standard output and allocates the five-byte buffer holding the
+    text `bytes`.
+"""
 verb main() -> Void {
     erg text = "text output";
     print(string: abs text);

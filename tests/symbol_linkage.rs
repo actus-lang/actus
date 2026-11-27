@@ -80,7 +80,7 @@ fn linkage_sources() -> Vec<(&'static str, &'static str)> {
     vec![
         (
             "main.act",
-            "import {\n    open pkg,\n};\n\nverb main() -> Int {\n    return public_value() - 3;\n}\n",
+            "import {\n    open pkg,\n};\n\n\"\"\"Entry point that returns the result of public_value minus 3.\"\"\"\nverb main() -> Int {\n    return public_value() - 3;\n}\n",
         ),
         (
             "pkg/pkg.act",
@@ -88,7 +88,7 @@ fn linkage_sources() -> Vec<(&'static str, &'static str)> {
         ),
         (
             "pkg/api.act",
-            "\"\"\"Return the integer value 3 that sums the private hidden value and the unit shared value.\"\"\" open verb public_value() -> Int {\n    return hidden_value() + shared_value();\n}\n\nverb hidden_value() -> Int {\n    return 1;\n}\n",
+            "\"\"\"Return the integer value 3 that sums the private hidden value and the unit shared value.\"\"\" open verb public_value() -> Int {\n    return hidden_value() + shared_value();\n}\n\n\"\"\"Returns the constant 1; the test checks that this verb stays hidden from other modules.\"\"\"\nverb hidden_value() -> Int {\n    return 1;\n}\n",
         ),
         (
             "pkg/shared.act",

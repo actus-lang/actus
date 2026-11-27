@@ -117,7 +117,7 @@ fn rejects_inline_array_size_overflow_during_native_layout() {
     let output = root.with_extension("o");
     fs::write(
         &input,
-        "verb main() -> Int { erg values: Array[u64, 4294967295] = Array[u64, 4294967295](); return values[0u32] as Int; }",
+        "\"\"\"Entry point that creates an array of u64 values with the maximum u32 element count, which exceeds the supported size, and returns its first element as Int.\"\"\"\nverb main() -> Int { erg values: Array[u64, 4294967295] = Array[u64, 4294967295](); return values[0u32] as Int; }",
     )
     .expect("write overflow fixture");
     let build = run_cli(&[

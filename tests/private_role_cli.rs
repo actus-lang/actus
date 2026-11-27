@@ -20,7 +20,7 @@ const OPEN_API: &str = "\"\"\"Fixture struct that holds one integer value.\"\"\"
 \"\"\"Performance that binds the write role to the file struct.\"\"\" open perform R for File { \"\"\"Borrow the file through the abs self role and return its integer value.\"\"\" verb write(abs self: File) -> Int { return self.value; } }
 \"\"\"Return the fixed integer value 2 for the role fixture.\"\"\" open verb shown() -> Int { return 2; }
 ";
-const MAIN_TAIL: &str = "verb main() -> Int { return 0; }\n";
+const MAIN_TAIL: &str = "\"\"\"Entry point of the private-declaration fixtures; it returns the exit status 0.\"\"\" verb main() -> Int { return 0; }\n";
 
 fn project(name: &str, api: &str, main: &str) -> PathBuf {
     let root =
@@ -139,8 +139,11 @@ fn private_enum_in_enum_struct_payload_is_private() {
 
 #[test]
 fn open_role_in_every_position_builds() {
-    let main = "verb f(abs w: dynamic R) -> Int { return 0; }
+    let main = "\"\"\"Take a role view by dynamic dispatch and return 0; it checks that an open role is nameable here.\"\"\"
+verb f(abs w: dynamic R) -> Int { return 0; }
+\"\"\"Take a value bounded by the open role and return 0; it checks the role as a generic bound.\"\"\"
 verb g[T: R](abs i: T) -> Int { return 0; }
+\"\"\"Build a file, call `f` through a role view and add the shown value 2 minus 2; the result is 0.\"\"\"
 verb main2() -> Int { erg file = File { value: 1, }; return f(w: ref file) + shown() - 2; }
 ";
     let root = project("open", OPEN_API, main);

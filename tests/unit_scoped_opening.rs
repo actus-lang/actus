@@ -103,7 +103,7 @@ fn borrowed<'a>(sources: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a
     sources.iter().map(|(path, source)| (*path, source.as_str())).collect()
 }
 
-const PUBLIC_MAIN: &str = "import {\n    open pkg,\n};\n\nverb main() -> Int {\n    return entry_width() as Int - 12;\n}\n";
+const PUBLIC_MAIN: &str = "import {\n    open pkg,\n};\n\n\"\"\"Entry point that returns the entry width as Int minus 12.\"\"\"\nverb main() -> Int {\n    return entry_width() as Int - 12;\n}\n";
 
 #[test]
 fn unit_scoped_opening_is_visible_inside_the_unit() {
@@ -116,7 +116,7 @@ fn unit_scoped_opening_is_visible_inside_the_unit() {
 #[test]
 fn unit_scoped_opening_is_not_an_export_of_the_unit() {
     let sources = unit_sources(
-        "import {\n    open pkg,\n};\n\nverb main() -> Int {\n    return encode_width() as Int - 4;\n}\n",
+        "import {\n    open pkg,\n};\n\n\"\"\"Entry point that returns the encode width as Int minus 4.\"\"\"\nverb main() -> Int {\n    return encode_width() as Int - 4;\n}\n",
     );
     let root = project("outside", &borrowed(&sources));
     for command in [
@@ -135,7 +135,7 @@ fn unit_scoped_opening_is_not_an_export_of_the_unit() {
 #[test]
 fn child_import_from_another_unit_sees_only_public_names() {
     let sources = unit_sources(
-        "import {\n    pkg::store::shard,\n};\n\nverb main() -> Int {\n    return shard::encode_width() as Int - 4;\n}\n",
+        "import {\n    pkg::store::shard,\n};\n\n\"\"\"Entry point that returns the encode width of the shard module as Int minus 4.\"\"\"\nverb main() -> Int {\n    return shard::encode_width() as Int - 4;\n}\n",
     );
     let root = project("child-import", &borrowed(&sources));
     let output = actus(&root, &["check", "--strict", "src/main.act"]);
@@ -164,7 +164,7 @@ fn a_sibling_named_unit_is_still_opened_by_open_unit() {
         "pkg/store/shard/unit.act",
         "\"\"\"Return the unsigned 32-bit value 0 that the unit sibling reports.\"\"\" open verb unit_width() -> u32 {\n    return 0u32;\n}\n".to_owned(),
     ));
-    sources[0].1 = "import {\n    open pkg,\n};\n\nverb main() -> Int {\n    return (entry_width() + unit_width()) as Int - 12;\n}\n".to_owned();
+    sources[0].1 = "import {\n    open pkg,\n};\n\n\"\"\"Entry point that returns the sum of the entry width and the unit width as Int minus 12.\"\"\"\nverb main() -> Int {\n    return (entry_width() + unit_width()) as Int - 12;\n}\n".to_owned();
     let root = project("named-unit", &borrowed(&sources));
     assert_eq!(check_build_run(&root), Some(0));
     fs::remove_dir_all(root).expect("remove named-unit fixture");

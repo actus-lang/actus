@@ -10,10 +10,21 @@ struct Storage[N: Usize] {
     erg values: Array[Cell, N],
 }
 
+"""
+Store the marker value 41 into the first cell of a storage of 64 cells through an
+exclusive `ins` loan. The storage length is the generic capacity parameter, so the
+same verb is instantiated for this size. The verb returns no value and the caller
+observes the stored marker after the call.
+"""
 verb write[N: Usize](ins storage: Storage[N]) {
     storage.values[0u32].marker = 41u8;
 }
 
+"""
+Create a zeroed storage of 64 cells, let `write` store the marker 41 in its first
+cell and return that marker plus one, 42. The storage is a local owner that is
+released when the verb returns; no other side effects occur.
+"""
 verb main() -> Int {
     erg storage: Storage[64] = Storage[64] {
         values: Array[Cell, 64](),

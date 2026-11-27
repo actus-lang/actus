@@ -13,7 +13,7 @@ use crate::lexer::TokenKind;
 use crate::modules::{ModuleError, ModuleResolutionError, reject_test_verbs};
 use crate::session::CompilationSession;
 
-use super::super::conformance::{validate_file_documentation, validate_source_limits};
+use super::super::conformance::validate_package_sources;
 use super::TestOptions;
 use super::collection::localized_test_diagnostic;
 
@@ -33,13 +33,17 @@ pub(super) struct TestDirectory {
 }
 
 /// Finds every test directory of the project and rejects every file that is
-/// in the wrong place. Production source files are read once: strict source
-/// limits are validated and a `meta test` verb in one is an error.
+/// in the wrong place. Strict mode first validates the package's production
+/// source set (limits and documentation), the same set `check` and `build`
+/// validate; then a `meta test` verb in a production file is an error.
 pub(super) fn discover_test_directories(
     configuration: &CompilerConfiguration,
     options: &TestOptions,
     session: &CompilationSession,
 ) -> Result<Vec<TestDirectory>, String> {
+    if !validate_package_sources(None, configuration, options.mode) {
+        return Err("strict source validation failed".to_owned());
+    }
     let source_root = configuration.source_root();
     let project_tests = configuration.project_root().join("tests");
     let mut directories = Vec::new();
@@ -56,7 +60,7 @@ pub(super) fn discover_test_directories(
                     pending.push(path);
                 }
             } else if is_act_file(&path) {
-                validate_production_source(&path, configuration, options, session)?;
+                validate_production_source(&path, configuration, session)?;
             }
         }
     }
@@ -211,17 +215,10 @@ fn module_path_of_directory(directory: &Path, source_root: &Path) -> Option<Stri
 fn validate_production_source(
     path: &Path,
     configuration: &CompilerConfiguration,
-    options: &TestOptions,
     session: &CompilationSession,
 ) -> Result<(), String> {
     let source = fs::read_to_string(path)
         .map_err(|error| format!("cannot read `{}`: {error}", path.display()))?;
-    if !validate_source_limits(path, &source, options.mode, configuration) {
-        return Err(format!("strict source-limit validation failed for `{}`", path.display()));
-    }
-    if !validate_file_documentation(path, &source, options.mode) {
-        return Err(format!("strict documentation validation failed for `{}`", path.display()));
-    }
     let parsed = session.parse(path, &source);
     if !parsed.tokens().iter().any(|token| matches!(token.kind, TokenKind::Meta)) {
         return Ok(());

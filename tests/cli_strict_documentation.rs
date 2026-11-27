@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const ENTRY: &str = "verb main() -> Int { return 0; }\n";
+const ENTRY: &str = "\"\"\"Entry point of the strict documentation fixture; it returns the exit status 0.\"\"\"\nverb main() -> Int { return 0; }\n";
 
 fn project(name: &str, files: &[(&str, &str)]) -> PathBuf {
     let root =
@@ -80,7 +80,10 @@ fn strict_check_validates_the_module_files_and_not_only_the_entry() {
     let root = project(
         "module",
         &[
-            ("main.act", "import { open shapes };\nverb main() -> Int { return area(); }\n"),
+            (
+                "main.act",
+                "import { open shapes };\n\"\"\"Entry point of the strict documentation fixture; it returns the exit status 0.\"\"\"\nverb main() -> Int { return area(); }\n",
+            ),
             (
                 "shapes/shapes.act",
                 "\"\"\"Re-export the area declarations of the shapes module.\"\"\"\nopen area;\n",
@@ -134,7 +137,10 @@ fn strict_check_accepts_documented_modules() {
     let root = project(
         "documented",
         &[
-            ("main.act", "import { open shapes };\nverb main() -> Int { return area(); }\n"),
+            (
+                "main.act",
+                "import { open shapes };\n\"\"\"Entry point of the strict documentation fixture; it returns the exit status 0.\"\"\"\nverb main() -> Int { return area(); }\n",
+            ),
             (
                 "shapes/shapes.act",
                 "\"\"\"Re-export the area declarations of the shapes module.\"\"\"\nopen area;\n",
@@ -158,7 +164,7 @@ fn strict_check_does_not_enforce_the_content_contract_yet() {
         "content",
         &[(
             "main.act",
-            "\"\"\"Compute the doubled number for the caller.\"\"\"\nopen verb double(erg x: Int) -> Int { return x + x; }\n\"\"\"Return the answer.\"\"\"\nopen verb answer() -> Int { return 42; }\nverb main() -> Int { return 0; }\n",
+            "\"\"\"Compute the doubled number for the caller.\"\"\"\nopen verb double(erg x: Int) -> Int { return x + x; }\n\"\"\"Return the answer.\"\"\"\nopen verb answer() -> Int { return 42; }\n\"\"\"Entry point of the strict documentation fixture; it returns the exit status 0.\"\"\"\nverb main() -> Int { return 0; }\n",
         )],
     );
     let output = actus(&root, &["check", "--strict", "src/main.act"]);

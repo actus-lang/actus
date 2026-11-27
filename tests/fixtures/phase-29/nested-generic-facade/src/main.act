@@ -2,6 +2,12 @@ import {
     open aie,
 };
 
+"""
+Build two zeroed storages of different capacities, four and eight values, and
+return the sum of their `root` results through the opened `aie` facade. The
+status shows that the same generic verb resolves for both capacities. It
+allocates nothing dynamically and has no side effects.
+"""
 verb main() -> Int {
     erg small: Storage[4] = Storage[4] {
         values: Array[u32, 4](),

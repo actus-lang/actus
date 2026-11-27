@@ -6,7 +6,11 @@ use actus::cli::run_with_args;
 #[test]
 fn strict_check_accepts_a_semantically_valid_source() {
     let input = std::env::temp_dir().join(format!("actus-strict-check-{}.act", std::process::id()));
-    fs::write(&input, "verb main() -> Int { return 42; }\n").expect("write source");
+    fs::write(
+        &input,
+        "\"\"\"Entry point that returns the exit status 42 for the strict acceptance test.\"\"\"\nverb main() -> Int { return 42; }\n",
+    )
+    .expect("write source");
 
     let result = run_with_args(
         vec!["check".to_owned(), input.display().to_string(), "--strict".to_owned()].into_iter(),
@@ -20,9 +24,12 @@ fn strict_check_accepts_a_semantically_valid_source() {
 fn strict_check_rejects_a_source_that_reaches_the_split_threshold() {
     let input =
         std::env::temp_dir().join(format!("actus-strict-limits-{}.act", std::process::id()));
-    let mut source =
-        (0..599).map(|index| format!("\"\"\"filler {index}\"\"\"\n")).collect::<String>();
-    source.push_str("verb main() -> Int { return 42; }\n");
+    let mut source = (0..599)
+        .map(|index| format!("open const FILLER_{index}: Int = {index};\n"))
+        .collect::<String>();
+    source.push_str(
+        "\"\"\"Entry point that returns the exit status 42 for the split-threshold test.\"\"\"\nverb main() -> Int { return 42; }\n",
+    );
     fs::write(&input, source).expect("write oversized source");
 
     let result = run_with_args(

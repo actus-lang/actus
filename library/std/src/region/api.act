@@ -88,18 +88,42 @@ unsafe extern "C" verb actus_region_logical_length[T](
     abs region: Region[T]
 ) -> Result[u64, RegionError];
 
+"""
+Private bridge that reads the logical element index at which the resident
+window of a `Region` starts. The region is an immutable `abs` view and is not
+modified. It returns `Ok(index)` or a typed `RegionError`, such as one for a
+closed region, and performs no allocation.
+"""
 unsafe extern "C" verb actus_region_window_start[T](
     abs region: Region[T]
 ) -> Result[u64, RegionError];
 
+"""
+Private bridge that reads how many elements are currently resident in the
+window of a `Region`. The region is an immutable `abs` view and is not
+modified. It returns `Ok(count)` or a typed `RegionError`, such as one for a
+closed region, and performs no allocation.
+"""
 unsafe extern "C" verb actus_region_window_count[T](
     abs region: Region[T]
 ) -> Result[u64, RegionError];
 
+"""
+Private bridge that reads the publication generation of a `Region`, the
+counter that advances each time dirty resident bytes are published. The region
+is an immutable `abs` view and is not modified. It returns `Ok(generation)` or a
+typed `RegionError`, and performs no allocation.
+"""
 unsafe extern "C" verb actus_region_generation[T](
     abs region: Region[T]
 ) -> Result[u64, RegionError];
 
+"""
+Private bridge that reports whether a `Region` holds resident modifications
+that were not yet published or cancelled. The region is an immutable `abs`
+view and is not modified. It returns `Ok(1)` for dirty, `Ok(0)` for clean, or a
+typed `RegionError`, and performs no allocation.
+"""
 unsafe extern "C" verb actus_region_dirty[T](abs region: Region[T]) -> Result[Int, RegionError];
 
 """Private bridge that pins the resident window against remap and eviction."""

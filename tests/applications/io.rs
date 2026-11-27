@@ -49,6 +49,19 @@ import {
     open path,
 };
 
+"""
+contract:
+purpose:
+    Create an exclusive temporary file in the current directory with the prefix actus-drop and report each failure stage as a distinct exit code.
+outputs:
+    0 when the file was created, 1 when the root path cannot be built, 2 when the file cannot be created.
+ownership:
+    The path and prefix buffers are owned locally; the root and prefix are borrowed by the open call.
+errors:
+    The path conversion and temporary_file_open results are mapped to the exit codes 1 and 2.
+side_effects:
+    Creates a file with exclusive creation, entropy and blocking filesystem access.
+"""
 meta capability("filesystem.create_exclusive")
 meta effect("filesystem", "blocking", "entropy")
 verb main() -> Int {
@@ -93,7 +106,7 @@ verb main() -> Int {
 
 #[test]
 fn module_application_executes_public_wrapper_with_private_implementation() {
-    let source = "import { open math }; verb main() -> Int { return add(); }\n";
+    let source = "import { open math };\n\"\"\"Entry point that returns the result of add as the process exit status.\"\"\"\nverb main() -> Int { return add(); }\n";
     let (root, input, output) = project("module-wrapper", source);
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(

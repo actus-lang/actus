@@ -18,10 +18,16 @@ pack ControlRegister {
     }
 }
 
+"""
+Store 0 into one integer slot through an exclusive `ins` loan. The caller passes an array element as the slot, so the verb shows indexed loans. It returns no value.
+"""
 verb write_slot(ins slot: Int) {
     slot = 0;
 }
 
+"""
+Fill a four-element array at a dynamic index, reset element 0 through an indexed `ins` loan and return the dynamic element plus one, 42.
+"""
 verb array_total() -> Int {
     erg values: Array[Int, 4] = Array[Int, 4]();
     erg dynamic_index = 2;
@@ -30,6 +36,9 @@ verb array_total() -> Int {
     return values[dynamic_index] + 1;
 }
 
+"""
+Assign a `Point` to an element of a two-element array and return the sum of its coordinates, 42.
+"""
 verb aggregate_total() -> Int {
     erg points: Array[Point, 2] = Array[Point, 2]();
     points[1] = Point {
@@ -39,6 +48,9 @@ verb aggregate_total() -> Int {
     return points[1].x + points[1].y;
 }
 
+"""
+Set the enabled bit in an element of a pack array and return the sum of its enabled and ready bits, 1.
+"""
 verb pack_total() -> Int {
     erg controls: Array[ControlRegister, 2] = Array[ControlRegister, 2]();
     controls[1] = ControlRegister {
@@ -48,6 +60,9 @@ verb pack_total() -> Int {
     return controls[1].enabled + controls[1].ready;
 }
 
+"""
+Place a two-element array in a 256-byte arena, write 7 at index 1 and return it. The arena owns the array and is released when the verb returns.
+"""
 verb arena_total() -> Int {
     erg arena: Arena[256] = Arena[256]();
     erg arena_values: Array[Int, 2] = arena.place(value: Array[Int, 2]());
@@ -55,6 +70,9 @@ verb arena_total() -> Int {
     return arena_values[1];
 }
 
+"""
+Program entry point: return the sum of the array, aggregate, pack and arena exercises as the exit status.
+"""
 verb main() -> Int {
     return array_total() + aggregate_total() + pack_total() + arena_total();
 }

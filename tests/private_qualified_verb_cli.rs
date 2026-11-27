@@ -8,7 +8,7 @@ use std::process::{Command, Output};
 
 const FACADE: &str =
     "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n";
-const API: &str = "verb helper() -> Int { return 1; }\n\"\"\"Return the fixed integer value 2 for the qualified call fixture.\"\"\" open verb shown() -> Int { return 2; }\nconst K: Int = 3;\n";
+const API: &str = "\"\"\"Returns the constant 1.\"\"\"\nverb helper() -> Int { return 1; }\n\"\"\"Return the fixed integer value 2 for the qualified call fixture.\"\"\" open verb shown() -> Int { return 2; }\nconst K: Int = 3;\n";
 
 fn project(name: &str, main: &str) -> PathBuf {
     let root =
@@ -52,7 +52,10 @@ fn both(root: &Path) -> Vec<(bool, String)> {
 
 #[test]
 fn private_verb_called_qualified_is_private_not_unknown() {
-    let root = project("verb", "import m;\nverb main() -> Int {\n    return m::helper();\n}\n");
+    let root = project(
+        "verb",
+        "import m; \"\"\"Entry point that returns the result of helper in module m.\"\"\"\nverb main() -> Int {\n    return m::helper();\n}\n",
+    );
     for (success, stderr) in both(&root) {
         assert!(!success, "{stderr}");
         assert!(stderr.contains("error[E1109] at 3:12:"), "{stderr}");
@@ -65,7 +68,10 @@ fn private_verb_called_qualified_is_private_not_unknown() {
 
 #[test]
 fn private_constant_read_qualified_is_private_not_undeclared() {
-    let root = project("constant", "import m;\nverb main() -> Int {\n    return m::K;\n}\n");
+    let root = project(
+        "constant",
+        "import m; \"\"\"Entry point that returns the constant K of module m.\"\"\"\nverb main() -> Int {\n    return m::K;\n}\n",
+    );
     for (success, stderr) in both(&root) {
         assert!(!success, "{stderr}");
         assert!(stderr.contains("error[E1109] at 3:12:"), "{stderr}");
@@ -77,7 +83,10 @@ fn private_constant_read_qualified_is_private_not_undeclared() {
 
 #[test]
 fn nonexistent_qualified_verb_is_still_unknown() {
-    let root = project("missing", "import m;\nverb main() -> Int {\n    return m::nothing();\n}\n");
+    let root = project(
+        "missing",
+        "import m; \"\"\"Entry point that calls the verb nothing of module m, which is declared without exposing it.\"\"\"\nverb main() -> Int {\n    return m::nothing();\n}\n",
+    );
     for (success, stderr) in both(&root) {
         assert!(!success, "{stderr}");
         assert!(stderr.contains("error[E1069] at 3:12:"), "{stderr}");
@@ -89,7 +98,10 @@ fn nonexistent_qualified_verb_is_still_unknown() {
 
 #[test]
 fn open_verb_called_qualified_builds() {
-    let root = project("open", "import m;\nverb main() -> Int {\n    return m::shown() - 2;\n}\n");
+    let root = project(
+        "open",
+        "import m; \"\"\"Entry point that returns the result of shown in module m minus 2.\"\"\"\nverb main() -> Int {\n    return m::shown() - 2;\n}\n",
+    );
     for (success, stderr) in both(&root) {
         assert!(success, "{stderr}");
     }
@@ -102,8 +114,10 @@ fn open_verb_called_qualified_builds() {
 /// same-name open verb in a second module is not expressible.)
 #[test]
 fn private_name_behind_an_unrelated_qualifier_is_still_unknown() {
-    let root =
-        project("unrelated", "import m;\nverb main() -> Int {\n    return other::helper();\n}\n");
+    let root = project(
+        "unrelated",
+        "import m; \"\"\"Entry point that calls helper in the module other, which the test expects to be unreachable from here.\"\"\"\nverb main() -> Int {\n    return other::helper();\n}\n",
+    );
     for (success, stderr) in both(&root) {
         assert!(!success, "{stderr}");
         assert!(stderr.contains("error[E1069] at 3:12:"), "{stderr}");

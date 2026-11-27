@@ -84,6 +84,19 @@ fn build_and_run_with_backend(
 fn aggregate_region_lifecycle_builds_and_runs_through_llvm_cli() {
     let root = std::env::temp_dir().join(format!("actus-llvm-region-{}", std::process::id()));
     let source = r#"import { open std::region };
+"""
+contract:
+purpose:
+    Open a one-element region of 16-byte arrays and drop it unused.
+outputs:
+    0 when the region opened, 1 when it did not.
+ownership:
+    The backing buffer is moved into the region and the region is dropped.
+errors:
+    A RegionError from region_open is mapped to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
@@ -116,6 +129,19 @@ verb main() -> Int {
 #[test]
 fn aggregate_region_lifecycle_has_matching_hosted_backend_results() {
     let source = r#"import { open std::region };
+"""
+contract:
+purpose:
+    Open a one-element region of 16-byte arrays and drop it unused.
+outputs:
+    0 when the region opened, 1 when it did not.
+ownership:
+    The backing buffer is moved into the region and the region is dropped.
+errors:
+    A RegionError from region_open is mapped to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
@@ -147,7 +173,7 @@ verb main() -> Int {
 
 #[test]
 fn aggregate_region_fixture_passes_semantic_analysis_separately() {
-    let source = "verb inspect(abs values: Region[Array[u8, 16]]) { }";
+    let source = "\"\"\"Borrows a region of 16-byte arrays and does nothing with it; it exists so a call can take a borrowed region.\"\"\"\nverb inspect(abs values: Region[Array[u8, 16]]) { }";
     let (tokens, errors) = actus::lexer::scan(source);
     assert!(errors.is_empty(), "semantic fixture lexing failed: {errors:?}");
     let program = actus::parser::parse(tokens).expect("semantic fixture should parse");
@@ -161,6 +187,21 @@ fn aggregate_region_lifecycle_is_native() {
         &root,
         r#"import { open std::region };
 
+"""
+contract:
+purpose:
+    Write a source buffer into a region of 16-byte arrays, publish it, read it back, and close the region, reporting each failing step.
+inputs:
+    region: exclusive ins loan of Region of 16-byte arrays; source: borrowed Buffer written into element 0.
+outputs:
+    0 when every step succeeds, otherwise 2 for write, 3 for publish, 4 for read or 5 for close.
+ownership:
+    The region is an exclusive ins loan that is mutated and closed; the source is borrowed.
+errors:
+    Each RegionError maps to the exit code of its step.
+side_effects:
+    Writes, publishes and closes the region.
+"""
 verb finish_lifecycle(ins region: Region[Array[u8, 16]], abs source: Buffer) -> Int {
     erg index: u64 = 0u64;
     erg written = region_write(region: ins region, index: erg index, source: abs source);
@@ -189,6 +230,7 @@ verb finish_lifecycle(ins region: Region[Array[u8, 16]], abs source: Buffer) -> 
     };
 }
 
+"""Checks that a 16-byte array has size 16 and alignment 1, returning 0 on success and 6 or 7 when the size or the alignment differs."""
 verb verify_layout() -> Int {
     erg aggregate_size: u64 = size_of[Array[u8, 16]]();
     erg aggregate_alignment: u64 = align_of[Array[u8, 16]]();
@@ -197,6 +239,19 @@ verb verify_layout() -> Int {
     return 0;
 }
 
+"""
+contract:
+purpose:
+    Verify the array layout, open a region of 16-byte arrays and run the full region lifecycle on it.
+outputs:
+    0 on success, the layout status when it differs, 1 when the region cannot be opened, otherwise the status of finish_lifecycle.
+ownership:
+    The backing buffer is moved into the region; the source buffer is borrowed by finish_lifecycle.
+errors:
+    Open errors map to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg layout_status: Int = verify_layout();
@@ -228,6 +283,19 @@ fn aggregate_region_object_emission_exposes_runtime_bridges() {
         &root,
         r#"import { open std::region };
 
+"""
+contract:
+purpose:
+    Open a one-element region of 16-byte arrays and drop the whole result without inspecting it.
+outputs:
+    0.
+ownership:
+    The backing buffer is moved into the region and the result is dropped.
+errors:
+    region_open can fail with a RegionError, which is discarded here.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
@@ -269,6 +337,21 @@ pack Frame {
     }
 }
 
+"""
+contract:
+purpose:
+    Open a one-element region of 16-byte arrays over a given buffer and close it again.
+inputs:
+    backing: owned Buffer that becomes the region storage.
+outputs:
+    0 on success, 1 when the region cannot be opened, 2 when it cannot be closed.
+ownership:
+    The backing buffer is moved into the region and the region is closed.
+errors:
+    Open and close errors map to the exit codes 1 and 2.
+side_effects:
+    Allocates region storage and closes the region.
+"""
 meta effect("allocation")
 verb open_and_close(dat backing: Buffer) -> Int {
     erg logical_length: u64 = 1u64;
@@ -292,6 +375,7 @@ verb open_and_close(dat backing: Buffer) -> Int {
     };
 }
 
+"""Entry point that checks the sizes and alignments of u32, byte arrays, nested arrays, Pair, Pair arrays and Frame, opens and closes a region over a 16-byte aggregate, and returns 0 or the number of the first failing check from 1 to 7."""
 meta effect("allocation")
 verb main() -> Int {
     if size_of[u32]() != 4u64 || align_of[u32]() != 4u64 { return 1; }
@@ -318,6 +402,21 @@ fn hosted_bulk_range_accepts_the_configured_limit() {
         &root,
         r#"import { open std::region };
 
+"""
+contract:
+purpose:
+    Bulk-write 131072 bytes into a u8 region, publish them, and bulk-read them back, checking the written and read counts.
+inputs:
+    region: exclusive ins loan of Region of u8 values; source: borrowed Buffer of 131072 bytes.
+outputs:
+    0 when the counts match, 2 or 4 or 5 for a write, publish or read error, 3 for a short write, 6 for a short read.
+ownership:
+    The region is an exclusive ins loan that is mutated; the source is borrowed.
+errors:
+    Each RegionError maps to the exit code of its step.
+side_effects:
+    Writes and publishes the region contents.
+"""
 verb copy_bulk(ins region: Region[u8], abs source: Buffer) -> Int {
     erg start: u64 = 0u64;
     erg count: u64 = 131072u64;
@@ -342,6 +441,19 @@ verb copy_bulk(ins region: Region[u8], abs source: Buffer) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Open a u8 region of 131072 elements and run the bulk copy round trip on it.
+outputs:
+    0 on success, 1 when the region cannot be opened, otherwise the status of copy_bulk.
+ownership:
+    The backing buffer is moved into the region; the source buffer is borrowed by copy_bulk.
+errors:
+    Open errors map to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[131072];
@@ -371,6 +483,21 @@ fn aggregate_region_rejects_wrong_buffer_without_dirtying_state() {
         &root,
         r#"import { open std::region };
 
+"""
+contract:
+purpose:
+    Try to write a source that is one byte too short into a 16-byte element, and check that the write fails and leaves the region clean.
+inputs:
+    region: exclusive ins loan of Region of 16-byte arrays.
+outputs:
+    0 when the short write is rejected, the region is not dirty and it closes, 2 when the write succeeds, 3 or 4 for dirty-state problems, 5 when the close fails.
+ownership:
+    The region is an exclusive ins loan and is closed here; the source is borrowed.
+errors:
+    The expected RegionError of the write is the success path; other statuses signal unexpected behavior.
+side_effects:
+    Closes the region.
+"""
 verb reject_write(ins region: Region[Array[u8, 16]]) -> Int {
     erg source: Buffer = Buffer[15];
     erg index: u64 = 0u64;
@@ -391,6 +518,19 @@ verb reject_write(ins region: Region[Array[u8, 16]]) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Open a region of 16-byte arrays and run the rejected short write check on it.
+outputs:
+    0 on success, 1 when the region cannot be opened, otherwise the status of reject_write.
+ownership:
+    The backing buffer is moved into the region and the region is handed to reject_write.
+errors:
+    Open errors map to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
@@ -420,6 +560,21 @@ fn aggregate_region_rejects_wrong_destination_size() {
         &root,
         r#"import { open std::region };
 
+"""
+contract:
+purpose:
+    Try to read an element into a destination that is one byte too short, check that the read fails, and close the region.
+inputs:
+    region: exclusive ins loan of Region of 16-byte arrays.
+outputs:
+    0 when the short read is rejected and the region closes, 2 when the read succeeds, 3 when the close fails.
+ownership:
+    The region is an exclusive ins loan and is closed here; the destination is borrowed.
+errors:
+    The expected RegionError of the read is the success path.
+side_effects:
+    Closes the region.
+"""
 verb reject_read(ins region: Region[Array[u8, 16]]) -> Int {
     erg destination: Buffer = Buffer[15];
     erg index: u64 = 0u64;
@@ -433,6 +588,19 @@ verb reject_read(ins region: Region[Array[u8, 16]]) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Open a region of 16-byte arrays and run the rejected short read check on it.
+outputs:
+    0 on success, 1 when the region cannot be opened, otherwise the status of reject_read.
+ownership:
+    The backing buffer is moved into the region and the region is handed to reject_read.
+errors:
+    Open errors map to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[16];
@@ -462,6 +630,21 @@ fn hosted_bulk_range_rejects_payload_above_the_limit() {
         &root,
         r#"import { open std::region };
 
+"""
+contract:
+purpose:
+    Try to bulk-write one more element than the region holds, and check that the write fails and leaves the region clean.
+inputs:
+    region: exclusive ins loan of Region of u8 values of length 131073.
+outputs:
+    0 when the oversized write is rejected, the region is not dirty and it closes, 2 when the write succeeds, 3 or 4 for dirty-state problems, 5 when the close fails.
+ownership:
+    The region is an exclusive ins loan and is closed here; the source is borrowed.
+errors:
+    The expected RegionError of the write is the success path.
+side_effects:
+    Closes the region.
+"""
 verb reject_bulk(ins region: Region[u8]) -> Int {
     erg source: Buffer = Buffer[131073];
     erg start: u64 = 0u64;
@@ -483,6 +666,19 @@ verb reject_bulk(ins region: Region[u8]) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Open a u8 region of 131073 elements and run the rejected oversized bulk write check on it.
+outputs:
+    0 on success, 1 when the region cannot be opened, otherwise the status of reject_bulk.
+ownership:
+    The backing buffer is moved into the region and the region is handed to reject_bulk.
+errors:
+    Open errors map to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[131073];

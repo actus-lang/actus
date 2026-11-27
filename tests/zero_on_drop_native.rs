@@ -41,6 +41,7 @@ struct Secret {
     key_b: u64,
 }
 
+"""Entry point that builds a Secret holding two keys and returns the first key as Int."""
 verb main() -> Int {
     erg secret: Secret = Secret { key_a: 1u64, key_b: 2u64, };
     return secret.key_a as Int;

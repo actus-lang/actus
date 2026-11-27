@@ -16,7 +16,7 @@ impl Project {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("src")).expect("create project");
         fs::write(root.join("Actus.toml"), manifest).expect("write manifest");
-        fs::write(root.join("src/main.act"), "verb main() {\n}\n").expect("write source");
+        fs::write(root.join("src/main.act"), "\"\"\"Entry point of the diagnostic-format fixture; it does nothing.\"\"\"\nverb main() {\n}\n").expect("write source");
         Self { root }
     }
 
@@ -104,9 +104,10 @@ fn a_manifest_key_that_selects_the_linker_is_located() {
 }
 
 fn write_oversized_source(project: &Project) {
-    let mut source =
-        (0..501).map(|index| format!("\"\"\"filler {index}\"\"\"\n")).collect::<String>();
-    source.push_str("verb main() {\n}\n");
+    let mut source = (0..501)
+        .map(|index| format!("open const FILLER_{index}: Int = {index};\n"))
+        .collect::<String>();
+    source.push_str("\"\"\"Entry point of the oversized-source fixture; it does nothing.\"\"\"\nverb main() {\n}\n");
     fs::write(project.root.join("src/main.act"), source).expect("write oversized source");
 }
 

@@ -8,6 +8,9 @@ struct Node {
     abs right: Option[abs Node],
 }
 
+"""
+Recursively add the value of a tree node and of all its descendants. The node is an immutable `abs` view; each child is an optional reference, so a missing child contributes 0 and a present one is visited with the same borrowed access. Recursion depth equals the height of the tree.
+"""
 verb sum(abs node: Node) -> Int {
     abs left = ref node.left;
     abs right = ref node.right;
@@ -20,6 +23,9 @@ verb sum(abs node: Node) -> Int {
     };
 }
 
+"""
+Build a three-node tree in a 512-byte arena, with a root of 30 and children of 10 and 20, and return the sum of its values, 60. The arena owns the nodes and releases them when it goes out of scope.
+"""
 verb main() -> Int {
     erg arena: Arena[512] = Arena[512]();
     erg left = arena.place(value: Node {

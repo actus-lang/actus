@@ -145,7 +145,7 @@ fn all_hosted_standard_library_facades_and_runtime_bridge_contracts_pass_llvm() 
     .expect("LLVM bridge audit manifest should be written");
     fs::write(
         &source,
-        "import { open std::io, open std::fs, open std::path, open std::process, open std::region, open std::wire, open std::charmap, open std::string, open std::time }; verb main() -> Int { return 0; }\n",
+        "import { open std::io, open std::fs, open std::path, open std::process, open std::region, open std::wire, open std::charmap, open std::string, open std::time };\n\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n",
     )
     .expect("LLVM bridge audit source should be written");
     let result = run_with_args(

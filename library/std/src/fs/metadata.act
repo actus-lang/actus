@@ -107,6 +107,12 @@ open verb metadata_absent() -> Metadata {
     };
 }
 
+"""
+Return the metadata value used before the runtime fills it in, with every
+timestamp, identity and flag reported as absent or zero. Callers pass it to a
+native bridge as the `ins` destination, so the function exists to give them an
+owned, fully initialized record. It performs no I/O and no allocation.
+"""
 verb metadata_default() -> Metadata {
     return metadata_absent();
 }

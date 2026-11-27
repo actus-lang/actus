@@ -10,7 +10,7 @@ fn missing_module_project() -> PathBuf {
         "[package]\nname = \"module-diagnostic\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
     )
     .expect("write module fixture manifest");
-    fs::write(root.join("src/main.act"), "import missing; verb main() -> Int { return 0; }\n")
+    fs::write(root.join("src/main.act"), "import missing;\n\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n")
         .expect("write missing module source");
     root
 }
@@ -32,7 +32,7 @@ fn provenance_project(name: &str, module_source: &str, extra: &[(&str, &str)]) -
         "[package]\nname = \"provenance\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
     )
     .expect("write provenance manifest");
-    fs::write(root.join("src/main.act"), "import module; verb main() -> Int { return 0; }\n")
+    fs::write(root.join("src/main.act"), "import module;\n\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n")
         .expect("write provenance entry");
     fs::write(root.join("src/module.act"), module_source).expect("write provenance module");
     for (path, source) in extra {
@@ -64,7 +64,7 @@ fn neutral_reexport_project() -> PathBuf {
         .expect("write neutral re-export lockfile");
     fs::write(
         root.join("src/main.act"),
-        "import app;\nverb main() -> Int { return app::start(); }\n",
+        "import app;\n\"\"\"Entry point that returns the result of start in the app module.\"\"\"\nverb main() -> Int { return app::start(); }\n",
     )
     .expect("write neutral re-export entry");
     fs::write(root.join("src/app/app.act"), "\"\"\"Re-export the start module declarations for the fixture project.\"\"\" open start;\n").expect("write neutral app facade");
@@ -126,7 +126,7 @@ fn conflicting_reexport_project() -> PathBuf {
         .expect("write conflicting re-export lockfile");
     fs::write(
         root.join("src/main.act"),
-        "import app;\nverb main() -> Int { return app::start(); }\n",
+        "import app;\n\"\"\"Entry point that returns the result of start in the app module.\"\"\"\nverb main() -> Int { return app::start(); }\n",
     )
     .expect("write conflicting re-export entry");
     fs::write(root.join("src/app/app.act"), "open start;\nopen contract;\n")
@@ -237,7 +237,7 @@ fn duplicate_project() -> PathBuf {
         "[package]\nname = \"provenance-duplicate\"\nversion = \"0.1.0\"\nsource_root = \"src\"\n",
     )
     .expect("write duplicate manifest");
-    fs::write(root.join("src/main.act"), "import demo; verb main() -> Int { return 0; }\n")
+    fs::write(root.join("src/main.act"), "import demo;\n\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n")
         .expect("write duplicate entry");
     fs::write(root.join("src/demo/demo.act"), "struct Shared { value: Int, }\n")
         .expect("write duplicate facade");
@@ -259,7 +259,7 @@ fn duplicate_facade_project() -> PathBuf {
     .expect("write duplicate manifest");
     fs::write(
         root.join("src/main.act"),
-        "import left; import right; verb main() -> Int { return 0; }\n",
+        "import left; import right;\n\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n",
     )
     .expect("write duplicate entry");
     fs::write(
@@ -272,7 +272,7 @@ fn duplicate_facade_project() -> PathBuf {
         "\"\"\"Re-export the api module declarations for the fixture project.\"\"\" open api;\n",
     )
     .expect("write right facade");
-    let api = "\"\"\"Fixture error enum that both facades declare identically.\"\"\" open enum SharedError { \"\"\"The shared resource was missing.\"\"\" Missing, } unsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;\n";
+    let api = "\"\"\"Fixture error enum that both facades declare identically.\"\"\" open enum SharedError { \"\"\"The shared resource was missing.\"\"\" Missing, }\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol shared_bridge in both the left and right modules, so the test can check that duplicate declarations report their module provenance.\ninputs:\n    buffer: borrowed Buffer.\noutputs:\n    An Int status.\nownership:\n    The buffer is borrowed and only read.\nabi:\n    unsafe extern C symbol shared_bridge taking a borrowed Buffer.\n\"\"\"\nunsafe extern \"C\" verb shared_bridge(abs buffer: Buffer) -> Int;\n";
     fs::write(root.join("src/left/api.act"), api).expect("write left declarations");
     fs::write(root.join("src/right/api.act"), api).expect("write right declarations");
     root

@@ -54,7 +54,7 @@ fn every_subcommand_rejects_an_unknown_option_naming_option_and_command() {
 fn unknown_option_is_rejected_after_a_valid_input_file() {
     let directory = scratch("after-input");
     let source = directory.join("main.act");
-    fs::write(&source, "verb main() -> Int { return 42; }\n").expect("write source");
+    fs::write(&source, "\"\"\"Entry point of the option-handling fixture; it returns the exit status 42.\"\"\"\nverb main() -> Int { return 42; }\n").expect("write source");
     let source = source.to_str().expect("utf-8 path");
     for command in ["check", "build", "run", "fmt", "watch", "parse", "publish"] {
         let output = actus(&[command, source, "--bogus"]);
@@ -90,7 +90,7 @@ fn strict_is_rejected_by_commands_without_it_and_hints_at_supporting_commands() 
 fn supported_options_still_work() {
     let directory = scratch("valid");
     let source = directory.join("main.act");
-    fs::write(&source, "verb main() -> Int {\n    return 42;\n}\n").expect("write source");
+    fs::write(&source, "\"\"\"Entry point of the option-handling fixture; it returns the exit status 42.\"\"\"\nverb main() -> Int {\n    return 42;\n}\n").expect("write source");
     let source = source.to_str().expect("utf-8 path");
 
     assert!(actus(&["check", source, "--strict"]).status.success());
@@ -119,7 +119,7 @@ fn supported_options_still_work() {
 fn run_forwards_option_like_arguments_after_the_separator() {
     let directory = scratch("run-separator");
     let source = directory.join("main.act");
-    fs::write(&source, "verb main() -> Int { return 42; }\n").expect("write source");
+    fs::write(&source, "\"\"\"Entry point of the option-handling fixture; it returns the exit status 42.\"\"\"\nverb main() -> Int { return 42; }\n").expect("write source");
     let source = source.to_str().expect("utf-8 path");
 
     let output = actus(&["run", source, "--release", "--", "--strict", "-z"]);

@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn emits_a_freestanding_llvm_object_without_host_runtime_imports() {
-    let source = "verb main() -> Int { erg value: u32 = 41u32; return value as Int; }";
+    let source = "\"\"\"Entry point that returns the u32 value 41 as Int.\"\"\"\nverb main() -> Int { erg value: u32 = 41u32; return value as Int; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "freestanding fixture should lex: {errors:?}");
     let program = parse(tokens).expect("freestanding fixture should parse");
@@ -702,7 +702,7 @@ fn executes_a_bundled_thumb_image_under_qemu() {
         "[package]\nname = \"qemu_arm\"\nversion = \"1.0.0\"\nentry = \"boot\"\n\n[build]\ntarget = \"thumbv7em-none-eabihf\"\nlinker_script = \"memory.x\"\n",
     )
     .expect("QEMU fixture manifest should be written");
-    let source = "struct Pair { erg left: u64, erg right: u64, erg extra0: u64, erg extra1: u64, erg extra2: u64, erg extra3: u64, erg extra4: u64, erg extra5: u64, } verb dividend() -> u64 { return 80u64; } verb divisor() -> u64 { return 2u64; } verb boot() -> Int { erg source: Pair = Pair { left: 1u64, right: 1u64, extra0: 0u64, extra1: 0u64, extra2: 0u64, extra3: 0u64, extra4: 0u64, extra5: 0u64, }; erg copied: Pair = source; erg numerator: u64 = dividend(); erg denominator: u64 = divisor(); erg quotient: u64 = numerator / denominator; return (copied.left + copied.right + quotient) as Int; }";
+    let source = "struct Pair { erg left: u64, erg right: u64, erg extra0: u64, erg extra1: u64, erg extra2: u64, erg extra3: u64, erg extra4: u64, erg extra5: u64, }\n\"\"\"Returns the u64 dividend 80.\"\"\"\nverb dividend() -> u64 { return 80u64; }\n\"\"\"Returns the u64 divisor 2.\"\"\"\nverb divisor() -> u64 { return 2u64; }\n\"\"\"Boot verb that copies a Pair of eight u64 fields by value, divides the dividend by the divisor, and returns the sum of the two copied fields and the quotient as Int.\"\"\"\nverb boot() -> Int { erg source: Pair = Pair { left: 1u64, right: 1u64, extra0: 0u64, extra1: 0u64, extra2: 0u64, extra3: 0u64, extra4: 0u64, extra5: 0u64, }; erg copied: Pair = source; erg numerator: u64 = dividend(); erg denominator: u64 = divisor(); erg quotient: u64 = numerator / denominator; return (copied.left + copied.right + quotient) as Int; }";
     let input = root.join("main.act");
     fs::write(&input, source).expect("QEMU Actus source should be written");
     let actus_object = root.join("actus.o");
@@ -919,7 +919,7 @@ fn links_and_runs_a_repr_c_aggregate_external_provider_through_llvm() {
     let manifest = root.join("Actus.toml");
     fs::write(&manifest, "[package]\nname = \"llvm_aggregate_ffi_fixture\"\nversion = \"0.1.0\"\n")
         .expect("aggregate FFI manifest should be written");
-    let source = "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; unsafe extern \"C\" verb make() -> Point; verb main() -> Int { erg point: Point = Point { x: 40i32, y: 2i32, }; erg output = make(); erg observed = inspect(point: erg output); return observed; }";
+    let source = "meta repr(C) struct Point { x: i32, y: i32, }\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol inspect, which takes a repr(C) Point by value and returns an Int.\ninputs:\n    point: owned Point passed by value.\noutputs:\n    The Int returned by the host provider.\nownership:\n    The Point is moved to the provider.\nabi:\n    unsafe extern C symbol inspect taking a Point by value.\n\"\"\"\nunsafe extern \"C\" verb inspect(erg point: Point) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol make, which returns a repr(C) Point by value.\noutputs:\n    A Point built by the host provider.\nownership:\n    The returned Point is owned by the caller.\nabi:\n    unsafe extern C symbol make returning a Point.\n\"\"\"\nunsafe extern \"C\" verb make() -> Point;\n\"\"\"Entry point that builds a Point with x 40 and y 2, obtains another Point from the foreign make verb, passes it to the foreign inspect verb and returns the observed value.\"\"\"\nverb main() -> Int { erg point: Point = Point { x: 40i32, y: 2i32, }; erg output = make(); erg observed = inspect(point: erg output); return observed; }";
     let (tokens, errors) = scan(source);
     assert!(errors.is_empty(), "aggregate FFI fixture should lex: {errors:?}");
     let program = parse(tokens).expect("aggregate FFI fixture should parse");

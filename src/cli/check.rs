@@ -7,9 +7,7 @@ use crate::modules::{
 use crate::session::CompilationSession;
 use std::fs;
 
-use super::conformance::{
-    ConformanceMode, parse_strict_option, validate_package_documentation, validate_source_limits,
-};
+use super::conformance::{ConformanceMode, parse_strict_option, validate_package_sources};
 use super::diagnostics::{report_frontend_error, report_mapped_diagnostic};
 
 pub(super) fn check_command(mut arguments: impl Iterator<Item = String>) -> i32 {
@@ -79,9 +77,6 @@ fn check_source(
     let input = input_path.to_path_buf();
     let Some(source) = read_check_source(&input) else { return 1 };
     let session = CompilationSession::new();
-    if !validate_source_limits(&input, &source, mode, configuration) {
-        return 1;
-    }
     let Some(program) = parse_check_source(&input, &session, &source) else { return 1 };
     let Some(plan) = resolve_check_program(configuration, &input, &source, program, &session)
     else {
@@ -157,7 +152,7 @@ fn analyze_check_program(
         report_mapped_diagnostic(source_map, input, source, module_diagnostic(&error));
         return 1;
     }
-    if !validate_package_documentation(input, &plan, mode) {
+    if !validate_package_sources(Some(input), configuration, mode) {
         return 1;
     }
     if mode.is_strict() {
@@ -200,7 +195,7 @@ fn check_module(
         report_mapped_diagnostic(source_map, input_path, "", module_diagnostic(&error));
         return 1;
     }
-    if !validate_package_documentation(input_path, &plan, mode) {
+    if !validate_package_sources(Some(input_path), configuration, mode) {
         return 1;
     }
     if mode.is_strict() {

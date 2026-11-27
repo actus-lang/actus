@@ -27,7 +27,7 @@ fn test_runner_preserves_effect_and_capability_contracts_on_generated_main() {
     let root = create_test_project(
         "runner-contracts",
         "contracts.act",
-        "meta effect(\"filesystem\", \"blocking\") meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } meta effect(\"filesystem\", \"blocking\") meta capability(\"filesystem.create_exclusive\") meta test verb contract_test() -> Int { primitive(); return 0; }\n",
+        "\"\"\"\ncontract:\npurpose:\n    Return 0 while declaring blocking filesystem effects and the exclusive-create capability, standing in for a primitive that needs them.\noutputs:\n    0.\nside_effects:\n    Declared as a blocking filesystem effect that requires the filesystem.create_exclusive capability; the body performs none.\n\"\"\"\nmeta effect(\"filesystem\", \"blocking\") meta capability(\"filesystem.create_exclusive\") verb primitive() -> Int { return 0; } meta effect(\"filesystem\", \"blocking\") meta capability(\"filesystem.create_exclusive\") meta test verb contract_test() -> Int { primitive(); return 0; }\n",
     );
     let output = run_test_command(&root);
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -103,7 +103,7 @@ fn test_filters_by_name_module_and_file_without_running_other_tests() {
     )
     .expect("write module test file");
     fs::write(root.join("src/domain/domain.act"), "open other;\n").expect("write source facade");
-    fs::write(root.join("src/domain/other.act"), "verb private_value() -> Int { return 0; }\n")
+    fs::write(root.join("src/domain/other.act"), "\"\"\"Private verb that returns the constant 0; the test checks that it is not visible outside its module.\"\"\"\nverb private_value() -> Int { return 0; }\n")
         .expect("write source module file");
 
     let output = run_command(
@@ -219,7 +219,7 @@ fn fixture_resolves_nested_sibling_aliases_and_qualified_types() {
         .expect("write qualified type");
     fs::write(
         root.join("tests/qualified_consumer.act"),
-        "import { types, parent::left::contract as left_contract, parent::right::contract as right_contract };\nverb combine() -> Int { erg envelope: types::Envelope = types::Envelope { value: 0, }; return envelope.value + left_contract::left_value() + right_contract::right_value(); }\nmeta test\nverb nested_sibling_aliases() -> Int { return combine() - 42; }\n",
+        "import { types, parent::left::contract as left_contract, parent::right::contract as right_contract };\n\"\"\"Builds an Envelope from the types module with value 0 and returns its value plus the left and right values obtained through two contract module aliases.\"\"\"\nverb combine() -> Int { erg envelope: types::Envelope = types::Envelope { value: 0, }; return envelope.value + left_contract::left_value() + right_contract::right_value(); }\nmeta test\nverb nested_sibling_aliases() -> Int { return combine() - 42; }\n",
     )
     .expect("write qualified consumer test");
 
@@ -283,7 +283,7 @@ fn module_test_preserves_descendant_canonical_imports() {
         .expect("write qualified type");
     fs::write(
         root.join("src/parent/consumer.act"),
-        "import { types, parent::left::contract as left_contract, parent::right::contract as right_contract };\nverb combine() -> Int { erg envelope: types::Envelope = types::Envelope { value: 0, }; return envelope.value + left_contract::left_value() + right_contract::right_value(); }\n",
+        "import { types, parent::left::contract as left_contract, parent::right::contract as right_contract };\n\"\"\"Builds an Envelope from the types module with value 0 and returns its value plus the left and right values obtained through two contract module aliases.\"\"\"\nverb combine() -> Int { erg envelope: types::Envelope = types::Envelope { value: 0, }; return envelope.value + left_contract::left_value() + right_contract::right_value(); }\n",
     )
     .expect("write consumer source");
     fs::write(
@@ -386,7 +386,7 @@ fn project_test_cannot_call_a_private_verb_through_an_open_import() {
     );
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
-    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+    fs::write(root.join("src/math/api.act"), "\"\"\"Private verb that returns the constant 42.\"\"\"\nverb private_value() -> Int { return 42; }\n")
         .expect("write private implementation");
 
     let output = run_test_command(&root);
@@ -407,7 +407,7 @@ fn project_test_cannot_call_a_private_verb_through_a_grouped_qualified_import() 
     );
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
-    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+    fs::write(root.join("src/math/api.act"), "\"\"\"Private verb that returns the constant 42.\"\"\"\nverb private_value() -> Int { return 42; }\n")
         .expect("write private implementation");
 
     let output = run_test_command(&root);
@@ -428,7 +428,7 @@ fn project_test_cannot_call_a_private_verb_through_a_qualified_import() {
     );
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
-    fs::write(root.join("src/math/api.act"), "verb private_value() -> Int { return 42; }\n")
+    fs::write(root.join("src/math/api.act"), "\"\"\"Private verb that returns the constant 42.\"\"\"\nverb private_value() -> Int { return 42; }\n")
         .expect("write private implementation");
 
     let output = run_test_command(&root);
@@ -514,7 +514,7 @@ fn file_limitless_metadata_does_not_change_nested_native_dependency_roots() {
     fs::write(forwarding.join("runtime.act"), "open forwarding;\n").expect("write child facade");
     fs::write(
         forwarding.join("forwarding.act"),
-        "meta limitless(\"file\")\nopen verb step() -> Int { return private_step(); }\nverb private_step() -> Int { return leaf_step(); }\nverb leaf_step() -> Int { return 42; }\n",
+        "meta limitless(\"file\")\nopen verb step() -> Int { return private_step(); }\n\"\"\"Private verb that returns the result of leaf_step.\"\"\"\nverb private_step() -> Int { return leaf_step(); }\n\"\"\"Private verb that returns the constant 42; it is the leaf of a private call chain.\"\"\"\nverb leaf_step() -> Int { return 42; }\n",
     )
     .expect("write nested forwarding implementation");
 
@@ -540,7 +540,7 @@ fn test_specializes_nested_generic_facade_dependencies() {
     fs::write(api.join("runtime.act"), "open api;\n").expect("write child facade");
     fs::write(
         api.join("api.act"),
-        "open struct Storage[N: Usize] { erg values: Array[u32, N], }\nverb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; }\nopen verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
+        "open struct Storage[N: Usize] { erg values: Array[u32, N], }\n\"\"\"Returns the generic capacity argument N, as a u32, of an exclusively borrowed Storage.\"\"\"\nverb inner[N: Usize](ins storage: Storage[N]) -> u32 { return N as u32; }\nopen verb outer[N: Usize](ins storage: Storage[N]) -> u32 { return inner(storage: ins storage); }\n",
     )
     .expect("write generic implementation");
 
@@ -583,7 +583,7 @@ fn fmt_check_reports_drift_then_accepts_canonical_output() {
         "[package]\nname = \"formatter\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "verb main()->Int{return 0;}\n").expect("write source");
+    fs::write(root.join("src/main.act"), "\"\"\"Entry point written without whitespace that returns 0.\"\"\"\nverb main()->Int{return 0;}\n").expect("write source");
     let before = run_in_project(&root, &["fmt", "--check"]);
     assert!(!before.success());
     assert!(run_in_project(&root, &["fmt"]).success());
@@ -604,7 +604,7 @@ fn fmt_is_idempotent_across_nested_facade_sources() {
     .expect("write manifest");
     fs::write(root.join("src/device/device.act"), "open runtime;\n").expect("write parent facade");
     fs::write(child.join("runtime.act"), "open api;\n").expect("write child facade");
-    fs::write(child.join("api.act"), "verb main()->Int{return 42;}\n")
+    fs::write(child.join("api.act"), "\"\"\"Entry point written without whitespace that returns 42.\"\"\"\nverb main()->Int{return 42;}\n")
         .expect("write child implementation");
 
     assert!(!run_in_project(&root, &["fmt", "--check"]).success());

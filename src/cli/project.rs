@@ -6,7 +6,7 @@ use std::process::Command;
 use crate::configuration::RuntimeProfile;
 
 const MANIFEST: &str = "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nentry = \"main\"\n\n[build]\ntarget = \"host\"\nprofile = \"debug\"{runtime}\n";
-const MAIN_SOURCE: &str = "verb main() {\n    print(string: \"Hello, world!\");\n}\n";
+const MAIN_SOURCE: &str = "\"\"\"Entry point of the new program: print a greeting to standard output.\"\"\"\nverb main() {\n    print(string: \"Hello, world!\");\n}\n";
 const GITIGNORE: &str = "/capsula/\nActus.lock\n*.o\n*.bin\n*.actus\n";
 
 struct ProjectOptions {

@@ -10,6 +10,18 @@ import {
     open std::wire,
 };
 
+"""
+contract:
+purpose:
+    Encode one frame with message 7, channel 2, sequence 42 and the payload
+    `ABC` into the caller's buffer.
+inputs:
+    encoded: output buffer sized for the 17-byte frame.
+outputs:
+    0 when exactly 17 bytes were written and 1 otherwise.
+side_effects:
+    Allocates the payload buffer and writes the frame into `encoded`.
+"""
 verb encode_frame(ins encoded: Buffer) -> Int {
     erg header = WireHeader {
         storage: Array[u8, 12](),
@@ -40,6 +52,18 @@ verb encode_frame(ins encoded: Buffer) -> Int {
     return 0;
 }
 
+"""
+contract:
+purpose:
+    Decode a frame and check its sequence number and first payload byte.
+inputs:
+    encoded: the frame bytes, borrowed read-only.
+outputs:
+    0 when the sequence is 42 and the payload starts with `A`, 1 when decoding
+    failed and 2 for a mismatch.
+side_effects:
+    Allocates a three-byte payload buffer.
+"""
 verb validate_frame(abs encoded: Buffer) -> Int {
     erg decoded_payload: Buffer = Buffer[3];
     erg decoded_result = wire_frame_decode(input: abs encoded, payload_output: ins decoded_payload);
@@ -53,6 +77,11 @@ verb validate_frame(abs encoded: Buffer) -> Int {
     };
 }
 
+"""
+Admit sequence number 42 in context 1 into an empty replay window and report
+whether it was accepted. It returns 0 for acceptance and 1 for any rejection.
+The window is local to the call, so the verb has no effect outside it.
+"""
 verb admit_sequence() -> Int {
     erg sequence = wire_sequence_empty();
     erg context_id: u32 = 1u32;
@@ -68,6 +97,19 @@ verb admit_sequence() -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Encode a frame, validate it, admit its sequence and print the first
+    observable line of the example.
+inputs:
+    encoded: output buffer that receives the frame.
+outputs:
+    0 on success, otherwise 1, 2 or 3 for the encode, validate or admit step
+    that failed.
+side_effects:
+    Writes the frame into `encoded` and prints one line to standard output.
+"""
 verb prepare_frame(ins encoded: Buffer) -> Int {
     if encode_frame(encoded: ins encoded) != 0 {
         return 1;
@@ -83,6 +125,12 @@ verb prepare_frame(ins encoded: Buffer) -> Int {
     return 0;
 }
 
+"""
+Feed the first five bytes of an encoded frame to the incremental parser and
+return the number of bytes it consumed, or 0 when the parser reports an error.
+The parser and the payload output are exclusive loans that the call mutates; the
+encoded frame is borrowed read-only. It allocates the five-byte chunk.
+"""
 verb feed_first(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer) -> u32 {
     erg first_chunk: Buffer = Buffer[5];
     for erg index: u32 in 0u32..5u32 {
@@ -99,6 +147,13 @@ verb feed_first(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer)
     };
 }
 
+"""
+Feed the next twelve bytes of an encoded frame, starting at offset five, to the
+incremental parser and return the number of bytes it consumed, or 0 when the
+parser reports an error. The parser and the payload output are exclusive loans
+that the call mutates; the encoded frame is borrowed read-only. It allocates the
+twelve-byte chunk.
+"""
 verb feed_second(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer) -> u32 {
     erg second_chunk: Buffer = Buffer[12];
     for erg index: u32 in 0u32..12u32 {
@@ -115,6 +170,20 @@ verb feed_second(ins parser: WireParser, abs encoded: Buffer, ins output: Buffer
     };
 }
 
+"""
+contract:
+purpose:
+    Parse the frame through the incremental parser in two chunks and check
+    that the parser reaches the ready state.
+inputs:
+    encoded: the complete frame, borrowed read-only.
+outputs:
+    0 on success, 4 when the first chunk consumed a different count, and 5
+    when the second chunk did not consume twelve bytes or the parser is not
+    ready.
+side_effects:
+    Allocates the parser payload buffer and prints one line on success.
+"""
 verb parse_chunks(abs encoded: Buffer) -> Int {
     erg parser = wire_parser_empty();
     erg parser_payload: Buffer = Buffer[3];
@@ -143,6 +212,12 @@ verb parse_chunks(abs encoded: Buffer) -> Int {
     return 0;
 }
 
+"""
+Run the wire example: encode, validate and admit a frame, then parse it in two
+chunks. It returns 0 when every stage succeeds, 1 when frame preparation fails
+and 2 when chunked parsing fails. It allocates the 17-byte frame buffer and
+prints two observable lines to standard output.
+"""
 verb main() -> Int {
     erg encoded: Buffer = Buffer[17];
     if prepare_frame(encoded: ins encoded) != 0 {

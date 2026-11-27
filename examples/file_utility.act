@@ -9,6 +9,19 @@ import {
     open fs,
 };
 
+"""
+contract:
+purpose:
+    Build the relative path `./actus_p192.bin` from raw ASCII bytes and
+    normalize it.
+outputs:
+    `Ok(path)` with the normalized path, or the `PathError` of the path module.
+ownership:
+    The raw buffer is consumed by the path constructor; the result is a newly
+    owned path.
+side_effects:
+    Allocates the raw byte buffer and the path.
+"""
 verb utility_path() -> Result[Path, PathError] {
     erg raw = Buffer[0];
     append(raw, 46);
@@ -35,6 +48,11 @@ verb utility_path() -> Result[Path, PathError] {
     };
 }
 
+"""
+Check that a path is relative and has a final file name. The path is an immutable
+`abs` view. The verb returns 0 when both hold, 20 when the path is not relative
+and 22 when it has no file name. It performs no I/O.
+"""
 verb validate_path(abs path: Path) -> Int {
     case is_relative(self: abs path) {
         true => {},
@@ -49,6 +67,20 @@ verb validate_path(abs path: Path) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Write the payload to the file, read it back, print it and continue with
+    `inspect_and_remove`.
+inputs:
+    path: the file path; payload: the bytes to write.
+outputs:
+    The status of `inspect_and_remove` on success, 11 when the write failed and
+    12 when the read failed.
+side_effects:
+    Blocking filesystem I/O: creates or replaces the file, reads it and writes
+    its content to standard output.
+"""
 meta effect("filesystem", "blocking")
 verb process_file(abs path: Path, abs payload: Buffer) -> Int {
     erg written = write_file(path: abs path, contents: abs payload);
@@ -73,6 +105,21 @@ verb process_file(abs path: Path, abs payload: Buffer) -> Int {
     return 12;
 }
 
+"""
+contract:
+purpose:
+    Read the file metadata, remove the file and check that a later read fails
+    with the typed `Failed` error.
+inputs:
+    path: the file to inspect and remove.
+outputs:
+    0 when the file was removed and the later read failed with `Failed`; 13
+    when the metadata could not be read, 14 when the removal failed, 18 when
+    the removed file could still be read, and 15 to 22 for another I/O error
+    on the final read.
+side_effects:
+    Blocking filesystem I/O: reads metadata and removes the file.
+"""
 meta effect("filesystem", "blocking")
 verb inspect_and_remove(abs path: Path) -> Int {
     erg information = metadata(path: abs path);
@@ -109,6 +156,18 @@ verb inspect_and_remove(abs path: Path) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Run the file utility: build the path, validate it, then write, read,
+    inspect and remove the file.
+outputs:
+    0 on success; 10 when the path cannot be built; otherwise the status of the
+    failing step of `validate_path` or `process_file`.
+side_effects:
+    Blocking filesystem I/O in the current directory and output to standard
+    output.
+"""
 meta effect("filesystem", "blocking")
 verb main() -> Int {
     erg path_result = utility_path();

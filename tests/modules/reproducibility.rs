@@ -12,7 +12,7 @@ fn write_fixture(root: &Path) {
     .unwrap();
     fs::write(
         root.join("src/main.act"),
-        "import zeta; import alpha; verb main() -> Int { return alpha::aye() + zeta::zed(); }\n",
+        "import zeta; import alpha;\n\"\"\"Entry point that returns the sum of aye in the alpha module and zed in the zeta module.\"\"\"\nverb main() -> Int { return alpha::aye() + zeta::zed(); }\n",
     )
     .unwrap();
     fs::write(

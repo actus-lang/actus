@@ -98,6 +98,21 @@ open verb wire_parser_header(abs parser: WireParser) -> WireHeader {
     return copy(value: abs parser.header);
 }
 
+"""
+contract:
+purpose:
+    Append one received byte to the parser frame storage.
+inputs:
+    parser: the parser state; byte: the byte to store.
+outputs:
+    `Ok(0)` after the byte is stored, or a `WireError`.
+ownership:
+    The parser is an exclusive `ins` loan.
+side_effects:
+    Writes the byte into the parser storage and advances the fill count.
+errors:
+    `PayloadTooLarge` when the storage already holds the maximum frame size.
+"""
 verb wire_parser_store(ins parser: WireParser, erg byte: u8) -> Result[Int, WireError] {
     if parser.filled >= WIRE_MAX_FRAME_BYTES {
         return Result[Int, WireError].Err(WireError.PayloadTooLarge);
@@ -107,6 +122,24 @@ verb wire_parser_store(ins parser: WireParser, erg byte: u8) -> Result[Int, Wire
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Decode the header once exactly the header bytes have been collected and
+    compute the expected total frame length.
+inputs:
+    parser: the parser state, whose storage holds the collected bytes.
+outputs:
+    `Ok(0)`, both when the header is decoded and when too few bytes have been
+    collected yet, or a `WireError`.
+ownership:
+    The parser is an exclusive `ins` loan.
+side_effects:
+    Stores the header, sets the expected length and moves the parser to the
+    collecting-body state; on error it resets the parser.
+errors:
+    Any header validation error from `wire_header_decode`.
+"""
 verb wire_parser_decode_header(ins parser: WireParser) -> Result[Int, WireError] {
     if parser.filled != WIRE_HEADER_BYTES {
         return Result[Int, WireError].Ok(0);
@@ -126,6 +159,25 @@ verb wire_parser_decode_header(ins parser: WireParser) -> Result[Int, WireError]
     };
 }
 
+"""
+contract:
+purpose:
+    Decode the complete frame once the expected number of bytes has arrived and
+    copy its payload out.
+inputs:
+    parser: the parser state; payload_output: destination for the payload.
+outputs:
+    `Ok(1)` when the frame was decoded and the parser is ready, `Ok(0)` when
+    more bytes are needed, or a `WireError`.
+ownership:
+    The parser and the output buffer are exclusive `ins` loans.
+side_effects:
+    Writes the payload into the output on success and moves the parser to the
+    ready state; on error it resets the parser.
+errors:
+    Any error of `wire_frame_decode`, such as `ChecksumMismatch` or
+    `InsufficientCapacity`.
+"""
 verb wire_parser_finish(
     ins parser: WireParser,
     ins payload_output: Buffer
@@ -146,6 +198,13 @@ verb wire_parser_finish(
     };
 }
 
+"""
+Handle one byte while the parser searches for the frame start. When the byte
+equals the first magic byte, it is stored as the first frame byte and the
+parser moves to the magic-matching state; any other byte is ignored. The parser
+is an exclusive `ins` loan, the byte is a copied scalar, and the result is
+always `Ok(0)` because this state cannot fail.
+"""
 verb wire_parser_consume_searching(ins parser: WireParser, erg byte: u8) -> Result[Int, WireError] {
     if byte == WIRE_MAGIC_0 {
         parser.storage[0] = byte;
@@ -155,6 +214,13 @@ verb wire_parser_consume_searching(ins parser: WireParser, erg byte: u8) -> Resu
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+Handle one byte while the parser expects the second magic byte. The second
+magic byte stores it and moves the parser to header collection; a repeated first
+magic byte keeps waiting with that byte as the new start; any other byte resets
+the parser to searching. The parser is an exclusive `ins` loan, the byte is a
+copied scalar, and the result is always `Ok(0)` because this state cannot fail.
+"""
 verb wire_parser_consume_magic(ins parser: WireParser, erg byte: u8) -> Result[Int, WireError] {
     if byte == WIRE_MAGIC_1 {
         parser.storage[1] = byte;
@@ -169,6 +235,25 @@ verb wire_parser_consume_magic(ins parser: WireParser, erg byte: u8) -> Result[I
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Handle one byte while the parser collects the header and payload: store it,
+    decode the header when complete, and finish the frame when complete.
+inputs:
+    parser: the parser state; byte: the received byte;
+    payload_output: destination for the payload.
+outputs:
+    `Ok(1)` when the frame became ready, `Ok(0)` when more bytes are needed,
+    or a `WireError`.
+ownership:
+    The parser and the output buffer are exclusive `ins` loans.
+side_effects:
+    Appends the byte and may write the payload into the output.
+errors:
+    The first error of `wire_parser_store`, `wire_parser_decode_header` or
+    `wire_parser_finish`.
+"""
 verb wire_parser_consume_body(
     ins parser: WireParser,
     erg byte: u8,
@@ -193,6 +278,23 @@ verb wire_parser_consume_body(
     return wire_parser_finish(parser: ins parser, payload_output: ins payload_output);
 }
 
+"""
+contract:
+purpose:
+    Dispatch one received byte to the handler of the current parser state.
+inputs:
+    parser: the parser state; byte: the received byte;
+    payload_output: destination for the payload.
+outputs:
+    `Ok(1)` when a frame became ready, `Ok(0)` otherwise, or a `WireError`.
+ownership:
+    The parser and the output buffer are exclusive `ins` loans.
+side_effects:
+    Updates the parser state and may write the payload into the output.
+errors:
+    `PolicyRejected` when a byte arrives while a frame is already ready, and
+    the errors of the state handlers.
+"""
 verb wire_parser_consume(
     ins parser: WireParser,
     erg byte: u8,

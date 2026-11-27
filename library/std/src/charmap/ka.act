@@ -13,6 +13,22 @@ open const KA_LAST_BYTE: u8 = 160u8;
 open const KA_UTF8_PREFIX: u8 = 225u8;
 open const KA_UTF8_SECOND: u8 = 131u8;
 
+"""
+contract:
+purpose:
+    Compute the number of bytes `ka_encode` will write for a UTF-8 input,
+    validating the whole input without writing anything.
+inputs:
+    input: borrowed `Buffer` holding ASCII and modern Georgian UTF-8.
+outputs:
+    `Ok(length)` where each three-byte Georgian letter counts as one byte, or
+    a typed `CharmapError`.
+ownership:
+    The input is an immutable `abs` view and stays caller-owned.
+errors:
+    `InvalidStorage` for a negative buffer length; `InvalidUtf8` and
+    `UnmappedByte` as reported by `ka_count_georgian_units`.
+"""
 verb ka_encoded_length(abs input: Buffer) -> Result[u32, CharmapError] {
     erg input_length: Int = buffer_length(buffer: abs input);
     if input_length < 0 {
@@ -30,6 +46,21 @@ verb ka_encoded_length(abs input: Buffer) -> Result[u32, CharmapError] {
     return Result[u32, CharmapError].Err(CharmapError.InvalidStorage);
 }
 
+"""
+contract:
+purpose:
+    Scan UTF-8 input once, validate it against the supported ASCII and modern
+    Georgian ranges, and count the three-byte Georgian letters it contains.
+inputs:
+    input: borrowed `Buffer` holding the candidate UTF-8 text.
+outputs:
+    `Ok(count)` with the number of Georgian letters, or a typed `CharmapError`.
+ownership:
+    The input is an immutable `abs` view and is never modified.
+errors:
+    `InvalidUtf8` for a truncated sequence or a lead byte other than `E1`;
+    `UnmappedByte` for a second or third byte outside the Georgian range.
+"""
 verb ka_count_georgian_units(abs input: Buffer) -> Result[u32, CharmapError] {
     erg input_length: u32 = buffer_length(buffer: abs input) as u32;
     erg count: u32 = 0u32;
@@ -59,6 +90,22 @@ verb ka_count_georgian_units(abs input: Buffer) -> Result[u32, CharmapError] {
     return Result[u32, CharmapError].Ok(count);
 }
 
+"""
+contract:
+purpose:
+    Compute the number of UTF-8 bytes `ka_decode` will write for an internal
+    byte input, validating every byte without writing anything.
+inputs:
+    input: borrowed `Buffer` of internal bytes (ASCII or `128..160`).
+outputs:
+    `Ok(length)` where each Georgian byte expands to three UTF-8 bytes, or a
+    typed `CharmapError`.
+ownership:
+    The input is an immutable `abs` view and stays caller-owned.
+errors:
+    `InvalidStorage` for a negative buffer length; `UnmappedByte` for a byte
+    that is neither ASCII nor in the Georgian range.
+"""
 verb ka_decoded_length(abs input: Buffer) -> Result[u32, CharmapError] {
     erg input_length: Int = buffer_length(buffer: abs input);
     if input_length < 0 {
@@ -143,6 +190,25 @@ open verb ka_decode(abs input: Buffer, ins output: Buffer) -> Result[u32, Charma
     return Result[u32, CharmapError].Err(CharmapError.InvalidStorage);
 }
 
+"""
+contract:
+purpose:
+    Write the one-byte encoding of an already validated UTF-8 input. It is the
+    second pass of `ka_encode` and assumes `ka_encoded_length` accepted the
+    input and the output has room for `required` bytes.
+inputs:
+    input: borrowed validated UTF-8 `Buffer`; output: destination `Buffer`;
+    required: the byte count computed by the validation pass.
+outputs:
+    `Ok(required)` after every byte is written.
+ownership:
+    The input is an immutable `abs` view; the output is mutated through `ins`
+    and remains owned by the caller.
+side_effects:
+    Writes exactly `required` bytes into the output buffer, starting at zero.
+errors:
+    None of its own; it relies on the caller's validation and capacity check.
+"""
 verb ka_encode_body(
     abs input: Buffer,
     ins output: Buffer,
@@ -168,6 +234,25 @@ verb ka_encode_body(
     return Result[u32, CharmapError].Ok(required);
 }
 
+"""
+contract:
+purpose:
+    Write the UTF-8 expansion of an already validated internal byte input. It
+    is the second pass of `ka_decode` and assumes `ka_decoded_length` accepted
+    the input and the output has room for `required` bytes.
+inputs:
+    input: borrowed validated `Buffer` of internal bytes; output: destination
+    `Buffer`; required: the byte count computed by the validation pass.
+outputs:
+    `Ok(required)` after every byte is written.
+ownership:
+    The input is an immutable `abs` view; the output is mutated through `ins`
+    and remains owned by the caller.
+side_effects:
+    Writes exactly `required` bytes into the output buffer, starting at zero.
+errors:
+    None of its own; it relies on the caller's validation and capacity check.
+"""
 verb ka_decode_body(
     abs input: Buffer,
     ins output: Buffer,

@@ -3,6 +3,20 @@ import {
     open std::string,
 };
 
+"""
+contract:
+purpose:
+    Validate a buffer as UTF-8 through the public text boundary and check
+    that its first byte is `A`.
+inputs:
+    storage: the candidate bytes, consumed.
+outputs:
+    0 when the first byte is 65, 1 for another first byte, 2 when reading the
+    byte failed and 4 when the buffer is not valid UTF-8.
+ownership:
+    The buffer moves into the owned text value, which is dropped before the
+    verb returns.
+"""
 verb inspect_text(dat storage: Buffer) -> Int {
     erg owned = utf8_from_buffer(storage: dat storage);
     return case dat owned {
@@ -23,6 +37,12 @@ verb inspect_text(dat storage: Buffer) -> Int {
     };
 }
 
+"""
+Build the five-byte buffer `Actus` by appending its ASCII codes and return the
+result of `inspect_text`. The exit status is 0 when the text boundary accepts
+the buffer and its first byte is `A`. The verb allocates the buffer and has no
+other side effects.
+"""
 verb main() -> Int {
     erg storage = Buffer[0];
     append(storage, 65);

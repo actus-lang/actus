@@ -13,7 +13,11 @@ pub(super) fn find_functions(source: &str, hash_comments: bool) -> Vec<FunctionR
 
 /// Counts physical source lines that contain code after comments are removed.
 ///
-/// Blank lines and comments do not contribute to architectural source-size limits.
+/// Blank lines and comments do not contribute to architectural source-size
+/// limits. In Actus source a `"""` documentation block, single-line or
+/// multi-line, is documentation and does not contribute either: the limits
+/// measure code complexity, and counting documentation would punish complete
+/// documentation. Code on the same line as a closing `"""` still counts.
 pub(super) fn code_line_count(source: &str, hash_comments: bool) -> usize {
     code_line_flags(source, hash_comments)
         .into_iter()
@@ -40,9 +44,22 @@ pub(super) fn code_line_count_between(
 
 fn code_line_flags(source: &str, hash_comments: bool) -> Vec<bool> {
     let mut in_block_comment = false;
+    let mut in_doc_string = false;
     source
         .lines()
-        .map(|line| !strip_comments(line, &mut in_block_comment, hash_comments).trim().is_empty())
+        .map(|line| {
+            let cleaned = if hash_comments {
+                strip_non_code_with_doc_state(
+                    line,
+                    &mut in_block_comment,
+                    &mut in_doc_string,
+                    hash_comments,
+                )
+            } else {
+                strip_comments(line, &mut in_block_comment)
+            };
+            !cleaned.trim().is_empty()
+        })
         .collect()
 }
 
@@ -192,7 +209,9 @@ fn strip_non_code_with_doc_state(
     output
 }
 
-fn strip_comments(line: &str, in_block_comment: &mut bool, hash_comments: bool) -> String {
+/// Removes Rust comments and string contents from one line. Rust source has no
+/// `#` comments, so the hash form is handled by the documentation-aware scanner.
+fn strip_comments(line: &str, in_block_comment: &mut bool) -> String {
     let mut output = String::new();
     let mut in_string = false;
     let mut in_doc_string = false;
@@ -234,9 +253,6 @@ fn strip_comments(line: &str, in_block_comment: &mut bool, hash_comments: bool) 
             continue;
         }
         if !in_string && character == '/' && next == Some('/') {
-            break;
-        }
-        if hash_comments && !in_string && character == '#' {
             break;
         }
         if !in_string && character == '/' && next == Some('*') {

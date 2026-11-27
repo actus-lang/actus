@@ -35,6 +35,14 @@ unsafe extern "C" verb actus_file_publish_coordinated_path(
     abs expected: Metadata
 ) -> Int;
 
+"""
+Windows implementation of the coordinated publication bridge. It has the same
+contract as the Unix declaration above: it takes the coordinator lock, compares
+the destination identity with the expected snapshot, and replaces the
+destination through the host replacement primitive before releasing the lock,
+using file identity instead of inode identity. Paths and metadata are borrowed
+`abs` views and the returned status is translated by the public wrapper.
+"""
 meta target("windows")
 meta capability("windows.file_identity", "windows.replace_file")
 unsafe extern "C" verb actus_file_publish_coordinated_path(
@@ -136,6 +144,13 @@ unsafe extern "C" verb actus_file_replace_atomic_path(
     abs to: path_module::Path
 ) -> Int;
 
+"""
+Windows implementation of the atomic replacement bridge. It has the same
+contract as the Unix declaration above: both paths are borrowed `abs` views,
+the destination is replaced in one host operation by the replace-file
+primitive, and the status is translated to `IoError` by the public wrapper. It
+never emulates replacement as a remove followed by a rename.
+"""
 meta target("windows")
 meta capability("windows.replace_file")
 unsafe extern "C" verb actus_file_replace_atomic_path(

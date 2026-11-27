@@ -14,12 +14,39 @@ open struct Utf8Buffer {
     erg length: Int,
 }
 
+"""
+Private bridge that validates that the bytes of a `Buffer` form well-formed
+UTF-8. The buffer is an immutable `abs` view and is not modified. It returns
+`0` when the content is valid and a non-zero status for malformed bytes or
+invalid buffer metadata; the caller decides whether to consume or drop the
+buffer. The call performs no allocation.
+"""
 unsafe extern "C" verb actus_buffer_validate_utf8(abs storage: Buffer) -> Int;
 
+"""
+Private bridge that reads the logical byte length of a `Buffer`. The buffer is an
+immutable `abs` view and is not modified. It returns the non-negative length,
+or a negative status when the buffer metadata is invalid; the public wrapper
+translates the status to `StringError`. The call performs no allocation.
+"""
 unsafe extern "C" verb actus_buffer_length(abs storage: Buffer) -> Int;
 
+"""
+Private bridge that reads the byte of a `Buffer` at `index`. The buffer is an
+immutable `abs` view and is not modified. It returns the byte value from `0` to
+`255`, or a negative status when the index is out of bounds or the buffer
+metadata is invalid. The call performs no allocation.
+"""
 unsafe extern "C" verb actus_buffer_byte_at(abs storage: Buffer, erg index: Int) -> Int;
 
+"""
+Private bridge that copies the validated bytes of a borrowed `String` into a
+caller-provided `Buffer`. The text is an immutable `abs` view; the destination
+is mutated through `ins` and stays owned by the caller. It returns the number of
+bytes copied on success, or a negative status for null or malformed text or
+insufficient storage; on failure the public wrapper drops the destination. The
+call writes only into the destination buffer.
+"""
 unsafe extern "C" verb actus_string_copy_to_buffer(
     abs text: String,
     ins storage: Buffer
