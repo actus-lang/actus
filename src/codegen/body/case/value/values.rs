@@ -336,6 +336,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     > {
         self.provider.enter_scope(branch.span);
         let mut instructions = Vec::new();
+        let (mut current, mut parameters) = (id, Vec::new());
         if let Pattern::Variant { variant, payload, .. } = &branch.pattern {
             self.provider.bind_enum_variant_payload(
                 subject,
@@ -359,43 +360,45 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 self.provider.lower_expression(expression, &mut instructions)?
             }
             CaseBody::Block(block) => {
-                match self.lower_case_value_block(branch, block, span, &mut instructions)? {
-                    CaseBlockValue::Value(value) => value,
-                    CaseBlockValue::Diverged => {
-                        return Ok((
-                            BackendBlock { parameters: Vec::new(), id, instructions },
-                            None,
-                        ));
-                    }
-                }
+                // A `?` statement of the arm splits it (bug #130): the arm
+                // continues, and hands its value over, in its last block.
+                let entry = std::mem::take(&mut instructions);
+                let (value, tail) = self.lower_case_value_block(id, branch, block, span, entry)?;
+                let CaseBlockValue::Value(value) = value else {
+                    return Ok((tail.into_block(), None));
+                };
+                (current, parameters, instructions) = (tail.id, tail.parameters, tail.instructions);
+                value
             }
         };
         // The arm hands its value to the merge block here, which ends its scope.
         self.provider.emit_scope_end(branch.span, &mut instructions);
         self.provider.exit_scope(branch.span, &mut instructions)?;
         self.provider.value_type(value).ok_or_else(|| unsupported(span, "case branch type"))?;
-        Ok((BackendBlock { parameters: Vec::new(), id, instructions }, Some((id, value))))
+        Ok((BackendBlock { parameters, id: current, instructions }, Some((current, value))))
     }
 
     fn lower_case_value_block(
         &mut self,
+        id: BackendBlockId,
         branch: &crate::ast::CaseBranch,
         block: &Block,
         span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<CaseBlockValue, BackendContractError> {
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<(CaseBlockValue, super::super::super::arm_tries::ArmTail), BackendContractError>
+    {
         let Some(last) = block.statements.last() else {
             return Err(unsupported(span, "case value block is empty"));
         };
         if matches!(last, Stmt::Return { .. }) {
-            for statement in &block.statements {
-                self.lower_statement(statement, instructions)?;
-            }
-            self.provider.exit_scope(branch.span, instructions)?;
-            return Ok(CaseBlockValue::Diverged);
+            let mut tail = self.lower_arm_statements(id, &block.statements, instructions)?;
+            self.provider.exit_scope(branch.span, &mut tail.instructions)?;
+            return Ok((CaseBlockValue::Diverged, tail));
         }
-        for statement in &block.statements[..block.statements.len() - 1] {
-            self.lower_statement(statement, instructions)?;
+        let prefix = &block.statements[..block.statements.len() - 1];
+        let mut tail = self.lower_arm_statements(id, prefix, instructions)?;
+        if tail.diverged {
+            return Err(unsupported(span, "case value block returns before its value"));
         }
         let expression = match last {
             Stmt::Expression { expression, .. } => expression.clone(),
@@ -407,7 +410,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             },
             _ => return Err(unsupported(span, "case value block requires a tail expression")),
         };
-        Ok(CaseBlockValue::Value(self.provider.lower_expression(&expression, instructions)?))
+        let value = self.provider.lower_expression(&expression, &mut tail.instructions)?;
+        Ok((CaseBlockValue::Value(value), tail))
     }
 }
 

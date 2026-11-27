@@ -130,6 +130,13 @@ fn normalize_block(block: &mut Block, context: &mut NormalizationContext<'_>) {
     for mut statement in statements {
         let mut generated = Vec::new();
         normalize_statement(&mut statement, context, &mut generated);
+        // The arms of a conditional with a `?` are blocks of their own (bug #130).
+        for owner in generated.iter_mut().chain(std::iter::once(&mut statement)) {
+            let arms = super::conditional_tries::value_arms(owner, &mut || fresh_name(context));
+            for arm in arms {
+                normalize_block(arm, context);
+            }
+        }
         normalized.extend(generated);
         normalized.push(statement);
     }
@@ -141,14 +148,8 @@ fn normalize_statement(
     context: &mut NormalizationContext<'_>,
     generated: &mut Vec<Stmt>,
 ) {
-    // A `?` nested in the value of a statement is bound first (bug #128).
-    if let Stmt::OwnerDecl { initializer: value, .. }
-    | Stmt::Return { value: Some(value), .. }
-    | Stmt::Expression { expression: value, .. }
-    | Stmt::Assignment { value, .. } = statement
-    {
-        generated.extend(super::nested_tries::hoist(value, &mut || fresh_name(context)));
-    }
+    // A `?` nested in the value of a statement is bound first (bugs #128, #130).
+    generated.extend(super::nested_tries::hoist_statement(statement, &mut || fresh_name(context)));
     match statement {
         Stmt::OwnerDecl { initializer, .. } | Stmt::Return { value: Some(initializer), .. } => {
             let (prefix, expression) = normalize_expression(initializer, context);

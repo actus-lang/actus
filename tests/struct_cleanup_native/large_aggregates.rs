@@ -8,8 +8,8 @@ use super::harness::run_on_every_backend;
 
 /// A `Fabric` is 64 KiB and a `Brain` 128 KiB, both above the size from which
 /// an aggregate is held in a heap block of its own.
-const FABRIC: &str = "struct Cell { erg storage: Array[u8, 64], } \
-struct Fabric { erg columns: Array[Cell, 1024], } struct Brain { erg fabrics: Array[Fabric, 2], } ";
+const FABRIC: &str = "meta copy struct Cell { erg storage: Array[u8, 64], } \
+meta copy struct Fabric { erg columns: Array[Cell, 1024], } struct Brain { erg fabrics: Array[Fabric, 2], } ";
 
 fn check_large(label: &str, body: &str) {
     let source = format!("{FABRIC}verb main() -> Int {{ {body} return 42; }}");
@@ -21,7 +21,7 @@ fn copying_an_element_out_and_back_frees_every_block() {
     check_large(
         "large-self-copy",
         "erg brain: Brain = Brain { fabrics: Array[Fabric, 2](), }; \
-erg local_fabric: Fabric = brain.fabrics[0u32]; brain.fabrics[0u32] = local_fabric;",
+erg local_fabric: Fabric = copy(value: abs brain.fabrics[0u32]); brain.fabrics[0u32] = local_fabric;",
     );
 }
 

@@ -54,11 +54,17 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
                  would be shared silently; {fix}"
             )
         }
-        SemanticErrorKind::MoveOutOfElement(path) => format!(
-            "cannot move `{path}` out of an array element: moves of single elements are not \
-             tracked, so the array would still release it; borrow it with `abs`, or assign a \
-             new value to the element in place"
-        ),
+        SemanticErrorKind::MoveOutOfElement(path, copyable) => {
+            let fix = if *copyable {
+                format!("write `copy(value: abs {path})` to duplicate it, or borrow it with `abs`")
+            } else {
+                "borrow it with `abs`, or assign a new value to the element in place".to_owned()
+            };
+            format!(
+                "cannot move `{path}` out of an array element: moves of single elements are \
+                 not tracked, so the array would still release it; {fix}"
+            )
+        }
         SemanticErrorKind::ZeroOnDropFieldMove { owner, field } => {
             format!("cannot move field `{field}` out of zero_on_drop owner `{owner}`")
         }
@@ -113,6 +119,10 @@ fn ownership_argument_core_message(kind: &SemanticErrorKind) -> Option<String> {
         SemanticErrorKind::InvalidArgumentRole { callee, parameter } => {
             format!("argument does not satisfy role of `{parameter}` in `{callee}`")
         }
+        SemanticErrorKind::MisplacedTry(place) => format!(
+            "`?` in {place} cannot return early from there; bind the value first with \
+             `erg value = ...?;` and use the binding"
+        ),
         SemanticErrorKind::InvalidAbsReturnOrigin { reason } => {
             format!("invalid abs return origin: {reason}")
         }

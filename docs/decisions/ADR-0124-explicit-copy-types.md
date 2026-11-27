@@ -57,6 +57,27 @@ leave the view, which can only be borrowed with `abs` while the owner keeps it.
 Scalars read through a view are unchanged, and so is taking a view of the
 field (`abs h = ref parser.header`, an `abs` argument, `-> abs`).
 
+### Reading an array element is not a copy
+
+An array element is owned by its array, and the language does not track moves
+of single elements: the array releases every element at its own cleanup
+(ADR-0125). Reading an element of a struct, enum, pack or array type BY VALUE
+(`erg p = points[i];`) is therefore a move out of an indexed element, which
+cannot be honoured, and nothing writes a copy, so it is not a copy either. The
+compiler rejects it with `E1010` for every such type, whether it holds a
+resource or only plain data (bug #123; bug #126 first closed it for the types
+that hold a resource, which a move would release twice). The rule applies at a
+constant or a run-time index, through a field of an element
+(`lines[i].start`), and in every position that stores or hands over a value: a
+binding, an assignment, an element assignment, a struct field initializer, an
+enum payload, an `erg` or `dat` argument, a return and the value of an `if`
+branch or a `case` arm. The message names the path. When the element type is a
+copy type the fix is the written copy, `copy(value: abs points[i])`; otherwise
+the element can be borrowed with `abs`, or replaced in place by an assignment,
+which releases the value it held. A scalar element (`counts[i]`, `points[i].x`)
+is a value and is unchanged, and so is a read by view (an `abs` argument, `ref
+points[i]`).
+
 ### Declared copy types
 
 A struct, an enum or a pack can declare that it may be duplicated:
@@ -147,6 +168,11 @@ separate question (bug #93) for its own decision.
   as `copy(value: abs header)`; the examples, the benchmarks and the test
   fixtures did not rely on it.
   No existing behaviour that was correct changes.
+- An element read by value is rejected for every aggregate type (bug #123).
+  Two compiler tests that copied a plain struct out of an array element
+  (`Point`, and the large `Fabric` with its `Cell`) declare those types
+  `meta copy` and write `copy(value: abs ...)`; the standard library, the
+  examples and twin-e did not rely on it.
 - `E1146` is added to the diagnostic catalog.
 - ADR-0059 item 1 ("an explicit copy or clone operation for values whose type
   is declared safe to duplicate") is completed for structs, enums and packs.

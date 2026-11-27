@@ -3,6 +3,7 @@ mod array_capacity;
 mod borrowing;
 mod calls;
 mod cleanup;
+mod conditional_tries;
 mod copy_types;
 mod dynamic;
 mod enums;
@@ -27,6 +28,7 @@ mod stack_limit;
 mod state;
 mod structs;
 mod target_filter;
+mod try_positions;
 mod types;
 mod volatile;
 
@@ -54,4 +56,5 @@ pub use model::{
 pub use stack_limit::validate_stack_limit_backend_target;
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use target_filter::{filter_program_for_target, filter_program_for_target_checked};
+use try_positions::misplaced_try;
 pub use types::{SemanticType, TypeRegistry};

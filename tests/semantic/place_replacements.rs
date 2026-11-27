@@ -132,7 +132,10 @@ fn moving_a_resource_out_of_an_array_element_is_rejected() {
     ] {
         let error = analyze_main(&format!("{BUFFERS} {tail}")).expect_err(label);
         match &error {
-            SemanticErrorKind::MoveOutOfElement(found) => assert_eq!(found, path, "{label}"),
+            SemanticErrorKind::MoveOutOfElement(found, copyable) => {
+                assert_eq!(found, path, "{label}");
+                assert!(!copyable, "{label}: a resource holder is never a copy type");
+            }
             _ => panic!("{label}: {error:?}"),
         }
     }

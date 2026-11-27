@@ -54,6 +54,30 @@ impl Analyzer {
             Expr::FieldAccess { object, field, .. } => self.resolved_type_name(object)
                 .and_then(|type_name| self.specialized_field_type(&type_name, field)),
             Expr::Index { target, index, .. } => self.validate_index_access(target, index).ok(),
+            // The value of an `if` is the tail of the first branch that has
+            // one; a branch that leaves with `return`, `break` or `continue`
+            // gives no value (bug #131: a struct value was typed `unknown`).
+            Expr::If { then_branch, else_branch, .. } => self.block_value_type(then_branch)
+                .or_else(|| match else_branch.as_ref()? {
+                    crate::ast::IfBranch::Block(block) => self.block_value_type(block),
+                    crate::ast::IfBranch::ElseIf(nested) => self.resolved_type_name(nested),
+                }),
+            _ => None,
+        }
+    }
+}
+
+impl Analyzer {
+    /// The type of the value of `block`: its tail expression when it is
+    /// written without `;`. A tail call followed by `;` is a statement, so an
+    /// `if` statement whose branches end in calls has no value.
+    fn block_value_type(&self, block: &crate::ast::Block) -> Option<TypeName> {
+        match block.statements.last() {
+            Some(crate::ast::Stmt::Expression { expression, span })
+                if span.end == crate::semantic::analyzer::expression_span(expression).end =>
+            {
+                self.resolved_type_name(expression)
+            }
             _ => None,
         }
     }

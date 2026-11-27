@@ -43,7 +43,7 @@ struct TryExpressionContext<'a> {
 /// the cleanup the analyzer planned for the exit at `exit` (the `?` itself,
 /// or the `return` it is part of), the scalar loan write-backs, and the
 /// return (ADR-0125).
-fn exit_return<P: BackendExpressionProvider>(
+pub(super) fn exit_return<P: BackendExpressionProvider>(
     provider: &mut P,
     value: super::BackendValueId,
     exit: crate::lexer::SourceSpan,
@@ -206,7 +206,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
-    fn lower_try_return_statement(
+    pub(super) fn lower_try_return_statement(
         &mut self,
         id: BackendBlockId,
         exit: crate::lexer::SourceSpan,
@@ -424,7 +424,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(())
     }
 
-    fn lower_try_payload(
+    pub(super) fn lower_try_payload(
         &mut self,
         source: super::BackendValueId,
         span: crate::lexer::SourceSpan,
@@ -457,7 +457,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     }
 }
 
-fn append_try_condition_branch(
+pub(super) fn append_try_condition_branch(
     instructions: &mut Vec<BackendInstruction>,
     condition: super::BackendValueId,
     ok_block: BackendBlockId,

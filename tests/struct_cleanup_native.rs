@@ -14,6 +14,8 @@
 mod arenas;
 #[path = "struct_cleanup_native/arrays.rs"]
 mod arrays;
+#[path = "struct_cleanup_native/element_copies.rs"]
+mod element_copies;
 #[path = "struct_cleanup_native/enums.rs"]
 mod enums;
 #[path = "struct_cleanup_native/exits.rs"]
@@ -28,3 +30,5 @@ mod place_assignments;
 mod structs;
 #[path = "struct_cleanup_native/temporaries.rs"]
 mod temporaries;
+#[path = "struct_cleanup_native/try_positions.rs"]
+mod try_positions;

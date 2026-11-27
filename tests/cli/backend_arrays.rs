@@ -801,7 +801,7 @@ fn both_native_backends_build_and_run_a_shared_aggregate_array_element_store() {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_build_and_run_a_shared_aggregate_array_element_replacement() {
-    let source = "struct Point { x: u32, }\n\"\"\"Entry point that stores a Point with x 41 in element 0, copies it to element 1 and returns the x of element 1 plus 1.\"\"\"\nverb main() -> Int { erg values: Array[Point, 2] = Array[Point, 2](); values[0u32] = Point { x: 41u32, }; values[1u32] = values[0u32]; return values[1u32].x as Int + 1; }\n";
+    let source = "meta copy struct Point { x: u32, }\n\"\"\"Entry point that stores a Point with x 41 in element 0, copies it to element 1 and returns the x of element 1 plus 1.\"\"\"\nverb main() -> Int { erg values: Array[Point, 2] = Array[Point, 2](); values[0u32] = Point { x: 41u32, }; values[1u32] = copy(value: abs values[0u32]); return values[1u32].x as Int + 1; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir().join(format!(
             "actus-cli-{backend}-aggregate-array-replacement-{}",
@@ -1006,7 +1006,7 @@ fn both_native_backends_round_trip_a_large_nested_aggregate_snapshot() {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_build_and_run_large_aggregate_array_element_self_copy() {
-    let source = "struct Cell { erg storage: Array[u8, 64], } struct Fabric { erg columns: Array[Cell, 1024], } struct Brain { erg fabrics: Array[Fabric, 2], }\n\"\"\"Entry point that copies a Fabric out of an array of a Brain, stores it back and returns 42.\"\"\"\nverb main() -> Int { erg brain: Brain = Brain { fabrics: Array[Fabric, 2](), }; erg local_fabric: Fabric = brain.fabrics[0u32]; brain.fabrics[0u32] = local_fabric; return 42; }\n";
+    let source = "meta copy struct Cell { erg storage: Array[u8, 64], } meta copy struct Fabric { erg columns: Array[Cell, 1024], } struct Brain { erg fabrics: Array[Fabric, 2], }\n\"\"\"Entry point that copies a Fabric out of an array of a Brain, stores it back and returns 42.\"\"\"\nverb main() -> Int { erg brain: Brain = Brain { fabrics: Array[Fabric, 2](), }; erg local_fabric: Fabric = copy(value: abs brain.fabrics[0u32]); brain.fabrics[0u32] = local_fabric; return 42; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir().join(format!(
             "actus-cli-{backend}-large-aggregate-array-self-copy-{}",

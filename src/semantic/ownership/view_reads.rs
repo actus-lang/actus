@@ -42,29 +42,30 @@ impl Analyzer {
         Err(SemanticError { kind: SemanticErrorKind::MoveOutOfView { path, loan, copyable }, span })
     }
 
-    /// Rejects moving a value that holds a resource out of an array element
-    /// of an owner, directly (`xs[i]`) or through a field of the element
-    /// (`xs[i].buf`). The language does not track moves of single elements,
-    /// so the array would still release the element at its own cleanup and
-    /// the value would be released twice (bug #126). The element can be
-    /// borrowed with `abs`, or replaced in place by an assignment, which
-    /// releases the value it held (ADR-0125).
+    /// Rejects reading a struct, enum, pack, array or resource BY VALUE out of
+    /// an array element of an owner, directly (`xs[i]`) or through a field of
+    /// the element (`xs[i].inner`), in every position that stores or hands
+    /// over a value (bug #123, ADR-0124). The language does not track moves
+    /// of single elements, so a move would leave the array releasing the
+    /// element again at its own cleanup (bug #126), and a silent copy would
+    /// share whatever the value owns. The element can be borrowed with `abs`,
+    /// replaced in place by an assignment (ADR-0125), or, when its type is a
+    /// copy type, duplicated with `copy(value: abs xs[i])`; the error says
+    /// whether that copy is the fix. A scalar element is a value and is
+    /// never judged.
     fn reject_move_out_of_element(
         &self,
         expression: &Expr,
         path: String,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if !passes_through_element(expression) {
+        if !passes_through_element(expression) || !self.is_move_only_aggregate(expression) {
             return Ok(());
         }
-        let Some(type_name) = self.resolved_type_name(expression) else { return Ok(()) };
-        if !self.type_holds_resource(&type_name) {
-            return Ok(());
-        }
-        // A type that holds a resource is never a copy type (ADR-0124), so
-        // the fix is never a written copy.
-        Err(SemanticError { kind: SemanticErrorKind::MoveOutOfElement(path), span })
+        let copyable = self
+            .resolved_type_name(expression)
+            .is_some_and(|type_name| self.type_is_copy(&type_name));
+        Err(SemanticError { kind: SemanticErrorKind::MoveOutOfElement(path, copyable), span })
     }
 }
 

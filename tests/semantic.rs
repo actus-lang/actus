@@ -10,6 +10,8 @@ mod array_copy;
 mod arrays;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
+#[path = "semantic/branch_value_types.rs"]
+mod branch_value_types;
 #[path = "semantic/call_result_views.rs"]
 mod call_result_views;
 #[path = "semantic/case_view_scope.rs"]
@@ -20,6 +22,8 @@ mod casts;
 mod drop;
 #[path = "semantic/dynamic.rs"]
 mod dynamic;
+#[path = "semantic/element_reads.rs"]
+mod element_reads;
 #[path = "semantic/enum_payload_moves.rs"]
 mod enum_payload_moves;
 #[path = "semantic/enums.rs"]
@@ -82,5 +86,7 @@ mod structs;
 mod suite;
 #[path = "semantic/temporaries.rs"]
 mod temporaries;
+#[path = "semantic/try_positions.rs"]
+mod try_positions;
 #[path = "semantic/void_values.rs"]
 mod void_values;

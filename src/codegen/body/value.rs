@@ -239,15 +239,18 @@ impl<P: super::BackendExpressionProvider> BodyLowering<'_, P> {
             return Err(unsupported(span, "if value branch requires a tail expression"));
         };
         self.provider.enter_scope(branch.span);
-        let mut instructions = Vec::new();
-        for statement in &branch.statements[..branch.statements.len() - 1] {
-            self.lower_statement(statement, &mut instructions)?;
+        // A `?` statement of the arm splits it, so its value is lowered in the
+        // block where the arm continues (bug #130).
+        let prefix = &branch.statements[..branch.statements.len() - 1];
+        let mut tail = self.lower_arm_statements(id, prefix, Vec::new())?;
+        if tail.diverged {
+            return Err(unsupported(span, "if value branch returns before its value"));
         }
-        let value = self.provider.lower_expression(expression, &mut instructions)?;
+        let value = self.provider.lower_expression(expression, &mut tail.instructions)?;
         // The branch hands its value to the merge block here, which ends its scope.
-        self.provider.emit_scope_end(branch.span, &mut instructions);
-        self.provider.exit_scope(branch.span, &mut instructions)?;
-        Ok((BackendBlock { parameters: Vec::new(), id, instructions }, value))
+        self.provider.emit_scope_end(branch.span, &mut tail.instructions);
+        self.provider.exit_scope(branch.span, &mut tail.instructions)?;
+        Ok((tail.into_block(), value))
     }
 
     pub(super) fn lower_if_return(

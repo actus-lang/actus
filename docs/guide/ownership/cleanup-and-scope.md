@@ -39,7 +39,12 @@ statement, and a call that a field or an element is read from
 (`Pair { a: track(id: one), b: load()? }`) releases, when it fails, every value
 the statement already evaluated: the compiler binds those values and the `?`
 to hidden owners in evaluation order, and the exit of the `?` releases the
-ones that are live.
+ones that are live. A `?` that runs on one path only, in the arm of an `if` or
+a `case` or on the right of `&&` and `||`, stays on its path: it returns, and
+releases what is live, only when that path runs, and a skipped arm or right
+operand runs nothing. A `?` that cannot return early from where it stands, such
+as one in an argument (`print(load()?)`), is rejected (`E1016`); bind the
+value first with `erg value = load()?;`.
 
 A `Drop` performance receives its value through `ins self` and releases what
 it owns in place. It must not build or pass on another owner of its own type:

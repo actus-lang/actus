@@ -47,6 +47,29 @@ A copy of a field is written the same way when the field is read through a view:
 value through an `abs` view or an `ins` loan without it is rejected (`E1010`,
 `E1082`), because a view cannot give up ownership and nothing was copied.
 
+An array element is copied the same way: `copy(value: abs points[i])`. An
+element stays owned by its array, so reading a struct, an enum, a pack or an
+array out of an element by value (`erg p = points[i];`, an argument, a return,
+a branch value) is rejected with `E1010` whether or not its type is a copy
+type; a copy type names the written copy as the fix. A scalar element, such as
+`counts[i]` or `points[i].x`, is a value and is read as before.
+
+```actus
+meta copy
+struct Point {
+    x: Int,
+    y: Int,
+}
+
+verb main() -> Int {
+    erg points: Array[Point, 2] = Array[Point, 2]();
+    points[1u32] = Point { x: 40, y: 2, };
+    erg moved: Point = copy(value: abs points[1u32]);
+    moved.x = 0;
+    return points[1u32].x + points[1u32].y + moved.x;
+}
+```
+
 `copy` on a type that is not a copy type is rejected with `E1021`. Scalars are
 copy types without a declaration and keep the rules of ADR-0059. An `Array` is a
 copy type when its element type is one, so `copy(value: abs values)` of an

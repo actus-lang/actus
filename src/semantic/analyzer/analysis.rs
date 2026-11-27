@@ -38,5 +38,14 @@ pub fn analyze(program: &Program) -> Result<SemanticModel, SemanticError> {
 /// Analyzes a program whose types a compilation plan already annotated.
 pub(crate) fn analyze_resolved(program: &Program) -> Result<SemanticModel, SemanticError> {
     let normalized = crate::semantic::normalize_generated_locals(program);
-    Analyzer::new().analyze(&normalized)
+    let model = Analyzer::new().analyze(&normalized)?;
+    // A `?` that no rule above rejected and that is not a statement of its
+    // own would not return early when lowered (bug #130).
+    if let Some((span, place)) = crate::semantic::misplaced_try(&normalized) {
+        return Err(SemanticError {
+            kind: super::errors::SemanticErrorKind::MisplacedTry(place),
+            span,
+        });
+    }
+    Ok(model)
 }

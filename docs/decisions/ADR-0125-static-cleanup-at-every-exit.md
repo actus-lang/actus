@@ -141,12 +141,39 @@ change. The generated locals are ordinary owners, so the exit list of the `?`
 releases exactly the values already evaluated, and a generated local the
 statement moves is not released again. This applies to the operands that are
 always evaluated: the payload of an enum constructor, the fields of a struct
-literal, the operands of an arithmetic or comparison operator and the operand
-of a field read, an index, a cast or a unary operator. The arguments of a verb
-or a method must be places that their roles bind, with or without a `?`, and a
-`?` inside an `if`, a `case` or the right operand of `&&` and `||` runs on one
-path only; neither is rewritten. A value that a nested `?` yields lives in its
+literal, the operands of an arithmetic or comparison operator, the left
+operand of `&&` and `||`, the condition of an `if` (the first one of an `else
+if` chain), the subject of a `case`, the bounds of a `for`, the value of a
+compound assignment and the operand of a field read, an index, a cast, a
+borrow or a unary operator. A value that a nested `?` yields lives in its
 generated local until the end of the scope, like any owner.
+
+A `?` that runs on one path only is not moved off its path (bug #130). `l &&
+r` with a `?` in `r` is written `if l { r } else { false }`, and `l || r` is
+written `if l { true } else { r }`, so `r` is still evaluated only when `l`
+does not decide the result. A conditional with a `?` in an arm is bound as a
+whole to a generated local, after its condition, unless it is already the
+value of the statement. Each arm is then a block of its own: an arm written as
+an expression becomes a block, an arm whose value is a `?` binds it to a
+generated local (`{ erg v = load()?; v }`), and the block is rewritten like
+any other, so every `?` is a statement of the arm. An `else if` whose
+condition or arms hold a `?` becomes an `else` block holding the inner `if`,
+so its condition is evaluated, and its `?` returns, only when the earlier
+conditions failed. The lowering splits an arm at each `?` statement: the
+`Err` path returns with the exit list of that `?`, which releases the owners
+of the arm and of every enclosing scope, and the `Ok` path continues the arm,
+whose value reaches the merge from its last block. The arm that is not taken
+runs nothing, on both back ends.
+
+What cannot return early from where it stands is rejected with `E1016`
+instead of being lowered: a `?` in an argument of a verb, a method or an
+intrinsic (an argument must be a place its role binds, with or without a `?`),
+in a `case` guard, in the index of an assigned element, and in a conditional,
+a loop or an `if` statement nested in the arm of a conditional whose value an
+owner receives (those arms are lowered statement by statement). The fix is to
+bind the value first, `erg value = load()?;`. The expression lowering no
+longer accepts a `?`: one that reached it would use the whole `Result` as its
+value and never return, so it is an internal error.
 
 A drop contract receives its value through `ins self` and must not take
 ownership of it again: a contract that builds or passes on an owner of the
