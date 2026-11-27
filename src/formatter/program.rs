@@ -123,7 +123,7 @@ impl Formatter<'_> {
         self.output.push_str(": ");
         self.type_name(&constant.ty);
         self.output.push_str(" = ");
-        self.expression(&constant.initializer);
+        self.wrapped_expression(&constant.initializer, 1);
         self.output.push_str(";\n");
     }
 
@@ -218,6 +218,18 @@ impl Formatter<'_> {
                 continue;
             }
             previous_text = Some(text.clone());
+            // A docstring that opens the file is the module's documentation: a different
+            // docstring written right after it, with nothing between them, belongs to the next
+            // item, so one blank line separates them.
+            let follows_module_docs = self.next_comment == 2
+                && text.starts_with("\"\"\"")
+                && self.comments[0].text.starts_with("\"\"\"")
+                && self.output.trim().starts_with("\"\"\"")
+                && self.output.trim().ends_with("\"\"\"")
+                && self.output.trim().matches("\"\"\"").count() == 2;
+            if follows_module_docs && !self.output.ends_with("\n\n") {
+                self.output.push('\n');
+            }
             if !self.output.is_empty() && !self.output.ends_with('\n') {
                 self.output.push('\n');
             }

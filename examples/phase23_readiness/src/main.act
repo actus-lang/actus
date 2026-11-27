@@ -5,6 +5,7 @@ This bounded workload exercises the complete 64-byte Minicolumn storage map:
 indexed byte access, packed field mutation, nested calls, Boolean control flow,
 fixed-width arithmetic, ownership-aware Buffer serialization, and restoration.
 """
+
 """A cache-line-sized packed cortical state with an exact 512-bit layout."""
 pack Minicolumn {
     erg storage: Array[u8, 64];
@@ -119,5 +120,6 @@ verb main() -> Int {
             restored.payload += 1u8;
         }
     }
-    return advanced + written + restored.layer_depth as Int + restored.axon_0 as Int + restored.flags as Int + restored.payload as Int;
+    return advanced + written + restored.layer_depth as Int + restored.axon_0 as Int
+        + restored.flags as Int + restored.payload as Int;
 }

@@ -84,7 +84,6 @@ fn a_move_followed_by_break_or_return_is_accepted() {
         ("if break", "loop { n += 1; if n > 2 { eat(packet: x); break; } }"),
         ("return", "loop { eat(packet: x); return; }"),
         ("nested block", "loop { { eat(packet: x); break; } }"),
-        ("for range break", "for erg i in 0..3 { eat(packet: x); break; }"),
         (
             "every case arm leaves",
             "loop { case n { 1 => { eat(packet: x); break; }, _ => { eat(packet: x); return; }, }; }",
@@ -129,4 +128,17 @@ fn a_loop_may_read_and_borrow_an_outer_value_without_moving_it() {
     if let Err(error) = result {
         panic!("a read is not a move: {:?}", error.kind);
     }
+}
+
+#[test]
+fn a_move_before_a_break_of_a_for_loop_is_rejected_at_the_loop() {
+    // The normal exit of a `for` keeps the value, so its paths disagree.
+    let (_, result) =
+        analyze_main(&format!("{SOURCE}for erg i in 0..3 {{ eat(packet: x); break; }}"));
+    let error = result.expect_err("the break path moves x and the normal exit keeps it");
+    assert!(
+        matches!(&error.kind, SemanticErrorKind::BranchStateMismatch { name, .. } if name == "x"),
+        "{:?}",
+        error.kind
+    );
 }

@@ -39,7 +39,7 @@ impl Analyzer {
         let index = self.binding(&binding.name, binding.span)?;
         self.binding_type_names.insert(index, self.normalize_imported_type_name(&type_name));
         let result = self.visit_block(body);
-        let result = self.leave_loop_ownership(body, result);
+        let result = self.leave_loop_ownership(body, true, result);
         self.loop_boundaries.pop();
         self.leave_scope();
         result

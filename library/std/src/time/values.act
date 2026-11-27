@@ -5,6 +5,7 @@ These constants keep unit scales and representability limits in one place.
 The facade does not open this file, so they remain private to `std::time`
 and are visible to every file of the module (ADR-0018, ADR-0110).
 """
+
 """Largest value representable by the time library's unsigned counter."""
 const U64_MAX: u64 = 18446744073709551615u64;
 """Exact nanoseconds contained in one microsecond."""

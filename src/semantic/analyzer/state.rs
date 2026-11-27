@@ -36,6 +36,10 @@ pub(crate) struct Analyzer {
     /// Ownership of every binding when each enclosing loop was entered, so a
     /// move that survives to the next iteration can be found (ADR-0016).
     pub(crate) loop_entry_ownership: Vec<Vec<crate::semantic::state::OwnershipState>>,
+    /// For each enclosing loop, the ownership of the bindings declared before
+    /// it at every `break` that targets it. The state after the loop is the
+    /// join of these (ADR-0016).
+    pub(crate) loop_break_ownership: Vec<Vec<Vec<crate::semantic::state::OwnershipState>>>,
     /// The span of the latest move or drop of each binding, for the diagnostic
     /// that reports a move carried into the next loop iteration.
     pub(crate) ownership_change_spans: HashMap<usize, SourceSpan>,

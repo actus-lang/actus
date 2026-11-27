@@ -6,6 +6,7 @@ storage. The decoder reads the same fixed range and validates magic, version,
 flags, and payload bounds before exposing metadata. Neither operation allocates
 storage, performs I/O, or owns the caller's buffers.
 """
+
 """Reject an invalid header contract before encoding or dispatch."""
 verb wire_validate_header(abs header: WireHeader) -> Result[Int, WireError] {
     if header.magic_0 != WIRE_MAGIC_0 || header.magic_1 != WIRE_MAGIC_1 {
@@ -79,7 +80,8 @@ open verb wire_header_decode(abs input: Buffer) -> Result[WireHeader, WireError]
     header.flags = input[3];
     header.message_id = input[4];
     header.channel_id = input[5];
-    header.sequence_num = (input[6] as u32) | ((input[7] as u32) << 8u32) | ((input[8] as u32) << 16u32) | ((input[9] as u32) << 24u32);
+    header.sequence_num = (input[6] as u32) | ((input[7] as u32) << 8u32)
+        | ((input[8] as u32) << 16u32) | ((input[9] as u32) << 24u32);
     header.payload_len = (input[10] as u16) | ((input[11] as u16) << 8u16);
     erg valid = wire_validate_header(header: abs header);
     return case dat valid {

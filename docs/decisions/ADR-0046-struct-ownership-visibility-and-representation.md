@@ -99,6 +99,16 @@ An `abs` field is a non-owning read-only view stored with explicit provenance.
 - An `abs` field may be present in standard-library view aggregates only when
   the existing single-origin and non-escaping borrow rules prove its safety.
 
+A call whose result type can hold a view (a struct, enum, pack or generic
+instance with an `abs` field or payload at any depth, such as `Option[abs
+Buffer]`) borrows every non-scalar argument passed to one of its `abs`
+parameters exactly as `Holder { view: source }` would: the source is frozen
+until the end of the block that receives the result, with the same diagnostics
+for a later drop, move or mutation. The caller does not track which parameter
+the result views, so all of them are frozen; a result that cannot hold a view
+freezes nothing. A chained call such as `make(src: abs first.b)` freezes the
+holder `first` that its argument is read from, as a direct construction does.
+
 The Alpha implementation does not infer a general lifetime relationship from
 an `abs` field. If the source and destination scopes cannot be proven by the
 existing origin model, construction is rejected.

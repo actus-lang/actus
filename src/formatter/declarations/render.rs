@@ -337,7 +337,7 @@ impl Formatter<'_> {
     }
 
     fn enum_struct_payload(&mut self, fields: &[crate::ast::EnumField]) {
-        self.output.push_str(" {");
+        self.output.push_str(" { ");
         for (index, field) in fields.iter().enumerate() {
             if index > 0 {
                 self.output.push_str(", ");
@@ -346,7 +346,7 @@ impl Formatter<'_> {
             self.output.push_str(": ");
             self.type_name(&field.ty);
         }
-        self.output.push('}');
+        self.output.push_str(" }");
     }
 
     pub(in crate::formatter) fn pack_definition(&mut self, definition: &crate::ast::PackDecl) {

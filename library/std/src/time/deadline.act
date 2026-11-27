@@ -5,6 +5,7 @@ A `Deadline` is valid only in the provider domain of its originating instant.
 It has no calendar meaning, does not own an OS timer, and cannot be used as a
 wall-clock timestamp. Deadline operations do not allocate.
 """
+
 """
 An immutable monotonic expiration point.
 

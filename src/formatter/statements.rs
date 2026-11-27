@@ -17,7 +17,9 @@ impl Formatter<'_> {
             self.line_indent();
             match block_value(statement) {
                 // The block's value, written without a `;` as in the source.
-                Some(value) if index + 1 == block.statements.len() => self.expression(value),
+                Some(value) if index + 1 == block.statements.len() => {
+                    self.wrapped_expression(value, 0)
+                }
                 _ => self.statement(statement),
             }
             let next = block.statements.get(index + 1);
@@ -40,14 +42,14 @@ impl Formatter<'_> {
             Stmt::Assignment { target, value, .. } => {
                 self.place(target);
                 self.output.push_str(" = ");
-                self.expression(value);
+                self.wrapped_expression(value, 1);
                 self.output.push(';');
             }
             Stmt::CompoundAssignment { target, operator, value, .. } => {
                 self.compound_assignment(target, *operator, value);
             }
             Stmt::Expression { expression, .. } => {
-                self.expression(expression);
+                self.wrapped_expression(expression, 1);
                 self.output.push(';');
             }
             Stmt::If { condition, then_branch, else_branch, .. } => {
@@ -118,7 +120,7 @@ impl Formatter<'_> {
             }
         }
         self.output.push_str(compound_operator_text(operator));
-        self.expression(value);
+        self.wrapped_expression(value, 1);
         self.output.push(';');
     }
 
@@ -137,7 +139,7 @@ impl Formatter<'_> {
             self.output.push_str(ty);
         }
         self.output.push_str(" = ");
-        self.expression(initializer);
+        self.wrapped_expression(initializer, 1);
         self.output.push(';');
     }
 
@@ -162,7 +164,7 @@ impl Formatter<'_> {
         self.output.push_str("return");
         if let Some(value) = value {
             self.output.push(' ');
-            self.expression(value);
+            self.wrapped_expression(value, 1);
         }
         self.output.push(';');
     }

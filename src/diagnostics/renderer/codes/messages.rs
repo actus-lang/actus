@@ -42,6 +42,18 @@ fn ownership_core_message(kind: &SemanticErrorKind) -> Option<String> {
             format!("cannot drop frozen binding `{name}`")
         }
         SemanticErrorKind::InvalidDatArgument { name } => format!("invalid dat argument `{name}`"),
+        SemanticErrorKind::MoveOutOfView { path, loan, copyable } => {
+            let view = if *loan { "an `ins` loan" } else { "an `abs` view" };
+            let fix = if *copyable {
+                format!("write `copy(value: abs {path})` to duplicate it, or borrow it with `abs`")
+            } else {
+                "borrow it with `abs`, or take ownership of the owner".to_owned()
+            };
+            format!(
+                "cannot read `{path}` by value through {view}: it is not an owner, so the value \
+                 would be shared silently; {fix}"
+            )
+        }
         SemanticErrorKind::ZeroOnDropFieldMove { owner, field } => {
             format!("cannot move field `{field}` out of zero_on_drop owner `{owner}`")
         }

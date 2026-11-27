@@ -62,7 +62,8 @@ meta test
 verb repr_c_payload_enum_is_bounded_and_executable() -> Int {
     erg message = WireMessage.Pair(code: 7u16, value: 11u32);
     erg score = case dat message {
-        WireMessage.Pair { code: code_value, value: value_value } => code_value as Int + value_value as Int,
+        WireMessage.Pair { code: code_value, value: value_value } => code_value as Int
+            + value_value as Int,
         _ => 0,
     };
     if score == 18 {
@@ -226,7 +227,9 @@ struct AlignedByte {
 
 meta test
 verb repr_explicit_alignment_is_minimum_and_checked() -> Int {
-    erg value = AlignedByte { value: 7u8, };
+    erg value = AlignedByte {
+        value: 7u8,
+    };
     if size_of[AlignedByte]() != 8u64 {
         return 1;
     }

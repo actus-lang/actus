@@ -152,7 +152,8 @@ verb wire_parser_decode_header(ins parser: WireParser) -> Result[Int, WireError]
         },
         Result.Ok(header) => {
             parser.header = copy(value: abs header);
-            parser.expected_length = WIRE_HEADER_BYTES + (header.payload_len as u32) + WIRE_CRC_BYTES;
+            parser.expected_length = WIRE_HEADER_BYTES + (header.payload_len as u32)
+                + WIRE_CRC_BYTES;
             parser.state = 2u8;
             return Result[Int, WireError].Ok(0);
         },

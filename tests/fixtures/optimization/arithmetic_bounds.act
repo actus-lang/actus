@@ -19,7 +19,8 @@ verb main() -> Int {
     erg level: u8 = 200;
     level +|= 100;
     erg checks = (maximum == 255) && (minimum == -128) && (wrapped == 4) && (saturated == 255)
-        && (floor == 0) && (clamped == -128) && (flipped == -128) && (counter == 0) && (level == 255);
+        && (floor == 0) && (clamped == -128) && (flipped == -128) && (counter == 0)
+        && (level == 255);
     if checks {
         return 7;
     }

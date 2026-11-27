@@ -15,7 +15,10 @@ verb main() -> Int {
         if i == 1000000 {
             break;
         }
-        erg p = Point { x: i % 7, y: 1 };
+        erg p = Point {
+            x: i % 7,
+            y: 1,
+        };
         abs view = ref p;
         total = total + view.sum();
         i = i + 1;

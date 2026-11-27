@@ -132,6 +132,17 @@ nested pattern tests, partial-move tests, early-exit cleanup tests, temporary
 The following remain explicitly deferred: mutable borrowing, reborrowing
 chains, advanced lifetime polymorphism, and shared mutable ownership.
 
+### Loop exits
+
+The ownership state after a loop is the join of the states of every path that
+leaves it: each `break` that targets it, and for a `for` loop (range or array)
+also its normal exit, which holds the state at the loop entry. A `loop` has no
+normal exit, only `break` and `return`. A `break` belongs to its innermost
+loop, a `return` never reaches the state after the loop, and a `continue` goes
+to the back edge. Paths that leave a binding in different states are rejected
+like the branches of an `if` (`E1061`), so a value moved before a `break` of a
+`for` loop is rejected at the loop, because the normal exit keeps it.
+
 ## Consequences
 
 The model keeps Actus simpler than a general lifetime calculus while making

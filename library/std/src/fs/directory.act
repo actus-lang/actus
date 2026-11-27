@@ -66,7 +66,10 @@ bits or retaining a native directory pointer. `File`, `Directory`, and
 `Symlink` are provider observations; `Other` covers entries that do not have
 one of those stable portable classifications. The enum is a copied scalar
 fact owned by its containing `DirectoryEntry` value and requires no cleanup.
+It is declared `meta copy`, so a reader that returns the classification from a
+borrowed entry writes the duplication as `copy(value: abs entry.kind)`.
 """
+meta copy
 open enum DirectoryEntryKind {
     """The provider identified the entry as a regular file."""
     File,
@@ -159,12 +162,13 @@ open verb directory_entry_is_symlink(abs entry: DirectoryEntry) -> Bool {
 Return the copied portable file-type classification for `entry`.
 
 `entry` is borrowed immutably with `abs` and remains available to the caller.
-The returned `DirectoryEntryKind` is a copied scalar value; this helper does
-not transfer path ownership, allocate, perform filesystem I/O, follow links,
-or retain any reference to the entry.
+The returned `DirectoryEntryKind` is an independent value written as
+`copy(value: abs entry.kind)`; this helper does not transfer path ownership,
+allocate, perform filesystem I/O, follow links, or retain any reference to the
+entry.
 """
 open verb directory_entry_file_type(abs entry: DirectoryEntry) -> DirectoryEntryKind {
-    return entry.kind;
+    return copy(value: abs entry.kind);
 }
 
 """

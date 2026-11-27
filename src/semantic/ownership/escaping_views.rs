@@ -148,6 +148,42 @@ impl Analyzer {
         receiver_origins.chain(argument_origins).collect()
     }
 
+    /// Freezes the sources of a call whose result can hold a view of them
+    /// (ADR-0046 2.3). A callee may return an aggregate that holds a view of
+    /// any of its `abs` parameters, and the caller does not track which one,
+    /// so every non-scalar argument passed to an `abs` parameter is borrowed
+    /// exactly as `Holder { view: source }` would borrow it: frozen until the
+    /// end of the block that receives the result, with the same diagnostics
+    /// for a later drop, move or mutation. A result that cannot hold a view,
+    /// or a `-> abs` result (tracked by its origin), borrows nothing.
+    pub(in crate::semantic) fn register_call_result_views(
+        &mut self,
+        arguments: &[Argument],
+        parameter_indices: &[usize],
+        signature: &crate::semantic::calls::VerbSignature,
+    ) -> Result<(), SemanticError> {
+        let holds_view = signature.return_access != Some(crate::ast::ReturnAccess::Abs)
+            && signature
+                .return_type_name
+                .as_ref()
+                .is_some_and(|ty| self.type_holds_view(&self.normalize_imported_type_name(ty)));
+        if !holds_view {
+            return Ok(());
+        }
+        for (argument, parameter_index) in arguments.iter().zip(parameter_indices) {
+            let scalar = self
+                .expression_type_name(&argument.expression)
+                .is_some_and(|name| crate::semantic::calls::shapes::is_scalar_name(&name));
+            if signature.params[*parameter_index].1 == Role::Abs && !scalar {
+                self.register_view_borrow(
+                    &argument.expression,
+                    expression_span(&argument.expression),
+                )?;
+            }
+        }
+        Ok(())
+    }
+
     /// The origin of the view that an `abs` slot takes of a source. A constant
     /// is static and a view that has no tracked origin comes from a scalar
     /// `abs` parameter; every other source with no `abs` parameter origin is

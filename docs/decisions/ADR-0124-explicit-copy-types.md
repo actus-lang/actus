@@ -40,6 +40,23 @@ only plain data. Reading a value does not move it: an operand, a comparison, a
 field read (`header.payload_len`), an `abs` argument and a `case` on an `abs`
 subject leave the source usable.
 
+### Reading through a view is not a copy
+
+A field read by value does not copy either, and through a view it cannot move.
+Reading a struct, an enum, a pack, an array or a resource from a field or an
+element whose path starts at an `abs` view or an `ins` loan (`return
+parser.header;` with `abs parser`, `erg x = parser.header;`, an argument, a
+struct field initializer, an enum payload, an assignment) would neither give up
+ownership, since a view owns nothing, nor write a copy, so two names would share
+one value silently. The compiler rejects it with `E1010` for an `abs` view and
+`E1082` for an `ins` loan (bug #108; the same rule replaces the use of a moved
+view, `E1005`, that moving a field out of an `abs` binding used to report,
+bug #113). The message names the path. When the type is a copy type the fix is
+the written copy, `copy(value: abs parser.header)`; otherwise the value cannot
+leave the view, which can only be borrowed with `abs` while the owner keeps it.
+Scalars read through a view are unchanged, and so is taking a view of the
+field (`abs h = ref parser.header`, an `abs` argument, `-> abs`).
+
 ### Declared copy types
 
 A struct, an enum or a pack can declare that it may be duplicated:

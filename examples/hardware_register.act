@@ -27,7 +27,8 @@ verb configure_control() -> Int {
     control.prescaler = 5;
     control.mode = 2;
     """`ready` is an abs field: it is observable but cannot be mutated."""
-    return (control.enabled as Int) + (control.ready as Int) + (control.prescaler as Int) + (control.mode as Int);
+    return (control.enabled as Int) + (control.ready as Int) + (control.prescaler as Int)
+        + (control.mode as Int);
 }
 
 """

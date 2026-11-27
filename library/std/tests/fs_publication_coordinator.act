@@ -147,6 +147,27 @@ verb publish_conflict_result(
     };
 }
 
+"""
+contract:
+purpose:
+    Check that coordinated publication reports a conflict when the destination was replaced
+    after its identity was recorded, and leaves the replacement in place.
+inputs:
+    lock_path: coordinator lock path, absent when the case starts.
+    destination: path whose first file's identity becomes the expected identity.
+    staging: path of the candidate file that must not be published.
+outputs:
+    0 when the publication reports a conflict and the destination still holds the two-byte
+    replacement; 1 to 6 identify the step that failed.
+ownership:
+    All paths are borrowed views; the caller removes the files afterwards.
+side_effects:
+    Writes the destination, moves it to a holding path, writes the staging file and a new
+    destination, attempts publication, and removes the holding path.
+invariants:
+    The first destination file stays alive at the holding path until publication is
+    attempted, so the new destination cannot reuse its file identity (inode).
+"""
 meta target("unix")
 meta effect("filesystem", "blocking")
 meta capability("unix.rename_atomic")
@@ -164,7 +185,70 @@ verb conflict_case(
     return case dat expected_result {
         Result.Err(_) => 2,
         Result.Ok(expected) => {
-            fs::remove_file(path: abs destination);
+            erg expected_primary: u64 = expected.identity_primary;
+            erg expected_secondary: u64 = expected.identity_secondary;
+            erg expected_kind: Int = expected.identity_kind;
+            erg holding_suffix: u8 = 100u8;
+            erg holding_result = coordinator_path(suffix: erg holding_suffix);
+            return case dat holding_result {
+                Result.Err(_) => 6,
+                Result.Ok(holding) => {
+                    fs::remove_file(path: abs holding);
+                    erg result = replaced_conflict_case(
+                        lock_path: abs lock_path,
+                        destination: abs destination,
+                        staging: abs staging,
+                        holding: abs holding,
+                        expected_primary: erg expected_primary,
+                        expected_secondary: erg expected_secondary,
+                        expected_kind: erg expected_kind
+                    );
+                    fs::remove_file(path: abs holding);
+                    result;
+                },
+            };
+        },
+    };
+}
+
+"""
+contract:
+purpose:
+    Replace the destination with a new file while the old one is kept at `holding`, then
+    attempt a publication that expects the old file's identity.
+inputs:
+    lock_path: coordinator lock path.
+    destination: path holding the first file, which is moved to `holding`.
+    staging: path where the candidate file is written.
+    holding: absent path that keeps the first file alive.
+    expected_primary: first identity component of the first file.
+    expected_secondary: second identity component of the first file.
+    expected_kind: identity layout of the first file.
+outputs:
+    The result of `publish_conflict_result`, or 3, 4 or 6 when writing the staging file,
+    writing the new destination or moving the first file fails.
+ownership:
+    All paths are borrowed views; the identity components are copied scalars.
+side_effects:
+    Renames the destination to `holding`, writes the staging file and a new destination, and
+    attempts coordinated publication.
+"""
+meta target("unix")
+meta effect("filesystem", "blocking")
+meta capability("unix.rename_atomic")
+verb replaced_conflict_case(
+    abs lock_path: path::Path,
+    abs destination: path::Path,
+    abs staging: path::Path,
+    abs holding: path::Path,
+    erg expected_primary: u64,
+    erg expected_secondary: u64,
+    erg expected_kind: Int
+) -> Int {
+    erg moved = fs::rename(from: abs destination, to: abs holding);
+    return case dat moved {
+        Result.Err(_) => 6,
+        Result.Ok(_) => {
             erg changed_value: u8 = 67u8;
             erg changed = write_value(path: abs staging, value: erg changed_value);
             if changed != 0 {
@@ -174,10 +258,7 @@ verb conflict_case(
             if staged != 0 {
                 return 4;
             }
-            erg expected_primary: u64 = expected.identity_primary;
-            erg expected_secondary: u64 = expected.identity_secondary;
-            erg expected_kind: Int = expected.identity_kind;
-            return publish_conflict_result(
+            publish_conflict_result(
                 lock_path: abs lock_path,
                 destination: abs destination,
                 staging: abs staging,

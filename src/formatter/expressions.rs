@@ -87,32 +87,7 @@ impl Formatter<'_> {
 
     fn binary(&mut self, left: &Expr, operator: &crate::ast::BinaryOp, right: &Expr) {
         self.expression(left);
-        self.output.push_str(match operator {
-            crate::ast::BinaryOp::Add => " + ",
-            crate::ast::BinaryOp::Subtract => " - ",
-            crate::ast::BinaryOp::Multiply => " * ",
-            crate::ast::BinaryOp::WrappingAdd => " +% ",
-            crate::ast::BinaryOp::WrappingSubtract => " -% ",
-            crate::ast::BinaryOp::WrappingMultiply => " *% ",
-            crate::ast::BinaryOp::SaturatingAdd => " +| ",
-            crate::ast::BinaryOp::SaturatingSubtract => " -| ",
-            crate::ast::BinaryOp::SaturatingMultiply => " *| ",
-            crate::ast::BinaryOp::Divide => " / ",
-            crate::ast::BinaryOp::Remainder => " % ",
-            crate::ast::BinaryOp::BitwiseAnd => " & ",
-            crate::ast::BinaryOp::BitwiseOr => " | ",
-            crate::ast::BinaryOp::BitwiseXor => " ^ ",
-            crate::ast::BinaryOp::ShiftLeft => " << ",
-            crate::ast::BinaryOp::ShiftRight => " >> ",
-            crate::ast::BinaryOp::LessThan => " < ",
-            crate::ast::BinaryOp::LessEquals => " <= ",
-            crate::ast::BinaryOp::GreaterThan => " > ",
-            crate::ast::BinaryOp::GreaterEquals => " >= ",
-            crate::ast::BinaryOp::Equals => " == ",
-            crate::ast::BinaryOp::NotEquals => " != ",
-            crate::ast::BinaryOp::LogicalAnd => " && ",
-            crate::ast::BinaryOp::LogicalOr => " || ",
-        });
+        self.output.push_str(binary_operator_text(operator));
         self.expression(right);
     }
 
@@ -186,7 +161,7 @@ impl Formatter<'_> {
             self.line_indent();
             self.output.push_str(&field.name);
             self.output.push_str(": ");
-            self.expression(&field.value);
+            self.wrapped_expression(&field.value, 1);
             self.output.push_str(",\n");
         }
         self.indent -= 1;
@@ -234,7 +209,9 @@ impl Formatter<'_> {
             }
             self.output.push_str(" => ");
             match &branch.body {
-                crate::ast::CaseBody::Expression(expression) => self.expression(expression),
+                crate::ast::CaseBody::Expression(expression) => {
+                    self.wrapped_expression(expression, 1)
+                }
                 crate::ast::CaseBody::Block(block) => self.block(block),
             }
             self.output.push_str(",\n");
@@ -251,7 +228,7 @@ impl Formatter<'_> {
         else_branch: Option<&crate::ast::IfBranch>,
     ) {
         self.output.push_str("if ");
-        self.expression(condition);
+        self.wrapped_expression(condition, 2);
         self.output.push(' ');
         self.block(then_branch);
         if let Some(else_branch) = else_branch {
@@ -295,7 +272,7 @@ impl Formatter<'_> {
                 self.output.push(')');
             }
             crate::ast::VariantPayload::Named(fields) => {
-                self.output.push_str(" {");
+                self.output.push_str(" { ");
                 for (index, field) in fields.iter().enumerate() {
                     if index > 0 {
                         self.output.push_str(", ");
@@ -304,7 +281,7 @@ impl Formatter<'_> {
                     self.output.push_str(": ");
                     self.output.push_str(&field.binding.name);
                 }
-                self.output.push('}');
+                self.output.push_str(" }");
             }
         }
     }
@@ -319,6 +296,36 @@ impl Formatter<'_> {
             self.output.push(' ');
         }
         self.expression(&argument.expression);
+    }
+}
+
+/// The operator of a binary expression with the single space on each side.
+pub(super) fn binary_operator_text(operator: &crate::ast::BinaryOp) -> &'static str {
+    match operator {
+        crate::ast::BinaryOp::Add => " + ",
+        crate::ast::BinaryOp::Subtract => " - ",
+        crate::ast::BinaryOp::Multiply => " * ",
+        crate::ast::BinaryOp::WrappingAdd => " +% ",
+        crate::ast::BinaryOp::WrappingSubtract => " -% ",
+        crate::ast::BinaryOp::WrappingMultiply => " *% ",
+        crate::ast::BinaryOp::SaturatingAdd => " +| ",
+        crate::ast::BinaryOp::SaturatingSubtract => " -| ",
+        crate::ast::BinaryOp::SaturatingMultiply => " *| ",
+        crate::ast::BinaryOp::Divide => " / ",
+        crate::ast::BinaryOp::Remainder => " % ",
+        crate::ast::BinaryOp::BitwiseAnd => " & ",
+        crate::ast::BinaryOp::BitwiseOr => " | ",
+        crate::ast::BinaryOp::BitwiseXor => " ^ ",
+        crate::ast::BinaryOp::ShiftLeft => " << ",
+        crate::ast::BinaryOp::ShiftRight => " >> ",
+        crate::ast::BinaryOp::LessThan => " < ",
+        crate::ast::BinaryOp::LessEquals => " <= ",
+        crate::ast::BinaryOp::GreaterThan => " > ",
+        crate::ast::BinaryOp::GreaterEquals => " >= ",
+        crate::ast::BinaryOp::Equals => " == ",
+        crate::ast::BinaryOp::NotEquals => " != ",
+        crate::ast::BinaryOp::LogicalAnd => " && ",
+        crate::ast::BinaryOp::LogicalOr => " || ",
     }
 }
 

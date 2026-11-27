@@ -32,7 +32,7 @@ enum Color {
 }
 
 enum Message {
-    Data {code: Int},
+    Data { code: Int },
     Empty,
 }
 
@@ -71,7 +71,7 @@ verb main() -> Int {
     consume(item: outer.inner.second);
     erg message = Message.Data(code: 1);
     return case dat message {
-        Message.Data {code: value} => static_score + inspected + value,
+        Message.Data { code: value } => static_score + inspected + value,
         Message.Empty => 0,
     };
 }

@@ -11,6 +11,14 @@ impl Analyzer {
         expression: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        // A field of an `ins` loan keeps its established message, which names
+        // the loan (`E1082`); the view check adds the path for every other read.
+        let through_loan = self
+            .root_binding_index(expression)
+            .is_some_and(|index| self.model.bindings[index].role == Role::Ins);
+        if !through_loan {
+            self.reject_move_out_of_view(expression, span)?;
+        }
         if let Expr::FieldAccess { object, field, .. } = expression {
             return self.move_struct_field(object, field, span);
         }

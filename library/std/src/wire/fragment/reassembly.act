@@ -119,7 +119,8 @@ verb wire_reassembly_check_identity(
     if header.generation != reassembly.generation {
         return Result[Int, WireError].Err(WireError.FragmentStale);
     }
-    if header.total_length != reassembly.total_length || header.fragment_count != reassembly.fragment_count {
+    if header.total_length != reassembly.total_length
+        || header.fragment_count != reassembly.fragment_count {
         return Result[Int, WireError].Err(WireError.FragmentRangeInvalid);
     }
     return Result[Int, WireError].Ok(0);

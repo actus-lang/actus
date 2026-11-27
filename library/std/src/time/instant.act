@@ -6,6 +6,7 @@ numeric origin is private to the provider and must not be interpreted as a
 wall-clock or calendar timestamp. Instants are copy-readable views for
 comparison; they do not own an operating-system handle or allocated storage.
 """
+
 """
 An immutable monotonic point captured from the active provider.
 

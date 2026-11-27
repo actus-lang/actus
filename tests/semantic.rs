@@ -10,6 +10,8 @@ mod array_copy;
 mod arrays;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
+#[path = "semantic/call_result_views.rs"]
+mod call_result_views;
 #[path = "semantic/case_view_scope.rs"]
 mod case_view_scope;
 #[path = "semantic/casts.rs"]
@@ -42,12 +44,16 @@ mod integer_operands;
 mod literal_range;
 #[path = "semantic/loans.rs"]
 mod loans;
+#[path = "semantic/loop_breaks.rs"]
+mod loop_breaks;
 #[path = "semantic/loop_moves.rs"]
 mod loop_moves;
 #[path = "semantic/misleading_messages.rs"]
 mod misleading_messages;
 #[path = "semantic/move_only_fields.rs"]
 mod move_only_fields;
+#[path = "semantic/move_out_of_view.rs"]
+mod move_out_of_view;
 #[path = "semantic/origins.rs"]
 mod origins;
 #[path = "semantic/packs.rs"]

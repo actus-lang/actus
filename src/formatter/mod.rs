@@ -5,6 +5,7 @@ mod expressions;
 mod imports;
 mod program;
 mod statements;
+mod wrapping;
 
 use program::{Formatter, LINE_WIDTH, meta_name, role_name};
 

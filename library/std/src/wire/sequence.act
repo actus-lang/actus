@@ -7,6 +7,7 @@ single wrap boundary of the u32 sequence space. Duplicate, stale, context
 mismatch, and unreasonable-jump cases return typed errors. This is replay
 suppression only; it does not authenticate a sender or a transport.
 """
+
 """The fixed number of sequence positions retained by the replay window."""
 open const WIRE_SEQUENCE_WINDOW_BITS: u32 = 64u32;
 """The largest forward sequence jump accepted in one context."""

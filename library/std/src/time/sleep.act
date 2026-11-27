@@ -6,6 +6,7 @@ busy-wait delay and must not be called from an interrupt or critical section
 unless the selected provider explicitly permits it. The public wrapper does
 not expose the hosted runtime ABI or allocate Actus storage.
 """
+
 """
 Private runtime bridge receiving an exact nanosecond duration.
 

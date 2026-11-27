@@ -203,6 +203,8 @@ impl Analyzer {
         if payload_type.reference_role == Some(Role::Abs) {
             return self.register_view_borrow(expression, span);
         }
+        // An array is stored by value too, though it is not tracked as moving.
+        self.reject_move_out_of_view(expression, span)?;
         let owns = payload_type.reference_role.is_none() && self.type_moves_on_store(payload_type);
         if owns {
             return self.consume_owned_source(expression, span);

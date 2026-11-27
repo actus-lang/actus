@@ -1,4 +1,7 @@
-"""A struct built and borrowed by a method in each of 20 000 000 iterations. Wrapping arithmetic, as in its C twin."""
+"""
+A struct built and borrowed by a method in each of 20 000 000 iterations. Wrapping arithmetic, as in
+its C twin.
+"""
 struct Point {
     x: Int,
     y: Int,
@@ -15,7 +18,10 @@ verb main() -> Int {
         if i == 20000000 {
             break;
         }
-        erg p = Point { x: i % 7, y: 1 };
+        erg p = Point {
+            x: i % 7,
+            y: 1,
+        };
         abs view = ref p;
         total = total +% view.sum();
         i = i +% 1;

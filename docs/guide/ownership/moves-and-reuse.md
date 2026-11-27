@@ -151,5 +151,33 @@ move at the end of the body. A moved value cannot be assigned a new value, so
 re-initialising it inside the loop is not a way out; create the value in the
 loop instead.
 
+The state after a loop is the join of the states of every path that leaves it:
+each `break`, and for a `for` loop also its normal exit. So a value moved or
+dropped before the only `break` of a `loop` is moved after it and a later use is
+`E1005`. A `break` belongs to its innermost loop, and a `return` never reaches
+the code after the loop. When the paths leave a value in different states the
+loop is rejected with `E1061`, as for the branches of an `if`; a value moved
+before a `break` of a `for` loop is such a case, because the normal exit keeps
+it:
+
+```actus fails=E1005
+verb finish(dat data: Buffer) {
+    drop(data);
+}
+
+verb main() {
+    erg data: Buffer = Buffer[4];
+    erg count: Int = 0;
+    loop {
+        count += 1;
+        if count > 2 {
+            finish(data: dat data);
+            break;
+        }
+    }
+    append(data, 1u8);
+}
+```
+
 A value that is borrowed or moved cannot be reused until the relevant loan or
 ownership transition has ended.

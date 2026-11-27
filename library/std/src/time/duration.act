@@ -6,6 +6,7 @@ clock state, allocates no storage, and can be borrowed with `abs` by arithmetic
 and conversion operations. Checked operations return `TimeError` instead of
 wrapping, clamping, truncating, or panicking.
 """
+
 """
 A bounded non-negative elapsed span represented exactly in nanoseconds.
 

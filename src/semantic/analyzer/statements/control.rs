@@ -19,7 +19,7 @@ impl Analyzer {
         self.loop_boundaries.push(self.scopes.len() - 1);
         self.enter_loop_ownership();
         let result = self.visit_block(block);
-        let result = self.leave_loop_ownership(block, result);
+        let result = self.leave_loop_ownership(block, false, result);
         self.loop_boundaries.pop();
         self.leave_scope();
         result
@@ -30,7 +30,9 @@ impl Analyzer {
         is_break: bool,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
-        if !is_break {
+        if is_break {
+            self.record_loop_break();
+        } else {
             self.reject_moves_into_next_iteration()?;
         }
         let kind = if is_break {

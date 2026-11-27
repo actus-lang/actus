@@ -202,6 +202,7 @@ impl Analyzer {
         }
         self.validate_exclusive_aliases(&resolved_arguments, &parameter_indices, signature)?;
         self.move_transferred_arguments(&resolved_arguments, &parameter_indices, signature)?;
+        self.register_call_result_views(&resolved_arguments, &parameter_indices, signature)?;
         self.execute_exclusive_loans(callee, &resolved_arguments, &parameter_indices, signature)?;
         if let Some(return_type) = &signature.return_type_name {
             let return_type = self.normalize_imported_type_name(return_type);

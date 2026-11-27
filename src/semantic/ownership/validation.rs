@@ -100,6 +100,7 @@ impl Analyzer {
         expression: &Expr,
         span: SourceSpan,
     ) -> Result<(), SemanticError> {
+        self.reject_move_out_of_view(expression, span)?;
         if matches!(expression, Expr::FieldAccess { .. })
             && self.root_binding_index(expression).is_some()
             && self.is_move_only_aggregate(expression)
