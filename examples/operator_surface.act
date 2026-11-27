@@ -38,7 +38,8 @@ verb operator_score() -> Int {
         true => 1,
         _ => 0,
     };
-    return (remainder as Int) + (bits as Int) + (inverted as Int) + (shifted_left as Int) + (shifted_right as Int) + ordered + reversed + logical;
+    return (remainder as Int) + (bits as Int) + (inverted as Int) + (shifted_left as Int)
+        + (shifted_right as Int) + ordered + reversed + logical;
 }
 
 """Exercise checked casts, Buffer and Array indexing, and pack mutation."""
@@ -55,7 +56,8 @@ verb storage_score() -> Int {
     };
     register.ready = 1;
     register.mode = 5;
-    return (values[array_index] as Int) + (bytes[buffer_index] as Int) + (register.ready as Int) + (register.mode as Int);
+    return (values[array_index] as Int) + (bytes[buffer_index] as Int) + (register.ready as Int)
+        + (register.mode as Int);
 }
 
 """Run the complete operator surface and return its deterministic checksum."""

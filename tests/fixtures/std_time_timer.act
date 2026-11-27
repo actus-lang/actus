@@ -276,5 +276,6 @@ verb main() -> Int {
     erg skip_policy: MissedTickPolicy = MissedTickPolicy.Skip;
     erg pending_expected: Int = 0;
     erg skip_code = policy_check(policy: abs skip_policy, expected: abs pending_expected);
-    return invalid_code + one_code + cancel_code + reuse_code + coalesce_code + catch_up_code + skip_code;
+    return invalid_code + one_code + cancel_code + reuse_code + coalesce_code + catch_up_code
+        + skip_code;
 }

@@ -6,6 +6,7 @@ null-terminated pointer ABI used by the hosted runtime and never allocates a
 replacement string. The module is hosted-only until a freestanding target
 provides the same checked provider contract.
 """
+
 """Re-export null, UTF-8, bounds, and provider failures for String access."""
 open errors;
 

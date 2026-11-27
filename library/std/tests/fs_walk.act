@@ -47,7 +47,8 @@ verb walker_emits_root_enter_event() -> Int {
                 Result.Ok(value) => case dat value {
                     Option.None => 3,
                     Option.Some(event) => {
-                        erg result = if event.kind == fs::WalkEventKind.EnterDirectory && event.depth == 0u32 {
+                        erg result = if event.kind == fs::WalkEventKind.EnterDirectory
+                            && event.depth == 0u32 {
                             0
                         } else {
                             4

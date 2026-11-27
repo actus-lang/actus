@@ -114,10 +114,18 @@ verb verify_filtered_directory(ins directory: Directory) -> Int {
     return case dat closed {
         Result.Err(_) => 5,
         Result.Ok(_) => {
-            if first != 97 { return 10; }
-            if second != 98 { return 11; }
-            if third != 99 { return 12; }
-            if end != -1 { return 13; }
+            if first != 97 {
+                return 10;
+            }
+            if second != 98 {
+                return 11;
+            }
+            if third != 99 {
+                return 12;
+            }
+            if end != -1 {
+                return 13;
+            }
             0;
         },
     };
@@ -132,7 +140,9 @@ verb lexicographic_directory_iteration_is_bounded() -> Int {
     append(names, 98u8);
     erg index: Int = 0;
     loop {
-        if index >= 3 { break; }
+        if index >= 3 {
+            break;
+        }
         erg letter: u8 = names[index];
         erg created = create_marker_file(name: erg letter);
         if created != 0 {

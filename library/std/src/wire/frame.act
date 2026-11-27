@@ -7,6 +7,7 @@ their wire order is independent of host integer representation. Payload bytes
 follow the header and the CRC16 trailer follows the payload. This type stores
 header metadata only; it does not own payload storage or perform I/O.
 """
+
 """The first magic byte required by every version-one frame."""
 open const WIRE_MAGIC_0: u8 = 218u8;
 """The second magic byte required by every version-one frame."""

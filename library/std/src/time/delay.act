@@ -6,6 +6,7 @@ current core until the deadline expires. It is intended for short firmware
 delays and must not be used where a blocking scheduler-aware sleep is
 available. It allocates no storage and has no callback or hidden thread.
 """
+
 """
 Private busy-wait helper for one already-created monotonic deadline.
 

@@ -78,7 +78,8 @@ verb wire_fragment_header_valid(
     if metadata.total_length == 0u32 || metadata.total_length > WIRE_REASSEMBLY_MAX_BYTES {
         return Result[Int, WireError].Err(WireError.FragmentRangeInvalid);
     }
-    if metadata.offset > metadata.total_length || payload_length > metadata.total_length - metadata.offset {
+    if metadata.offset > metadata.total_length
+        || payload_length > metadata.total_length - metadata.offset {
         return Result[Int, WireError].Err(WireError.FragmentRangeInvalid);
     }
     return Result[Int, WireError].Ok(0);
@@ -177,9 +178,12 @@ verb wire_fragment_read_header(abs input: Buffer) -> WireFragmentHeader {
     header.version = input[0];
     header.fragment_index = (input[1] as u16) | ((input[2] as u16) << 8u16);
     header.fragment_count = (input[3] as u16) | ((input[4] as u16) << 8u16);
-    header.total_length = (input[5] as u32) | ((input[6] as u32) << 8u32) | ((input[7] as u32) << 16u32) | ((input[8] as u32) << 24u32);
-    header.offset = (input[9] as u32) | ((input[10] as u32) << 8u32) | ((input[11] as u32) << 16u32) | ((input[12] as u32) << 24u32);
-    header.generation = (input[13] as u32) | ((input[14] as u32) << 8u32) | ((input[15] as u32) << 16u32) | ((input[16] as u32) << 24u32);
+    header.total_length = (input[5] as u32) | ((input[6] as u32) << 8u32)
+        | ((input[7] as u32) << 16u32) | ((input[8] as u32) << 24u32);
+    header.offset = (input[9] as u32) | ((input[10] as u32) << 8u32) | ((input[11] as u32) << 16u32)
+        | ((input[12] as u32) << 24u32);
+    header.generation = (input[13] as u32) | ((input[14] as u32) << 8u32)
+        | ((input[15] as u32) << 16u32) | ((input[16] as u32) << 24u32);
     return header;
 }
 
@@ -196,7 +200,8 @@ open verb wire_fragment_decode(abs input: Buffer) -> Result[WireFragmentHeader, 
         return Result[WireFragmentHeader, WireError].Err(WireError.Truncated);
     }
     erg header: WireFragmentHeader = wire_fragment_read_header(input: abs input);
-    erg payload_length: u32 = (buffer_length(buffer: abs input) as u32) - WIRE_FRAGMENT_HEADER_BYTES;
+    erg payload_length: u32 = (buffer_length(buffer: abs input) as u32)
+        - WIRE_FRAGMENT_HEADER_BYTES;
     erg valid = wire_fragment_header_valid(
         metadata: abs header,
         payload_length: erg payload_length

@@ -343,6 +343,26 @@ verb finish_sensor_calibration_window(
 }
 ```
 
+A binary operator chain whose line would pass 100 columns, counting the `;`, `,` or ` {`
+that ends it, breaks before the operators of its outermost (lowest-precedence) level. Each
+continuation line is indented one level deeper than the statement, starts with the operator, and
+holds as many operands as fit. Parentheses and the operators inside operands are never changed,
+and an expression that fits stays on one line. The rule applies to `erg` and `abs`
+declarations, assignments, `return`, `if` conditions, and `case` arm values:
+
+```act
+erg checks = (maximum == 255) && (minimum == -128) && (wrapped == 4) && (saturated == 255)
+    && (floor == 0) && (clamped == -128) && (flipped == -128) && (counter == 0)
+    && (level == 255);
+```
+
+The braces of enum struct variants and of their patterns keep one space inside, as in
+`Pair { code: c, value: v }`. A `case` arm whose pattern line is too long keeps the pattern on one
+line and wraps its value by the rule above.
+
+A docstring that opens the file documents the module. When another, different docstring follows
+it, one blank line separates the two.
+
 ## 8. Operators and bounded access
 
 Use explicit parentheses when a mixed expression would be difficult to read.
