@@ -206,6 +206,7 @@ impl Analyzer {
         matches!(head, "Buffer" | "Arena" | "Array")
             || self.struct_types.contains_key(head)
             || self.enum_types.contains_key(head)
+            || self.pack_types.contains_key(head)
     }
 
     fn visit_index_assignment(

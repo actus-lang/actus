@@ -41,6 +41,7 @@ The exact 12-byte version-one header.
 header carries metadata only, so constructing or inspecting it cannot allocate,
 perform transport I/O, or authenticate a sender.
 """
+meta copy
 open pack WireHeader {
     """Owned fixed-size storage containing the serialized header bytes."""
     erg storage: Array[u8, 12];

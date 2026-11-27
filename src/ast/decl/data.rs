@@ -114,6 +114,10 @@ impl EnumDef {
 }
 
 impl PackDecl {
+    pub fn is_copy(&self) -> bool {
+        self.metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Copy))
+    }
+
     pub fn layout_identity(&self) -> String {
         let fields = self
             .fields

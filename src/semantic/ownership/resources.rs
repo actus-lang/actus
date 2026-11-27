@@ -16,8 +16,8 @@ impl Analyzer {
     }
 
     /// Whether a value of this type moves out of its source when it is stored
-    /// or passed to an owner (ADR-0124): every struct and enum, a resource,
-    /// and an array that holds one. A scalar is not moved here.
+    /// or passed to an owner (ADR-0124): every struct, enum and pack, a
+    /// resource, and an array that holds one. A scalar is not moved here.
     pub(in crate::semantic) fn type_moves_on_store(&self, type_name: &TypeName) -> bool {
         if self.type_holds_resource(type_name) {
             return true;
@@ -26,7 +26,9 @@ impl Analyzer {
             return false;
         }
         let head = type_name.name.split('[').next().unwrap_or(&type_name.name);
-        self.struct_types.contains_key(head) || self.enum_types.contains_key(head)
+        self.struct_types.contains_key(head)
+            || self.enum_types.contains_key(head)
+            || self.pack_types.contains_key(head)
     }
 
     /// Whether an argument or stored value moves out of its source, judged by

@@ -321,7 +321,9 @@ impl Analyzer {
         // The copy has the type of its operand, including the type arguments
         // of a generic `meta copy` declaration.
         let head = type_name.as_deref().and_then(|name| name.split('[').next()).unwrap_or("");
-        let aggregate = self.struct_types.contains_key(head) || self.enum_types.contains_key(head);
+        let aggregate = self.struct_types.contains_key(head)
+            || self.enum_types.contains_key(head)
+            || self.pack_types.contains_key(head);
         let result_type = aggregate
             .then(|| self.resolved_type_name(&argument.expression))
             .flatten()

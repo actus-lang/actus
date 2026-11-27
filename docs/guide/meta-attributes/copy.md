@@ -1,7 +1,7 @@
 # `meta copy`
 
-`meta copy` declares that a struct or an enum may be duplicated. Without it, no
-struct or enum value is ever duplicated: a binding, an assignment, a struct
+`meta copy` declares that a struct, an enum or a pack may be duplicated.
+Without it, no struct, enum or pack value is ever duplicated: a binding, an assignment, a struct
 field initializer, an enum payload, an `erg` or `dat` argument and a return all
 move their source, whether the type holds a resource or only plain data
 (ADR-0124).
@@ -51,11 +51,11 @@ Every field of a struct and every payload of an enum must itself be a copy
 type:
 
 - `Int`, `Usize`, `Bool`, the fixed-width integers and the floats;
-- another struct or enum declared `meta copy`;
+- another struct, enum or pack declared `meta copy`;
 - an `Array` of copy types.
 
-A `Buffer`, an `Arena`, an `abs` view, a struct or an enum that is not
-`meta copy`, and a generic parameter are not copy types, and a declaration that
+A `Buffer`, an `Arena`, an `abs` view, a struct, an enum or a pack that is
+not `meta copy`, and a generic parameter are not copy types, and a declaration that
 has a drop contract (`perform Drop`) cannot be `meta copy`. The declaration is
 rejected with [`E1146`](../../language/diagnostics/E1146.md)
 and the message names the field that prevents it.
@@ -70,7 +70,7 @@ struct Frame {
 
 ## Placement
 
-`meta copy` is valid before a struct or an enum declaration. On a verb, a
+`meta copy` is valid before a struct, an enum or a pack declaration. On a verb, a
 field or anything else it is the usual metadata target error, and writing it
 twice on one declaration is the duplicate metadata error.
 
@@ -84,8 +84,42 @@ enum Sample {
 }
 ```
 
+## Packs
+
+A [`pack`](../language/packs.md) follows the same rules as a struct. It moves in
+every place a struct moves, a field read such as `header.payload_len` does not
+move it, and it is duplicated only by `copy(value: abs x)` once it is declared
+`meta copy`. The attribute goes before `pack` (and before `open pack`); it is the
+only attribute a pack accepts.
+
+```actus
+meta copy
+pack Control {
+    erg storage: u32;
+    layout little;
+    fields {
+        erg enabled: u1 at 0;
+        erg channel: u5 at 1;
+        abs _reserved: u26 at 6 = 0;
+    }
+}
+
+verb main() -> Int {
+    erg original = Control { storage: 0u32, };
+    original.channel = 3u8;
+    erg duplicate = copy(value: abs original);
+    duplicate.channel = 9u8;
+    return (original.channel as Int) + (duplicate.channel as Int);
+}
+```
+
+Every field of a pack is a fixed-width integer or a bounded array of them, and
+its storage is a fixed-width integer or `Array[u8, N]`, so `meta copy` on a
+pack is always valid unless the pack has a drop contract. The copy has its own
+storage whichever storage the pack uses. Without `meta copy`, `copy` on a pack
+is rejected with `E1021`.
+
 ## Not covered
 
-`meta copy` does not change `pack` declarations, and it does not make a
-resource copyable. A value that owns a buffer or an arena moves; to hand out a
-second owner, build a new resource explicitly.
+`meta copy` does not make a resource copyable. A value that owns a buffer or an
+arena moves; to hand out a second owner, build a new resource explicitly.

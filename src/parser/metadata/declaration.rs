@@ -36,6 +36,19 @@ impl Parser {
                 self.parse_enum_def_with_metadata(is_open, metadata, doc)?,
             ));
         }
+        if self.check_simple(&TokenKind::Pack) {
+            // `meta copy` is the only attribute a pack accepts (ADR-0124).
+            if metadata.iter().any(|attribute| !matches!(attribute, MetaAttribute::Copy)) {
+                return Err(ParseError {
+                    code: ParseErrorCode::MetadataTargetNotAllowed,
+                    kind: ParseErrorKind::MetadataTargetNotAllowed,
+                    span: self.metadata_span(),
+                });
+            }
+            let mut pack = self.parse_pack_decl(is_open, doc)?;
+            pack.metadata = metadata;
+            return Ok(TopLevelDecl::Pack(pack));
+        }
         if self.check_simple(&TokenKind::Unsafe) || self.check_simple(&TokenKind::Extern) {
             let verb = self.parse_external_verb(
                 self.check_simple(&TokenKind::Unsafe),
@@ -87,7 +100,9 @@ fn ensure_type_metadata_target(
         metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::Volatile));
     let has_zero_on_drop =
         metadata.iter().any(|attribute| matches!(attribute, MetaAttribute::ZeroOnDrop));
-    let is_type = parser.check_simple(&TokenKind::Struct) || parser.check_simple(&TokenKind::Enum);
+    let is_type = parser.check_simple(&TokenKind::Struct)
+        || parser.check_simple(&TokenKind::Enum)
+        || parser.check_simple(&TokenKind::Pack);
     if ((has_volatile || has_zero_on_drop) && !parser.check_simple(&TokenKind::Struct))
         || (metadata.iter().any(|attribute| {
             matches!(

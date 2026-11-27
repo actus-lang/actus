@@ -84,7 +84,7 @@ open verb wire_header_decode(abs input: Buffer) -> Result[WireHeader, WireError]
     erg valid = wire_validate_header(header: abs header);
     return case dat valid {
         Result.Err(error) => Result[WireHeader, WireError].Err(error),
-        Result.Ok(_) => Result[WireHeader, WireError].Ok(header),
+        Result.Ok(_) => Result[WireHeader, WireError].Ok(copy(value: abs header)),
     };
 }
 
@@ -291,7 +291,7 @@ verb wire_decode_frame_with_header(
     );
     return case dat payload_result {
         Result.Err(error) => Result[WireHeader, WireError].Err(error),
-        Result.Ok(_) => Result[WireHeader, WireError].Ok(header),
+        Result.Ok(_) => Result[WireHeader, WireError].Ok(copy(value: abs header)),
     };
 }
 

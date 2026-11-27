@@ -7,7 +7,7 @@ A move may happen through a `dat` call, a returned owned value, an assignment,
 or a payload operation. Fields and indexed places are tracked as part of their
 containing owner.
 
-Every struct and every enum is moved by these operations, whether it holds a
+Every struct, every enum and every pack is moved by these operations, whether it holds a
 resource or only plain data (ADR-0124). A binding, an assignment, a struct
 field initializer, an enum payload, an `erg` or `dat` argument and a return
 take the value away from the source, and the compiler rejects a later use with
@@ -30,14 +30,14 @@ verb main() -> Int {
 }
 ```
 
-Use `copy(value: abs value)` only for a scalar or for a struct or an enum
+Use `copy(value: abs value)` only for a scalar or for a struct, an enum or a pack
 declared [`meta copy`](../meta-attributes/copy.md). It does not make buffers,
 strings, resources, or cleanup-bearing aggregates copyable. Identity
 arithmetic such as `value + 0u32` is not a substitute for explicit reuse.
 
-## Struct and enum reuse
+## Struct, enum and pack reuse
 
-A struct of plain data is moved like any other owner. To keep the source, the
+A struct of plain data (an enum or a pack in the same way) is moved like any other owner. To keep the source, the
 type declares `meta copy` and the duplication is written:
 
 ```actus

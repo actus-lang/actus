@@ -106,6 +106,16 @@ fn preserves_copy_metadata_on_structs_and_enums_idempotently() {
 }
 
 #[test]
+fn preserves_copy_metadata_on_packs_idempotently() {
+    let formatted = format_source(
+        "meta copy pack Cell { erg storage: u8; layout little; fields { erg kind: u8 at 0; } } meta copy open pack Line { erg storage: Array[u8, 2]; layout big; fields { erg word: u16 at 0; } }",
+    );
+    assert_eq!(formatted.matches("meta copy").count(), 2);
+    assert!(formatted.contains("meta copy\nopen pack Line"), "{formatted}");
+    assert_eq!(format_source(&formatted), formatted);
+}
+
+#[test]
 fn preserves_deterministic_metadata_idempotently() {
     let formatted = format_source("meta deterministic verb stable() -> Int { return 0; }");
     assert!(formatted.contains("meta deterministic"));

@@ -38,7 +38,7 @@ memory-access contract described in ADR-0101.
 [`meta zero_on_drop`](zero-on-drop.md) documents the explicit secret-storage
 clearing contract described in ADR-0102.
 
-[`meta copy`](copy.md) declares that a struct or an enum of plain data may be
+[`meta copy`](copy.md) declares that a struct, an enum or a pack of plain data may be
 duplicated, always by a written `copy(value: abs x)` (ADR-0124).
 
 [`meta stack_limit(...)`](stack-limit.md) documents the target-specific

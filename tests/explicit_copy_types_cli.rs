@@ -235,3 +235,113 @@ fn executes_a_copy_of_an_enum_with_a_payload() {
     );
     assert_eq!(run_on_every_backend("enum", &source), BACKENDS_BUILT);
 }
+
+const CELL: &str = "pack Cell { erg storage: u16; layout little; fields { erg kind: u8 at 0; erg size: u8 at 8; } } \
+struct Holder { held: Cell, } verb take(erg held: Cell) {} ";
+
+#[test]
+fn check_rejects_use_of_a_pack_after_it_moved() {
+    for (label, body) in [
+        ("binding", "erg a = Cell { storage: 1u16, }; erg b = a; print(int: a.kind);"),
+        (
+            "field",
+            "erg a = Cell { storage: 1u16, }; erg h = Holder { held: a, }; print(int: a.kind);",
+        ),
+        (
+            "payload",
+            "erg a = Cell { storage: 1u16, }; erg o = Option[Cell].Some(a); print(int: a.kind);",
+        ),
+        ("argument", "erg a = Cell { storage: 1u16, }; take(held: a); print(int: a.kind);"),
+    ] {
+        let output = actus(label, "check", &format!("{CELL}verb main() {{ {body} }}"));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(!output.status.success(), "{label}: must be rejected");
+        assert!(stderr.contains("E1005"), "{label}: {stderr}");
+    }
+}
+
+#[test]
+fn check_accepts_reads_and_a_written_copy_of_a_meta_copy_pack() {
+    let source = "meta copy pack Cell { erg storage: u16; layout little; fields { erg kind: u8 at 0; erg size: u8 at 8; } } \
+        verb main() { erg a = Cell { storage: 1u16, }; print(int: a.kind); print(int: a.kind + a.size); \
+        erg b = copy(value: abs a); print(int: a.kind); print(int: b.kind); }";
+    let output = actus("pack-copy", "check", source);
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+}
+
+#[test]
+fn check_rejects_a_copy_of_a_pack_that_is_not_meta_copy() {
+    let output = actus(
+        "pack-plain-copy",
+        "check",
+        &format!(
+            "{CELL}verb main() {{ erg a = Cell {{ storage: 1u16, }}; erg b = copy(value: abs a); }}"
+        ),
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "must be rejected");
+    assert!(stderr.contains("E1021"), "{stderr}");
+}
+
+#[test]
+fn check_rejects_meta_copy_on_a_pack_with_a_drop_contract() {
+    let source = "meta copy pack Cell { erg storage: u8; layout little; fields { erg kind: u8 at 0; } } \
+        perform Drop for Cell { verb drop(ins self: Cell) { } } verb main() {}";
+    let output = actus("pack-drop", "check", source);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "must be rejected");
+    assert!(stderr.contains("E1146") && stderr.contains("`Cell`"), "{stderr}");
+}
+
+const PACKS: &str = "meta copy pack Register { erg storage: u32; layout little; fields { \
+erg enabled: u1 at 0; abs mode: u3 at 1; erg channel: u5 at 4; abs _reserved: u23 at 9 = 0; } } \
+meta copy pack Header { erg storage: Array[u8, 4]; layout little; fields { \
+erg kind: u8 at 0; erg length: u16 at 8; erg flag: u8 at 24; } } \
+struct Slot { register: Register, } verb bump(erg register: Register) -> u8 { register.channel = 31; return register.channel as u8; } ";
+
+#[test]
+fn executes_a_pack_copy_that_changes_without_changing_the_original() {
+    let source = format!(
+        "{PACKS}verb main() -> Int {{ erg original = Register {{ storage: 0u32, }}; original.channel = 3; \
+        erg duplicate = copy(value: abs original); duplicate.channel = 9; duplicate.enabled = 1; \
+        if original.channel != 3 {{ return 1; }} if original.enabled != 0 {{ return 2; }} \
+        return (duplicate.channel as Int) + (duplicate.enabled as Int) + (original.channel as Int) + 29; }}"
+    );
+    assert_eq!(run_on_every_backend("pack-independent", &source), BACKENDS_BUILT);
+}
+
+#[test]
+fn executes_a_copy_of_an_array_backed_pack_that_changes_without_changing_the_original() {
+    let source = format!(
+        "{PACKS}verb main() -> Int {{ erg original = Header {{ storage: Array[u8, 4](), }}; \
+        original.kind = 5u8; original.length = 300u16; original.flag = 1u8; \
+        erg duplicate = copy(value: abs original); duplicate.kind = 7u8; duplicate.length = 1u16; duplicate.flag = 9u8; \
+        if original.kind != 5u8 {{ return 1; }} if original.length != 300u16 {{ return 2; }} \
+        if original.flag != 1u8 {{ return 3; }} \
+        return (duplicate.kind as Int) + (duplicate.length as Int) + (duplicate.flag as Int) + 25; }}"
+    );
+    assert_eq!(run_on_every_backend("pack-array-independent", &source), BACKENDS_BUILT);
+}
+
+#[test]
+fn executes_a_pack_copy_written_into_a_struct_field_and_an_erg_parameter() {
+    let source = format!(
+        "{PACKS}verb main() -> Int {{ erg original = Register {{ storage: 0u32, }}; original.channel = 3; \
+        erg slot = Slot {{ register: copy(value: abs original), }}; slot.register.channel = 4; \
+        erg lent = copy(value: abs original); erg bumped = bump(register: lent); \
+        if original.channel != 3 {{ return 1; }} \
+        return (slot.register.channel as Int) + (bumped as Int) + (original.channel as Int) + 4; }}"
+    );
+    assert_eq!(run_on_every_backend("pack-field", &source), BACKENDS_BUILT);
+}
+
+#[test]
+fn executes_a_copy_of_a_pack_stored_in_an_array_element() {
+    let source = format!(
+        "{PACKS}verb main() -> Int {{ erg original = Header {{ storage: Array[u8, 4](), }}; original.kind = 40u8; \
+        erg items: Array[Header, 2] = Array[Header, 2](); items[1] = copy(value: abs original); \
+        items[1].kind = 2u8; if original.kind != 40u8 {{ return 1; }} \
+        return (items[1].kind as Int) + (original.kind as Int); }}"
+    );
+    assert_eq!(run_on_every_backend("pack-element", &source), BACKENDS_BUILT);
+}

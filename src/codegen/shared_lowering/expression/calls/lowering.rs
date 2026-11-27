@@ -141,9 +141,9 @@ fn lower_copy_call(
         return Err(unsupported(span, "copy requires one value"));
     };
     let source = provider.lower_expression(&argument.expression, instructions)?;
-    // A struct is stored in memory that the source and the copy would share,
-    // so the copy gets storage of its own (ADR-0124). A scalar or an enum is
-    // a value, and an enum is never modified in place.
+    // A struct or a pack is stored in memory that the source and the copy
+    // would share, so the copy gets storage of its own (ADR-0124). A scalar or
+    // an enum is a value, and an enum is never modified in place.
     let Some(BackendValueType::Aggregate { layout }) = provider.value_type(source) else {
         return Ok(source);
     };

@@ -463,8 +463,8 @@ contract.
 
 Use `copy(value: abs value)` when an eligible scalar must be reused at an
 owning call boundary. The compiler accepts `Int`, `Bool`, fixed-width
-integer and float values, and structs and enums declared `meta copy`
-(ADR-0124). The `abs` role is explicit for this intrinsic and the operation
+integer and float values, and structs, enums and packs declared
+`meta copy` (ADR-0124). The `abs` role is explicit for this intrinsic and the operation
 does not consume the caller. Do not use identity arithmetic such as `value + 0u32` to express
 reuse. Buffers, strings, resources, cleanup-bearing aggregates, and
 unsupported user-defined values are rejected with `E1021`; a missing explicit

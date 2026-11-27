@@ -1,5 +1,6 @@
 use crate::ast::{
-    EnumDef, EnumPayload, PrimitiveType, StructDef, StructFieldRole, TypeName, primitive_type,
+    EnumDef, EnumPayload, PackDecl, PrimitiveType, StructDef, StructFieldRole, TypeName,
+    primitive_type,
 };
 use crate::lexer::SourceSpan;
 
@@ -21,13 +22,13 @@ struct CopyField<'a> {
 
 impl Analyzer {
     /// Whether a value of this type may be duplicated by the written
-    /// `copy(value: abs x)` (ADR-0124): a scalar, a struct or enum declared
-    /// `meta copy`, or an array of copy types. A view never is.
+    /// `copy(value: abs x)` (ADR-0124): a scalar, a struct, enum or pack
+    /// declared `meta copy`, or an array of copy types. A view never is.
     pub(in crate::semantic) fn type_is_copy(&self, type_name: &TypeName) -> bool {
         self.type_is_copy_within(type_name, 0)
     }
 
-    /// Whether the named type is a scalar or a struct or enum declared
+    /// Whether the named type is a scalar or a struct, enum or pack declared
     /// `meta copy`; the head of a generic instance such as `Pair[Int]` names
     /// the declaration. Arrays are copy types only as fields, not as `copy`
     /// operands.
@@ -42,6 +43,7 @@ impl Analyzer {
         }
         self.struct_types.get(head).is_some_and(StructDef::is_copy)
             || self.enum_types.get(head).is_some_and(EnumDef::is_copy)
+            || self.pack_types.get(head).is_some_and(PackDecl::is_copy)
     }
 
     fn type_is_copy_within(&self, type_name: &TypeName, depth: usize) -> bool {
@@ -59,31 +61,12 @@ impl Analyzer {
         self.named_type_is_copy_operand(name)
     }
 
-    /// Rejects `meta copy` on a struct or enum with a drop contract or with a
-    /// field or payload that is not a copy type (E1146). Declarations are
-    /// checked in source order so the first offender reported is
+    /// Rejects `meta copy` on a struct, enum or pack with a drop contract or
+    /// with a field or payload that is not a copy type (E1146). Declarations
+    /// are checked in source order so the first offender reported is
     /// deterministic.
     pub(in crate::semantic) fn validate_copy_declarations(&self) -> Result<(), SemanticError> {
-        let mut declarations: Vec<(&str, SourceSpan, Vec<CopyField<'_>>)> = Vec::new();
-        for definition in self.struct_types.values().filter(|definition| definition.is_copy()) {
-            let fields = definition
-                .fields
-                .iter()
-                .map(|field| CopyField {
-                    name: field.name.clone(),
-                    type_name: &field.ty,
-                    span: field.span,
-                    view: matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins),
-                })
-                .collect();
-            declarations.push((definition.name.as_str(), definition.span, fields));
-        }
-        for definition in self.enum_types.values().filter(|definition| definition.is_copy()) {
-            let payloads = enum_copy_fields(definition);
-            declarations.push((definition.name.as_str(), definition.span, payloads));
-        }
-        declarations.sort_by_key(|(name, span, _)| (span.start, *name));
-        for (name, span, fields) in declarations {
+        for (name, span, fields) in self.copy_declarations() {
             if self.drop_types.contains(name) {
                 return Err(copy_error(name, "it has a drop contract".to_owned(), span));
             }
@@ -106,6 +89,44 @@ impl Analyzer {
             }
         }
         Ok(())
+    }
+
+    /// Every struct, enum and pack declared `meta copy` with its fields, in
+    /// source order.
+    fn copy_declarations(&self) -> Vec<(&str, SourceSpan, Vec<CopyField<'_>>)> {
+        let mut declarations: Vec<(&str, SourceSpan, Vec<CopyField<'_>>)> = Vec::new();
+        for definition in self.struct_types.values().filter(|definition| definition.is_copy()) {
+            let fields = definition
+                .fields
+                .iter()
+                .map(|field| CopyField {
+                    name: field.name.clone(),
+                    type_name: &field.ty,
+                    span: field.span,
+                    view: matches!(field.role, StructFieldRole::Abs | StructFieldRole::Ins),
+                })
+                .collect();
+            declarations.push((definition.name.as_str(), definition.span, fields));
+        }
+        for definition in self.enum_types.values().filter(|definition| definition.is_copy()) {
+            let payloads = enum_copy_fields(definition);
+            declarations.push((definition.name.as_str(), definition.span, payloads));
+        }
+        for definition in self.pack_types.values().filter(|definition| definition.is_copy()) {
+            let fields = definition
+                .fields
+                .iter()
+                .map(|field| CopyField {
+                    name: field.name.clone(),
+                    type_name: &field.ty,
+                    span: field.span,
+                    view: false,
+                })
+                .collect();
+            declarations.push((definition.name.as_str(), definition.span, fields));
+        }
+        declarations.sort_by_key(|(name, span, _)| (span.start, *name));
+        declarations
     }
 }
 
