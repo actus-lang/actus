@@ -41,7 +41,7 @@ fn actus(root: &Path, arguments: &[&str]) -> Output {
 fn assert_rejected(name: &str, source: &str, line: &str) {
     let root = project(name, &[("main.act", &format!("{source}{ENTRY}"))]);
     let output = actus(&root, &["check", "--strict", "src/main.act"]);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = String::from_utf8_lossy(&output.stderr).replace('\\', "/");
     assert_eq!(output.status.code(), Some(1), "stderr: {stderr}");
     let first = stderr.lines().next().unwrap_or_default();
     assert!(first.starts_with("src/main.act: error[") && first.contains(line), "stderr: {stderr}");
@@ -89,7 +89,7 @@ fn strict_check_validates_the_module_files_and_not_only_the_entry() {
         ],
     );
     let output = actus(&root, &["check", "--strict", "src/main.act"]);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = String::from_utf8_lossy(&output.stderr).replace('\\', "/");
     assert_eq!(output.status.code(), Some(1), "stderr: {stderr}");
     assert!(
         stderr.contains("src/shapes/area.act: error[E1840] at 1:6: verb area: missing"),

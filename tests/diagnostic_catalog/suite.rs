@@ -112,6 +112,7 @@ fn the_catalog_and_the_registry_list_the_same_codes() {
 fn every_failing_example_reports_its_code_first_inside_the_example() {
     let (entries, _) = load_entries();
     let mut problems = Vec::new();
+    let mut skipped = 0;
     for entry in &entries {
         let examples: Vec<_> =
             entry.blocks.iter().filter(|block| block.section == "Example").collect();
@@ -119,6 +120,9 @@ fn every_failing_example_reports_its_code_first_inside_the_example() {
             let Some(failing) = group.iter().find(|block| block.fails.is_some()) else {
                 continue;
             };
+            if skipped_without_llvm(&group, &mut skipped) {
+                continue;
+            }
             let command = Block::command_for(&group);
             let strict = Block::strict_for(&group);
             let project = TempProject::create(&group).expect("project should be created");
@@ -142,6 +146,7 @@ fn every_failing_example_reports_its_code_first_inside_the_example() {
             }
         }
     }
+    report_skipped(skipped);
     assert_no_problems(&problems);
 }
 
@@ -149,12 +154,16 @@ fn every_failing_example_reports_its_code_first_inside_the_example() {
 fn every_compiling_block_passes_check() {
     let (entries, _) = load_entries();
     let mut problems = Vec::new();
+    let mut skipped = 0;
     for entry in &entries {
         let fixes: Vec<_> = entry.blocks.iter().filter(|block| block.section == "Fix").collect();
         for group in groups(&fixes) {
             let Some(compiling) = group.iter().find(|block| block.compiles) else {
                 continue;
             };
+            if skipped_without_llvm(&group, &mut skipped) {
+                continue;
+            }
             let project = TempProject::create(&group).expect("project should be created");
             let command = Block::command_for(&group);
             let strict = Block::strict_for(&group);
@@ -170,7 +179,26 @@ fn every_compiling_block_passes_check() {
             }
         }
     }
+    report_skipped(skipped);
     assert_no_problems(&problems);
+}
+
+/// Whether a group marked `llvm` is skipped because this test binary is built
+/// without the `llvm` feature (ADR-0123); a skipped group is counted.
+fn skipped_without_llvm(group: &[&Block], skipped: &mut usize) -> bool {
+    let skip = Block::needs_llvm(group) && !cfg!(feature = "llvm");
+    *skipped += usize::from(skip);
+    skip
+}
+
+/// Prints how many groups were skipped, so a skip is visible (shown with
+/// `--nocapture`, and always when the test fails).
+fn report_skipped(skipped: usize) {
+    if skipped > 0 {
+        eprintln!(
+            "diagnostic catalog: skipped {skipped} group(s) marked `llvm`, built without the `llvm` feature"
+        );
+    }
 }
 
 const VALID_ENTRY: &str = "# E1140: operands of different integer types\n\nExplanation.\n\n## Example\n\n```actus fails=E1140\nverb main() {}\n```\n\n## Fix\n\nText.\n\n```actus compiles\nverb main() {}\n```\n";
@@ -342,4 +370,33 @@ fn a_malformed_repeat_region_is_an_entry_shape_error() {
             VALID_ENTRY.replace("verb main() {}\n```\n\n## Fix", &format!("{body}```\n\n## Fix"));
         assert!(parse_entry("E1140", &text).is_err(), "{body}");
     }
+}
+
+#[test]
+fn the_llvm_marker_is_accepted_and_marks_the_group() {
+    let failing = VALID_ENTRY.replace("fails=E1140", "fails=E1140,llvm");
+    let entry = parse_entry("E1140", &failing).expect("the `,llvm` marker should parse");
+    let group: Vec<&Block> = entry.blocks.iter().filter(|block| block.fails.is_some()).collect();
+    assert!(Block::needs_llvm(&group));
+    let combined = VALID_ENTRY.replace("fails=E1140", "fails=E1140,build,strict,llvm");
+    assert!(parse_entry("E1140", &combined).is_ok());
+    let fix = VALID_ENTRY.replace("actus compiles", "actus compiles llvm");
+    let entry = parse_entry("E1140", &fix).expect("`compiles llvm` should parse");
+    let group: Vec<&Block> = entry.blocks.iter().filter(|block| block.compiles).collect();
+    assert!(Block::needs_llvm(&group));
+    let plain = parse_entry("E1140", VALID_ENTRY).expect("entry should parse");
+    assert!(!Block::needs_llvm(&plain.blocks.iter().collect::<Vec<_>>()));
+}
+
+#[test]
+fn a_misplaced_llvm_marker_is_rejected() {
+    for text in [
+        VALID_ENTRY.replace("fails=E1140", "fails=E1140,llvm,strict"),
+        VALID_ENTRY.replace("fails=E1140", "fails=E1140 llvm"),
+        VALID_ENTRY.replace("actus compiles", "actus compiles,llvm"),
+    ] {
+        assert!(parse_entry("E1140", &text).is_err(), "{text}");
+    }
+    let alone = VALID_ENTRY.replace("```actus compiles\n", "```actus llvm file=src/other.act\n");
+    assert!(parse_entry("E1140", &alone).is_err());
 }

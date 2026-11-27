@@ -44,7 +44,7 @@ impl Project {
             .current_dir(&self.root)
             .output()
             .expect("run actus");
-        (output.status.code(), String::from_utf8_lossy(&output.stderr).into_owned())
+        (output.status.code(), String::from_utf8_lossy(&output.stderr).replace('\\', "/"))
     }
 }
 

@@ -48,8 +48,8 @@ fn actus(root: &Path, arguments: &[&str]) -> Output {
 
 fn text(output: &Output) -> (String, String) {
     (
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
+        String::from_utf8_lossy(&output.stdout).replace('\\', "/"),
+        String::from_utf8_lossy(&output.stderr).replace('\\', "/"),
     )
 }
 

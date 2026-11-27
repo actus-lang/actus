@@ -37,7 +37,7 @@ fn actus(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) -> (Outp
         .current_dir(root)
         .output()
         .expect("run actus");
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stdout = String::from_utf8_lossy(&output.stdout).replace('\\', "/");
     (output, stdout)
 }
 

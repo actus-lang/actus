@@ -113,6 +113,12 @@ and must exit 0, so every test of it passes.
 The marker `fails=E####,strict`, also written `fails=E####,build,strict` or
 `fails=E####,test,strict`, runs the command with `--strict` (ADR-0041), and a
 `compiles` group written `actus compiles strict` is verified with `--strict`.
+The marker `llvm`, written `fails=E####,llvm` (last, after `build`/`test` and
+`strict`) or `actus compiles llvm`, says the group needs a compiler built with
+the `llvm` feature, as a `meta stack_limit` proof does (ADR-0103). A test binary
+built without that feature skips the group and prints how many groups it
+skipped; every other group runs on every build. A group that needs the proof
+also pins its target in `Actus.toml`, so the result does not depend on the host.
 Every diagnostic prints as `<path>: error[E####] at line:column: message`, or
 `error[E####]: message` when it names no file, which only an error of the
 toolchain or the environment does; the test skips the location check of such a

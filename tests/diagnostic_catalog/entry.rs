@@ -15,6 +15,8 @@ pub struct Block {
     /// The example fails, or the fix compiles, under `--strict` (ADR-0041).
     pub strict: bool,
     pub compiles: bool,
+    /// The group needs a compiler built with the `llvm` feature (ADR-0123).
+    pub llvm: bool,
     pub file: Option<String>,
     pub body: String,
     pub line: usize,
@@ -49,6 +51,12 @@ impl Block {
 }
 
 impl Block {
+    /// Whether a group needs the LLVM back end: one of its blocks carries the
+    /// marker `llvm`.
+    pub fn needs_llvm(group: &[&Block]) -> bool {
+        group.iter().any(|block| block.llvm)
+    }
+
     /// Whether the command that verifies a group runs with `--strict`: the
     /// marker `fails=E####,strict` of the failing block, or the word `strict`
     /// on a `compiles` block of a group that has no failing block.
@@ -144,13 +152,19 @@ fn parse_info(info: &str, section: &str, line: usize) -> Result<Option<Block>, S
     }
     let mut block = Block { section: section.to_owned(), line, ..Block::default() };
     let mut word_strict = false;
+    let mut word_llvm = false;
     for word in words {
         if let Some(value) = word.strip_prefix("fails=") {
-            // `fails=E####` takes the flags `build` or `test` (one of them) and
-            // `strict`, in this order, separated by commas.
+            // `fails=E####` takes the flags `build` or `test` (one of them),
+            // `strict` and `llvm`, in this order, each optional, separated by
+            // commas.
             let mut flags = value.split(',');
             let code = flags.next().unwrap_or_default();
             let flags: Vec<&str> = flags.collect();
+            let (flags, llvm) = match flags.split_last() {
+                Some((&"llvm", rest)) => (rest.to_vec(), true),
+                _ => (flags, false),
+            };
             let (command, strict) = match flags.as_slice() {
                 [] => ("", false),
                 ["strict"] => ("", true),
@@ -158,6 +172,7 @@ fn parse_info(info: &str, section: &str, line: usize) -> Result<Option<Block>, S
                 ["build" | "test", "strict"] => (flags[0], true),
                 _ => return Err(format!("line {line}: bad marker `{word}`")),
             };
+            block.llvm = llvm;
             if !is_code(code) {
                 return Err(format!("line {line}: bad marker `{word}`"));
             }
@@ -169,6 +184,8 @@ fn parse_info(info: &str, section: &str, line: usize) -> Result<Option<Block>, S
             block.compiles = true;
         } else if word == "strict" {
             word_strict = true;
+        } else if word == "llvm" {
+            word_llvm = true;
         } else if let Some(path) = word.strip_prefix("file=") {
             if path.is_empty()
                 || path.starts_with('/')
@@ -181,6 +198,14 @@ fn parse_info(info: &str, section: &str, line: usize) -> Result<Option<Block>, S
         } else {
             return Err(format!("line {line}: unknown marker `{word}`"));
         }
+    }
+    if word_llvm {
+        if !block.compiles || block.fails.is_some() {
+            return Err(format!(
+                "line {line}: the word `llvm` belongs to `compiles`; a failing block is marked `fails=E####,llvm`"
+            ));
+        }
+        block.llvm = true;
     }
     if word_strict {
         if !block.compiles || block.fails.is_some() {
