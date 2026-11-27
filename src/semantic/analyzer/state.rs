@@ -23,6 +23,8 @@ pub(crate) struct Analyzer {
     pub(crate) next_loan_id: usize,
     pub(crate) active_field_loans: Vec<(usize, String, usize)>,
     pub(crate) active_borrow_ids: HashSet<usize>,
+    /// The binding index of the owner each borrow froze.
+    pub(crate) borrow_owner_indices: HashMap<usize, usize>,
     pub(crate) signatures: HashMap<String, super::super::calls::VerbSignature>,
     pub(crate) signature_origins: HashMap<String, (bool, SourceSpan)>,
     pub(crate) local_signatures: HashSet<String>,

@@ -62,6 +62,41 @@ Without the `copy`, the struct field initializer moves `header` and the read
 that follows is `E1005`. When the later read is only a field value, read it
 before the move instead of copying.
 
+## Partial moves of an owner
+
+A move out of a field is tracked by field path (ADR-0016, ADR-0046). Moving
+`config.first` makes only `config.first` unusable; the other fields of
+`config` stay owned, can be read, viewed with `abs`, and moved the same way,
+including through a `dat` parameter. The owner as a whole is now partially
+moved: using it whole (passing it, moving it, viewing it) or moving the same
+field again is `E1005`, and so is moving a field that contains a moved path,
+or a path inside a moved field. Nested paths behave in the same way:
+`config.inner.first` and `config.inner.second` are independent, while
+`config.inner` overlaps both.
+
+```actus
+struct Config {
+    erg first: Buffer,
+    erg second: Buffer,
+}
+
+verb release(dat held: Buffer) {
+    drop(held);
+}
+
+verb main() {
+    erg config: Config = Config { first: Buffer[4], second: Buffer[4], };
+    release(held: dat config.first);
+    print(buffer_length(buffer: abs config.second));
+    release(held: dat config.second);
+}
+```
+
+A partially moved owner is cleaned up for the fields it still owns, exactly
+once: at the end of its scope, or at an explicit `drop(config)`, which releases
+only the fields that were not moved. The moved fields belong to their new
+owners and are never released a second time.
+
 ## Moves inside a loop
 
 A loop body runs again, so a value that is declared before the loop and moved or

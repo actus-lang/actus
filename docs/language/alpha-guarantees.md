@@ -55,8 +55,9 @@ depend on the native backend or on a garbage collector.
 - Structs are not implicitly copyable. Compatible whole-struct assignment
   transfers the source owner, cleans the destination's previous owned value,
   and reports use-after-move on later source access.
-- Partial field moves are tracked by field path and cleanup skips moved fields
-  exactly once. Self-assignment and overlapping moves are rejected.
+- Partial field moves are tracked by field path: the other fields stay usable,
+  the owner as a whole does not, and cleanup, scope end or explicit `drop`,
+  skips moved fields exactly once. Self-assignment and overlapping moves are rejected.
 - Ordinary struct layout is deterministic by declaration order and target
   alignment. Packed and public C-ABI representations require their explicit
   contracts; unsupported aggregate ABI exposure is rejected or deferred.

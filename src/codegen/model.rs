@@ -164,10 +164,18 @@ pub(super) fn cleanup_bridge_descriptor(
 
 pub(crate) fn lower_explicit_drop(
     binding_index: usize,
+    moved_fields: &[String],
     model: &SemanticModel,
 ) -> Option<LoweredCleanupInstruction> {
-    model.bindings.get(binding_index)?;
-    Some(lower_binding_drop(binding_index, model))
+    let binding = model.bindings.get(binding_index)?;
+    if moved_fields.is_empty() {
+        return Some(lower_binding_drop(binding_index, model));
+    }
+    Some(LoweredCleanupInstruction::DropBindingFields {
+        binding_index,
+        name: binding.name.clone(),
+        moved_fields: moved_fields.to_vec(),
+    })
 }
 
 pub(super) fn validate_cleanup_plans(model: &SemanticModel) -> Result<(), String> {

@@ -278,7 +278,19 @@ pub(super) fn lower_cleanup(
             let field = operand.field.ok_or_else(|| {
                 BackendEmitError("Cranelift field cleanup requires a field sublayout".to_owned())
             })?;
-            builder.ins().iadd_imm_s(value, i64::from(field.offset))
+            let field_address = builder.ins().iadd_imm_s(value, i64::from(field.offset));
+            if operand.bridge == BackendCleanupBridge::BufferDrop {
+                // A buffer field stores the buffer handle, and the runtime
+                // releases the handle itself, not the slot that holds it.
+                builder.ins().load(
+                    module.isa().pointer_type(),
+                    cranelift_codegen::ir::MemFlagsData::new(),
+                    field_address,
+                    0,
+                )
+            } else {
+                field_address
+            }
         }
     };
     let symbol = operand.performance_symbol.as_ref().map_or_else(

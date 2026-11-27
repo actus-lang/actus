@@ -187,6 +187,7 @@ impl Analyzer {
             origin_span: span,
         });
         self.active_borrow_ids.insert(borrow_id);
+        self.borrow_owner_indices.insert(borrow_id, owner_index);
         self.scopes.last_mut().expect("a verb always has a scope").borrow_ids.push(borrow_id);
         match &mut self.model.bindings[owner_index].access {
             AccessState::Mutable => {
