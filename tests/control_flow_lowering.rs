@@ -49,14 +49,14 @@ fn run(name: &str, source: &str) -> Option<i32> {
 /// does not dominate the inner loop exit.
 #[test]
 fn inner_loop_in_a_branch_keeps_outer_bindings() {
-    let source = "verb main() -> Int {\n    erg marks: Array[u8, 10] = Array[u8, 10]();\n    erg count = 0;\n    erg outer = 0;\n    loop {\n        if outer >= 3 {\n            break;\n        }\n        if outer < 9 {\n            count = count + 1;\n            erg inner = 5;\n            loop {\n                if inner >= 7 {\n                    break;\n                }\n                marks[inner] = 1;\n                inner = inner + 1;\n            }\n        }\n        outer = outer + 1;\n    }\n    return count;\n}\n";
+    let source = "\"\"\"Entry point that runs two nested loops, counting three outer passes while marking elements 5 and 6 of a ten-element byte array in the inner loop, and returns the count 3.\"\"\"\nverb main() -> Int {\n    erg marks: Array[u8, 10] = Array[u8, 10]();\n    erg count = 0;\n    erg outer = 0;\n    loop {\n        if outer >= 3 {\n            break;\n        }\n        if outer < 9 {\n            count = count + 1;\n            erg inner = 5;\n            loop {\n                if inner >= 7 {\n                    break;\n                }\n                marks[inner] = 1;\n                inner = inner + 1;\n            }\n        }\n        outer = outer + 1;\n    }\n    return count;\n}\n";
     assert_eq!(run("inner-loop", source), Some(3));
 }
 
 /// The sieve of Eratosthenes below 100 counts 25 primes.
 #[test]
 fn sieve_with_an_inner_loop_in_a_branch_counts_primes() {
-    let source = "verb main() -> Int {\n    erg composite: Array[u8, 100] = Array[u8, 100]();\n    erg count = 0;\n    erg candidate = 2;\n    loop {\n        if candidate >= 100 {\n            break;\n        }\n        if composite[candidate] == 0 {\n            count = count + 1;\n            erg multiple = candidate * candidate;\n            loop {\n                if multiple >= 100 {\n                    break;\n                }\n                composite[multiple] = 1;\n                multiple = multiple + candidate;\n            }\n        }\n        candidate = candidate + 1;\n    }\n    return count;\n}\n";
+    let source = "\"\"\"Entry point that runs a sieve of Eratosthenes over the numbers below 100 in a byte array and returns how many primes it found.\"\"\"\nverb main() -> Int {\n    erg composite: Array[u8, 100] = Array[u8, 100]();\n    erg count = 0;\n    erg candidate = 2;\n    loop {\n        if candidate >= 100 {\n            break;\n        }\n        if composite[candidate] == 0 {\n            count = count + 1;\n            erg multiple = candidate * candidate;\n            loop {\n                if multiple >= 100 {\n                    break;\n                }\n                composite[multiple] = 1;\n                multiple = multiple + candidate;\n            }\n        }\n        candidate = candidate + 1;\n    }\n    return count;\n}\n";
     assert_eq!(run("sieve", source), Some(25));
 }
 
@@ -64,14 +64,14 @@ fn sieve_with_an_inner_loop_in_a_branch_counts_primes() {
 /// type of the binding, so the join merges values of one type.
 #[test]
 fn branch_literals_take_the_type_of_the_assigned_binding() {
-    let source = "verb main() -> Int {\n    erg outer: u64 = 0;\n    erg total: u64 = 0;\n    erg x: u64 = 0;\n    loop {\n        if outer >= 3 {\n            break;\n        }\n        if outer == 1 {\n            x = 5;\n        } else {\n            x = 2;\n        }\n        total = total + x;\n        outer = outer + 1;\n    }\n    return total as Int;\n}\n";
+    let source = "\"\"\"Entry point that loops three times, adds 5 on the middle pass and 2 on the others to a u64 total, and returns the total 9 as Int.\"\"\"\nverb main() -> Int {\n    erg outer: u64 = 0;\n    erg total: u64 = 0;\n    erg x: u64 = 0;\n    loop {\n        if outer >= 3 {\n            break;\n        }\n        if outer == 1 {\n            x = 5;\n        } else {\n            x = 2;\n        }\n        total = total + x;\n        outer = outer + 1;\n    }\n    return total as Int;\n}\n";
     assert_eq!(run("branch-literals", source), Some(9));
 }
 
 /// A literal divisor and remainder take the `u64` type of the dividend.
 #[test]
 fn literal_divisors_take_the_type_of_the_dividend() {
-    let source = "verb steps(erg start: u64) -> u64 {\n    erg value = start;\n    erg count: u64 = 0;\n    loop {\n        if value == 1 {\n            break;\n        }\n        if value % 2 == 0 {\n            value = value / 2;\n        } else {\n            value = value * 3 + 1;\n        }\n        count = count + 1;\n    }\n    return count;\n}\n\nverb main() -> Int {\n    erg start: u64 = 27;\n    return steps(start: erg start) as Int;\n}\n";
+    let source = "\"\"\"Returns the number of Collatz steps a u64 start value needs to reach 1, halving even values and mapping odd values to three times the value plus one.\"\"\"\nverb steps(erg start: u64) -> u64 {\n    erg value = start;\n    erg count: u64 = 0;\n    loop {\n        if value == 1 {\n            break;\n        }\n        if value % 2 == 0 {\n            value = value / 2;\n        } else {\n            value = value * 3 + 1;\n        }\n        count = count + 1;\n    }\n    return count;\n}\n\n\"\"\"Entry point that returns the Collatz step count of 27, which is 111.\"\"\"\nverb main() -> Int {\n    erg start: u64 = 27;\n    return steps(start: erg start) as Int;\n}\n";
     assert_eq!(run("divisors", source), Some(111));
 }
 
@@ -79,7 +79,7 @@ fn literal_divisors_take_the_type_of_the_dividend() {
 /// divides normally instead of trapping.
 #[test]
 fn unsigned_division_by_all_ones_does_not_trap() {
-    let source = "verb main() -> Int {\n    erg dividend: u64 = 9223372036854775808;\n    erg divisor: u64 = 18446744073709551615;\n    erg quotient = dividend / divisor;\n    return (quotient as Int) + 5;\n}\n";
+    let source = "\"\"\"Entry point that divides the u64 value 2 to the power 63 by the largest u64 so the quotient is 0, and returns the quotient plus 5.\"\"\"\nverb main() -> Int {\n    erg dividend: u64 = 9223372036854775808;\n    erg divisor: u64 = 18446744073709551615;\n    erg quotient = dividend / divisor;\n    return (quotient as Int) + 5;\n}\n";
     assert_eq!(run("unsigned-division", source), Some(5));
 }
 
@@ -87,7 +87,7 @@ fn unsigned_division_by_all_ones_does_not_trap() {
 /// full value instead of a truncated one.
 #[test]
 fn large_unsigned_literals_keep_their_value() {
-    let source = "verb main() -> Int {\n    erg dividend: u64 = 9223372036854775808;\n    erg divisor: u64 = 3;\n    erg quotient = dividend / divisor;\n    return (quotient % 7) as Int;\n}\n";
+    let source = "\"\"\"Entry point that divides the u64 value 2 to the power 63 by 3, which only fits unsigned arithmetic, and returns the quotient modulo 7 as Int.\"\"\"\nverb main() -> Int {\n    erg dividend: u64 = 9223372036854775808;\n    erg divisor: u64 = 3;\n    erg quotient = dividend / divisor;\n    return (quotient % 7) as Int;\n}\n";
     assert_eq!(run("large-literal", source), Some(2));
 }
 
@@ -97,6 +97,6 @@ fn large_unsigned_literals_keep_their_value() {
 /// iteration and overflow it long before the loop ends.
 #[test]
 fn temporaries_built_in_a_loop_reuse_one_stack_slot() {
-    let source = "struct Point {\n    x: Int,\n    y: Int,\n}\n\nverb sum(abs self: Point) -> Int {\n    return self.x + self.y;\n}\n\nverb main() -> Int {\n    erg total = 0;\n    erg i = 0;\n    loop {\n        if i == 50000000 {\n            break;\n        }\n        erg p = Point { x: i % 7, y: 1 };\n        abs view = ref p;\n        total = total + view.sum();\n        i = i + 1;\n    }\n    return total % 100;\n}\n";
+    let source = "struct Point {\n    x: Int,\n    y: Int,\n}\n\n\"\"\"Returns the sum of the x and y fields of a borrowed Point.\"\"\"\nverb sum(abs self: Point) -> Int {\n    return self.x + self.y;\n}\n\n\"\"\"Entry point that builds a Point and calls the sum method on a borrowed view of it fifty million times in a loop, and returns the accumulated total modulo 100.\"\"\"\nverb main() -> Int {\n    erg total = 0;\n    erg i = 0;\n    loop {\n        if i == 50000000 {\n            break;\n        }\n        erg p = Point { x: i % 7, y: 1 };\n        abs view = ref p;\n        total = total + view.sum();\n        i = i + 1;\n    }\n    return total % 100;\n}\n";
     assert_eq!(run("loop-temporaries", source), Some(97));
 }

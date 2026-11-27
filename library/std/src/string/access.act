@@ -8,6 +8,13 @@ either result, so malformed data is never silently replaced or truncated.
 """
 unsafe extern "C" verb actus_string_length(abs text: String) -> Int;
 
+"""
+Private bridge that reads one byte of a borrowed `String` at `index`. The text
+is an immutable `abs` view and is never modified or retained. It returns the
+byte value from `0` to `255` on success and a negative status when the string
+is null, is not valid UTF-8, or the index is out of bounds; the public wrapper
+translates the status to `StringError`. The call performs no allocation.
+"""
 unsafe extern "C" verb actus_string_byte_at(abs text: String, erg index: Int) -> Int;
 
 """

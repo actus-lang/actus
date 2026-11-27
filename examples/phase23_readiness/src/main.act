@@ -94,6 +94,13 @@ verb snapshot_restore(abs source: Minicolumn) -> Minicolumn {
     return restored;
 }
 
+"""
+Program entry point of the readiness example. It builds the initialized source
+column, advances it, snapshots and restores a second column, then combines the
+advance result, the written byte count and several restored fields into the
+returned exit status. The status shows that the column fields survive the round
+trip. The verb allocates only the temporary snapshot buffer.
+"""
 verb main() -> Int {
     erg source = initialized_source();
     erg advanced = advance(column: ins source);

@@ -4,12 +4,18 @@ verb write_marker(ins target: Buffer) -> Int {
     return 0;
 }
 
+"""
+Append the marker byte through `write_marker` and then the byte 35 to the same buffer, using an exclusive `ins` loan for both calls. The caller keeps ownership of the buffer and always receives 0.
+"""
 verb enrich(ins target: Buffer) -> Int {
     write_marker(target: ins target);
     append(target, 35);
     return 0;
 }
 
+"""
+Create an eight-byte buffer, let `enrich` add bytes through an exclusive loan, append one more byte as the owner, print 42 and return it as the exit status.
+"""
 verb main() -> Int {
     erg buffer: Buffer = Buffer[8];
     enrich(target: ins buffer);

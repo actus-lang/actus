@@ -12,23 +12,35 @@ pack ByteRegister {
     }
 }
 
+"""
+Read the first two bytes of a borrowed `Buffer` through checked native indexing and return their sum. The buffer is an immutable `abs` view and is not modified. The caller must have stored at least two bytes, otherwise the indexing check fails at run time.
+"""
 verb inspect_buffer(abs bytes: Buffer) -> Int {
     erg first = bytes[0];
     erg last = bytes[1];
     return first + last;
 }
 
+"""
+Write into a four-element integer array through an exclusive `ins` loan: element 1 becomes 40 and the element at the last index, 3, becomes 2. The caller keeps ownership of the array and observes both writes after the call. The verb returns no value and allocates nothing.
+"""
 verb mutate_array(ins values: Array[Int, 4]) {
     erg last_index = 3;
     values[1] = 40;
     values[last_index] = 2;
 }
 
+"""
+Read element 1 of a four-element integer array through an immutable `abs` view and return it. The array is not modified and nothing is allocated.
+"""
 verb inspect_array(abs values: Array[Int, 4]) -> Int {
     erg observed_index = 1;
     return values[observed_index];
 }
 
+"""
+Build a growable `Buffer` holding the bytes 17 and 25, pass it to `inspect_buffer` as a borrowed view and return the sum, 42. The buffer is owned by this verb and is allocated here.
+"""
 verb exercise_buffer_indexing() -> Int {
     erg bytes: Buffer = Buffer[0];
     append(bytes, 17);
@@ -36,6 +48,9 @@ verb exercise_buffer_indexing() -> Int {
     return inspect_buffer(bytes: abs bytes);
 }
 
+"""
+Create a zeroed four-element array, let `mutate_array` write into it through an exclusive loan, then read element 1 through `inspect_array` and add element 3. The result, 42, shows that the loan mutations are visible to the owner.
+"""
 verb exercise_array_loans() -> Int {
     erg values: Array[Int, 4] = Array[Int, 4]();
     mutate_array(values: ins values);
@@ -43,6 +58,9 @@ verb exercise_array_loans() -> Int {
     return observed + values[3];
 }
 
+"""
+Write the value 41 into the `payload` field of a one-byte pack and read it back. The write goes through the checked `u8` pack-field path, so a value that does not fit the field would be rejected at run time. It returns the stored value, 41.
+"""
 verb exercise_checked_u8_pack_write() -> Int {
     erg register = ByteRegister {
         storage: 0,
@@ -52,6 +70,9 @@ verb exercise_checked_u8_pack_write() -> Int {
     return register.payload;
 }
 
+"""
+Program entry point: run the buffer, array-loan and pack-write exercises, print their combined total as an integer and return it as the exit status, 125.
+"""
 verb main() -> Int {
     erg buffer_total = exercise_buffer_indexing();
     erg array_total = exercise_array_loans();

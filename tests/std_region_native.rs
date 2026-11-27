@@ -19,7 +19,7 @@ fn write_region_object_fixture(root: &std::path::Path, logical_length: &str) {
     fs::write(
         source_root.join("main.act"),
         format!(
-            "import {{ open std::region }}; meta effect(\"allocation\") verb main() -> Int {{ erg backing: Buffer = Buffer[4]; erg logical_length: u64 = {logical_length}; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(opened); return 0; }}\n"
+            "import {{ open std::region }};\n\"\"\"\ncontract:\npurpose:\n    Open a region over a four-byte backing buffer with the logical length chosen by the test and drop the result.\noutputs:\n    0.\nownership:\n    The backing buffer is moved into the region call and the result is dropped.\nerrors:\n    region_open may fail with a RegionError for an unsupported logical length; the result is discarded.\nside_effects:\n    Allocates region storage.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int {{ erg backing: Buffer = Buffer[4]; erg logical_length: u64 = {logical_length}; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(opened); return 0; }}\n"
         ),
     )
     .expect("fixture source should be written");
@@ -35,7 +35,7 @@ fn write_inline_object_fixture(root: &std::path::Path) {
     .expect("inline fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "verb main() -> Int { erg values: Array[u32, 2] = Array[u32, 2](); return values[0u32] as Int; }\n",
+        "\"\"\"Entry point that creates a two-element u32 array and returns the first element as Int.\"\"\"\nverb main() -> Int { erg values: Array[u32, 2] = Array[u32, 2](); return values[0u32] as Int; }\n",
     )
     .expect("inline fixture source should be written");
 }
@@ -79,7 +79,7 @@ fn write_freestanding_region_fixture(root: &std::path::Path, backend: &str) {
     .expect("freestanding parity manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::region }; meta effect(\"allocation\") verb boot(erg backing: Buffer) -> Int { erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(_region) => { return 0; }, }; }\n",
+        "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a one-element u8 region over the given backing buffer and return without closing it.\ninputs:\n    backing: owned Buffer that becomes the region storage.\noutputs:\n    0 when the region opened, 1 when it did not.\nownership:\n    The backing buffer is moved into the region; the region is not used afterwards.\nerrors:\n    A RegionError from region_open is mapped to the exit code 1.\nside_effects:\n    Allocates region storage.\n\"\"\"\nmeta effect(\"allocation\") verb boot(erg backing: Buffer) -> Int { erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(_region) => { return 0; }, }; }\n",
     )
     .expect("freestanding parity source should be written");
 }
@@ -133,7 +133,7 @@ fn hosted_std_region_operations_build_and_run() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }",
+        "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a one-element u32 region over a four-byte buffer and read element 0 into a destination buffer.\noutputs:\n    0 on success, 1 when the region cannot be opened, 2 when the read fails.\nownership:\n    The backing buffer is moved into the region; the destination buffer is borrowed by the read.\nerrors:\n    region_open and region_read errors map to the exit codes 1 and 2.\nside_effects:\n    Allocates region storage.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }",
     )
     .expect("fixture source should be written");
 
@@ -208,15 +208,54 @@ fn hosted_std_region_inspection_and_clean_remap_run_natively() {
     fs::write(
         source_root.join("main.act"),
         r#"import { open std::region };
+"""
+contract:
+purpose:
+    Read the window start of a region and check that it is 0.
+inputs:
+    region: borrowed Region of u32 values.
+outputs:
+    0 when the window start is 0, 1 when it cannot be read, 2 when it differs.
+ownership:
+    The region is a borrowed abs view and is only read.
+errors:
+    A RegionError from region_window_start maps to 1.
+"""
 verb check_start(abs region: Region[u32]) -> Int {
     erg result = region_window_start(region: abs region);
     return case dat result { Result.Err(_) => 1, Result.Ok(value) => if value == 0u64 { return 0; } else { return 2; }, };
 }
 
+"""
+contract:
+purpose:
+    Read the generation of a region and check that it is 2.
+inputs:
+    region: borrowed Region of u32 values.
+outputs:
+    0 when the generation is 2, 1 when it cannot be read, 2 when it differs.
+ownership:
+    The region is a borrowed abs view and is only read.
+errors:
+    A RegionError from region_generation maps to 1.
+"""
 verb check_generation(abs region: Region[u32]) -> Int {
     erg result = region_generation(region: abs region);
     return case dat result { Result.Err(_) => 1, Result.Ok(value) => if value == 2u64 { return 0; } else { return 2; }, };
 }
+"""
+contract:
+purpose:
+    Open a four-element u32 region, remap it to a new backing window starting at element 2, and check the window start and generation before and after.
+outputs:
+    0 on success, 20 when the region cannot be opened, 21 to 25 for the failing check or step.
+ownership:
+    The backing and replacement buffers are moved into the region calls; the region is closed at the end.
+errors:
+    Open, remap and close errors map to the exit codes 20, 22 and 25.
+side_effects:
+    Allocates region storage, remaps the window and closes the region.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[4];
@@ -285,6 +324,21 @@ fn hosted_std_region_bounded_ranges_run_natively() {
     fs::write(
         source_root.join("main.act"),
         r#"import { open std::region };
+"""
+contract:
+purpose:
+    Publish a region of u32 values, read two elements back with a range read, and check that reading an empty range at the end succeeds with count 0.
+inputs:
+    region: exclusive ins loan of Region of u32 values.
+outputs:
+    0 on success, 6 when publishing fails, 7 or 9 when a read fails, 8 or 10 for a wrong count.
+ownership:
+    The region is an exclusive ins loan that is published and then read.
+errors:
+    Each RegionError maps to the exit code of its step.
+side_effects:
+    Publishes the region contents.
+"""
 verb verify_published(ins region: Region[u32]) -> Int {
     erg published = region_publish(region: ins region);
     return case dat published {
@@ -308,6 +362,21 @@ verb verify_published(ins region: Region[u32]) -> Int {
         },
     };
 }
+"""
+contract:
+purpose:
+    Check that a range write crossing the end of the window is rejected, then write a valid two-element range and verify it by publishing.
+inputs:
+    region: exclusive ins loan of Region of u32 values; source: borrowed Buffer holding the elements.
+outputs:
+    0 on success, 3 when the crossing write is accepted, 4 or 5 when the valid write fails or reports a wrong count, otherwise the status of verify_published.
+ownership:
+    The region is an exclusive ins loan that is mutated; the source is borrowed.
+errors:
+    The crossing write must report a RegionError.
+side_effects:
+    Writes the valid range into the region.
+"""
 verb verify_ranges(ins region: Region[u32], abs source: Buffer) -> Int {
     erg crossing_start: u64 = 1u64;
     erg range_count: u64 = 2u64;
@@ -318,6 +387,19 @@ verb verify_ranges(ins region: Region[u32], abs source: Buffer) -> Int {
     erg written = region_write_range(region: ins region, start_index: erg write_start, element_count: erg range_count, source: abs source);
     return case dat written { Result.Err(_) => 4, Result.Ok(count) => if count == 2u64 { return verify_published(region: ins region); } else { return 5; }, };
 }
+"""
+contract:
+purpose:
+    Open a four-element u32 region with a two-element window and run the range write checks on it.
+outputs:
+    0 on success, 1 when the region cannot be opened, otherwise the status of verify_ranges.
+ownership:
+    The backing and source buffers are owned locally; the region is handed to verify_ranges.
+errors:
+    Open errors map to the exit code 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[8];
@@ -368,6 +450,19 @@ fn hosted_std_region_volatile_ranges_run_with_explicit_effects() {
     fs::write(
         source_root.join("main.act"),
         r#"import { open std::region };
+"""
+contract:
+purpose:
+    Open a two-byte region, write two bytes with a volatile range write, read them back with a volatile range read and compare them.
+outputs:
+    0 on success, 1 when the region cannot be opened, 2 to 5 for the failing step or a data mismatch.
+ownership:
+    The backing buffer is moved into the region; the source and destination buffers are borrowed.
+errors:
+    Open, volatile write and volatile read errors map to distinct exit codes.
+side_effects:
+    Allocates region storage and performs volatile accesses.
+"""
 meta effect("allocation", "volatile")
 verb main() -> Int {
     erg backing: Buffer = Buffer[2];
@@ -436,7 +531,7 @@ fn hosted_std_region_accepts_exact_128_kib_bulk_transfer() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[131072]; erg logical_length: u64 = 131072u64; erg window_start: u64 = 0u64; erg window_count: u64 = 131072u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[131072]; erg start: u64 = 0u64; erg count: u64 = 131072u64; erg written = region_write_range(region: ins region, start_index: erg start, element_count: erg count, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[131072]; erg read = region_read_range(region: abs region, start_index: erg start, element_count: erg count, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(value) => { if value != 131072u64 { return 5; } erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 6, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }",
+        "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a u8 region of 131072 elements, bulk-write and publish all elements, bulk-read them back and close the region.\noutputs:\n    0 on success, otherwise 1 to 6 for the failing step.\nownership:\n    The backing buffer is moved into the region; the source and destination buffers are borrowed.\nerrors:\n    Each RegionError maps to the exit code of its step.\nside_effects:\n    Allocates region storage, writes and closes the region.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[131072]; erg logical_length: u64 = 131072u64; erg window_start: u64 = 0u64; erg window_count: u64 = 131072u64; erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[131072]; erg start: u64 = 0u64; erg count: u64 = 131072u64; erg written = region_write_range(region: ins region, start_index: erg start, element_count: erg count, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[131072]; erg read = region_read_range(region: abs region, start_index: erg start, element_count: erg count, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(value) => { if value != 131072u64 { return 5; } erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 6, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }",
     )
     .expect("fixture source should be written");
 
@@ -474,7 +569,7 @@ fn hosted_std_region_write_publish_and_read_are_visible() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[4]; erg index: u64 = 0u64; erg written = region_write(region: ins region, index: erg index, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(_) => { erg closed = region_close(region: ins region); drop(closed); return 0; }, }; }, }; }, }; }, }; }",
+        "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a one-element u32 region, write, publish and read element 0, and close the region, dropping the close result.\noutputs:\n    0 on success, otherwise 1 to 4 for the failing step.\nownership:\n    The backing buffer is moved into the region; the source and destination buffers are borrowed.\nerrors:\n    Each RegionError maps to the exit code of its step.\nside_effects:\n    Allocates region storage, writes and closes the region.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg source: Buffer = Buffer[4]; erg index: u64 = 0u64; erg written = region_write(region: ins region, index: erg index, source: abs source); return case dat written { Result.Err(_) => 2, Result.Ok(_) => { erg published = region_publish(region: ins region); return case dat published { Result.Err(_) => 3, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 4, Result.Ok(_) => { erg closed = region_close(region: ins region); drop(closed); return 0; }, }; }, }; }, }; }, }; }",
     )
     .expect("fixture source should be written");
 
@@ -510,7 +605,7 @@ fn hosted_std_region_rejects_out_of_window_read_without_trap() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }\n",
+        "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a one-element u32 region, then read index 1, which is out of range, and expect the read to fail.\noutputs:\n    0 when the out-of-range read fails as expected, 1 when the region cannot be opened, 2 when the read unexpectedly succeeds.\nownership:\n    The backing buffer is moved into the region; the destination buffer is borrowed by the read.\nerrors:\n    region_read must report a RegionError for the out-of-range index.\nside_effects:\n    Allocates region storage.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }\n",
     )
     .expect("fixture source should be written");
 
@@ -549,7 +644,7 @@ fn hosted_std_region_pinning_blocks_remap_until_unpinned() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg pinned = region_pin(region: ins region); return case dat pinned { Result.Err(_) => 2, Result.Ok(_) => { erg state = region_pinned(region: abs region); return case dat state { Result.Err(_) => 3, Result.Ok(value) => { if value != 1 { return 4; } erg replacement: Buffer = Buffer[4]; erg remapped = region_remap(region: ins region, backing: dat replacement, window_start: erg window_start, window_count: erg window_count); return case dat remapped { Result.Ok(_) => 5, Result.Err(_) => { erg unpinned = region_unpin(region: ins region); return case dat unpinned { Result.Err(_) => 6, Result.Ok(_) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 7, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }, }; }",
+        "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Pin a region, check that it reports as pinned, verify that remapping a pinned region is rejected, then unpin and close it.\noutputs:\n    0 on success, otherwise 1 to 7 for the failing step.\nownership:\n    The region is lent exclusively to the pin, remap, unpin and close calls.\nerrors:\n    Remapping a pinned region must fail; every other RegionError maps to an exit code.\nside_effects:\n    Allocates region storage, pins, unpins and closes the region.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg pinned = region_pin(region: ins region); return case dat pinned { Result.Err(_) => 2, Result.Ok(_) => { erg state = region_pinned(region: abs region); return case dat state { Result.Err(_) => 3, Result.Ok(value) => { if value != 1 { return 4; } erg replacement: Buffer = Buffer[4]; erg remapped = region_remap(region: ins region, backing: dat replacement, window_start: erg window_start, window_count: erg window_count); return case dat remapped { Result.Ok(_) => 5, Result.Err(_) => { erg unpinned = region_unpin(region: ins region); return case dat unpinned { Result.Err(_) => 6, Result.Ok(_) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 7, Result.Ok(_) => 0, }; }, }; }, }; }, }; }, }; }, }; }",
     )
     .expect("fixture source should be written");
     let build = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -587,7 +682,7 @@ fn hosted_std_region_rejects_access_after_close_without_trap() {
     .expect("fixture manifest should be written");
     fs::write(
         source_root.join("main.act"),
-        "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 3, }; }, }; }, }; }\n",
+        "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Close a region and check that reading from it afterwards fails.\noutputs:\n    0 when the read after close fails, 1 or 2 when open or close fails, 3 when the read succeeds.\nownership:\n    The region is lent exclusively to close and then borrowed by read.\nerrors:\n    The read after close must report a RegionError.\nside_effects:\n    Allocates region storage and closes the region.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 3, }; }, }; }, }; }\n",
     )
     .expect("fixture source should be written");
 
@@ -627,9 +722,25 @@ fn hosted_std_region_cleanup_handles_early_return_and_nested_transfer() {
     fs::write(
         source_root.join("main.act"),
         r#"import { open std::region };
+"""Takes ownership of a region of u32 values and returns 0; the region is released when the verb ends."""
 verb consume_region(dat region: Region[u32]) -> Int {
     return 0;
 }
+"""
+contract:
+purpose:
+    Open a region over the given buffer and return from the Ok arm without closing it, so the region is released at the early return.
+inputs:
+    backing: owned Buffer that becomes the region storage.
+outputs:
+    0 when the region opened, 1 when it did not.
+ownership:
+    The backing buffer is moved into the region, which is released at the early return.
+errors:
+    A RegionError from region_open maps to 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb open_and_return(dat backing: Buffer) -> Int {
     erg logical_length: u64 = 1u64;
@@ -638,6 +749,21 @@ verb open_and_return(dat backing: Buffer) -> Int {
     erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
     return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { return 0; }, };
 }
+"""
+contract:
+purpose:
+    Open a region over the given buffer and transfer ownership of it to consume_region.
+inputs:
+    backing: owned Buffer that becomes the region storage.
+outputs:
+    The result of consume_region, or 2 when the region cannot be opened.
+ownership:
+    The region is moved into consume_region.
+errors:
+    A RegionError from region_open maps to 2.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb open_and_transfer(dat backing: Buffer) -> Int {
     erg logical_length: u64 = 1u64;
@@ -646,6 +772,21 @@ verb open_and_transfer(dat backing: Buffer) -> Int {
     erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
     return case dat opened { Result.Err(_) => 2, Result.Ok(region) => { return consume_region(region: dat region); }, };
 }
+"""
+contract:
+purpose:
+    Open a region and release it on only one branch of a conditional, checking that the region is cleaned up on each path.
+inputs:
+    backing: owned Buffer that becomes the region storage.
+outputs:
+    0 on the taken branch, 5 on the other, or 4 when the region cannot be opened.
+ownership:
+    The region is released at the end of its scope on every path.
+errors:
+    A RegionError from region_open maps to 4.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb open_and_branch(dat backing: Buffer) -> Int {
     erg logical_length: u64 = 1u64;
@@ -654,6 +795,21 @@ verb open_and_branch(dat backing: Buffer) -> Int {
     erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
     return case dat opened { Result.Err(_) => 4, Result.Ok(region) => { erg branch: Bool = true; if branch { return 0; } return 5; }, };
 }
+"""
+contract:
+purpose:
+    Open a one-element region over a given buffer, then read an element into a one-byte destination, expecting the mismatched read to fail.
+inputs:
+    backing: owned Buffer that becomes the region storage.
+outputs:
+    0 when the read fails as expected, 6 when the region cannot be opened, 7 when the read succeeds.
+ownership:
+    The region is released at the end of the verb; the destination buffer is borrowed by the read.
+errors:
+    The expected RegionError of the read is the success path.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb open_and_fail(dat backing: Buffer) -> Int {
     erg logical_length: u64 = 1u64;
@@ -662,6 +818,7 @@ verb open_and_fail(dat backing: Buffer) -> Int {
     erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);
     return case dat opened { Result.Err(_) => 6, Result.Ok(region) => { erg destination: Buffer = Buffer[1]; erg index: u64 = 0u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 7, }; }, };
 }
+"""Entry point that runs the open_and_return, open_and_transfer, open_and_branch and open_and_fail verbs on separate four-byte buffers and returns 0 when each region is cleaned up as expected, otherwise the status of the first failing verb."""
 meta effect("allocation")
 verb main() -> Int {
     erg first: Buffer = Buffer[4];
@@ -775,6 +932,21 @@ fn freestanding_region_object_imports_only_target_provider_bridges() {
     fs::write(
         source_root.join("main.act"),
         r#"import { open std::region };
+"""
+contract:
+purpose:
+    Publish a region, cancel it, then read element 0 and close the region, mapping every failure to an exit code.
+inputs:
+    region: exclusive ins loan of Region of u8 values; destination: exclusive ins loan of Buffer receiving the element.
+outputs:
+    0 on success, 3 when publishing fails, 4 when canceling fails, 5 when the read fails.
+ownership:
+    Both parameters are exclusive ins loans; the region is published, canceled and closed.
+errors:
+    Each RegionError maps to the exit code of its step.
+side_effects:
+    Publishes, cancels and closes the region.
+"""
 verb after_write(ins region: Region[u8], ins destination: Buffer) -> Int {
     erg published = region_publish(region: ins region);
     return case dat published {
@@ -799,6 +971,21 @@ verb after_write(ins region: Region[u8], ins destination: Buffer) -> Int {
         },
     };
 }
+"""
+contract:
+purpose:
+    Write a source into element 0 of a region and continue with after_write.
+inputs:
+    region: exclusive ins loan of Region of u8 values; source: borrowed Buffer written; destination: exclusive ins loan of Buffer passed on.
+outputs:
+    0 on success, 2 when the write fails, otherwise the status of after_write.
+ownership:
+    The region and destination are exclusive ins loans; the source is borrowed.
+errors:
+    A RegionError from region_write maps to 2.
+side_effects:
+    Writes into the region.
+"""
 verb write_and_continue(ins region: Region[u8], abs source: Buffer, ins destination: Buffer) -> Int {
     erg index: u64 = 0u64;
     erg written = region_write(region: ins region, index: erg index, source: abs source);
@@ -809,6 +996,21 @@ verb write_and_continue(ins region: Region[u8], abs source: Buffer, ins destinat
         },
     };
 }
+"""
+contract:
+purpose:
+    Open a u8 region with a very large logical length and run write_and_continue on it.
+inputs:
+    backing: owned Buffer; destination: owned Buffer; source: owned Buffer.
+outputs:
+    0 on success, 1 when the region cannot be opened, otherwise the status of write_and_continue.
+ownership:
+    The backing buffer is moved into the region; the region is handed on as an exclusively borrowed view.
+errors:
+    A RegionError from region_open maps to 1.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb boot(erg backing: Buffer, erg destination: Buffer, erg source: Buffer) -> Int {
     erg logical_length: u64 = 1099511627776u64;
@@ -907,7 +1109,7 @@ fn freestanding_region_object_scales_logical_capacity_with_bounded_output() {
         fs::write(
             source_root.join("main.act"),
             format!(
-                "import {{ open std::region }};\nmeta effect(\"allocation\")\nverb boot(erg backing: Buffer) -> Int {{\n    erg logical_length: u64 = {logical_length};\n    erg window_start: u64 = 0u64;\n    erg window_count: u64 = 1u64;\n    erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);\n    return case dat opened {{\n        Result.Err(_) => 1,\n        Result.Ok(region) => {{ drop(region); return 0; }},\n    }};\n}}\n"
+                "import {{ open std::region }};\n\"\"\"\ncontract:\npurpose:\n    Open a u8 region over the given backing buffer with the logical length chosen by the test, then drop it.\ninputs:\n    backing: owned Buffer that becomes the region storage.\noutputs:\n    0 when the region opened, 1 when it did not.\nownership:\n    The backing buffer is moved into the region, which is dropped.\nerrors:\n    A RegionError from region_open maps to 1.\nside_effects:\n    Allocates region storage.\n\"\"\"\nmeta effect(\"allocation\")\nverb boot(erg backing: Buffer) -> Int {{\n    erg logical_length: u64 = {logical_length};\n    erg window_start: u64 = 0u64;\n    erg window_count: u64 = 1u64;\n    erg opened = region_open[u8](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count);\n    return case dat opened {{\n        Result.Err(_) => 1,\n        Result.Ok(region) => {{ drop(region); return 0; }},\n    }};\n}}\n"
             ),
         )
         .expect("freestanding scale fixture source should be written");

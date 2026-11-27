@@ -2,6 +2,11 @@ import {
     open calc,
 };
 
+"""
+Program entry point of the unit-showcase example. It adds 40 and 2 through the
+opened `calc` module, prints the result as an integer and returns it as the exit
+status. The only side effect is the line printed to standard output.
+"""
 verb main() -> Int {
     erg left = 40;
     erg right = 2;

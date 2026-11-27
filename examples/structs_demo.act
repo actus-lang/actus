@@ -8,10 +8,16 @@ struct Player {
     score: Int,
 }
 
+"""
+Return the sum of the player position coordinates and the score. The player is an immutable `abs` view and is not modified.
+"""
 verb total_score(abs self: Player) -> Int {
     return self.position.x + self.position.y + self.score;
 }
 
+"""
+Build a player, move it to x equal to 8, compute its total score through a borrowed view, print the result and return it, 17.
+"""
 verb main() -> Int {
     erg player = Player {
         position: Point {

@@ -32,6 +32,22 @@ open pack WireFragmentHeader {
     }
 }
 
+"""
+contract:
+purpose:
+    Validate the fixed fragment metadata against the format limits and the
+    size of the payload that accompanies it.
+inputs:
+    metadata: the fragment header; payload_length: payload size in bytes.
+outputs:
+    `Ok(0)` when every field is acceptable, or a `WireError`.
+ownership:
+    The header is an immutable `abs` view and is not modified.
+errors:
+    `FragmentUnsupportedVersion`, `FragmentCountInvalid`,
+    `FragmentIndexInvalid`, `FragmentTooLarge` and `FragmentRangeInvalid` for
+    the corresponding violated limit.
+"""
 verb wire_fragment_header_valid(
     abs metadata: WireFragmentHeader,
     erg payload_length: u32
@@ -57,6 +73,13 @@ verb wire_fragment_header_valid(
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+Write the 17-byte fragment header into the start of `output` in little-endian
+order: version, index, count, total length, offset and generation. The header is
+an immutable `abs` view that the caller validated; the output is mutated through
+`ins` and must already hold at least 17 bytes, which the function does not
+check. It allocates nothing and returns no value.
+"""
 verb wire_fragment_write_header(
     abs header: WireFragmentHeader,
     ins output: Buffer
@@ -80,6 +103,12 @@ verb wire_fragment_write_header(
     output[16] = ((header.generation >> 24u32) & 255u32) as u8;
 }
 
+"""
+Copy the whole payload into `output` directly after the fragment header, one
+byte at a time. The payload is an immutable `abs` view; the output is mutated
+through `ins` and must already be large enough for the header and the payload,
+which the caller checked. The function allocates nothing and returns no value.
+"""
 verb wire_fragment_write_payload(abs payload: Buffer, ins output: Buffer) -> Void {
     erg length: u32 = buffer_length(buffer: abs payload) as u32;
     erg index: u32 = 0u32;
@@ -123,6 +152,13 @@ open verb wire_fragment_encode(
     return Result[u32, WireError].Ok(required);
 }
 
+"""
+Read the 17-byte fragment header from the start of `input` in little-endian
+order into a new owned `WireFragmentHeader`. The input is an immutable `abs`
+view and is not modified. The function does not validate the fields and does
+not check the length: the caller must have verified that at least 17 bytes are
+present.
+"""
 verb wire_fragment_read_header(abs input: Buffer) -> WireFragmentHeader {
     erg header = WireFragmentHeader {
         storage: Array[u8, 17](),

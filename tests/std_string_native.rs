@@ -20,6 +20,21 @@ fn hosted_string_byte_access_handles_ascii_multibyte_empty_and_bounds() {
         root.join("src/main.act"),
         r#"meta limitless("file")
 import { open std::string };
+"""
+contract:
+purpose:
+    Take ownership of a Utf8Buffer, check that its length is 3, and release it.
+inputs:
+    value: owned Utf8Buffer that is dropped.
+outputs:
+    0 when the length is 3, 1 when it differs, 3 when the length cannot be read.
+ownership:
+    The value is consumed and dropped.
+errors:
+    A length error maps to 3.
+side_effects:
+    Releases the buffer.
+"""
 verb inspect_owned(dat value: Utf8Buffer) -> Int {
     erg length_result = utf8_length(text: abs value);
     drop(value);
@@ -28,6 +43,17 @@ verb inspect_owned(dat value: Utf8Buffer) -> Int {
         Result.Err(_) => 3,
     };
 }
+"""
+contract:
+purpose:
+    Build an owned Utf8Buffer from the string AB appended to an existing one-byte storage, and inspect it.
+outputs:
+    0 on success, 1 for a wrong length, 2 when the conversion fails, 3 when the length cannot be read.
+ownership:
+    The storage is moved into the Utf8Buffer, which is moved into inspect_owned.
+errors:
+    A conversion error maps to 2.
+"""
 verb owned_utf8_code() -> Int {
     erg storage = Buffer[0];
     append(storage, 65);
@@ -38,6 +64,17 @@ verb owned_utf8_code() -> Int {
         Result.Err(_) => 2,
     };
 }
+"""
+contract:
+purpose:
+    Build a Utf8Buffer from the bytes A, NUL and B and check that the embedded NUL byte counts toward the length 3.
+outputs:
+    0 when the length is 3, 1 when it differs, 2 when the conversion fails, 3 when the length cannot be read.
+ownership:
+    The storage is moved into the Utf8Buffer, which is borrowed by utf8_length.
+errors:
+    A conversion error maps to 2.
+"""
 verb embedded_nul_code() -> Int {
     erg storage = Buffer[0];
     append(storage, 65);
@@ -55,6 +92,19 @@ verb embedded_nul_code() -> Int {
         Result.Err(_) => 2,
     };
 }
+"""
+contract:
+purpose:
+    Check that a string result failed with the out-of-bounds error.
+inputs:
+    result: owned Result of Int and StringError to classify.
+outputs:
+    0 for StringError.OutOfBounds, 1 for another error, 2 for success.
+ownership:
+    The result is owned and consumed by the case.
+errors:
+    Only the out-of-bounds error counts as the expected outcome.
+"""
 verb bounds_ok(erg result: Result[Int, StringError]) -> Int {
     return case dat result {
         Result.Err(error) => case dat error {
@@ -64,6 +114,7 @@ verb bounds_ok(erg result: Result[Int, StringError]) -> Int {
         Result.Ok(_) => 2,
     };
 }
+"""Entry point that checks the owned and embedded-NUL UTF-8 helpers and the string length and byte access verbs on an ASCII string, a two-byte UTF-8 string and an empty string, including an out-of-bounds index, and returns 0 when all agree and a nonzero code for the first mismatch."""
 verb main() -> Int {
     if owned_utf8_code() != 0 {
         return 7;
@@ -134,6 +185,7 @@ fn hosted_io_and_string_facades_share_compatible_buffer_bridge() {
         root.join("src/main.act"),
         r#"import { open std::io, open std::string };
 
+"""Entry point that returns 0 when a three-byte string has length 3 and a one-byte buffer has size 1, and nonzero when a length is wrong or cannot be read."""
 verb main() -> Int {
     erg text: String = "abc";
     erg text_result = string_length(text: abs text);
@@ -250,6 +302,7 @@ open const TOKEN_VERSION: u16 = 1u16;
         r#"import { open text };
 import { open std::io, open std::string };
 import std::time;
+"""Entry point that reads a byte of a string and inspects the phrase Hello Giorgi, returning the inspected status; it carries the limitless attribute to disable verb limits."""
 meta limitless("verb")
 verb main() -> Int {
     erg phrase: String = "Hello Giorgi";

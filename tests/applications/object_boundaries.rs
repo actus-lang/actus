@@ -5,7 +5,7 @@ use std::process::Command;
 
 #[test]
 fn module_wrapper_preserves_runtime_c_abi_across_object_boundaries() {
-    let source = "import { open output }; verb main() -> Int { return emit(); }\n";
+    let source = "import { open output };\n\"\"\"Entry point that returns the result of emit as the process exit status.\"\"\"\nverb main() -> Int { return emit(); }\n";
     let (root, input, output) = project("module-runtime-bridge", source);
     fs::create_dir_all(root.join("src/output")).expect("create output module directory");
     fs::write(
@@ -36,7 +36,7 @@ open verb emit() -> Int { erg value = 79; actus_print_int(value: value); return 
 #[cfg(unix)]
 #[test]
 fn unresolved_external_bridge_fails_during_multi_object_link() {
-    let source = "import { open missing }; verb main() -> Int { return invoke(); }\n";
+    let source = "import { open missing };\n\"\"\"Entry point that returns the result of invoke as the process exit status.\"\"\"\nverb main() -> Int { return invoke(); }\n";
     let (root, input, output) = project("unresolved-bridge", source);
     fs::create_dir_all(root.join("src/missing")).expect("create missing module directory");
     fs::write(
@@ -76,7 +76,7 @@ open verb invoke() -> Int { return absent_bridge(); }
 
 #[test]
 fn freestanding_object_keeps_only_the_configured_entry_global() {
-    let source = "import { open math }; verb boot() -> Int { return add(); }\n";
+    let source = "import { open math };\n\"\"\"Alternative entry verb that returns the result of add; the test selects it instead of main.\"\"\"\nverb boot() -> Int { return add(); }\n";
     let (root, input, output) = project("freestanding-objects", source);
     fs::write(
         root.join("Actus.toml"),
@@ -132,13 +132,13 @@ open verb add() -> Int { return 7; }
 
 #[test]
 fn object_build_emits_one_object_for_the_program() {
-    let source = "import { open math }; verb main() -> Int { return add(); }\n";
+    let source = "import { open math };\n\"\"\"Entry point that returns the result of add as the process exit status.\"\"\"\nverb main() -> Int { return add(); }\n";
     let (root, input, output) = project("module-objects", source);
     fs::create_dir_all(root.join("src/math")).expect("create module directory");
     fs::write(root.join("src/math/math.act"), "open api;\n").expect("write module facade");
     fs::write(
         root.join("src/math/api.act"),
-        "open verb add() -> Int { return hidden(); } verb hidden() -> Int { return 42; }\n",
+        "open verb add() -> Int { return hidden(); }\n\"\"\"Verb that returns the constant 42; it is deliberately not public and is not the entry point.\"\"\"\nverb hidden() -> Int { return 42; }\n",
     )
     .expect("write module implementation");
     let object = output.with_extension("obj");
@@ -158,13 +158,13 @@ fn object_build_emits_one_object_for_the_program() {
 
 #[test]
 fn module_application_rejects_private_bridge_before_codegen() {
-    let source = "import { open runtime }; verb main() -> Int { return private_bridge(); }\n";
+    let source = "import { open runtime };\n\"\"\"Entry point that returns the result of private_bridge, the private foreign verb of the runtime module.\"\"\"\nverb main() -> Int { return private_bridge(); }\n";
     let (root, input, _output) = project("private-bridge", source);
     fs::create_dir_all(root.join("src/runtime")).expect("create runtime module directory");
     fs::write(root.join("src/runtime/runtime.act"), "open api;\n").expect("write runtime facade");
     fs::write(
         root.join("src/runtime/api.act"),
-        "open verb read() -> Int { return private_bridge(); } unsafe extern \"C\" verb private_bridge() -> Int;\n",
+        "open verb read() -> Int { return private_bridge(); }\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol private_bridge, a private provider verb that returns an Int.\noutputs:\n    The Int returned by the runtime implementation.\nownership:\n    The symbol is provided by the host runtime, not by Actus code.\nerrors:\n    Strict check rejects the private bridge with E1109 before code generation.\nabi:\n    unsafe extern C symbol private_bridge with no parameters and an Int result.\n\"\"\"\nunsafe extern \"C\" verb private_bridge() -> Int;\n",
     )
     .expect("write runtime implementation");
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))

@@ -223,6 +223,13 @@ unsafe extern "C" verb actus_path_extension_equals(
 """Close one owned directory handle exactly once through the runtime bridge."""
 unsafe extern "C" verb actus_directory_close(abs handle: Int) -> Int;
 
+"""
+Build the filter that accepts every entry: files, directories, symbolic links
+and hidden names are all included and no extension is required. `read_dir` and
+`read_dir_ordered` use it so that unfiltered iteration needs no caller-built
+filter. The result is a new owned value with an absent extension path; the
+function performs no I/O and no allocation.
+"""
 verb directory_filter_default() -> DirectoryFilter {
     return DirectoryFilter {
         regular_files_only: false,
@@ -285,6 +292,29 @@ open verb read_dir_ordered(
     );
 }
 
+"""
+contract:
+purpose:
+    Open a directory through the runtime bridge with an ordering code and keep
+    the declarative filter inside the returned `Directory`. It is the single
+    implementation behind `read_dir_ordered` and `read_dir_filtered`.
+inputs:
+    path: borrowed directory path; order: `Native` or `Lexicographic`;
+    filter: entry filter transferred into the returned `Directory`.
+outputs:
+    `Ok(Directory)` owning the native handle and the filter, or a typed
+    `IoError`.
+ownership:
+    The path is an immutable `abs` view. The filter is consumed and, on
+    failure, released together with the rejected handle.
+side_effects:
+    Blocking filesystem I/O: the runtime opens the directory and, for
+    `Lexicographic`, snapshots entry names.
+errors:
+    `InvalidInput` when the bounded ordered snapshot is exceeded,
+    `Unsupported` when the provider cannot order entries, and `Failed` for
+    every other open failure.
+"""
 meta effect("filesystem", "blocking")
 verb read_dir_ordered_with_filter(
     abs path: path_module::Path,
@@ -341,6 +371,14 @@ open verb read_dir_filtered(
     );
 }
 
+"""
+Decide whether one entry passes a directory filter. The entry is rejected when
+the filter keeps regular files only and the entry is not a file, when
+directories, symbolic links or hidden names are excluded and the entry is one,
+or when an extension is required and the entry name does not end with it.
+Both arguments are immutable `abs` views that are not modified; the function
+returns `true` to keep the entry and performs no allocation.
+"""
 verb directory_entry_matches(
     abs entry: DirectoryEntry,
     abs filter: DirectoryFilter
@@ -366,6 +404,25 @@ verb directory_entry_matches(
     };
 }
 
+"""
+contract:
+purpose:
+    Translate the status of one native "next entry" call into a typed result,
+    building the owned `DirectoryEntry` when the call produced one.
+inputs:
+    status: `0` for a POSIX entry, `1` for a Windows UTF-16 entry, `-2` for end
+    of directory, `-3` for invalid input, anything else for failure;
+    storage: the entry name buffer; metadata: the entry metadata.
+outputs:
+    `Ok(Some(entry))` for an entry, `Ok(None)` at the end of the directory, or
+    a typed `IoError`.
+ownership:
+    Storage and metadata are consumed: they move into the entry or are
+    dropped when the status carries no entry.
+errors:
+    `InvalidInput` for status `-3`, `Failed` for other negative statuses, and
+    the error of `directory_entry_from_storage` when the name cannot be built.
+"""
 verb directory_entry_status(
     erg status: Int,
     dat storage: Buffer,
@@ -432,6 +489,24 @@ open verb next_dir_entry(ins directory: Directory) -> Result[Option[DirectoryEnt
     }
 }
 
+"""
+contract:
+purpose:
+    Copy the bytes of a native entry-name buffer into a new owned buffer so the
+    entry can hold both its name and its relative path.
+inputs:
+    source: borrowed buffer holding the entry name bytes.
+outputs:
+    `Ok(buffer)` with an independent copy, or an `IoError`.
+ownership:
+    The source is an immutable `abs` view and is unchanged; the result is a
+    newly owned buffer.
+side_effects:
+    Allocates and appends one byte at a time to the new buffer.
+errors:
+    Returns the `IoError` reported by `io::buffer_size` when the source
+    length cannot be read.
+"""
 verb copy_entry_storage(abs source: Buffer) -> Result[Buffer, io::IoError] {
     erg output: Buffer = Buffer[0];
     erg length = io::buffer_size(buffer: abs source)?;
@@ -447,6 +522,12 @@ verb copy_entry_storage(abs source: Buffer) -> Result[Buffer, io::IoError] {
     return Ok(output);
 }
 
+"""
+Classify an entry from its copied metadata. A symbolic link wins over the other
+flags, then a regular file, then a directory; anything else is `Other`. The
+metadata is an immutable `abs` view describing the entry itself rather than
+the target of a link, and the function performs no I/O or allocation.
+"""
 verb directory_entry_kind(abs metadata: Metadata) -> DirectoryEntryKind {
     return case metadata.is_symlink {
         1 => DirectoryEntryKind.Symlink,
@@ -460,6 +541,14 @@ verb directory_entry_kind(abs metadata: Metadata) -> DirectoryEntryKind {
     };
 }
 
+"""
+Convert a path-construction result into the `IoError` error domain of the
+directory API. A successful path is passed through unchanged and any
+`PathError` becomes `IoError.InvalidData`, because an entry name the host
+returned but the path module rejects is malformed data, not a caller mistake.
+The result is consumed and its path, when present, is moved into the return
+value.
+"""
 verb directory_path_result(
     dat result: Result[path_module::Path, path_module::PathError]
 ) -> Result[path_module::Path, io::IoError] {
@@ -469,6 +558,25 @@ verb directory_path_result(
     };
 }
 
+"""
+contract:
+purpose:
+    Build an owned `DirectoryEntry` from a native name buffer and metadata by
+    constructing the name path, a separate relative path and the entry kind.
+inputs:
+    storage: name buffer; metadata: copied entry metadata; status: `0` for
+    POSIX bytes, any other value for Windows UTF-16.
+outputs:
+    `Ok(Some(entry))` or a typed `IoError`.
+ownership:
+    Storage and metadata are consumed into the entry; a private copy of the
+    storage backs the relative path.
+side_effects:
+    Allocates the copied storage and the two path values.
+errors:
+    `InvalidData` when either path cannot be built, and any error of
+    `copy_entry_storage`.
+"""
 verb directory_entry_from_storage(
     dat storage: Buffer,
     dat metadata: Metadata,

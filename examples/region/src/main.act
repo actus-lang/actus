@@ -8,6 +8,18 @@ return typed results.
 """
 import std::region;
 
+"""
+contract:
+purpose:
+    Open the four-element example region with a one-element resident window
+    over a four-byte backing buffer.
+outputs:
+    `Ok(region)` owning the backing buffer, or the `RegionError` of the open.
+ownership:
+    The backing buffer is consumed into the region.
+side_effects:
+    Allocates the backing buffer and the region metadata.
+"""
 meta effect("allocation")
 verb open_example() -> Result[region::Region[Array[u16, 2]], region::RegionError] {
     erg backing: Buffer = Buffer[4];
@@ -22,6 +34,19 @@ verb open_example() -> Result[region::Region[Array[u16, 2]], region::RegionError
     );
 }
 
+"""
+contract:
+purpose:
+    Write one element into the resident window and publish it, so the region
+    generation advances.
+inputs:
+    region: the open region, borrowed exclusively.
+outputs:
+    0 on success, 1 when the write failed or wrote a different count, and 2
+    when publishing failed.
+side_effects:
+    Allocates a four-byte source buffer and mutates the region.
+"""
 verb publish_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     erg source: Buffer = Buffer[4];
     erg write_start: u64 = 0u64;
@@ -47,6 +72,18 @@ verb publish_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Read the published element back into a caller buffer.
+inputs:
+    region: the open region, borrowed read-only.
+outputs:
+    0 when exactly one element was read, 3 for a different count and 4 when the
+    read failed.
+side_effects:
+    Allocates a four-byte destination buffer; the region is not modified.
+"""
 verb read_published(abs region: region::Region[Array[u16, 2]]) -> Int {
     erg destination: Buffer = Buffer[4];
     erg read_start: u64 = 0u64;
@@ -68,6 +105,19 @@ verb read_published(abs region: region::Region[Array[u16, 2]]) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Write one element and cancel it, restoring the last published bytes.
+inputs:
+    region: the open region, borrowed exclusively.
+outputs:
+    0 when the cancel reported zero, 5 when the write failed and 6 when the
+    cancel failed or reported another value.
+side_effects:
+    Allocates a four-byte source buffer and mutates the region, then rolls the
+    resident bytes back.
+"""
 verb cancel_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     erg source: Buffer = Buffer[4];
     erg index: u64 = 0u64;
@@ -92,6 +142,19 @@ verb cancel_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Replace the clean resident window with a window that starts at element two.
+inputs:
+    region: the open region, borrowed exclusively.
+outputs:
+    0 on success and 7 when the remap failed.
+ownership:
+    The replacement backing buffer is consumed into the region.
+side_effects:
+    Allocates the replacement buffer and remaps the region.
+"""
 meta effect("allocation")
 verb remap_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     erg replacement: Buffer = Buffer[4];
@@ -109,6 +172,17 @@ verb remap_region(ins region: region::Region[Array[u16, 2]]) -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Run the region lifecycle example: open, publish, read, cancel, remap and
+    close, stopping at the first step that fails.
+outputs:
+    Exit status 0 when every step succeeds. Otherwise the code of the failing
+    step: 10 for open, 11 for close, or the code of the helper that failed.
+side_effects:
+    Allocates the region buffers and releases the region at the end.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg opened = open_example();

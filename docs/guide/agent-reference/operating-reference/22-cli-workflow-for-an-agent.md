@@ -46,15 +46,20 @@ actus watch --once
 `--strict` is a release/conformance validation mode for supported `check`,
 `build`, and `test` workflows. It validates fail-closed source, ownership,
 architecture, documentation, target, lockfile, and execution contracts.
-The documentation check covers every public declaration of every source file
-of the package: `check` and `build` validate the entry file and each module
-file of the compilation plan, and `test` validates every production file. A
-public declaration without a `"""` block docstring fails with `E1840`, a
-docstring that contradicts an ownership role with `E1844`, and one that
-promises a `Result` cannot fail with `E1845`. The content contract (`E1841`,
-`E1842`: required contract parts and short or restating summaries) is not
-enforced yet; it comes with phase 56. Without `--strict` the documentation is
-not checked.
+`check`, `build` and `test` validate the same files: every production `.act`
+file under the package source root, each once, whether or not another file
+imports it (`tests` directories and the `fixtures` and `snapshots` data
+directories are not production source). On each file strict mode checks the
+source limits and the documentation. The source limits count code lines only:
+blank lines, `#` comments and `"""` documentation blocks do not count, so a
+complete docstring never costs a line of the 500-line file budget or the
+50-line function budget. The documentation check covers every public
+declaration and every private verb: a verb or public declaration without a
+`"""` block docstring fails with `E1840`, a docstring that contradicts an
+ownership role with `E1844`, and one that promises a `Result` cannot fail with
+`E1845`. The content contract (`E1841`, `E1842`: required contract parts and
+short or restating summaries) is not enforced yet; it comes with phase 56.
+Without `--strict` the documentation and the source size are not checked.
 It is not an argument for `run`, `fmt`, or `watch`.
 Every subcommand rejects an option it does not define with
 ``error: unknown option `--strict` for `actus run` `` and exit status 2; it never

@@ -65,7 +65,7 @@ fn assert_scope_error(root: &Path, expected: &str) {
 }
 
 const MAIN: &str = "import { open pkg };\n\
-     verb main() -> Int {\n\
+     \"\"\"Entry point that builds a four-element Holder, passes it to train and returns the trained result minus 4.\"\"\"\nverb main() -> Int {\n\
      erg small: Holder[4] = Holder[4] { values: Array[u32, 4](), };\n\
      return train(holder: ins small) as Int - 4;\n}\n";
 
@@ -143,12 +143,18 @@ fn child_module_sees_private_ancestor_declarations() {
     let root = project(
         "ancestor-private",
         &[
-            ("main.act", "import { open pkg };\nverb main() -> Int { return run() as Int - 7; }\n"),
+            (
+                "main.act",
+                "import { open pkg };\n\"\"\"Entry point that returns the result of run, a u32, as Int minus 7.\"\"\"\nverb main() -> Int { return run() as Int - 7; }\n",
+            ),
             (
                 "pkg/pkg.act",
                 "\"\"\"Re-export the base module declarations for the fixture project.\"\"\" open base;\n\"\"\"Re-export the worker module declarations for the fixture project.\"\"\" open worker;\n",
             ),
-            ("pkg/base.act", "verb seven() -> u32 { return 7u32; }\n"),
+            (
+                "pkg/base.act",
+                "\"\"\"Returns the u32 constant 7.\"\"\"\nverb seven() -> u32 { return 7u32; }\n",
+            ),
             (
                 "pkg/worker/worker.act",
                 "\"\"\"Re-export the job module declarations for the fixture project.\"\"\" open job;\n",
@@ -168,7 +174,10 @@ fn parent_module_cannot_use_a_private_child_declaration() {
     let root = project(
         "private-child",
         &[
-            ("main.act", "import { open pkg };\nverb main() -> Int { return run() as Int; }\n"),
+            (
+                "main.act",
+                "import { open pkg };\n\"\"\"Entry point that returns the result of run, a u32, as Int.\"\"\"\nverb main() -> Int { return run() as Int; }\n",
+            ),
             (
                 "pkg/pkg.act",
                 "\"\"\"Re-export the entry module declarations for the fixture project.\"\"\" open entry;\n\"\"\"Re-export the worker module declarations for the fixture project.\"\"\" open worker;\n",
@@ -178,7 +187,10 @@ fn parent_module_cannot_use_a_private_child_declaration() {
                 "pkg/worker/worker.act",
                 "\"\"\"Re-export the job module declarations for the fixture project.\"\"\" open job;\n",
             ),
-            ("pkg/worker/job.act", "verb hidden() -> u32 { return 0u32; }\n"),
+            (
+                "pkg/worker/job.act",
+                "\"\"\"Returns the u32 constant 0; the test checks that the verb stays hidden from other modules.\"\"\"\nverb hidden() -> u32 { return 0u32; }\n",
+            ),
         ],
     );
     assert_scope_error(&root, "`hidden` is private to child module `pkg::worker`");
@@ -190,7 +202,10 @@ fn parent_module_uses_the_exports_of_an_opened_child() {
     let root = project(
         "opened-child",
         &[
-            ("main.act", "import { open pkg };\nverb main() -> Int { return run() as Int - 3; }\n"),
+            (
+                "main.act",
+                "import { open pkg };\n\"\"\"Entry point that returns the result of run, a u32, as Int minus 3.\"\"\"\nverb main() -> Int { return run() as Int - 3; }\n",
+            ),
             (
                 "pkg/pkg.act",
                 "\"\"\"Re-export the entry module declarations for the fixture project.\"\"\" open entry;\n\"\"\"Re-export the worker module declarations for the fixture project.\"\"\" open worker;\n",
@@ -218,7 +233,10 @@ fn qualified_call_through_an_unimported_binding_is_rejected() {
     let root = project(
         "binding-not-inherited",
         &[
-            ("main.act", "import { open pkg };\nverb main() -> Int { return run() as Int - 5; }\n"),
+            (
+                "main.act",
+                "import { open pkg };\n\"\"\"Entry point that returns the result of run, a u32, as Int minus 5.\"\"\"\nverb main() -> Int { return run() as Int - 5; }\n",
+            ),
             ("pkg/pkg.act", "open entry;\nopen worker;\nopen tools;\n"),
             (
                 "pkg/entry.act",

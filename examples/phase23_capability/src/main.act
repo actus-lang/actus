@@ -12,10 +12,21 @@ struct Fabric[N: Usize] {
     cells: Array[Cell, N],
 }
 
+"""
+Receive an integer notification value and ignore it. The verb exists so the
+example can exercise a call from inside a conditional block with an owned
+scalar argument. It allocates nothing and has no side effects.
+"""
 verb notify(erg value: Int) -> Void {
     return;
 }
 
+"""
+Mutate the second cell of a two-cell fabric. When the always-true condition
+holds, it stores the charge 41 into the nested indexed field, reads the field
+back and passes it to `notify`. The fabric is an exclusive `ins` loan, so the
+caller observes the change.
+"""
 verb update(ins fabric: Fabric[2]) {
     if true {
         fabric.cells[1].charge = 41u8;
@@ -24,6 +35,12 @@ verb update(ins fabric: Fabric[2]) {
     }
 }
 
+"""
+Build a two-cell fabric with zeroed cells, let `update` set the charge of the
+second cell to 41, and return that charge plus one. The exit status is 42 when
+nested indexed field mutation and the call inside a conditional block both
+work. It allocates nothing and has no external side effects.
+"""
 verb main() -> Int {
     erg fabric: Fabric[2] = Fabric[2] {
         cells: Array[Cell, 2](),

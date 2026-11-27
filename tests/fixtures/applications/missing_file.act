@@ -5,6 +5,19 @@ import {
     open io,
 };
 
+"""
+contract:
+purpose:
+    Build the relative path `missing_192` from raw ASCII bytes, naming a file
+    that does not exist.
+outputs:
+    `Ok(path)` with the new path, or the `PathError` of the path module.
+ownership:
+    The raw buffer is consumed by the path constructor; the result is a newly
+    owned path.
+side_effects:
+    Allocates the raw byte buffer and the path.
+"""
 verb missing_path() -> Result[Path, PathError] {
     erg raw = Buffer[0];
     append(raw, 109);
@@ -22,6 +35,17 @@ verb missing_path() -> Result[Path, PathError] {
     return path_from_posix(storage: dat raw);
 }
 
+"""
+contract:
+purpose:
+    Read a file that does not exist and check that the failure is the typed
+    `IoError.Failed`.
+outputs:
+    0 when the read fails with `Failed`; 1 when the path cannot be built; 2 to
+    9 for any other I/O error; 5 when the missing file was unexpectedly read.
+side_effects:
+    Blocking filesystem read of the relative path `missing_192`.
+"""
 meta effect("filesystem", "blocking")
 verb main() -> Int {
     erg parsed = missing_path();

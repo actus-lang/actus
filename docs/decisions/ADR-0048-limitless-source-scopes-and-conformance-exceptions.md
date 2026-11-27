@@ -36,10 +36,13 @@ validation, conformance scanner, CLI diagnostics, LSP diagnostics, and
 The source-size metric measures code-bearing lines rather than raw physical
 lines. Blank lines, Rust-style `//` and `/* ... */` comments, and Actus `#`
 comments are excluded. An inline comment does not create an additional measured
-line when code is already present. Actus triple-quoted `""" ... """` blocks
-remain counted because they are language constructs and part of the
-documentation contract. This allows production sources to use concise inline
-notes without weakening the architectural limits on executable code.
+line when code is already present. Actus triple-quoted `""" ... """`
+documentation blocks, single-line or multi-line, are documentation and are
+excluded as well (ADR-0041): the limits measure code complexity, and counting
+documentation would punish complete docstrings. Code on the line of a closing
+`"""` still counts. This allows production sources to use concise inline
+notes and complete documentation without weakening the architectural limits on
+executable code.
 
 ## Decision
 

@@ -2,6 +2,12 @@ import {
     open control,
 };
 
+"""
+Program entry point of the hierarchical-modules example. It returns the value
+produced by `control_value` from the opened `control` module as the process exit
+status, so a status of 24 shows that the nested module chain resolved. It takes
+no input, allocates nothing and has no side effects.
+"""
 verb main() -> Int {
     return control_value();
 }

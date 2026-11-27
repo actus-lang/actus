@@ -132,21 +132,25 @@ negative test, and document the code's category here. Strict-conformance codes
 must remain inside the reserved `E1800`–`E1899` range and use the category
 sub-range assigned above.
 
-The documentation validator reports `E1840` for a missing or empty block,
+The documentation validator reports `E1840` for a missing or empty block on a
+public declaration or on any private verb,
 `E1841` for a missing contract section, `E1842` for an incomplete or
 signature-restating summary, `E1844` for an ownership contradiction, and
 `E1845` for a result guarantee that misrepresents implementation behavior.
-Strict mode (`actus check`, `build` and `test` with `--strict`, for every source
-file of the package) currently enforces only `E1840`, `E1844` and `E1845`. The
-content checks `E1841` and `E1842` are keyword based and not reliable yet, so
-they are not reported by the CLI; they come with phase 56. `E1843` is not
+Strict mode (`actus check`, `build` and `test` with `--strict`, for every
+production source file of the package) currently enforces only `E1840`, `E1844`
+and `E1845`. The content checks `E1841` and `E1842` are keyword based and not
+reliable yet, so they are not reported by the CLI; they come with phase 56.
+`E1843` is not
 assigned and is not reported. Without `--strict` documentation is never checked.
 
 The source-limit validator measures code-bearing lines. Blank lines, Rust-style
 `//` and `/* ... */` comments, and Actus `#` comments do not count; inline
 comments are ignored after the code on their line has been counted. Actus
-triple-quoted `""" ... """` documentation blocks remain counted because they
-are language constructs. `E1850` is reported when a file exceeds the preferred
+triple-quoted `""" ... """` documentation blocks, single-line or multi-line, are
+documentation and do not count either; code on the line of a closing `"""`
+still counts. The strict commands measure the same files: every production
+`.act` file of the package. `E1850` is reported when a file exceeds the preferred
 500 code-line size or `E1853` when a function exceeds the preferred 50
 code-line size. These two are warnings in the report of `actus conformance`,
 which does not fail the run, and errors under `--strict`.

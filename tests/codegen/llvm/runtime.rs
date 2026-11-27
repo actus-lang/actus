@@ -150,7 +150,7 @@ fn llvm_preserves_pointer_runtime_result_without_status_coercion() {
 #[test]
 fn llvm_lowers_the_filesystem_close_bridge_with_its_status_contract() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_close_buffer(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_close_buffer(handle: abs handle); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_close_buffer, which closes a file handle and returns a status.\ninputs:\n    handle: borrowed Int file handle.\noutputs:\n    An Int status; zero on success, a negative failure code otherwise.\nownership:\n    The handle is a borrowed scalar and stays owned by the caller.\nabi:\n    unsafe extern C symbol actus_file_close_buffer taking one Int handle.\n\"\"\"\nunsafe extern \"C\" verb actus_file_close_buffer(abs handle: Int) -> Int;\n\"\"\"Calls the foreign close bridge with a file handle and returns its status unchanged.\"\"\"\nverb call(erg handle: Int) -> Int { return actus_file_close_buffer(handle: abs handle); }",
     );
     assert!(ir.contains("declare i32 @actus_file_close_buffer(i32)"));
     assert!(ir.contains("call i32 @actus_file_close_buffer(i32 %0)"));
@@ -168,7 +168,7 @@ fn llvm_preserves_the_external_c_scalar_abi_matrix() {
         ("Buffer", "ptr"),
     ] {
         let source = format!(
-            "unsafe extern \"C\" verb bridge() -> {actus_type}; verb call() -> {actus_type} {{ return bridge(); }}"
+            "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol bridge, which returns a value of the scalar type being tested.\noutputs:\n    A value of the scalar type under test.\nabi:\n    unsafe extern C symbol bridge with no parameters.\n\"\"\"\nunsafe extern \"C\" verb bridge() -> {actus_type};\n\"\"\"Calls the foreign bridge verb and returns its scalar result unchanged, so the test can check the width and signedness of the lowered return value.\"\"\"\nverb call() -> {actus_type} {{ return bridge(); }}"
         );
         let ir = emit_source_runtime_bridge(&source);
         assert!(ir.contains(&format!("declare {llvm_type} @bridge()")), "{ir}");
@@ -179,7 +179,7 @@ fn llvm_preserves_the_external_c_scalar_abi_matrix() {
 #[test]
 fn llvm_lowers_the_filesystem_read_bridge_with_a_mutable_buffer() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int; verb call(erg handle: Int, ins buffer: Buffer) -> Int { return actus_file_read_buffer(handle: abs handle, buffer: ins buffer); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_read_buffer, which reads from a file handle into a buffer and returns a status.\ninputs:\n    handle: borrowed Int file handle; buffer: exclusive ins loan of Buffer filled by the provider.\noutputs:\n    An Int count or negative failure code.\nownership:\n    The handle is a borrowed scalar; the buffer is an exclusive ins loan that the provider writes.\nside_effects:\n    Writes into the buffer.\nabi:\n    unsafe extern C symbol actus_file_read_buffer taking a handle and a mutable Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_file_read_buffer(abs handle: Int, ins buffer: Buffer) -> Int;\n\"\"\"Calls the foreign read bridge with a file handle and a mutable buffer and returns its status unchanged.\"\"\"\nverb call(erg handle: Int, ins buffer: Buffer) -> Int { return actus_file_read_buffer(handle: abs handle, buffer: ins buffer); }",
     );
     assert!(ir.contains("declare i32 @actus_file_read_buffer(i32, ptr align 8)"), "{ir}");
     assert!(ir.contains("call i32 @actus_file_read_buffer(i32 %0, ptr %1)"), "{ir}");
@@ -188,7 +188,7 @@ fn llvm_lowers_the_filesystem_read_bridge_with_a_mutable_buffer() {
 #[test]
 fn llvm_lowers_the_filesystem_write_bridge_with_a_borrowed_buffer() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int; verb call(erg handle: Int, abs buffer: Buffer) -> Int { return actus_file_write_buffer(handle: abs handle, buffer: abs buffer); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_write_buffer, which writes a buffer to a file handle and returns a status.\ninputs:\n    handle: borrowed Int file handle; buffer: borrowed Buffer that is only read.\noutputs:\n    An Int count or negative failure code.\nownership:\n    The handle and buffer are borrowed and stay owned by the caller.\nside_effects:\n    Writes the buffer contents to the file.\nabi:\n    unsafe extern C symbol actus_file_write_buffer taking a handle and a borrowed Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_file_write_buffer(abs handle: Int, abs buffer: Buffer) -> Int;\n\"\"\"Calls the foreign write bridge with a file handle and a borrowed buffer and returns its status unchanged.\"\"\"\nverb call(erg handle: Int, abs buffer: Buffer) -> Int { return actus_file_write_buffer(handle: abs handle, buffer: abs buffer); }",
     );
     assert!(ir.contains("declare i32 @actus_file_write_buffer(i32, ptr align 8)"), "{ir}");
     assert!(ir.contains("call i32 @actus_file_write_buffer(i32 %0, ptr %1)"), "{ir}");
@@ -197,7 +197,7 @@ fn llvm_lowers_the_filesystem_write_bridge_with_a_borrowed_buffer() {
 #[test]
 fn llvm_lowers_the_filesystem_seek_bridge_with_three_signed_scalars() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_seek_buffer(abs handle: Int, abs offset: Int, abs whence: Int) -> Int; verb call(erg handle: Int, erg offset: Int, erg whence: Int) -> Int { return actus_file_seek_buffer(handle: abs handle, offset: abs offset, whence: abs whence); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_seek_buffer, which moves the position of a file handle and returns the new position or a failure code.\ninputs:\n    handle: borrowed Int file handle; offset: borrowed signed Int offset; whence: borrowed Int origin selector.\noutputs:\n    An Int position or negative failure code.\nownership:\n    All three scalars are borrowed and stay owned by the caller.\nside_effects:\n    Moves the file position.\nabi:\n    unsafe extern C symbol actus_file_seek_buffer taking three signed scalars.\n\"\"\"\nunsafe extern \"C\" verb actus_file_seek_buffer(abs handle: Int, abs offset: Int, abs whence: Int) -> Int;\n\"\"\"Calls the foreign seek bridge with a handle, an offset and a whence selector and returns its status unchanged.\"\"\"\nverb call(erg handle: Int, erg offset: Int, erg whence: Int) -> Int { return actus_file_seek_buffer(handle: abs handle, offset: abs offset, whence: abs whence); }",
     );
     assert!(ir.contains("declare i32 @actus_file_seek_buffer(i32, i32, i32)"), "{ir}");
     assert!(ir.contains("call i32 @actus_file_seek_buffer(i32 %0, i32 %1, i32 %2)"), "{ir}");
@@ -207,7 +207,7 @@ fn llvm_lowers_the_filesystem_seek_bridge_with_three_signed_scalars() {
 fn llvm_lowers_the_filesystem_sync_bridges_as_scalar_statuses() {
     for symbol in ["actus_file_sync_data_buffer", "actus_file_sync_all_buffer"] {
         let source = format!(
-            "unsafe extern \"C\" verb {symbol}(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int {{ return {symbol}(handle: abs handle); }}"
+            "unsafe extern \"C\" verb {symbol}(abs handle: Int) -> Int;\n\"\"\"Calls the foreign bridge named by the test with a file handle and returns its status unchanged.\"\"\"\nverb call(erg handle: Int) -> Int {{ return {symbol}(handle: abs handle); }}"
         );
         let ir = emit_source_runtime_bridge(&source);
         assert!(ir.contains(&format!("declare i32 @{symbol}(i32)")), "{ir}");
@@ -218,7 +218,7 @@ fn llvm_lowers_the_filesystem_sync_bridges_as_scalar_statuses() {
 #[test]
 fn llvm_lowers_the_monotonic_clock_bridge_without_hidden_parameters() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_monotonic_nanos() -> u64; verb call() -> u64 { return actus_monotonic_nanos(); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_monotonic_nanos, which returns the monotonic clock reading in nanoseconds.\noutputs:\n    A u64 nanosecond reading.\nside_effects:\n    Reads the monotonic clock.\nabi:\n    unsafe extern C symbol actus_monotonic_nanos with no parameters and no hidden arguments.\n\"\"\"\nunsafe extern \"C\" verb actus_monotonic_nanos() -> u64;\n\"\"\"Calls the foreign monotonic clock bridge and returns the u64 reading unchanged.\"\"\"\nverb call() -> u64 { return actus_monotonic_nanos(); }",
     );
     assert!(ir.contains("declare i64 @actus_monotonic_nanos()"));
     assert!(ir.contains("call i64 @actus_monotonic_nanos()"));
@@ -228,7 +228,7 @@ fn llvm_lowers_the_monotonic_clock_bridge_without_hidden_parameters() {
 #[test]
 fn llvm_lowers_the_process_count_bridge_as_a_scalar_status() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_process_arg_count() -> Int; verb call() -> Int { return actus_process_arg_count(); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_process_arg_count, which returns the number of process arguments as a status scalar.\noutputs:\n    An Int count of process arguments.\nside_effects:\n    Reads the process arguments.\nabi:\n    unsafe extern C symbol actus_process_arg_count with no parameters.\n\"\"\"\nunsafe extern \"C\" verb actus_process_arg_count() -> Int;\n\"\"\"Calls the foreign process argument count bridge and returns the count unchanged.\"\"\"\nverb call() -> Int { return actus_process_arg_count(); }",
     );
     assert!(ir.contains("declare i32 @actus_process_arg_count()"));
     assert!(ir.contains("call i32 @actus_process_arg_count()"));
@@ -238,7 +238,7 @@ fn llvm_lowers_the_process_count_bridge_as_a_scalar_status() {
 #[test]
 fn llvm_lowers_the_stdin_eof_bridge_as_a_signed_status() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_read_byte() -> Int; verb call() -> Int { return actus_read_byte(); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_read_byte, which reads one byte from standard input and returns it or a negative end-of-input status.\noutputs:\n    An Int byte value, or a negative status at end of input.\nside_effects:\n    Consumes one byte of standard input.\nabi:\n    unsafe extern C symbol actus_read_byte with no parameters.\n\"\"\"\nunsafe extern \"C\" verb actus_read_byte() -> Int;\n\"\"\"Calls the foreign read-byte bridge and returns the signed status unchanged.\"\"\"\nverb call() -> Int { return actus_read_byte(); }",
     );
     assert!(ir.contains("declare i32 @actus_read_byte()"));
     assert!(ir.contains("call i32 @actus_read_byte()"));
@@ -247,7 +247,7 @@ fn llvm_lowers_the_stdin_eof_bridge_as_a_signed_status() {
 #[test]
 fn llvm_lowers_the_stdout_flush_bridge_as_a_signed_status() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_flush_stdout() -> Int; verb call() -> Int { return actus_flush_stdout(); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_flush_stdout, which flushes standard output and returns a status.\noutputs:\n    An Int status; zero on success, a negative failure code otherwise.\nside_effects:\n    Flushes standard output.\nabi:\n    unsafe extern C symbol actus_flush_stdout with no parameters.\n\"\"\"\nunsafe extern \"C\" verb actus_flush_stdout() -> Int;\n\"\"\"Calls the foreign flush bridge and returns its signed status unchanged.\"\"\"\nverb call() -> Int { return actus_flush_stdout(); }",
     );
     assert!(ir.contains("declare i32 @actus_flush_stdout()"));
     assert!(ir.contains("call i32 @actus_flush_stdout()"));
@@ -256,7 +256,7 @@ fn llvm_lowers_the_stdout_flush_bridge_as_a_signed_status() {
 #[test]
 fn llvm_lowers_the_stdout_buffer_bridge_through_a_borrowed_pointer() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int; verb call(abs buffer: Buffer) -> Int { return actus_write_buffer_stdout(buffer: abs buffer); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_write_buffer_stdout, which writes a buffer to standard output and returns a status.\ninputs:\n    buffer: borrowed Buffer that is only read.\noutputs:\n    An Int count or negative failure code.\nownership:\n    The buffer is borrowed and stays owned by the caller.\nside_effects:\n    Writes the buffer contents to standard output.\nabi:\n    unsafe extern C symbol actus_write_buffer_stdout taking a borrowed Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_write_buffer_stdout(abs buffer: Buffer) -> Int;\n\"\"\"Calls the foreign stdout write bridge with a borrowed buffer and returns its status unchanged.\"\"\"\nverb call(abs buffer: Buffer) -> Int { return actus_write_buffer_stdout(buffer: abs buffer); }",
     );
     assert!(ir.contains("declare i32 @actus_write_buffer_stdout(ptr align 8)"), "{ir}");
     assert!(ir.contains("call i32 @actus_write_buffer_stdout(ptr %0)"), "{ir}");
@@ -264,38 +264,38 @@ fn llvm_lowers_the_stdout_buffer_bridge_through_a_borrowed_pointer() {
 
 #[test]
 fn llvm_executes_the_region_open_and_close_bridge_contract() {
-    let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }";
+    let source = "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a one-element u32 region over a four-byte backing buffer and close it again.\noutputs:\n    0 on success, 1 when the region cannot be opened, 2 when it cannot be closed.\nownership:\n    The backing buffer is moved into the region; the region is closed through an exclusively borrowed view.\nerrors:\n    region_open and region_close errors map to the exit codes 1 and 2.\nside_effects:\n    Allocates region storage and closes the region.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg closed = region_close(region: ins region); return case dat closed { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }";
     assert_eq!(run_llvm_executable_fixture("open-close", source), 0);
 }
 
 #[test]
 fn llvm_preserves_the_region_bounds_failure_contract() {
-    let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }";
+    let source = "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a one-element u32 region, then read index 1, which is out of range, and expect the read to fail.\noutputs:\n    0 when the out-of-range read fails as expected, 1 when the region cannot be opened, 2 when the read unexpectedly succeeds.\nownership:\n    The backing buffer is moved into the region; the destination buffer is borrowed by the read.\nerrors:\n    region_read must report a RegionError for the out-of-range index.\nside_effects:\n    Allocates region storage.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[4]; erg index: u64 = 1u64; erg read = region_read(region: abs region, index: erg index, destination: ins destination); return case dat read { Result.Err(_) => 0, Result.Ok(_) => 2, }; }, }; }";
     assert_eq!(run_llvm_executable_fixture("bounds-failure", source), 0);
 }
 
 #[test]
 fn llvm_preserves_representative_runtime_failure_statuses() {
-    let source = "unsafe extern \"C\" verb actus_file_close_buffer(abs handle: Int) -> Int; unsafe extern \"C\" verb actus_process_arg(ins buffer: Buffer, erg index: Int) -> Int; unsafe extern \"C\" verb actus_path_validate_storage(abs storage: Buffer, erg unit_width: Int) -> Int; unsafe extern \"C\" verb actus_buffer_byte_at(abs buffer: Buffer, erg index: Int) -> Int; unsafe extern \"C\" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int; verb main() -> Int { erg handle: Int = -1; erg index: Int = -1; erg unit_width: Int = 1; erg byte_index: Int = 0; erg empty: Buffer = Buffer[0]; erg invalid: Buffer = Buffer[0]; append(invalid, 255u8); erg valid: Buffer = Buffer[0]; append(valid, 65u8); erg close_status = actus_file_close_buffer(handle: abs handle); erg process_status = actus_process_arg(buffer: ins empty, index: erg index); erg path_status = actus_path_validate_storage(storage: abs empty, unit_width: erg unit_width); erg empty_byte_status = actus_buffer_byte_at(buffer: abs empty, index: erg unit_width); erg invalid_utf8_status = actus_buffer_validate_utf8(buffer: abs invalid); erg invalid_byte = actus_buffer_byte_at(buffer: abs invalid, index: erg byte_index); erg valid_utf8_status = actus_buffer_validate_utf8(buffer: abs valid); erg valid_byte = actus_buffer_byte_at(buffer: abs valid, index: erg byte_index); drop(empty); drop(invalid); drop(valid); if close_status != -1 { return 1; } if process_status != -3 { return 2; } if path_status != -4 { return 3; } if empty_byte_status != -2 { return 4; } if invalid_utf8_status != -1 { return 5; } if invalid_byte != 255 { return 6; } if valid_utf8_status != 0 { return 7; } if valid_byte != 65 { return 8; } return 0; }";
+    let source = "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_close_buffer, which closes a file handle and returns a status.\ninputs:\n    handle: borrowed Int file handle.\noutputs:\n    An Int status; zero on success, -1 for an invalid handle.\nownership:\n    The handle is a borrowed scalar.\nside_effects:\n    Closes the file handle.\nabi:\n    unsafe extern C symbol actus_file_close_buffer taking one Int handle.\n\"\"\"\nunsafe extern \"C\" verb actus_file_close_buffer(abs handle: Int) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_process_arg, which copies a process argument into a buffer and returns a status.\ninputs:\n    buffer: exclusive ins loan of Buffer that receives the argument; index: owned Int argument index.\noutputs:\n    An Int length or a negative status, -3 for an invalid index.\nownership:\n    The buffer is an exclusive ins loan that the provider writes.\nside_effects:\n    Writes the argument into the buffer.\nabi:\n    unsafe extern C symbol actus_process_arg taking a mutable Buffer and an index.\n\"\"\"\nunsafe extern \"C\" verb actus_process_arg(ins buffer: Buffer, erg index: Int) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_path_validate_storage, which validates path storage for a code unit width and returns a status.\ninputs:\n    storage: borrowed Buffer holding the path bytes; unit_width: owned Int width of a code unit.\noutputs:\n    An Int status, -4 for invalid storage.\nownership:\n    The storage is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_path_validate_storage taking a borrowed Buffer and a width.\n\"\"\"\nunsafe extern \"C\" verb actus_path_validate_storage(abs storage: Buffer, erg unit_width: Int) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_byte_at, which reads one byte of a buffer and returns it or a failure status.\ninputs:\n    buffer: borrowed Buffer; index: owned Int byte index.\noutputs:\n    The byte value as Int, or -2 when the index is outside the buffer.\nownership:\n    The buffer is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_buffer_byte_at taking a borrowed Buffer and an index.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_byte_at(abs buffer: Buffer, erg index: Int) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_validate_utf8, which checks that a buffer holds valid UTF-8 and returns a status.\ninputs:\n    buffer: borrowed Buffer holding the candidate text.\noutputs:\n    0 for valid UTF-8, -1 for invalid UTF-8.\nownership:\n    The buffer is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_buffer_validate_utf8 taking a borrowed Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int;\n\"\"\"Entry point that calls the runtime bridges with deliberately invalid handles, indexes and bytes and returns 0 only when each reports its documented failure status (-1, -3, -4, -2, -1) and the valid cases report 0 and the byte 65; any other status returns its check number from 1 to 8.\"\"\"\nverb main() -> Int { erg handle: Int = -1; erg index: Int = -1; erg unit_width: Int = 1; erg byte_index: Int = 0; erg empty: Buffer = Buffer[0]; erg invalid: Buffer = Buffer[0]; append(invalid, 255u8); erg valid: Buffer = Buffer[0]; append(valid, 65u8); erg close_status = actus_file_close_buffer(handle: abs handle); erg process_status = actus_process_arg(buffer: ins empty, index: erg index); erg path_status = actus_path_validate_storage(storage: abs empty, unit_width: erg unit_width); erg empty_byte_status = actus_buffer_byte_at(buffer: abs empty, index: erg unit_width); erg invalid_utf8_status = actus_buffer_validate_utf8(buffer: abs invalid); erg invalid_byte = actus_buffer_byte_at(buffer: abs invalid, index: erg byte_index); erg valid_utf8_status = actus_buffer_validate_utf8(buffer: abs valid); erg valid_byte = actus_buffer_byte_at(buffer: abs valid, index: erg byte_index); drop(empty); drop(invalid); drop(valid); if close_status != -1 { return 1; } if process_status != -3 { return 2; } if path_status != -4 { return 3; } if empty_byte_status != -2 { return 4; } if invalid_utf8_status != -1 { return 5; } if invalid_byte != 255 { return 6; } if valid_utf8_status != 0 { return 7; } if valid_byte != 65 { return 8; } return 0; }";
     assert_eq!(run_llvm_executable_fixture("runtime-failure-statuses", source), 0);
 }
 
 #[test]
 fn llvm_executes_the_deterministic_runtime_status_matrix() {
-    let source = "unsafe extern \"C\" verb actus_process_arg_count() -> Int; unsafe extern \"C\" verb actus_process_arg(ins buffer: Buffer, erg index: Int) -> Int; unsafe extern \"C\" verb actus_string_length(abs text: String) -> Int; unsafe extern \"C\" verb actus_string_byte_at(abs text: String, erg index: Int) -> Int; unsafe extern \"C\" verb actus_buffer_capacity(abs buffer: Buffer) -> Int; unsafe extern \"C\" verb actus_buffer_clear(ins buffer: Buffer) -> Int; unsafe extern \"C\" verb actus_cursor_seek(ins buffer: Buffer, erg position: Int) -> Int; unsafe extern \"C\" verb actus_sleep_context_enter(erg flags: u32) -> Int; unsafe extern \"C\" verb actus_sleep_context_exit(erg flags: u32) -> Int; unsafe extern \"C\" verb actus_sleep_nanos(erg nanos: u64) -> Int; verb main() -> Int { erg empty: Buffer = Buffer[0]; erg text: String = \"Actus\"; erg invalid_index: Int = 999999; erg first_index: Int = 0; erg negative_index: Int = -1; erg end_index: Int = 5; erg negative_position: Int = -1; erg invalid_flags: u32 = 0u32; erg context_flags: u32 = 1u32; erg no_sleep: u64 = 0u64; erg process_count = actus_process_arg_count(); erg process_invalid = actus_process_arg(buffer: ins empty, index: erg invalid_index); erg string_length = actus_string_length(text: abs text); erg string_byte = actus_string_byte_at(text: abs text, index: erg first_index); erg string_negative = actus_string_byte_at(text: abs text, index: erg negative_index); erg string_oob = actus_string_byte_at(text: abs text, index: erg end_index); erg capacity = actus_buffer_capacity(buffer: abs empty); erg clear = actus_buffer_clear(buffer: ins empty); erg cursor_negative = actus_cursor_seek(buffer: ins empty, position: erg negative_position); erg context_invalid = actus_sleep_context_enter(flags: erg invalid_flags); erg context_enter = actus_sleep_context_enter(flags: erg context_flags); erg blocked_sleep = actus_sleep_nanos(nanos: erg no_sleep); erg context_exit = actus_sleep_context_exit(flags: erg context_flags); erg context_mismatch = actus_sleep_context_exit(flags: erg context_flags); drop(empty); if process_count < 1 { return 1; } if process_invalid != -3 { return 2; } if string_length != 5 { return 3; } if string_byte != 65 { return 4; } if string_negative != -3 { return 5; } if string_oob != -3 { return 6; } if capacity != 0 { return 7; } if clear != 0 { return 8; } if cursor_negative != -1 { return 9; } if context_invalid != -1 { return 10; } if context_enter != 0 { return 11; } if blocked_sleep != -1 { return 12; } if context_exit != 0 { return 13; } if context_mismatch != -1 { return 14; } drop(text); return 0; }";
+    let source = "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_process_arg_count, which returns the number of process arguments.\noutputs:\n    An Int count of process arguments.\nside_effects:\n    Reads the process arguments.\nabi:\n    unsafe extern C symbol actus_process_arg_count with no parameters.\n\"\"\"\nunsafe extern \"C\" verb actus_process_arg_count() -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_process_arg, which copies a process argument into a buffer and returns a status.\ninputs:\n    buffer: exclusive ins loan of Buffer that receives the argument; index: owned Int argument index.\noutputs:\n    An Int length or a negative status for an invalid index.\nownership:\n    The buffer is an exclusive ins loan that the provider writes.\nside_effects:\n    Writes the argument into the buffer.\nabi:\n    unsafe extern C symbol actus_process_arg taking a mutable Buffer and an index.\n\"\"\"\nunsafe extern \"C\" verb actus_process_arg(ins buffer: Buffer, erg index: Int) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_string_length, which returns the byte length of a string.\ninputs:\n    text: borrowed String.\noutputs:\n    The length as Int.\nownership:\n    The string is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_string_length taking a borrowed String.\n\"\"\"\nunsafe extern \"C\" verb actus_string_length(abs text: String) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_string_byte_at, which reads one byte of a string and returns it or a failure status.\ninputs:\n    text: borrowed String; index: owned Int byte index.\noutputs:\n    The byte value as Int, or a negative status for an invalid index.\nownership:\n    The string is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_string_byte_at taking a borrowed String and an index.\n\"\"\"\nunsafe extern \"C\" verb actus_string_byte_at(abs text: String, erg index: Int) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_capacity, which returns the capacity of a buffer.\ninputs:\n    buffer: borrowed Buffer.\noutputs:\n    The capacity as Int.\nownership:\n    The buffer is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_buffer_capacity taking a borrowed Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_capacity(abs buffer: Buffer) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_clear, which empties a buffer and returns a status.\ninputs:\n    buffer: exclusive ins loan of Buffer that is cleared.\noutputs:\n    An Int status; zero on success.\nownership:\n    The buffer is an exclusive ins loan that the provider mutates.\nside_effects:\n    Clears the buffer contents.\nabi:\n    unsafe extern C symbol actus_buffer_clear taking a mutable Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_clear(ins buffer: Buffer) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_cursor_seek, which moves the cursor of a buffer and returns a status.\ninputs:\n    buffer: exclusive ins loan of Buffer holding the cursor; position: owned Int new position.\noutputs:\n    An Int status; negative for an invalid position.\nownership:\n    The buffer is an exclusive ins loan that the provider mutates.\nside_effects:\n    Moves the buffer cursor.\nabi:\n    unsafe extern C symbol actus_cursor_seek taking a mutable Buffer and a position.\n\"\"\"\nunsafe extern \"C\" verb actus_cursor_seek(ins buffer: Buffer, erg position: Int) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_sleep_context_enter, which marks entry into a context that may sleep and returns a status.\ninputs:\n    flags: owned u32 flag set; zero is invalid.\noutputs:\n    An Int status; negative for invalid flags.\nownership:\n    The flags are an owned scalar.\nside_effects:\n    Enters the sleep context.\nabi:\n    unsafe extern C symbol actus_sleep_context_enter taking a u32 flag set.\n\"\"\"\nunsafe extern \"C\" verb actus_sleep_context_enter(erg flags: u32) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_sleep_context_exit, which marks exit from a context that may sleep and returns a status.\ninputs:\n    flags: owned u32 flag set; zero is invalid.\noutputs:\n    An Int status; negative for invalid flags.\nownership:\n    The flags are an owned scalar.\nside_effects:\n    Leaves the sleep context.\nabi:\n    unsafe extern C symbol actus_sleep_context_exit taking a u32 flag set.\n\"\"\"\nunsafe extern \"C\" verb actus_sleep_context_exit(erg flags: u32) -> Int;\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_sleep_nanos, which sleeps for a number of nanoseconds and returns a status.\ninputs:\n    nanos: owned u64 duration; zero returns at once.\noutputs:\n    An Int status; zero on success.\nownership:\n    The duration is an owned scalar.\nside_effects:\n    Blocks the thread for the given duration.\nabi:\n    unsafe extern C symbol actus_sleep_nanos taking a u64 duration.\n\"\"\"\nunsafe extern \"C\" verb actus_sleep_nanos(erg nanos: u64) -> Int;\n\"\"\"Entry point that runs every deterministic runtime bridge with in-range, out-of-range and invalid arguments and returns 0 only when each reports its documented status; a failing check returns its own number.\"\"\"\nverb main() -> Int { erg empty: Buffer = Buffer[0]; erg text: String = \"Actus\"; erg invalid_index: Int = 999999; erg first_index: Int = 0; erg negative_index: Int = -1; erg end_index: Int = 5; erg negative_position: Int = -1; erg invalid_flags: u32 = 0u32; erg context_flags: u32 = 1u32; erg no_sleep: u64 = 0u64; erg process_count = actus_process_arg_count(); erg process_invalid = actus_process_arg(buffer: ins empty, index: erg invalid_index); erg string_length = actus_string_length(text: abs text); erg string_byte = actus_string_byte_at(text: abs text, index: erg first_index); erg string_negative = actus_string_byte_at(text: abs text, index: erg negative_index); erg string_oob = actus_string_byte_at(text: abs text, index: erg end_index); erg capacity = actus_buffer_capacity(buffer: abs empty); erg clear = actus_buffer_clear(buffer: ins empty); erg cursor_negative = actus_cursor_seek(buffer: ins empty, position: erg negative_position); erg context_invalid = actus_sleep_context_enter(flags: erg invalid_flags); erg context_enter = actus_sleep_context_enter(flags: erg context_flags); erg blocked_sleep = actus_sleep_nanos(nanos: erg no_sleep); erg context_exit = actus_sleep_context_exit(flags: erg context_flags); erg context_mismatch = actus_sleep_context_exit(flags: erg context_flags); drop(empty); if process_count < 1 { return 1; } if process_invalid != -3 { return 2; } if string_length != 5 { return 3; } if string_byte != 65 { return 4; } if string_negative != -3 { return 5; } if string_oob != -3 { return 6; } if capacity != 0 { return 7; } if clear != 0 { return 8; } if cursor_negative != -1 { return 9; } if context_invalid != -1 { return 10; } if context_enter != 0 { return 11; } if blocked_sleep != -1 { return 12; } if context_exit != 0 { return 13; } if context_mismatch != -1 { return 14; } drop(text); return 0; }";
     assert_eq!(run_llvm_executable_fixture("deterministic-status-matrix", source), 0);
 }
 
 #[test]
 fn llvm_executes_checked_representation_layouts() {
-    let source = "meta repr(C, packed) struct Wire { prefix: u8, value: u32, } meta repr(transparent) struct UserId { value: u64, } meta repr(C, align(8u32)) struct Aligned { value: u8, } meta repr(C) enum Message { Byte { value: u8, }, Pair { code: u16, value: u32, }, Empty, } verb main() -> Int { erg wire: Wire = Wire { prefix: 1u8, value: 40u32, }; erg id: UserId = UserId { value: 2u64, }; erg aligned: Aligned = Aligned { value: 0u8, }; erg message = Message.Pair(code: 0u16, value: 0u32); wire.value = 41u32; id.value = 1u64; aligned.value = 0u8; return case dat message { Message.Pair { code: code_value, value: value_value } => wire.value as Int + id.value as Int + aligned.value as Int + code_value as Int + value_value as Int, _ => 1, }; }";
+    let source = "meta repr(C, packed) struct Wire { prefix: u8, value: u32, } meta repr(transparent) struct UserId { value: u64, } meta repr(C, align(8u32)) struct Aligned { value: u8, } meta repr(C) enum Message { Byte { value: u8, }, Pair { code: u16, value: u32, }, Empty, }\n\"\"\"Entry point that builds a packed Wire, a UserId, an Aligned value and a Pair message, updates their fields and returns the sum of the field values through a case on the message.\"\"\"\nverb main() -> Int { erg wire: Wire = Wire { prefix: 1u8, value: 40u32, }; erg id: UserId = UserId { value: 2u64, }; erg aligned: Aligned = Aligned { value: 0u8, }; erg message = Message.Pair(code: 0u16, value: 0u32); wire.value = 41u32; id.value = 1u64; aligned.value = 0u8; return case dat message { Message.Pair { code: code_value, value: value_value } => wire.value as Int + id.value as Int + aligned.value as Int + code_value as Int + value_value as Int, _ => 1, }; }";
     assert_eq!(run_llvm_executable_fixture("checked-representations", source), 42);
 }
 
 #[test]
 fn llvm_lowers_the_buffer_length_bridge_through_a_borrowed_pointer() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_buffer_length(abs buffer: Buffer) -> Int; verb call(abs buffer: Buffer) -> Int { return actus_buffer_length(buffer: abs buffer); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_length, which returns the length of a buffer.\ninputs:\n    buffer: borrowed Buffer.\noutputs:\n    The length as Int.\nownership:\n    The buffer is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_buffer_length taking a borrowed Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_length(abs buffer: Buffer) -> Int;\n\"\"\"Calls the foreign buffer length bridge with a borrowed buffer and returns the length unchanged.\"\"\"\nverb call(abs buffer: Buffer) -> Int { return actus_buffer_length(buffer: abs buffer); }",
     );
     assert!(ir.contains("declare i32 @actus_buffer_length(ptr align 8)"));
     assert!(ir.contains("call i32 @actus_buffer_length(ptr %0)"));
@@ -304,7 +304,7 @@ fn llvm_lowers_the_buffer_length_bridge_through_a_borrowed_pointer() {
 #[test]
 fn llvm_lowers_the_buffer_byte_access_bridge_with_a_signed_index() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_buffer_byte_at(abs buffer: Buffer, erg index: Int) -> Int; verb call(abs buffer: Buffer, erg index: Int) -> Int { return actus_buffer_byte_at(buffer: abs buffer, index: erg index); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_byte_at, which reads one byte of a buffer at a signed index and returns it or a failure status.\ninputs:\n    buffer: borrowed Buffer; index: owned signed Int byte index.\noutputs:\n    The byte value as Int, or a negative status for an invalid index.\nownership:\n    The buffer is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_buffer_byte_at taking a borrowed Buffer and a signed index.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_byte_at(abs buffer: Buffer, erg index: Int) -> Int;\n\"\"\"Calls the foreign byte access bridge with a borrowed buffer and a signed index and returns the byte or status unchanged.\"\"\"\nverb call(abs buffer: Buffer, erg index: Int) -> Int { return actus_buffer_byte_at(buffer: abs buffer, index: erg index); }",
     );
     assert!(ir.contains("declare i32 @actus_buffer_byte_at(ptr align 8, i32)"));
     assert!(ir.contains("call i32 @actus_buffer_byte_at(ptr %0, i32 %1)"));
@@ -313,7 +313,7 @@ fn llvm_lowers_the_buffer_byte_access_bridge_with_a_signed_index() {
 #[test]
 fn llvm_lowers_the_buffer_utf8_validation_bridge_as_a_signed_status() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int; verb call(abs buffer: Buffer) -> Int { return actus_buffer_validate_utf8(buffer: abs buffer); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_validate_utf8, which checks that a buffer holds valid UTF-8 and returns a signed status.\ninputs:\n    buffer: borrowed Buffer holding the candidate text.\noutputs:\n    0 for valid UTF-8, a negative status for invalid UTF-8.\nownership:\n    The buffer is borrowed and only read.\nabi:\n    unsafe extern C symbol actus_buffer_validate_utf8 taking a borrowed Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_validate_utf8(abs buffer: Buffer) -> Int;\n\"\"\"Calls the foreign UTF-8 validation bridge with a borrowed buffer and returns its signed status unchanged.\"\"\"\nverb call(abs buffer: Buffer) -> Int { return actus_buffer_validate_utf8(buffer: abs buffer); }",
     );
     assert!(ir.contains("declare i32 @actus_buffer_validate_utf8(ptr align 8)"));
     assert!(ir.contains("call i32 @actus_buffer_validate_utf8(ptr %0)"));
@@ -321,7 +321,9 @@ fn llvm_lowers_the_buffer_utf8_validation_bridge_as_a_signed_status() {
 
 #[test]
 fn llvm_lowers_buffer_allocation_with_a_pointer_result() {
-    let ir = emit_source_runtime_bridge("verb call() -> Buffer { return Buffer[4]; }");
+    let ir = emit_source_runtime_bridge(
+        "\"\"\"Returns a new four-byte Buffer.\"\"\"\nverb call() -> Buffer { return Buffer[4]; }",
+    );
     assert!(ir.contains("declare ptr @actus_buffer_allocate(i64)"), "{ir}");
     assert!(ir.contains("call ptr @actus_buffer_allocate(i64 4)"), "{ir}");
 }
@@ -329,7 +331,7 @@ fn llvm_lowers_buffer_allocation_with_a_pointer_result() {
 #[test]
 fn llvm_lowers_buffer_append_with_an_eight_bit_byte() {
     let ir = emit_source_runtime_bridge(
-        "verb call() -> Int { erg buffer: Buffer = Buffer[0]; append(handle: buffer, byte: 7u8); return 0; }",
+        "\"\"\"Appends the byte 7 to a local empty buffer using named arguments and returns 0.\"\"\"\nverb call() -> Int { erg buffer: Buffer = Buffer[0]; append(handle: buffer, byte: 7u8); return 0; }",
     );
     assert!(ir.contains("declare i8 @actus_buffer_append(ptr, i8)"), "{ir}");
     assert!(ir.contains("call i8 @actus_buffer_append(ptr %"), "{ir}");
@@ -338,7 +340,7 @@ fn llvm_lowers_buffer_append_with_an_eight_bit_byte() {
 #[test]
 fn llvm_lowers_buffer_byte_set_with_checked_index_and_byte_types() {
     let ir = emit_source_runtime_bridge(
-        "verb call(ins buffer: Buffer, erg index: Int, erg byte: u8) -> Int { buffer[index] = byte; return 0; }",
+        "\"\"\"Stores a byte at a signed index of an exclusively borrowed buffer and returns 0.\"\"\"\nverb call(ins buffer: Buffer, erg index: Int, erg byte: u8) -> Int { buffer[index] = byte; return 0; }",
     );
     assert!(ir.contains("declare i32 @actus_buffer_byte_set(ptr, i32, i8)"), "{ir}");
     assert!(ir.contains("call i32 @actus_buffer_byte_set(ptr %0, i32 %1, i8 %2)"), "{ir}");
@@ -347,7 +349,7 @@ fn llvm_lowers_buffer_byte_set_with_checked_index_and_byte_types() {
 #[test]
 fn llvm_lowers_buffer_move_as_a_void_ownership_bridge() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_buffer_move(abs destination: Buffer, abs source: Buffer); verb call(abs destination: Buffer, abs source: Buffer) -> Int { actus_buffer_move(destination: abs destination, source: abs source); return 0; }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_buffer_move, which moves the contents of a source buffer into a destination buffer and returns no value.\ninputs:\n    destination: borrowed Buffer that receives the contents; source: borrowed Buffer that supplies them.\noutputs:\n    No value.\nownership:\n    Both buffers are borrowed; the provider takes over the source storage.\nside_effects:\n    Moves the buffer contents.\nabi:\n    unsafe extern C symbol actus_buffer_move taking two Buffers and returning void.\n\"\"\"\nunsafe extern \"C\" verb actus_buffer_move(abs destination: Buffer, abs source: Buffer);\n\"\"\"Calls the foreign buffer move bridge, which returns no value, and returns 0.\"\"\"\nverb call(abs destination: Buffer, abs source: Buffer) -> Int { actus_buffer_move(destination: abs destination, source: abs source); return 0; }",
     );
     assert!(ir.contains("declare void @actus_buffer_move(ptr align 8, ptr align 8)"), "{ir}");
     assert!(ir.contains("call void @actus_buffer_move(ptr %0, ptr %1)"), "{ir}");
@@ -356,7 +358,7 @@ fn llvm_lowers_buffer_move_as_a_void_ownership_bridge() {
 #[test]
 fn llvm_lowers_the_filesystem_remove_path_bridge_with_a_borrowed_pointer() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_remove_path(abs path: Buffer) -> Int; verb call(abs path: Buffer) -> Int { return actus_file_remove_path(path: abs path); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_remove_path, which removes the file at a path and returns a status.\ninputs:\n    path: borrowed Buffer holding the path bytes.\noutputs:\n    An Int status; zero on success, negative on failure.\nownership:\n    The path is borrowed and only read.\nside_effects:\n    Removes a file from the filesystem.\nabi:\n    unsafe extern C symbol actus_file_remove_path taking a borrowed path Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_file_remove_path(abs path: Buffer) -> Int;\n\"\"\"Calls the foreign remove-path bridge with a borrowed path and returns its status unchanged.\"\"\"\nverb call(abs path: Buffer) -> Int { return actus_file_remove_path(path: abs path); }",
     );
     assert!(ir.contains("declare i32 @actus_file_remove_path(ptr align 8)"));
     assert!(ir.contains("call i32 @actus_file_remove_path(ptr %0)"));
@@ -365,7 +367,7 @@ fn llvm_lowers_the_filesystem_remove_path_bridge_with_a_borrowed_pointer() {
 #[test]
 fn llvm_lowers_the_filesystem_parent_sync_bridge_with_a_status_return() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_sync_parent_path(abs path: Buffer) -> Int; verb call(abs path: Buffer) -> Int { return actus_file_sync_parent_path(path: abs path); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_sync_parent_path, which flushes the parent directory of a path to storage and returns a status.\ninputs:\n    path: borrowed Buffer holding the path bytes.\noutputs:\n    An Int status; zero on success, negative on failure.\nownership:\n    The path is borrowed and only read.\nside_effects:\n    Synchronizes a directory with storage.\nabi:\n    unsafe extern C symbol actus_file_sync_parent_path taking a borrowed path Buffer.\n\"\"\"\nunsafe extern \"C\" verb actus_file_sync_parent_path(abs path: Buffer) -> Int;\n\"\"\"Calls the foreign parent-sync bridge with a borrowed path and returns its status unchanged.\"\"\"\nverb call(abs path: Buffer) -> Int { return actus_file_sync_parent_path(path: abs path); }",
     );
     assert!(ir.contains("declare i32 @actus_file_sync_parent_path(ptr align 8)"));
     assert!(ir.contains("call i32 @actus_file_sync_parent_path(ptr %0)"));
@@ -374,7 +376,7 @@ fn llvm_lowers_the_filesystem_parent_sync_bridge_with_a_status_return() {
 #[test]
 fn llvm_lowers_the_directory_close_bridge_with_a_scalar_handle() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_directory_close(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_directory_close(handle: abs handle); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_directory_close, which closes a directory handle and returns a status.\ninputs:\n    handle: borrowed Int directory handle.\noutputs:\n    An Int status; zero on success, negative on failure.\nownership:\n    The handle is a borrowed scalar.\nside_effects:\n    Closes the directory handle.\nabi:\n    unsafe extern C symbol actus_directory_close taking one Int handle.\n\"\"\"\nunsafe extern \"C\" verb actus_directory_close(abs handle: Int) -> Int;\n\"\"\"Calls the foreign directory close bridge with a scalar handle and returns its status unchanged.\"\"\"\nverb call(erg handle: Int) -> Int { return actus_directory_close(handle: abs handle); }",
     );
     assert!(ir.contains("declare i32 @actus_directory_close(i32)"));
     assert!(ir.contains("call i32 @actus_directory_close(i32 %0)"));
@@ -383,7 +385,7 @@ fn llvm_lowers_the_directory_close_bridge_with_a_scalar_handle() {
 #[test]
 fn llvm_lowers_the_atomic_replace_bridge_with_two_borrowed_paths() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_replace_atomic_path(abs from: Buffer, abs to: Buffer) -> Int; verb call(abs from: Buffer, abs to: Buffer) -> Int { return actus_file_replace_atomic_path(from: abs from, to: abs to); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_replace_atomic_path, which atomically replaces one path with another and returns a status.\ninputs:\n    from: borrowed Buffer holding the source path; to: borrowed Buffer holding the destination path.\noutputs:\n    An Int status; zero on success, negative on failure.\nownership:\n    Both paths are borrowed and only read.\nside_effects:\n    Atomically renames a file over the destination.\nabi:\n    unsafe extern C symbol actus_file_replace_atomic_path taking two borrowed path Buffers.\n\"\"\"\nunsafe extern \"C\" verb actus_file_replace_atomic_path(abs from: Buffer, abs to: Buffer) -> Int;\n\"\"\"Calls the foreign atomic replace bridge with two borrowed paths and returns its status unchanged.\"\"\"\nverb call(abs from: Buffer, abs to: Buffer) -> Int { return actus_file_replace_atomic_path(from: abs from, to: abs to); }",
     );
     assert!(ir.contains("declare i32 @actus_file_replace_atomic_path(ptr align 8, ptr align 8)"));
     assert!(ir.contains("call i32 @actus_file_replace_atomic_path(ptr %0, ptr %1)"));
@@ -392,7 +394,7 @@ fn llvm_lowers_the_atomic_replace_bridge_with_two_borrowed_paths() {
 #[test]
 fn llvm_lowers_the_shared_lock_bridge_with_a_scalar_handle() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_lock_shared(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_lock_shared(handle: abs handle); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_lock_shared, which takes a shared lock on a file handle and returns a status.\ninputs:\n    handle: borrowed Int file handle.\noutputs:\n    An Int status; zero on success, negative on failure.\nownership:\n    The handle is a borrowed scalar.\nside_effects:\n    Acquires a shared file lock and may block.\nabi:\n    unsafe extern C symbol actus_file_lock_shared taking one Int handle.\n\"\"\"\nunsafe extern \"C\" verb actus_file_lock_shared(abs handle: Int) -> Int;\n\"\"\"Calls the foreign shared lock bridge with a scalar handle and returns its status unchanged.\"\"\"\nverb call(erg handle: Int) -> Int { return actus_file_lock_shared(handle: abs handle); }",
     );
     assert!(ir.contains("declare i32 @actus_file_lock_shared(i32)"));
     assert!(ir.contains("call i32 @actus_file_lock_shared(i32 %0)"));
@@ -401,7 +403,7 @@ fn llvm_lowers_the_shared_lock_bridge_with_a_scalar_handle() {
 #[test]
 fn llvm_lowers_the_try_lock_busy_status_bridge_without_coercion() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_try_lock(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_try_lock(handle: abs handle); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_try_lock, which tries to lock a file handle without blocking and returns a status.\ninputs:\n    handle: borrowed Int file handle.\noutputs:\n    An Int status; zero when locked, a busy status when another holder owns the lock, negative on failure.\nownership:\n    The handle is a borrowed scalar.\nside_effects:\n    May acquire a file lock.\nabi:\n    unsafe extern C symbol actus_file_try_lock taking one Int handle.\n\"\"\"\nunsafe extern \"C\" verb actus_file_try_lock(abs handle: Int) -> Int;\n\"\"\"Calls the foreign try-lock bridge with a scalar handle and returns the busy or failure status without coercion.\"\"\"\nverb call(erg handle: Int) -> Int { return actus_file_try_lock(handle: abs handle); }",
     );
     assert!(ir.contains("declare i32 @actus_file_try_lock(i32)"));
     assert!(ir.contains("call i32 @actus_file_try_lock(i32 %0)"));
@@ -410,7 +412,7 @@ fn llvm_lowers_the_try_lock_busy_status_bridge_without_coercion() {
 #[test]
 fn llvm_lowers_the_unlock_bridge_with_a_scalar_status_return() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_unlock(abs handle: Int) -> Int; verb call(erg handle: Int) -> Int { return actus_file_unlock(handle: abs handle); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_unlock, which releases the lock on a file handle and returns a status.\ninputs:\n    handle: borrowed Int file handle.\noutputs:\n    An Int status; zero on success, negative on failure.\nownership:\n    The handle is a borrowed scalar.\nside_effects:\n    Releases a file lock.\nabi:\n    unsafe extern C symbol actus_file_unlock taking one Int handle.\n\"\"\"\nunsafe extern \"C\" verb actus_file_unlock(abs handle: Int) -> Int;\n\"\"\"Calls the foreign unlock bridge with a scalar handle and returns its status unchanged.\"\"\"\nverb call(erg handle: Int) -> Int { return actus_file_unlock(handle: abs handle); }",
     );
     assert!(ir.contains("declare i32 @actus_file_unlock(i32)"));
     assert!(ir.contains("call i32 @actus_file_unlock(i32 %0)"));
@@ -419,7 +421,7 @@ fn llvm_lowers_the_unlock_bridge_with_a_scalar_status_return() {
 #[test]
 fn llvm_lowers_the_open_options_bridge_with_all_flag_arguments() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_file_open_options_path(abs path: Buffer, abs read: Int, abs write: Int, abs append: Int, abs truncate: Int, abs create: Int, abs create_new: Int, abs close_on_exec: Int) -> Int; verb call(abs path: Buffer, erg flag: Int) -> Int { return actus_file_open_options_path(path: abs path, read: abs flag, write: abs flag, append: abs flag, truncate: abs flag, create: abs flag, create_new: abs flag, close_on_exec: abs flag); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_file_open_options_path, which opens the file at a path with explicit option flags and returns a handle or a failure status.\ninputs:\n    path: borrowed Buffer holding the path bytes; read, write, append, truncate, create, create_new and close_on_exec: borrowed Int flags, nonzero to enable.\noutputs:\n    An Int file handle, or a negative failure status.\nownership:\n    The path and the flags are borrowed and only read.\nside_effects:\n    Opens a file and may create or truncate it.\nabi:\n    unsafe extern C symbol actus_file_open_options_path taking a path Buffer and seven Int flags.\n\"\"\"\nunsafe extern \"C\" verb actus_file_open_options_path(abs path: Buffer, abs read: Int, abs write: Int, abs append: Int, abs truncate: Int, abs create: Int, abs create_new: Int, abs close_on_exec: Int) -> Int;\n\"\"\"Calls the foreign open-options bridge with a borrowed path and passes the same flag value for all seven option arguments, then returns the handle or status unchanged.\"\"\"\nverb call(abs path: Buffer, erg flag: Int) -> Int { return actus_file_open_options_path(path: abs path, read: abs flag, write: abs flag, append: abs flag, truncate: abs flag, create: abs flag, create_new: abs flag, close_on_exec: abs flag); }",
     );
     assert!(ir.contains(
         "declare i32 @actus_file_open_options_path(ptr align 8, i32, i32, i32, i32, i32, i32, i32)"
@@ -430,7 +432,7 @@ fn llvm_lowers_the_open_options_bridge_with_all_flag_arguments() {
 #[test]
 fn llvm_lowers_the_ordered_directory_open_bridge_with_a_order_argument() {
     let ir = emit_source_runtime_bridge(
-        "unsafe extern \"C\" verb actus_directory_open_ordered(abs path: Buffer, erg order: Int) -> Int; verb call(abs path: Buffer, erg order: Int) -> Int { return actus_directory_open_ordered(path: abs path, order: erg order); }",
+        "\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol actus_directory_open_ordered, which opens a directory with a chosen entry order and returns a handle or a failure status.\ninputs:\n    path: borrowed Buffer holding the directory path; order: owned Int order selector.\noutputs:\n    An Int directory handle, or a negative failure status.\nownership:\n    The path is borrowed and only read; the order is an owned scalar.\nside_effects:\n    Opens a directory for reading.\nabi:\n    unsafe extern C symbol actus_directory_open_ordered taking a path Buffer and an order Int.\n\"\"\"\nunsafe extern \"C\" verb actus_directory_open_ordered(abs path: Buffer, erg order: Int) -> Int;\n\"\"\"Calls the foreign ordered directory open bridge with a borrowed path and an order selector and returns the handle or status unchanged.\"\"\"\nverb call(abs path: Buffer, erg order: Int) -> Int { return actus_directory_open_ordered(path: abs path, order: erg order); }",
     );
     assert!(ir.contains("declare i32 @actus_directory_open_ordered(ptr align 8, i32)"));
     assert!(ir.contains("call i32 @actus_directory_open_ordered(ptr %0, i32 %1)"));
@@ -439,7 +441,7 @@ fn llvm_lowers_the_ordered_directory_open_bridge_with_a_order_argument() {
 #[test]
 fn llvm_lowers_repr_c_external_aggregate_parameters_without_erasing_the_layout() {
     let ir = emit_source_runtime_bridge(
-        "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb inspect(erg point: Point) -> Int; verb call(erg point: Point) -> Int { return inspect(point: erg point); }",
+        "meta repr(C) struct Point { x: i32, y: i32, }\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol inspect, which takes a repr(C) Point by value and returns an Int.\ninputs:\n    point: owned Point passed by value.\noutputs:\n    The Int returned by the provider.\nownership:\n    The Point is moved to the provider.\nabi:\n    unsafe extern C symbol inspect taking a Point by value.\n\"\"\"\nunsafe extern \"C\" verb inspect(erg point: Point) -> Int;\n\"\"\"Calls the foreign inspect verb with a Point by value and returns its result unchanged, so the test can check that the aggregate layout survives lowering.\"\"\"\nverb call(erg point: Point) -> Int { return inspect(point: erg point); }",
     );
     assert!(ir.contains("declare i32 @inspect(ptr align 4)"), "{ir}");
     assert!(ir.contains("call i32 @inspect(ptr %0)"), "{ir}");
@@ -448,7 +450,7 @@ fn llvm_lowers_repr_c_external_aggregate_parameters_without_erasing_the_layout()
 #[test]
 fn llvm_lowers_repr_c_external_aggregate_returns_through_the_declared_return_abi() {
     let ir = emit_source_runtime_bridge(
-        "meta repr(C) struct Point { x: i32, y: i32, } unsafe extern \"C\" verb make() -> Point; verb call() -> Point { return make(); }",
+        "meta repr(C) struct Point { x: i32, y: i32, }\n\"\"\"\ncontract:\npurpose:\n    Declare the foreign C symbol make, which returns a repr(C) Point by value.\noutputs:\n    A Point built by the provider.\nownership:\n    The returned Point is owned by the caller.\nabi:\n    unsafe extern C symbol make returning a Point.\n\"\"\"\nunsafe extern \"C\" verb make() -> Point;\n\"\"\"Calls the foreign make verb and returns the Point it produced unchanged, so the test can check the declared return convention.\"\"\"\nverb call() -> Point { return make(); }",
     );
     assert!(ir.contains("declare void @make(ptr align 4)"), "{ir}");
     assert!(ir.contains("call void @make(ptr %slot0)"), "{ir}");

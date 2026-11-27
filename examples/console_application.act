@@ -7,6 +7,18 @@ import {
     open io,
 };
 
+"""
+contract:
+purpose:
+    Read one line from standard input, echo it and report failures as exit codes.
+outputs:
+    0 when a line was read; 2 at end of input; 3 to 10 for the other I/O
+    errors in the order of the `IoError` variants after `EndOfStream`.
+side_effects:
+    Reads standard input, writes the line to standard output and to standard
+    error, and flushes the output. At end of input it writes the two bytes `EO`
+    to standard error.
+"""
 verb main() -> Int {
     erg input = Buffer[0];
     erg result = read_line(buffer: ins input);

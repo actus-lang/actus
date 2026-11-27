@@ -10,7 +10,7 @@ fn cranelift_backend_builds_and_runs_a_shared_scalar_struct_parameter_read() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Counter { value: Int, } verb read(abs counter: Counter) -> Int { return counter.value; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; return read(counter: abs counter) + 1; }\n",
+        "struct Counter { value: Int, }\n\"\"\"Returns the value field of a borrowed Counter.\"\"\"\nverb read(abs counter: Counter) -> Int { return counter.value; }\n\"\"\"Entry point that builds a Counter holding 41, reads it through a borrow and returns the value plus 1.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; return read(counter: abs counter) + 1; }\n",
     )
     .expect("write Cranelift scalar-struct parameter fixture");
     let result = run_with_args(
@@ -42,7 +42,7 @@ fn llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_read() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Counter { value: Int, } verb read(abs counter: Counter) -> Int { return counter.value; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; return read(counter: abs counter) + 1; }\n",
+        "struct Counter { value: Int, }\n\"\"\"Returns the value field of a borrowed Counter.\"\"\"\nverb read(abs counter: Counter) -> Int { return counter.value; }\n\"\"\"Entry point that builds a Counter holding 41, reads it through a borrow and returns the value plus 1.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; return read(counter: abs counter) + 1; }\n",
     )
     .expect("write LLVM scalar-struct parameter fixture");
     let result = run_with_args(
@@ -74,7 +74,7 @@ fn cranelift_backend_builds_and_runs_a_shared_fixed_array_element_store() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] = 41u32; return values[2u32] as Int + 1; }\n",
+        "\"\"\"Entry point that stores 41 in element 2 of a u32 array with a plain assignment and returns that element as Int plus 1.\"\"\"\nverb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] = 41u32; return values[2u32] as Int + 1; }\n",
     )
     .expect("write Cranelift fixed-array store fixture");
     let result = run_with_args(
@@ -106,7 +106,7 @@ fn llvm_backend_builds_and_runs_a_shared_fixed_array_element_store() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] = 41u32; return values[2u32] as Int + 1; }\n",
+        "\"\"\"Entry point that stores 41 in element 2 of a u32 array with a plain assignment and returns that element as Int plus 1.\"\"\"\nverb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] = 41u32; return values[2u32] as Int + 1; }\n",
     )
     .expect("write LLVM fixed-array store fixture");
     let result = run_with_args(
@@ -137,7 +137,7 @@ fn cranelift_backend_builds_and_runs_a_shared_fixed_array_element_compound_store
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }\n",
+        "\"\"\"Entry point that adds 41 to element 2 of a u32 array with a compound assignment and returns that element as Int plus 1.\"\"\"\nverb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }\n",
     )
     .expect("write Cranelift fixed-array compound store fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -171,7 +171,7 @@ fn cranelift_backend_lowers_case_branch_with_trailing_if_value() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "enum Failure { Bad, } verb check(abs value: Int) -> Bool { erg result: Result[Int, Failure] = Result[Int, Failure].Ok(1); return case dat result { Result.Err(_) => false, Result.Ok(_) => { if value == 0 { false; } else { erg selected: Bool = true; selected; } }, }; } verb main() -> Int { erg value = 1; if check(value: abs value) { return 0; } return 1; }\n",
+        "enum Failure { Bad, }\n\"\"\"\ncontract:\npurpose:\n    Evaluate a case over an Ok result whose block arm picks true or false from the borrowed value, to check block tails in case arms.\ninputs:\n    value: borrowed Int compared with zero.\noutputs:\n    false when the value is 0, true otherwise.\nownership:\n    The value is a borrowed abs view and is only read.\n\"\"\"\nverb check(abs value: Int) -> Bool { erg result: Result[Int, Failure] = Result[Int, Failure].Ok(1); return case dat result { Result.Err(_) => false, Result.Ok(_) => { if value == 0 { false; } else { erg selected: Bool = true; selected; } }, }; }\n\"\"\"Entry point that returns 0 when check accepts the value 1, and 1 otherwise.\"\"\"\nverb main() -> Int { erg value = 1; if check(value: abs value) { return 0; } return 1; }\n",
     )
     .expect("write Cranelift case-if tail fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -204,7 +204,7 @@ fn llvm_backend_lowers_case_branch_with_trailing_if_value() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "enum Failure { Bad, } verb check(abs value: Int) -> Bool { erg result: Result[Int, Failure] = Result[Int, Failure].Ok(1); return case dat result { Result.Err(_) => false, Result.Ok(_) => { if value == 0 { false; } else { erg selected: Bool = true; selected; } }, }; } verb main() -> Int { erg value = 1; if check(value: abs value) { return 0; } return 1; }\n",
+        "enum Failure { Bad, }\n\"\"\"\ncontract:\npurpose:\n    Evaluate a case over an Ok result whose block arm picks true or false from the borrowed value, to check block tails in case arms.\ninputs:\n    value: borrowed Int compared with zero.\noutputs:\n    false when the value is 0, true otherwise.\nownership:\n    The value is a borrowed abs view and is only read.\n\"\"\"\nverb check(abs value: Int) -> Bool { erg result: Result[Int, Failure] = Result[Int, Failure].Ok(1); return case dat result { Result.Err(_) => false, Result.Ok(_) => { if value == 0 { false; } else { erg selected: Bool = true; selected; } }, }; }\n\"\"\"Entry point that returns 0 when check accepts the value 1, and 1 otherwise.\"\"\"\nverb main() -> Int { erg value = 1; if check(value: abs value) { return 0; } return 1; }\n",
     )
     .expect("write LLVM case-if tail fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -237,7 +237,7 @@ fn cranelift_backend_merges_case_branch_assignment_before_call() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "enum Failure { Bad, } verb consume(abs value: u32) -> Int { return value as Int; } verb check() -> Int { erg target: u32 = 0u32; erg result: Result[u32, Failure] = Result[u32, Failure].Ok(1031u32); erg status: Int = case dat result { Result.Err(_) => 1, Result.Ok(index) => { target = index; 0; }, }; return consume(value: abs target) + status; } verb main() -> Int { if check() == 1031 { return 0; } return 1; }\n",
+        "enum Failure { Bad, }\n\"\"\"Returns a borrowed u32 converted to Int.\"\"\"\nverb consume(abs value: u32) -> Int { return value as Int; }\n\"\"\"\ncontract:\npurpose:\n    Assign the Ok payload of a Result to an outer variable inside a case block and return that value plus the case status.\noutputs:\n    1031 when the Result is Ok, since the status is then 0.\nownership:\n    The target is a local u32 written from the case block and then borrowed by consume.\n\"\"\"\nverb check() -> Int { erg target: u32 = 0u32; erg result: Result[u32, Failure] = Result[u32, Failure].Ok(1031u32); erg status: Int = case dat result { Result.Err(_) => 1, Result.Ok(index) => { target = index; 0; }, }; return consume(value: abs target) + status; }\n\"\"\"Entry point that returns 0 when check yields 1031, and 1 otherwise.\"\"\"\nverb main() -> Int { if check() == 1031 { return 0; } return 1; }\n",
     )
     .expect("write Cranelift case-assignment call fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -271,7 +271,7 @@ fn llvm_backend_merges_case_branch_assignment_before_call() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "enum Failure { Bad, } verb consume(abs value: u32) -> Int { return value as Int; } verb check() -> Int { erg target: u32 = 0u32; erg result: Result[u32, Failure] = Result[u32, Failure].Ok(1031u32); erg status: Int = case dat result { Result.Err(_) => 1, Result.Ok(index) => { target = index; 0; }, }; return consume(value: abs target) + status; } verb main() -> Int { if check() == 1031 { return 0; } return 1; }\n",
+        "enum Failure { Bad, }\n\"\"\"Returns a borrowed u32 converted to Int.\"\"\"\nverb consume(abs value: u32) -> Int { return value as Int; }\n\"\"\"\ncontract:\npurpose:\n    Assign the Ok payload of a Result to an outer variable inside a case block and return that value plus the case status.\noutputs:\n    1031 when the Result is Ok, since the status is then 0.\nownership:\n    The target is a local u32 written from the case block and then borrowed by consume.\n\"\"\"\nverb check() -> Int { erg target: u32 = 0u32; erg result: Result[u32, Failure] = Result[u32, Failure].Ok(1031u32); erg status: Int = case dat result { Result.Err(_) => 1, Result.Ok(index) => { target = index; 0; }, }; return consume(value: abs target) + status; }\n\"\"\"Entry point that returns 0 when check yields 1031, and 1 otherwise.\"\"\"\nverb main() -> Int { if check() == 1031 { return 0; } return 1; }\n",
     )
     .expect("write LLVM case-assignment call fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -304,7 +304,7 @@ fn cranelift_backend_copies_aggregate_case_payload_into_existing_owner() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Location { erg global_index: u32, } enum Failure { Invalid, } verb assign(ins location: Location) { erg result = Result[Location, Failure].Ok(Location { global_index: 41u32, }); case dat result { Result.Err(_) => { location.global_index = 0u32; }, Result.Ok(value) => { location = value; }, }; } verb main() -> Int { erg location: Location = Location { global_index: 0u32, }; assign(location: ins location); return location.global_index as Int; }\n",
+        "struct Location { erg global_index: u32, } enum Failure { Invalid, }\n\"\"\"\ncontract:\npurpose:\n    Overwrite an exclusively borrowed Location with the Location carried by an Ok result, or reset its index to zero on error.\ninputs:\n    location: exclusive ins loan of Location replaced or reset in place.\noutputs:\n    No value.\nownership:\n    The location is an exclusive ins loan and is mutated.\nside_effects:\n    Replaces the whole Location, or sets global_index to 0.\n\"\"\"\nverb assign(ins location: Location) { erg result = Result[Location, Failure].Ok(Location { global_index: 41u32, }); case dat result { Result.Err(_) => { location.global_index = 0u32; }, Result.Ok(value) => { location = value; }, }; }\n\"\"\"Entry point that starts with a zeroed Location, lets assign overwrite it and returns the resulting global_index as Int.\"\"\"\nverb main() -> Int { erg location: Location = Location { global_index: 0u32, }; assign(location: ins location); return location.global_index as Int; }\n",
     )
     .expect("write Cranelift aggregate case assignment fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -338,7 +338,7 @@ fn llvm_backend_copies_aggregate_case_payload_into_existing_owner() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Location { erg global_index: u32, } enum Failure { Invalid, } verb assign(ins location: Location) { erg result = Result[Location, Failure].Ok(Location { global_index: 41u32, }); case dat result { Result.Err(_) => { location.global_index = 0u32; }, Result.Ok(value) => { location = value; }, }; } verb main() -> Int { erg location: Location = Location { global_index: 0u32, }; assign(location: ins location); return location.global_index as Int; }\n",
+        "struct Location { erg global_index: u32, } enum Failure { Invalid, }\n\"\"\"\ncontract:\npurpose:\n    Overwrite an exclusively borrowed Location with the Location carried by an Ok result, or reset its index to zero on error.\ninputs:\n    location: exclusive ins loan of Location replaced or reset in place.\noutputs:\n    No value.\nownership:\n    The location is an exclusive ins loan and is mutated.\nside_effects:\n    Replaces the whole Location, or sets global_index to 0.\n\"\"\"\nverb assign(ins location: Location) { erg result = Result[Location, Failure].Ok(Location { global_index: 41u32, }); case dat result { Result.Err(_) => { location.global_index = 0u32; }, Result.Ok(value) => { location = value; }, }; }\n\"\"\"Entry point that starts with a zeroed Location, lets assign overwrite it and returns the resulting global_index as Int.\"\"\"\nverb main() -> Int { erg location: Location = Location { global_index: 0u32, }; assign(location: ins location); return location.global_index as Int; }\n",
     )
     .expect("write LLVM aggregate case assignment fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -372,7 +372,7 @@ fn cranelift_backend_coerces_case_branch_values_to_the_merge_type() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb main() -> Int { erg left: u8 = 13; erg right: u8 = 5; erg value = case (left < right) || (left <= right) { true => 1, _ => 0, }; return value; }\n",
+        "\"\"\"Entry point that compares two u8 values with untyped literals through a short-circuit or and returns 1 when either comparison holds, otherwise 0.\"\"\"\nverb main() -> Int { erg left: u8 = 13; erg right: u8 = 5; erg value = case (left < right) || (left <= right) { true => 1, _ => 0, }; return value; }\n",
     )
     .expect("write Cranelift case merge fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -399,7 +399,7 @@ fn cranelift_backend_coerces_case_branch_values_to_the_merge_type() {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_share_logical_case_predicates() {
-    let source = "verb main() -> Int { erg left: u8 = 13u8; erg right: u8 = 5u8; erg value = case (left < right) || (left <= right) { true => 1, _ => 0, }; return value; }\n";
+    let source = "\"\"\"Entry point that compares two u8 values with typed literals through a short-circuit or and returns 1 when either comparison holds, otherwise 0.\"\"\"\nverb main() -> Int { erg left: u8 = 13u8; erg right: u8 = 5u8; erg value = case (left < right) || (left <= right) { true => 1, _ => 0, }; return value; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir()
             .join(format!("actus-cli-{backend}-logical-case-{}", std::process::id()));
@@ -437,7 +437,7 @@ fn both_native_backends_share_logical_case_predicates() {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_share_scalar_if_and_empty_case_continuation() {
-    let source = "enum Failure { Bad, } verb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(7); } verb main() -> Int { erg result = produce(); return case dat result { Result.Err(_) => { return 1; }, Result.Ok(_) => {}, }; return if 7 == 7 { 0 } else { 1 }; }\n";
+    let source = "enum Failure { Bad, }\n\"\"\"\ncontract:\npurpose:\n    Return an Ok result holding 7.\noutputs:\n    Result.Ok with 7.\n\"\"\"\nverb produce() -> Result[Int, Failure] { return Result[Int, Failure].Ok(7); }\n\"\"\"Entry point that returns 1 from inside a case arm when produce fails and falls through the Ok arm to return 0 when the check 7 equals 7 holds.\"\"\"\nverb main() -> Int { erg result = produce(); return case dat result { Result.Err(_) => { return 1; }, Result.Ok(_) => {}, }; return if 7 == 7 { 0 } else { 1 }; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir()
             .join(format!("actus-cli-{backend}-scalar-if-case-{}", std::process::id()));
@@ -481,7 +481,7 @@ fn llvm_backend_builds_and_runs_a_shared_fixed_array_element_compound_store() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }\n",
+        "\"\"\"Entry point that adds 41 to element 2 of a u32 array with a compound assignment and returns that element as Int plus 1.\"\"\"\nverb main() -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[2u32] += 41u32; return values[2u32] as Int + 1; }\n",
     )
     .expect("write LLVM fixed-array compound store fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -515,7 +515,7 @@ fn cranelift_backend_builds_and_runs_a_shared_dynamic_fixed_array_index() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[index] += 41u32; return values[index] as Int + 1; } verb main() -> Int { return read(index: abs 2u32); }\n",
+        "\"\"\"Adds 41 to the element of a fresh u32 array selected by a borrowed index and returns that element plus 1.\"\"\"\nverb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[index] += 41u32; return values[index] as Int + 1; }\n\"\"\"Entry point that returns the result of read for the in-range index 2.\"\"\"\nverb main() -> Int { return read(index: abs 2u32); }\n",
     )
     .expect("write Cranelift dynamic fixed-array fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -548,7 +548,7 @@ fn llvm_backend_builds_and_runs_a_shared_dynamic_fixed_array_index() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[index] += 41u32; return values[index] as Int + 1; } verb main() -> Int { return read(index: abs 2u32); }\n",
+        "\"\"\"Adds 41 to the element of a fresh u32 array selected by a borrowed index and returns that element plus 1.\"\"\"\nverb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); values[index] += 41u32; return values[index] as Int + 1; }\n\"\"\"Entry point that returns the result of read for the in-range index 2.\"\"\"\nverb main() -> Int { return read(index: abs 2u32); }\n",
     )
     .expect("write LLVM dynamic fixed-array fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -581,7 +581,7 @@ fn cranelift_backend_reports_a_shared_dynamic_fixed_array_index_out_of_bounds() 
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[index] as Int; } verb main() -> Int { return read(index: abs 4u32); }\n",
+        "\"\"\"Returns the element of a fresh u32 array selected by a borrowed index, which the test calls with an out-of-range index.\"\"\"\nverb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[index] as Int; }\n\"\"\"Entry point that calls read with the index 4, one past the end of the four-element array.\"\"\"\nverb main() -> Int { return read(index: abs 4u32); }\n",
     )
     .expect("write Cranelift array bounds fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -616,7 +616,7 @@ fn llvm_backend_reports_a_shared_dynamic_fixed_array_index_out_of_bounds() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "verb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[index] as Int; } verb main() -> Int { return read(index: abs 4u32); }\n",
+        "\"\"\"Returns the element of a fresh u32 array selected by a borrowed index, which the test calls with an out-of-range index.\"\"\"\nverb read(abs index: u32) -> Int { erg values: Array[u32, 4] = Array[u32, 4](); return values[index] as Int; }\n\"\"\"Entry point that calls read with the index 4, one past the end of the four-element array.\"\"\"\nverb main() -> Int { return read(index: abs 4u32); }\n",
     )
     .expect("write LLVM array bounds fixture");
     let status = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -651,7 +651,7 @@ fn cranelift_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation()
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Counter { value: Int, } verb increment(ins counter: Counter) { counter.value += 1; return; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n",
+        "struct Counter { value: Int, }\n\"\"\"Adds 1 to the value of an exclusively borrowed Counter and returns early.\"\"\"\nverb increment(ins counter: Counter) { counter.value += 1; return; }\n\"\"\"Entry point that increments a Counter holding 41 through increment and returns its value.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n",
     )
     .expect("write Cranelift scalar-struct mutation fixture");
     let result = run_with_args(
@@ -683,7 +683,7 @@ fn llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Counter { value: Int, } verb increment(ins counter: Counter) { counter.value += 1; return; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n",
+        "struct Counter { value: Int, }\n\"\"\"Adds 1 to the value of an exclusively borrowed Counter and returns early.\"\"\"\nverb increment(ins counter: Counter) { counter.value += 1; return; }\n\"\"\"Entry point that increments a Counter holding 41 through increment and returns its value.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n",
     )
     .expect("write LLVM scalar-struct mutation fixture");
     let result = run_with_args(
@@ -709,7 +709,7 @@ fn llvm_backend_builds_and_runs_a_shared_scalar_struct_parameter_mutation() {
 #[cfg(all(unix, feature = "cranelift", feature = "llvm"))]
 #[test]
 fn both_native_backends_share_structured_ins_caller_owned_storage() {
-    let source = "struct Counter { value: Int, } verb increment(ins counter: Counter) { counter.value += 1; return; } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n";
+    let source = "struct Counter { value: Int, }\n\"\"\"Adds 1 to the value of an exclusively borrowed Counter and returns early.\"\"\"\nverb increment(ins counter: Counter) { counter.value += 1; return; }\n\"\"\"Entry point that increments a Counter holding 41 through increment and returns its value.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; increment(counter: ins counter); return counter.value; }\n";
     for backend in ["cranelift", "llvm"] {
         let root = std::env::temp_dir()
             .join(format!("actus-cli-{backend}-structured-ins-{}", std::process::id()));
@@ -752,7 +752,7 @@ fn llvm_backend_builds_and_runs_scalar_aggregate_field_access() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; return counter.value + 1; }\n",
+        "struct Counter { value: Int, }\n\"\"\"Entry point that returns the value of a Counter holding 41 plus 1.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; return counter.value + 1; }\n",
     )
     .expect("write LLVM aggregate field fixture");
 
@@ -785,7 +785,7 @@ fn llvm_backend_builds_and_runs_scalar_aggregate_field_assignment() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value = 42; return counter.value; }\n",
+        "struct Counter { value: Int, }\n\"\"\"Entry point that assigns 42 to the value of a Counter holding 41 and returns it.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value = 42; return counter.value; }\n",
     )
     .expect("write LLVM aggregate field assignment fixture");
     let result = run_with_args(
@@ -817,7 +817,7 @@ fn llvm_backend_builds_and_runs_scalar_aggregate_field_compound_assignment() {
     let output = root.with_extension("bin");
     fs::write(
         &input,
-        "struct Counter { value: Int, } verb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value += 1; return counter.value; }\n",
+        "struct Counter { value: Int, }\n\"\"\"Entry point that adds 1 to the value of a Counter holding 41 with a compound assignment and returns it.\"\"\"\nverb main() -> Int { erg counter: Counter = Counter { value: 41, }; counter.value += 1; return counter.value; }\n",
     )
     .expect("write LLVM aggregate field compound fixture");
     let result = run_with_args(
@@ -852,7 +852,7 @@ fn llvm_backend_builds_and_runs_shared_scalar_bitwise_operations() {
         "[package]\nname = \"llvm-bitwise-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
     )
     .expect("write LLVM bitwise fixture manifest");
-    fs::write(&input, "verb main() -> Int { return (12 & 10) | 1; }\n")
+    fs::write(&input, "\"\"\"Entry point that returns the bitwise and of 12 and 10 combined with 1 by bitwise or.\"\"\"\nverb main() -> Int { return (12 & 10) | 1; }\n")
         .expect("write LLVM bitwise fixture source");
 
     let result = run_with_args(
@@ -885,7 +885,7 @@ fn llvm_backend_builds_and_runs_checked_scalar_division_and_remainder() {
         "[package]\nname = \"llvm-division-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
     )
     .expect("write LLVM division fixture manifest");
-    fs::write(&input, "verb main() -> Int { return 20 / 5 + 17 % 6; }\n")
+    fs::write(&input, "\"\"\"Entry point that returns 20 divided by 5 plus the remainder of 17 divided by 6.\"\"\"\nverb main() -> Int { return 20 / 5 + 17 % 6; }\n")
         .expect("write LLVM division fixture source");
 
     let result = run_with_args(
@@ -918,7 +918,7 @@ fn llvm_backend_builds_and_runs_checked_scalar_shifts() {
         "[package]\nname = \"llvm-shift-cli\"\nversion = \"1.0.0\"\n\n[build]\nbackend = \"llvm\"\n",
     )
     .expect("write LLVM shift fixture manifest");
-    fs::write(&input, "verb main() -> Int { return (1 << 4) + (32 >> 3); }\n")
+    fs::write(&input, "\"\"\"Entry point that returns 1 shifted left by 4 plus 32 shifted right by 3.\"\"\"\nverb main() -> Int { return (1 << 4) + (32 >> 3); }\n")
         .expect("write LLVM shift fixture source");
 
     let result = run_with_args(

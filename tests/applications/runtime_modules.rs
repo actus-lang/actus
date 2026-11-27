@@ -5,7 +5,7 @@ use std::process::Command;
 
 #[test]
 fn nested_runtime_facade_qualifies_sibling_imports() {
-    let source = "import { open feature }; verb main() -> Int { return runtime_probe(); }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the result of runtime_probe as the process exit status.\"\"\"\nverb main() -> Int { return runtime_probe(); }\n";
     let (root, input, output) = project("nested-runtime-sibling-import", source);
     fs::write(
         root.join("Actus.toml"),
@@ -37,7 +37,7 @@ open verb runtime_probe() -> Int { return 0; }
 
 #[test]
 fn generic_nested_module_lowers_facade_constant_without_native_binding() {
-    let source = "import { open feature }; verb main() -> Int { return inspect[2]() as Int; }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the Int conversion of inspect instantiated with the generic argument 2.\"\"\"\nverb main() -> Int { return inspect[2]() as Int; }\n";
     let (root, input, output) = project("generic-constant-facade", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -80,7 +80,7 @@ open verb inspect[N: Usize]() -> u16 { return BUFFER_STRIDE + (N as u16); }
 
 #[test]
 fn native_lowering_inlines_facade_constant_in_else_if_branch() {
-    let source = "import { open feature }; verb main() -> Int { erg input: u8 = 17u8; return inspect(value: erg input); }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that passes the u8 value 17 by ownership to inspect and returns its result.\"\"\"\nverb main() -> Int { erg input: u8 = 17u8; return inspect(value: erg input); }\n";
     let (root, input, output) = project("constant-else-if-lowering", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -130,7 +130,7 @@ open verb inspect(erg value: u8) -> Int {
 
 #[test]
 fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
-    let source = "import { open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
+    let source = "import { open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a region of u32 slots over a 4-byte backing buffer and drop the result without using it.\noutputs:\n    0.\nownership:\n    The backing buffer is moved into the region by the open call; the result is dropped.\nerrors:\n    region_open can fail with a RegionError, which is discarded here.\nside_effects:\n    Allocates region storage.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[4]; erg logical_length: u64 = 1u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg result = region_open[u32](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); drop(result); return 0; }\n";
     let (root, input, output) = project("generic-region-object", source);
     fs::write(
         root.join("Actus.toml"),
@@ -155,7 +155,7 @@ fn generic_region_facade_object_emits_size_of_with_concrete_element_type() {
 
 #[test]
 fn generic_region_lowers_an_imported_packed_element_type() {
-    let source = "import { open feature, open std::region }; meta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[64]; erg logical_length: u64 = 1048576u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[64]; erg index: u64 = 0u64; erg read_result = region_read(region: abs region, index: erg index, destination: ins destination); region_close(region: ins region); return case dat read_result { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
+    let source = "import { open feature, open std::region };\n\"\"\"\ncontract:\npurpose:\n    Open a Minicolumn region with a very large logical length, read one element into a destination buffer, then close the region.\noutputs:\n    0 on success, 1 when the region cannot be opened, 2 when the read fails.\nownership:\n    The backing buffer is moved into the region; the destination is borrowed by the read.\nerrors:\n    region_open and region_read errors are mapped to the exit codes 1 and 2.\nside_effects:\n    Allocates region storage and closes the region.\n\"\"\"\nmeta effect(\"allocation\") verb main() -> Int { erg backing: Buffer = Buffer[64]; erg logical_length: u64 = 1048576u64; erg window_start: u64 = 0u64; erg window_count: u64 = 1u64; erg opened = region_open[Minicolumn](backing: dat backing, logical_length: erg logical_length, window_start: erg window_start, window_count: erg window_count); return case dat opened { Result.Err(_) => 1, Result.Ok(region) => { erg destination: Buffer = Buffer[64]; erg index: u64 = 0u64; erg read_result = region_read(region: abs region, index: erg index, destination: ins destination); region_close(region: ins region); return case dat read_result { Result.Err(_) => 2, Result.Ok(_) => 0, }; }, }; }\n";
     let (root, input, output) = project("generic-region-imported-pack", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
     fs::write(
@@ -218,6 +218,21 @@ open pack Minicolumn {
 fn generic_region_lowers_all_packed_element_operations() {
     let source = r#"import { open feature, open std::region };
 
+"""
+contract:
+purpose:
+    Write one Minicolumn into a region, publish the write, then cancel the region, reporting which step failed.
+inputs:
+    region: exclusive ins loan of Region of Minicolumn values.
+outputs:
+    0 when write, publish and cancel all succeed, otherwise 1, 2 or 3 for the failing step.
+ownership:
+    The region is an exclusive ins loan and is mutated; the source buffer is borrowed.
+errors:
+    region_write, region_publish and region_cancel errors map to the exit codes 1, 2 and 3.
+side_effects:
+    Mutates the region by writing, publishing and canceling.
+"""
 verb write_publish_cancel(ins region: Region[Minicolumn]) -> Int {
     erg source: Buffer = Buffer[64];
     erg index: u64 = 0u64;
@@ -242,10 +257,24 @@ verb write_publish_cancel(ins region: Region[Minicolumn]) -> Int {
     };
 }
 
+"""Returns the Minicolumn region it was given, moving ownership from the parameter to the result so the test can check that a packed region survives a forwarding call."""
 verb forward_packed_region(dat region: Region[Minicolumn]) -> Region[Minicolumn] {
     return region;
 }
 
+"""
+contract:
+purpose:
+    Open a Minicolumn region, forward it through forward_packed_region, run write_publish_cancel on it, then read an element back and close the region.
+outputs:
+    0 on success, or a nonzero code identifying the failing step.
+ownership:
+    The region is moved through forward_packed_region and then borrowed by region_read and lent exclusively to region_close; buffers are owned locally.
+errors:
+    Open, write, read and close errors are mapped to distinct nonzero exit codes.
+side_effects:
+    Allocates region storage and mutates and closes the region.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg backing: Buffer = Buffer[64];
@@ -337,7 +366,7 @@ open pack Minicolumn {
 
 #[test]
 fn nested_facade_lowers_pack_backed_const_generic_parameters() {
-    let source = "import { open feature }; verb main() -> Int { return inspect[256]() as Int; }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the Int conversion of inspect instantiated with the generic argument 256.\"\"\"\nverb main() -> Int { return inspect[256]() as Int; }\n";
     let (root, input, output) = project("pack-backed-generic-facade", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
     fs::write(
@@ -412,10 +441,26 @@ struct Pair {
     erg right: u32,
 }
 
+"""Returns the generic Region it was given, moving ownership from the parameter to the result."""
 verb forward_region[T](dat region: Region[T]) -> Region[T] {
     return region;
 }
 
+"""
+contract:
+purpose:
+    Open a one-element region of type T over the given backing buffer.
+inputs:
+    backing: owned Buffer that becomes the region storage.
+outputs:
+    Result.Ok with the opened Region of T, or Result.Err with a RegionError.
+ownership:
+    The backing buffer is moved into the region.
+errors:
+    Any RegionError from region_open is returned unchanged.
+side_effects:
+    Allocates region storage.
+"""
 meta effect("allocation")
 verb open_forward[T](dat backing: Buffer) -> Result[Region[T], RegionError] {
     erg logical_length: u64 = 1u64;
@@ -429,6 +474,19 @@ verb open_forward[T](dat backing: Buffer) -> Result[Region[T], RegionError] {
     );
 }
 
+"""
+contract:
+purpose:
+    Open a region of u16 pairs, forward it, read one element and close it, mapping every failure to an exit code.
+outputs:
+    0 on success, 1 when the region cannot be opened, 2 when the read fails, 3 when the close fails.
+ownership:
+    The region is moved through forward_region and then borrowed by region_read and lent exclusively to region_close; buffers are owned locally.
+errors:
+    Open, read and close errors map to the exit codes 1, 2 and 3.
+side_effects:
+    Allocates region storage and closes the region.
+"""
 meta effect("allocation")
 verb check_array() -> Int {
     erg backing: Buffer = Buffer[4];
@@ -453,6 +511,19 @@ verb check_array() -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Open a region of Pair structs, forward it, read one element and close it, mapping every failure to an exit code.
+outputs:
+    0 on success, 4 when the region cannot be opened, 5 when the read fails, 6 when the close fails.
+ownership:
+    The region is moved through forward_region and then borrowed by region_read and lent exclusively to region_close; buffers are owned locally.
+errors:
+    Open, read and close errors map to the exit codes 4, 5 and 6.
+side_effects:
+    Allocates region storage and closes the region.
+"""
 meta effect("allocation")
 verb check_struct() -> Int {
     erg backing: Buffer = Buffer[8];
@@ -477,6 +548,19 @@ verb check_struct() -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Open a region of 16-byte arrays, forward it, read one element and close it, mapping every failure to an exit code.
+outputs:
+    0 on success, 7 when the region cannot be opened, 8 when the read fails, 9 when the close fails.
+ownership:
+    The region is moved through forward_region and then borrowed by region_read and lent exclusively to region_close; buffers are owned locally.
+errors:
+    Open, read and close errors map to the exit codes 7, 8 and 9.
+side_effects:
+    Allocates region storage and closes the region.
+"""
 meta effect("allocation")
 verb check_byte_array() -> Int {
     erg backing: Buffer = Buffer[16];
@@ -501,6 +585,17 @@ verb check_byte_array() -> Int {
     };
 }
 
+"""
+contract:
+purpose:
+    Run the array, struct and byte-array region checks in order and stop at the first failure.
+outputs:
+    0 when all three checks pass, otherwise the first nonzero status.
+errors:
+    The status of the first failing check is returned unchanged.
+side_effects:
+    Allocates and closes region storage through the three checks.
+"""
 meta effect("allocation")
 verb main() -> Int {
     erg array_status: Int = check_array();
@@ -527,7 +622,7 @@ verb main() -> Int {
 
 #[test]
 fn generic_facade_constant_survives_scalar_predicate_and_aggregate_specialization() {
-    let source = "import { open feature }; verb main() -> Int { return inspect[2]() as Int; }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the Int conversion of inspect instantiated with the generic argument 2.\"\"\"\nverb main() -> Int { return inspect[2]() as Int; }\n";
     let (root, input, output) = project("generic-constant-uses", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(
@@ -583,7 +678,7 @@ open verb inspect[N: Usize]() -> u16 {
 
 #[test]
 fn facade_constant_objects_are_deterministic_and_symbol_free() {
-    let source = "import { open feature }; verb main() -> Int { return stride() as Int; }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the Int conversion of stride, a configuration constant reached through the canonical parent facade.\"\"\"\nverb main() -> Int { return stride() as Int; }\n";
     let (root, input, output) = project("constant-symbol-integrity", source);
     fs::create_dir_all(root.join("src/config")).expect("create configuration directory");
     fs::write(

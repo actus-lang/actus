@@ -42,7 +42,7 @@ fn new_creates_a_formatted_hello_world_with_the_standard_library() {
     );
     assert_eq!(
         fs::read_to_string(root.join("src/main.act")).unwrap(),
-        "verb main() {\n    print(string: \"Hello, world!\");\n}\n"
+        "\"\"\"Entry point of the new program: print a greeting to standard output.\"\"\"\nverb main() {\n    print(string: \"Hello, world!\");\n}\n"
     );
     let actus = |arguments: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -70,7 +70,7 @@ fn a_core_project_importing_the_standard_library_names_the_runtime_setting() {
     let manifest = fs::read_to_string(root.join("Actus.toml")).expect("read manifest");
     assert!(!manifest.contains("runtime"), "{manifest}");
 
-    fs::write(root.join("src/main.act"), "import std::io;\n\nverb main() {}\n")
+    fs::write(root.join("src/main.act"), "import std::io;\n\n\"\"\"Entry point with an empty body and no result type; it does nothing.\"\"\"\nverb main() {}\n")
         .expect("write std import");
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))
         .arg("check")
@@ -142,7 +142,7 @@ fn package_zero_float_policy_accepts_integer_builds() {
         "[package]\nname = \"integer_app\"\nversion = \"0.1.0\"\n\n[build]\nverify_no_float_ir = true\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "verb main() -> Int { return 0; }\n")
+    fs::write(root.join("src/main.act"), "\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n")
         .expect("write integer source");
     fs::create_dir_all(root.join("tests")).expect("create test directory");
     fs::write(root.join("tests/smoke.act"), "meta test\nverb smoke() -> Int { return 0; }\n")
@@ -196,7 +196,7 @@ fn package_zero_float_policy_rejects_float_builds_with_function_context() {
     .expect("write manifest");
     fs::write(
         root.join("src/main.act"),
-        "verb main() -> Int { erg value: f32 = 1.0f32; return 0; }\n",
+        "\"\"\"Entry point that binds an f32 constant and returns 0.\"\"\"\nverb main() -> Int { erg value: f32 = 1.0f32; return 0; }\n",
     )
     .expect("write float source");
 
@@ -277,7 +277,7 @@ fn init_creates_an_existing_directory_project_without_git() {
 #[test]
 fn check_validates_source_without_emitting_code() {
     let input = std::env::temp_dir().join(format!("actus-check-{}.act", std::process::id()));
-    fs::write(&input, "verb main() -> Int { return 42; }\n").expect("write source");
+    fs::write(&input, "\"\"\"Entry point that returns the constant 42.\"\"\"\nverb main() -> Int { return 42; }\n").expect("write source");
 
     let result = run_with_args(vec!["check".to_owned(), input.display().to_string()].into_iter());
 
@@ -325,7 +325,7 @@ fn native_build_propagates_nested_generic_instances_through_an_imported_module()
         "[package]\nname = \"nested-generic-module\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "import { open aie }; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n")
+    fs::write(root.join("src/main.act"), "import { open aie };\n\"\"\"Entry point that builds a Storage of capacity 4 and returns the result of outer on it as Int.\"\"\"\nverb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n")
         .expect("write root source");
     fs::write(module.join("aie.act"), "\"\"\"Re-export the engine module declarations for the fixture project.\"\"\" open engine;\n").expect("write module facade");
     fs::write(
@@ -359,7 +359,7 @@ fn native_build_propagates_nested_generics_through_a_child_facade() {
     .expect("write manifest");
     fs::write(
         root.join("src/main.act"),
-        "import { open aie }; verb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n",
+        "import { open aie };\n\"\"\"Entry point that builds a Storage of capacity 4 and returns the result of outer on it as Int.\"\"\"\nverb main() -> Int { erg storage: Storage[4] = Storage[4] { values: Array[u32, 4](), }; return outer(storage: ins storage) as Int; }\n",
     )
     .expect("write root source");
     fs::write(root.join("src/aie/aie.act"), "\"\"\"Re-export the runtime module declarations for the fixture project.\"\"\" open runtime;\n").expect("write parent facade");
@@ -396,7 +396,7 @@ fn native_build_specializes_root_generic_calls_through_nested_facades() {
     .expect("write manifest");
     fs::write(
         root.join("src/main.act"),
-        "import { open device }; verb wrapper[N: Usize](ins value: Storage[N]) -> u32 { return forward(value: ins value); } verb main() -> Int { erg value: Storage[4] = Storage[4] { values: Array[u32, 4]() }; return wrapper(value: ins value) as Int; }\n",
+        "import { open device };\n\"\"\"Passes an exclusively borrowed Storage of capacity N on to forward and returns the u32 it produced.\"\"\"\nverb wrapper[N: Usize](ins value: Storage[N]) -> u32 { return forward(value: ins value); }\n\"\"\"Entry point that builds a Storage of capacity 4 with a zeroed array and returns the result of wrapper as Int.\"\"\"\nverb main() -> Int { erg value: Storage[4] = Storage[4] { values: Array[u32, 4]() }; return wrapper(value: ins value) as Int; }\n",
     )
     .expect("write root source");
     fs::write(root.join("src/device/device.act"), "\"\"\"Re-export the runtime module declarations for the fixture project.\"\"\" open runtime;\n").expect("write parent facade");
@@ -515,7 +515,7 @@ fn native_build_links_multiple_child_facades_once() {
     .expect("write manifest");
     fs::write(
         root.join("src/main.act"),
-        "import { open device }; verb main() -> Int { return runtime_value() + layout_value(); }\n",
+        "import { open device };\n\"\"\"Entry point that returns the sum of runtime_value and layout_value.\"\"\"\nverb main() -> Int { return runtime_value() + layout_value(); }\n",
     )
     .expect("write root source");
     fs::write(root.join("src/device/device.act"), "open runtime; open layout;\n")
@@ -549,7 +549,7 @@ fn watch_once_checks_the_project_entry() {
         "[package]\nname = \"watcher\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "verb main() -> Int { return 0; }\n")
+    fs::write(root.join("src/main.act"), "\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n")
         .expect("write entry source");
 
     let output = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -575,7 +575,7 @@ fn check_and_run_follow_manifest_source_root_and_entry() {
         "[package]\nname = \"custom\"\nversion = \"0.1.0\"\nedition = \"alpha\"\nsource_root = \"app\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("app/main.act"), "verb main() -> Int { return 44; }\n")
+    fs::write(root.join("app/main.act"), "\"\"\"Entry point that returns the constant 44.\"\"\"\nverb main() -> Int { return 44; }\n")
         .expect("write entry source");
 
     let check = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -612,7 +612,7 @@ fn watch_rechecks_after_a_source_change_and_surfaces_failure() {
     )
     .expect("write manifest");
     let source = root.join("src/main.act");
-    fs::write(&source, "verb main() -> Int { return 0; }\n").expect("write entry source");
+    fs::write(&source, "\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }\n").expect("write entry source");
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["watch", "--interval", "20"])
@@ -622,7 +622,7 @@ fn watch_rechecks_after_a_source_change_and_surfaces_failure() {
         .spawn()
         .expect("start watch command");
     thread::sleep(Duration::from_millis(100));
-    fs::write(&source, "verb main() -> Int { return ; }\n").expect("write invalid source");
+    fs::write(&source, "\"\"\"Entry point whose return statement has no expression, so the parser must reject it.\"\"\"\nverb main() -> Int { return ; }\n").expect("write invalid source");
     thread::sleep(Duration::from_millis(150));
     let _ = child.kill();
     let output = child.wait_with_output().expect("collect watch output");
@@ -645,7 +645,7 @@ fn build_discovers_the_manifest_entry_without_an_input_path() {
         "[package]\nname = \"entry\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "verb main() -> Int { return 42; }\n")
+    fs::write(root.join("src/main.act"), "\"\"\"Entry point that returns the constant 42.\"\"\"\nverb main() -> Int { return 42; }\n")
         .expect("write entry source");
 
     let result = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -677,7 +677,7 @@ fn build_discovers_a_parent_manifest_from_a_nested_directory() {
         "[package]\nname = \"nested\"\nversion = \"0.1.0\"\nedition = \"alpha\"\n",
     )
     .expect("write manifest");
-    fs::write(root.join("src/main.act"), "verb main() -> Int { return 43; }\n")
+    fs::write(root.join("src/main.act"), "\"\"\"Entry point that returns the constant 43.\"\"\"\nverb main() -> Int { return 43; }\n")
         .expect("write entry source");
 
     let result = Command::new(env!("CARGO_BIN_EXE_actus"))
@@ -701,7 +701,7 @@ fn build_discovers_a_parent_manifest_from_a_nested_directory() {
 #[test]
 fn run_accepts_release_profile_and_forwards_arguments() {
     let input = std::env::temp_dir().join(format!("actus-run-options-{}.act", std::process::id()));
-    fs::write(&input, "verb main() -> Int { return 42; }\n").expect("write source");
+    fs::write(&input, "\"\"\"Entry point that returns the constant 42.\"\"\"\nverb main() -> Int { return 42; }\n").expect("write source");
 
     let result = run_with_args(
         vec![
@@ -722,7 +722,7 @@ fn run_accepts_release_profile_and_forwards_arguments() {
 #[test]
 fn run_preserves_program_output_and_reports_status_without_temp_path() {
     let input = std::env::temp_dir().join(format!("actus-run-output-{}.act", std::process::id()));
-    fs::write(&input, "verb main() -> Int { print(42); return 7; }\n").expect("write source");
+    fs::write(&input, "\"\"\"\ncontract:\npurpose:\n    Print the number 42 and return 7 as the exit status.\noutputs:\n    7.\nside_effects:\n    Writes the number 42 to standard output.\n\"\"\"\nverb main() -> Int { print(42); return 7; }\n").expect("write source");
 
     let output = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["run", input.to_str().unwrap()])
@@ -743,7 +743,7 @@ fn run_preserves_program_output_and_reports_status_without_temp_path() {
 fn run_reports_build_failures_without_exposing_temp_paths() {
     let input =
         std::env::temp_dir().join(format!("actus-invalid-source-{}.act", std::process::id()));
-    fs::write(&input, "verb main() -> Int { return ; }\n").expect("write invalid source");
+    fs::write(&input, "\"\"\"Entry point whose return statement has no expression, so the parser must reject it.\"\"\"\nverb main() -> Int { return ; }\n").expect("write invalid source");
 
     let output = Command::new(env!("CARGO_BIN_EXE_actus"))
         .args(["run", input.to_str().unwrap()])

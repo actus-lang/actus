@@ -7,6 +7,12 @@ open verb control_value() -> Int {
     return safe_default();
 }
 
+"""
+Return the safe default control value, 24. It is private to the `safety`
+module and reached only through the public `control_value` verb, which shows
+that a facade can export a value while keeping its source private. It takes no
+parameters, allocates nothing and has no side effects.
+"""
 verb safe_default() -> Int {
     return 24;
 }

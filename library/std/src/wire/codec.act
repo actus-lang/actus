@@ -88,10 +88,23 @@ open verb wire_header_decode(abs input: Buffer) -> Result[WireHeader, WireError]
     };
 }
 
+"""
+Compute the offset at which the frame trailer begins: the fixed header size
+plus the payload length declared in the header. The header is an immutable
+`abs` view that is not validated here; the function performs no I/O and no
+allocation.
+"""
 verb wire_frame_data_end(abs header: WireHeader) -> u32 {
     return WIRE_HEADER_BYTES + (header.payload_len as u32);
 }
 
+"""
+Copy `length` bytes from `source` starting at `source_offset` into
+`destination` starting at `destination_offset`, one byte at a time, and return
+the length copied. The source is an immutable `abs` view; the destination is
+mutated through `ins`. The caller must have checked that both ranges fit; the
+function performs no bounds check of its own and allocates nothing.
+"""
 verb wire_copy_payload(
     abs source: Buffer,
     ins destination: Buffer,
@@ -110,10 +123,36 @@ verb wire_copy_payload(
     return length as Int;
 }
 
+"""
+Read the two-byte little-endian CRC trailer stored at `offset` in a frame.
+The input is an immutable `abs` view and is not modified. The caller must
+guarantee that both bytes lie inside the buffer; the function only decodes
+them and does not verify the checksum.
+"""
 verb wire_read_checksum(abs input: Buffer, erg offset: u32) -> u16 {
     return (input[offset] as u16) | ((input[offset + 1u32] as u16) << 8u16);
 }
 
+"""
+contract:
+purpose:
+    Write the payload after the header, compute the CRC-16 of header and
+    payload, and append it as the little-endian trailer.
+inputs:
+    payload: borrowed payload bytes; output: frame buffer whose header is
+    already written; payload_length and frame_data_end: byte counts computed by
+    the caller.
+outputs:
+    `Ok(total)` with the full frame length including the trailer, or a
+    `WireError`.
+ownership:
+    The payload is an immutable `abs` view; the output is mutated through
+    `ins` and stays caller-owned.
+side_effects:
+    Writes the payload and two checksum bytes into the output buffer.
+errors:
+    Any `WireError` reported by `wire_crc16_ccitt`.
+"""
 verb wire_write_payload_and_checksum(
     abs payload: Buffer,
     ins output: Buffer,
@@ -145,6 +184,25 @@ verb wire_write_payload_and_checksum(
     };
 }
 
+"""
+contract:
+purpose:
+    Check that the output buffer can hold the whole frame and write the encoded
+    header at its start.
+inputs:
+    header: borrowed header; output: destination buffer; frame_length: total
+    frame size in bytes.
+outputs:
+    `Ok(0)` when the header was written, or a `WireError`.
+ownership:
+    The header is an immutable `abs` view; the output is an exclusive `ins`
+    loan.
+side_effects:
+    Writes the header bytes into the output buffer.
+errors:
+    `InsufficientCapacity` when the buffer is smaller than the frame, and any
+    error of `wire_header_encode`.
+"""
 verb wire_prepare_frame_output(
     abs header: WireHeader,
     ins output: Buffer,
@@ -161,6 +219,26 @@ verb wire_prepare_frame_output(
     };
 }
 
+"""
+contract:
+purpose:
+    Encode one frame in two stages: prepare the output with the header, then
+    write the payload and the checksum trailer.
+inputs:
+    header and payload: borrowed values; output: destination buffer;
+    payload_length: the payload size already checked against the header.
+outputs:
+    `Ok(total)` with the frame length including the two CRC bytes, or a
+    `WireError`.
+ownership:
+    Header and payload are immutable `abs` views; the output is an exclusive
+    `ins` loan that stays caller-owned.
+side_effects:
+    Writes the complete frame into the output buffer.
+errors:
+    The first error of `wire_prepare_frame_output` or
+    `wire_write_payload_and_checksum`.
+"""
 verb wire_encode_frame_parts(
     abs header: WireHeader,
     abs payload: Buffer,
@@ -219,6 +297,26 @@ open verb wire_frame_encode(
     );
 }
 
+"""
+contract:
+purpose:
+    Verify the CRC trailer of a received frame and, only when it is valid, copy
+    the payload into the caller's output buffer.
+inputs:
+    input: the complete frame; payload_output: destination buffer;
+    frame_data_end: trailer offset; payload_length: declared payload size.
+outputs:
+    `Ok(0)` when the payload was copied, or a `WireError`.
+ownership:
+    The input is an immutable `abs` view; the destination is an exclusive `ins`
+    loan.
+side_effects:
+    Writes `payload_length` bytes into the destination after the checksum
+    passed; nothing is written on failure.
+errors:
+    `ChecksumMismatch` or the CRC error from `wire_validate_checksum`, and
+    `InsufficientCapacity` when the destination is too small.
+"""
 verb wire_validate_and_copy_payload(
     abs input: Buffer,
     ins payload_output: Buffer,
@@ -251,6 +349,21 @@ verb wire_validate_and_copy_payload(
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Compute the CRC-16 over the header and payload of a frame and compare it
+    with the little-endian trailer stored after them.
+inputs:
+    input: the complete frame; frame_data_end: offset of the trailer.
+outputs:
+    `Ok(0)` when the checksums agree, or a `WireError`.
+ownership:
+    The input is an immutable `abs` view and is not modified.
+errors:
+    `ChecksumMismatch` when the values differ, and any error of
+    `wire_crc16_ccitt`.
+"""
 verb wire_validate_checksum(abs input: Buffer, erg frame_data_end: u32) -> Result[Int, WireError] {
     erg checksum_start: u32 = 0u32;
     erg checksum_result = wire_crc16_ccitt(
@@ -271,6 +384,27 @@ verb wire_validate_checksum(abs input: Buffer, erg frame_data_end: u32) -> Resul
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Finish decoding a frame whose header was already parsed and validated by
+    checking the frame is complete, verifying the checksum and copying the
+    payload.
+inputs:
+    header: the validated header, consumed; input: the complete frame;
+    payload_output: destination for the payload.
+outputs:
+    `Ok(header)` as a copy of the header after the payload is stored, or a
+    `WireError`.
+ownership:
+    The header is consumed; the input is an immutable `abs` view; the output is
+    an exclusive `ins` loan.
+side_effects:
+    Writes the payload into `payload_output` once the checksum is valid.
+errors:
+    `Truncated` when the input is shorter than the frame, plus every error of
+    `wire_validate_and_copy_payload`.
+"""
 verb wire_decode_frame_with_header(
     dat header: WireHeader,
     abs input: Buffer,

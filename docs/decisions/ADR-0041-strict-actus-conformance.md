@@ -211,6 +211,19 @@ implemented by the runtime does not satisfy the rule. Rust public APIs use
 Rust `///` documentation; Actus `.act` APIs use the canonical block-docstring
 form above.
 
+Strict mode also requires a block docstring on every private verb, that is a
+`verb` or `external verb` declared without `open`, and on the methods of a
+private `perform` block. A missing or empty docstring is reported with `E1840`
+and names the verb. The requirement is for the presence of the docstring only;
+the content contract above is checked on public declarations. Private structs,
+fields, enums and the other private declaration kinds do not need a docstring.
+A project that documents every verb (purpose, inputs, outputs, errors and side
+effects) can be read and reviewed without opening each body, which is why the
+check does not stop at the public interface.
+
+Documentation is checked on the same set of files as the source limits (see
+"Source limits"): every production `.act` file under the package source root.
+
 ### Source limits
 
 Strict validation enforces these limits on Actus sources, counted in code
@@ -222,6 +235,23 @@ lines, as errors:
 - functions above 50 lines are above the preferred size (`E1853`);
 - functions of 60 lines or more must be split (`E1854`);
 - functions above the 80-line hard limit are always rejected (`E1855`).
+
+A line counts when it carries code. Blank lines, `#` comments and `"""`
+documentation blocks (docstrings of every declaration, single-line or
+multi-line, including structured `contract:` docstrings) do not count; code on
+the same line as a closing `"""` still counts, and so does the code of a line
+that ends with a `#` comment. The limits measure code complexity. Counting
+documentation would punish complete documentation and push authors toward
+shorter docstrings, which is the opposite of what strict mode asks for. The
+diagnostic message reports the measured code-line count.
+
+The files measured are the same for `actus check --strict`, `actus build
+--strict` and `actus test --strict`: every production `.act` file under the
+package source root, in lexical order, each once, whether or not another file
+imports it. `tests` directories and the `fixtures` and `snapshots` data
+directories are not production source. An explicit entry file outside the
+source root is measured as well. Test files in `tests` directories keep their
+own source-limit check in `actus test --strict`.
 
 Because every strict warning is an error, a strict run accepts a file of at
 most 500 code lines and a function of at most 50, unless ADR-0048 lifts the

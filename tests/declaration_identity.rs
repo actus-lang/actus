@@ -57,9 +57,9 @@ fn size_of_generic_parameter_with_an_imported_struct() {
             (
                 "main.act",
                 "import { open shapes };\n\
-                 verb size[T]() -> u64 { return size_of[T](); }\n\
-                 verb alignment[T]() -> u64 { return align_of[T](); }\n\
-                 verb main() -> Int {\n\
+                 \"\"\"Returns the size in bytes of the type argument T, using the size_of intrinsic.\"\"\"\nverb size[T]() -> u64 { return size_of[T](); }\n\
+                 \"\"\"Returns the alignment in bytes of the type argument T, using the align_of intrinsic.\"\"\"\nverb alignment[T]() -> u64 { return align_of[T](); }\n\
+                 \"\"\"Entry point that returns 0 when the Wide struct has size 24 and alignment 8, and 1 or 2 when the size or the alignment differs.\"\"\"\nverb main() -> Int {\n\
                  if size[Wide]() != 24u64 { return 1; }\n\
                  if alignment[Wide]() != 8u64 { return 2; }\n\
                  return 0;\n}\n",
@@ -86,15 +86,15 @@ fn private_type_arguments_are_rejected_by_check_and_build() {
     for (name, use_site) in [
         (
             "generic",
-            "verb size[T]() -> u64 { return size_of[T](); }\nverb main() -> Int { if size[Hidden]() != 8u64 { return 1; } return 0; }\n",
+            "\"\"\"Returns the size in bytes of the type argument T, using the size_of intrinsic.\"\"\"\nverb size[T]() -> u64 { return size_of[T](); }\n\"\"\"Entry point that returns 0 when the size of the Hidden struct, read through the generic size verb, is 8.\"\"\"\nverb main() -> Int { if size[Hidden]() != 8u64 { return 1; } return 0; }\n",
         ),
         (
             "intrinsic",
-            "verb main() -> Int { if size_of[Hidden]() != 8u64 { return 1; } return 0; }\n",
+            "\"\"\"Entry point that returns 0 when the size_of intrinsic reports 8 for the Hidden struct.\"\"\"\nverb main() -> Int { if size_of[Hidden]() != 8u64 { return 1; } return 0; }\n",
         ),
         (
             "nested",
-            "verb main() -> Int { if size_of[Array[Hidden, 2]]() != 16u64 { return 1; } return 0; }\n",
+            "\"\"\"Entry point that returns 0 when a two-element array of Hidden structs has size 16.\"\"\"\nverb main() -> Int { if size_of[Array[Hidden, 2]]() != 16u64 { return 1; } return 0; }\n",
         ),
     ] {
         let main = format!("import {{ open shapes }};\n{use_site}");
@@ -128,9 +128,9 @@ fn size_of_generic_parameter_with_a_root_struct() {
         &[(
             "main.act",
             "struct Wide { erg a: u64, erg b: u32, erg c: u64, }\n\
-             verb size[T]() -> u64 { return size_of[T](); }\n\
-             verb alignment[T]() -> u64 { return align_of[T](); }\n\
-             verb main() -> Int {\n\
+             \"\"\"Returns the size in bytes of the type argument T, using the size_of intrinsic.\"\"\"\nverb size[T]() -> u64 { return size_of[T](); }\n\
+             \"\"\"Returns the alignment in bytes of the type argument T, using the align_of intrinsic.\"\"\"\nverb alignment[T]() -> u64 { return align_of[T](); }\n\
+             \"\"\"Entry point that returns 0 when the Wide struct has size 24 and alignment 8, and 1 or 2 when the size or the alignment differs.\"\"\"\nverb main() -> Int {\n\
              if size[Wide]() != 24u64 { return 1; }\n\
              if alignment[Wide]() != 8u64 { return 2; }\n\
              return 0;\n}\n",

@@ -38,13 +38,36 @@ fn comments_and_blank_lines_do_not_count_toward_file_limit() {
 }
 
 #[test]
-fn actus_documentation_blocks_count_toward_file_limit() {
+fn actus_documentation_blocks_do_not_count_toward_file_limit() {
     let mut source = String::from("verb main() { return; }\n");
     for index in 0..600 {
         source.push_str(&format!("\"\"\"architectural note {index}\"\"\"\n"));
     }
+    for index in 0..300 {
+        source.push_str(&format!("\"\"\"\nmulti-line note {index}\n\nsecond paragraph\n\"\"\"\n"));
+    }
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn code_beyond_the_limit_still_fails_when_documentation_surrounds_it() {
+    let mut source = String::new();
+    for index in 0..501 {
+        source.push_str(&format!("\"\"\"\nnote {index}\n\"\"\"\nline_{index};\n"));
+    }
     let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
-    assert_eq!(diagnostics[0].code(), "E1851");
+    assert_eq!(diagnostics[0].code(), "E1850");
+    assert!(diagnostics[0].message().contains("501 code lines"), "{}", diagnostics[0].message());
+}
+
+#[test]
+fn code_on_the_line_of_a_closing_documentation_delimiter_counts() {
+    let mut source = String::new();
+    for index in 0..501 {
+        source.push_str(&format!("\"\"\"\nnote {index}\n\"\"\" line_{index};\n"));
+    }
+    let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
+    assert!(diagnostics[0].message().contains("501 code lines"), "{}", diagnostics[0].message());
 }
 
 #[test]
@@ -67,10 +90,21 @@ fn comments_and_blank_lines_do_not_count_toward_function_limit() {
 }
 
 #[test]
-fn actus_documentation_blocks_count_toward_function_limit() {
+fn actus_documentation_blocks_do_not_count_toward_function_limit() {
     let mut source = String::from("verb main() {\n");
     for index in 0..80 {
         source.push_str(&format!("\"\"\"implementation note {index}\"\"\"\n"));
+        source.push_str(&format!("\"\"\"\nmulti-line note {index}\n\"\"\"\n"));
+    }
+    source.push_str("return;\n}\n");
+    assert!(source_limit_diagnostics(Path::new("src/example.act"), &source, policy()).is_empty());
+}
+
+#[test]
+fn function_code_lines_still_count_next_to_documentation() {
+    let mut source = String::from("\"\"\"Documented verb.\"\"\"\nverb main() {\n");
+    for index in 0..80 {
+        source.push_str(&format!("step_{index};\n\"\"\"\nnote\n\"\"\"\n"));
     }
     source.push_str("return;\n}\n");
     let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
@@ -140,7 +174,7 @@ fn limitless_metadata_does_not_disable_semantic_validation() {
 fn verb_limitless_metadata_skips_only_function_diagnostic() {
     let mut source = String::from("meta limitless(\"verb\") verb large() {\n");
     for index in 0..80 {
-        source.push_str(&format!("\"\"\"documentation {index}\"\"\"\n"));
+        source.push_str(&format!("line_{index};\n"));
     }
     source.push_str("return;\n}\n");
     let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());
@@ -151,11 +185,11 @@ fn verb_limitless_metadata_skips_only_function_diagnostic() {
 fn verb_limitless_metadata_does_not_exempt_a_sibling_verb() {
     let mut source = String::from("meta limitless(\"verb\") verb exempt() {\n");
     for index in 0..60 {
-        source.push_str(&format!("\"\"\"exempt {index}\"\"\"\n"));
+        source.push_str(&format!("exempt_{index};\n"));
     }
     source.push_str("return;\n}\nverb sibling() {\n");
     for index in 0..60 {
-        source.push_str(&format!("\"\"\"sibling {index}\"\"\"\n"));
+        source.push_str(&format!("sibling_{index};\n"));
     }
     source.push_str("return;\n}\n");
     let diagnostics = source_limit_diagnostics(Path::new("src/example.act"), &source, policy());

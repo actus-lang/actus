@@ -86,6 +86,12 @@ open verb wire_sequence_highest(abs window: WireSequenceWindow) -> u32 {
     return window.highest;
 }
 
+"""
+Compute the modular distance from `previous` forward to `current` in the
+32-bit sequence space, treating the space as a ring so a counter that wrapped
+past the maximum still yields a small distance. Both arguments are copied
+scalars; the function performs no I/O and no allocation.
+"""
 verb wire_sequence_forward_distance(erg current: u32, erg previous: u32) -> u32 {
     if current >= previous {
         return current - previous;
@@ -93,6 +99,12 @@ verb wire_sequence_forward_distance(erg current: u32, erg previous: u32) -> u32 
     return (4294967295u32 - previous) + current + 1u32;
 }
 
+"""
+Compute the modular distance from `current` backward to `previous` in the
+32-bit sequence space, treating the space as a ring so a counter that wrapped
+past the maximum still yields the right distance. Both arguments are copied
+scalars; the function performs no I/O and no allocation.
+"""
 verb wire_sequence_backward_distance(erg current: u32, erg previous: u32) -> u32 {
     if previous >= current {
         return previous - current;
@@ -100,6 +112,25 @@ verb wire_sequence_backward_distance(erg current: u32, erg previous: u32) -> u32
     return (4294967295u32 - current) + previous + 1u32;
 }
 
+"""
+contract:
+purpose:
+    Accept a sequence number newer than the highest one by shifting the receipt
+    window forward.
+inputs:
+    window: the sequence window; sequence_num: the new highest number;
+    distance: its forward distance from the previous highest.
+outputs:
+    `Ok(0)` after the window advanced, or a `WireError`.
+ownership:
+    The window is an exclusive `ins` loan.
+side_effects:
+    Sets `highest` and shifts the receipt bits, restarting them when the jump
+    reaches the window size.
+errors:
+    `SequenceJumpTooLarge` when the distance exceeds the allowed forward jump;
+    the window is unchanged.
+"""
 verb wire_sequence_accept_forward(
     ins window: WireSequenceWindow,
     erg sequence_num: u32,
@@ -117,6 +148,23 @@ verb wire_sequence_accept_forward(
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Accept an older sequence number that is still inside the receipt window.
+inputs:
+    window: the sequence window; distance: how far behind the highest the
+    number is.
+outputs:
+    `Ok(0)` after the receipt bit is set, or a `WireError`.
+ownership:
+    The window is an exclusive `ins` loan.
+side_effects:
+    Sets the receipt bit for the number.
+errors:
+    `SequenceStale` when the number fell out of the window and
+    `SequenceDuplicate` when its bit is already set; the window is unchanged.
+"""
 verb wire_sequence_accept_backward(
     ins window: WireSequenceWindow,
     erg distance: u32
@@ -132,6 +180,24 @@ verb wire_sequence_accept_backward(
     return Result[Int, WireError].Ok(0);
 }
 
+"""
+contract:
+purpose:
+    Classify a sequence number against an initialized window and delegate to
+    the forward or backward acceptance rule.
+inputs:
+    window: the initialized sequence window; sequence_num: the received
+    number.
+outputs:
+    `Ok(0)` when accepted, or a `WireError`.
+ownership:
+    The window is an exclusive `ins` loan.
+side_effects:
+    Updates the window when the number is accepted.
+errors:
+    `SequenceDuplicate` for the current highest number, plus the errors of
+    `wire_sequence_accept_forward` and `wire_sequence_accept_backward`.
+"""
 verb wire_sequence_accept_existing(
     ins window: WireSequenceWindow,
     erg sequence_num: u32

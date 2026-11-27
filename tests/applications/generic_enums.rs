@@ -11,7 +11,9 @@ fn generic_result_facade_project_named(
     import_path: &str,
     name: &str,
 ) -> (PathBuf, PathBuf, PathBuf) {
-    let source = format!("import {{ open {import_path} }}; verb main() -> Int {{ return 0; }}\n");
+    let source = format!(
+        "import {{ open {import_path} }};\n\"\"\"Entry point of an otherwise empty generic-result facade project; it returns 0.\"\"\"\nverb main() -> Int {{ return 0; }}\n"
+    );
     let (root, input, output) = project(name, &source);
     fs::write(
         root.join("Actus.toml"),
@@ -167,10 +169,32 @@ enum Failure {
     Failed,
 }
 
+"""
+contract:
+purpose:
+    Wrap the value field of the storage in Option.Some.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N whose value is a u32.
+outputs:
+    Option.Some holding the storage value.
+ownership:
+    The storage is an exclusive ins loan and is only read.
+"""
 verb make_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
     return Option[u32].Some(storage.value);
 }
 
+"""
+contract:
+purpose:
+    Forward the Option produced by make_option unchanged, rebuilding each variant by case.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N.
+outputs:
+    Option.Some with the same payload, or Option.None.
+ownership:
+    The storage stays an exclusive ins loan and is passed on to make_option.
+"""
 verb forward_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
     erg produced = make_option(storage: ins storage);
     return case dat produced {
@@ -179,6 +203,19 @@ verb forward_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
     };
 }
 
+"""
+contract:
+purpose:
+    Produce Ok with the storage value when it equals 41, otherwise a Failure.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N whose value is a u32.
+outputs:
+    Result.Ok with the value, or Result.Err with Failure.Failed.
+ownership:
+    The storage is an exclusive ins loan and is only read.
+errors:
+    Failure.Failed when the stored value is not 41.
+"""
 verb make_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
     if storage.value == 41u32 {
         return Result[u32, Failure].Ok(storage.value);
@@ -186,14 +223,27 @@ verb make_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
     return Result[u32, Failure].Err(Failure.Failed);
 }
 
+"""Returns Option.Some holding the u32 constant 41."""
 verb plain_option() -> Option[u32] {
     return Option[u32].Some(41u32);
 }
 
+"""Returns Result.Ok holding the u32 constant 41."""
 verb plain_result() -> Result[u32, Failure] {
     return Result[u32, Failure].Ok(41u32);
 }
 
+"""
+contract:
+purpose:
+    Forward the Option from plain_option after adding the storage value minus 41 to its payload.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N.
+outputs:
+    Option.Some with the adjusted payload, or Option.None.
+ownership:
+    The storage is an exclusive ins loan and is only read.
+"""
 verb forward_plain_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
     erg produced = plain_option();
     return case dat produced {
@@ -202,6 +252,19 @@ verb forward_plain_option[N: Usize](ins storage: Storage[N]) -> Option[u32] {
     };
 }
 
+"""
+contract:
+purpose:
+    Forward the Result from plain_result after adding the storage value minus 41 to an Ok payload.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N.
+outputs:
+    Result.Ok with the adjusted payload, or the original error.
+ownership:
+    The storage is an exclusive ins loan and is only read.
+errors:
+    Any error produced by plain_result is passed through.
+"""
 verb forward_plain_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
     erg produced = plain_result();
     return case dat produced {
@@ -210,6 +273,19 @@ verb forward_plain_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Fail
     };
 }
 
+"""
+contract:
+purpose:
+    Forward the Result produced by make_result unchanged, rebuilding each variant by case.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N.
+outputs:
+    Result.Ok with the same payload, or the same Failure.
+ownership:
+    The storage stays an exclusive ins loan and is passed on to make_result.
+errors:
+    Failure values from make_result are passed through.
+"""
 verb forward_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
     erg produced = make_result(storage: ins storage);
     return case dat produced {
@@ -218,6 +294,7 @@ verb forward_result[N: Usize](ins storage: Storage[N]) -> Result[u32, Failure] {
     };
 }
 
+"""Entry point that builds a storage holding 41, runs all four forwarding verbs on it, unwraps each Option or Result with a case, and returns the sum of the four payloads as Int."""
 verb main() -> Int {
     erg storage: Storage[4] = Storage[4] { value: 41u32, };
     erg option = forward_option(storage: ins storage);
@@ -265,14 +342,31 @@ enum Failure {
     Failed,
 }
 
+"""Returns Result.Ok holding the u8 slot number 0, standing in for a successful slot reservation."""
 verb reserve() -> Result[u8, Failure] {
     return Result[u8, Failure].Ok(0u8);
 }
 
+"""Returns Option.Some holding the u32 column index 7, standing in for a successful column creation."""
 verb create_column() -> Option[u32] {
     return Option[u32].Some(7u32);
 }
 
+"""
+contract:
+purpose:
+    Create a column and, when one exists, record the reserved slot in the cache and return the column index plus the storage value.
+inputs:
+    storage: exclusive ins loan of Storage; cache: exclusive ins loan of Cache whose slot is written; slot: owned u8 slot number.
+outputs:
+    Result.Ok with the column index plus the storage value, or Result.Err with Failure.Failed.
+ownership:
+    The cache is an exclusive ins loan and is mutated; the slot is consumed.
+errors:
+    Failure.Failed when create_column yields no column.
+side_effects:
+    Writes the slot into the cache.
+"""
 verb finish[N: Usize](ins storage: Storage, ins cache: Cache, erg slot: u8) -> Result[u32, Failure] {
     erg created = create_column();
     erg result: Result[u32, Failure] = Result[u32, Failure].Err(Failure.Failed);
@@ -286,6 +380,21 @@ verb finish[N: Usize](ins storage: Storage, ins cache: Cache, erg slot: u8) -> R
     return result;
 }
 
+"""
+contract:
+purpose:
+    Reserve a slot and, on success, finish the operation with it.
+inputs:
+    storage: exclusive ins loan of Storage; cache: exclusive ins loan of Cache.
+outputs:
+    The Result of finish, or the error from reserve.
+ownership:
+    Storage and cache stay exclusive ins loans and are passed on to finish.
+errors:
+    The error from reserve is passed through.
+side_effects:
+    finish records the slot in the cache.
+"""
 verb complete[N: Usize](ins storage: Storage, ins cache: Cache) -> Result[u32, Failure] {
     erg prepared = reserve();
     return case dat prepared {
@@ -294,6 +403,7 @@ verb complete[N: Usize](ins storage: Storage, ins cache: Cache) -> Result[u32, F
     };
 }
 
+"""Entry point that builds a storage holding 41 and an empty cache, runs complete with capacity 4, and returns the Ok value as Int or 0 on error."""
 verb main() -> Int {
     erg storage: Storage = Storage { value: 41u32, };
     erg cache: Cache = Cache { slot: 0u8, };
@@ -322,10 +432,30 @@ enum Failure {
     Failed,
 }
 
+"""
+contract:
+purpose:
+    Produce an Ok result owning a Payload with the value 41.
+outputs:
+    Result.Ok with a new Payload, or Result.Err with Failure.
+ownership:
+    The returned Payload is owned by the caller.
+"""
 verb produce[N: Usize]() -> Result[Payload, Failure] {
     return Result[Payload, Failure].Ok(Payload { value: 41u32, });
 }
 
+"""
+contract:
+purpose:
+    Forward the Result from produce, moving the Payload through the case unchanged.
+outputs:
+    Result.Ok owning the same Payload, or the same Failure.
+ownership:
+    The Payload moves from the produced result into the returned one.
+errors:
+    Failure values from produce are passed through.
+"""
 verb forward[N: Usize]() -> Result[Payload, Failure] {
     erg result = produce[N]();
     return case dat result {
@@ -334,6 +464,7 @@ verb forward[N: Usize]() -> Result[Payload, Failure] {
     };
 }
 
+"""Entry point that forwards a produced Result with capacity 4 and returns the Payload value as Int, or 0 on error."""
 verb main() -> Int {
     erg result = forward[4]();
     return case dat result {
@@ -351,7 +482,7 @@ verb main() -> Int {
 
 #[test]
 fn nested_facade_generic_result_preserves_aggregate_payload_natively() {
-    let source = "import { open feature }; verb main() -> Int { erg result = forward[4](); return case dat result { Result.Ok(payload) => payload.value as Int, Result.Err(_) => 0, }; }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that forwards a produced Result with capacity 4 and returns the Payload value as Int, or 0 on error.\"\"\"\nverb main() -> Int { erg result = forward[4](); return case dat result { Result.Ok(payload) => payload.value as Int, Result.Err(_) => 0, }; }\n";
     let (root, input, output) = project("nested-facade-aggregate-enum", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature facade");
     fs::write(
@@ -405,10 +536,34 @@ enum Failure {
     Invalid,
 }
 
+"""
+contract:
+purpose:
+    Admit the storage by returning its u64 value as an Ok result.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N holding a u64.
+outputs:
+    Result.Ok with the u64 value.
+ownership:
+    The storage is an exclusive ins loan and is only read.
+"""
 verb validate[N: Usize](ins storage: Storage[N]) -> Result[u64, Failure] {
     return Result[u64, Failure].Ok(storage.value);
 }
 
+"""
+contract:
+purpose:
+    Validate the storage and wrap the admitted value into a TokenCode with a zero high mask.
+inputs:
+    storage: exclusive ins loan of Storage of capacity N.
+outputs:
+    Result.Ok with a TokenCode whose mask_low is the value, or the validation error.
+ownership:
+    The storage stays an exclusive ins loan and is passed on to validate.
+errors:
+    Any error from validate is passed through.
+"""
 verb encode[N: Usize](ins storage: Storage[N]) -> Result[TokenCode, Failure] {
     erg admission = validate(storage: ins storage);
     return case dat admission {
@@ -417,6 +572,7 @@ verb encode[N: Usize](ins storage: Storage[N]) -> Result[TokenCode, Failure] {
     };
 }
 
+"""Entry point that encodes a storage holding 41 and returns the mask_low of the resulting TokenCode as Int, or 0 on error."""
 verb main() -> Int {
     erg storage: Storage[4] = Storage[4] { value: 41u64, };
     erg result = encode(storage: ins storage);
@@ -444,6 +600,15 @@ enum Failure {
     Invalid,
 }
 
+"""
+contract:
+purpose:
+    Wrap an Ok u64 admission of 41 into a TokenCode result, with each case arm ending in a block tail expression.
+outputs:
+    Result.Ok with a TokenCode whose mask_low is 41, or the admission error.
+errors:
+    The admission error is passed through; the local admission is always Ok here.
+"""
 verb encode() -> Result[TokenCode, Failure] {
     erg admission: Result[u64, Failure] = Result[u64, Failure].Ok(41u64);
     return case dat admission {
@@ -456,6 +621,7 @@ verb encode() -> Result[TokenCode, Failure] {
     };
 }
 
+"""Entry point that returns the mask_low of the TokenCode produced by encode as Int, or 0 on error."""
 verb main() -> Int {
     erg result = encode();
     return case dat result {
@@ -473,7 +639,7 @@ verb main() -> Int {
 
 #[test]
 fn nested_facade_result_case_with_aggregate_payload_preserves_native_identity() {
-    let source = "import { open feature }; verb main() -> Int { return run(); }\n";
+    let source = "import { open feature };\n\"\"\"Entry point that returns the result of run as the process exit status.\"\"\"\nverb main() -> Int { return run(); }\n";
     let (root, input, output) = project("nested-facade-result-aggregate-case", source);
     fs::create_dir_all(root.join("src/feature")).expect("create feature directory");
     fs::write(
@@ -534,12 +700,32 @@ enum Failure {
     Invalid,
 }
 
+"""
+contract:
+purpose:
+    Build a 20-byte array whose first byte is 41 and return it inside an Ok result.
+outputs:
+    Result.Ok owning the array, or Result.Err with Failure.
+ownership:
+    The array is created locally and moved to the caller.
+"""
 verb produce() -> Result[Array[u8, 20], Failure] {
     erg bytes: Array[u8,20] = Array[u8,20]();
     bytes[0u32] = 41u8;
     return Result[Array[u8, 20], Failure].Ok(bytes);
 }
 
+"""
+contract:
+purpose:
+    Forward the array Result from produce, moving the Ok payload through the case.
+outputs:
+    Result.Ok owning the same array, or the same Failure.
+ownership:
+    The array moves from the produced result into the returned one.
+errors:
+    Failure values from produce are passed through.
+"""
 verb forward() -> Result[Array[u8, 20], Failure] {
     erg result = produce();
     return case dat result {
@@ -548,6 +734,7 @@ verb forward() -> Result[Array[u8, 20], Failure] {
     };
 }
 
+"""Entry point that returns the first byte of the forwarded array as Int, or 0 when forward fails."""
 verb main() -> Int {
     erg result = forward();
     return case dat result {

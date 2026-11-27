@@ -14,6 +14,12 @@ open verb calc_sum(erg left: Int, erg right: Int) -> Int {
     return add(left: left, right: right);
 }
 
+"""
+Return zero. The helper is deliberately private to the `ops` unit so the
+example shows that declarations without `open` are not visible to importing
+modules. Nothing calls it. It takes no parameters, allocates nothing and has no
+side effects.
+"""
 verb hidden_helper() -> Int {
     return 0;
 }

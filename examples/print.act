@@ -1,3 +1,6 @@
+"""
+Print one string literal through the native `print` verb and return 0 as the exit status. The only side effect is the output.
+"""
 verb main() -> Int {
     erg text = "Actus print works";
     print(string: text);

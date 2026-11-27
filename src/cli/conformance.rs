@@ -40,40 +40,65 @@ pub(super) fn validate_source_limits(
     false
 }
 
-/// Strict mode validates the public documentation of every source file of the
-/// package (ADR-0041): the entry file and every module file of the compilation
-/// plan that belongs to the package, not the dependencies or the runtime.
-/// Outside strict mode nothing is checked. A file that does not lex or parse is
-/// reported by the frontend, so it is skipped here.
-pub(super) fn validate_package_documentation(
-    entry: &Path,
-    plan: &crate::modules::ModuleCompilationPlan,
+/// Every production `.act` file under the package source root, in lexical
+/// order: `tests` directories and the `fixtures` and `snapshots` data
+/// directories are not production source. This is the one set that strict
+/// source limits and strict documentation are checked on, whatever the command
+/// and whether or not a file is imported by anything.
+pub(super) fn production_source_files(source_root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let mut pending = vec![source_root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        let Ok(entries) = fs::read_dir(&directory) else { continue };
+        for path in entries.flatten().map(|entry| entry.path()) {
+            let name = path.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+            if path.is_dir() {
+                if !matches!(name, "tests" | "fixtures" | "snapshots") {
+                    pending.push(path);
+                }
+            } else if path.extension().is_some_and(|extension| extension == "act") {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+/// Strict mode checks source limits and public and private-verb documentation
+/// on every production file of the package (ADR-0041), plus the explicit entry
+/// file when it lies outside that set. Each file is read and checked once and
+/// every finding is reported, not only the first. Outside strict mode nothing
+/// is checked. A file that does not lex or parse is reported by the frontend,
+/// so its documentation is skipped here.
+pub(super) fn validate_package_sources(
+    entry: Option<&Path>,
+    configuration: &crate::configuration::CompilerConfiguration,
     mode: ConformanceMode,
 ) -> bool {
     if !mode.is_strict() {
         return true;
     }
-    let mut paths = std::collections::BTreeSet::from([entry.to_path_buf()]);
-    for unit in plan.units() {
-        if unit.identity().package() == plan.package_identity() {
-            paths.extend(unit.sources().iter().map(|source| source.path().to_path_buf()));
-        }
+    let mut files = std::collections::BTreeMap::new();
+    for path in production_source_files(configuration.source_root())
+        .into_iter()
+        .chain(entry.map(Path::to_path_buf))
+    {
+        let identity = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+        files.entry(identity).or_insert(path);
     }
     let mut valid = true;
-    for path in paths {
+    for path in files.into_values() {
         if let Ok(source) = fs::read_to_string(&path) {
+            valid &= validate_source_limits(&path, &source, mode, configuration);
             valid &= validate_file_documentation(&path, &source, mode);
         }
     }
     valid
 }
 
-/// Reports the public-documentation findings of one source file as errors.
-pub(super) fn validate_file_documentation(
-    path: &Path,
-    source: &str,
-    mode: ConformanceMode,
-) -> bool {
+/// Reports the documentation findings of one source file as errors.
+fn validate_file_documentation(path: &Path, source: &str, mode: ConformanceMode) -> bool {
     if !mode.is_strict() {
         return true;
     }

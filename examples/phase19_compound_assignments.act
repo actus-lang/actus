@@ -14,6 +14,9 @@ struct Counter {
     erg value: u8,
 }
 
+"""
+Apply every compound assignment operator to a scalar and then add to an array element, a struct field and a pack field, and return the sum of the four results as the exit status.
+"""
 verb main() -> Int {
     erg scalar: u8 = 5u8;
     scalar += 7u8;

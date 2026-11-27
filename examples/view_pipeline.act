@@ -3,10 +3,16 @@ verb identity(abs input: Buffer) -> abs Buffer {
     return input;
 }
 
+"""
+Accept a buffer view and return 1. It demonstrates a callee that borrows an immutable view and cannot retain it.
+"""
 verb inspect(abs input: Buffer) -> Int {
     return 1;
 }
 
+"""
+Borrow a view of a buffer through `identity`, inspect it inside a nested scope, then append to the buffer as the owner after the view ended, print 42 and return it.
+"""
 verb main() -> Int {
     erg buffer = Buffer[4];
     {

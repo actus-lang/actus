@@ -24,7 +24,7 @@ fn unused_wire_modules_are_absent_from_native_object_set() {
     );
     fs::write(
         root.join("src/main.act"),
-        "import { open std::wire }; verb main() -> Int { return WIRE_VERSION as Int; }\n",
+        "import { open std::wire };\n\"\"\"Entry point that returns the WIRE_VERSION constant as Int.\"\"\"\nverb main() -> Int { return WIRE_VERSION as Int; }\n",
     )
     .expect("source");
     let output = root.join("wire.o");
@@ -72,7 +72,7 @@ fn freestanding_wire_types_emit_without_host_runtime_imports() {
     );
     fs::write(
         root.join("src/main.act"),
-        "import { open std::wire }; verb boot() -> Int { erg header = WireHeader { storage: Array[u8, 12]() }; header.version = WIRE_VERSION; return header.version as Int; }\n",
+        "import { open std::wire };\n\"\"\"Boot verb that builds a WireHeader, sets its version field to WIRE_VERSION and returns the field as Int.\"\"\"\nverb boot() -> Int { erg header = WireHeader { storage: Array[u8, 12]() }; header.version = WIRE_VERSION; return header.version as Int; }\n",
     )
     .expect("source");
     let output = root.join("wire.o");
@@ -126,6 +126,17 @@ fn hosted_wire_crc16_executes_with_deterministic_reference_value() {
     fs::write(
         root.join("src/main.act"),
         r#"import { open std::wire };
+"""
+contract:
+purpose:
+    Compute the CRC-16 CCITT checksum of the bytes 1, 2 and 3 and check that it equals 44461.
+outputs:
+    0 when the checksum matches, 1 when it differs, 2 when it cannot be computed.
+ownership:
+    The input buffer is borrowed by the checksum call.
+errors:
+    A WireError from wire_crc16_ccitt maps to 2.
+"""
 verb crc_status() -> Int {
     erg crc_input: Buffer = Buffer[0];
     append(crc_input, 1u8);
@@ -139,6 +150,15 @@ verb crc_status() -> Int {
         Result.Err(_) => 2,
     };
 }
+"""
+contract:
+purpose:
+    Fill a WireHeader field by field, check that a 12-byte output is too small for the frame, and then run the full frame round trip.
+outputs:
+    0 on success, 5 when the capacity check fails, otherwise the status of frame_status.
+ownership:
+    The header is moved into frame_status after being borrowed by capacity_status.
+"""
 verb header_status() -> Int {
     erg header = WireHeader {storage: Array[u8, 12]()};
     header.magic_0 = WIRE_MAGIC_0;
@@ -158,6 +178,19 @@ verb header_status() -> Int {
     }
     return frame_status(header: dat header);
 }
+"""
+contract:
+purpose:
+    Try to encode a frame into a 12-byte output buffer and check that it fails with the insufficient capacity error.
+inputs:
+    header: borrowed WireHeader; payload: borrowed Buffer.
+outputs:
+    0 for WireError.InsufficientCapacity, 1 when the encode succeeds, 2 for another error.
+ownership:
+    Header and payload are borrowed; the output is local.
+errors:
+    Only the insufficient capacity error counts as the expected outcome.
+"""
 verb capacity_status(abs header: WireHeader, abs payload: Buffer) -> Int {
     erg output = Buffer[12];
     erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins output);
@@ -169,6 +202,19 @@ verb capacity_status(abs header: WireHeader, abs payload: Buffer) -> Int {
         },
     };
 }
+"""
+contract:
+purpose:
+    Encode a frame with the payload 7, 8, 9, decode it again, compare the sequence number and payload, then corrupt one checksum byte and continue with bad_checksum_status.
+inputs:
+    header: owned WireHeader to encode.
+outputs:
+    0 on success, 3 when the encode fails, 4 when the decode fails, 1 when the round trip differs, otherwise the status of bad_checksum_status.
+ownership:
+    The header is borrowed by the encode call; the encoded buffer is mutated and passed on.
+errors:
+    WireError values from encode and decode map to 3 and 4.
+"""
 verb frame_status(dat header: WireHeader) -> Int {
     erg payload: Buffer = Buffer[0];
     append(payload, 7u8);
@@ -194,6 +240,19 @@ verb frame_status(dat header: WireHeader) -> Int {
         },
     };
 }
+"""
+contract:
+purpose:
+    Decode a frame whose checksum byte was corrupted and check that it fails with the checksum mismatch error, leaving the payload output untouched.
+inputs:
+    encoded: exclusive ins loan of Buffer holding the corrupted frame.
+outputs:
+    0 when the checksum mismatch is reported and the payload output keeps 91, 92, 93, 1 for another error, 2 when decoding succeeds, 3 when the output was modified.
+ownership:
+    The encoded buffer is an exclusive ins loan; the payload output is local.
+errors:
+    Only the checksum mismatch error counts as the expected outcome.
+"""
 verb bad_checksum_status(ins encoded: Buffer) -> Int {
     erg payload: Buffer = Buffer[3];
     payload[0] = 91u8;
@@ -208,6 +267,17 @@ verb bad_checksum_status(ins encoded: Buffer) -> Int {
         },
     };
 }
+"""
+contract:
+purpose:
+    Decode a header whose first magic byte is wrong and check that it fails with the invalid magic error.
+outputs:
+    0 for WireError.InvalidMagic, 1 for anything else.
+ownership:
+    The input buffer is borrowed by the decode call.
+errors:
+    Only the invalid magic error counts as the expected outcome.
+"""
 verb invalid_magic_status() -> Int {
     erg input: Buffer = Buffer[12];
     input[0] = 0u8;
@@ -216,6 +286,17 @@ verb invalid_magic_status() -> Int {
     erg decoded = wire_header_decode(input: abs input);
     return case dat decoded { Result.Err(error) => case dat error { WireError.InvalidMagic => 0, _ => 1 }, _ => 1 };
 }
+"""
+contract:
+purpose:
+    Decode a header with an unsupported version byte and check that it fails with the unsupported version error.
+outputs:
+    0 for WireError.UnsupportedVersion, 1 for anything else.
+ownership:
+    The input buffer is borrowed by the decode call.
+errors:
+    Only the unsupported version error counts as the expected outcome.
+"""
 verb invalid_version_status() -> Int {
     erg input: Buffer = Buffer[12];
     input[0] = WIRE_MAGIC_0;
@@ -224,6 +305,17 @@ verb invalid_version_status() -> Int {
     erg decoded = wire_header_decode(input: abs input);
     return case dat decoded { Result.Err(error) => case dat error { WireError.UnsupportedVersion => 0, _ => 1 }, _ => 1 };
 }
+"""
+contract:
+purpose:
+    Decode a header with an unknown flag bit set and check that it fails with the unknown flags error.
+outputs:
+    0 for WireError.UnknownFlags, 1 for anything else.
+ownership:
+    The input buffer is borrowed by the decode call.
+errors:
+    Only the unknown flags error counts as the expected outcome.
+"""
 verb unknown_flags_status() -> Int {
     erg input: Buffer = Buffer[12];
     input[0] = WIRE_MAGIC_0;
@@ -233,6 +325,17 @@ verb unknown_flags_status() -> Int {
     erg decoded = wire_header_decode(input: abs input);
     return case dat decoded { Result.Err(error) => case dat error { WireError.UnknownFlags => 0, _ => 1 }, _ => 1 };
 }
+"""
+contract:
+purpose:
+    Decode a header that declares a payload length of 1025 and check that it fails with the payload too large error.
+outputs:
+    0 for WireError.PayloadTooLarge, 1 to 4 for other specific errors, 5 for any other error, 6 when decoding succeeds.
+ownership:
+    The input buffer is borrowed by the decode call.
+errors:
+    Only the payload too large error counts as the expected outcome.
+"""
 verb oversized_header_status() -> Int {
     erg input: Buffer = Buffer[12];
     input[0] = WIRE_MAGIC_0;
@@ -254,11 +357,35 @@ verb oversized_header_status() -> Int {
         Result.Ok(_) => 6,
     };
 }
+"""
+contract:
+purpose:
+    Decode a header from an 11-byte buffer, one byte shorter than a header, and check that it fails with the truncated error.
+outputs:
+    0 for WireError.Truncated, 1 for anything else.
+ownership:
+    The input buffer is borrowed by the decode call.
+errors:
+    Only the truncated error counts as the expected outcome.
+"""
 verb truncated_header_status() -> Int {
     erg input: Buffer = Buffer[11];
     erg decoded = wire_header_decode(input: abs input);
     return case dat decoded { Result.Err(error) => case dat error { WireError.Truncated => 0, _ => 1 }, _ => 1 };
 }
+"""
+contract:
+purpose:
+    Encode a frame into a 1038-byte output and check that the reported byte count equals the expected one.
+inputs:
+    header: borrowed WireHeader; payload: borrowed Buffer; expected_count: borrowed u32 frame length.
+outputs:
+    0 when the count matches, 1 when it differs, 2 when the encode fails.
+ownership:
+    All three parameters are borrowed; the output is local.
+errors:
+    A WireError from wire_frame_encode maps to 2.
+"""
 verb frame_count_status(abs header: WireHeader, abs payload: Buffer, abs expected_count: u32) -> Int {
     erg output = Buffer[1038];
     erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins output);
@@ -267,6 +394,19 @@ verb frame_count_status(abs header: WireHeader, abs payload: Buffer, abs expecte
         Result.Err(_) => 2,
     };
 }
+"""
+contract:
+purpose:
+    Encode a frame with a 1025-byte payload and check that it fails with the payload too large error.
+inputs:
+    header: borrowed WireHeader declaring the oversized payload.
+outputs:
+    0 for WireError.PayloadTooLarge, 1 for another error, 2 when the encode succeeds.
+ownership:
+    The header is borrowed; payload and output buffers are local.
+errors:
+    Only the payload too large error counts as the expected outcome.
+"""
 verb oversized_status(abs header: WireHeader) -> Int {
     erg payload: Buffer = Buffer[1025];
     erg output = Buffer[1039];
@@ -276,6 +416,7 @@ verb oversized_status(abs header: WireHeader) -> Int {
         Result.Ok(_) => 2,
     };
 }
+"""Encodes a frame with the maximum 1024-byte payload and checks that its length is 1038 bytes, returning the status of frame_count_status."""
 verb maximum_status() -> Int {
     erg maximum_header = WireHeader {storage: Array[u8, 12]()};
     maximum_header.magic_0 = WIRE_MAGIC_0;
@@ -286,6 +427,7 @@ verb maximum_status() -> Int {
     erg expected_count: u32 = 1038u32;
     return frame_count_status(header: abs maximum_header, payload: abs maximum_payload, expected_count: abs expected_count);
 }
+"""Encodes a frame with an empty payload and checks that its length is 14 bytes, returning the status of frame_count_status."""
 verb empty_status() -> Int {
     erg empty_header = WireHeader {storage: Array[u8, 12]()};
     empty_header.magic_0 = WIRE_MAGIC_0;
@@ -296,6 +438,7 @@ verb empty_status() -> Int {
     erg empty_count: u32 = 14u32;
     return frame_count_status(header: abs empty_header, payload: abs empty_payload, expected_count: abs empty_count);
 }
+"""Encodes a frame with a one-byte payload and checks that its length is 15 bytes, returning the status of frame_count_status."""
 verb minimum_status() -> Int {
     erg minimum_header = WireHeader {storage: Array[u8, 12]()};
     minimum_header.magic_0 = WIRE_MAGIC_0;
@@ -306,6 +449,7 @@ verb minimum_status() -> Int {
     erg minimum_count: u32 = 15u32;
     return frame_count_status(header: abs minimum_header, payload: abs minimum_payload, expected_count: abs minimum_count);
 }
+"""Runs the empty, one-byte and maximum payload checks, then the oversized payload check, and returns 0 when all pass or the number 1 to 4 of the first failing check."""
 verb boundary_status() -> Int {
     erg empty = empty_status();
     if empty != 0 {
@@ -329,6 +473,7 @@ verb boundary_status() -> Int {
     }
     return 0;
 }
+"""Compares the first length bytes of two buffers one by one and returns false at the first difference, true otherwise."""
 verb buffers_equal(abs left: Buffer, abs right: Buffer, abs length: u32) -> Bool {
     for erg index: u32 in 0u32 .. length {
         erg left_byte: u8 = left[index];
@@ -339,6 +484,21 @@ verb buffers_equal(abs left: Buffer, abs right: Buffer, abs length: u32) -> Bool
     }
     return true;
 }
+"""
+contract:
+purpose:
+    Encode a frame into the given output buffer and report only success or failure.
+inputs:
+    header: borrowed WireHeader; payload: borrowed Buffer; output: exclusive ins loan of Buffer receiving the frame.
+outputs:
+    0 when the encode succeeds, 1 when it fails.
+ownership:
+    The header and payload are borrowed; the output is an exclusive ins loan that is written.
+errors:
+    A WireError from wire_frame_encode maps to 1.
+side_effects:
+    Writes the frame into the output buffer.
+"""
 verb deterministic_encode_status(abs header: WireHeader, abs payload: Buffer, ins output: Buffer) -> Int {
     erg result = wire_frame_encode(header: abs header, payload: abs payload, output: ins output);
     return case dat result {
@@ -346,6 +506,19 @@ verb deterministic_encode_status(abs header: WireHeader, abs payload: Buffer, in
         Result.Err(_) => 1,
     };
 }
+"""
+contract:
+purpose:
+    Encode the same frame twice into two separate buffers and check that the 18 bytes are identical.
+outputs:
+    0 when both encodes succeed and the frames are equal, 1 or 2 when an encode fails, 3 when the frames differ.
+ownership:
+    The header and payload are borrowed; both outputs are local and compared afterwards.
+errors:
+    Encode failures map to 1 and 2.
+side_effects:
+    Writes the two frames into local buffers.
+"""
 verb deterministic_status() -> Int {
     erg header = WireHeader {storage: Array[u8, 12]()};
     header.magic_0 = WIRE_MAGIC_0;
@@ -371,6 +544,7 @@ verb deterministic_status() -> Int {
     }
     return 0;
 }
+"""Runs the invalid magic, invalid version, unknown flags, oversized header and truncated header checks in order and returns 0 when all pass or the number 1 to 5 of the first failing check."""
 verb negative_status() -> Int {
     if invalid_magic_status() != 0 {
         return 1;
@@ -389,6 +563,7 @@ verb negative_status() -> Int {
     }
     return 0;
 }
+"""Entry point that runs the checksum, header, negative, boundary and deterministic encoding checks, and returns 0 when all pass or the code 7 to 11 of the first failing group."""
 verb main() -> Int {
     if crc_status() != 0 {
         return 7;
@@ -448,6 +623,17 @@ fn hosted_wire_endpoint_parser_is_optional_and_bounded() {
     fs::write(
         root.join("src/main.act"),
         r#"import { open std::wire };
+"""
+contract:
+purpose:
+    Parse the endpoint text wire://robot:8080/c... and check that the port is 8080, a port is present and the path length is 8.
+outputs:
+    0 when the endpoint parses as expected, 2 when a field differs, 15 or 16 or another code for the specific WireEndpointError.
+ownership:
+    The input buffer is borrowed by the parse call.
+errors:
+    Each WireEndpointError maps to its own exit code.
+"""
 verb valid_status() -> Int {
     erg input = Buffer[25];
     input[0] = 119u8; input[1] = 105u8; input[2] = 114u8; input[3] = 101u8;
@@ -469,6 +655,17 @@ verb valid_status() -> Int {
         Result.Ok(endpoint) => if endpoint.port == 8080u32 && endpoint.has_port == 1u32 && endpoint.path_length == 8u32 { 0 } else { 2 },
     };
 }
+"""
+contract:
+purpose:
+    Parse the text wire:// with no authority and check that it fails with the missing authority error.
+outputs:
+    0 for WireEndpointError.MissingAuthority, 1 for another error, 2 when the parse succeeds.
+ownership:
+    The input buffer is borrowed by the parse call.
+errors:
+    Only the missing authority error counts as the expected outcome.
+"""
 verb invalid_status() -> Int {
     erg input = Buffer[7];
     input[0] = 119u8; input[1] = 105u8; input[2] = 114u8; input[3] = 101u8;
@@ -476,6 +673,7 @@ verb invalid_status() -> Int {
     erg parsed = wire_endpoint_parse(input: abs input);
     return case dat parsed { Result.Err(error) => case dat error { WireEndpointError.MissingAuthority => 0, _ => 1, }, Result.Ok(_) => 2, };
 }
+"""Entry point that runs the valid and the invalid endpoint checks and returns the status of the valid one."""
 verb main() -> Int {
     erg valid = valid_status();
     erg invalid = invalid_status();
@@ -514,6 +712,19 @@ fn hosted_wire_parser_accepts_split_frame_chunks() {
     fs::write(
         root.join("src/main.act"),
         r#"import { open std::wire };
+"""
+contract:
+purpose:
+    Feed an encoded 17-byte frame to the parser in two chunks of 5 and 12 bytes and check that it is Collecting after the first and Ready after the second, with the right header and payload.
+inputs:
+    encoded: borrowed Buffer holding the frame.
+outputs:
+    0 on success, 1 or 3 when a feed fails, 2 or 4 when a count or state is wrong, 5 when the header or payload differ.
+ownership:
+    The encoded buffer is borrowed and copied into two chunk buffers; the parser is local.
+errors:
+    A WireError from wire_parser_feed maps to 1 and 3.
+"""
 verb feed_chunks(abs encoded: Buffer) -> Int {
     erg first: Buffer = Buffer[0];
     for erg index: u32 in 0u32 .. 5u32 { append(first, encoded[index]); }
@@ -536,6 +747,17 @@ verb feed_chunks(abs encoded: Buffer) -> Int {
     if parsed.sequence_num != 287454020u32 || payload[0] != 7u8 || payload[2] != 9u8 { return 5; }
     return 0;
 }
+"""
+contract:
+purpose:
+    Feed four noise bytes to an empty parser and check that all four are consumed while it stays in the Searching state.
+outputs:
+    0 on success, 1 when the feed fails, 2 when the consumed count is wrong, 3 when the state is not Searching.
+ownership:
+    The noise buffer is borrowed by the feed call; the parser is local.
+errors:
+    A WireError from wire_parser_feed maps to 1.
+"""
 verb parser_noise_status() -> Int {
     erg noise: Buffer = Buffer[0];
     append(noise, 0u8); append(noise, 1u8); append(noise, 2u8); append(noise, 3u8);
@@ -547,6 +769,19 @@ verb parser_noise_status() -> Int {
     erg status = wire_parser_status(parser: abs parser);
     return case dat status { WireParserStatus.Searching => 0, _ => 3, };
 }
+"""
+contract:
+purpose:
+    Feed a frame preceded by one junk byte to the parser and check that it resynchronizes on the magic bytes, consumes 18 bytes and becomes Ready with the first payload byte 7.
+inputs:
+    encoded: borrowed Buffer holding a valid frame.
+outputs:
+    0 on success, 1 when the feed fails, 2 when the count, payload or state is wrong.
+ownership:
+    The encoded buffer is borrowed and copied behind the junk byte; the parser is local.
+errors:
+    A WireError from wire_parser_feed maps to 1.
+"""
 verb parser_magic_resync_status(abs encoded: Buffer) -> Int {
     erg input: Buffer = Buffer[18];
     input[0] = 0u8;
@@ -564,6 +799,21 @@ verb parser_magic_resync_status(abs encoded: Buffer) -> Int {
         },
     };
 }
+"""
+contract:
+purpose:
+    Set an unknown flag bit in the encoded frame, feed it to the parser, check that it fails with the unknown flags error and returns to Searching, then restore the byte.
+inputs:
+    encoded: exclusive ins loan of Buffer holding a valid frame that is modified temporarily.
+outputs:
+    0 on success, 1 or 2 for a wrong result, 3 when the parser is not Searching.
+ownership:
+    The encoded buffer is an exclusive ins loan that is changed and restored.
+errors:
+    Only the unknown flags error counts as the expected outcome.
+side_effects:
+    Temporarily changes byte 3 of the encoded buffer.
+"""
 verb parser_flags_status(ins encoded: Buffer) -> Int {
     encoded[3] = 1u8;
     erg parser = wire_parser_empty();
@@ -575,6 +825,21 @@ verb parser_flags_status(ins encoded: Buffer) -> Int {
     erg status = wire_parser_status(parser: abs parser);
     return case dat status { WireParserStatus.Searching => 0, _ => 3, };
 }
+"""
+contract:
+purpose:
+    Set an oversized payload length in the encoded frame, feed it to the parser, check that it fails with the payload too large error and returns to Searching, then restore the bytes.
+inputs:
+    encoded: exclusive ins loan of Buffer holding a valid frame that is modified temporarily.
+outputs:
+    0 on success, 1 or 2 for a wrong result, 3 when the parser is not Searching.
+ownership:
+    The encoded buffer is an exclusive ins loan that is changed and restored.
+errors:
+    Only the payload too large error counts as the expected outcome.
+side_effects:
+    Temporarily changes bytes 10 and 11 of the encoded buffer.
+"""
 verb parser_length_status(ins encoded: Buffer) -> Int {
     encoded[10] = 1u8;
     encoded[11] = 4u8;
@@ -588,6 +853,21 @@ verb parser_length_status(ins encoded: Buffer) -> Int {
     erg status = wire_parser_status(parser: abs parser);
     return case dat status { WireParserStatus.Searching => 0, _ => 3, };
 }
+"""
+contract:
+purpose:
+    Feed the parser a frame with an unsupported version and then a frame with a corrupted checksum, check each error and that the parser returns to Searching, then run the flags and length rejection checks.
+inputs:
+    encoded: exclusive ins loan of Buffer holding a valid frame that is modified temporarily.
+outputs:
+    0 on success, otherwise 1 to 6 for the first failing check.
+ownership:
+    The encoded buffer is an exclusive ins loan that is changed and restored between steps.
+errors:
+    Only the unsupported version and checksum mismatch errors count as the expected outcomes.
+side_effects:
+    Temporarily changes bytes 2 and 12 of the encoded buffer.
+"""
 verb parser_rejection_status(ins encoded: Buffer) -> Int {
     encoded[2] = 2u8;
     erg parser = wire_parser_empty();
@@ -615,6 +895,7 @@ verb parser_rejection_status(ins encoded: Buffer) -> Int {
     if parser_length_status(encoded: ins encoded) != 0 { return 5; }
     return 0;
 }
+"""Entry point that encodes a frame with the payload 7, 8, 9, then runs the parser noise, resynchronization, rejection and chunked feed checks on it, returning 0 when all pass, 6 when the encode fails and 7 when a parser check fails."""
 verb main() -> Int {
     erg header = WireHeader {storage: Array[u8, 12]()};
     header.magic_0 = WIRE_MAGIC_0;
@@ -661,27 +942,95 @@ fn hosted_wire_sequence_window_rejects_replays_and_stale_contexts() {
     fs::write(
         root.join("src/main.act"),
         r#"import { open std::wire };
+"""
+contract:
+purpose:
+    Accept a sequence number in a sequence window and report only success or failure.
+inputs:
+    window: exclusive ins loan of WireSequenceWindow; context_id: owned u32 context; sequence_num: owned u32 sequence number.
+outputs:
+    0 when the number is accepted, 1 when it is rejected.
+ownership:
+    The window is an exclusive ins loan that is updated on acceptance.
+errors:
+    Any WireError maps to 1.
+side_effects:
+    Updates the window on acceptance.
+"""
 verb accept_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Ok(_) => 0, Result.Err(_) => 1, };
 }
 
+"""
+contract:
+purpose:
+    Offer a sequence number to the window and check that it is rejected as a duplicate.
+inputs:
+    window: exclusive ins loan of WireSequenceWindow; context_id: owned u32 context; sequence_num: owned u32 sequence number.
+outputs:
+    0 for WireError.SequenceDuplicate, 1 for another error, 2 when accepted.
+ownership:
+    The window is an exclusive ins loan.
+errors:
+    Only the duplicate error counts as the expected outcome.
+"""
 verb duplicate_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Err(error) => case dat error { WireError.SequenceDuplicate => 0, _ => 1, }, Result.Ok(_) => 2, };
 }
+"""
+contract:
+purpose:
+    Offer a sequence number to the window and check that it is rejected as stale.
+inputs:
+    window: exclusive ins loan of WireSequenceWindow; context_id: owned u32 context; sequence_num: owned u32 sequence number.
+outputs:
+    0 for WireError.SequenceStale, 1 for another error, 2 when accepted.
+ownership:
+    The window is an exclusive ins loan.
+errors:
+    Only the stale error counts as the expected outcome.
+"""
 verb stale_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Err(error) => case dat error { WireError.SequenceStale => 0, _ => 1, }, Result.Ok(_) => 2, };
 }
+"""
+contract:
+purpose:
+    Offer a sequence number to the window and check that it is rejected as a jump that is too large.
+inputs:
+    window: exclusive ins loan of WireSequenceWindow; context_id: owned u32 context; sequence_num: owned u32 sequence number.
+outputs:
+    0 for WireError.SequenceJumpTooLarge, 1 for another error, 2 when accepted.
+ownership:
+    The window is an exclusive ins loan.
+errors:
+    Only the jump too large error counts as the expected outcome.
+"""
 verb jump_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Err(error) => case dat error { WireError.SequenceJumpTooLarge => 0, _ => 1, }, Result.Ok(_) => 2, };
 }
+"""
+contract:
+purpose:
+    Offer a sequence number for another context to the window and check that it is rejected as a context mismatch.
+inputs:
+    window: exclusive ins loan of WireSequenceWindow; context_id: owned u32 context; sequence_num: owned u32 sequence number.
+outputs:
+    0 for WireError.SequenceContextMismatch, 1 for another error, 2 when accepted.
+ownership:
+    The window is an exclusive ins loan.
+errors:
+    Only the context mismatch error counts as the expected outcome.
+"""
 verb context_status(ins window: WireSequenceWindow, erg context_id: u32, erg sequence_num: u32) -> Int {
     erg result = wire_sequence_accept(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num);
     return case dat result { Result.Err(error) => case dat error { WireError.SequenceContextMismatch => 0, _ => 1, }, Result.Ok(_) => 2, };
 }
+"""Drives a sequence window through numbers 10, 12, 11, a duplicate, 80, a stale 1 and a jump to 1105, checking the accepted or rejected outcome and the highest number after each step, and returns 0 or the number 1 to 9 of the first failing step."""
 verb order_status() -> Int {
     erg window = wire_sequence_empty();
     erg context_id: u32 = 7u32;
@@ -702,6 +1051,7 @@ verb order_status() -> Int {
     if wire_sequence_highest(window: abs window) != 80u32 { return 9; }
     return 0;
 }
+"""Drives a sequence window through context changes, replacement, reset and the wrap around from 4294967295 to 0, checking the outcome after each step, and returns 0 or the code 10 to 15 of the first failing step."""
 verb lifecycle_status() -> Int {
     erg window = wire_sequence_empty();
     erg context_id: u32 = 7u32;
@@ -723,6 +1073,7 @@ verb lifecycle_status() -> Int {
     if accept_status(window: ins window, context_id: erg context_id, sequence_num: erg sequence_num) != 0 { return 14; }
     return if wire_sequence_highest(window: abs window) == 0u32 { 0 } else { 15 };
 }
+"""Entry point that runs the sequence order check and the context lifecycle check, returning 0 when both pass or 1 or 2 for the first failing one."""
 verb main() -> Int {
     if order_status() != 0 { return 1; }
     if lifecycle_status() != 0 { return 2; }
@@ -767,6 +1118,21 @@ fn hosted_wire_fragment_reassembly_executes_bounded_lifecycle() {
     fs::write(
         root.join("src/main.act"),
         r#"import { open std::wire };
+"""
+contract:
+purpose:
+    Encode a three-byte payload as a fragment at the given offset and index into an output buffer.
+inputs:
+    output: exclusive ins loan of Buffer receiving the fragment; payload: borrowed Buffer; offset: owned u32 byte offset; index: owned u16 fragment index.
+outputs:
+    0 when the fragment was encoded, 1 when the encoding failed.
+ownership:
+    The output is an exclusive ins loan that is written; the payload is borrowed.
+errors:
+    A WireError from wire_fragment_encode maps to 1.
+side_effects:
+    Writes the fragment into the output buffer.
+"""
 verb make_fragment(ins output: Buffer, abs payload: Buffer, erg offset: u32, erg index: u16) -> Int {
     erg header = WireFragmentHeader {storage: Array[u8, 17]()};
     header.version = WIRE_FRAGMENT_VERSION;
@@ -778,6 +1144,21 @@ verb make_fragment(ins output: Buffer, abs payload: Buffer, erg offset: u32, erg
     erg encoded = wire_fragment_encode(header: abs header, payload: abs payload, output: ins output);
     return case dat encoded { Result.Ok(_) => 0, Result.Err(_) => 1, };
 }
+"""
+contract:
+purpose:
+    Accept the first fragment of a two-fragment message into a reassembly and check that the same fragment is then rejected as a duplicate.
+inputs:
+    reassembly: exclusive ins loan of WireReassembly in progress.
+outputs:
+    0 on success, 2 when the fragment cannot be built, 3 when the first accept fails or completes, 4 when the duplicate is not reported.
+ownership:
+    The reassembly is an exclusive ins loan that is updated on acceptance.
+errors:
+    The duplicate fragment error is the expected outcome of the second accept.
+side_effects:
+    Updates the reassembly state.
+"""
 verb accept_first(ins reassembly: WireReassembly) -> Int {
     erg first_payload = Buffer[3];
     first_payload[0] = 65u8;
@@ -793,6 +1174,21 @@ verb accept_first(ins reassembly: WireReassembly) -> Int {
     if case dat duplicate { Result.Err(error) => case dat error { WireError.FragmentDuplicate => false, _ => true, }, Result.Ok(_) => true, } { return 4; }
     return 0;
 }
+"""
+contract:
+purpose:
+    Accept the second fragment, check that the message completes, and copy the six reassembled bytes ABCDEF to an output buffer.
+inputs:
+    reassembly: exclusive ins loan of WireReassembly with the first fragment accepted.
+outputs:
+    0 on success, 5 when the fragment cannot be built, 6 when the accept fails, 7 when the copied bytes differ, 8 when the copy fails.
+ownership:
+    The reassembly is an exclusive ins loan that is updated and then read.
+errors:
+    A WireError from accept or copy maps to 6 or 8.
+side_effects:
+    Updates the reassembly state.
+"""
 verb complete_second(ins reassembly: WireReassembly) -> Int {
     erg second_payload = Buffer[3];
     second_payload[0] = 68u8;
@@ -808,6 +1204,7 @@ verb complete_second(ins reassembly: WireReassembly) -> Int {
     erg copied = wire_reassembly_copy(reassembly: abs reassembly, output: ins output);
     return case dat copied { Result.Ok(value) => if value == 6u32 && output[0] == 65u8 && output[5] == 70u8 { 0 } else { 7 }, Result.Err(_) => 8, };
 }
+"""Entry point that opens a reassembly over six bytes, begins a two-fragment message, accepts the first fragment and completes it with the second, returning 0 or the code of the first failing step."""
 verb main() -> Int {
     erg storage = Buffer[6];
     erg reassembly = wire_reassembly_open(storage: dat storage);

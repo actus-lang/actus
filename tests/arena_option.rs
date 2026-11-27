@@ -17,7 +17,7 @@ fn analyze_source(source: &str) -> Result<actus::semantic::SemanticModel, Semant
 #[test]
 fn accepts_option_reference_payloads_for_recursive_nodes() {
     analyze_source(
-        "struct ListNode { value: Int, next: Option[abs ListNode], } verb main() -> Int { return 0; }",
+        "struct ListNode { value: Int, next: Option[abs ListNode], }\n\"\"\"Entry point that returns 0 without doing any work.\"\"\"\nverb main() -> Int { return 0; }",
     )
     .expect("Option[abs Node] should be a valid recursive type");
 }
@@ -25,7 +25,7 @@ fn accepts_option_reference_payloads_for_recursive_nodes() {
 #[test]
 fn rejects_arena_drop_while_an_option_reference_is_live() {
     let error = analyze_source(
-        "struct Node { value: Int, } verb main() -> Int { erg arena: Arena[128] = Arena[128](); erg node = arena.place(value: Node { value: 1, }); abs view = ref node; drop(arena); return view.value; }",
+        "struct Node { value: Int, }\n\"\"\"Entry point that places a Node in an arena, takes a borrowed view of it, drops the arena while the view is alive, and returns the node value; the test expects the compiler to reject the use after drop.\"\"\"\nverb main() -> Int { erg arena: Arena[128] = Arena[128](); erg node = arena.place(value: Node { value: 1, }); abs view = ref node; drop(arena); return view.value; }",
     )
     .expect_err("an arena owner must not be dropped while its view is live");
     assert!(
@@ -105,6 +105,7 @@ struct ListNode {
     next: Option[abs ListNode],
 }
 
+"""Returns the sum of the value of a list node and of every node reachable through its next link, recursing over the borrowed child nodes."""
 verb sum(abs node: ListNode) -> Int {
     abs next = ref node.next;
     return node.value + case next {
@@ -113,6 +114,7 @@ verb sum(abs node: ListNode) -> Int {
     };
 }
 
+"""Entry point that places a three-node list holding 10, 20 and 30 in an arena, borrows its head and returns the sum computed by sum."""
 verb main() -> Int {
     erg arena: Arena[256] = Arena[256]();
     erg tail = arena.place(value: ListNode { value: 30, next: Option[abs ListNode].None, });

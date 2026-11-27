@@ -114,6 +114,11 @@ open verb timer_periodic(
     return Result[Int, TimeError].Ok(0);
 }
 
+"""
+Map the public `MissedTickPolicy` to the byte stored inside a `Timer`: `0` for
+`Coalesce`, `1` for `CatchUp` and `2` for `Skip`. The policy is an immutable
+`abs` view; the function performs no provider access and no allocation.
+"""
 verb timer_policy_code(abs policy: MissedTickPolicy) -> u8 {
     return case abs policy {
         MissedTickPolicy.Coalesce => 0u8,
@@ -300,6 +305,27 @@ open verb timer_state(abs timer: Timer) -> TimerState {
     };
 }
 
+"""
+contract:
+purpose:
+    Advance a periodic timer at one polled instant according to its missed-tick
+    policy and report whether a tick fired.
+inputs:
+    timer: the armed periodic timer; instant: the monotonic instant of the
+    poll.
+outputs:
+    `Ok(Fired)` or `Ok(Pending)`, or a typed `TimeError`.
+ownership:
+    The timer is an exclusive `ins` loan; the instant is an immutable `abs`
+    view.
+side_effects:
+    Moves the timer deadline: `Coalesce` re-arms one period after the poll
+    instant, `CatchUp` adds one period to the previous deadline, and `Skip`
+    re-arms after the poll instant without reporting a tick.
+errors:
+    `Overflow` when the new deadline does not fit in 64 bits, and
+    `InvalidTimerState` for an unknown policy byte.
+"""
 verb timer_poll_periodic(ins timer: Timer, abs instant: Instant) -> Result[TimerPoll, TimeError] {
     erg policy = timer.policy;
     case policy {

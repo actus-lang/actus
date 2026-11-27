@@ -107,9 +107,10 @@ File size limits are architectural guardrails and must be treated as mandatory r
 The limits measure **code-bearing lines**, not raw physical lines. Blank lines,
 Rust-style `//` and `/* ... */` comments, and Actus `#` comments are ignored.
 Inline comments do not add a line when code is already present on that line.
-Actus triple-quoted `""" ... """` documentation blocks remain counted because
-they are language constructs and part of the documentation contract. The
-diagnostic reports the measured code-line count explicitly.
+Actus triple-quoted `""" ... """` documentation blocks, single-line or
+multi-line, are documentation and are not counted either, so complete
+docstrings are never penalized; code on the same line as a closing `"""` still
+counts. The diagnostic reports the measured code-line count explicitly.
 
 - Preferred size: 500 lines or fewer.
 - Warning threshold: 600 lines.
@@ -329,6 +330,10 @@ library.
 
 - Every public Actus type, enum, external bridge, and verb must have a `"""`
   documentation block.
+- Every verb, public or private, must have a `"""` documentation block: strict
+  mode reports a private verb without one with `E1840`. Private verbs need a
+  complete, informative description (purpose, inputs, outputs, errors and side
+  effects as applicable), never a few words written to satisfy the check.
 - Documentation must state the relevant ownership role, return value, error
   variants, side effects, and C ABI relationship where applicable.
 - `Result.Ok(count)` must be documented as the exact number of processed

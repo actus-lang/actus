@@ -12,7 +12,11 @@ use super::contract::{Contract, FieldRoleLabel, is_signature_restatement, word_c
 use super::language::{contains_section, has_contradiction, is_misrepresenting};
 use super::{DocumentationIssue, DocumentationSection};
 
-/// Validate every public declaration and public member in one parsed program.
+/// Validate every public declaration and public member in one parsed program,
+/// and require a block docstring on every private verb.
+///
+/// A private verb needs only a present docstring (strict mode documents every
+/// verb); the content contract applies to public declarations.
 pub fn validate_public_documentation(program: &Program) -> Vec<DocumentationIssue> {
     let mut issues = Vec::new();
     for declaration in &program.declarations {
@@ -24,7 +28,18 @@ pub fn validate_public_documentation(program: &Program) -> Vec<DocumentationIssu
 fn validate_top_level(declaration: &TopLevelDecl, issues: &mut Vec<DocumentationIssue>) {
     match declaration {
         TopLevelDecl::Verb(verb) if verb.is_open => validate_verb(verb, issues),
+        TopLevelDecl::Verb(verb) => {
+            require_private_verb_doc(&verb.name, verb.doc.as_deref(), verb.span, issues)
+        }
         TopLevelDecl::ExternalVerb(verb) if verb.is_open => validate_external(verb, issues),
+        TopLevelDecl::ExternalVerb(verb) => {
+            require_private_verb_doc(&verb.name, verb.doc.as_deref(), verb.span, issues)
+        }
+        TopLevelDecl::Perform(perform) if !perform.is_open => {
+            for method in &perform.methods {
+                require_private_verb_doc(&method.name, method.doc.as_deref(), method.span, issues);
+            }
+        }
         TopLevelDecl::Struct(definition) if definition.is_open => {
             validate_struct(definition, issues)
         }
@@ -56,6 +71,23 @@ fn validate_verb(verb: &VerbDecl, issues: &mut Vec<DocumentationIssue>) {
         false,
         issues,
     );
+}
+
+fn require_private_verb_doc(
+    name: &str,
+    doc: Option<&str>,
+    span: SourceSpan,
+    issues: &mut Vec<DocumentationIssue>,
+) {
+    if doc.is_none_or(|doc| doc.trim().is_empty()) {
+        issues.push(issue(
+            STRICT_DOCUMENTATION_MISSING,
+            format!("verb {name}"),
+            DocumentationSection::Purpose,
+            span,
+            "private verb has no block docstring; strict mode documents every verb",
+        ));
+    }
 }
 
 fn validate_external(verb: &ExternalVerbDecl, issues: &mut Vec<DocumentationIssue>) {
