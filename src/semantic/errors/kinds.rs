@@ -270,6 +270,11 @@ pub enum SemanticErrorKind {
         field: String,
         role: String,
     },
+    ScalarViewField {
+        struct_name: String,
+        field: String,
+        type_name: String,
+    },
     InvalidReprC {
         declaration: String,
         reason: String,

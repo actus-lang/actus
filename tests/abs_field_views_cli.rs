@@ -105,3 +105,20 @@ verb main() -> Int { erg plain = Plain { number: 42, }; erg holder = View { plai
     let _ = fs::remove_file(input);
     let _ = fs::remove_file(output);
 }
+
+#[test]
+fn check_rejects_an_abs_field_of_a_scalar_type_and_accepts_viewable_types() {
+    for (label, field) in
+        [("int", "abs held: Int"), ("u8", "abs held: u8"), ("bool", "abs held: Bool")]
+    {
+        let output =
+            actus(label, "check", &format!("struct Count {{ {field}, }} verb main() {{}}"));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(!output.status.success(), "{label}: must be rejected");
+        assert!(stderr.contains("E1147"), "{label}: {stderr}");
+    }
+    for (label, field) in [("buffer", "abs held: Buffer"), ("string", "abs text: String")] {
+        let output = actus(label, "check", &format!("struct View {{ {field}, }} verb main() {{}}"));
+        assert!(output.status.success(), "{label}: {}", String::from_utf8_lossy(&output.stderr));
+    }
+}

@@ -99,6 +99,9 @@ An `abs` field is a non-owning read-only view stored with explicit provenance.
 - Its type must be one that can be viewed: a scalar (`Int`, `Bool`, `Usize`, a
   fixed-width integer, a float) has no view, and the declaration is rejected
   (`E1147`).
+- Its type must be one that can be viewed: a scalar (`Int`, `Bool`, `Usize`, a
+  fixed-width integer, a float) has no view, and the declaration is rejected
+  (`E1147`).
 - An `abs` field may be present in standard-library view aggregates only when
   the existing single-origin and non-escaping borrow rules prove its safety.
 

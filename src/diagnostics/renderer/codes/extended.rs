@@ -274,6 +274,11 @@ fn struct_field_message(kind: &SemanticErrorKind) -> Option<String> {
                 "struct field `{field}` in `{struct_name}` cannot persist the `{role}` ownership role"
             )
         }
+        SemanticErrorKind::ScalarViewField { struct_name, field, type_name } => {
+            format!(
+                "field `{field}` of `{struct_name}` is an `abs` view of the scalar type `{type_name}`; a scalar is copied, so declare a plain field"
+            )
+        }
         SemanticErrorKind::FrozenStructField { struct_name, field } => {
             format!("cannot mutate read-only `abs` field `{field}` on struct `{struct_name}`")
         }

@@ -8,7 +8,7 @@ use actus::semantic::{SemanticErrorKind, analyze};
 
 const PRELUDE: &str = "struct Plain { number: Int, } struct ViewBuffer { abs held: Buffer, } \
 struct ViewPlain { abs held: Plain, } struct OwnPlain { erg inner: Plain, } \
-struct Outer { erg view: ViewBuffer, } struct ViewCount { abs held: Int, } \
+struct Outer { erg view: ViewBuffer, } \
 verb consume(dat held: Buffer) {} ";
 
 fn analyze_main(body: &str) -> Result<actus::semantic::SemanticModel, SemanticErrorKind> {
@@ -119,7 +119,6 @@ fn an_abs_field_still_allows_reading_and_sharing_the_source() {
             "erg plain = Plain { number: 1, }; erg first = ViewPlain { held: plain, }; erg second = ViewPlain { held: plain, }; print(plain.number);",
         ),
         ("fresh value", "erg holder = ViewPlain { held: Plain { number: 1, }, }; print(1);"),
-        ("scalar", "erg count: Int = 1; erg holder = ViewCount { held: count, }; print(count);"),
         (
             "drop after the last use of the block",
             "erg source: Buffer = Buffer[4]; erg holder = ViewBuffer { held: source, }; print(1);",
@@ -166,4 +165,20 @@ fn an_abs_enum_payload_freezes_its_source_like_an_abs_field() {
         "{BUFFER}{{ erg holder = Option[abs Buffer].Some(source); }} drop(source);"
     ))
     .expect("the view ends with the holder's block");
+}
+
+#[test]
+fn an_abs_field_of_a_scalar_type_is_rejected_at_the_declaration() {
+    let source = "struct ViewCount { abs held: Int, } verb main() { erg count: Int = 1; \
+erg holder = ViewCount { held: count, }; print(count); }";
+    let (tokens, errors) = scan(source);
+    assert!(errors.is_empty(), "unexpected lexer errors: {errors:?}");
+    let error = analyze(&parse(tokens).expect("source should parse"))
+        .expect_err("a scalar has no view")
+        .kind;
+    assert!(matches!(
+        error,
+        SemanticErrorKind::ScalarViewField { struct_name, field, type_name }
+            if struct_name == "ViewCount" && field == "held" && type_name == "Int"
+    ));
 }
