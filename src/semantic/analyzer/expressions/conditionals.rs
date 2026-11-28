@@ -60,20 +60,35 @@ impl Analyzer {
         }
         let initial_state = self.snapshot_binding_states();
         let binding_count = initial_state.len();
+        let watermark = self.next_borrow_id;
         let then_returns = self.visit_branch_block(then_branch, returning)?;
+        if then_returns || branch_diverges(then_branch) {
+            self.end_leaving_holder_borrows(watermark);
+        }
+        let mut arm_views = self.block_tail_view_origins(then_branch);
         let then_state = self.snapshot_binding_prefix(binding_count);
         self.restore_binding_states(&initial_state);
+        let watermark = self.next_borrow_id;
         let else_returns = match else_branch {
-            Some(IfBranch::Block(block)) => self.visit_branch_block(block, returning)?,
+            Some(IfBranch::Block(block)) => {
+                let returns = self.visit_branch_block(block, returning)?;
+                arm_views.extend(self.block_tail_view_origins(block));
+                returns
+            }
             Some(IfBranch::ElseIf(nested)) => {
                 if returning {
                     self.returned_arms = Some(expression_span(nested));
                 }
                 self.visit_consumed_expression(nested)?;
+                arm_views.extend(self.value_view_origins(nested));
                 returning
             }
             None => false,
         };
+        if else_returns || else_branch.is_some_and(|branch| else_branch_diverges(self, branch)) {
+            self.end_leaving_holder_borrows(watermark);
+        }
+        self.record_conditional_views(expression_span(expression), arm_views);
         let else_state = self.snapshot_binding_prefix(binding_count);
         self.join_if_states(
             &initial_state,
@@ -190,6 +205,7 @@ impl Analyzer {
                 self.restore_binding_states(then_state);
             }
         }
+        self.refreeze_holder_borrows();
         Ok(())
     }
 

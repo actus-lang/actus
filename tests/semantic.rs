@@ -88,5 +88,7 @@ mod suite;
 mod temporaries;
 #[path = "semantic/try_positions.rs"]
 mod try_positions;
+#[path = "semantic/view_lifetimes.rs"]
+mod view_lifetimes;
 #[path = "semantic/void_values.rs"]
 mod void_values;

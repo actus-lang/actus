@@ -49,6 +49,7 @@ impl Analyzer {
             self.restore_binding_states(joined_state);
         }
         self.leave_scope();
+        self.refreeze_holder_borrows();
         Ok(())
     }
 
@@ -64,6 +65,7 @@ impl Analyzer {
         case_span: SourceSpan,
     ) -> Result<Vec<Vec<(OwnershipState, AccessState)>>, SemanticError> {
         let mut branch_results = Vec::new();
+        let mut arm_views = Vec::new();
         let mut result_type: Option<String> = None;
         let mut seen = HashSet::new();
         let mut wildcard_seen = false;
@@ -71,15 +73,13 @@ impl Analyzer {
             self.restore_binding_states(branch_state);
             self.validate_branch_order(&mut seen, &mut wildcard_seen, branch)?;
             self.validate_pattern(&branch.pattern, subject_type, subject)?;
-            self.enter_scope(branch.span);
-            self.bind_pattern_variables(&branch.pattern, mode, subject)?;
-            if mode == crate::ast::CaseMode::Dat {
-                self.register_unbound_payload_cleanup(subject, &branch.pattern)?;
-            }
-            if let Some(guard) = &branch.guard {
-                self.validate_case_guard(guard, branch.span)?;
-            }
+            let watermark = self.next_borrow_id;
+            self.enter_case_arm(branch, mode, subject)?;
             let leaves = self.visit_case_arm(branch, returning)?;
+            arm_views.extend(self.case_body_view_origins(&branch.body));
+            if leaves || case_branch_diverges(&branch.body) {
+                self.end_leaving_holder_borrows(watermark);
+            }
             if let Some(candidate) = super::analyzer::case_branch_type(self, &branch.body)
                 .map(|candidate| self.normalize_imported_type_key(&candidate))
             {
@@ -103,12 +103,32 @@ impl Analyzer {
                 branch_results.push(self.snapshot_binding_prefix(branch_count));
             }
         }
+        self.record_conditional_views(case_span, arm_views);
         if let Some(result_type) = result_type
             && let Some(type_name) = super::calls::parse_type_name_key(&result_type, case_span)
         {
             self.case_result_types.insert(self.expression_cache_key(case_span), type_name);
         }
         Ok(branch_results)
+    }
+
+    /// Opens the scope of one arm of a `case`, binds the variables of its
+    /// pattern and checks its guard. The caller closes the scope.
+    fn enter_case_arm(
+        &mut self,
+        branch: &CaseBranch,
+        mode: crate::ast::CaseMode,
+        subject: &Expr,
+    ) -> Result<(), SemanticError> {
+        self.enter_scope(branch.span);
+        self.bind_pattern_variables(&branch.pattern, mode, subject)?;
+        if mode == crate::ast::CaseMode::Dat {
+            self.register_unbound_payload_cleanup(subject, &branch.pattern)?;
+        }
+        if let Some(guard) = &branch.guard {
+            self.validate_case_guard(guard, branch.span)?;
+        }
+        Ok(())
     }
 
     fn validate_branch_order(
@@ -165,7 +185,7 @@ impl Analyzer {
         let Some(expected_states) = branch_results.first() else { return Ok(()) };
         for states in branch_results.iter().skip(1) {
             for (index, (expected, found)) in expected_states.iter().zip(states).enumerate() {
-                if expected != found {
+                if expected.0 != found.0 || !self.same_branch_access(&expected.1, &found.1) {
                     let name = self.model.bindings[index].name.clone();
                     return Err(SemanticError {
                         kind: SemanticErrorKind::BranchStateMismatch {

@@ -177,29 +177,45 @@ impl Analyzer {
         owner_index: usize,
         span: SourceSpan,
     ) {
+        let depth = self.scopes.len();
+        self.add_borrow_at(depth, owner, field, owner_index, span);
+    }
+
+    /// Registers a borrow that ends with the scope at `depth` (1 is the
+    /// outermost scope of the verb) instead of the current one, so the owner
+    /// stays frozen for as long as the binding that holds the view lives.
+    pub(super) fn add_borrow_at(
+        &mut self,
+        depth: usize,
+        owner: &str,
+        field: Option<String>,
+        owner_index: usize,
+        span: SourceSpan,
+    ) -> usize {
         let borrow_id = self.next_borrow_id;
         self.next_borrow_id += 1;
         self.model.borrows.push(BorrowRecord {
             id: borrow_id,
             owner: owner.to_owned(),
             field,
-            scope_depth: self.scopes.len(),
+            scope_depth: depth,
             origin_span: span,
         });
         self.active_borrow_ids.insert(borrow_id);
         self.borrow_owner_indices.insert(borrow_id, owner_index);
-        self.scopes.last_mut().expect("a verb always has a scope").borrow_ids.push(borrow_id);
+        self.scopes[depth - 1].borrow_ids.push(borrow_id);
         match &mut self.model.bindings[owner_index].access {
             AccessState::Mutable => {
                 self.model.bindings[owner_index].access =
                     AccessState::Frozen { borrow_ids: vec![borrow_id] }
             }
             AccessState::Frozen { borrow_ids } => borrow_ids.push(borrow_id),
-            AccessState::Suspended { .. } => return,
+            AccessState::Suspended { .. } => return borrow_id,
         }
         if !self.model.bindings[owner_index].ownership.is_live() {
             self.model.bindings[owner_index].access = AccessState::Mutable;
         }
+        borrow_id
     }
 }
 

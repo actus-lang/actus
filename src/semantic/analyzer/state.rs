@@ -57,6 +57,14 @@ pub(crate) struct Analyzer {
     /// The origin of every view that an aggregate binding holds, so a returned
     /// or stored value can be checked against its sources (ADR-0046 2.3).
     pub(crate) binding_held_views: HashMap<usize, Vec<Origin>>,
+    /// The origin of every view that the value of an `if` or `case` holds,
+    /// the union over its arms. Each arm is read while its own scope, and the
+    /// pattern variables of it, are still live (ADR-0046 2.3).
+    pub(crate) conditional_view_origins: HashMap<ExpressionCacheKey, Vec<Origin>>,
+    /// The borrows that freeze the source of a view at the scope of the
+    /// binding that holds it, which is not always the scope that stored it
+    /// (ADR-0046 2.3). A branch join gives them back after it.
+    pub(crate) holder_borrow_ids: HashSet<usize>,
     pub(crate) struct_types: HashMap<String, StructDef>,
     pub(crate) pack_types: HashMap<String, crate::ast::PackDecl>,
     pub(crate) enum_types: HashMap<String, EnumDef>,

@@ -217,62 +217,6 @@ impl Analyzer {
             || self.pack_types.contains_key(head)
     }
 
-    fn visit_index_assignment(
-        &mut self,
-        target: &Expr,
-        index: &Expr,
-        value: &Expr,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
-        self.validate_index_assignment_owner(target)?;
-        self.visit_expression(target)?;
-        self.visit_expression(index)?;
-        self.reject_void_value(value)?;
-        let element = self.validate_index_access(target, index)?;
-        // Visit the value first: an explicit `copy` is typed by its operand.
-        self.visit_expression(value)?;
-        self.validate_index_value(target, index, value)?;
-        self.reject_move_out_of_view(value, super::super::validation::expression_span(value))?;
-        // A struct, enum or resource stored in an element moves (ADR-0124).
-        if self.argument_moves_source(value, &element) {
-            self.consume_owned_source(value, super::super::validation::expression_span(value))?;
-        }
-        self.plan_try_unwind(value);
-        self.replace_owned_element(target, &element, span);
-        Ok(())
-    }
-
-    fn validate_index_assignment_owner(&self, target: &Expr) -> Result<(), SemanticError> {
-        match target {
-            Expr::Identifier { name, span } => {
-                self.reject_constant_assignment(name, *span)?;
-                let binding = self.binding(name, *span)?;
-                self.ensure_mutable(binding, name, *span)
-            }
-            Expr::FieldAccess { object, field, span, .. } => {
-                self.validate_index_assignment_owner(object)?;
-                if let Some(pack_name) = self.expression_pack_type(object) {
-                    let Some(pack_field) = self.pack_field(&pack_name, field) else {
-                        return Ok(());
-                    };
-                    if matches!(pack_field.role, crate::ast::Role::Abs) {
-                        return Err(SemanticError {
-                            kind: super::super::errors::SemanticErrorKind::InvalidFieldAssignmentTarget {
-                                field: field.clone(),
-                            },
-                            span: *span,
-                        });
-                    }
-                } else if let Some(struct_name) = self.expression_struct_type(object) {
-                    self.ensure_struct_field_mutable(&struct_name, field, *span)?;
-                }
-                Ok(())
-            }
-            Expr::Index { target, .. } => self.validate_index_assignment_owner(target),
-            _ => Ok(()),
-        }
-    }
-
     fn visit_owner_decl(
         &mut self,
         role: &Role,
@@ -416,7 +360,7 @@ impl Analyzer {
         }
     }
 
-    fn plan_try_unwind(&mut self, expression: &Expr) {
+    pub(super) fn plan_try_unwind(&mut self, expression: &Expr) {
         if let Expr::Try { span, .. } = expression {
             self.plan_return_unwind(*span);
         }

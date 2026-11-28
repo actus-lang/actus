@@ -1,5 +1,6 @@
 mod analysis;
 mod control;
+mod index_assignment;
 mod inferred_types;
 
 use super::state::Analyzer;

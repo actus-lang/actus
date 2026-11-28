@@ -96,6 +96,9 @@ An `abs` field is a non-owning read-only view stored with explicit provenance.
 - Construction must establish a valid single-origin borrow record.
 - The view cannot escape its source scope or be returned as an unrelated owner.
 - An `abs` field may not be used to create an `erg`, `dat`, or `ins` binding.
+- Its type must be one that can be viewed: a scalar (`Int`, `Bool`, `Usize`, a
+  fixed-width integer, a float) has no view, and the declaration is rejected
+  (`E1147`).
 - An `abs` field may be present in standard-library view aggregates only when
   the existing single-origin and non-escaping borrow rules prove its safety.
 
@@ -108,6 +111,18 @@ for a later drop, move or mutation. The caller does not track which parameter
 the result views, so all of them are frozen; a result that cannot hold a view
 freezes nothing. A chained call such as `make(src: abs first.b)` freezes the
 holder `first` that its argument is read from, as a direct construction does.
+
+A view held by a value belongs to the place that holds the value. When a value
+that holds views is stored in a binding, whether declared with it, assigned to
+it, or stored in a field or an element of it, every source of those views is
+frozen until the end of the scope of that binding, with the same diagnostics as
+a direct construction. A source declared in a scope deeper than the binding's
+would be released before the binding, so storing a view of it there is rejected
+(`E1018`). The views an `if` or `case` value holds are the views of the value of
+every arm. A pattern variable bound by a `case` holds the views of its subject's
+payload: the views the subject holds, or a view of the subject itself when the
+subject holds none; a variable bound from an `abs` parameter therefore derives
+from that parameter.
 
 The Alpha implementation does not infer a general lifetime relationship from
 an `abs` field. If the source and destination scopes cannot be proven by the

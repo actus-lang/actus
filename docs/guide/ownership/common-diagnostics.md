@@ -10,7 +10,9 @@ Common situations include:
 - creating an `ins` loan from an `abs` binding;
 - creating two conflicting loans for one owner;
 - returning or storing a view beyond its source scope, including a struct,
-  `Option` or `Result` that holds a view of a local (`E1018`);
+  `Option` or `Result` that holds a view of a local (`E1018`), or storing a
+  view of an inner-block local in a binding, field or element of an outer
+  block (`E1018`);
 - moving a value inside a loop that runs again (`E1005`, moved in a previous
   iteration), unless the path leaves the loop with `break` or `return`;
 - dropping a moved or already-dropped value;

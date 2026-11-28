@@ -125,7 +125,7 @@ fn is_view_source(type_name: &TypeName) -> bool {
     !matches!(type_name.name.as_str(), "Int" | "Bool" | "String")
 }
 
-fn derive_from(origin: Origin) -> Origin {
+pub(super) fn derive_from(origin: Origin) -> Origin {
     match origin {
         Origin::AbsParameter { parameter_index }
         | Origin::Derived { root_parameter: parameter_index } => {
@@ -135,7 +135,7 @@ fn derive_from(origin: Origin) -> Origin {
     }
 }
 
-fn combine<I>(origins: I) -> Origin
+pub(super) fn combine<I>(origins: I) -> Origin
 where
     I: IntoIterator<Item = Origin>,
 {
