@@ -31,7 +31,7 @@ impl Analyzer {
         let loan = match self.model.bindings[index].role {
             Role::Abs => false,
             Role::Ins => true,
-            _ => return Ok(()),
+            _ => return self.reject_move_out_of_element(expression, path, span),
         };
         if !self.is_move_only_aggregate(expression) {
             return Ok(());
@@ -40,6 +40,42 @@ impl Analyzer {
             .resolved_type_name(expression)
             .is_some_and(|type_name| self.type_is_copy(&type_name));
         Err(SemanticError { kind: SemanticErrorKind::MoveOutOfView { path, loan, copyable }, span })
+    }
+
+    /// Rejects reading a struct, enum, pack, array or resource BY VALUE out of
+    /// an array element of an owner, directly (`xs[i]`) or through a field of
+    /// the element (`xs[i].inner`), in every position that stores or hands
+    /// over a value (bug #123, ADR-0124). The language does not track moves
+    /// of single elements, so a move would leave the array releasing the
+    /// element again at its own cleanup (bug #126), and a silent copy would
+    /// share whatever the value owns. The element can be borrowed with `abs`,
+    /// replaced in place by an assignment (ADR-0125), or, when its type is a
+    /// copy type, duplicated with `copy(value: abs xs[i])`; the error says
+    /// whether that copy is the fix. A scalar element is a value and is
+    /// never judged.
+    fn reject_move_out_of_element(
+        &self,
+        expression: &Expr,
+        path: String,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        if !passes_through_element(expression) || !self.is_move_only_aggregate(expression) {
+            return Ok(());
+        }
+        let copyable = self
+            .resolved_type_name(expression)
+            .is_some_and(|type_name| self.type_is_copy(&type_name));
+        Err(SemanticError { kind: SemanticErrorKind::MoveOutOfElement(path, copyable), span })
+    }
+}
+
+/// Whether a field or element path reads from an array element anywhere
+/// along it; an index into a `Buffer` yields a byte, which is never judged.
+fn passes_through_element(expression: &Expr) -> bool {
+    match expression {
+        Expr::Index { .. } => true,
+        Expr::FieldAccess { object, .. } => passes_through_element(object),
+        _ => false,
     }
 }
 

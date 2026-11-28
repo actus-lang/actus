@@ -91,6 +91,7 @@ fn declaration_semantic_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode>
         SemanticErrorKind::SelfAssignment { .. } => DiagnosticCode::SELF_ASSIGNMENT,
         SemanticErrorKind::InvalidReprC { .. } => DiagnosticCode::INVALID_REPR_C,
         SemanticErrorKind::InvalidCopyType { .. } => DiagnosticCode::INVALID_COPY_TYPE,
+        SemanticErrorKind::ScalarViewField { .. } => DiagnosticCode::SCALAR_VIEW_FIELD,
         _ => return None,
     })
 }
@@ -190,6 +191,8 @@ fn ownership_binding_code(kind: &SemanticErrorKind) -> Option<DiagnosticCode> {
         SemanticErrorKind::MoveOutOfView { loan: false, .. } => {
             DiagnosticCode::INVALID_DAT_ARGUMENT
         }
+        SemanticErrorKind::MoveOutOfElement(..) => DiagnosticCode::INVALID_DAT_ARGUMENT,
+        SemanticErrorKind::MisplacedTry(_) => DiagnosticCode::INVALID_ARGUMENT_ROLE,
         SemanticErrorKind::ZeroOnDropFieldMove { .. } => DiagnosticCode::ZERO_ON_DROP_FIELD_MOVE,
         SemanticErrorKind::MoveFrozen { .. } | SemanticErrorKind::MutateFrozen { .. } => {
             DiagnosticCode::MOVE_OR_MUTATE_FROZEN

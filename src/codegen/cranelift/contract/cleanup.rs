@@ -122,7 +122,7 @@ fn collect_cleanup_bridges(backend_module: &BackendModule) -> Vec<BackendCleanup
     for function in &backend_module.functions {
         for block in &function.blocks {
             for instruction in &block.instructions {
-                let BackendInstruction::Cleanup { operand: Some(operand), .. } = instruction else {
+                let Some(operand) = instruction.cleanup_operand() else {
                     continue;
                 };
                 if !bridges.contains(&operand.bridge) {
@@ -323,6 +323,36 @@ fn bridge_symbol(bridge: BackendCleanupBridge) -> &'static str {
         BackendCleanupBridge::SecureZero { .. } => crate::runtime::SECURE_ZERO_SYMBOL,
         BackendCleanupBridge::PerformanceDrop => "",
     }
+}
+
+/// Lowers a cleanup that runs only when its boolean condition holds, the
+/// release of an enum payload that only the active variant owns (ADR-0125).
+/// The cleanup gets a block of its own and the instructions that follow
+/// continue in a new block that both paths reach.
+pub(super) fn lower_conditional_cleanup(
+    module: &mut ObjectModule,
+    builder: &mut FunctionBuilder<'_>,
+    (condition, action, operand): (
+        BackendValueId,
+        &LoweredCleanupInstruction,
+        BackendCleanupOperand,
+    ),
+    declarations: &BTreeMap<String, Declaration>,
+    values: &BTreeMap<BackendValueId, cranelift_codegen::ir::Value>,
+) -> Result<(), BackendEmitError> {
+    let condition = values.get(&condition).copied().ok_or_else(|| {
+        BackendEmitError(format!("Cranelift cleanup condition {} is unavailable", condition.0))
+    })?;
+    let release = builder.create_block();
+    let next = builder.create_block();
+    builder.ins().brif(condition, release, &[], next, &[]);
+    builder.seal_block(release);
+    builder.switch_to_block(release);
+    lower_cleanup(module, builder, action, Some(operand), declarations, values)?;
+    builder.ins().jump(next, &[]);
+    builder.seal_block(next);
+    builder.switch_to_block(next);
+    Ok(())
 }
 
 #[cfg(test)]

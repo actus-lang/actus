@@ -110,6 +110,76 @@ impl Analyzer {
         self.initialize_owner(expression, span)
     }
 
+    /// Moves an owner out through the tail value of a block, the value of an
+    /// `if` branch or a `case` arm (ADR-0125): the value leaves the block, so
+    /// the block's scope must not release it. Only an owner whose type moves
+    /// when it is stored is moved; a scalar is copied, and a view or a loan
+    /// is not an owner.
+    pub(in crate::semantic) fn consume_value_tail(
+        &mut self,
+        expression: &Expr,
+        span: SourceSpan,
+    ) -> Result<(), SemanticError> {
+        // The tail is the block's value, even when it is written with `;`,
+        // so a call there is received, not discarded (bug #128).
+        self.keep_tail_value(expression);
+        let index = match expression {
+            // A field moves by its path only when its type is move-only.
+            Expr::FieldAccess { .. } => return self.consume_owned_source(expression, span),
+            // An element cannot leave its array by value (bug #126).
+            Expr::Index { .. } => return self.reject_move_out_of_view(expression, span),
+            Expr::Identifier { name, span } => match self.binding(name, *span) {
+                Ok(index) => index,
+                Err(_) => return Ok(()),
+            },
+            _ => return Ok(()),
+        };
+        let binding = &self.model.bindings[index];
+        if !matches!(binding.role, Role::Erg | Role::Dat) {
+            return Ok(());
+        }
+        let moves = binding.ty == Some(crate::ast::BuiltinType::Buffer)
+            || self
+                .binding_type_names
+                .get(&index)
+                .is_some_and(|type_name| self.type_moves_on_store(type_name));
+        if !moves {
+            return Ok(());
+        }
+        self.consume_owned_source(expression, span)
+    }
+
+    /// Records that the assignment at `span` releases the value the owner
+    /// `index` held before it stores the new one (ADR-0125), and makes the
+    /// owner live again: it owns the value it was just given. Nothing is
+    /// released when the assigned expression itself consumed the old value
+    /// (`b = grow(b: dat b)`), and a partially moved owner releases only the
+    /// fields it still owned.
+    pub(in crate::semantic) fn replace_owned_value(&mut self, index: usize, span: SourceSpan) {
+        let binding = &self.model.bindings[index];
+        if !matches!(binding.role, Role::Erg | Role::Dat) {
+            return;
+        }
+        let holds_resource = binding.ty == Some(crate::ast::BuiltinType::Buffer)
+            || self
+                .binding_type_names
+                .get(&index)
+                .is_some_and(|type_name| self.type_holds_resource(type_name));
+        let moved_fields = match &binding.ownership {
+            OwnershipState::Active => Some(Vec::new()),
+            OwnershipState::PartiallyMoved { fields } => Some(fields.clone()),
+            OwnershipState::Moved | OwnershipState::Dropped => None,
+        };
+        if let Some(moved_fields) = moved_fields.filter(|_| holds_resource) {
+            self.model.replacement_drops.push(crate::semantic::model::ExplicitDrop {
+                binding_index: index,
+                span,
+                moved_fields,
+            });
+        }
+        self.model.bindings[index].ownership = OwnershipState::Active;
+    }
+
     fn validate_owner_source(
         &self,
         expression: &Expr,

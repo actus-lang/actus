@@ -1,3 +1,4 @@
+mod arm_tries;
 mod case;
 mod contract;
 mod control_flow;

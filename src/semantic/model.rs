@@ -191,6 +191,17 @@ pub struct SemanticModel {
     pub argument_roles: Vec<ArgumentRoleFact>,
     pub cleanup_plans: Vec<super::cleanup::ScopeCleanup>,
     pub explicit_drops: Vec<ExplicitDrop>,
+    /// Assignments to a live owner: the value the owner held is released
+    /// before the new one is stored (ADR-0125). `span` is the assignment's.
+    pub replacement_drops: Vec<ExplicitDrop>,
+    /// Assignments to a field or an array element that hold an owned value:
+    /// the value is released before the new one is stored (ADR-0125).
+    pub place_replacements: Vec<super::cleanup::PlaceReplacement>,
+    /// Values that no binding receives, released after the expression that
+    /// last reads them (ADR-0125).
+    pub temporary_releases: Vec<super::cleanup::TemporaryRelease>,
+    /// Where the exit lists of each analysed verb body lie (ADR-0125).
+    pub verb_cleanups: Vec<super::cleanup::VerbCleanup>,
     pub return_unwind_plans: Vec<super::cleanup::UnwindPlan>,
     pub loop_unwind_plans: Vec<super::cleanup::LoopUnwindPlan>,
     pub generic_instances: Vec<GenericInstance>,

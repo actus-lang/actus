@@ -98,7 +98,8 @@ fn lower_non_scalar(
         BackendInstruction::Return { .. }
         | BackendInstruction::Fail { .. }
         | BackendInstruction::Trap { .. }
-        | BackendInstruction::Cleanup { .. } => {
+        | BackendInstruction::Cleanup { .. }
+        | BackendInstruction::CleanupWhen { .. } => {
             lower_termination(module, builder, instruction, state)
         }
         _ if is_aggregate_instruction(instruction) => aggregate::lower_aggregate_instruction(
@@ -271,6 +272,15 @@ fn lower_termination(
             state.declarations,
             state.values,
         ),
+        BackendInstruction::CleanupWhen { condition, action, operand, .. } => {
+            cleanup::lower_conditional_cleanup(
+                module,
+                builder,
+                (*condition, action, operand.clone()),
+                state.declarations,
+                state.values,
+            )
+        }
         _ => Err(BackendEmitError("Cranelift termination instruction expected".to_owned())),
     }
 }

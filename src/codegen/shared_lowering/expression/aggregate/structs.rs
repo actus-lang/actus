@@ -47,12 +47,22 @@ pub(super) fn lower_struct_literal(
     let result = provider.allocate();
     provider.remember_value(result, BackendValueType::Aggregate { layout });
     provider.remember_nominal_type(result, type_name);
+    // Only a field stored by value copies its source; a view field stores
+    // an address.
+    let moved = lowered_fields
+        .iter()
+        .filter(|field| matches!(field.ty, BackendValueType::Aggregate { .. }))
+        .map(|field| field.value)
+        .collect::<Vec<_>>();
     instructions.push(BackendInstruction::AggregateConstruct {
         result,
         layout,
         fields: lowered_fields,
         span,
     });
+    for value in moved {
+        super::super::cleanup::release_moved_storage(provider, value, span, instructions);
+    }
     provider.remember_heap_owned_aggregate(result, layout);
     Ok(result)
 }

@@ -224,58 +224,39 @@ fn lower_case_branch_body<P: BackendExpressionProvider>(
 ) -> Result<BackendBlock, BackendContractError> {
     let CaseBodyInput { id, branch, span, subject, mode, fallthrough, guard_failure } = input;
     lowering.provider.enter_scope(branch.span);
-    let mut body_prefix = match bind_case_payload(lowering, branch, subject, mode) {
-        Ok(instructions) => instructions,
-        Err(error) => {
-            let mut discarded = Vec::new();
-            let _ = lowering.provider.exit_scope(branch.span, &mut discarded);
-            return Err(error);
-        }
-    };
-    let scope_bindings = lowering.provider.snapshot_bindings();
-    let nested_block_start = lowering.blocks.len();
-    let branch_result = lower_bound_case_branch(
+    lowering.open_scopes.push((branch.span, fallthrough));
+    let result = lower_case_branch_scope(
         lowering,
-        BoundCaseInput {
-            lowering: &mut body_prefix,
-            id,
-            branch,
-            span,
-            fallthrough,
-            guard_failure,
-            nested_block_start,
-            scope_bindings: scope_bindings.clone(),
-        },
+        id,
+        branch,
+        (span, subject, mode),
+        fallthrough,
+        guard_failure,
     );
-    match branch_result {
-        Ok(mut body) => {
-            if branch.guard.is_none() {
-                body.instructions.splice(0..0, body_prefix);
-                lowering.distribute_scope_cleanup(branch.span, nested_block_start)?;
-                let cleanup_on_exit = match body.instructions.last() {
-                    Some(BackendInstruction::Jump { target, .. }) => {
-                        fallthrough.is_some_and(|continuation| continuation == *target)
-                    }
-                    _ => true,
-                };
-                if cleanup_on_exit {
-                    lowering.provider.exit_scope_with_bindings(
-                        branch.span,
-                        &mut body.instructions,
-                        &scope_bindings,
-                    )?;
-                } else {
-                    lowering.provider.exit_scope_without_cleanup()?;
-                }
-            }
-            Ok(body)
-        }
-        Err(error) => {
-            let mut discarded = Vec::new();
-            let _ = lowering.provider.exit_scope(branch.span, &mut discarded);
-            Err(error)
-        }
+    lowering.open_scopes.pop();
+    lowering.provider.exit_scope_without_cleanup()?;
+    result
+}
+
+/// Lowers a case branch inside its scope. The branch's scope ends where its
+/// body falls through to `fallthrough`, like a block's (ADR-0125).
+fn lower_case_branch_scope<P: BackendExpressionProvider>(
+    lowering: &mut BodyLowering<'_, P>,
+    id: BackendBlockId,
+    branch: &crate::ast::CaseBranch,
+    (span, subject, mode): (SourceSpan, BackendValueId, CaseMode),
+    fallthrough: Option<BackendBlockId>,
+    guard_failure: BackendBlockId,
+) -> Result<BackendBlock, BackendContractError> {
+    let mut body_prefix = bind_case_payload(lowering, branch, subject, mode)?;
+    let mut body = lower_bound_case_branch(
+        lowering,
+        BoundCaseInput { lowering: &mut body_prefix, id, branch, span, fallthrough, guard_failure },
+    )?;
+    if branch.guard.is_none() {
+        body.instructions.splice(0..0, body_prefix);
     }
+    Ok(body)
 }
 
 fn bind_case_payload<P: BackendExpressionProvider>(
@@ -302,16 +283,8 @@ fn lower_bound_case_branch<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
     input: BoundCaseInput<'_>,
 ) -> Result<BackendBlock, BackendContractError> {
-    let BoundCaseInput {
-        lowering: body_prefix,
-        id,
-        branch,
-        span,
-        fallthrough,
-        guard_failure,
-        nested_block_start,
-        scope_bindings,
-    } = input;
+    let BoundCaseInput { lowering: body_prefix, id, branch, span, fallthrough, guard_failure } =
+        input;
     if branch.guard.is_some() {
         return lower_guarded_case_branch(
             lowering,
@@ -322,8 +295,6 @@ fn lower_bound_case_branch<P: BackendExpressionProvider>(
                 fallthrough,
                 guard_failure,
                 guard_instructions: std::mem::take(body_prefix),
-                nested_block_start,
-                scope_bindings,
             },
         );
     }
@@ -334,16 +305,8 @@ fn lower_guarded_case_branch<P: BackendExpressionProvider>(
     lowering: &mut BodyLowering<'_, P>,
     input: GuardedCaseInput<'_>,
 ) -> Result<BackendBlock, BackendContractError> {
-    let GuardedCaseInput {
-        id,
-        branch,
-        span,
-        fallthrough,
-        guard_failure,
-        mut guard_instructions,
-        nested_block_start,
-        scope_bindings,
-    } = input;
+    let GuardedCaseInput { id, branch, span, fallthrough, guard_failure, mut guard_instructions } =
+        input;
     let body_id = lowering.allocate_block();
     let guard_failure_id = lowering.allocate_block();
     let condition = lowering.provider.lower_expression(
@@ -358,7 +321,7 @@ fn lower_guarded_case_branch<P: BackendExpressionProvider>(
         else_arguments: Vec::new(),
         span: branch.span,
     });
-    let mut body = case_return_block(lowering, body_id, branch, span, fallthrough)?;
+    let body = case_return_block(lowering, body_id, branch, span, fallthrough)?;
     lowering.blocks.push(BackendBlock {
         parameters: Vec::new(),
         id: guard_failure_id,
@@ -368,22 +331,6 @@ fn lower_guarded_case_branch<P: BackendExpressionProvider>(
             span: branch.span,
         }],
     });
-    lowering.distribute_scope_cleanup(branch.span, nested_block_start)?;
-    let cleanup_on_exit = match body.instructions.last() {
-        Some(BackendInstruction::Jump { target, .. }) => {
-            fallthrough.is_some_and(|continuation| continuation == *target)
-        }
-        _ => true,
-    };
-    if cleanup_on_exit {
-        lowering.provider.exit_scope_with_bindings(
-            branch.span,
-            &mut body.instructions,
-            &scope_bindings,
-        )?;
-    } else {
-        lowering.provider.exit_scope_without_cleanup()?;
-    }
     lowering.blocks.push(body);
     Ok(BackendBlock { parameters: Vec::new(), id, instructions: guard_instructions })
 }

@@ -21,7 +21,10 @@ impl Analyzer {
             self.plan_return_unwind(statement_span);
             return Ok(());
         };
-        self.validate_return_expression(expression)?;
+        self.returned_arms = returned_arms_span(unwrap_grouping(expression));
+        let validated = self.validate_return_expression(expression);
+        self.returned_arms = None;
+        validated?;
         if self.current_return_access == Some(crate::ast::ReturnAccess::Abs) {
             self.plan_return_unwind(statement_span);
             return Ok(());
@@ -29,6 +32,11 @@ impl Analyzer {
         let returned_expression = unwrap_grouping(expression);
         self.reject_move_out_of_view(returned_expression, expression_span(returned_expression))?;
         let Expr::Identifier { name, span } = returned_expression else {
+            // A returned field path (`return batch.index;`) leaves with the
+            // value, so its owner releases only the fields it still holds.
+            if matches!(returned_expression, Expr::FieldAccess { .. }) {
+                self.consume_value_tail(returned_expression, statement_span)?;
+            }
             if contains_returned_borrow(expression) {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::BorrowedReturn { name: "temporary borrow".to_owned() },
@@ -295,5 +303,41 @@ fn expression_span(expression: &Expr) -> SourceSpan {
         | Expr::Case { span, .. }
         | Expr::Cast { span, .. }
         | Expr::If { span, .. } => *span,
+    }
+}
+
+/// The span of a returned `case` or `if` whose arms each leave the verb with a
+/// `return` of their own: every `if`, and a `case` whose block arms all end
+/// with a value or leave by `return`, `break` or `continue` (ADR-0125). A
+/// `case` with an arm that ends with a plain statement runs as a statement
+/// whose arms rejoin, so its arms are joined like any `case`.
+impl Analyzer {
+    /// Whether the verb being analysed returns a value; a verb without one
+    /// returns from the arms of a returned `case` or `if` without a value.
+    pub(crate) fn returns_value(&self) -> bool {
+        self.current_return_type_name.as_ref().is_some_and(|type_name| type_name.name != "Void")
+    }
+}
+
+pub(crate) fn returned_arms_span(expression: &Expr) -> Option<SourceSpan> {
+    match expression {
+        Expr::If { span, .. } => Some(*span),
+        Expr::Case { branches, span, .. } => branches
+            .iter()
+            .all(|branch| match &branch.body {
+                crate::ast::CaseBody::Expression(_) => true,
+                crate::ast::CaseBody::Block(block) => block.statements.last().is_some_and(|last| {
+                    matches!(
+                        last,
+                        crate::ast::Stmt::Expression { .. }
+                            | crate::ast::Stmt::If { .. }
+                            | crate::ast::Stmt::Return { .. }
+                            | crate::ast::Stmt::Break { .. }
+                            | crate::ast::Stmt::Continue { .. }
+                    )
+                }),
+            })
+            .then_some(*span),
+        _ => None,
     }
 }

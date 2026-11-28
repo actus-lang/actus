@@ -52,6 +52,11 @@ struct. `header` can be inspected through the struct but cannot be mutated or
 freed through that view. See [ownership roles](../ownership/roles.md) for the
 full role rules.
 
+The type of an `abs` field must be one that can be viewed. A scalar (`Int`,
+`Bool`, `Usize`, a fixed-width integer or a float) has no view, so
+`abs held: Int` is rejected with `E1147`; declare a plain field (`held: Int`),
+which copies the value.
+
 ## Mutation, views, and field moves
 
 An `erg` owner can mutate its fields. An `abs` view can read fields but cannot

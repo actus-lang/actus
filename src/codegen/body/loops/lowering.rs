@@ -270,7 +270,9 @@ impl<P: super::super::BackendExpressionProvider> BodyLowering<'_, P> {
             &mut prefix,
         )?;
         let nested_block_start = self.blocks.len();
+        self.open_scopes.push((body.span, Some(increment_id)));
         let result = self.lower_block_in_scope(body_id, body, Some(increment_id));
+        self.open_scopes.pop();
         let mut lowered = match result {
             Ok(block) => block,
             Err(error) => {

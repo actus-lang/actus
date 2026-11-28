@@ -12,6 +12,19 @@ impl Analyzer {
         let Expr::Identifier { name, span } = subject else { return Ok(()) };
         let binding_index = self.binding(name, *span)?;
         let Pattern::Variant { enum_name, variant, payload, span } = pattern else {
+            // A wildcard branch consumes the subject without naming a variant:
+            // the branch releases it by its active variant (ADR-0125).
+            if matches!(pattern, Pattern::Wildcard { .. })
+                && let Some(type_name) = self.binding_type_names.get(&binding_index).cloned()
+                && self.type_holds_resource(&type_name)
+            {
+                self.register_payload_cleanup(
+                    binding_index,
+                    type_name.name,
+                    "_".to_owned(),
+                    String::new(),
+                );
+            }
             return Ok(());
         };
         let enum_name = self.imported_member_name(enum_name).unwrap_or(enum_name);

@@ -1,3 +1,5 @@
+use super::PackLayoutError;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SemanticErrorKind {
     DuplicateBinding {
@@ -44,6 +46,9 @@ pub enum SemanticErrorKind {
         loan: bool,
         copyable: bool,
     },
+    /// An aggregate read by value out of this array element (`true`: copy type).
+    MoveOutOfElement(String, bool),
+    MisplacedTry(String), // a `?` that cannot return early from this place (bug #130)
     ZeroOnDropFieldMove {
         owner: String,
         field: String,
@@ -265,6 +270,11 @@ pub enum SemanticErrorKind {
         field: String,
         role: String,
     },
+    ScalarViewField {
+        struct_name: String,
+        field: String,
+        type_name: String,
+    },
     InvalidReprC {
         declaration: String,
         reason: String,
@@ -462,34 +472,8 @@ pub enum SemanticErrorKind {
         borrow_ids: Vec<usize>,
     },
     MissingReturnValue,
-    InvalidPackStorage {
-        pack: String,
-        ty: String,
-    },
-    InvalidPackFieldType {
-        pack: String,
-        field: String,
-        ty: String,
-    },
-    PackFieldOutOfBounds {
-        pack: String,
-        field: String,
-        offset: u16,
-        width: u16,
-        capacity: u16,
-    },
-    PackFieldOverlap {
-        pack: String,
-        field: String,
-        other: String,
-        start: u16,
-        end: u16,
-    },
-    PackUncoveredBits {
-        pack: String,
-        start: u16,
-        end: u16,
-    },
+    /// A pack declaration whose storage, field types or bit layout is invalid.
+    PackLayout(PackLayoutError),
     InvalidSerializationContract {
         contract: String,
         reason: String,

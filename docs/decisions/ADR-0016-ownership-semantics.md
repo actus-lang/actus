@@ -143,6 +143,18 @@ to the back edge. Paths that leave a binding in different states are rejected
 like the branches of an `if` (`E1061`), so a value moved before a `break` of a
 `for` loop is rejected at the loop, because the normal exit keeps it.
 
+### Branch scopes and conditional operands
+
+Each branch block of an `if` is a scope of its own: an owner declared in a
+branch is released where the branch ends, so a path that does not run the
+branch never releases it. The value of a branch or a `case` arm leaves it, so
+an owner named as that value is moved out before the branch's own release.
+The right operand of `&&` and `||` runs on one path only and is checked like a
+branch: if it moves or drops an owner of a resource, the path that skips it
+disagrees and the program is rejected (`E1061`). Assigning a new value to an owner releases
+the value it held, unless the assigned expression consumed it, and makes the
+owner live again. The exits that release owners follow ADR-0125.
+
 ## Consequences
 
 The model keeps Actus simpler than a general lifetime calculus while making

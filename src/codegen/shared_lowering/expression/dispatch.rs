@@ -8,7 +8,23 @@ use crate::ast::Expr;
 use crate::codegen::body::BackendExpressionProvider;
 use crate::lexer::SourceSpan;
 
+/// The internal error for a `?` that reached the expression lowering.
+const TRY_OUTSIDE_STATEMENT: &str =
+    "internal error: a `?` outside a statement reached the expression lowering";
+
 pub(super) fn lower_expression(
+    provider: &mut SharedExpressionProvider<'_>,
+    expression: &Expr,
+    instructions: &mut Vec<BackendInstruction>,
+) -> Result<BackendValueId, BackendContractError> {
+    let value = lower_expression_kind(provider, expression, instructions)?;
+    // A value no binding receives is released after the expression that
+    // last reads it (ADR-0125, bug #128).
+    super::cleanup::track_temporaries(provider, expression_span(expression), value, instructions);
+    Ok(value)
+}
+
+fn lower_expression_kind(
     provider: &mut SharedExpressionProvider<'_>,
     expression: &Expr,
     instructions: &mut Vec<BackendInstruction>,
@@ -45,9 +61,9 @@ pub(super) fn lower_expression(
                 provider.lower_runtime_cast(expression, target, *span, instructions)
             }
         }
-        Expr::Try { expression, span } => {
-            lower_same_result_try(provider, expression, *span, instructions)
-        }
+        // Every accepted `?` is a statement the body lowering returns from
+        // (bugs #128, #130); here it would never return (internal error).
+        Expr::Try { span, .. } => Err(unsupported(*span, TRY_OUTSIDE_STATEMENT)),
         Expr::Unary { .. } => provider.lower_unary(expression, instructions),
         Expr::Binary { .. } => provider.lower_binary(expression, instructions),
         Expr::If { condition, .. } if matches!(condition.as_ref(), Expr::BoolLiteral { .. }) => {
@@ -218,23 +234,4 @@ fn lower_borrow(
     } else {
         Err(unsupported(span, "borrow requires a pointer-valued expression"))
     }
-}
-
-fn lower_same_result_try(
-    provider: &mut SharedExpressionProvider<'_>,
-    expression: &Expr,
-    span: SourceSpan,
-    instructions: &mut Vec<BackendInstruction>,
-) -> Result<BackendValueId, BackendContractError> {
-    let value = provider.lower_expression(expression, instructions)?;
-    let return_type = provider
-        .return_types
-        .get(&provider.verb_name)
-        .copied()
-        .flatten()
-        .ok_or_else(|| unsupported(span, "try propagation requires a Result return type"))?;
-    if provider.value_type(value) != Some(return_type) {
-        return Err(unsupported(span, "try propagation requires the same Result type"));
-    }
-    Ok(value)
 }

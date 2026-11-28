@@ -3,6 +3,7 @@ mod array_capacity;
 mod borrowing;
 mod calls;
 mod cleanup;
+mod conditional_tries;
 mod copy_types;
 mod dynamic;
 mod enums;
@@ -13,6 +14,7 @@ mod intrinsics;
 mod loans;
 mod methods;
 mod model;
+mod nested_tries;
 mod origins;
 mod ownership;
 mod packs;
@@ -26,6 +28,7 @@ mod stack_limit;
 mod state;
 mod structs;
 mod target_filter;
+mod try_positions;
 mod types;
 mod volatile;
 
@@ -37,8 +40,11 @@ pub(crate) use analyzer::{
     validate_stack_limit_recursion,
 };
 pub(crate) use calls::{parse_type_name_key, print_uses_label};
-pub use cleanup::{CleanupAction, LoopExitKind, LoopUnwindPlan, ScopeCleanup, UnwindPlan};
-pub use errors::{SemanticError, SemanticErrorKind};
+pub use cleanup::{
+    CleanupAction, LoopExitKind, LoopUnwindPlan, PlaceReplacement, ReplacedPlace, ScopeCleanup,
+    TemporaryRelease, UnwindPlan, VerbCleanup,
+};
+pub use errors::{PackLayoutError, SemanticError, SemanticErrorKind};
 pub(crate) use generated_locals::normalize_program as normalize_generated_locals;
 pub(crate) use generics::substitution::TypeSubstitution;
 pub use model::{
@@ -50,4 +56,5 @@ pub use model::{
 pub use stack_limit::validate_stack_limit_backend_target;
 pub use state::{AccessState, OwnershipState, ResourceState};
 pub use target_filter::{filter_program_for_target, filter_program_for_target_checked};
+use try_positions::misplaced_try;
 pub use types::{SemanticType, TypeRegistry};

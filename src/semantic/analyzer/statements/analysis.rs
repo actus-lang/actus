@@ -36,7 +36,11 @@ impl Analyzer {
             Stmt::CompoundAssignment { target, operator, value, span } => {
                 self.visit_compound_assignment(target, *operator, value, *span)
             }
-            Stmt::Expression { expression, span } => self.visit_expr_statement(expression, *span),
+            Stmt::Expression { expression, span } => {
+                self.visit_expr_statement(expression)?;
+                self.release_discarded_value(expression, *span);
+                Ok(())
+            }
             Stmt::If { condition, then_branch, else_branch, span } => {
                 let expression = Expr::If {
                     condition: Box::new(condition.clone()),
@@ -101,7 +105,7 @@ impl Analyzer {
                     span,
                 };
                 self.precheck_compound_operands(binary_operator, &left, value)?;
-                self.visit_index_assignment(&target_expression, index, value)?;
+                self.visit_index_assignment(&target_expression, index, value, span)?;
                 self.validate_binary_operator(binary_operator, &left, value)
             }
         }
@@ -141,7 +145,7 @@ impl Analyzer {
             }
             Place::Index { target, index, .. } => {
                 let target = target.to_expr();
-                self.visit_index_assignment(&target, index, value)
+                self.visit_index_assignment(&target, index, value, span)
             }
         }
     }
@@ -165,6 +169,7 @@ impl Analyzer {
         self.validate_arena_provenance_target(index, name, value, span)?;
         self.record_binding_provenance(index, value)?;
         self.plan_try_unwind(value);
+        self.replace_owned_value(index, span);
         Ok(())
     }
 
@@ -187,6 +192,9 @@ impl Analyzer {
                 span,
             });
         }
+        if matches!(value, Expr::Index { .. }) {
+            self.reject_move_out_of_view(value, span)?;
+        }
         if matches!(value, Expr::Identifier { .. } | Expr::FieldAccess { .. }) {
             self.move_dat_argument(value, span)?;
         }
@@ -207,60 +215,6 @@ impl Analyzer {
             || self.struct_types.contains_key(head)
             || self.enum_types.contains_key(head)
             || self.pack_types.contains_key(head)
-    }
-
-    fn visit_index_assignment(
-        &mut self,
-        target: &Expr,
-        index: &Expr,
-        value: &Expr,
-    ) -> Result<(), SemanticError> {
-        self.validate_index_assignment_owner(target)?;
-        self.visit_expression(target)?;
-        self.visit_expression(index)?;
-        self.reject_void_value(value)?;
-        let element = self.validate_index_access(target, index)?;
-        // Visit the value first: an explicit `copy` is typed by its operand.
-        self.visit_expression(value)?;
-        self.validate_index_value(target, index, value)?;
-        self.reject_move_out_of_view(value, super::super::validation::expression_span(value))?;
-        // A struct, enum or resource stored in an element moves (ADR-0124).
-        if self.argument_moves_source(value, &element) {
-            self.consume_owned_source(value, super::super::validation::expression_span(value))?;
-        }
-        self.plan_try_unwind(value);
-        Ok(())
-    }
-
-    fn validate_index_assignment_owner(&self, target: &Expr) -> Result<(), SemanticError> {
-        match target {
-            Expr::Identifier { name, span } => {
-                self.reject_constant_assignment(name, *span)?;
-                let binding = self.binding(name, *span)?;
-                self.ensure_mutable(binding, name, *span)
-            }
-            Expr::FieldAccess { object, field, span, .. } => {
-                self.validate_index_assignment_owner(object)?;
-                if let Some(pack_name) = self.expression_pack_type(object) {
-                    let Some(pack_field) = self.pack_field(&pack_name, field) else {
-                        return Ok(());
-                    };
-                    if matches!(pack_field.role, crate::ast::Role::Abs) {
-                        return Err(SemanticError {
-                            kind: super::super::errors::SemanticErrorKind::InvalidFieldAssignmentTarget {
-                                field: field.clone(),
-                            },
-                            span: *span,
-                        });
-                    }
-                } else if let Some(struct_name) = self.expression_struct_type(object) {
-                    self.ensure_struct_field_mutable(&struct_name, field, *span)?;
-                }
-                Ok(())
-            }
-            Expr::Index { target, .. } => self.validate_index_assignment_owner(target),
-            _ => Ok(()),
-        }
     }
 
     fn visit_owner_decl(
@@ -406,7 +360,7 @@ impl Analyzer {
         }
     }
 
-    fn plan_try_unwind(&mut self, expression: &Expr) {
+    pub(super) fn plan_try_unwind(&mut self, expression: &Expr) {
         if let Expr::Try { span, .. } = expression {
             self.plan_return_unwind(*span);
         }
@@ -470,11 +424,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn visit_expr_statement(
-        &mut self,
-        expression: &Expr,
-        span: SourceSpan,
-    ) -> Result<(), SemanticError> {
+    fn visit_expr_statement(&mut self, expression: &Expr) -> Result<(), SemanticError> {
         let previous = self.discarded_expression;
         let previous_consumed = self.expression_value_consumed;
         self.discarded_expression = true;
@@ -486,9 +436,9 @@ impl Analyzer {
         result?;
         // A bare literal statement, such as the tail of an `if` branch, is an `Int`.
         self.validate_default_integer_literal(expression)?;
-        if matches!(expression, Expr::Try { .. }) {
-            self.plan_return_unwind(span);
-        }
+        // The failure exit of a `?` statement is planned under the span of
+        // the `?` expression, as every other `?` exit is (ADR-0125).
+        self.plan_try_unwind(expression);
         Ok(())
     }
 }

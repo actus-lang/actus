@@ -1,7 +1,7 @@
 use super::contract::unsupported;
 use super::{
-    BackendBlock, BackendBlockId, BackendContractError, BackendFailure, BackendInstruction,
-    BackendIntegerBinaryOp, BackendValueId, SymbolIdentity,
+    BackendContractError, BackendFailure, BackendInstruction, BackendIntegerBinaryOp,
+    BackendValueId, SymbolIdentity,
 };
 use crate::ast::{CompoundAssignmentOp, Expr};
 use crate::codegen::BackendValueType;
@@ -103,40 +103,40 @@ pub trait BackendExpressionProvider {
         Ok(())
     }
 
-    fn exit_scope_with_bindings(
-        &mut self,
-        span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-        _binding_values: &std::collections::BTreeMap<String, BackendValueId>,
-    ) -> Result<(), BackendContractError> {
-        self.exit_scope(span, instructions)
-    }
-
     fn exit_scope_without_cleanup(&mut self) -> Result<(), BackendContractError> {
         Ok(())
     }
 
-    fn distribute_scope_cleanup(
-        &mut self,
-        _span: SourceSpan,
-        _blocks: &mut Vec<BackendBlock>,
-        _start: usize,
-        _block_bindings: &std::collections::BTreeMap<
-            BackendBlockId,
-            std::collections::BTreeMap<String, BackendValueId>,
-        >,
-    ) -> Result<(), BackendContractError> {
-        Ok(())
-    }
+    /// Emits the cleanup of the scope at `span` where its fallthrough path
+    /// ends: the analyzer's list for that scope end, with the values the
+    /// lowering holds at this point (ADR-0125).
+    fn emit_scope_end(&mut self, _span: SourceSpan, _instructions: &mut Vec<BackendInstruction>) {}
 
-    fn is_loop_exit(&self, _span: SourceSpan) -> bool {
-        false
-    }
-
+    /// Emits the cleanup of the `break` or `continue` at `span`: the
+    /// analyzer's list for that exit (ADR-0125).
     fn emit_loop_cleanup(
         &mut self,
         _span: SourceSpan,
         _kind: LoopExitKind,
+        _instructions: &mut Vec<BackendInstruction>,
+    ) -> Result<(), BackendContractError> {
+        Ok(())
+    }
+
+    /// Whether the analyzer planned an exit list for a `return` at `span`. The
+    /// arms of a returned `case` or `if` have lists of their own, while an
+    /// `if` that the lowering synthesised itself (from `return a && b`) has
+    /// none and leaves through the list of the `return` statement it came from.
+    fn has_return_exit(&self, _span: SourceSpan) -> bool {
+        false
+    }
+
+    /// Emits the cleanup of the `return` statement, or `?` failure exit, at
+    /// `span` before it leaves the verb: the analyzer's list for that exit,
+    /// every open scope innermost first (ADR-0125).
+    fn emit_return_cleanup(
+        &mut self,
+        _span: SourceSpan,
         _instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
         Ok(())

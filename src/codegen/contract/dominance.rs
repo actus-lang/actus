@@ -18,8 +18,7 @@ pub(super) fn validate_cleanup_value_dominance(
     let dominators = calculate_dominators(entry, blocks);
     for block in blocks {
         for (instruction, operation) in block.instructions.iter().enumerate() {
-            let Some(BackendInstruction::Cleanup { operand: Some(operand), .. }) = Some(operation)
-            else {
+            let Some(operand) = operation.cleanup_operand() else {
                 continue;
             };
             let Some(definition) = definitions.get(&operand.value) else {

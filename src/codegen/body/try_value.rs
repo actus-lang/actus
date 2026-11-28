@@ -39,15 +39,21 @@ struct TryExpressionContext<'a> {
     instructions: Vec<BackendInstruction>,
 }
 
-fn parameter_writeback_return<P: BackendExpressionProvider>(
-    provider: &P,
+/// The instructions of a path that leaves the verb with `value` at a `?`:
+/// the cleanup the analyzer planned for the exit at `exit` (the `?` itself,
+/// or the `return` it is part of), the scalar loan write-backs, and the
+/// return (ADR-0125).
+pub(super) fn exit_return<P: BackendExpressionProvider>(
+    provider: &mut P,
     value: super::BackendValueId,
+    exit: crate::lexer::SourceSpan,
     span: crate::lexer::SourceSpan,
-) -> Vec<BackendInstruction> {
+) -> Result<Vec<BackendInstruction>, BackendContractError> {
     let mut instructions = Vec::new();
+    provider.emit_return_cleanup(exit, &mut instructions)?;
     provider.append_parameter_writebacks(&mut instructions);
     instructions.push(BackendInstruction::Return { value: Some(value), span });
-    instructions
+    Ok(instructions)
 }
 
 struct TryTargetContext<'a> {
@@ -99,8 +105,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 fallthrough,
                 instructions,
             ),
-            Stmt::Return { value: Some(Expr::Try { expression, span }), .. } => {
-                self.lower_try_return_statement(id, block.span, expression, *span, instructions)
+            Stmt::Return { value: Some(Expr::Try { expression, span }), span: exit } => {
+                self.lower_try_return_statement(id, *exit, expression, *span, instructions)
             }
             Stmt::Expression { expression: Expr::Try { expression, span }, .. } => self
                 .lower_try_expression_statement(TryExpressionContext {
@@ -182,15 +188,13 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: error_block,
-            instructions: parameter_writeback_return(self.provider, source, span),
+            instructions: exit_return(self.provider, source, span, span)?,
         });
         let continuation_block =
             Block { statements: block.statements[index + 1..].to_vec(), span: block.span };
         let continuation_block =
             self.lower_block_in_scope(continuation, &continuation_block, fallthrough)?;
         self.blocks.push(continuation_block);
-        let cleanup_start = self.blocks.len().saturating_sub(3);
-        self.distribute_scope_cleanup(block.span, cleanup_start)?;
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: ok_block,
@@ -202,10 +206,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(BackendBlock { parameters: Vec::new(), id, instructions })
     }
 
-    fn lower_try_return_statement(
+    pub(super) fn lower_try_return_statement(
         &mut self,
         id: BackendBlockId,
-        block_span: crate::lexer::SourceSpan,
+        exit: crate::lexer::SourceSpan,
         expression: &Expr,
         span: crate::lexer::SourceSpan,
         mut instructions: Vec<BackendInstruction>,
@@ -237,7 +241,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             payload_type: Some(payload_type),
             span,
         });
-        ok_instructions.extend(parameter_writeback_return(self.provider, result, span));
+        ok_instructions.extend(exit_return(self.provider, result, exit, span)?);
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: ok_block,
@@ -246,10 +250,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: error_block,
-            instructions: parameter_writeback_return(self.provider, source, span),
+            instructions: exit_return(self.provider, source, exit, span)?,
         });
-        let cleanup_start = self.blocks.len().saturating_sub(2);
-        self.distribute_scope_cleanup(block_span, cleanup_start)?;
         instructions.push(BackendInstruction::Branch {
             condition,
             then_block: ok_block,
@@ -345,8 +347,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             payload_value: context.payload_value,
             payload_type: context.payload_type,
             ok_instructions: context.ok_instructions,
-        });
-        let cleanup_start = self.blocks.len().saturating_sub(2);
+        })?;
         append_try_condition_branch(
             &mut context.instructions,
             context.condition,
@@ -369,7 +370,6 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         }];
         continuation_block.instructions.splice(0..0, binding_instructions);
         self.blocks.push(continuation_block);
-        self.distribute_scope_cleanup(context.block.span, cleanup_start)?;
         Ok(BackendBlock {
             parameters: Vec::new(),
             id: context.id,
@@ -392,7 +392,10 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(instructions)
     }
 
-    fn push_try_branches(&mut self, context: TryBranchesContext) {
+    fn push_try_branches(
+        &mut self,
+        context: TryBranchesContext,
+    ) -> Result<(), BackendContractError> {
         let TryBranchesContext {
             ok_block,
             error_block,
@@ -416,11 +419,12 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         self.blocks.push(BackendBlock {
             parameters: Vec::new(),
             id: error_block,
-            instructions: parameter_writeback_return(self.provider, source, span),
+            instructions: exit_return(self.provider, source, span, span)?,
         });
+        Ok(())
     }
 
-    fn lower_try_payload(
+    pub(super) fn lower_try_payload(
         &mut self,
         source: super::BackendValueId,
         span: crate::lexer::SourceSpan,
@@ -453,7 +457,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     }
 }
 
-fn append_try_condition_branch(
+pub(super) fn append_try_condition_branch(
     instructions: &mut Vec<BackendInstruction>,
     condition: super::BackendValueId,
     ok_block: BackendBlockId,

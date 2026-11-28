@@ -101,78 +101,43 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
     fn scalar_loan_binding_names(&self) -> Vec<String> {
         self.scalar_loan_parameters.iter().map(|(name, _, _, _)| name.clone()).collect()
     }
-    fn enter_scope(&mut self, _span: SourceSpan) {
+    fn enter_scope(&mut self, span: SourceSpan) {
         self.locals.push(BTreeMap::new());
+        self.scope_spans.push(span);
     }
+    /// Closes the innermost scope. Its cleanup is not emitted here: the
+    /// lowering runs it where the scope's fallthrough path ends
+    /// (`emit_scope_end`) and every other exit runs its own list.
     fn exit_scope(
         &mut self,
-        span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
+        _span: SourceSpan,
+        _instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        let skip_scope_cleanup = matches!(
-            instructions.last(),
-            Some(BackendInstruction::Jump { span, .. }) if self.is_loop_exit(*span)
-        );
-        if !skip_scope_cleanup {
-            cleanup::emit_scope_cleanup(self, span, instructions, None);
-        }
         self.locals.pop();
-        Ok(())
-    }
-
-    fn exit_scope_with_bindings(
-        &mut self,
-        span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-        binding_values: &std::collections::BTreeMap<String, BackendValueId>,
-    ) -> Result<(), BackendContractError> {
-        let skip_scope_cleanup =
-            matches!(instructions.last(), Some(BackendInstruction::Jump { .. }));
-        if !skip_scope_cleanup {
-            cleanup::emit_scope_cleanup(self, span, instructions, Some(binding_values));
-        }
-        self.locals.pop();
+        self.scope_spans.pop();
         Ok(())
     }
 
     fn exit_scope_without_cleanup(&mut self) -> Result<(), BackendContractError> {
         self.locals.pop();
+        self.scope_spans.pop();
         Ok(())
     }
 
-    fn distribute_scope_cleanup(
+    fn emit_scope_end(&mut self, span: SourceSpan, instructions: &mut Vec<BackendInstruction>) {
+        cleanup::emit_scope_end(self, span, instructions);
+    }
+
+    fn has_return_exit(&self, span: SourceSpan) -> bool {
+        self.exits.is_some_and(|exits| exits.return_exit(span).is_some())
+    }
+
+    fn emit_return_cleanup(
         &mut self,
         span: SourceSpan,
-        blocks: &mut Vec<super::super::super::super::BackendBlock>,
-        start: usize,
-        block_bindings: &std::collections::BTreeMap<
-            BackendBlockId,
-            std::collections::BTreeMap<String, BackendValueId>,
-        >,
+        instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        for block in blocks.iter_mut().skip(start) {
-            if matches!(
-                block.instructions.last(),
-                Some(BackendInstruction::Return { .. }) | Some(BackendInstruction::Fail { .. })
-            ) {
-                cleanup::emit_scope_cleanup(
-                    self,
-                    span,
-                    &mut block.instructions,
-                    block_bindings.get(&block.id),
-                );
-            }
-        }
-        Ok(())
-    }
-
-    fn is_loop_exit(&self, span: SourceSpan) -> bool {
-        self.cleanup_plans.iter().any(|plan| {
-            matches!(
-                plan.origin,
-                BackendCleanupOrigin::Loop { span: boundary, .. } if boundary == span
-            )
-        })
+        cleanup::emit_return_exit(self, span, instructions)
     }
 
     fn emit_loop_cleanup(
@@ -181,8 +146,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         kind: LoopExitKind,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        cleanup::append_loop_cleanup(self, span, kind, instructions);
-        Ok(())
+        cleanup::emit_loop_exit(self, span, kind, instructions)
     }
 
     fn drop_binding(
@@ -191,7 +155,11 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         span: SourceSpan,
         instructions: &mut Vec<BackendInstruction>,
     ) -> Result<(), BackendContractError> {
-        drop::lower_binding(self, name, span, instructions)
+        if self.binding_value(name).is_none() {
+            return Err(unsupported(span, "explicit drop binding is not lowered"));
+        }
+        cleanup::emit_explicit_drop(self, span, instructions);
+        Ok(())
     }
     fn bind_owner(
         &mut self,
@@ -256,9 +224,7 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
             )?;
             return Ok(());
         }
-        if let Some(previous) = self.binding_value(name).filter(|previous| *previous != value) {
-            cleanup::emit_replacement_cleanup(self, name, previous, span, instructions);
-        }
+        cleanup::emit_replacement(self, span, instructions);
         if self.locals.is_empty() {
             return Err(unsupported(span, "scalar assignment has no active lexical scope"));
         }
@@ -300,6 +266,9 @@ impl BackendExpressionProvider for SharedExpressionProvider<'_> {
         let Expr::StructLit { fields, .. } = value else {
             return Err(unsupported(span, "aggregate assignment requires a struct literal"));
         };
+        if self.exits.and_then(|exits| exits.replacement(span)).is_some() {
+            return aggregate::assign_struct_literal_owner(self, name, fields, span, instructions);
+        }
         let object = Expr::Identifier { name: name.to_owned(), span };
         for field in fields {
             aggregate::lower_field_assignment(

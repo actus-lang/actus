@@ -428,13 +428,33 @@ Successful close returns `Ok(0)` and releases every frame and visited-identity
 record. An invalid or already-released token returns `Err(IoError.Failed)`.
 The operation performs no path or file-content I/O and does not publish state.
 
+The token is released through `release_walker`, which marks it released, so
+the walker's `Drop`, which runs when this verb returns because the `dat`
+parameter is released with its scope, finds nothing left to release.
+
 Explicit close is the status-bearing cleanup path. Callers may rely on `Drop`
 for early returns, but `Drop` intentionally discards the native close status
 because cleanup performances cannot report an error to the caller.
 """
 meta effect("filesystem", "blocking")
 open verb close_walker(dat walker: Walker) -> Result[Int, io::IoError] {
+    return release_walker(walker: ins walker);
+}
+
+"""Release the traversal token of an exclusively borrowed walker in place.
+
+`walker` is an `ins` loan: the caller keeps the owner and only its token
+changes. The runtime bridge closes the token and frees every retained frame
+and visited-identity record; the token is then marked released (`-1`) whether
+or not the close succeeded, so no later cleanup, including the walker's
+`Drop`, closes it again. Returns `Ok(0)` on success, or `Err(IoError.Failed)`
+when the token was invalid or already released. No path or file-content I/O
+is performed and nothing is allocated.
+"""
+meta effect("filesystem", "blocking")
+open verb release_walker(ins walker: Walker) -> Result[Int, io::IoError] {
     erg status = actus_walker_close(handle: abs walker.handle);
+    walker.handle = -1;
     return case status {
         -1 => Err(io::IoError.Failed),
         _ => Ok(status),
@@ -444,21 +464,22 @@ open verb close_walker(dat walker: Walker) -> Result[Int, io::IoError] {
 """Provide best-effort automatic cleanup for abandoned walker owners.
 
 The performance runs when ownership leaves scope without an explicit close.
-It releases the native token exactly once from the Actus ownership path and
-does not replace the explicit `close_walker` status-bearing operation.
+It releases the native token exactly once, in place, and does not replace the
+explicit `close_walker` status-bearing operation.
 """
 open perform Drop for Walker {
-    """Release the owned runtime traversal token exactly once.
+    """Release the owned runtime traversal token exactly once, in place.
 
-    `self` is an `ins` loan of the Drop owner; the performance may inspect its
-    handle for cleanup but does not transfer the owner to another binding.
+    `self` is an `ins` loan of the Drop owner. A token that `close_walker`
+    already released is marked `-1` and is left alone; a live token is closed
+    by `release_walker`, which marks it released. The performance never
+    builds or transfers another owner of the walker (ADR-0125), and it
+    discards the close status because a cleanup cannot report a failure.
     """
     meta effect("filesystem", "blocking")
     verb drop(ins self: Walker) {
-        erg owner = Walker {
-            handle: self.handle,
-        };
-        close_walker(walker: dat owner);
-        self.handle = -1;
+        if self.handle != -1 {
+            release_walker(walker: ins self);
+        }
     }
 }

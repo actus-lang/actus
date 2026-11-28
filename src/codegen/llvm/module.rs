@@ -213,7 +213,7 @@ fn cleanup_bridges(module: &BackendModule) -> Vec<BackendCleanupBridge> {
     for function in &module.functions {
         for block in &function.blocks {
             for instruction in &block.instructions {
-                let BackendInstruction::Cleanup { operand: Some(operand), .. } = instruction else {
+                let Some(operand) = instruction.cleanup_operand() else {
                     continue;
                 };
                 if matches!(operand.bridge, BackendCleanupBridge::PerformanceDrop) {

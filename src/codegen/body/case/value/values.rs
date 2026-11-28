@@ -24,12 +24,12 @@ enum CaseBlockValue {
     Diverged,
 }
 
-struct CaseOwnerBranches {
-    merge_id: BackendBlockId,
-    branch_values: Vec<CaseBranchValue>,
-    current_id: BackendBlockId,
-    entry_instructions: Option<Vec<BackendInstruction>>,
-    instructions: Vec<BackendInstruction>,
+pub(super) struct CaseOwnerBranches {
+    pub(super) merge_id: BackendBlockId,
+    pub(super) branch_values: Vec<CaseBranchValue>,
+    pub(super) current_id: BackendBlockId,
+    pub(super) entry_instructions: Option<Vec<BackendInstruction>>,
+    pub(super) instructions: Vec<BackendInstruction>,
 }
 
 pub(in crate::codegen::body) struct CaseOwnerInput<'a> {
@@ -57,15 +57,15 @@ struct CaseOwnerContinuationInput<'a> {
     span: SourceSpan,
 }
 
-struct CaseOwnerBranchesInput<'a> {
-    id: BackendBlockId,
-    mode: crate::ast::CaseMode,
-    subject: &'a Expr,
-    branches: &'a [crate::ast::CaseBranch],
-    span: SourceSpan,
-    carried: &'a [CarriedBinding],
-    initial_values: &'a BTreeMap<String, BackendValueId>,
-    instructions: Vec<BackendInstruction>,
+pub(super) struct CaseOwnerBranchesInput<'a> {
+    pub(super) id: BackendBlockId,
+    pub(super) mode: crate::ast::CaseMode,
+    pub(super) subject: &'a Expr,
+    pub(super) branches: &'a [crate::ast::CaseBranch],
+    pub(super) span: SourceSpan,
+    pub(super) carried: &'a [CarriedBinding],
+    pub(super) initial_values: &'a BTreeMap<String, BackendValueId>,
+    pub(super) instructions: Vec<BackendInstruction>,
 }
 
 struct CaseOwnerBranchInput<'a> {
@@ -194,7 +194,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(continuation_block)
     }
 
-    fn attach_case_value_branches(
+    pub(super) fn attach_case_value_branches(
         &mut self,
         branch_values: Vec<CaseBranchValue>,
         merge_id: BackendBlockId,
@@ -238,7 +238,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
         Ok(())
     }
 
-    fn lower_case_owner_branches(
+    pub(super) fn lower_case_owner_branches(
         &mut self,
         input: CaseOwnerBranchesInput<'_>,
     ) -> Result<CaseOwnerBranches, BackendContractError> {
@@ -336,6 +336,7 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
     > {
         self.provider.enter_scope(branch.span);
         let mut instructions = Vec::new();
+        let (mut current, mut parameters) = (id, Vec::new());
         if let Pattern::Variant { variant, payload, .. } = &branch.pattern {
             self.provider.bind_enum_variant_payload(
                 subject,
@@ -351,48 +352,53 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
                 if matches!(expression.as_ref(), Expr::Case { .. }) =>
             {
                 let (entry, merge_id, value) =
-                    self.lower_nested_case_value(id, expression, span, instructions)?;
+                    self.lower_nested_case_value(id, expression, span, instructions, branch.span)?;
+                self.provider.exit_scope(branch.span, &mut Vec::new())?;
                 return Ok((entry, Some((merge_id, value))));
             }
             CaseBody::Expression(expression) => {
                 self.provider.lower_expression(expression, &mut instructions)?
             }
             CaseBody::Block(block) => {
-                match self.lower_case_value_block(branch, block, span, &mut instructions)? {
-                    CaseBlockValue::Value(value) => value,
-                    CaseBlockValue::Diverged => {
-                        return Ok((
-                            BackendBlock { parameters: Vec::new(), id, instructions },
-                            None,
-                        ));
-                    }
-                }
+                // A `?` statement of the arm splits it (bug #130): the arm
+                // continues, and hands its value over, in its last block.
+                let entry = std::mem::take(&mut instructions);
+                let (value, tail) = self.lower_case_value_block(id, branch, block, span, entry)?;
+                let CaseBlockValue::Value(value) = value else {
+                    return Ok((tail.into_block(), None));
+                };
+                (current, parameters, instructions) = (tail.id, tail.parameters, tail.instructions);
+                value
             }
         };
+        // The arm hands its value to the merge block here, which ends its scope.
+        self.provider.emit_scope_end(branch.span, &mut instructions);
         self.provider.exit_scope(branch.span, &mut instructions)?;
         self.provider.value_type(value).ok_or_else(|| unsupported(span, "case branch type"))?;
-        Ok((BackendBlock { parameters: Vec::new(), id, instructions }, Some((id, value))))
+        Ok((BackendBlock { parameters, id: current, instructions }, Some((current, value))))
     }
 
     fn lower_case_value_block(
         &mut self,
+        id: BackendBlockId,
         branch: &crate::ast::CaseBranch,
         block: &Block,
         span: SourceSpan,
-        instructions: &mut Vec<BackendInstruction>,
-    ) -> Result<CaseBlockValue, BackendContractError> {
+        instructions: Vec<BackendInstruction>,
+    ) -> Result<(CaseBlockValue, super::super::super::arm_tries::ArmTail), BackendContractError>
+    {
         let Some(last) = block.statements.last() else {
             return Err(unsupported(span, "case value block is empty"));
         };
         if matches!(last, Stmt::Return { .. }) {
-            for statement in &block.statements {
-                self.lower_statement(statement, instructions)?;
-            }
-            self.provider.exit_scope(branch.span, instructions)?;
-            return Ok(CaseBlockValue::Diverged);
+            let mut tail = self.lower_arm_statements(id, &block.statements, instructions)?;
+            self.provider.exit_scope(branch.span, &mut tail.instructions)?;
+            return Ok((CaseBlockValue::Diverged, tail));
         }
-        for statement in &block.statements[..block.statements.len() - 1] {
-            self.lower_statement(statement, instructions)?;
+        let prefix = &block.statements[..block.statements.len() - 1];
+        let mut tail = self.lower_arm_statements(id, prefix, instructions)?;
+        if tail.diverged {
+            return Err(unsupported(span, "case value block returns before its value"));
         }
         let expression = match last {
             Stmt::Expression { expression, .. } => expression.clone(),
@@ -404,63 +410,8 @@ impl<P: BackendExpressionProvider> BodyLowering<'_, P> {
             },
             _ => return Err(unsupported(span, "case value block requires a tail expression")),
         };
-        Ok(CaseBlockValue::Value(self.provider.lower_expression(&expression, instructions)?))
-    }
-
-    fn lower_nested_case_value(
-        &mut self,
-        id: BackendBlockId,
-        expression: &Expr,
-        span: SourceSpan,
-        instructions: Vec<BackendInstruction>,
-    ) -> Result<(BackendBlock, BackendBlockId, BackendValueId), BackendContractError> {
-        let Expr::Case { mode, subject, branches, .. } = expression else {
-            return Err(unsupported(span, "nested enum case expected"));
-        };
-        let empty_carried: [CarriedBinding; 0] = [];
-        let empty_initial_values: BTreeMap<String, BackendValueId> = BTreeMap::new();
-        let lowered = self.lower_case_owner_branches(CaseOwnerBranchesInput {
-            id,
-            mode: *mode,
-            subject,
-            branches,
-            span,
-            carried: &empty_carried,
-            initial_values: &empty_initial_values,
-            instructions,
-        })?;
-        let Some(first_value) = lowered.branch_values.first().map(|branch| branch.value) else {
-            return Err(unsupported(span, "empty nested enum case"));
-        };
-        let result_type = self
-            .provider
-            .value_type(first_value)
-            .ok_or_else(|| unsupported(span, "nested case result type is unavailable"))?;
-        let result = self.provider.allocate_value(result_type);
-        self.provider.copy_value_metadata(first_value, result);
-        self.blocks.push(BackendBlock {
-            parameters: vec![BackendBlockParameter { value: result, ty: result_type, span }],
-            id: lowered.merge_id,
-            instructions: Vec::new(),
-        });
-        self.attach_case_value_branches(
-            lowered.branch_values,
-            lowered.merge_id,
-            result_type,
-            &empty_carried,
-            span,
-        )?;
-        let entry = if let Some(entry_instructions) = lowered.entry_instructions {
-            self.blocks.push(BackendBlock {
-                parameters: Vec::new(),
-                id: lowered.current_id,
-                instructions: lowered.instructions,
-            });
-            BackendBlock { parameters: Vec::new(), id, instructions: entry_instructions }
-        } else {
-            BackendBlock { parameters: Vec::new(), id, instructions: lowered.instructions }
-        };
-        Ok((entry, lowered.merge_id, result))
+        let value = self.provider.lower_expression(&expression, &mut tail.instructions)?;
+        Ok((CaseBlockValue::Value(value), tail))
     }
 }
 

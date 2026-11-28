@@ -15,8 +15,9 @@ pub(crate) struct SharedExpressionProvider<'a> {
         Vec<(String, BackendValueId, BackendValueId, BackendValueType)>,
     aggregate_loan_parameters:
         BTreeMap<String, (BackendValueId, super::super::super::BackendLayout)>,
-    owned_parameters: std::collections::BTreeSet<String>,
     pub(super) locals: Vec<BTreeMap<String, BackendValueId>>,
+    /// The source span of each open lexical scope, innermost last.
+    pub(super) scope_spans: Vec<crate::lexer::SourceSpan>,
     pub(super) verb_name: String,
     pub(super) return_types: &'a BTreeMap<String, Option<BackendValueType>>,
     pub(super) return_nominal_types: &'a BTreeMap<String, Option<crate::ast::TypeName>>,
@@ -29,7 +30,11 @@ pub(crate) struct SharedExpressionProvider<'a> {
         &'a BTreeMap<(String, String), Option<crate::ast::TypeName>>,
     pub(super) external_symbols: &'a BTreeMap<String, SymbolIdentity>,
     pub(super) bindings: Option<&'a BackendSymbolBindings>,
-    pub(super) cleanup_plans: &'a [super::super::super::BackendCleanupPlan],
+    /// The analyzer's exit lists of this verb body (ADR-0125).
+    pub(super) exits: Option<&'a super::super::exits::VerbExits>,
+    /// The values of the temporaries the exit lists release, by the span of
+    /// the expression that produced them, until they are released.
+    pub(super) temporaries: Vec<(crate::lexer::SourceSpan, BackendValueId)>,
     value_types: BTreeMap<BackendValueId, BackendValueType>,
     nominal_types: BTreeMap<BackendValueId, crate::ast::TypeName>,
     array_big_endian: BTreeMap<BackendValueId, bool>,
@@ -59,7 +64,7 @@ impl<'a> SharedExpressionProvider<'a> {
         >,
         external_symbols: &'a BTreeMap<String, SymbolIdentity>,
         bindings: Option<&'a BackendSymbolBindings>,
-        cleanup_plans: &'a [super::super::super::BackendCleanupPlan],
+        exits: Option<&'a super::super::exits::VerbExits>,
     ) -> Self {
         let parameter_state = parameter_state::initialize(verb, layouts);
         Self {
@@ -69,8 +74,9 @@ impl<'a> SharedExpressionProvider<'a> {
             parameters: parameter_state.parameters,
             scalar_loan_parameters: parameter_state.scalar_loan_parameters,
             aggregate_loan_parameters: parameter_state.aggregate_loan_parameters,
-            owned_parameters: parameter_state.owned_parameters,
             locals: Vec::new(),
+            temporaries: Vec::new(),
+            scope_spans: Vec::new(),
             verb_name: verb.name.clone(),
             return_types,
             return_nominal_types,
@@ -82,7 +88,7 @@ impl<'a> SharedExpressionProvider<'a> {
             performance_return_nominal_types,
             external_symbols,
             bindings,
-            cleanup_plans,
+            exits,
             value_types: parameter_state.value_types,
             nominal_types: parameter_state.nominal_types,
             array_big_endian: BTreeMap::new(),
@@ -97,15 +103,6 @@ impl<'a> SharedExpressionProvider<'a> {
         let result = BackendValueId(self.next_value);
         self.next_value += 1;
         result
-    }
-    pub(in crate::codegen::shared_lowering) fn parameter_value(
-        &self,
-        name: &str,
-    ) -> Option<BackendValueId> {
-        self.parameters.get(name).copied()
-    }
-    pub(in crate::codegen::shared_lowering) fn parameter_is_owned(&self, name: &str) -> bool {
-        self.owned_parameters.contains(name)
     }
     pub(in crate::codegen::shared_lowering) fn aggregate_loan_parameter(
         &self,
@@ -288,6 +285,13 @@ impl<'a> SharedExpressionProvider<'a> {
         if layout.size >= crate::codegen::LARGE_AGGREGATE_THRESHOLD {
             self.heap_owned_aggregate_values.insert(value);
         }
+    }
+    /// Forgets that `value` owns a heap block, once the block was freed.
+    pub(in crate::codegen::shared_lowering) fn forget_heap_owned_aggregate(
+        &mut self,
+        value: BackendValueId,
+    ) {
+        self.heap_owned_aggregate_values.remove(&value);
     }
     pub(in crate::codegen::shared_lowering) fn is_heap_owned_aggregate(
         &self,

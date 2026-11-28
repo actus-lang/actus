@@ -19,7 +19,12 @@ A view can also be held by a struct, an `Option` or a `Result`. Such a value may
 be returned, or stored in a field of an `ins` parameter, only when every view in
 it comes from an `abs` parameter of the verb, as for a direct `-> abs` return
 (ADR-0021). A view of a local or of a value the verb owns is rejected with
-`E1018`.
+`E1018`. The view belongs to the place that holds the value: the source stays
+frozen until the end of the scope of the binding, field or element that holds
+it, and a source declared in a deeper block than that binding is rejected with
+`E1018`, because it would be released first. An `if` or `case` value holds the
+views of all its arms, and a variable bound by a `case` pattern holds the views
+of the value it matched.
 
 A view owns nothing, so a struct, enum, pack, array or buffer read from one of
 its fields or elements cannot be taken by value: `return parser.header;`,

@@ -44,6 +44,8 @@ permit hidden process-wide storage.
 - [ ] Define `Arena[N]` layout and target alignment rules.
 - [ ] Track arena provenance in semantic analysis.
 - [ ] Enforce non-escaping `ins` and `abs` references.
-- [ ] Lower teardown to one deterministic bulk release operation.
+- [x] Lower teardown to one deterministic bulk release operation (ADR-0125:
+  the arena is emptied at every exit of its scope; its storage is a fixed
+  slot of the verb on both back ends).
 - [ ] Test cyclic graphs, exhaustion, nested scopes, and cross-arena rejection.
 - [ ] Verify bare-metal operation without a host allocator.

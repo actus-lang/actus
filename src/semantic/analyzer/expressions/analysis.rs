@@ -77,14 +77,7 @@ impl Analyzer {
             }
             Expr::StructLit { name, type_arguments, resolved_type, fields, span } => self
                 .visit_struct_literal(name, type_arguments, resolved_type.as_ref(), fields, *span),
-            Expr::FieldAccess { object, field, span, .. } => {
-                self.visit_field_access(object, field, *span)
-            }
-            Expr::Index { target, index, .. } => {
-                self.visit_consumed_expression(target)?;
-                self.visit_consumed_expression(index)?;
-                self.validate_index_access(target, index).map(|_| ())
-            }
+            Expr::FieldAccess { .. } | Expr::Index { .. } => self.visit_place_read(expression),
             Expr::Case { mode, subject, branches, span } => {
                 self.visit_case_expression(*mode, subject, branches, *span)
             }
@@ -102,6 +95,24 @@ impl Analyzer {
             }
             Expr::StringLiteral { .. } => Ok(()),
         }
+    }
+
+    /// Visits a field read or an element read, and records the release of
+    /// the call the path starts from when it is a temporary (bug #128).
+    fn visit_place_read(&mut self, expression: &Expr) -> Result<(), SemanticError> {
+        match expression {
+            Expr::FieldAccess { object, field, span, .. } => {
+                self.visit_field_access(object, field, *span)?
+            }
+            Expr::Index { target, index, .. } => {
+                self.visit_consumed_expression(target)?;
+                self.visit_consumed_expression(index)?;
+                self.validate_index_access(target, index)?;
+            }
+            _ => return Ok(()),
+        }
+        self.release_read_temporary(expression);
+        Ok(())
     }
 
     fn visit_unary_expression(
@@ -252,7 +263,11 @@ impl Analyzer {
         right: &Expr,
     ) -> Result<(), SemanticError> {
         self.visit_consumed_expression(left)?;
-        self.visit_consumed_expression(right)?;
+        if matches!(operator, BinaryOp::LogicalAnd | BinaryOp::LogicalOr) {
+            self.visit_conditional_operand(right)?;
+        } else {
+            self.visit_consumed_expression(right)?;
+        }
         self.validate_binary_operator(*operator, left, right)
     }
 

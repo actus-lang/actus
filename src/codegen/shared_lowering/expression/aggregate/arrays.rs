@@ -86,6 +86,7 @@ pub(super) fn lower_array_element_assignment(
     if provider.value_type(value) != Some(location.element_type) {
         return Err(unsupported(span, "array element assignment type mismatch"));
     }
+    release_replaced_element(provider, &location, span, instructions);
     instructions.push(BackendInstruction::ArrayElementStore {
         base: location.base,
         index: location.index,
@@ -97,7 +98,43 @@ pub(super) fn lower_array_element_assignment(
         big_endian: location.big_endian,
         span,
     });
+    if matches!(location.element_type, BackendValueType::Aggregate { .. }) {
+        super::super::cleanup::release_moved_storage(provider, value, span, instructions);
+    }
     Ok(())
+}
+
+/// Releases the element an assignment replaces, after the new value was
+/// evaluated and before it is stored (ADR-0125): the old element is loaded
+/// and released by the analyzer's list for the assignment at `span`. An
+/// assignment without a list loads nothing.
+fn release_replaced_element(
+    provider: &mut SharedExpressionProvider<'_>,
+    location: &ArrayElementLocation,
+    span: SourceSpan,
+    instructions: &mut Vec<BackendInstruction>,
+) {
+    if provider.exits.and_then(|exits| exits.place_replacement(span)).is_none() {
+        return;
+    }
+    let old = provider.allocate();
+    provider.remember_value(old, location.element_type);
+    provider.remember_nominal_type(old, location.element_type_name.clone());
+    if matches!(location.element_type, BackendValueType::Aggregate { .. }) {
+        provider.remember_aggregate_place(old);
+    }
+    instructions.push(BackendInstruction::ArrayElementLoad {
+        result: old,
+        base: location.base,
+        index: location.index,
+        aggregate_layout: location.aggregate_layout,
+        element_layout: location.element_layout,
+        element_type: location.element_type,
+        capacity: location.capacity,
+        big_endian: location.big_endian,
+        span,
+    });
+    super::super::cleanup::emit_place_replacement(provider, span, old, instructions);
 }
 
 pub(super) fn lower_array_element_location(

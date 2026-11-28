@@ -63,7 +63,7 @@ impl Analyzer {
     ) -> Result<(), SemanticError> {
         for (binding, ty) in bindings.iter().zip(types) {
             let type_name = self.specialize_pattern_type(enum_name, &ty, subject)?;
-            self.bind_pattern_binding(binding, &type_name, mode)?;
+            self.bind_pattern_binding(binding, &type_name, mode, subject)?;
         }
         Ok(())
     }
@@ -89,7 +89,7 @@ impl Analyzer {
                 });
             };
             let type_name = self.specialize_pattern_type(enum_name, &field.ty, subject)?;
-            self.bind_pattern_binding(&pattern.binding, &type_name, mode)?;
+            self.bind_pattern_binding(&pattern.binding, &type_name, mode, subject)?;
         }
         Ok(())
     }
@@ -153,6 +153,7 @@ impl Analyzer {
         binding: &PatternBinding,
         type_name: &crate::ast::TypeName,
         mode: crate::ast::CaseMode,
+        subject: &Expr,
     ) -> Result<(), SemanticError> {
         if binding.name == "_" {
             return Ok(());
@@ -183,9 +184,10 @@ impl Analyzer {
         if self.enum_types.contains_key(&parsed_type.name) {
             self.binding_enum_types.insert(index, parsed_type.clone());
             if !parsed_type.arguments.is_empty() {
-                self.binding_enum_type_applications.insert(index, parsed_type);
+                self.binding_enum_type_applications.insert(index, parsed_type.clone());
             }
         }
+        self.record_pattern_view_provenance(index, &parsed_type, mode, subject);
         Ok(())
     }
 }

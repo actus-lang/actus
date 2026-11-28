@@ -10,6 +10,8 @@ mod array_copy;
 mod arrays;
 #[path = "semantic/borrowing.rs"]
 mod borrowing;
+#[path = "semantic/branch_value_types.rs"]
+mod branch_value_types;
 #[path = "semantic/call_result_views.rs"]
 mod call_result_views;
 #[path = "semantic/case_view_scope.rs"]
@@ -20,6 +22,8 @@ mod casts;
 mod drop;
 #[path = "semantic/dynamic.rs"]
 mod dynamic;
+#[path = "semantic/element_reads.rs"]
+mod element_reads;
 #[path = "semantic/enum_payload_moves.rs"]
 mod enum_payload_moves;
 #[path = "semantic/enums.rs"]
@@ -28,6 +32,8 @@ mod enums;
 mod erg_argument_moves;
 #[path = "semantic/escaping_views.rs"]
 mod escaping_views;
+#[path = "semantic/exit_lists.rs"]
+mod exit_lists;
 #[path = "semantic/explicit_copy_packs.rs"]
 mod explicit_copy_packs;
 #[path = "semantic/explicit_copy_types.rs"]
@@ -64,6 +70,8 @@ mod partial_field_moves;
 mod pattern_literals;
 #[path = "semantic/pattern_ownership.rs"]
 mod pattern_ownership;
+#[path = "semantic/place_replacements.rs"]
+mod place_replacements;
 #[path = "semantic/repr.rs"]
 mod repr;
 #[path = "semantic/roles.rs"]
@@ -76,5 +84,11 @@ mod state;
 mod structs;
 #[path = "semantic/suite.rs"]
 mod suite;
+#[path = "semantic/temporaries.rs"]
+mod temporaries;
+#[path = "semantic/try_positions.rs"]
+mod try_positions;
+#[path = "semantic/view_lifetimes.rs"]
+mod view_lifetimes;
 #[path = "semantic/void_values.rs"]
 mod void_values;

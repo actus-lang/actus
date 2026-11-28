@@ -260,13 +260,14 @@ pub(crate) fn lower_program_to_backend_module_with_layouts_and_context(
     let semantic = analyze_after_validation(analysis_program)?;
     let cleanup_provider = ProgramLayouts::new(analysis_program, namespace, package, module_path);
     let cleanup_plans = super::lower_semantic_cleanup_with_provider(&semantic, &cleanup_provider)?;
+    let schedule = super::exits::CleanupSchedule::build(&semantic, &cleanup_provider)?;
     let external_symbols = scalar_external_symbols(namespace, &declarations.externals, bindings)?;
     let functions = lower_shared_functions(
         namespace,
         entry_name,
         layouts,
         &declarations,
-        &cleanup_plans,
+        (&cleanup_plans, &schedule),
         &external_symbols,
         bindings,
     )?;

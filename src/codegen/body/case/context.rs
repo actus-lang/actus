@@ -41,8 +41,6 @@ pub(super) struct BoundCaseInput<'a> {
     pub(super) span: SourceSpan,
     pub(super) fallthrough: Option<BackendBlockId>,
     pub(super) guard_failure: BackendBlockId,
-    pub(super) nested_block_start: usize,
-    pub(super) scope_bindings: std::collections::BTreeMap<String, BackendValueId>,
 }
 
 pub(super) struct GuardedCaseInput<'a> {
@@ -52,6 +50,4 @@ pub(super) struct GuardedCaseInput<'a> {
     pub(super) fallthrough: Option<BackendBlockId>,
     pub(super) guard_failure: BackendBlockId,
     pub(super) guard_instructions: Vec<BackendInstruction>,
-    pub(super) nested_block_start: usize,
-    pub(super) scope_bindings: std::collections::BTreeMap<String, BackendValueId>,
 }

@@ -102,8 +102,10 @@ collapsed into `IoError.Failed`.
 platform byte or code-unit name representation. The hosted walker bounds
 depth, visited directory identities, entries per directory, and entry-name
 length; exceeding a bound is a typed failure. `Ok(Option.None)` is clean end
-of stream. `close_walker(dat walker)` releases all retained frames, and the
-`Walker` Drop performance provides best-effort cleanup on early exits.
+of stream. `close_walker(dat walker)` releases all retained frames;
+`release_walker(ins walker)` does the same in place and marks the walker
+released, which is also what the `Walker` Drop performance does for best-effort
+cleanup on early exits, so a token is never closed twice.
 
 `remove_dir` is for an empty directory according to the host provider. A
 missing, protected, non-empty, or otherwise rejected target is reported as

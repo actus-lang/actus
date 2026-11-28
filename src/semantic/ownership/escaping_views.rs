@@ -48,8 +48,9 @@ impl Analyzer {
     /// The origin of every view that the value of an expression holds: the
     /// `abs` fields of a struct literal, the `abs` payload of an enum
     /// constructor, the views a binding or a field of it was built with, and
-    /// the views that a call's arguments put into its result. A struct or
-    /// enum that is moved into another carries its views along.
+    /// the views that a call's arguments put into its result, and the views of
+    /// every arm of an `if` or `case`. A struct or enum that is moved into
+    /// another carries its views along.
     pub(in crate::semantic) fn value_view_origins(&self, expression: &Expr) -> Vec<Origin> {
         match expression {
             Expr::Grouping { expression, .. }
@@ -93,6 +94,7 @@ impl Analyzer {
                     })
                     .collect()
             }
+            Expr::If { span, .. } | Expr::Case { span, .. } => self.conditional_views(*span),
             Expr::Call { callee, arguments, .. } => {
                 self.call_view_origins(expression, callee, None, arguments)
             }
@@ -263,6 +265,7 @@ impl Analyzer {
         if origins.is_empty() {
             self.binding_held_views.remove(&index);
         } else {
+            self.hold_views_in_binding(index, &origins, expression_span(value))?;
             self.binding_held_views.insert(index, origins);
         }
         Ok(())
@@ -281,6 +284,7 @@ impl Analyzer {
         if self.model.bindings[index].role == Role::Ins {
             self.reject_escaping_views(value)?;
         }
+        self.hold_views_in_binding(index, &origins, expression_span(value))?;
         self.binding_held_views.entry(index).or_default().extend(origins);
         Ok(())
     }

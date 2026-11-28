@@ -1,4 +1,4 @@
 mod bridge;
 mod emission;
 
-pub(super) use emission::emit_cleanup;
+pub(super) use emission::{emit_cleanup, emit_conditional_cleanup};

@@ -11,6 +11,11 @@ pub(crate) struct ScopeFrame {
     pub(crate) borrow_ids: Vec<usize>,
     pub(crate) declaration_indices: Vec<usize>,
     pub(crate) payload_cleanup: Vec<(usize, String, String, String)>,
+    /// Names declared in the closed branch scopes of an `if` directly inside
+    /// this scope. They own nothing here any more (their branch released
+    /// them) and may be declared again, but they still resolve for the type
+    /// queries that run after the `if`.
+    pub(crate) retired: HashMap<String, usize>,
 }
 
 pub(crate) type ExpressionCacheKey = (usize, usize, usize);
@@ -52,6 +57,14 @@ pub(crate) struct Analyzer {
     /// The origin of every view that an aggregate binding holds, so a returned
     /// or stored value can be checked against its sources (ADR-0046 2.3).
     pub(crate) binding_held_views: HashMap<usize, Vec<Origin>>,
+    /// The origin of every view that the value of an `if` or `case` holds,
+    /// the union over its arms. Each arm is read while its own scope, and the
+    /// pattern variables of it, are still live (ADR-0046 2.3).
+    pub(crate) conditional_view_origins: HashMap<ExpressionCacheKey, Vec<Origin>>,
+    /// The borrows that freeze the source of a view at the scope of the
+    /// binding that holds it, which is not always the scope that stored it
+    /// (ADR-0046 2.3). A branch join gives them back after it.
+    pub(crate) holder_borrow_ids: HashSet<usize>,
     pub(crate) struct_types: HashMap<String, StructDef>,
     pub(crate) pack_types: HashMap<String, crate::ast::PackDecl>,
     pub(crate) enum_types: HashMap<String, EnumDef>,
@@ -87,6 +100,10 @@ pub(crate) struct Analyzer {
     pub(crate) case_result_types: HashMap<ExpressionCacheKey, crate::ast::TypeName>,
     pub(crate) type_registry: super::super::types::TypeRegistry,
     pub(crate) discarded_expression: bool,
+    /// The span of the `case` or `if` whose value a `return` returns. Each of
+    /// its arms leaves the verb by a `return` of its own, so each arm gets an
+    /// exit list of its own (ADR-0125); the `case` or `if` takes it.
+    pub(crate) returned_arms: Option<crate::lexer::SourceSpan>,
     pub(crate) expression_value_consumed: bool,
     /// Set by a parent just before it visits the one child whose value is
     /// dropped: a statement expression, the inside of a grouping, or an arm

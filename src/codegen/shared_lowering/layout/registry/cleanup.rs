@@ -194,7 +194,10 @@ impl ProgramLayouts<'_> {
         )))
     }
 
-    fn resource_cleanup(&self, bridge: BackendCleanupBridge) -> BackendCleanupResolvedDescriptor {
+    pub(super) fn resource_cleanup(
+        &self,
+        bridge: BackendCleanupBridge,
+    ) -> BackendCleanupResolvedDescriptor {
         self.cleanup_descriptor(bridge, self.pointer_layout(), None)
     }
 
