@@ -44,7 +44,7 @@ pub use cleanup::{
     CleanupAction, LoopExitKind, LoopUnwindPlan, PlaceReplacement, ReplacedPlace, ScopeCleanup,
     TemporaryRelease, UnwindPlan, VerbCleanup,
 };
-pub use errors::{SemanticError, SemanticErrorKind};
+pub use errors::{PackLayoutError, SemanticError, SemanticErrorKind};
 pub(crate) use generated_locals::normalize_program as normalize_generated_locals;
 pub(crate) use generics::substitution::TypeSubstitution;
 pub use model::{

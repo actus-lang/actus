@@ -1,6 +1,6 @@
 use actus::lexer::scan;
 use actus::parser::parse;
-use actus::semantic::{SemanticErrorKind, analyze};
+use actus::semantic::{PackLayoutError, SemanticErrorKind, analyze};
 
 fn analyze_source(source: &str) -> Result<actus::semantic::SemanticModel, SemanticErrorKind> {
     let (tokens, errors) = scan(source);
@@ -42,7 +42,10 @@ fn rejects_pointer_bearing_or_dynamic_pack_fields_from_serialized_state() {
         let error = analyze_source(&source)
             .expect_err("serialized pack fields must not contain pointers or dynamic state");
         assert!(
-            matches!(error, SemanticErrorKind::InvalidPackFieldType { .. }),
+            matches!(
+                error,
+                SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackFieldType { .. })
+            ),
             "unexpected diagnostic for {field_type}: {error:?}"
         );
     }
@@ -207,7 +210,7 @@ fn rejects_invalid_multi_word_pack_storage_contracts() {
     ] {
         assert!(matches!(
             analyze_source(source),
-            Err(SemanticErrorKind::InvalidPackStorage { .. })
+            Err(SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackStorage { .. }))
         ));
     }
 }
@@ -220,7 +223,7 @@ fn rejects_unsupported_pack_storage_types() {
     ] {
         assert!(matches!(
             analyze_source(source),
-            Err(SemanticErrorKind::InvalidPackStorage { .. })
+            Err(SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackStorage { .. }))
         ));
     }
 }
@@ -245,7 +248,7 @@ fn rejects_pack_field_overlaps_with_bit_details() {
     .expect_err("overlapping fields must be rejected");
     assert!(matches!(
         error,
-        SemanticErrorKind::PackFieldOverlap { field, other, start: 3, end: 4, .. }
+        SemanticErrorKind::PackLayout(PackLayoutError::PackFieldOverlap { field, other, start: 3, end: 4, .. })
             if field == "second" && other == "first"
     ));
 }
@@ -258,7 +261,7 @@ fn rejects_pack_fields_beyond_storage_capacity() {
     .expect_err("out-of-bounds fields must be rejected");
     assert!(matches!(
         error,
-        SemanticErrorKind::PackFieldOutOfBounds { field, offset: 4, width: 5, capacity: 8, .. }
+        SemanticErrorKind::PackLayout(PackLayoutError::PackFieldOutOfBounds { field, offset: 4, width: 5, capacity: 8, .. })
             if field == "second"
     ));
 }
@@ -269,7 +272,10 @@ fn rejects_uncovered_bits_without_reserved_field() {
         "pack Control { erg storage: u8; layout little; fields { erg first: u3 at 0; abs second: u4 at 4; } }",
     )
     .expect_err("gaps must require an explicit reserved field");
-    assert!(matches!(error, SemanticErrorKind::PackUncoveredBits { start: 3, end: 4, .. }));
+    assert!(matches!(
+        error,
+        SemanticErrorKind::PackLayout(PackLayoutError::PackUncoveredBits { start: 3, end: 4, .. })
+    ));
 }
 
 #[test]

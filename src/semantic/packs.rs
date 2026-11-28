@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::analyzer::Analyzer;
-use super::errors::{SemanticError, SemanticErrorKind};
+use super::errors::{PackLayoutError, SemanticError, SemanticErrorKind};
 use super::model::{PackFieldContract, PackLayoutContract};
 use crate::ast::{
     BinaryOp, Expr, PackDecl, PackField, PackStorage, PrimitiveType, Program, Role, TopLevelDecl,
@@ -174,10 +174,10 @@ fn validate_pack(pack: &PackDecl) -> Result<PackLayoutContract, SemanticError> {
     let (coverage, reserved) = validate_pack_fields(pack, capacity)?;
     validate_full_coverage(pack, &coverage, &reserved)?;
     let storage_bytes = pack.storage.byte_capacity().ok_or_else(|| SemanticError {
-        kind: SemanticErrorKind::InvalidPackStorage {
+        kind: SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackStorage {
             pack: pack.name.clone(),
             ty: pack.storage.type_name().name.clone(),
-        },
+        }),
         span: pack.storage.span(),
     })?;
     let fields = pack
@@ -262,13 +262,13 @@ fn validate_pack_overlap(
         return Ok(());
     };
     Err(SemanticError {
-        kind: SemanticErrorKind::PackFieldOverlap {
+        kind: SemanticErrorKind::PackLayout(PackLayoutError::PackFieldOverlap {
             pack: pack.name.clone(),
             field: field.name.clone(),
             other,
             start,
             end: overlap_end,
-        },
+        }),
         span: field.span,
     })
 }
@@ -278,19 +278,19 @@ fn storage_capacity(pack: &PackDecl) -> Result<u16, SemanticError> {
         if primitive_type(&element.name) != Some(PrimitiveType::Integer { signed: false, width: 8 })
         {
             return Err(SemanticError {
-                kind: SemanticErrorKind::InvalidPackStorage {
+                kind: SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackStorage {
                     pack: pack.name.clone(),
                     ty: element.name.clone(),
-                },
+                }),
                 span: pack.storage.span(),
             });
         }
         let bits = capacity.checked_mul(8).filter(|bits| *bits > 0 && *bits <= u64::from(u16::MAX));
         return bits.map(|bits| bits as u16).ok_or_else(|| SemanticError {
-            kind: SemanticErrorKind::InvalidPackStorage {
+            kind: SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackStorage {
                 pack: pack.name.clone(),
                 ty: format!("Array[u8, {capacity}]"),
-            },
+            }),
             span: pack.storage.span(),
         });
     }
@@ -301,10 +301,10 @@ fn storage_capacity(pack: &PackDecl) -> Result<u16, SemanticError> {
             Ok(width as u16)
         }
         _ => Err(SemanticError {
-            kind: SemanticErrorKind::InvalidPackStorage {
+            kind: SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackStorage {
                 pack: pack.name.clone(),
                 ty: pack.storage.type_name().name.clone(),
-            },
+            }),
             span: pack.storage.span(),
         }),
     }
@@ -338,24 +338,24 @@ fn indexed_field_count(field: &PackField) -> Option<u32> {
 
 fn invalid_pack_field_type(pack: &PackDecl, field: &PackField) -> SemanticError {
     SemanticError {
-        kind: SemanticErrorKind::InvalidPackFieldType {
+        kind: SemanticErrorKind::PackLayout(PackLayoutError::InvalidPackFieldType {
             pack: pack.name.clone(),
             field: field.name.clone(),
             ty: field.ty.name.clone(),
-        },
+        }),
         span: field.ty.span,
     }
 }
 
 fn out_of_bounds(pack: &PackDecl, field: &PackField, width: u16, capacity: u16) -> SemanticError {
     SemanticError {
-        kind: SemanticErrorKind::PackFieldOutOfBounds {
+        kind: SemanticErrorKind::PackLayout(PackLayoutError::PackFieldOutOfBounds {
             pack: pack.name.clone(),
             field: field.name.clone(),
             offset: field.offset,
             width,
             capacity,
-        },
+        }),
         span: field.span,
     }
 }
@@ -381,7 +381,11 @@ fn validate_full_coverage(
             .any(|(reserved_start, reserved_end)| *reserved_start <= start && *reserved_end >= end)
         {
             return Err(SemanticError {
-                kind: SemanticErrorKind::PackUncoveredBits { pack: pack.name.clone(), start, end },
+                kind: SemanticErrorKind::PackLayout(PackLayoutError::PackUncoveredBits {
+                    pack: pack.name.clone(),
+                    start,
+                    end,
+                }),
                 span: pack.span,
             });
         }

@@ -1,3 +1,5 @@
+use super::PackLayoutError;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SemanticErrorKind {
     DuplicateBinding {
@@ -465,34 +467,8 @@ pub enum SemanticErrorKind {
         borrow_ids: Vec<usize>,
     },
     MissingReturnValue,
-    InvalidPackStorage {
-        pack: String,
-        ty: String,
-    },
-    InvalidPackFieldType {
-        pack: String,
-        field: String,
-        ty: String,
-    },
-    PackFieldOutOfBounds {
-        pack: String,
-        field: String,
-        offset: u16,
-        width: u16,
-        capacity: u16,
-    },
-    PackFieldOverlap {
-        pack: String,
-        field: String,
-        other: String,
-        start: u16,
-        end: u16,
-    },
-    PackUncoveredBits {
-        pack: String,
-        start: u16,
-        end: u16,
-    },
+    /// A pack declaration whose storage, field types or bit layout is invalid.
+    PackLayout(PackLayoutError),
     InvalidSerializationContract {
         contract: String,
         reason: String,
